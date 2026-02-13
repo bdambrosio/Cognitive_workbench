@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-Zenoh Character Launcher
+Cognitive Workbench Launcher
 
-This script launches multiple character instances with their respective nodes.
-Each character gets its own situation_node and executive_node.
+Loads a scenario YAML, creates a shared SGLang runtime (if configured),
+and runs each character as a thread sharing that runtime.
+Shared services (FastAPI UI, resource browser) remain subprocesses.
 """
 
 import subprocess
+import threading
 import time
 import signal
 import sys
@@ -16,450 +18,438 @@ import logging
 import yaml
 import os
 from pathlib import Path
-from typing import Dict, List, Any
-from dataclasses import dataclass
+from typing import Dict, List, Any, Optional
 
 
-@dataclass
-class CharacterInstance:
-    """Represents a character instance with its processes."""
-    name: str
-    config: Dict[str, Any]
-    processes: List[subprocess.Popen] = None
-    
-    def __post_init__(self):
-        if self.processes is None:
-            self.processes = []
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+
+_debug_env = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on')
+
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO if _debug_env else logging.WARNING)
+
+file_handler = logging.FileHandler('logs/character_launcher.log', mode='w')
+file_handler.setLevel(logging.INFO)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[console_handler, file_handler],
+    force=True
+)
+logger = logging.getLogger('launcher')
 
 
-class CharacterLauncher:
-    """Manages launching and monitoring character instances."""
-    
-    def __init__(self):
-        self.characters: List[CharacterInstance] = []
-        self.shared_processes: List[subprocess.Popen] = []
-        self.running = True
-        self.zenoh_session = None
-        
-        # Configure logging
-        # Console handler with WARNING level (less verbose)
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(logging.WARNING)
+# ---------------------------------------------------------------------------
+# YAML parsing
+# ---------------------------------------------------------------------------
 
-        # Raise console verbosity when CWB_DEBUG is set
-        _debug_env = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on')
-        if _debug_env:
-            console_handler.setLevel(logging.INFO)
-        
-        # File handler with INFO level (full logging)
-        file_handler = logging.FileHandler('logs/character_launcher.log', mode='w')
-        file_handler.setLevel(logging.INFO)
-        
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S',
-            handlers=[console_handler, file_handler],
-            force=True
-        )
-        self.logger = logging.getLogger('character_launcher')
-        if _debug_env:
-            self.logger.info('🔧 Debug mode enabled for Launcher (console INFO)')
-        
-        # Register signal handlers for graceful shutdown
-        signal.signal(signal.SIGTERM, self._signal_handler)
-        signal.signal(signal.SIGINT, self._signal_handler)
-        
-        # Initialize Zenoh session and subscribe to shutdown requests
-        try:
-            import zenoh
-            config = zenoh.Config()
-            self.zenoh_session = zenoh.open(config)
-            # Listen for centralized shutdown requests
-            self.zenoh_session.declare_subscriber(
-                "cognitive/launcher/shutdown",
-                self._shutdown_request_callback
-            )
-            # Publisher for ready signal
-            self.ready_publisher = self.zenoh_session.declare_publisher("cognitive/launcher/ready")
-            self.logger.info('✅ Launcher subscribed to cognitive/launcher/shutdown and ready to publish ready signal')
-        except Exception as e:
-            self.logger.warning(f'⚠️  Could not initialize Zenoh in launcher for shutdown subscription: {e}')
-    
-    def _signal_handler(self, signum, frame):
-        """Handle shutdown signals gracefully."""
-        self.logger.info(f'Received signal {signum}, initiating shutdown...')
-        self.running = False
-
-    def _shutdown_request_callback(self, sample):
-        """Handle shutdown request published by UI or other controller."""
-        try:
-            payload = sample.payload.to_bytes().decode('utf-8')
-            self.logger.warning(f'Received shutdown request via Zenoh: {payload}')
-        except Exception:
-            self.logger.warning('Received shutdown request via Zenoh')
-        # Trigger graceful shutdown
-        self.running = False
-        self.shutdown()
-    
-    def add_character(self, name: str, config: Dict[str, Any]):
-        """Add a character to be launched."""
-        canonical_name = name.capitalize()
-        character = CharacterInstance(name=canonical_name, config=config)
-        self.characters.append(character)
-        self.logger.info(f'Added character: {canonical_name}')
-    
-    def launch_shared_services(self, world_name: str = None, launch_ui: bool = False, launch_resource_browser: bool = False, ui_port: int = 3000, setting: str = None, scenario_name: str = None):
-        """Launch shared services (map node, optional UI, optional resource browser)."""
-        self.logger.info('Launching shared services...')
-        world_label = world_name or scenario_name or 'infospace'
-        
-        # Launch FastAPI Action Display Node (optional UI)
-        if launch_ui:
-            try:
-                ui_args = [sys.executable, 'fastapi_action_display.py', '--port', str(ui_port)]
-                if scenario_name:
-                    ui_args.extend(['--scenario', scenario_name])
-                ui_process = subprocess.Popen(ui_args)
-                self.shared_processes.append(ui_process)
-                self.logger.info(f'✅ FastAPI Action Display Node launched on port {ui_port}')
-                self.logger.info(f'   - Web UI available at: http://localhost:{ui_port}')
-            except Exception as e:
-                self.logger.error(f'❌ Failed to launch FastAPI Action Display Node: {e}')
-        
-        # Launch Resource Browser (optional debug tool)
-        if launch_resource_browser:
-            try:
-                browser_args = [sys.executable, 'resource_browser.py', '--map', world_label, '--port', '3001', '--no-browser']
-                browser_process = subprocess.Popen(browser_args)
-                self.shared_processes.append(browser_process)
-                self.logger.info(f'✅ Resource Browser launched on port 3001')
-                self.logger.info(f'   - Access via button in Action Display UI')
-            except Exception as e:
-                self.logger.error(f'❌ Failed to launch Resource Browser: {e}')
-                
-        
-        # Resource management handled by executive_node
-        self.logger.info(f'✅ Resource management handled by executive_node (world: {world_label})')
-    
-    def launch_character(self, character: CharacterInstance):
-        """Launch all nodes for a specific character."""
-        self.logger.info(f'Launching character: {character.name}')
-
-    
-        
-                
-        # Launch executive_node for this character (needs memory, situation, and agenda)
-        _src_dir = str(Path(__file__).resolve().parent)
-        _env = os.environ.copy()
-        _env.setdefault('PYTHONPATH', _src_dir)
-        if _src_dir not in _env.get('PYTHONPATH', '').split(os.pathsep):
-            _env['PYTHONPATH'] = os.pathsep.join([_src_dir, _env.get('PYTHONPATH', '')])
-        try:
-            executive_process = subprocess.Popen([
-                sys.executable, 'executive_node.py',
-                '-c', character.name,
-                '-config', json.dumps(character.config)
-            ], cwd=_src_dir, env=_env)
-            character.processes.append(executive_process)
-            self.logger.info(f'✅ {character.name} executive_node launched')
-        except Exception as e:
-            self.logger.error(f'❌ Failed to launch {character.name} executive_node: {e}')
-    
-    def launch_all_characters(self, world_name: str = None, launch_ui: bool = False, launch_resource_browser: bool = False, ui_port: int = 3000, setting: str = None, scenario_name: str = None):
-        """Launch all character instances."""
-        self.logger.info(f'Launching {len(self.characters)} characters...')
-        
-        world_label = world_name or scenario_name or 'infospace'
-        
-        # Add infospace flag and map name to all character configs
-        for character in self.characters:
-            character.config['is_infospace'] = True
-            character.config['map_name'] = world_label
-        
-        # Launch shared services first
-        self.launch_shared_services(world_name, launch_ui, launch_resource_browser, ui_port, setting, scenario_name)
-        time.sleep(2)  # Give shared services time to start
-        
-        # Launch each character
-        for character in self.characters:
-            self.launch_character(character)
-            time.sleep(1)  # Small delay between characters
-        
-        self.logger.info('✅ All characters launched')
-        
-        # Publish ready signal with character count
-        try:
-            ready_message = {
-                'status': 'ready',
-                'character_count': len(self.characters),
-                'timestamp': time.time()
-            }
-            self.ready_publisher.put(json.dumps(ready_message))
-            self.logger.info(f'🚀 Published ready signal: {len(self.characters)} characters active')
-        except Exception as e:
-            self.logger.error(f'❌ Failed to publish ready signal: {e}')
-    
-    def monitor_processes(self):
-        """Monitor running processes and restart if needed."""
-        self.logger.info('Monitoring processes...')
-        
-        while self.running:
-            # Track if anything is still alive
-            any_alive = False
-
-            # Check shared processes
-            for i, process in enumerate(self.shared_processes):
-                if process.poll() is None:
-                    any_alive = True
-                else:
-                    self.logger.warning(f'Shared process {i} has stopped')
-            
-            # Check character processes
-            for character in self.characters:
-                for i, process in enumerate(character.processes):
-                    if process.poll() is None:
-                        any_alive = True
-                    else:
-                        self.logger.warning(f'{character.name} process {i} has stopped')
-
-            # If everything has stopped, end monitoring loop
-            if not any_alive:
-                self.logger.info('All child processes have exited; stopping monitor loop')
-                break
-
-            time.sleep(5)  # Check every 5 seconds
-    
-    def shutdown(self):
-        """Gracefully shutdown all processes using standard Zenoh pattern."""
-        self.logger.info('🛑 Initiating graceful shutdown...')
-        
-        # Stop monitoring
-        self.running = False
-        
-        # Step 1: Send SIGTERM to ALL processes (they handle shutdown themselves)
-        all_processes = []
-        
-        # Collect all character processes
-        for character in self.characters:
-            for process in character.processes:
-                all_processes.append((f'{character.name}', process))
-        
-        # Collect all shared processes
-        for process in self.shared_processes:
-            all_processes.append(('shared', process))
-        
-        # Send SIGTERM to all processes simultaneously
-        self.logger.info(f'📨 Sending SIGTERM to {len(all_processes)} processes...')
-        for name, process in all_processes:
-            try:
-                process.terminate()
-                self.logger.info(f'  ✉️  SIGTERM sent to {name} process {process.pid}')
-            except Exception as e:
-                self.logger.error(f'  ❌ Error sending SIGTERM to {name} process {process.pid}: {e}')
-        
-        # Step 2: Wait for graceful shutdown (standard timeout)
-        shutdown_timeout = 5  # 5 seconds total
-        self.logger.info(f'⏳ Waiting up to {shutdown_timeout}s for graceful shutdown...')
-        
-        start_time = time.time()
-        while time.time() - start_time < shutdown_timeout:
-            alive_processes = [p for _, p in all_processes if p.poll() is None]
-            if not alive_processes:
-                self.logger.info('✅ All processes shut down gracefully')
-                return
-            
-            time.sleep(1)  # Check every second
-            elapsed = int(time.time() - start_time)
-            if elapsed % 5 == 0:  # Log every 5 seconds
-                self.logger.warning(f'  ⏰ {len(alive_processes)} processes still running after {elapsed}s...')
-        
-        # Step 3: Force kill any remaining processes
-        remaining_processes = [(name, p) for name, p in all_processes if p.poll() is None]
-        if remaining_processes:
-            self.logger.warning(f'⚠️  Force killing {len(remaining_processes)} unresponsive processes...')
-            for name, process in remaining_processes:
-                try:
-                    process.kill()
-                    self.logger.warning(f'  💀 Force killed {name} process {process.pid}')
-                except Exception as e:
-                    self.logger.error(f'  ❌ Error force killing {name} process {process.pid}: {e}')
-        
-        self.logger.info('✅ Shutdown complete')
-        # Close zenoh session if present
-        try:
-            if self.zenoh_session is not None:
-                self.zenoh_session.close()
-        except Exception:
-            pass
+def load_scenario(config_file: str) -> dict:
+    """Load and return the full scenario dict from a YAML file."""
+    config_path = os.path.join('../scenarios', config_file)
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f)
 
 
-def main():
-    """Main entry point for the launcher."""
-    parser = argparse.ArgumentParser(description='Zenoh Cognitive Workbench Launcher')
-    parser.add_argument('config_file', help='YAML configuration file with character and LLM settings')
-    parser.add_argument('--characters', nargs='+', help='Character names to launch (overrides config file)')
-    parser.add_argument('--list-only', action='store_true', help='List available characters and exit')
-    parser.add_argument('--ui', action='store_true', help='Launch FastAPI web UI')
-    parser.add_argument('--ui-port', type=int, default=3000, help='Port for FastAPI web UI (default: 3000)')
-    parser.add_argument('--resource-browser', action='store_true', help='Launch Resource Browser for debugging (port 3001)')
-    parser.add_argument('--scenario-id', type=str, default=None, help='Optional scenario identifier (forwarded, not used yet)')
-    parser.add_argument('--debug', action='store_true', help='Enable debug mode (disables map turn timeout)')
-    
-    args = parser.parse_args()
-    
-    launcher = CharacterLauncher()
-    # Propagate debug mode to environment (read by map_node)
-    if args.debug:
-        os.environ['CWB_DEBUG'] = '1'
-        launcher.logger.warning('Debug mode enabled: map_node will disable turn timeout')
-    
-    # Load configuration from file
-    try:
-        # Assume config files are in scenarios subdirectory
-        config_path = os.path.join('../scenarios', args.config_file)
-        with open(config_path, 'r') as f:
-            config_data = yaml.safe_load(f)
-        
-        # Extract scenario name from config filename (e.g., "laTerre.yaml" -> "laTerre")
-        scenario_name = Path(args.config_file).stem
-        
-        # Extract LLM configuration (still needed by executive_node for SGLang)
-        llm_config = config_data.get('llm_config', {})
-        
-        # Extract world configuration (if present) - generalized for any external world API
-        world_config = config_data.get('world_config', {})
-        world_name = world_config.get('world_name') if world_config else None
-        
-        setting = config_data.get('setting', {})
-        # Optional: scenario-level max_turns (documented in YAML; can be commented out with #)
-        max_turns_yaml = config_data.get('max_turns', None)
-        if max_turns_yaml is not None:
-            try:
-                os.environ['CWB_MAX_TURNS'] = str(int(max_turns_yaml))
-            except Exception:
-                pass
+def parse_characters(config_data: dict, llm_config: dict, world_config: dict, setting) -> List[Dict[str, Any]]:
+    """Return a list of (name, config) tuples from the YAML characters section."""
+    characters_config = config_data.get('characters', [])
+    ontology = config_data.get('Ontology', False)
+    activities = config_data.get('Activities', False)
+    result = []
 
-        # Extract characters configuration
-        characters_config = config_data.get('characters', [])
-        ontology = config_data.get('Ontology', False)
-        activities = config_data.get('Activities', False)
-        if isinstance(characters_config, dict):
-            # Handle dict format: character_name: config
-            for name, config in characters_config.items():
-                new_config = config.copy()
+    if isinstance(characters_config, dict):
+        for name, config in characters_config.items():
+            new_config = config.copy()
+            new_config['ontology'] = ontology
+            new_config['activities'] = activities
+            new_config['characters'] = characters_config.copy()
+            new_config['llm_config'] = llm_config
+            new_config['world_config'] = world_config
+            new_config['setting'] = setting
+            result.append((name.capitalize(), new_config))
+    elif isinstance(characters_config, list):
+        for char_config in characters_config:
+            if isinstance(char_config, dict):
+                name = char_config.get('name', f'character_{len(result)}')
+                new_config = {k: v for k, v in char_config.items() if k != 'name'}
                 new_config['ontology'] = ontology
                 new_config['activities'] = activities
-                new_config['characters'] = characters_config.copy()
+                new_config['characters'] = characters_config
                 new_config['llm_config'] = llm_config
                 new_config['world_config'] = world_config
                 new_config['setting'] = setting
-                launcher.add_character(name, new_config)
-        elif isinstance(characters_config, list):
-            # Handle list format: [{'name': 'Alice', ...}, ...]
-            for char_config in characters_config:
-                new_config = char_config.copy()
-                if isinstance(char_config, dict):
-                    name = char_config.get('name', f'character_{len(launcher.characters)}')
-                    new_config = {k: v for k, v in char_config.items() if k != 'name'}
-                    new_config['ontology'] = ontology
-                    new_config['activities'] = activities
-                    new_config['characters'] = characters_config
-                    new_config['llm_config'] = llm_config
-                    new_config['world_config'] = world_config
-                    new_config['setting'] = setting
-                    launcher.add_character(name, new_config)
-        
-    except Exception as e:
-        print(f"Error loading config file '{config_path}': {e}")
+                result.append((name.capitalize(), new_config))
+    return result
+
+
+# ---------------------------------------------------------------------------
+# World data cleanup (interactive, runs before launch)
+# ---------------------------------------------------------------------------
+
+def maybe_clean_world_data(world_name: str, character_names: List[str]):
+    """Prompt user to reuse or delete existing world data."""
+    world_file = Path(f"data/world/{world_name}_world.json")
+    if not world_file.exists():
         return
-    
-    # Add characters from command line if provided
-    if args.characters:
-        for name in args.characters:
-            launcher.add_character(name, {})
-    
-    # If no characters specified, add some defaults
-    if not launcher.characters:
-        launcher.add_character('default', {})
-        launcher.add_character('samantha', {})
-    
-    if args.list_only:
-        print("Available characters:")
-        for character in launcher.characters:
-            print(f"  - {character.name}")
+
+    print(f"\nFound existing world data for '{world_name}'")
+    reuse = input("Reuse existing world? (y/n): ").strip().lower()
+    if reuse not in ['n', 'no']:
+        print(f"Reusing existing world '{world_name}'")
         return
-    
+
+    confirm = input("Are you sure you want to delete existing world data and create new? (y/n): ").strip().lower()
+    if confirm != 'y':
+        print(f"Reusing existing world '{world_name}'")
+        return
+
+    print("Creating new world...")
     try:
-        # Use world_name from world_config as authoritative, fallback to scenario_name
-        final_world_name = world_name or scenario_name or 'infospace'
-        world_file = Path(f"data/world/{final_world_name}_world.json")
+        world_file.unlink()
+        print(f"Removed existing world data for '{world_name}'")
+    except Exception as e:
+        print(f"Failed to remove existing world data: {e}")
 
-        if world_file.exists():
-            print(f"\nFound existing world data for '{final_world_name}'")
-            reuse = input("Reuse existing world? (y/n): ").strip().lower()
-            if reuse in ['n', 'no']:
-                confirm_delete = input("Are you sure you want to delete existing world data and create new? (y/n): ").strip().lower()
-                if confirm_delete == 'y':
-                    print("Creating new world...")
+    data_dir = Path("data")
+    if not data_dir.exists():
+        return
+
+    for subdir, suffix in [("memory", "_memory.json"), ("situation", "_situation.json")]:
+        target_dir = data_dir / subdir
+        if target_dir.exists():
+            for f in target_dir.glob(f"*{suffix}"):
+                char_name = f.stem.replace(suffix.replace('.json', ''), '')
+                if char_name in character_names:
                     try:
-                        world_file.unlink()
-                        print(f"Removed existing world data for '{final_world_name}'")
-                    except Exception as e:
-                        print(f"Failed to remove existing world data: {e}")
-                    
-                    data_dir = Path("data")
-                    if data_dir.exists():
-                        character_names = [char.name for char in launcher.characters]
-                        
-                        memory_dir = data_dir / "memory"
-                        if memory_dir.exists():
-                            for mem_file in memory_dir.glob("*_memory.json"):
-                                char_name = mem_file.stem.replace('_memory', '')
-                                if char_name in character_names:
-                                    try:
-                                        mem_file.unlink()
-                                        print(f"Removed existing memory data: {mem_file.name}")
-                                    except Exception:
-                                        pass
-                        
-                        situation_dir = data_dir / "situation"
-                        if situation_dir.exists():
-                            for sit_file in situation_dir.glob("*_situation.json"):
-                                char_name = sit_file.stem.replace('_situation', '')
-                                if char_name in character_names:
-                                    try:
-                                        sit_file.unlink()
-                                        print(f"Removed existing situation data: {sit_file.name}")
-                                    except Exception:
-                                        pass
-                        
-                        rag_stores_dir = data_dir / "rag_stores"
-                        if rag_stores_dir.exists():
-                            for char_name in character_names:
-                                char_rag_dir = rag_stores_dir / char_name
-                                if char_rag_dir.exists():
-                                    try:
-                                        import shutil
-                                        shutil.rmtree(char_rag_dir)
-                                        print(f"Removed existing RAG store: {char_name}")
-                                    except Exception as e:
-                                        print(f"Failed to remove RAG store for {char_name}: {e}")
-                else:
-                    print(f"Reusing existing world '{final_world_name}'")
-            else:
-                print(f"Reusing existing world '{final_world_name}'")
+                        f.unlink()
+                        print(f"Removed {f.name}")
+                    except Exception:
+                        pass
 
-        launcher.launch_all_characters(world_name, args.ui, args.resource_browser, ui_port=args.ui_port, setting=setting, scenario_name=scenario_name)
-        
-        # Monitor processes
-        launcher.monitor_processes()
-        
+    rag_dir = data_dir / "rag_stores"
+    if rag_dir.exists():
+        import shutil
+        for char_name in character_names:
+            char_rag = rag_dir / char_name
+            if char_rag.exists():
+                try:
+                    shutil.rmtree(char_rag)
+                    print(f"Removed RAG store: {char_name}")
+                except Exception as e:
+                    print(f"Failed to remove RAG store for {char_name}: {e}")
+
+
+# ---------------------------------------------------------------------------
+# SGLang runtime factory
+# ---------------------------------------------------------------------------
+
+def create_sglang_runtime(llm_config: dict):
+    """Create and return (runtime, tokenizer) or (None, None) if SGLang unavailable."""
+    sgl_model_path = llm_config.get('sgl_model_path')
+    if not sgl_model_path:
+        return None, None
+
+    try:
+        import sglang as sgl
+        from transformers import AutoTokenizer
+    except ImportError:
+        logger.warning("SGLang not available - skipping runtime creation")
+        return None, None
+
+    try:
+        logger.info(f"Initializing SGLang Runtime with model: {sgl_model_path}")
+        tokenizer = AutoTokenizer.from_pretrained(sgl_model_path)
+
+        if sgl_model_path.startswith("allenai/Olmo-3"):
+            runtime = sgl.Runtime(model_path=sgl_model_path, context_length=32768, cuda_graph_max_bs=4, tp_size=1, mem_fraction_static=0.82, attention_backend="triton")
+        elif 'FP8' in sgl_model_path:
+            logger.info("Initializing SGLang Runtime with FP8 patch")
+            runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, dtype="auto", tp_size=1, mem_fraction_static=0.9, fp8_gemm_runner_backend="triton", attention_backend="flashinfer")
+        else:
+            runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, dtype="auto", tp_size=1, mem_fraction_static=0.9, attention_backend="flashinfer")
+
+        sgl.set_default_backend(runtime)
+        logger.info(f"SGLang Runtime initialized (model={sgl_model_path})")
+        return runtime, tokenizer
+    except Exception as e:
+        logger.error(f"Failed to initialize SGLang Runtime: {e}")
+        return None, None
+
+
+def start_api_server(runtime, model_path: str, port: int = 5000):
+    """Start the OpenAI-compatible API server on a daemon thread. Returns server or None."""
+    if runtime is None:
+        return None
+    try:
+        from sglang_api_server import SGLangAPIServer
+        server = SGLangAPIServer(runtime=runtime, model_path=model_path, port=port)
+        server.start()
+        logger.info(f"OpenAI-compatible API server started on port {port}")
+        return server
+    except Exception as e:
+        logger.warning(f"Failed to start API server: {e}")
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Shared-service subprocess helpers
+# ---------------------------------------------------------------------------
+
+def launch_ui(scenario_name: str, port: int) -> Optional[subprocess.Popen]:
+    try:
+        args = [sys.executable, 'fastapi_action_display.py', '--port', str(port)]
+        if scenario_name:
+            args.extend(['--scenario', scenario_name])
+        proc = subprocess.Popen(args)
+        logger.info(f"FastAPI UI launched on port {port}  http://localhost:{port}")
+        return proc
+    except Exception as e:
+        logger.error(f"Failed to launch FastAPI UI: {e}")
+        return None
+
+
+def launch_resource_browser(world_label: str) -> Optional[subprocess.Popen]:
+    try:
+        proc = subprocess.Popen([sys.executable, 'resource_browser.py', '--map', world_label, '--port', '3001', '--no-browser'])
+        logger.info("Resource Browser launched on port 3001")
+        return proc
+    except Exception as e:
+        logger.error(f"Failed to launch Resource Browser: {e}")
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Agent thread
+# ---------------------------------------------------------------------------
+
+def run_agent(name: str, config: dict, runtime, tokenizer, shutdown_event: threading.Event):
+    """Entry point for each character thread.
+    
+    The node's OODA loop checks node.shutdown_requested. We monitor the
+    shared shutdown_event and propagate it to the node.
+    """
+    node = None
+    try:
+        from executive_node import ZenohExecutiveNode
+        logger.info(f"Starting agent thread: {name}")
+        node = ZenohExecutiveNode(character_name=name, character_config=config, runtime=runtime, tokenizer=tokenizer)
+        # Start a tiny daemon thread that propagates the shared event to this node
+        def _watch_shutdown():
+            shutdown_event.wait()
+            if node:
+                node.shutdown_requested = True
+        watcher = threading.Thread(target=_watch_shutdown, daemon=True)
+        watcher.start()
+
+        # Run the OODA loop (blocks until node.shutdown_requested becomes True)
+        node.run()
+    except Exception as e:
+        logger.error(f"Agent {name} crashed: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def main():
+    parser = argparse.ArgumentParser(description='Cognitive Workbench Launcher')
+    parser.add_argument('config_file', help='YAML configuration file (in scenarios/)')
+    parser.add_argument('--characters', nargs='+', help='Override which characters to launch')
+    parser.add_argument('--list-only', action='store_true', help='List characters and exit')
+    parser.add_argument('--ui', action='store_true', help='Launch FastAPI web UI')
+    parser.add_argument('--ui-port', type=int, default=3000, help='Port for web UI (default: 3000)')
+    parser.add_argument('--resource-browser', action='store_true', help='Launch Resource Browser (port 3001)')
+    parser.add_argument('--debug', action='store_true', help='Enable debug mode')
+    args = parser.parse_args()
+
+    if args.debug:
+        os.environ['CWB_DEBUG'] = '1'
+
+    # ---- Load scenario ----
+    try:
+        config_data = load_scenario(args.config_file)
+    except Exception as e:
+        print(f"Error loading config: {e}")
+        return
+
+    scenario_name = Path(args.config_file).stem
+    llm_config = config_data.get('llm_config', {})
+    world_config = config_data.get('world_config', {})
+    world_name = (world_config.get('world_name') if world_config else None) or scenario_name or 'infospace'
+    setting = config_data.get('setting', {})
+
+    # Optional max_turns
+    max_turns = config_data.get('max_turns')
+    if max_turns is not None:
+        os.environ['CWB_MAX_TURNS'] = str(int(max_turns))
+
+    # ---- Parse characters ----
+    characters = parse_characters(config_data, llm_config, world_config, setting)
+
+    # Command-line override
+    if args.characters:
+        characters = [(n.capitalize(), {}) for n in args.characters]
+
+    if not characters:
+        print("No characters defined in scenario")
+        return
+
+    # Add infospace flag and map name
+    for _name, cfg in characters:
+        cfg['is_infospace'] = True
+        cfg['map_name'] = world_name
+
+    if args.list_only:
+        print("Characters:")
+        for name, _ in characters:
+            print(f"  - {name}")
+        return
+
+    # ---- World data cleanup ----
+    maybe_clean_world_data(world_name, [n for n, _ in characters])
+
+    # ---- Shared SGLang runtime ----
+    runtime, tokenizer = create_sglang_runtime(llm_config)
+    api_server = start_api_server(runtime, llm_config.get('sgl_model_path', ''))
+
+    # ---- Shared services (subprocesses) ----
+    service_procs: List[subprocess.Popen] = []
+    if args.ui:
+        proc = launch_ui(scenario_name, args.ui_port)
+        if proc:
+            service_procs.append(proc)
+    if args.resource_browser:
+        proc = launch_resource_browser(world_name)
+        if proc:
+            service_procs.append(proc)
+
+    if service_procs:
+        # Wait for UI to be healthy before launching agents (announcements need a listener)
+        if args.ui:
+            import urllib.request
+            ui_url = f"http://localhost:{args.ui_port}/api/characters"
+            for attempt in range(30):
+                try:
+                    urllib.request.urlopen(ui_url, timeout=1)
+                    logger.info(f"UI is healthy (attempt {attempt + 1})")
+                    break
+                except Exception:
+                    time.sleep(1)
+            else:
+                logger.warning("UI did not become healthy in 30s, launching agents anyway")
+        else:
+            time.sleep(2)
+
+    # ---- Zenoh ready signal ----
+    zenoh_session = None
+    try:
+        import zenoh
+        zenoh_session = zenoh.open(zenoh.Config())
+        ready_pub = zenoh_session.declare_publisher("cognitive/launcher/ready")
+        ready_pub.put(json.dumps({'status': 'ready', 'character_count': len(characters), 'timestamp': time.time()}))
+        logger.info(f"Published ready signal: {len(characters)} characters")
+    except Exception as e:
+        logger.warning(f"Could not publish ready signal: {e}")
+
+    # ---- Launch agent threads ----
+    shutdown_event = threading.Event()
+    threads: List[threading.Thread] = []
+    for name, config in characters:
+        t = threading.Thread(target=run_agent, args=(name, config, runtime, tokenizer, shutdown_event), name=f"agent-{name}", daemon=True)
+        t.start()
+        threads.append(t)
+        time.sleep(0.5)  # Small stagger
+
+    logger.info(f"All {len(threads)} agent threads started")
+
+    # ---- Wait for shutdown ----
+    def _signal_handler(signum, frame):
+        logger.info(f"Received signal {signum}, shutting down...")
+        shutdown_event.set()
+
+    signal.signal(signal.SIGTERM, _signal_handler)
+    signal.signal(signal.SIGINT, _signal_handler)
+
+    # Also listen for Zenoh shutdown requests
+    if zenoh_session:
+        def _zenoh_shutdown(sample):
+            logger.warning("Received shutdown request via Zenoh")
+            shutdown_event.set()
+        zenoh_session.declare_subscriber("cognitive/launcher/shutdown", _zenoh_shutdown)
+
+    try:
+        # Block until shutdown requested
+        while not shutdown_event.is_set():
+            # Check if all agent threads have exited on their own
+            if all(not t.is_alive() for t in threads):
+                logger.info("All agent threads have exited")
+                break
+            time.sleep(1)
     except KeyboardInterrupt:
-        print('\nReceived interrupt signal')
-    finally:
-        launcher.shutdown()
-        os._exit(0)
+        shutdown_event.set()
+
+    # ---- Graceful shutdown ----
+    logger.info("Shutting down...")
+    shutdown_event.set()
+
+    # Also publish Zenoh shutdown so nodes exit their OODA loops
+    if zenoh_session:
+        try:
+            zenoh_session.put("cognitive/shutdown/executive", json.dumps({"source": "launcher"}).encode('utf-8'))
+        except Exception:
+            pass
+
+    # Wait for agent threads
+    for t in threads:
+        t.join(timeout=10)
+        if t.is_alive():
+            logger.warning(f"Agent thread {t.name} did not exit in time")
+
+    # Stop API server
+    if api_server:
+        try:
+            api_server.stop()
+        except Exception:
+            pass
+
+    # Terminate service subprocesses
+    for proc in service_procs:
+        try:
+            proc.terminate()
+        except Exception:
+            pass
+    for proc in service_procs:
+        try:
+            proc.wait(timeout=5)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+
+    # Shutdown SGLang runtime
+    if runtime:
+        try:
+            runtime.shutdown()
+            logger.info("SGLang Runtime shut down")
+        except Exception as e:
+            logger.warning(f"Error shutting down runtime: {e}")
+
+    # Close Zenoh
+    if zenoh_session:
+        try:
+            zenoh_session.close()
+        except Exception:
+            pass
+
+    logger.info("Shutdown complete")
+    os._exit(0)
 
 
 if __name__ == '__main__':

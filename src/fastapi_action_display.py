@@ -3304,7 +3304,7 @@ Generated: {generated_at}
         }
         
         async function sendText() {
-            let character = document.getElementById('characterInput').value;
+            let character = activeCharacter || document.getElementById('characterInput').value;
             // If no character specified, use the first (and only) character from characterTabs
             if (!character && characterTabs.size > 0) {
                 character = Array.from(characterTabs.keys())[0];

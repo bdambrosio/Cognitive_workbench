@@ -301,7 +301,7 @@ class ZenohExecutiveNode:
         
         return tools
     
-    def __init__(self, character_name="default", character_config=None):
+    def __init__(self, character_name="default", character_config=None, runtime=None, tokenizer=None):
         # Store character info (canonicalized)
         self.character_name = character_name.capitalize()
         self.character_config = character_config or {}
@@ -498,8 +498,15 @@ class ZenohExecutiveNode:
                 logger.error(f"❌ Failed to query vLLM server: {e}")
                 raise  # Fail fast
         
-        # Initialize SGLang.Runtime if available and configured (optional if vLLM is used)
-        if HAS_SGLANG and sgl_model_path:
+        # Initialize SGLang.Runtime - accept externally-provided runtime (shared across agents)
+        # or create a new one if running standalone
+        if runtime is not None:
+            # Runtime provided by launcher (shared across agent threads)
+            self.runtime = runtime
+            self.tokenizer = tokenizer if tokenizer is not None else (AutoTokenizer.from_pretrained(sgl_model_path) if sgl_model_path else None)
+            self.api_server = None  # API server managed by launcher
+            logger.info(f'🤖 Using shared SGLang Runtime for {self.character_name}')
+        elif HAS_SGLANG and sgl_model_path:
             try:
                 logger.info(f"🚀 Initializing SGLang Runtime with model: {sgl_model_path}")
                 self.tokenizer = AutoTokenizer.from_pretrained(sgl_model_path)
@@ -958,9 +965,11 @@ class ZenohExecutiveNode:
 
 
 
-        # Register signal handlers for graceful shutdown
-        signal.signal(signal.SIGTERM, self._signal_handler)
-        signal.signal(signal.SIGINT, self._signal_handler)
+        # Register signal handlers for graceful shutdown (only works in main thread)
+        import threading as _threading
+        if _threading.current_thread() is _threading.main_thread():
+            signal.signal(signal.SIGTERM, self._signal_handler)
+            signal.signal(signal.SIGINT, self._signal_handler)
 
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals gracefully."""
@@ -1046,8 +1055,8 @@ class ZenohExecutiveNode:
                         except (json.JSONDecodeError, TypeError):
                             text = content
                             source = 'console'
-                        # Unpause for explicit goals OR User text (which gets converted to goal)
-                        if text.strip().startswith('goal:') or source == 'User':
+                        # Unpause for explicit goals, User text, or messages from other agents
+                        if text.strip().startswith('goal:') or source == 'User' or source not in ('unknown', 'console'):
                             logger.info(f'🚀 Goal/User input in queue, unpausing execution')
                             self.execution_paused = False
                             self._publish_execution_state()
@@ -1813,6 +1822,16 @@ class ZenohExecutiveNode:
                     self._publish_execution_state()
                     return  # Don't process as speech
             
+            # Agent-to-agent message processing — treat like User input (create goal)
+            if source and source not in ('unknown', 'console'):
+                self._create_character_note()
+                self._add_to_conversation(f"{source} says: {clean_input}")
+                logger.info(f'📥 {self.character_name} Received message from {source}: "{goal}"')
+                self.parse_and_set_goal("", f"Respond to {source}: {goal}")
+                self.execution_paused = False
+                self._publish_execution_state()
+                return
+
             # Normal dialog processing
             logger.info(f'📥 {self.character_name} Processing text input: "{text_input}" (source: {source})')
             self.plan_just_generated = True  # Skip action execution this turn
