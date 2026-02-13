@@ -2807,6 +2807,16 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         self.executive_node.action_publisher.put(json.dumps(action_data))
         self.executive_node.action_counter += 1
         
+        # For non-User targets, also send question to target's sense_data so they actually hear it
+        if target != 'User':
+            sense_data = {
+                'timestamp': datetime.now().isoformat(),
+                'sequence_id': 0,
+                'mode': 'text',
+                'content': json.dumps({'source': self.agent_name, 'text': str(question_text)})
+            }
+            self.session.put(f"cognitive/{target}/sense_data", json.dumps(sense_data))
+        
         display_var = self._normalize_var_for_log(out_var)
         logger.info(f"❓ Ask: '{question_text}' → awaiting response for {display_var}")
         

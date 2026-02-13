@@ -2490,6 +2490,25 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                 f"Ensure the REQUEST_TOOLS list is a valid JSON list of tool names.\n"
             )
             
+            # Stage 3.2 (pre-reflection): Vision evaluation before planner reflects
+            eval_target = ""
+            if tool_name == "_code_block_":
+                if new_bindings:
+                    eval_target = list(new_bindings.keys())[-1]
+            elif tool_name in _ARTIFACT_PRODUCING_TOOLS:
+                out_var = action.get('out', '')
+                if out_var:
+                    eval_target = out_var
+            if eval_target:
+                last_eval_target = eval_target
+            if eval_target and vision_criteria:
+                logger.info(f"Step {step}: Vision eval auto-target: {eval_target} (tool={tool_name})")
+                compressed_ctx = _compress_trace(str(s))
+                vision_eval_text = _vision_eval_check(vision_criteria, eval_target, executor, compressed_context=compressed_ctx)
+                if vision_eval_text:
+                    s += user(f"VISION EVALUATION (quality check against criteria):\n{vision_eval_text}\nIf any criterion shows FAIL, consider adjusting your approach in the next step.\n")
+                    s += assistant("Noted.\n")
+            
             s += assistant(
                 "\nTHOUGHTS: "
                 + gen(f"thoughts_{step}", max_tokens=128, temperature=GEN_TEMPERATURE, stop=["\nHYPOTHESES:", "HYPOTHESES:"])
@@ -2572,26 +2591,6 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                     except Exception as e:
                         logger.debug(f"Stage 3.1: Failed to update commentary for {resource_id}: {e}")
             
-            # Stage 3.2: Vision evaluation (auto-detect from bindings)
-            eval_target = ""
-            if tool_name == "_code_block_":
-                # Code blocks don't have action['out']; use last new binding
-                if new_bindings:
-                    eval_target = list(new_bindings.keys())[-1]
-            elif tool_name in _ARTIFACT_PRODUCING_TOOLS:
-                out_var = action.get('out', '')
-                if out_var:
-                    eval_target = out_var
-            if eval_target:
-                last_eval_target = eval_target
-            if eval_target and vision_criteria:
-                logger.info(f"Step {step}: Vision eval auto-target: {eval_target} (tool={tool_name})")
-                compressed_ctx = _compress_trace(str(s))
-                vision_eval_text = _vision_eval_check(vision_criteria, eval_target, executor, compressed_context=compressed_ctx)
-                if vision_eval_text:
-                    s += user(f"VISION EVALUATION (quality check against criteria):\n{vision_eval_text}\nIf any criterion shows FAIL, consider adjusting your approach in the next step.\n")
-                    s += assistant("Noted.\n")
-            
             # Stage 3.5: Dynamic tool loading (if requested)
             requested_tools_raw = s[f"request_tools_{step}"].strip()
             requested_tools = parse_request_tools(requested_tools_raw)
@@ -2656,6 +2655,13 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                             deep_eval_continued = True
                             logger.info(f"Done gate: Deep eval found issues, continuing plan")
                             continue
+                    elif shallow_text and not deep_eval_continued and "fail" in shallow_text.lower():
+                        # Deep eval unavailable; fall back to shallow eval
+                        deep_eval_continued = True
+                        s += user(f"VISION EVALUATION (final quality gate, shallow):\n{shallow_text}\nIf any criterion shows FAIL, revise your approach.\n")
+                        s += assistant("Noted.\n")
+                        logger.info(f"Done gate: Shallow eval has FAILs and deep eval unavailable, continuing plan")
+                        continue
                 
                 # Generate final answer using NEXT_TASK as prompt, or generic goal-focused prompt
                 next_task_raw = s[f"next_task_{step}"].strip()
@@ -3567,6 +3573,25 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
             f"Ensure the REQUEST_TOOLS list is a valid JSON list of tool names.\n"
         )
 
+        # Stage 3.2 (pre-reflection): Vision evaluation before planner reflects
+        eval_target = ""
+        if tool_name == "_code_block_":
+            if new_bindings:
+                eval_target = list(new_bindings.keys())[-1]
+        elif tool_name in _ARTIFACT_PRODUCING_TOOLS:
+            out_var = action.get('out', '')
+            if out_var:
+                eval_target = out_var
+        if eval_target:
+            last_eval_target = eval_target
+        if eval_target and vision_criteria:
+            logger.info(f"Step {step}: Vision eval auto-target: {eval_target} (tool={tool_name})")
+            compressed_ctx = _compress_trace(prompt)
+            vision_eval_text = _vision_eval_check(vision_criteria, eval_target, executor, compressed_context=compressed_ctx)
+            if vision_eval_text:
+                prompt += format_user(f"VISION EVALUATION (quality check against criteria):\n{vision_eval_text}\nIf any criterion shows FAIL, consider adjusting your approach in the next step.\n")
+                prompt += format_assistant("Noted.\n")
+
         # --- STAGE 3: single generation + label parsing ---
         prompt += format_assistant("")
         stage3_block = vllm_gen(f"stage3_block_{step}", prompt, state, max_tokens=768, temperature=GEN_TEMPERATURE, executor=executor)
@@ -3634,26 +3659,6 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                 except Exception as e:
                     logger.debug(f"Stage 3.1: Failed to update commentary for {resource_id}: {e}")
         
-        # Stage 3.2: Vision evaluation (auto-detect from bindings)
-        eval_target = ""
-        if tool_name == "_code_block_":
-            # Code blocks don't have action['out']; use last new binding
-            if new_bindings:
-                eval_target = list(new_bindings.keys())[-1]
-        elif tool_name in _ARTIFACT_PRODUCING_TOOLS:
-            out_var = action.get('out', '')
-            if out_var:
-                eval_target = out_var
-        if eval_target:
-            last_eval_target = eval_target
-        if eval_target and vision_criteria:
-            logger.info(f"Step {step}: Vision eval auto-target: {eval_target} (tool={tool_name})")
-            compressed_ctx = _compress_trace(prompt)
-            vision_eval_text = _vision_eval_check(vision_criteria, eval_target, executor, compressed_context=compressed_ctx)
-            if vision_eval_text:
-                prompt += format_user(f"VISION EVALUATION (quality check against criteria):\n{vision_eval_text}\nIf any criterion shows FAIL, consider adjusting your approach in the next step.\n")
-                prompt += format_assistant("Noted.\n")
-        
         # Stage 3.5: Dynamic tool loading
         requested_tools_raw = state.get(f"request_tools_{step}", "").strip()
         requested_tools = parse_request_tools(requested_tools_raw)
@@ -3717,6 +3722,13 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                         deep_eval_continued = True
                         logger.info(f"Done gate: Deep eval found issues, continuing plan")
                         continue
+                elif shallow_text and not deep_eval_continued and "fail" in shallow_text.lower():
+                    # Deep eval unavailable; fall back to shallow eval
+                    deep_eval_continued = True
+                    prompt += format_user(f"VISION EVALUATION (final quality gate, shallow):\n{shallow_text}\nIf any criterion shows FAIL, revise your approach.\n")
+                    prompt += format_assistant("Noted.\n")
+                    logger.info(f"Done gate: Shallow eval has FAILs and deep eval unavailable, continuing plan")
+                    continue
             
             # Generate final answer
             next_task_raw = state.get(f"next_task_{step}", "").strip()
