@@ -840,6 +840,10 @@ class ZenohExecutiveNode:
             f"cognitive/{character_name}/control/clear_transients",
             self.handle_clear_transients
         )
+        self.control_clear_persistents_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/clear_persistents",
+            self.handle_clear_persistents
+        )
         
         # === ZENOH PUBLICATION ===
         # NAME: execution_state_update
@@ -2328,6 +2332,63 @@ class ZenohExecutiveNode:
             logger.info(f"🗑️ Cleared transients - {deleted_notes} Notes, {deleted_collections} Collections, {bindings_cleared} bindings")
         except Exception as e:
             logger.error(f'Error clearing transients: {e}')
+            traceback.print_exc()
+    
+    def handle_clear_persistents(self, sample):
+        """Handle clear persistents command - clears all persistent resources."""
+        try:
+            if not self.resource_manager:
+                logger.error("Resource manager not available, cannot clear persistents")
+                return
+            
+            PRESERVED_COLLECTIONS = {'conversation', 'conversation_history'}
+            
+            deleted_notes = 0
+            deleted_collections = 0
+            to_delete = []
+            for resource_id, resource_data in self.resource_manager.resource_registry.items():
+                props = resource_data.get('properties', {})
+                
+                # Only target persistent resources
+                if not props.get('persistent', False):
+                    continue
+                
+                if resource_id.startswith('Note_') and resource_id != 'Note_null':
+                    to_delete.append(resource_id)
+                elif resource_id.startswith('Collection_'):
+                    collection_name = props.get('collection_name')
+                    is_preserved = False
+                    if collection_name and collection_name in PRESERVED_COLLECTIONS:
+                        is_preserved = True
+                    for preserved_name in PRESERVED_COLLECTIONS:
+                        if self.resource_manager.named_collections.get(preserved_name) == resource_id:
+                            is_preserved = True
+                            break
+                    if is_preserved:
+                        continue
+                    to_delete.append(resource_id)
+            
+            for resource_id in to_delete:
+                success, _ = self.resource_manager.delete_resource(resource_id)
+                if success:
+                    if resource_id.startswith('Note_'):
+                        deleted_notes += 1
+                    else:
+                        deleted_collections += 1
+            
+            # Clear bindings that reference deleted resources
+            bindings_cleared = 0
+            if self.infospace_executor:
+                deleted_set = set(to_delete)
+                for scope in self.infospace_executor.plan_bindings:
+                    to_remove = [k for k, v in scope.items() if v in deleted_set]
+                    for k in to_remove:
+                        del scope[k]
+                        bindings_cleared += 1
+            
+            logger.info(f"🗑️ Cleared persistents - {deleted_notes} Notes, {deleted_collections} Collections, {bindings_cleared} bindings")
+        except Exception as e:
+            logger.error(f'Error clearing persistents: {e}')
             traceback.print_exc()
     
     def handle_stop_command(self, sample):
