@@ -2354,7 +2354,7 @@ Generated: {generated_at}
                                 Sync
                             </label>
                             <button onclick="sendText()" style="background-color: #5fb85f;">Submit</button>
-                            <button onclick="endConversation()" style="background-color: #555; color: #ccc;" title="End conversation (or type goodbye, bye, etc.)">End</button>
+                            <button id="endConversationButton" onclick="endConversation()" style="background-color: #555; color: #ccc;" title="End conversation (or type goodbye, bye, etc.)">End</button>
                         </div>
                     </div>
                     <div id="activeConversation" style="color: #4ecdc4; font-size: 0.9em; margin-bottom: 10px; display: none;">
@@ -3022,8 +3022,8 @@ Generated: {generated_at}
             const entry = document.createElement('div');
             entry.className = 'action-entry';
             
-            // Prefer simulation time (latest from time_update); fallback to local clock
-            const timestamp = latestSimTimeISO ? new Date(latestSimTimeISO).toLocaleTimeString() : new Date().toLocaleTimeString();
+            // Prefer per-action timestamp; fallback to simulation time, then local clock
+            const timestamp = actionData.timestamp ? new Date(actionData.timestamp).toLocaleTimeString() : (latestSimTimeISO ? new Date(latestSimTimeISO).toLocaleTimeString() : new Date().toLocaleTimeString());
             let html = `<span class="timestamp">[${timestamp}]</span> `;
             html += `<span class="character-name">[${actionData.character.toUpperCase()}]</span> `;
             let actorLabel = '';
@@ -3251,8 +3251,17 @@ Generated: {generated_at}
             // Update mode tracking
             currentTurnMode = stateData.turn.mode;
             
+            // End button: red when dialog active (User or agent can end), grey when no active dialog
+            const endBtn = document.getElementById('endConversationButton');
+            if (endBtn) {
+                const hasActiveDialog = stateData.active_dialog === true;
+                endBtn.style.background = hasActiveDialog ? '#c0392b' : '#555';
+                endBtn.style.color = hasActiveDialog ? '#fff' : '#ccc';
+                endBtn.title = hasActiveDialog ? 'End conversation (click to close)' : 'End conversation (or type goodbye, bye, etc.)';
+            }
+            
             console.log(`✅ Applied button states: autonomous=${stateData.buttons.autonomous ? stateData.buttons.autonomous.enabled : 'N/A'}, ` +
-                       `stop=${stateData.buttons.stop.enabled}`);
+                       `stop=${stateData.buttons.stop.enabled}, active_dialog=${stateData.active_dialog}`);
         }
         
         function handleTurnStart(turnData) {
@@ -5013,6 +5022,7 @@ Generated: {generated_at}
             paused = state_data.get('paused', True)
             mode = state_data.get('mode', 'step')
             continuous_mode = state_data.get('continuous_mode', False)
+            active_dialog = state_data.get('active_dialog', False)
             
             with self.turn_state_lock:
                 self.turn_state['mode'] = mode
@@ -5041,6 +5051,7 @@ Generated: {generated_at}
                     'completed_characters': [],
                     'is_active': not paused
                 },
+                'active_dialog': active_dialog,
                 'buttons': {
                     'autonomous': {
                         'enabled': step_enabled or run_enabled,  # Enable if either step or run would be enabled
