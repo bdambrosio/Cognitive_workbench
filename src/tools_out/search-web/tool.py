@@ -1,0 +1,714 @@
+"""
+Lightweight LLM-assisted web search + extract (Google CSE) — Selenium-free.
+
+Env vars:
+  GOOGLE_API_KEY
+  GOOGLE_CX
+"""
+
+import concurrent.futures
+import json
+import logging
+import os
+import time
+import traceback
+from datetime import date
+from itertools import zip_longest
+from typing import List, Dict, Any, Optional
+import requests
+import urllib.parse as en
+import warnings
+from infospace_executor import InfospaceExecutor
+
+import wordfreq as wf
+from unstructured.partition.html import partition_html
+from utils.grobid import parse_pdf_grobid
+from utils.text_chunking import segment_text_boundary_aware
+
+# ------------------------------
+# Logging setup
+# ------------------------------
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+
+def _fail(executor: InfospaceExecutor, reason: str, value: Optional[str] = None, extra: Optional[Dict[str, Any]] = None):
+    return executor._create_uniform_return(
+        "failed",
+        value=value or reason,
+        reason=reason,
+        extra=extra,
+    )
+
+
+def _success(
+    executor: InfospaceExecutor,
+    value: str,
+    resource_id: Optional[str],
+    extra: Optional[Dict[str, Any]] = None,
+):
+    return executor._create_uniform_return("success", value=value, resource_id=resource_id, extra=extra)
+
+# Suppress verbose warnings from unstructured
+warnings.filterwarnings('ignore', category=UserWarning, module='unstructured')
+
+# ------------------------------
+# Helpers for creating Notes/Collections
+# ------------------------------
+
+def _create_note(content: Any, agent_name: str, resource_manager, source_skill: str = 'search-web') -> str:
+    """Create a Note and return its ID."""
+    if not resource_manager:
+        logger.error("Resource manager not available")
+        return None
+    
+    format_type = 'json' if isinstance(content, dict) else 'text'
+    success, note_id, error_msg, location = resource_manager.create_note(
+        agent_name, content, format_type, source_skill, str(content)[:100], '', {}
+    )
+    
+    if success:
+        return note_id
+    else:
+        logger.error(f"Failed to create Note: {error_msg}")
+        return None
+
+def _create_collection(note_ids: List[str], agent_name: str, resource_manager, source_skill: str = 'search-web') -> str:
+    """Create a Collection and return its ID."""
+    if not resource_manager:
+        logger.error("Resource manager not available")
+        return None
+    
+    success, collection_id, error_msg, location = resource_manager.create_collection(
+        agent_name, note_ids, 'list', source_skill, f'{len(note_ids)} search results', '', {}
+    )
+    
+    if success:
+        logger.info(f"Created Collection {collection_id} with {len(note_ids)} items")
+        return collection_id
+    else:
+        logger.error(f"Failed to create Collection: {error_msg}")
+        return None
+
+# ------------------------------
+# Small utilities
+# ------------------------------
+
+def _today_prefix() -> str:
+    return " as of " + date.today().strftime("%b-%d-%Y")
+
+def _extract_domain(url: str) -> str:
+    try:
+        from urllib.parse import urlparse
+        netloc = urlparse(url).netloc or ""
+        return netloc.lower()
+    except Exception:
+        return ""
+
+def _http_get(url: str, timeout: float = 10.0, headers: Optional[Dict[str, str]] = None) -> Optional[str]:
+    try:
+        hdrs = {
+            "User-Agent": "Mozilla/5.0 (compatible; LLMSearch/1.0; +https://example.org/bot)",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        }
+        if headers:
+            hdrs.update(headers)
+        r = requests.get(url, timeout=timeout, headers=hdrs)
+        if r.status_code == 200 and r.text:
+            # basic size guard
+            text = r.text
+            if len(text) > 2_500_000:  # ~2.5MB hard cap
+                return text[:2_500_000]
+            return text
+    except Exception:
+        pass
+    return None
+
+# ------------------------------
+# Google CSE
+# ------------------------------
+
+def _google_search(query: str, num: int = 10) -> List[str]:
+    key = os.getenv("GOOGLE_API_KEY", "").strip()
+    cx = os.getenv("GOOGLE_CX", "").strip()
+    if not key or not cx:
+        return []
+
+    # Prefer recent by adding a date-sort if the query implies recency
+    sort = ""  # default relevance
+    q_lower = query.lower()
+    if "today" in q_lower or "latest" in q_lower or "breaking" in q_lower:
+        # date-sorted; CSE supports sort expr; leaving blank often works better than bad params
+        # You can also inject a time range via qdr if your CX supports it, e.g., 'q=...&sort=date:r:s'
+        pass
+
+    try:
+        url = (
+            "https://www.googleapis.com/customsearch/v1?"
+            f"key={en.quote(key)}&cx={en.quote(cx)}&num={num}&q={en.quote(query)}{sort}"
+        )
+        r = requests.get(url, timeout=10)
+        data = r.json()
+        items = data.get("items", [])
+        links = []
+        for it in items:
+            link = (it.get("link") or "").strip()
+            if link:
+                links.append(link)
+        return links
+    except Exception:
+        traceback.print_exc()
+        return []
+
+# ------------------------------
+# Content selection / extraction
+# ------------------------------
+
+def _compute_keyword_weights(keywords: List[str]) -> Dict[str, int]:
+    weights: Dict[str, int] = {}
+    for kw in keywords:
+        z = wf.zipf_frequency(kw, "en")
+        w = max(0, int(8 - z))
+        if w > 0:
+            weights[kw] = w
+            parts = kw.split()
+            if len(parts) > 1:
+                for p in parts:
+                    z2 = wf.zipf_frequency(p, "en")
+                    w2 = max(0, int((8 - z2) * 0.5))
+                    if w2 > 0:
+                        weights[p] = max(weights.get(p, 0), w2)
+    return weights
+
+def _extract_subtext(text: str, keywords: List[str], keyword_weights: Dict[str, int], max_chars: int) -> str:
+    # Split on paragraph boundaries (double newlines or more)
+    # Preserve paragraph structure by treating paragraphs as units
+    paragraphs = []
+    for para in text.split("\n\n"):
+        para = para.strip()
+        if para:  # Only keep non-empty paragraphs
+            paragraphs.append(para)
+    
+    # Score paragraphs (not individual lines)
+    score = []
+    for para in paragraphs:
+        s = 0
+        low = para.lower()
+        for kw, w in keyword_weights.items():
+            if kw.lower() in low:
+                s += w
+        score.append((s, para))
+
+    score.sort(key=lambda x: x[0], reverse=True)
+    acc = []
+    total = 0
+    max_score = sum(keyword_weights.values()) if keyword_weights else 1
+    # favor high-signal paragraphs while staying within char budget
+    for s, para in score:
+        if s <= 0:
+            continue
+        # Account for double newline separator when adding paragraphs
+        separator_len = 2 if acc else 0
+        if total + len(para) + separator_len > max_chars and s < max_score // 6:
+            continue
+        acc.append(para)
+        total += len(para) + separator_len
+        if total >= 2*max_chars:
+            break
+    # Join paragraphs with double newlines to preserve structure
+    result = "\n\n".join(acc)
+    if len(result) > max_chars:
+        #logger.warning(f"Extracted text exceeds max_chars: {len(result)} > {max_chars}")
+        result = result[:int(max_chars)]
+    return result
+
+def _html_to_text_extract(html: str, query: str, max_chars: int) -> str:
+    # partition_html returns elements (titles, narrative text, etc.). We'll join their string forms.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        elements = partition_html(text=html)
+    # Join elements with double newlines to preserve paragraph structure
+    joined = "\n\n".join(str(e).strip() for e in elements if str(e).strip())
+    kws = query.split()
+    kw_weights = _compute_keyword_weights(kws)
+    return _extract_subtext(joined, kws, kw_weights, max_chars=max_chars), joined
+
+# ------------------------------
+# LLM-assisted TL;DR
+# ------------------------------
+
+def _llm_tldr(llm_generate, text: str, query: str, max_chars: int, timeout: float = 12.0, heartbeat=None) -> str:
+    """
+    Use llm_generate function for LLM calls with chunking for large text.
+    
+    Chunks text >80k chars to avoid oversized LLM requests, then tests each chunk
+    for relevance using OR aggregation (returns True if ANY chunk is relevant).
+    """
+    # Chunk text if it's too large (leave room for prompt overhead)
+    # Use 80k as safe limit (prompt template adds ~500 chars)
+    chunks = segment_text_boundary_aware(text, max_chunk_size=80000)
+    
+    if len(chunks) == 1:
+        # Single chunk - direct test
+        chunk_text = chunks[0][0]
+        return _test_chunk_relevance(llm_generate, chunk_text, query, max_chars, heartbeat)
+    
+    # Multiple chunks - OR aggregation (true if ANY chunk matches)
+        logger.info(f"search-web: large text ({len(chunks)} chunks), testing each chunk for relevance")
+    
+    for i, (chunk_text, _) in enumerate(chunks):
+        if _test_chunk_relevance(llm_generate, chunk_text, query, max_chars, heartbeat):
+            logger.info(f"search-web: relevant content found in chunk {i+1}/{len(chunks)}")
+            return True
+    
+    return False
+
+
+def _test_chunk_relevance(llm_generate, chunk_text: str, query: str, max_chars: int, heartbeat=None) -> bool:
+    """Test a single chunk for relevance to the query."""
+    prompt = ["Your task is to analyze the following Text to identify if it is relevant to the Query.\n",
+              """Query:
+{{$query}}
+
+Text:
+
+{{$text}}
+
+
+Respond using the following JSON format:
+
+{"relevant":<true / false>}
+
+If the text is relevant to the query, set relevant to 'true' , else set relevant to 'false'.
+Respond only with the JSON, no commentary, no code fences, no reasoning:
+
+
+"""]
+    try:
+        raw = llm_generate(messages=prompt, bindings={"query": query, "text": chunk_text}, max_tokens=max_chars, temperature=0.2, is_json=True)
+        
+        # Send heartbeat after LLM call
+        if heartbeat:
+            heartbeat()
+        
+        # Handle response: should be dict after is_json=True processing
+        if isinstance(raw.text, dict):
+            if str(raw.text.get("relevant", "")).lower().startswith("true"):
+                return True
+            else:
+                return False
+        elif isinstance(raw.text, str):
+            # Fallback: try parsing string JSON
+            if raw.success:
+                if "true" in str(raw.text).lower():
+                    return True
+                else:
+                    return False
+            else:
+                return False
+        else:
+            return False
+    except Exception as e:
+        logger.warning(f"search-web: relevance test failed: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"LLM TLDR failed: {e}")
+        traceback.print_exc()
+        return False
+
+# ------------------------------
+# URL processing
+# ------------------------------
+
+def _is_mostly_numbers(text: str) -> bool:
+    """Check if text is mostly digits (frequency dumps, logs, etc.)"""
+    alnum = [c for c in text if c.isalnum()]
+    if not alnum:
+        return False
+    digits = sum(1 for c in alnum if c.isdigit())
+    return digits / len(alnum) > 0.5
+
+def _detect_format_from_content(content: str, url: str) -> str:
+    """Detect format from content and URL (simplified version for search-web)."""
+    url_lower = url.lower()
+    
+    # Check URL extension
+    if url_lower.endswith('.pdf'):
+        return "pdf"
+    if url_lower.endswith(('.md', '.markdown')):
+        return "markdown"
+    if url_lower.endswith(('.html', '.htm')):
+        return "html"
+    if url_lower.endswith('.txt'):
+        return "text"
+    
+    # Check content (first 1024 chars)
+    content_sample = content[:1024].lower()
+    if content.startswith('%PDF'):
+        return "pdf"
+    if content.startswith('<') or '<html' in content_sample:
+        return "html"
+    
+    # Default to html for web search results
+    return "html"
+
+def _process_url(url: str, query: str, llm_generate, per_url_timeout: float, max_chars: int, heartbeat=None, grobid_url: str = None) -> Dict[str, Any]:
+    """
+    Process a single URL from search results.
+    
+    Args:
+        url: URL to process
+        query: Original search query
+        llm_generate: LLM generation function
+        per_url_timeout: Timeout per URL
+        max_chars: Maximum characters to extract
+        heartbeat: Optional heartbeat callback
+        grobid_url: Optional GROBID server URL for PDF parsing
+    """
+    start = time.time()
+    html = _http_get(url, timeout=per_url_timeout)
+    if not html:
+        return _create_empty_result(url, start)
+    
+    try:
+        # Detect format
+        file_format = _detect_format_from_content(html, url)
+        
+        # Handle PDF with GROBID if available
+        if file_format == "pdf" and grobid_url:
+            # Parse PDF with GROBID (handles download internally)
+            title = url.split('/')[-1].replace('.pdf', '') or "document"
+            grobid_result = parse_pdf_grobid(pdf_url=url, title=title, grobid_url=grobid_url)
+            if grobid_result:
+                    # Concatenate chunks with section headers
+                    chunks = grobid_result.get('chunks', [])
+                    if chunks:
+                        chunk_texts = []
+                        for section_title, section_text in chunks:
+                            chunk_texts.append(f"{section_title}\n{section_text}")
+                        extract = "\n\n".join(chunk_texts)
+                    elif grobid_result.get('abstract'):
+                        extract = grobid_result['abstract']
+                    else:
+                        extract = html[:max_chars]  # Fallback to raw content
+                    
+                    if len(extract) < 16:
+                        return _create_empty_result(url, start, file_format)
+                    
+                    # LLM filter for relevance
+                    remaining_time = max(3.0, per_url_timeout - (time.time() - start) - 1.0)
+                    tldr = _llm_tldr(llm_generate, extract, query=query, max_chars=max_chars, timeout=remaining_time, heartbeat=heartbeat)
+                    
+                    if tldr:
+                        return {
+                            "text": extract,
+                            "format": file_format,
+                            "metadata": {
+                                "source_url": url,
+                                "uri": url,
+                                "domain": _extract_domain(url),
+                                "elapsed_ms": int((time.time() - start) * 1000)
+                            },
+                            "char_count": len(extract)
+                        }
+                    return _create_empty_result(url, start, file_format)
+        
+        # Extract filtered text (query-relevant excerpts) for HTML
+        extract, full_text = _html_to_text_extract(html, query=query, max_chars=max_chars)
+        if not extract or len(extract) < 16:
+            return _create_empty_result(url, start, file_format)
+        
+        # Reject garbage content
+        if _is_mostly_numbers(extract):
+            #logger.warning(f"Rejected mostly-numeric content from {url}")
+            return _create_empty_result(url, start, file_format)
+        
+        # LLM filter for relevance
+        remaining_time = max(3.0, per_url_timeout - (time.time() - start) - 1.0)
+        tldr = _llm_tldr(llm_generate, extract, query=query, max_chars=max_chars, timeout=remaining_time, heartbeat=heartbeat)
+        filtered_text = extract
+        
+        # Return uniform structure matching fetch-text
+        if tldr:
+            return {
+            "text": filtered_text,
+            "format": file_format,
+            "metadata": {
+                "source_url": url,
+                "uri": url,  # Standardized URI field for consistency with semantic-scholar and search primitives
+                "domain": _extract_domain(url),
+                "elapsed_ms": int((time.time() - start) * 1000)
+            },
+            "char_count": len(filtered_text)
+        }
+    except Exception:
+        traceback.print_exc()
+        return _create_empty_result(url, start)
+
+def _create_empty_result(url: str, start_time: float, file_format: str = "html") -> Dict[str, Any]:
+    """Create empty result with uniform structure."""
+    return {
+        "text": "",
+        "format": file_format,
+        "metadata": {
+            "source_url": url,
+            "uri": url,  # Standardized URI field for consistency with semantic-scholar and search primitives
+            "domain": _extract_domain(url),
+            "elapsed_ms": int((time.time() - start_time) * 1000)
+        },
+        "char_count": 0
+    }
+
+# ------------------------------
+# Public entry point
+# ------------------------------
+
+def llm_search(query: str, llm_generate, max_chars: int = 8000, max_urls: int = 10, max_workers: int = 6, wall_time_limit: float = 20.0, heartbeat=None, grobid_url: str = None) -> List[Dict[str, Any]]:
+    """
+    High-level:
+      1) Google CSE for initial URL set (two phrasings interleaved).
+      2) Concurrently fetch + extract + LLM TL;DR relevant slices.
+      3) Return list of {domain, url, extract, elapsed_ms} (only those with content).
+    
+    Args:
+        grobid_url: Optional GROBID server URL for PDF parsing
+    """
+
+
+    # 1) Build two phrasings: original and LLM-rephrased (like your old flow)
+    q_orig = query
+    if "today" in query.lower() or "latest" in query.lower():
+        q_orig = f"{_today_prefix()} {query}"
+
+    urls_orig = _google_search(q_orig)[:max_urls]
+
+    # LLM rephrase
+    rephr = ""
+    try:
+        response = llm_generate(
+            messages=[f"""Rephrase the following google searchquery. 
+Generate a significant rephrasing of the query that is likely to find different results from the original query. 
+Be sure to keep, or better, sharpen the semantic intent of the query.
+
+#Query:
+{query}
+
+Keep any dates, times, locations, keywords, and subject specifiers and any other significant details that narrow the search. 
+Respond only with the rephrased query followed by the </end> tag, no commentary, no code fences, no reasoning.
+End your response with:
+</end>
+"""],
+            max_tokens=150,
+            temperature=0.4,
+            is_json=False,
+            stops=['</end>']
+        )
+        
+        # Send heartbeat after LLM call
+        if heartbeat:
+            heartbeat()
+        
+        rephrase = response.text
+        #logger.info(f"LLM rephrased search-web query: {rephrase}")
+    except Exception as e:
+        logger.error(f"LLM rephrasing failed: {e}")
+        traceback.print_exc()
+        rephrase = ""
+
+    if rephrase:
+        urls_rephr = _google_search(rephrase)[:max_urls] if rephr else []
+    else:
+        urls_rephr = []
+
+    urls = [v for v in zip_longest(urls_orig, urls_rephr) for v in v if v]
+    # keep order but de-dup
+    seen = set()
+    interleaved = []
+    for u in urls:
+        if u not in seen:
+            interleaved.append(u)
+            seen.add(u)
+
+    # 2) Concurrent process with a global wall-time budget
+    results: List[Dict[str, Any]] = []
+    ex = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+    in_flight = []
+    try:
+        t0 = time.time()
+        idx = 0
+        while idx < len(interleaved) or in_flight:
+            # Check timeout - if exceeded, harvest done tasks and exit
+            if (time.time() - t0) >= wall_time_limit:
+                logger.warning(f"Wall time limit {wall_time_limit}s exceeded, collecting completed results")
+                for fut in in_flight:
+                    if fut.done():
+                        try:
+                            item = fut.result()
+                            if item and item.get("text"):
+                                results.append(item)
+                        except Exception:
+                            pass
+                break
+            
+            # launch new tasks while under budget
+            while idx < len(interleaved) and len(in_flight) < max_workers and (time.time() - t0) < wall_time_limit:
+                url = interleaved[idx]
+                idx += 1
+                per_url_timeout = max(8.0, wall_time_limit - (time.time() - t0 - 1.0))
+                fut = ex.submit(_process_url, url, query, llm_generate, per_url_timeout, max_chars/4, heartbeat, grobid_url)
+                #logger.info(f"Submitted task for url: {url}")
+                in_flight.append(fut)
+
+            # harvest any finished
+            still = []
+            for fut in in_flight:
+                if fut.done():
+                    try:
+                        item = fut.result()
+                        if item and item.get("text"):
+                            #logger.info(f"Completed task: {item.get('text')[:20]}...")
+                            results.append(item)
+                    except Exception as e:
+                        logger.error(f"Error processing task: {e}")
+                        traceback.print_exc()
+                        pass
+                    still.append(None)
+                else:
+                    try:
+                        # Wait with timeout - if it completes, get result
+                        item = fut.result(timeout=0.1)
+                        #logger.info(f"Completed task: {item}")
+                        if item and item.get("text"):
+                            results.append(item)
+                        still.append(None)
+                    except concurrent.futures.TimeoutError:
+                        still.append(fut)
+                    except Exception:
+                        still.append(None)
+            in_flight = [f for f in still if f is not None]
+            time.sleep(0.05 if len(in_flight) < max_workers else 0.2)
+    finally:
+        # Shutdown without waiting for slow threads
+        ex.shutdown(wait=False)
+
+    # 3) Optional basic re-rank: prefer domains with text length and query hits
+    ql = query.lower()
+    def _score(it):
+        text = it.get("text", "")
+        hit = 2 if ql[:32] in text.lower() else 0
+        return (len(text), hit)
+
+    results.sort(key=_score, reverse=True)
+    return results
+
+# ------------------------------
+# Tool interface for infospace
+# ------------------------------
+
+def tool(input_value, **kwargs):
+    """
+    Web search tool using Google CSE + LLM extraction.
+    
+    Args:
+        input_value: Query string (preferred, for backward compatibility)
+        **kwargs: query (required), agent_name (required), llm_generate (required), grobid_url (optional)
+    
+    Returns:
+        Collection ID containing structured Note for each search result
+    """
+    # Extract grobid_url from kwargs if available (from YAML config)
+    grobid_url = kwargs.get('grobid_url')
+    
+    executor: InfospaceExecutor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+
+    # Prefer 'query' parameter, fallback to input_value for backward compatibility
+    query = kwargs.get('query') or input_value or kwargs.get('value', '')
+    if not isinstance(query, str):
+        query = ''
+    if not query:
+        return _fail(executor, 'query parameter required (search query)')
+    
+    agent_name = kwargs.get('agent_name')
+    if not agent_name:
+        return _fail(executor, 'agent_name required in kwargs')
+    
+    # Get llm_generate function (required)
+    llm_generate = kwargs.get('llm_generate')
+    if not llm_generate:
+        return _fail(executor, 'llm_generate function required in kwargs')
+    
+    # Check for required API keys
+    if not os.getenv('GOOGLE_API_KEY') or not os.getenv('GOOGLE_CX'):
+        return _fail(executor, 'GOOGLE_API_KEY and GOOGLE_CX environment variables required')
+    
+    # Perform search
+    try:
+        results = llm_search(
+            query=query,
+            llm_generate=llm_generate,
+            max_chars=32000,
+            max_urls=10,
+            max_workers=6,
+            wall_time_limit=20.0,
+            heartbeat=kwargs.get('heartbeat'),
+            grobid_url=grobid_url
+        )
+    except Exception as e:
+        return _fail(executor, 'search_failed', extra={"exception": str(e)})
+    
+    resource_manager = kwargs.get('resource_manager')
+    
+    if not results:
+        # Return empty Collection for no results
+        empty_coll_id = _create_collection([], agent_name, resource_manager)
+        if not empty_coll_id:
+            return _fail(executor, 'Failed to create empty Collection')
+        return _success(
+            executor,
+            '0 items []',
+            empty_coll_id,
+            {"item_count": 0, "query": query},
+        )
+    
+    # Create a Note for each result (each is structured JSON)
+    note_ids = []
+    for result in results:
+        note_id = _create_note(result, agent_name, resource_manager)
+        if note_id:
+            note_ids.append(note_id)
+        else:
+            logger.warning(f"Failed to create Note for result: {result.get('url', 'unknown')}")
+    
+    if not note_ids:
+        return _fail(executor, 'Failed to create any Notes from search results')
+    
+    # Create Collection containing all result Notes
+    collection_id = _create_collection(note_ids, agent_name, resource_manager)
+    if not collection_id:
+        return _fail(executor, 'Failed to create Collection')
+    
+    # Format collection value as "X items [Note_1, ...]"
+    item_count = len(note_ids)
+    display_ids = note_ids[:5]
+    note_list_str = ', '.join(display_ids)
+    if item_count > 5:
+        note_list_str += ', ...'
+    collection_value = f"{item_count} items [{note_list_str}]"
+    
+    logger.info(f"search-web created Collection {collection_id} with {len(note_ids)} results for query: {query}")
+    return _success(
+        executor,
+        collection_value,
+        collection_id,
+        {"item_count": item_count, "query": query, "note_ids": note_ids},
+    )
+
+if __name__ == "__main__":
+    from llm_client import ZenohLLMClient
+    client = ZenohLLMClient(server_name='openai', model_name='gpt-4.1')
+    def llm_generate_wrapper(messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
+        return client.generate(messages=messages, bindings=bindings, max_tokens=max_tokens, temperature=temperature, is_json=is_json, stops=stops if stops else ['</end>'])
+    results = llm_search("What is the weather in Tokyo?", llm_generate_wrapper, max_chars=1000, max_urls=10, max_workers=4, wall_time_limit=20.0)
+    print(results)
