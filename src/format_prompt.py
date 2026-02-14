@@ -532,19 +532,31 @@ layout.addWidget(clear_button)
 clear_button.clicked.connect(clear_text)
 
 def load_trace_section():
-    """Load section(s) of planner_trace_Jill.txt starting from last n ProgramState lines in trace file."""
-    trace_file_path = Path(__file__).parent / "logs" / "planner_trace_Jill.txt"
+    """Load section(s) of planner_trace_{agent}.txt starting from last n ProgramState lines in trace file."""
+    trace_dir = Path(__file__).parent / "logs"
     
-    # Check if trace file exists
-    if not trace_file_path.exists():
-        QMessageBox.critical(window, "Error", f"Trace file not found: {trace_file_path}")
-        return
-    
-    # Create dialog to ask for number of sections
+    # Create dialog to ask for agent name and number of sections
     dialog = QDialog(window)
     dialog.setWindowTitle("Load Trace Sections")
     dialog_layout = QVBoxLayout()
     
+    # Agent name
+    agent_label = QLabel("Agent name:")
+    dialog_layout.addWidget(agent_label)
+    agent_combo = QComboBox()
+    agent_combo.setEditable(True)
+    # Populate from existing planner_trace_*.txt files
+    if trace_dir.exists():
+        for f in sorted(trace_dir.glob("planner_trace_*.txt")):
+            agent = f.stem.replace("planner_trace_", "")
+            if agent and agent not in [agent_combo.itemText(i) for i in range(agent_combo.count())]:
+                agent_combo.addItem(agent)
+    if agent_combo.count() == 0:
+        agent_combo.addItems(["Jill", "Jack"])
+    agent_combo.setCurrentIndex(0)
+    dialog_layout.addWidget(agent_combo)
+    
+    # Number of sections
     label = QLabel("How many sections to load?")
     dialog_layout.addWidget(label)
     
@@ -568,7 +580,14 @@ def load_trace_section():
     if dialog.exec() != QDialog.DialogCode.Accepted:
         return
     
+    agent_name = agent_combo.currentText().strip() or "Jill"
     num_sections = int(combo.currentText())
+    trace_file_path = trace_dir / f"planner_trace_{agent_name}.txt"
+    
+    # Check if trace file exists
+    if not trace_file_path.exists():
+        QMessageBox.critical(window, "Error", f"Trace file not found: {trace_file_path}")
+        return
     
     # Read trace file and find matching lines
     try:

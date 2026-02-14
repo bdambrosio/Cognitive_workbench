@@ -263,7 +263,6 @@ Operation_name: applicable to: <Note | Collection | Note, Collection>;   Purpose
  - union, intersection, difference: Collection;  Set operations on Collections
  - load: Note, Collection;  Load persistent resource
  - persist: Note, Collection;  Mark resource as persistent
- - display: Note, Collection;  Show content to user (UI only)
  - discover-notes, discover-collections: N/A;  Global discovery (return Coll.)
  - search-within-collection: Collection;  Search indexed Collection
 
@@ -271,7 +270,6 @@ Key distinctions:
 - split (Note→Coll): Transforms internal structure (array/lines) into separate items
 - flatten (Coll→Note): Opposite of split, merges Collection into single Note
 - load: Use to GET content *into planner context*. Supports slice parameter for controlled access (e.g., slice="0:3" for first 3 Collection items, slice=":" for full Note content). Slicing a Collection returns a new Collection.
-- display: Use to SHOW content to user (UI popup, does NOT return content for planning)
 - persist: Mark resource as persistent (saved to filesystem)
 
 Discovery and Search Primitives:
@@ -478,8 +476,8 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "schema_hint": {"target": "$variable", "operation": "string", "out": "$variable"}
         },
         "split": {
-            "description": "Transform Note structure into Collection: JSON array → Collection of Notes (one per element), or plain text → Collection of Notes (default: by sentence). NOT for inspecting Collection contents. Use display or flatten to view Collection data.",
-            "full_description": "Split transforms a single Note's internal structure into a Collection. Input must be a Note (not Collection) containing either: (1) JSON array - each element becomes a Note in output Collection, (2) JSON object with array field - extracts array from specified field (default 'results'), (3) JSONL format - multiple JSON objects separated by newlines, or (4) plain text - splits by delimiter (default 'sentence' for semantic processing). For plain text, default delimiter is 'sentence' which splits on sentence boundaries (. ! ? followed by space/newline), normalizes whitespace (removes internal newlines), and filters empty segments. Optional delimiter parameter: 'sentence' (default), 'paragraph' (double newlines), 'line' (single newlines), or custom string. This is a STRUCTURE TRANSFORMATION, not content inspection. To view Collection contents, use display (show to user) or flatten (merge into single Note). Common mistake: trying to split a Collection to 'see inside it' - Collections are already split, use display instead.",
+            "description": "Transform Note structure into Collection: JSON array → Collection of Notes (one per element), or plain text → Collection of Notes (default: by sentence). NOT for inspecting Collection contents. Use flatten to merge Collection into single Note, or load to read content.",
+            "full_description": "Split transforms a single Note's internal structure into a Collection. Input must be a Note (not Collection) containing either: (1) JSON array - each element becomes a Note in output Collection, (2) JSON object with array field - extracts array from specified field (default 'results'), (3) JSONL format - multiple JSON objects separated by newlines, or (4) plain text - splits by delimiter (default 'sentence' for semantic processing). For plain text, default delimiter is 'sentence' which splits on sentence boundaries (. ! ? followed by space/newline), normalizes whitespace (removes internal newlines), and filters empty segments. Optional delimiter parameter: 'sentence' (default), 'paragraph' (double newlines), 'line' (single newlines), or custom string. This is a STRUCTURE TRANSFORMATION, not content inspection. To view Collection contents, use flatten (merge into single Note) or load to read content. Common mistake: trying to split a Collection to 'see inside it' - Collections are already split, use display instead.",
             "examples": [
                 '{"type":"split","target":"$json_array_note","out":"$items"}  # [1,2,3] → Collection of 3 Notes',
                 '{"type":"split","target":"$text_note","out":"$sentences"}  # "First. Second!" → Collection of 2 Notes (default: sentence splitting)',
@@ -493,10 +491,6 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "description": "Flatten Collection to single Note.",
             "schema_hint": {"target": "$variable", "out": "$variable"}
         },
-        "display": {
-            "description": "Display Note content to user (UI popup). Does NOT return content to planner context. Use load to read content for planning.",
-            "schema_hint": {"value": "$variable or target"}
-        },
         "think": {
             "description": PRIMITIVE_DOCS["think"]["description"],
             "full_description": PRIMITIVE_DOCS["think"].get("full_description"),
@@ -504,12 +498,16 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "schema_hint": PRIMITIVE_DOCS["think"]["schema_hint"]
         },
         "say": {
-            "description": "Output text to user. Requires: value (text to say), target ('user').",
-            "schema_hint": {"target": "user", "value": "string"}
+            "description": "Send text to target (User or agent). Fire-and-forget; does not wait for reply. Requires: value, target (default User).",
+            "schema_hint": {"target": "User or agent name", "value": "string"}
         },
         "ask": {
-            "description": "Ask user a question and wait for response (suspends plan execution). Requires: value (the question text), out (variable to bind user's response). Example: {\"type\": \"ask\", \"value\": \"Should I continue?\", \"out\": \"$answer\"}",
-            "schema_hint": {"value": "string (question text)", "out": "$variable"}
+            "description": "Send question to target and wait for reply (blocks plan). Use when you need the reply in one step. Requires: value, out. Optional: target (default User).",
+            "schema_hint": {"target": "User or agent name (optional)", "value": "string", "out": "$variable"}
+        },
+        "listen": {
+            "description": "Wait for message from target without sending. Use after say when you need the reply in two steps. Requires: target, out.",
+            "schema_hint": {"target": "agent name", "out": "$variable"}
         },
         "add": {
             "description": "Add a Note to an existing Collection (mutates Collection in place). When used with map to add multiple Notes, use collection parameter: {\"type\":\"map\",\"target\":\"$notes\",\"operation\":\"add\",\"collection\":\"$collection\",\"out\":\"$collection\"}",
@@ -720,6 +718,8 @@ def tool_catalog_text(tools: Dict[str, Dict]) -> str:
     if core_tools:
         lines.append("#INFOSPACE CORE")
         for name, meta in sorted(core_tools):
+            if name == "ask":
+                lines.append("#COMMUNICATION (say=send only | ask=send+wait | listen=wait after say)")
             lines.extend(format_tool(name, meta))
         lines.append("")  # Blank line before workflows
     
@@ -1054,13 +1054,13 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
     
     # Normalize variable references: ensure $ prefix for common variable fields
     # These fields typically reference variables (not literal values)
-    # Exception: 'target' in say/display is a character name (literal), not a variable
-    # Exception: 'value' in create-note/add/say/display/think/ask accepts literals, so don't normalize
+    # Exception: 'target' in say is a character name (literal), not a variable
+    # Exception: 'value' in create-note/add/say/think/ask accepts literals, so don't normalize
     # These primitives accept both literals and variables - trust LLM to add $ when needed
     variable_fields = ['out', 'source']
     # Primitives/tools that accept literal values in 'value' field (don't normalize)
     literal_value_primitives = [
-        'create-note', 'create-collection', 'add', 'remove', 'say', 'display', 'think', 'ask',
+        'create-note', 'create-collection', 'add', 'remove', 'say', 'think', 'ask',
         'search-web', 'semantic-scholar', 'discover-notes', 'discover-collections',
     ]
     if tool_name not in literal_value_primitives:
@@ -1654,7 +1654,13 @@ def _vision_eval_check(vision_criteria: str, eval_target: str, executor, compres
     if compressed_context:
         context_section = f"\nEXECUTION CONTEXT (compressed trace of steps so far):\n{compressed_context}\n"
     
-    eval_prompt = f"""Evaluate the following artifact against each quality criterion. For each, answer PASS or FAIL with a one-sentence reason if FAIL.
+    eval_prompt = f"""Evaluate the following artifact against each quality criterion.
+
+RULES:
+- PASS means the criterion IS satisfied by the artifact. FAIL means it is NOT satisfied.
+- If the artifact meets the criterion, you MUST label it PASS regardless of minor imperfections.
+- Only use FAIL when the criterion is clearly unmet — do not label FAIL if your reason describes success.
+- Provide a one-sentence reason for FAIL verdicts. No reason needed for PASS.
 
 CRITERIA:
 {vision_criteria}
@@ -1725,7 +1731,8 @@ def _vision_eval_deep(vision_criteria: str, eval_target: str, classifier_result:
         f"4. For each criterion, report PASS or FAIL with a one-sentence evidence-based reason.\n"
         f"5. End with a one-line RECOMMENDATION for the parent planner (e.g., 'lower filter threshold', "
         f"'add section headers', 'broaden search terms').\n"
-        f"6. Use say to deliver your evaluation report."
+        f"6. Return the evaluation report as your final answer. Do NOT use say — the report is returned "
+        f"to the parent planner as text, not delivered to any user."
     )
     
     try:
@@ -1868,6 +1875,12 @@ if HAS_SGLANG:
         # Extract goal for step prompts (truncate at ## CONTEXT ## if present)
         goal_for_step = _extract_goal_for_step(goal)
         
+        # Interrupt checkpoint: entry to tool_planner_infospace
+        if executor and _interrupt_requested(executor):
+            _clear_interrupt(executor)
+            s["final_answer"] = "Interrupted by user."
+            return s
+        
         # Track which tools have had their skill docs loaded (re-initialized each call, persists across stages)
         # Store in state so it persists across stages within this call, but reset at start of each new call
         _loaded_skill_docs = set[Any]()          
@@ -2007,6 +2020,12 @@ ALWAYS follow all formatting instructions exactly.
         except (KeyError, json.JSONDecodeError, TypeError) as e:
             logger.warning(f"Failed to parse selected tools for doc expansion: {e}")
         
+        # Interrupt checkpoint: after Stage 1, before step loop
+        if executor and _interrupt_requested(executor):
+            _clear_interrupt(executor)
+            s["final_answer"] = "Interrupted by user."
+            return s
+        
         # Stage 2/3 format instructions
         """
         s += user(
@@ -2059,10 +2078,9 @@ ALWAYS follow all formatting instructions exactly.
             "  TOOL_NAME: <name from the Complete primitive and tool catalog>\n"
             "  TOOL_ARGS_JSON: <json object>\n\n"
             "#Stage 2 VARIABLE LIFETIME:\n"
-            "  Variables created via 'out' parameters in prior steps (including inside\n"
-            "  code blocks) remain in scope for the entire plan. You do NOT need to\n"
-            "  persist and reload them. Use $variable_name directly.\n"
-            "  Example: if step 1 created $papers, step 2 can use target: '$papers'.\n"
+            "  Variables created via 'out' parameters remain in scope. Chain by passing\n"
+            "  the variable name (e.g. target='$papers'), NOT by extracting from r['value'] in Python.\n"
+            "  Example: step 1 creates $papers → step 2 uses target: '$papers'. Do NOT parse r['value'].\n"
             "\n"
             "#Stage 2 NUMERIC ARGUMENTS:\n"
             "  IMPORTANT: All numeric tool arguments (integers, floats) must be simple literals.\n"
@@ -2215,20 +2233,21 @@ ALWAYS follow all formatting instructions exactly.
             "    ```\n"
             "    Rules for Option B:\n"
             "    - Max 6 tool calls via executor.execute_action_tracked(action_dict, \"codegen\")\n"
-            "    - VARIABLE BINDING: The \"out\": \"$name\" field in each action dict binds the result.\n"
-            "      Subsequent actions reference it as the STRING \"$name\", NOT via Python variables.\n"
+            "    - VARIABLE BINDING: The \"out\": \"$name\" field binds the result. Chain actions by passing that variable.\n"
+            "      DO write: {\"out\": \"$papers\"} then {\"target\": \"$papers\"} in the next action.\n"
             "      Do NOT write: val = r1[\"value\"]; next_action[\"target\"] = val\n"
-            "      DO write: {\"out\": \"$papers\"} then {\"target\": \"$papers\"}\n"
-            "      Use r1 ONLY for status checking: if r1[\"status\"] != \"success\"\n"
-            "      ITEM COUNTS: r1.get(\"extra\",{}).get(\"item_count\") — NEVER len(r1[\"value\"]) (value is a display string, not a list).\n"
+            "      Do NOT extract items from r[\"value\"] or r[\"data\"] — use target=\"$variable\" in the next action instead.\n"
+            "    - CODE BLOCK RESULT CONTRACT: Use r ONLY for status and metadata. Never parse r[\"value\"] or r[\"data\"] as data.\n"
+            "      r[\"status\"] — success/failure. r[\"resource_id\"] — ID. r.get(\"extra\",{}).get(\"item_count\") — count.\n"
+            "      r[\"value\"] and r[\"data\"] are DISPLAY strings for humans — do NOT iterate, parse, or extract from them.\n"
+            "    - ANTI-PATTERN: Building a list from r[\"value\"] and passing to create-collection. Wrong. Use $variable in the next action.\n"
             "    - if/else control flow and loops are allowed.\n"
             "    - Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
             "\n"
             "#Stage 2 VARIABLE LIFETIME:\n"
-            "  Variables created via 'out' parameters in prior steps (including inside\n"
-            "  code blocks) remain in scope for the entire plan. You do NOT need to\n"
-            "  persist and reload them. Use $variable_name directly.\n"
-            "  Example: if step 1 created $papers, step 2 can use target: '$papers'.\n"
+            "  Variables created via 'out' parameters remain in scope. Chain by passing\n"
+            "  the variable name (e.g. target='$papers'), NOT by extracting from r['value'] in Python.\n"
+            "  Example: step 1 creates $papers → step 2 uses target: '$papers'. Do NOT parse r['value'].\n"
             "\n"
             "#Stage 2 NUMERIC ARGUMENTS:\n"
             "  IMPORTANT: All numeric tool arguments must be simple literals.\n"
@@ -2263,6 +2282,9 @@ ALWAYS follow all formatting instructions exactly.
             "  (a) Use a different tool to achieve the same sub-goal, or\n"
             "  (b) Skip the failing step and proceed with available data, or\n"
             "  (c) Use a code block to call the tool with explicit parameters.\n"
+            "- SEARCH-EVALUATE CAP: Do not run more than 2 search-then-evaluate cycles\n"
+            "  for the same quality criterion. If a criterion remains FAIL after 2 attempts,\n"
+            "  proceed with available data and note the limitation.\n"
             "\n"
             "AUDIT (STRICT):\n"
             "1. DECLARE SCOPE\n"
@@ -2432,6 +2454,12 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                 code_text = s[f"code_block_{step}"].strip()
                 logger.info(f"Stage 2: Code block generated ({len(code_text)} chars)")
                 
+                # Interrupt checkpoint: after code-block gen, before execute
+                if _interrupt_requested(executor):
+                    _clear_interrupt(executor)
+                    s["final_answer"] = "Interrupted by user."
+                    break
+                
                 # Snapshot bindings before execution
                 bindings_before = dict(executor.plan_bindings_flat)
                 
@@ -2447,6 +2475,12 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                 logger.info(f"Step {step}: _code_block_ -> {tool_result[:100]}")
                 if new_bindings:
                     logger.info(f"Step {step}: New bindings from code block: {new_bindings}")
+                
+                # Interrupt checkpoint: after code-block execution
+                if _interrupt_requested(executor):
+                    _clear_interrupt(executor)
+                    s["final_answer"] = "Interrupted by user."
+                    break
             else:
                 action = sgl_to_infospace_action(tool_name, tool_args_json, step, executor.available_tools)
                 new_bindings = None
@@ -2465,6 +2499,12 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                 
                 logger.info(f"Stage 2: Choose tool + args\n{tool_name} -> {tool_args_json}")
                 logger.info(f"Step {step}: {tool_name} -> {tool_result[:100]}")
+                
+                # Interrupt checkpoint: after tool execution
+                if _interrupt_requested(executor):
+                    _clear_interrupt(executor)
+                    s["final_answer"] = "Interrupted by user."
+                    break
             
             # Stage 3: Reflect
             result_display = tool_result[:512]
@@ -2506,7 +2546,7 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                 compressed_ctx = _compress_trace(str(s))
                 vision_eval_text = _vision_eval_check(vision_criteria, eval_target, executor, compressed_context=compressed_ctx)
                 if vision_eval_text:
-                    s += user(f"VISION EVALUATION (quality check against criteria):\n{vision_eval_text}\nIf any criterion shows FAIL, consider adjusting your approach in the next step.\n")
+                    s += user(f"VISION EVALUATION (quality check against criteria):\n{vision_eval_text}\nFAILs are advisory — attempt to address them if easy, but do NOT loop or search repeatedly to fix a single criterion. Proceed with available data after at most one retry.\n")
                     s += assistant("Noted.\n")
             
             s += assistant(
@@ -2616,6 +2656,11 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
             # Check if done
             done_raw = s[f"done_{step}"].strip().upper()
             if done_raw.startswith("YES"):
+                # Interrupt checkpoint: before verification/final answer
+                if _interrupt_requested(executor):
+                    _clear_interrupt(executor)
+                    s["final_answer"] = "Interrupted by user."
+                    break
                 # --- [START NEW VERIFICATION LOGIC] ---
                 # Intercept the completion to force a self-audit
                 s += user(
@@ -2656,11 +2701,11 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                             logger.info(f"Done gate: Deep eval found issues, continuing plan")
                             continue
                     elif shallow_text and not deep_eval_continued and "fail" in shallow_text.lower():
-                        # Deep eval unavailable; fall back to shallow eval
+                        # Deep eval unavailable; fall back to shallow eval — advisory only, one retry max
                         deep_eval_continued = True
-                        s += user(f"VISION EVALUATION (final quality gate, shallow):\n{shallow_text}\nIf any criterion shows FAIL, revise your approach.\n")
+                        s += user(f"VISION EVALUATION (final quality gate, shallow):\n{shallow_text}\nFAILs are advisory. Make one quick attempt to address if easy, otherwise finish with what you have.\n")
                         s += assistant("Noted.\n")
-                        logger.info(f"Done gate: Shallow eval has FAILs and deep eval unavailable, continuing plan")
+                        logger.info(f"Done gate: Shallow eval has FAILs and deep eval unavailable, continuing plan (advisory)")
                         continue
                 
                 # Generate final answer using NEXT_TASK as prompt, or generic goal-focused prompt
@@ -2688,6 +2733,10 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
             else:
                 logger.warning(f"Step {step}: No NEXT_TASK provided, stopping")
         
+        # Interrupt checkpoint: exit from tool_planner_infospace
+        if executor and _interrupt_requested(executor):
+            _clear_interrupt(executor)
+            s["final_answer"] = "Interrupted by user."
         
         # Write full conversation state to trace file (file-only, not console)
         if trace_file:
@@ -3093,6 +3142,12 @@ def tool_planner_infospace_vllm(template, goal: str, world_model: Dict, characte
     # Extract goal for step prompts (truncate at ## CONTEXT ## if present)
     goal_for_step = _extract_goal_for_step(goal)
     
+    # Interrupt checkpoint: entry to tool_planner_infospace
+    if executor and _interrupt_requested(executor):
+        _clear_interrupt(executor)
+        state["final_answer"] = "Interrupted by user."
+        return state
+    
     # Track which tools have had their skill docs loaded
     _loaded_skill_docs = set[Any]()
     
@@ -3225,6 +3280,12 @@ ALWAYS follow all formatting instructions exactly.
     except (KeyError, json.JSONDecodeError, TypeError) as e:
         logger.warning(f"Failed to parse selected tools for doc expansion: {e}")
     
+    # Interrupt checkpoint: after Stage 1, before step loop
+    if executor and _interrupt_requested(executor):
+        _clear_interrupt(executor)
+        state["final_answer"] = "Interrupted by user."
+        return state
+    
     # Stage 2/3 format instructions
     prompt += format_user(
         "#Stage 2-PRE: Instructions\n"
@@ -3302,20 +3363,21 @@ ALWAYS follow all formatting instructions exactly.
         "    ```\n"
         "    Rules for Option B:\n"
         "    - Max 6 tool calls via executor.execute_action_tracked(action_dict, \"codegen\")\n"
-        "    - VARIABLE BINDING: The \"out\": \"$name\" field in each action dict binds the result.\n"
-        "      Subsequent actions reference it as the STRING \"$name\", NOT via Python variables.\n"
+        "    - VARIABLE BINDING: The \"out\": \"$name\" field binds the result. Chain actions by passing that variable.\n"
+        "      DO write: {\"out\": \"$papers\"} then {\"target\": \"$papers\"} in the next action.\n"
         "      Do NOT write: val = r1[\"value\"]; next_action[\"target\"] = val\n"
-        "      DO write: {\"out\": \"$papers\"} then {\"target\": \"$papers\"}\n"
-        "      Use r1 ONLY for status checking: if r1[\"status\"] != \"success\"\n"
-        "      ITEM COUNTS: r1.get(\"extra\",{}).get(\"item_count\") — NEVER len(r1[\"value\"]) (value is a display string, not a list).\n"
+        "      Do NOT extract items from r[\"value\"] or r[\"data\"] — use target=\"$variable\" in the next action instead.\n"
+        "    - CODE BLOCK RESULT CONTRACT: Use r ONLY for status and metadata. Never parse r[\"value\"] or r[\"data\"] as data.\n"
+        "      r[\"status\"] — success/failure. r[\"resource_id\"] — ID. r.get(\"extra\",{}).get(\"item_count\") — count.\n"
+        "      r[\"value\"] and r[\"data\"] are DISPLAY strings for humans — do NOT iterate, parse, or extract from them.\n"
+        "    - ANTI-PATTERN: Building a list from r[\"value\"] and passing to create-collection. Wrong. Use $variable in the next action.\n"
         "    - if/else control flow and loops are allowed.\n"
         "    - Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
         "\n"
         "#Stage 2 VARIABLE LIFETIME:\n"
-        "  Variables created via 'out' parameters in prior steps (including inside\n"
-        "  code blocks) remain in scope for the entire plan. You do NOT need to\n"
-        "  persist and reload them. Use $variable_name directly.\n"
-        "  Example: if step 1 created $papers, step 2 can use target: '$papers'.\n"
+        "  Variables created via 'out' parameters remain in scope. Chain by passing\n"
+        "  the variable name (e.g. target='$papers'), NOT by extracting from r['value'] in Python.\n"
+        "  Example: step 1 creates $papers → step 2 uses target: '$papers'. Do NOT parse r['value'].\n"
         "\n"
         "#Stage 2 NUMERIC ARGUMENTS:\n"
         "  IMPORTANT: All numeric tool arguments must be simple literals.\n"
@@ -3350,6 +3412,9 @@ ALWAYS follow all formatting instructions exactly.
         "  (a) Use a different tool to achieve the same sub-goal, or\n"
         "  (b) Skip the failing step and proceed with available data, or\n"
         "  (c) Use a code block to call the tool with explicit parameters.\n"
+        "- SEARCH-EVALUATE CAP: Do not run more than 2 search-then-evaluate cycles\n"
+        "  for the same quality criterion. If a criterion remains FAIL after 2 attempts,\n"
+        "  proceed with available data and note the limitation.\n"
         "\n"
         "AUDIT (STRICT):\n"
         "1. DECLARE SCOPE\n"
@@ -3515,6 +3580,12 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
             
             logger.info(f"Stage 2: Code block generated ({len(code_text)} chars)")
             
+            # Interrupt checkpoint: after code-block gen, before execute
+            if _interrupt_requested(executor):
+                _clear_interrupt(executor)
+                state["final_answer"] = "Interrupted by user."
+                break
+            
             # Snapshot bindings before execution
             bindings_before = dict(executor.plan_bindings_flat)
             
@@ -3530,6 +3601,12 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
             logger.info(f"Step {step}: _code_block_ -> {tool_result[:100]}")
             if new_bindings:
                 logger.info(f"Step {step}: New bindings from code block: {new_bindings}")
+            
+            # Interrupt checkpoint: after code-block execution
+            if _interrupt_requested(executor):
+                _clear_interrupt(executor)
+                state["final_answer"] = "Interrupted by user."
+                break
         else:
             action = sgl_to_infospace_action(tool_name, tool_args_json, step, executor.available_tools)
             new_bindings = None
@@ -3548,6 +3625,12 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
             
             logger.info(f"Stage 2: Choose tool + args\n{tool_name} -> {tool_args_json}")
             logger.info(f"Step {step}: {tool_name} -> {tool_result[:100]}")
+            
+            # Interrupt checkpoint: after tool execution
+            if _interrupt_requested(executor):
+                _clear_interrupt(executor)
+                state["final_answer"] = "Interrupted by user."
+                break
         
         # Stage 3: Reflect
         result_display = tool_result[:512]
@@ -3589,7 +3672,7 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
             compressed_ctx = _compress_trace(prompt)
             vision_eval_text = _vision_eval_check(vision_criteria, eval_target, executor, compressed_context=compressed_ctx)
             if vision_eval_text:
-                prompt += format_user(f"VISION EVALUATION (quality check against criteria):\n{vision_eval_text}\nIf any criterion shows FAIL, consider adjusting your approach in the next step.\n")
+                prompt += format_user(f"VISION EVALUATION (quality check against criteria):\n{vision_eval_text}\nFAILs are advisory — attempt to address them if easy, but do NOT loop or search repeatedly to fix a single criterion. Proceed with available data after at most one retry.\n")
                 prompt += format_assistant("Noted.\n")
 
         # --- STAGE 3: single generation + label parsing ---
@@ -3681,6 +3764,11 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
         # Check if done
         done_raw = state.get(f"done_{step}", "").strip().upper()
         if done_raw.startswith("YES"):
+            # Interrupt checkpoint: before verification/final answer
+            if _interrupt_requested(executor):
+                _clear_interrupt(executor)
+                state["final_answer"] = "Interrupted by user."
+                break
             # Verification logic
             prompt += format_user(
                 "STOP. Before providing the final answer, perform a verification step. \n"
@@ -3723,11 +3811,11 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                         logger.info(f"Done gate: Deep eval found issues, continuing plan")
                         continue
                 elif shallow_text and not deep_eval_continued and "fail" in shallow_text.lower():
-                    # Deep eval unavailable; fall back to shallow eval
+                    # Deep eval unavailable; fall back to shallow eval — advisory only, one retry max
                     deep_eval_continued = True
-                    prompt += format_user(f"VISION EVALUATION (final quality gate, shallow):\n{shallow_text}\nIf any criterion shows FAIL, revise your approach.\n")
+                    prompt += format_user(f"VISION EVALUATION (final quality gate, shallow):\n{shallow_text}\nFAILs are advisory. Make one quick attempt to address if easy, otherwise finish with what you have.\n")
                     prompt += format_assistant("Noted.\n")
-                    logger.info(f"Done gate: Shallow eval has FAILs and deep eval unavailable, continuing plan")
+                    logger.info(f"Done gate: Shallow eval has FAILs and deep eval unavailable, continuing plan (advisory)")
                     continue
             
             # Generate final answer
@@ -3751,6 +3839,11 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
             logger.info(f"Step {step}: Next task: {current_task} (phase: {current_phase_type})")
         else:
             logger.warning(f"Step {step}: No NEXT_TASK provided, stopping")
+    
+    # Interrupt checkpoint: exit from tool_planner_infospace
+    if executor and _interrupt_requested(executor):
+        _clear_interrupt(executor)
+        state["final_answer"] = "Interrupted by user."
     
     # Write full conversation state to trace file
     if trace_file:

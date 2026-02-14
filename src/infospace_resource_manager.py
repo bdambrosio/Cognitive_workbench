@@ -548,7 +548,7 @@ class InfospaceResourceManager:
     - Persistence helpers
     """
     
-    def __init__(self, world_name: str, session=None, world_config: Optional[Dict] = None):
+    def __init__(self, world_name: str, session=None, world_config: Optional[Dict] = None, agent_name: Optional[str] = None):
         """
         Initialize the resource manager.
         
@@ -556,8 +556,10 @@ class InfospaceResourceManager:
             world_name: Name of the world (for persistence/index naming)
             session: Optional Zenoh session for save_all subscriber
             world_config: Optional world config dict with 'world_name' field for world-specific directory
+            agent_name: Optional agent name to scope resources per-agent
         """
         self.world_name = world_name
+        self.agent_name = agent_name
         self.resource_types = ResourceTypeRegistry(InfospaceResources)
         self.resource_registry: Dict[str, Dict[str, Any]] = {}
         
@@ -592,6 +594,10 @@ class InfospaceResourceManager:
             current_dir = Path(__file__).parent
             project_root = current_dir.parent  # src/ -> project root
             self.base_dir = project_root / "data" / "resources"
+        
+        # Scope per agent if agent_name provided
+        if self.agent_name:
+            self.base_dir = self.base_dir / self.agent_name
         
         self.base_dir.mkdir(parents=True, exist_ok=True)
         
