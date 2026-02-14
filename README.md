@@ -15,7 +15,27 @@ This repo is experimental research software. It prioritizes **inspectable agent 
 Core ideas:
 - **Incremental planning**: the planner interleaves reasoning and tool execution.
 - **Infospace memory**: Notes + Collections are treated as working memory.
-- **World integrations** (optional): scenario-specific “world tools” (e.g., Minecraft) can be loaded per character.
+- **World integrations** (optional): scenario-specific “world tools” (e.g., Minecraft, fs) can be loaded per character.
+
+## Recent Updates (2026-02)
+
+**Conversation & dialog**:
+- **Envisioning** for User and agent-to-agent dialogs: lightweight LLM call produces "their move" / "your move" framing so the planner sees conversational context, not just raw messages.
+- **End button** turns red when a dialog is active (User or agent-to-agent); grey when closed. User can interrupt internal agent-to-agent conversations.
+- Fixed `conversation_history` vs `recent_conversation` mismatch so envisioning sees actual dialog history.
+
+**Code blocks & uniform_return**:
+- **`r["data"]`** now holds structured content: string for Notes, list of `{"text":..., "metadata":...}` for Collections. Code blocks can inspect results (e.g. `if len(r["data"]) < 3: broaden_search()`).
+- `r["value"]` remains the display string for humans. Planner instructions simplified.
+
+**UI**:
+- Action log timestamps now show per-action execution time (not cached simulation time).
+
+**World tools**:
+- **File system (fs)** world: `jill-fs.yaml` with fs-list, fs-read, fs-grep, fs-find, fs-head, fs-stat. Scenario data under `scenarios/fs/`.
+
+**Repository**:
+- `scenarios/*/` and `src/musings/` added to `.gitignore`.
 
 ## Wiki (recommended entry points)
 
@@ -53,12 +73,12 @@ From `src/`, run the launcher with UI enabled.
 
 ```bash
 cd src
-python3 launcher.py <character_name>-<world>.yaml> --ui --resource-browser
+python3 launcher.py <character_name>-<world>.yaml --ui --resource-browser
 ```
 The core agent is jill-infospace. this gives you the full infospace reasoner, web-search, semantic-scholar search, and base tool set.
 
 ```bash
-python3 launcher.py jill-infospace.yaml> --ui --resource-browser
+python3 launcher.py jill-infospace.yaml --ui --resource-browser
 ```
 
 Open the UI at `http://localhost:3000` if it doesn't auto-open a browser window
@@ -85,7 +105,7 @@ Core tools live in `src/tools/`. World-specific tools live in `src/world-tools/<
 
 ### Tool execution envelope: uniform_return (executor-facing)
 
-At the engineering level, tool results are expected to return a `uniform_return` dict for consistent logging/UI. For full details, see the wiki “Tools” page.
+Tool results return a `uniform_return` dict: `status`, `value` (display string), `data` (structured content for code blocks), `resource_id`, `extra`. For Notes, `data` is the text; for Collections, `data` is a list of `{"text":..., "metadata":...}`. For full details, see the wiki “Tools” page.
 
 ### Tool catalog ordering and sources
 
@@ -159,11 +179,12 @@ src/
   tools/
   world-tools/
     minecraft/
+    fs/
 scenarios/
 tests/
 ```
 
-Note: runtime-generated scenario resources live under `scenarios/*/resources/` and are ignored by git.
+Note: `scenarios/*/` and `src/musings/` are gitignored (runtime data).
 
 ## Contributing
 
