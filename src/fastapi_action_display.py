@@ -852,32 +852,30 @@ class FastAPIActionDisplayNode:
         
         @self.app.post("/api/turn/stop")
         async def stop_turns():
-            """Stop execution and trigger interrupt."""
+            """Stop execution and trigger interrupt for ALL active characters."""
             try:
-                if self.active_character_name is None:
-                    return {"success": False, "message": "No character available yet"}
+                if not self.active_characters:
+                    return {"success": False, "message": "No characters available yet"}
                 
                 logger.info(f"🛑 Stop command received in FastAPI")
                 
                 with self.turn_state_lock:
                     self.turn_state['mode'] = 'step'
                 
-                # Publish stop command (pauses execution)
-                self.control_stop_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
-                
-                # Also publish interrupt command (interrupts planner loop + pauses)
-                interrupt_payload = {
+                stop_payload = json.dumps({"timestamp": datetime.now().isoformat()}).encode()
+                interrupt_payload = json.dumps({
                     "timestamp": datetime.now().isoformat(),
                     "source": "ui",
                     "command": "interrupt"
-                }
-                self.session.put(
-                    f"cognitive/{self.active_character_name}/control/interrupt",
-                    json.dumps(interrupt_payload).encode("utf-8")
-                )
-                logger.info(f"🛑 Stop and interrupt commands sent to {self.active_character_name}")
+                }).encode("utf-8")
                 
-                return {"success": True, "message": "Stop and interrupt commands sent"}
+                # Broadcast stop and interrupt to ALL active characters
+                for char_name in self.active_characters:
+                    self.session.put(f"cognitive/{char_name}/control/stop", stop_payload)
+                    self.session.put(f"cognitive/{char_name}/control/interrupt", interrupt_payload)
+                logger.info(f"🛑 Stop and interrupt commands sent to all: {list(self.active_characters)}")
+                
+                return {"success": True, "message": f"Stop and interrupt sent to {len(self.active_characters)} character(s)"}
             except Exception as e:
                 logger.error(f"Error in stop_turns: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
@@ -941,41 +939,43 @@ class FastAPIActionDisplayNode:
                 return {"success": False, "message": f"Error: {str(e)}"}
         
         @self.app.post("/api/control/clear_transients")
-        async def clear_transients():
-            """Clear transients."""
+        async def clear_transients(data: Dict[str, str] = {}):
+            """Clear transients for a specific character."""
             try:
-                if self.active_character_name is None:
+                character = data.get('character') or self.active_character_name
+                if character is None:
                     return {"success": False, "message": "No character available yet"}
                 
-                logger.info(f"🗑️ Clear transients command received")
+                logger.info(f"🗑️ Clear transients command received for {character}")
                 
                 # Publish clear transients command
-                topic = f"cognitive/{self.active_character_name}/control/clear_transients"
+                topic = f"cognitive/{character}/control/clear_transients"
                 publisher = self.session.declare_publisher(topic)
                 publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
-                logger.info(f"🗑️ Clear transients command sent to {self.active_character_name}")
+                logger.info(f"🗑️ Clear transients command sent to {character}")
                 
-                return {"success": True, "message": "Clear transients command sent"}
+                return {"success": True, "message": f"Clear transients command sent to {character}"}
             except Exception as e:
                 logger.error(f"Error in clear_transients: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
         
         @self.app.post("/api/control/clear_persistents")
-        async def clear_persistents():
-            """Clear persistents."""
+        async def clear_persistents(data: Dict[str, str] = {}):
+            """Clear persistents for a specific character."""
             try:
-                if self.active_character_name is None:
+                character = data.get('character') or self.active_character_name
+                if character is None:
                     return {"success": False, "message": "No character available yet"}
                 
-                logger.info(f"🗑️ Clear persistents command received")
+                logger.info(f"🗑️ Clear persistents command received for {character}")
                 
                 # Publish clear persistents command
-                topic = f"cognitive/{self.active_character_name}/control/clear_persistents"
+                topic = f"cognitive/{character}/control/clear_persistents"
                 publisher = self.session.declare_publisher(topic)
                 publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
-                logger.info(f"🗑️ Clear persistents command sent to {self.active_character_name}")
+                logger.info(f"🗑️ Clear persistents command sent to {character}")
                 
-                return {"success": True, "message": "Clear persistents command sent"}
+                return {"success": True, "message": f"Clear persistents command sent to {character}"}
             except Exception as e:
                 logger.error(f"Error in clear_persistents: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
@@ -2354,6 +2354,7 @@ Generated: {generated_at}
                                 Sync
                             </label>
                             <button onclick="sendText()" style="background-color: #5fb85f;">Submit</button>
+                            <button onclick="endConversation()" style="background-color: #555; color: #ccc;" title="End conversation (or type goodbye, bye, etc.)">End</button>
                         </div>
                     </div>
                     <div id="activeConversation" style="color: #4ecdc4; font-size: 0.9em; margin-bottom: 10px; display: none;">
@@ -3003,8 +3004,8 @@ Generated: {generated_at}
             
             const typeLower = (actionData.action_type || '').toLowerCase();
             
-            // Handle ask action type - show indicator
-            if (typeLower === 'ask') {
+            // Handle ask action type - show indicator only when targeting User
+            if (typeLower === 'ask' && (!actionData.target || actionData.target === 'User')) {
                 const questionText = actionData.text || actionData.value || 'Awaiting your response...';
                 document.getElementById('askQuestion').textContent = questionText;
                 document.getElementById('askIndicator').style.display = 'block';
@@ -3420,6 +3421,33 @@ Generated: {generated_at}
                 resultDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
             }
         }
+
+        async function endConversation() {
+            let character = activeCharacter || document.getElementById('characterInput').value;
+            if (!character && characterTabs.size > 0) {
+                character = Array.from(characterTabs.keys())[0];
+            }
+            if (!character) {
+                document.getElementById('sendResult').innerHTML = '<span class="error">No character selected</span>';
+                return;
+            }
+            try {
+                const response = await fetch('/api/end_dialog', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ character: character })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('sendResult').innerHTML = `<span class="success">${result.message}</span>`;
+                    updateConversationIndicator();
+                } else {
+                    document.getElementById('sendResult').innerHTML = `<span class="error">${result.error || 'Failed'}</span>`;
+                }
+            } catch (error) {
+                document.getElementById('sendResult').innerHTML = `<span class="error">${error.message}</span>`;
+            }
+        }
         
         
         async function updateConversationIndicator() {
@@ -3623,7 +3651,8 @@ Generated: {generated_at}
         }
         
         async function clearTransients() {
-            if (!confirm('Are you sure you want to clear all transient resources? This cannot be undone.')) {
+            const character = activeCharacter || 'Unknown';
+            if (!confirm(`Clear all transient resources for ${character}? This cannot be undone.`)) {
                 return;
             }
             
@@ -3636,7 +3665,8 @@ Generated: {generated_at}
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                    }
+                    },
+                    body: JSON.stringify({ character: character })
                 });
                 
                 const result = await response.json();
@@ -3655,7 +3685,8 @@ Generated: {generated_at}
         }
         
         async function clearPersistents() {
-            if (!confirm('Are you sure you want to clear all PERSISTENT resources? This cannot be undone.')) {
+            const character = activeCharacter || 'Unknown';
+            if (!confirm(`Clear all PERSISTENT resources for ${character}? This cannot be undone.`)) {
                 return;
             }
             
@@ -3668,7 +3699,8 @@ Generated: {generated_at}
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                    }
+                    },
+                    body: JSON.stringify({ character: character })
                 });
                 
                 const result = await response.json();

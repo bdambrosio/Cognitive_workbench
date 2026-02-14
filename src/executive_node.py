@@ -625,6 +625,13 @@ class ZenohExecutiveNode:
             self._handle_save_command
         )
         logger.info(f'💾 Subscribed to cognitive/save_all')
+
+        # Subscriber for close_dialog (UI "End conversation" button)
+        self.close_dialog_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/memory/close_dialog",
+            self._handle_close_dialog
+        )
+        logger.info(f'🔚 Subscribed to cognitive/{character_name}/memory/close_dialog')
         
         # Infospace is always enabled now (physical world removed)
         self.map_name = self.character_config.get('map_name', 'infolab')
@@ -641,7 +648,7 @@ class ZenohExecutiveNode:
         
         # Create resource manager for direct resource access
         world_config = self.character_config.get('world_config', {})
-        self.resource_manager = InfospaceResourceManager(self.map_name, session=self.session, world_config=world_config)
+        self.resource_manager = InfospaceResourceManager(self.map_name, session=self.session, world_config=world_config, agent_name=self.character_name)
         logger.info(f'📦 Resource manager initialized for {self.map_name}')
         
         # Load resources from file on startup
@@ -677,7 +684,7 @@ class ZenohExecutiveNode:
             self.infospace_executor.openrouter_api_key = self.openrouter_api_key
         logger.info(f'🧩 Infospace executor initialized for {character_name}')
         
-        # Build available_tools for models: loaded tools + infospace primitives (display, load, persist, etc.)
+        # Build available_tools for models: loaded tools + infospace primitives (load, persist, etc.)
         from infospace_executor import INFOSPACE_PRIMITIVES
         available_for_models = dict(self.available_tools)
         for p in INFOSPACE_PRIMITIVES:
@@ -781,9 +788,14 @@ class ZenohExecutiveNode:
         self.action_history = []  # List of ActionRecord instances
         self.last_say_text = ''
         self._last_published_final_answer = None  # Track last published final_answer to prevent duplicates
+        self._last_agent_message = {}  # {source: message} for dedup of agent-to-agent messages
+        self._agent_conversation_turns = 0  # Count of agent-to-agent exchanges
+        self._dialog_purposes = {}  # {agent_name: original_purpose} for topic anchoring
+        self._dialog_cooldowns = {}  # {agent_name: timestamp} suppress re-open after close
         
-        # Ask primitive state
+        # Ask/listen primitive state
         self.awaiting_ask_response = False
+        self.awaiting_listen_response = False
         
         # Track last action outputs for plan_result
         self.last_say_text = ''
@@ -986,6 +998,17 @@ class ZenohExecutiveNode:
                 logger.info(f'💾 Saved resource manager state for {self.map_name}')
         except Exception as e:
             logger.error(f'Error handling save command: {e}')
+
+    def _handle_close_dialog(self, sample):
+        """Handle close_dialog from UI (End conversation button)."""
+        try:
+            payload_bytes = sample.payload.to_bytes()
+            data = json.loads(payload_bytes.decode('utf-8'))
+            entity_name = data.get('entity_name', 'User')
+            self.memory.close_dialog(entity_name)
+            logger.info(f'🔚 {self.character_name} closed dialog with {entity_name} (from UI)')
+        except Exception as e:
+            logger.warning(f'Error handling close_dialog: {e}')
     
     def _handle_execute_saved_plan(self, sample):
         """Handle execute_saved_plan command - load and execute a saved plan."""
@@ -1067,7 +1090,8 @@ class ZenohExecutiveNode:
                 else:
                     try:
                         # Priority order: Text input → Normal OODA
-                        if self.text_input_queue:
+                        # Skip if ask/listen primitive is polling text_input_queue directly
+                        if self.text_input_queue and not self.awaiting_ask_response and not self.awaiting_listen_response:
                             self._process_text_input()
                         self._run_ooda_loop()
                         
@@ -1757,10 +1781,12 @@ class ZenohExecutiveNode:
         """Process one queued text input."""
         sense_data = self.text_input_queue.pop(0)
         content = sense_data['content']
+        close_flag = False
         try:
             content_data = json.loads(content)
             text_input = content_data.get('text', '')
             source = content_data.get('source', 'unknown')
+            close_flag = content_data.get('close', False)
         except (json.JSONDecodeError, TypeError):
             text_input = content
             source = 'console'
@@ -1804,30 +1830,108 @@ class ZenohExecutiveNode:
                     self.parse_and_set_goal("", clean_input[5:].strip())
                     return  # Don't process as speech
                 else:
-                    # Regular user input - ensure character note exists and load it
-                    # Create character note if it doesn't exist (only once per session)
+                    # Regular user input
                     self._create_character_note()
-                    
-                    # Create note with user input and add to conversation collection
                     self._add_to_conversation(f"User says: {clean_input}")
-                    
-                    # Prepend load instruction to user input using character_name
-                    template = f"""{clean_input}"""
-                    
-                    # Convert to goal format
-                    logger.info(f'📥 {self.character_name} Received goal: "{goal}"')
-                    self.parse_and_set_goal(template, goal)
-                    # Unpause execution so plan executes immediately (same as explicit goal: prefix)
+
+                    # End-of-conversation keywords
+                    end_phrases = ('goodbye', 'bye', 'end conversation', "we're done", "that's all", 'done talking')
+                    if clean_input.strip().lower() in end_phrases:
+                        self.memory.close_dialog("User")
+                        logger.info(f'📥 {self.character_name} User ended conversation')
+                        return
+
+                    goal_lower = clean_input.lower()
+                    dialog_keywords = ('ask', 'tell', 'discuss', 'talk')
+                    other_agents = [n for n in self.character_config.get('characters', {}).keys() if n != self.character_name]
+                    mentioned = [a for a in other_agents if a in clean_input]
+                    if mentioned and any(kw in goal_lower for kw in dialog_keywords):
+                        other_agent = mentioned[0]
+                        self._dialog_purposes[other_agent] = clean_input[:500]
+                        goal_text = f"Initiate dialog with {other_agent}"
+                        context = f"\n## CONTEXT ##\nUser instruction: {clean_input[:500]}"
+                        logger.info(f'📥 {self.character_name} Received dialog goal (wrapped): "{goal_text}"')
+                        self.parse_and_set_goal("", f"{goal_text}{context}")
+                    else:
+                        # User talking to character — treat as conversation (initiate or continue)
+                        in_conversation = False
+                        try:
+                            entity = self.memory.get_or_create_entity("User")
+                            if entity.active and entity.dialogs and len(entity.dialogs[-1]) > 0:
+                                in_conversation = True
+                        except Exception:
+                            pass
+                        goal_text = "Continue dialog with User" if in_conversation else "Respond to User"
+                        context = f"\n## CONTEXT ##\nMessage from User: {clean_input[:500]}"
+                        logger.info(f'📥 {self.character_name} Received: "{goal_text}"')
+                        self.parse_and_set_goal("", f"{goal_text}{context}")
                     self.execution_paused = False
                     self._publish_execution_state()
                     return  # Don't process as speech
             
             # Agent-to-agent message processing — treat like User input (create goal)
             if source and source not in ('unknown', 'console'):
+                # Dedup: skip if identical to last message from this source
+                if self._last_agent_message.get(source) == clean_input:
+                    logger.info(f'📥 {self.character_name} Skipping duplicate message from {source}')
+                    return
+                self._last_agent_message[source] = clean_input
                 self._create_character_note()
                 self._add_to_conversation(f"{source} says: {clean_input}")
-                logger.info(f'📥 {self.character_name} Received message from {source}: "{goal}"')
-                self.parse_and_set_goal("", f"Respond to {source}: {goal}")
+                goal_preview = clean_input[:80] + ('...' if len(clean_input) > 80 else '')
+                logger.info(f'📥 {self.character_name} Received message from {source}: "{goal_preview}"')
+
+                # Close flag: other agent signaled end of conversation — record but don't reply
+                if close_flag:
+                    logger.info(f'📥 {self.character_name} Dialog closed by {source} (close flag)')
+                    self.memory.close_dialog(source)
+                    self._dialog_cooldowns[source] = time.time()
+                    self._dialog_purposes.pop(source, None)
+                    return
+
+                # Cooldown: suppress re-open if we just closed dialog with this source
+                cooldown_until = self._dialog_cooldowns.get(source, 0)
+                if time.time() - cooldown_until < 10:
+                    logger.info(f'📥 {self.character_name} Suppressing re-open from {source} (cooldown)')
+                    return
+
+                # Envision the conversational moment
+                purpose = self._dialog_purposes.get(source, '')
+                envision = self._envision_conversation_turn(source, clean_input, purpose)
+                goal_text = f"Continue dialog with {source}"
+                context = (
+                    f"\n## CONTEXT ##\n"
+                    f"Their move: {envision['turn_intent']}\n"
+                    f"Your move: {envision['my_move']}\n"
+                    f"Message from {source}: {clean_input[:500]}\n"
+                    f"Do NOT say anything to User. This is a direct conversation with {source} only."
+                )
+                if purpose:
+                    context += f"\nOriginal purpose: {purpose}"
+                # Check turn count and natural dialog end
+                turn_count = 0
+                should_close = False
+                try:
+                    entity = self.memory.get_or_create_entity(source)
+                    if entity.dialogs:
+                        turn_count = len(entity.dialogs[-1])
+                except Exception:
+                    pass
+                if turn_count >= 8:
+                    should_close = True
+                    logger.info(f'📥 {self.character_name} Enforcing closure: turn_count={turn_count}')
+                elif turn_count >= 4:
+                    # After a few exchanges, check if dialog should naturally end
+                    try:
+                        char_context = self.character_config.get('character', self.character_name)
+                        should_close = entity.natural_dialog_end(char_context)
+                    except Exception:
+                        pass
+                if should_close:
+                    context += "\n\nThis conversation should end now. Send a BRIEF closing statement. Your say action MUST include close: true."
+                elif turn_count >= 6:
+                    context += "\n\nConsider wrapping up — conversation is approaching the 8-turn limit."
+                self.parse_and_set_goal("", f"{goal_text}{context}")
                 self.execution_paused = False
                 self._publish_execution_state()
                 return
@@ -1836,6 +1940,50 @@ class ZenohExecutiveNode:
             logger.info(f'📥 {self.character_name} Processing text input: "{text_input}" (source: {source})')
             self.plan_just_generated = True  # Skip action execution this turn
         
+    def _envision_conversation_turn(self, source: str, message: str, purpose: str = '') -> dict:
+        """Lightweight LLM call to characterize the conversational moment."""
+        # Gather recent dialog turns for context
+        recent_turns = ""
+        entity_data = self.memory.get_entity_data(source, limit=6, scope='current')
+        if entity_data and 'recent_conversation' in entity_data:
+            for entry in entity_data['recent_conversation'][-6:]:
+                if isinstance(entry, dict) and 'source' in entry and 'text' in entry:
+                    text_preview = str(entry['text'])[:200]
+                    recent_turns += f"{entry['source']}: {text_preview}\n"
+
+        purpose_line = f"CONVERSATION PURPOSE: {purpose}\n" if purpose else ""
+        prompt = (
+            f"{purpose_line}"
+            f"RECENT DIALOG:\n{recent_turns}\n"
+            f"INCOMING MESSAGE from {source}:\n{message[:500]}\n\n"
+            f"You are {self.character_name}. Given this conversational moment, provide:\n"
+            f"1. TURN_INTENT: What conversational move is {source} making? (1 sentence)\n"
+            f"2. MY_MOVE: What conversational move should {self.character_name} make in response? "
+            f"Do NOT echo or paraphrase — add new insight, push back, or ask a follow-up. "
+            f"If the conversation's purpose has been achieved, say so and wrap up. (1 sentence)\n"
+        )
+
+        try:
+            result = self.llm_generate(messages=[prompt], max_tokens=128, temperature=0.3, stops=["\n\n"])
+            if result.success and result.text:
+                text = result.text.strip()
+                turn_intent = ""
+                my_move = ""
+                for line in text.split('\n'):
+                    line = line.strip()
+                    if line.upper().startswith('TURN_INTENT:') or line.startswith('1.'):
+                        turn_intent = line.split(':', 1)[-1].strip() if ':' in line else line[2:].strip()
+                    elif line.upper().startswith('MY_MOVE:') or line.startswith('2.'):
+                        my_move = line.split(':', 1)[-1].strip() if ':' in line else line[2:].strip()
+                if turn_intent and my_move:
+                    logger.info(f'🎭 Envision: intent="{turn_intent[:60]}" move="{my_move[:60]}"')
+                    return {'turn_intent': turn_intent, 'my_move': my_move}
+        except Exception as e:
+            logger.warning(f'Envision failed: {e}')
+
+        # Fallback: generic framing
+        return {'turn_intent': f'{source} is communicating', 'my_move': f'Engage with {source} — contribute your own perspective'}
+
     def _run_ooda_loop(self):
         """Execute the OODA loop: Observe, Orient, Decide, Act."""
         try:

@@ -378,105 +378,59 @@ End your response with:
         
         return entity 
     
-    def natural_dialog_end(self, input_text, context):
+    def natural_dialog_end(self, context: str) -> bool:
         """
-        Analyze whether a dialog should naturally end after the given input.
+        Pure query: should this dialog naturally end now?
+        Does NOT close the dialog — caller decides when and how to close.
         
         Args:
-            input_text: The text input that would end the dialog
+            context: Character description / personality context
             
         Returns:
             bool: True if dialog should end, False if it should continue
         """
-        # Build transcript from recent conversation
-        if input_text.strip().endswith('?') or self.entity_name.strip() == 'User':
+        if not self.active or not self.dialogs:
             return False
+        
+        conversation_entries = self.get_recent_conversation(20)
+        if not conversation_entries:
+            return False
+        
+        # Don't end if last message is a question
+        last_text = ''
+        for entry in reversed(conversation_entries):
+            if isinstance(entry, dict) and 'text' in entry:
+                last_text = entry['text'].strip()
+                break
+        if last_text.endswith('?'):
+            return False
+        
         transcript_text = ''
-        if self.active:
-            conversation_entries = self.get_recent_conversation(20)
-            if conversation_entries:
-                for entry in conversation_entries:
-                    if isinstance(entry, dict) and 'source' in entry and 'text' in entry:
-                        transcript_text += f"{entry['source']}: {entry['text']}\n"
+        for entry in conversation_entries:
+            if isinstance(entry, dict) and 'source' in entry and 'text' in entry:
+                transcript_text += f"{entry['source']}: {entry['text']}\n"
         
-        # Add the proposed input to transcript
-        # don't actually need this, already in transcript!
-        #transcript_text += f"{self.entity_name}: {input_text}\n"
-        
-        # If no LLM generate callback available, default to continuing dialog
         if not self.llm_generate:
-            self.logger.warning(f'No LLM generate callback available for natural_dialog_end, defaulting to continue')
             return False
         
-        prompt = """Given the following context and dialog transcript, rate the naturalness of ending at this point.
-Include in your consideration of whether you are likely to end the dialog your personality and drives. 
-
-#Context
-You are {{$context}}
-##
-
-#Transcript
-{{$transcript}}
-##
-                              
-For example, if the last entry in the transcript contains a question that expects an answer (as opposed to merely musing), ending at this point is likely not expected.
-On the other hand, if the last entry is an agreement to an earlier suggestion, this may be a natural end.
-Dialogs may be short or longer depending on the characters involved and their personalities, conversational styles, and relationship.
-Respond only with a rating between 0 and 10, where
-0 expects continuation of the dialog (i.e., termination at this point would be unnatural)
-10 expects termination at this point (i.e., continuation is highly unexpected, unnatural, or repetitious).   
-                                                  
-Do not include any text in your response, ONLY the numeric rating.
-
-My rating is:
-"""
-        
-        # Apply bindings
-        prompt_with_bindings = prompt
-        prompt_with_bindings = prompt_with_bindings.replace("{{$context}}", context)
-        prompt_with_bindings = prompt_with_bindings.replace("{{$transcript}}", transcript_text)
+        prompt = (
+            f"You are {context}\n\n"
+            f"TRANSCRIPT:\n{transcript_text}\n\n"
+            f"Rate the naturalness of ending this dialog NOW on a scale of 0-10.\n"
+            f"0 = continuation expected, 10 = ending is natural or continuing would be repetitious.\n"
+            f"Respond with ONLY a number.\n"
+        )
         
         try:
-            response = self.llm_generate(
-                messages=[prompt_with_bindings],
-                bindings={},
-                max_tokens=20,
-                temperature=0.7,
-                stops=['</end>'],
-                is_json=False
-            )
-            
-            # Handle response format
-            if isinstance(response, dict):
-                response_text = response.get('text', '')
-                success = response.get('success', False)
-            elif hasattr(response, 'text'):
-                response_text = response.text
-                success = response.success if hasattr(response, 'success') else True
-            else:
-                response_text = str(response)
-                success = True
-            
-            if success:
-                # Extract rating from response
-                try:
-                    rating = int(''.join(filter(str.isdigit, response_text)))
-                    if rating < 0 or rating > 10:
-                        rating = 7
-                except ValueError:
-                    self.logger.warning(f'{self.entity_name} natural_dialog_end: invalid rating: {response_text}')
-                    rating = 7
-            
-            # Determine if dialog should end based on rating and some randomness
-            should_end = rating > 7 or (random.randint(4, 10) < rating) or ((rating + len(transcript_text.split('\n'))) > random.randint(12,14))
-            self.logger.info(f'{self.entity_name} natural_dialog_end: rating: {rating}, should_end: {should_end}')
-            if should_end:
-                self.close_dialog()
-            return should_end
-            
+            result = self.llm_generate(messages=[prompt], max_tokens=8, temperature=0.3)
+            if result.success and result.text:
+                rating = int(''.join(filter(str.isdigit, result.text.strip())))
+                rating = max(0, min(10, rating))
+                should_end = rating >= 7
+                self.logger.info(f'{self.entity_name} natural_dialog_end: rating={rating}, should_end={should_end}')
+                return should_end
         except Exception as e:
-            self.logger.error(f'Error in natural_dialog_end for {self.entity_name}: {e}')
-            traceback.print_exc()
-            self.close_dialog()
-            return True
+            self.logger.warning(f'natural_dialog_end failed for {self.entity_name}: {e}')
+        
+        return False  # Fail-open: don't kill conversations on errors
     

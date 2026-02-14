@@ -90,7 +90,7 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
     # Primitive action names that tools cannot collide with
     primitive_names = {
         'move', 'say', 'think', 'take', 'place', 'inspect', 'use', 'scan',
-        'apply', 'display', 'create-note', 'create-collection', 'persist', 'load', 'index', 'organize', 'search',
+        'apply', 'create-note', 'create-collection', 'persist', 'load', 'index', 'organize', 'search',
         'extract', 'filter', 'merge', 'coerce',
         'aggregate', 'sort', 'group_by', 'compare', 'map', 'flatten', 'add', 'split',
         'while', 'if', 'wait', 'sleep', 'focus'

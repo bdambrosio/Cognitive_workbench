@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 # Primitives executed by InfospaceExecutor (used by WorldModel/ToolModel to treat as available)
 INFOSPACE_PRIMITIVES = frozenset({
     'apply', 'create-note', 'create-collection', 'persist', 'load', 'index', 'organize',
-    'search-within-collection', 'discover-notes', 'discover-collections', 'say', 'display',
+    'search-within-collection', 'discover-notes', 'discover-collections', 'say',
     'think', 'ask', 'coerce', 'map', 'flatten', 'add', 'split', 'size', 'union',
     'intersection', 'difference', 'remove', 'project', 'pluck', 'head',
     'filter-structured', 'sort', 'join',
@@ -890,9 +890,9 @@ class InfospaceExecutor:
             'discover-notes': self._execute_discover_notes,
             'discover-collections': self._execute_discover_collections,
             'say': self._execute_say,
-            'display': self._execute_display,
             'think': self._execute_think,
             'ask': self._execute_ask,
+            'listen': self._execute_listen,
             # Phase 2: Data Operations (whole-value only)
             'coerce': self._execute_coerce,
             'map': self._execute_map,
@@ -2292,6 +2292,17 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             # Enforce ceiling
             sliced_ids = sliced_ids[:self.LOAD_MAX_COLLECTION_ITEMS]
             
+            # Single-item slice: return the Note directly instead of wrapping in a Collection
+            if len(sliced_ids) == 1 and slice_arg and ':' not in str(slice_arg).strip():
+                note_id = sliced_ids[0]
+                content = self._get_content(note_id)
+                content_str = str(content) if content is not None else ""
+                sliced_content = content_str[:self.LOAD_MAX_NOTE_CHARS]
+                self._bind_variable(out_var, note_id)
+                prefixed_content = f"Note Content: {sliced_content}"
+                logger.info(f"Loaded {target_arg}[{slice_arg}] → {display_var} = {note_id} (Note, unwrapped from Collection)")
+                return self._create_uniform_return('success', value=prefixed_content, resource_id=note_id)
+            
             # Create new Collection from slice
             collection_id = self._create_collection(sliced_ids, f'load_slice')
             if not collection_id:
@@ -2664,14 +2675,14 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             target = 'User'
         
         # Send message to target's sense_data (mirrors physical space send_text_input)
+        content_payload = {'source': self.agent_name, 'text': value_str}
+        if action.get('close'):
+            content_payload['close'] = True
         sense_data = {
             'timestamp': datetime.now().isoformat(),
             'sequence_id': 0,
             'mode': 'text',
-            'content': json.dumps({
-                'source': self.agent_name,
-                'text': value_str
-            })
+            'content': json.dumps(content_payload)
         }
         
         self.session.put(
@@ -2696,53 +2707,19 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             self.executive_node.last_say_text = value_str
         
         logger.info(f"Say [{target}]: {value_str}")
+        
+        # If close flag set, close our own dialog with the target and set cooldown
+        if action.get('close') and target.lower() != 'user':
+            try:
+                self.executive_node.memory.close_dialog(target)
+                self.executive_node._dialog_cooldowns[target] = time.time()
+                self.executive_node._dialog_purposes.pop(target, None)
+                logger.info(f"Say [{target}]: dialog closed (close flag)")
+            except Exception as e:
+                logger.warning(f"Say close_dialog failed for {target}: {e}")
+        
         # Return truncated message text, no resource_id
         return self._create_uniform_return('success', value=value_str, resource_id=None)
-    
-    def _execute_display(self, action: Dict) -> Dict:
-        """
-        Display formatted content to the UI action log pane.
-        
-        Required: type, value or target (accepts both for compatibility)
-        """
-        # Accept both value and target (target preferred for consistency with other primitives)
-        target_arg = action.get('value') or action.get('target')
-        
-        # Resolve variable if it's a $variable
-        value = self._resolve_value(target_arg)
-        
-        # If resolved value is a resource ID (literal string like "Note_20"), dereference it
-        if isinstance(value, str) and (value.startswith('Note_') or value.startswith('Collection_')):
-            content = self._get_content(value)
-            if content is not None:
-                value = content
-                logger.warning(f"display: dereferenced resource to content (len={len(str(value))})")
-        
-        if value is None:
-            return self._create_uniform_return('failed', reason='display requires value or target')
-        
-        # Always display to User
-        target = 'User'
-        
-        # Publish display action to action log pane (not sense_data!)
-        display_action = {
-            'type': 'display',
-            'character': self.agent_name,
-            'target': target,
-            'text': str(value),
-            'value': str(value),
-            'timestamp': datetime.now().isoformat()
-        }
-        
-        # Publish to action channel so FastAPI can log to action log pane
-        self.session.put(
-            f"cognitive/{self.agent_name}/action",
-            json.dumps(display_action)
-        )
-        
-        logger.info(f"Display [{target}]: published {len(str(value))} chars to action channel for action log pane")
-        # Return truncated content (1024 chars), no resource_id
-        return self._create_uniform_return('success', value=str(value), resource_id=None)
     
     def _execute_think(self, action: Dict) -> Dict:
         """
@@ -2836,9 +2813,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 # Process the text input directly
                 sense_data = self.executive_node.text_input_queue.pop(0)
                 content = sense_data['content']
+                close_flag = False
                 try:
                     content_data = json.loads(content)
                     response_text = content_data.get('text', '')
+                    close_flag = content_data.get('close', False)
                 except (json.JSONDecodeError, TypeError):
                     response_text = str(content)
                 
@@ -2846,6 +2825,16 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 
                 if response_text:
                     self.executive_node.awaiting_ask_response = False
+                    
+                    # If responder sent close flag, close our dialog with them
+                    if close_flag and target != 'User':
+                        try:
+                            self.executive_node.memory.close_dialog(target)
+                            self.executive_node._dialog_cooldowns[target] = time.time()
+                            self.executive_node._dialog_purposes.pop(target, None)
+                            logger.info(f"Ask: dialog closed by {target} (close flag)")
+                        except Exception as e:
+                            logger.warning(f"Ask close_dialog failed for {target}: {e}")
                     
                     # Don't publish response action - the User's say is already in the log
                     # Publishing both creates redundant entries
@@ -2866,6 +2855,47 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         logger.warning(f"⏱️ Ask timeout after {timeout}s: no user response")
         self._bind_variable(out_var, "Note_null")
         return self._create_uniform_return('failed', reason=f'User response timeout after {timeout}s')
+    
+    def _execute_listen(self, action: Dict) -> Dict:
+        """
+        Wait for a message from target without sending. Use after say when you need the reply.
+        Required: target, out. Polls text_input_queue for message from target.
+        """
+        import time
+        target = action.get('target')
+        out_var = action.get('out')
+        if not target or not out_var:
+            return self._create_uniform_return('failed', reason='listen requires target and out')
+        
+        self.executive_node.awaiting_listen_response = True
+        timeout = 300
+        start_time = time.time()
+        
+        while time.time() - start_time < timeout:
+            time.sleep(0.1)
+            queue = self.executive_node.text_input_queue
+            for i, sense_data in enumerate(queue):
+                try:
+                    content_data = json.loads(sense_data['content'])
+                    if content_data.get('source') != target:
+                        continue
+                except (json.JSONDecodeError, TypeError, KeyError):
+                    continue
+                queue.pop(i)
+                response_text = content_data.get('text', sense_data.get('content', '')).strip().strip('"').strip("'")
+                self.executive_node.awaiting_listen_response = False
+                response_note_id = self._persist_note(response_text, 'listen-response')
+                if response_note_id:
+                    self._bind_variable(out_var, response_note_id)
+                else:
+                    self._bind_variable(out_var, "Note_null")
+                logger.info(f"✅ Listen: response from {target} → {out_var}")
+                return self._create_uniform_return('success', value=response_text, resource_id=response_note_id or "Note_null")
+        
+        self.executive_node.awaiting_listen_response = False
+        logger.warning(f"⏱️ Listen timeout after {timeout}s: no message from {target}")
+        self._bind_variable(out_var, "Note_null")
+        return self._create_uniform_return('failed', reason=f'Listen timeout: no message from {target}')
     
     # ==================== Phase 2: Data Operations ====================
     
@@ -3035,7 +3065,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             # Mutation primitives (mutate target Collection, need special result handling)
             'add', 'remove',
             # Side-effect primitives (don't create result Notes, need special handling)
-            'display', 'say', 'think',
+            'say', 'think',
             # Optimized cases (have inline implementations for performance)
             'project', 'pluck',
             # Collection-only primitives (operate on Collections, not individual Notes)
@@ -3075,7 +3105,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                         if 'out' not in primitive_action:
                             primitive_action['out'] = additional_args.get('target', out_var)
                         result = self.execute_action(primitive_action)
-                    elif operation in ['display', 'say', 'think']:
+                    elif operation in ['say', 'think']:
                         # Side-effect primitives: map item becomes 'value'
                         primitive_action = {'type': operation, 'value': note_id}
                         primitive_action.update(additional_args)
@@ -3174,7 +3204,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                             if 'out' not in primitive_action:
                                 primitive_action['out'] = tool_args.get('target', out_var)
                             result = self.execute_action(primitive_action)
-                        elif tool_name in ['display', 'say', 'think']:
+                        elif tool_name in ['say', 'think']:
                             primitive_action = {'type': tool_name, 'value': note_id}
                             primitive_action.update(tool_args)
                             result = self.execute_action(primitive_action)
@@ -3264,8 +3294,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                     if isinstance(result_value, str) and result_value.startswith('Collection_'):
                         # Keep reference to mutated collection (will overwrite each iteration, but that's fine)
                         result_note_ids.append(result_value)
-                # For side-effect primitives (display, say, think): no result Note needed
-                elif isinstance(operation, str) and operation in ['display', 'say', 'think']:
+                # For side-effect primitives (say, think): no result Note needed
+                elif isinstance(operation, str) and operation in ['say', 'think']:
                     # Side-effect only - don't create result Note, but don't treat as failure
                     pass
                 elif result_value is None:
@@ -3306,7 +3336,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                     return self._create_uniform_return('failed', reason=f'Mutation target {mutation_target} not bound')
             else:
                 return self._create_uniform_return('failed', reason=f'{operation} requires target in args')
-        elif isinstance(operation, str) and operation in ['display', 'say', 'think']:
+        elif isinstance(operation, str) and operation in ['say', 'think']:
             # Side-effect primitives - create empty Collection (side effects executed, no result Notes)
             operation_str = operation if isinstance(operation, str) else 'operation'
             collection_id = self._create_collection([], f'map_{operation_str}')
@@ -5507,8 +5537,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 last_action_result = result.copy()
                 
                 # Publish action result for UI display (if executive_node available)
-                # Skip say/ask - they self-publish with proper text field
-                if self.executive_node and stype not in ('say', 'ask'):
+                # Skip say/ask - they self-publish; listen is silent wait
+                if self.executive_node and stype not in ('say', 'ask', 'listen'):
                     self.executive_node._publish_action_result(step, result, stype, datetime.now())
                 
                 # Check for suspension (ask action)
@@ -5744,8 +5774,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 last_action_result = result.copy()
                 
                 # Publish action result for UI display (if executive_node available)
-                # Skip say/ask - they self-publish with proper text field
-                if self.executive_node and stype not in ('say', 'ask'):
+                # Skip say/ask - they self-publish; listen is silent wait
+                if self.executive_node and stype not in ('say', 'ask', 'listen'):
                     self.executive_node._publish_action_result(step, result, stype, datetime.now())
                 
                 # Check for ask suspension
