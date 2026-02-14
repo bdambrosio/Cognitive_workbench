@@ -722,19 +722,24 @@ class InfospaceExecutor:
         prefix_str = f"{collection_prefix}: " if collection_prefix else ""
         return f"{prefix_str}{item_count} items [{note_list_str}]"
     
-    def _create_uniform_return(self, status: str, value: Any = None, resource_id: Optional[str] = None, reason: Optional[str] = None, extra: Optional[Dict] = None) -> Dict:
+    def _create_uniform_return(self, status: str, value: Any = None, resource_id: Optional[str] = None, reason: Optional[str] = None, extra: Optional[Dict] = None, data: Any = None) -> Dict:
         """
         Create uniform return format for all actions.
         
         Args:
             status: 'success' or 'failed'
-            value: Content value (will be truncated if string/too long)
+            value: Content value for display (will be truncated if string/too long)
             resource_id: Resource ID if resource was created/referenced
             reason: Error reason if failed
             extra: Optional metadata dict (passed to Note/Collection properties)
+            data: Structured content for code blocks. If None, auto-populated:
+                  - Notes: string content from resource properties
+                  - Collections: list of dicts with 'text' and 'metadata' per item
+                  - Scalars: the raw value
+                  - Failed: None
             
         Returns:
-            Uniform return dict with type='uniform_return', status, value (formatted), data (raw value/reason), extra, resource_id, reason
+            Uniform return dict with type='uniform_return', status, value (display), data (structured), extra, resource_id, reason
         """
         result = {
             'type': 'uniform_return',
@@ -743,11 +748,12 @@ class InfospaceExecutor:
 
         if status == 'failed':
             result['reason'] = reason or 'Unknown error'
-            result['data'] = reason or value  # data = reason on failure
+            result['data'] = None
             result['value'] = self._format_return_value(value or reason, extra=extra, max_chars=960)
             result['resource_id'] = None
         else:
-            result['data'] = value  # data = value on success (raw, unformatted)
+            # data: use explicit data arg if provided, otherwise fall back to value
+            result['data'] = data if data is not None else value
             result['value'] = self._format_return_value(value, extra=extra, max_chars=960) if value is not None else None
             result['resource_id'] = resource_id
         
@@ -755,13 +761,30 @@ class InfospaceExecutor:
         if extra:
             result['extra'] = extra
         
-        # Auto-inject item_count for Collection results so code blocks can use r.get("extra",{}).get("item_count")
-        if status == 'success' and resource_id and isinstance(resource_id, str) and resource_id.startswith('Collection_') and self.resource_manager:
+        # Auto-enrich for resource-backed results
+        if status == 'success' and resource_id and isinstance(resource_id, str) and self.resource_manager:
             resource = self.resource_manager.get_resource(resource_id)
             if resource:
-                if 'extra' not in result or result['extra'] is None:
-                    result['extra'] = {}
-                result['extra'].setdefault('item_count', resource.get('properties', {}).get('item_count', 0))
+                props = resource.get('properties', {})
+                # Auto-inject item_count for Collections
+                if resource_id.startswith('Collection_'):
+                    if 'extra' not in result or result['extra'] is None:
+                        result['extra'] = {}
+                    result['extra'].setdefault('item_count', props.get('item_count', 0))
+                # Auto-populate data from resource content if not explicitly set
+                if result['data'] is None or (data is None and isinstance(result['data'], str) and result['data'] == value):
+                    content = props.get('content')
+                    if resource_id.startswith('Note_'):
+                        result['data'] = content  # string
+                    elif resource_id.startswith('Collection_') and isinstance(content, list):
+                        # Build structured items: text + metadata per Note
+                        items = []
+                        for item_id in content:
+                            item_resource = self.resource_manager.get_resource(item_id)
+                            if item_resource:
+                                item_props = item_resource.get('properties', {})
+                                items.append({'text': item_props.get('content', ''), 'metadata': {k: v for k, v in item_props.items() if k != 'content'}})
+                        result['data'] = items
         
         return result
     

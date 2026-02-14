@@ -1007,6 +1007,7 @@ class ZenohExecutiveNode:
             entity_name = data.get('entity_name', 'User')
             self.memory.close_dialog(entity_name)
             logger.info(f'🔚 {self.character_name} closed dialog with {entity_name} (from UI)')
+            self._publish_execution_state()
         except Exception as e:
             logger.warning(f'Error handling close_dialog: {e}')
     
@@ -2599,11 +2600,20 @@ class ZenohExecutiveNode:
     def _publish_execution_state(self):
         """Publish current execution state for UI."""
         try:
+            active_dialog = False
+            try:
+                for entity in self.memory.entity_models.values():
+                    if entity.active and entity.dialogs and len(entity.dialogs[-1]) > 0:
+                        active_dialog = True
+                        break
+            except Exception:
+                pass
             state_data = {
                 'paused': self.execution_paused,
                 'mode': self.execution_mode,
                 'character': self.character_name,
                 'continuous_mode': self.continuous_mode,
+                'active_dialog': active_dialog,
                 'timestamp': time.time()
             }
             self.execution_state_publisher.put(json.dumps(state_data).encode('utf-8'))

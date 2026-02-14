@@ -60,5 +60,7 @@ src/world-tools/minecraft/bot-reference/
 src/world-tools/minecraft/voxel_affordance_model/
 
 # Scenario resources (generated/runtime data)
-scenarios/*/resources/
-scenarios/fs/fs/*
+scenarios/*/
+
+# Musings (generated/runtime)
+src/musings/
