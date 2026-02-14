@@ -1861,8 +1861,15 @@ class ZenohExecutiveNode:
                                 in_conversation = True
                         except Exception:
                             pass
+                        # Side note: when initiating (no prior dialog), envision has less context; fallback handles it
+                        envision = self._envision_conversation_turn("User", clean_input, "")
                         goal_text = "Continue dialog with User" if in_conversation else "Respond to User"
-                        context = f"\n## CONTEXT ##\nMessage from User: {clean_input[:500]}"
+                        context = (
+                            f"\n## CONTEXT ##\n"
+                            f"Their move: {envision['turn_intent']}\n"
+                            f"Your move: {envision['my_move']}\n"
+                            f"Message from User: {clean_input[:500]}"
+                        )
                         logger.info(f'📥 {self.character_name} Received: "{goal_text}"')
                         self.parse_and_set_goal("", f"{goal_text}{context}")
                     self.execution_paused = False
@@ -1945,8 +1952,8 @@ class ZenohExecutiveNode:
         # Gather recent dialog turns for context
         recent_turns = ""
         entity_data = self.memory.get_entity_data(source, limit=6, scope='current')
-        if entity_data and 'recent_conversation' in entity_data:
-            for entry in entity_data['recent_conversation'][-6:]:
+        if entity_data and 'conversation_history' in entity_data:
+            for entry in entity_data['conversation_history'][-6:]:
                 if isinstance(entry, dict) and 'source' in entry and 'text' in entry:
                     text_preview = str(entry['text'])[:200]
                     recent_turns += f"{entry['source']}: {text_preview}\n"
