@@ -291,8 +291,9 @@ def tool(input_value, runtime=None, **kwargs):
     Returns:
         Collection ID containing structured Note for each paper result
     """
-    # Extract grobid_url from kwargs if available (from YAML config)
+    # Extract grobid_url and pdf_parser from kwargs (from YAML config)
     grobid_url = kwargs.get('grobid_url')
+    pdf_parser = kwargs.get('pdf_parser')
     
     executor: InfospaceExecutor = kwargs.get("executor")
     if not executor:
@@ -318,8 +319,9 @@ def tool(input_value, runtime=None, **kwargs):
     # Search papers
     results = search_papers(query, limit=limit)
     
-    # Enhance results with GROBID if grobid_url is provided
-    if grobid_url and results:
+    # Enhance results with GROBID if grobid_url is provided and pdf_parser is not "pymupdf"
+    use_pymupdf_only = (pdf_parser or "").lower() == "pymupdf"
+    if grobid_url and results and not use_pymupdf_only:
         logger.info(f"Enhancing {len(results)} results with GROBID parsing")
         enhanced_results = []
         for result in results:

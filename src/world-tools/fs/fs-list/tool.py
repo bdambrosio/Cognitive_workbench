@@ -16,10 +16,12 @@ try:
         build_json_content,
         build_text_content,
         file_metadata,
+        get_fs_root,
         is_binary_file,
         is_documentation_file,
         list_dir_entries,
         resolve_fs_path,
+        _find_project_root,
     )
 except ImportError:
     import sys
@@ -29,10 +31,12 @@ except ImportError:
         build_json_content,
         build_text_content,
         file_metadata,
+        get_fs_root,
         is_binary_file,
         is_documentation_file,
         list_dir_entries,
         resolve_fs_path,
+        _find_project_root,
     )
 
 
@@ -136,8 +140,8 @@ def tool(input_value=None, **kwargs):
 
     resource_manager = kwargs.get("resource_manager")
     agent_name = kwargs.get("agent_name", "fs-list")
-    world_name = kwargs.get("world_name", "")
-    
+    world_name = kwargs.get("world_name", "") or (executor.world_name if executor else "")
+
     path_arg = kwargs.get("path") or input_value or kwargs.get("value")
     recursive = bool(kwargs.get("recursive", False))
     include_files = kwargs.get("include_files", True)
@@ -146,7 +150,6 @@ def tool(input_value=None, **kwargs):
 
     abs_path, rel_path = resolve_fs_path(path_arg, world_name, Path(__file__))
     if abs_path is None:
-        from ..fs_common import get_fs_root, _find_project_root
         fs_root = get_fs_root(world_name, Path(__file__))
         project_root = _find_project_root(Path(__file__))
         logger.error(f"fs-list: resolve_fs_path failed - world_name='{world_name}', fs_root={fs_root}, project_root={project_root}, tool_file={Path(__file__)}")

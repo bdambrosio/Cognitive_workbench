@@ -70,8 +70,9 @@ def tool(url_or_content: str, runtime=None, **kwargs) -> str:
     if not executor:
         return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
 
-    # Extract grobid_url from kwargs if available (from YAML config)
+    # Extract grobid_url and pdf_parser from kwargs (from YAML config)
     grobid_url = kwargs.get('grobid_url')
+    pdf_parser = kwargs.get('pdf_parser')
     
     if not url_or_content or not isinstance(url_or_content, str):
         return _fail(executor, "url_or_content parameter required")
@@ -179,7 +180,7 @@ def tool(url_or_content: str, runtime=None, **kwargs) -> str:
     file_format = _detect_format(content, content_type, final_url)
     
     if file_format == "pdf":
-        result = _extract_pdf_text(content, final_url, grobid_url=grobid_url)
+        result = _extract_pdf_text(content, final_url, grobid_url=grobid_url, pdf_parser=pdf_parser)
     elif file_format == "html":
         result = _extract_html_text(content, final_url)
     elif file_format == "docx":
@@ -399,7 +400,7 @@ def _process_base64_pdf(content: str) -> str:
         return json.dumps({"error": f"Failed to decode PDF: {str(e)}"})
 
 
-def _extract_pdf_text(content: bytes, url: str, grobid_url: str = None) -> str:
+def _extract_pdf_text(content: bytes, url: str, grobid_url: str = None, pdf_parser: str = None) -> str:
     """
     Extract text from PDF bytes.
     
@@ -407,9 +408,11 @@ def _extract_pdf_text(content: bytes, url: str, grobid_url: str = None) -> str:
         content: PDF file bytes
         url: Source URL or file path
         grobid_url: Optional GROBID server URL for enhanced PDF parsing
+        pdf_parser: When "pymupdf", use pymupdf only (skip GROBID even if available)
     """
-    # Use GROBID if available
-    if grobid_url:
+    use_pymupdf_only = (pdf_parser or "").lower() == "pymupdf"
+    # Use GROBID if available and not forcing pymupdf
+    if grobid_url and not use_pymupdf_only:
         try:
             # Save content to temp file for GROBID
             with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:

@@ -444,6 +444,7 @@ class ZenohExecutiveNode:
         vllm_model_path = llm_config.get('vllm_model_path')
         vllm_url = llm_config.get('vllm_url', 'http://localhost:5000/v1/chat/completions')
         openrouter_model_path = llm_config.get('openrouter_model_path')
+        anthropic_model_path = llm_config.get('anthropic_model_path')
         
         self.runtime = None
         self.llm_client = None
@@ -451,6 +452,8 @@ class ZenohExecutiveNode:
         self.vllm_url = None
         self.openrouter_model = None
         self.openrouter_api_key = None
+        self.anthropic_model = None
+        self.anthropic_api_key = None
         
         # Check SGLang availability
         HAS_SGLANG = False
@@ -460,8 +463,17 @@ class ZenohExecutiveNode:
         except ImportError:
             pass
         
+        # Initialize Anthropic API if configured
+        if anthropic_model_path:
+            api_key = os.getenv('CLAUDE_API_KEY')
+            if not api_key:
+                logger.error("❌ Anthropic model configured but CLAUDE_API_KEY environment variable not set")
+                raise ValueError("CLAUDE_API_KEY environment variable required for Anthropic API")
+            self.anthropic_model = anthropic_model_path
+            self.anthropic_api_key = api_key
+            logger.info(f"✅ Anthropic API configured with model: {anthropic_model_path}")
         # Initialize OpenRouter if configured
-        if openrouter_model_path:
+        elif openrouter_model_path:
             api_key = os.getenv('OPENROUTER_API_KEY')
             if not api_key:
                 logger.error("❌ OpenRouter model configured but OPENROUTER_API_KEY environment variable not set")
@@ -682,6 +694,9 @@ class ZenohExecutiveNode:
         if self.openrouter_model and self.openrouter_api_key:
             self.infospace_executor.openrouter_model = self.openrouter_model
             self.infospace_executor.openrouter_api_key = self.openrouter_api_key
+        if self.anthropic_model and self.anthropic_api_key:
+            self.infospace_executor.anthropic_model = self.anthropic_model
+            self.infospace_executor.anthropic_api_key = self.anthropic_api_key
         logger.info(f'🧩 Infospace executor initialized for {character_name}')
         
         # Build available_tools for models: loaded tools + infospace primitives (load, persist, etc.)
@@ -735,6 +750,7 @@ class ZenohExecutiveNode:
             vllm_model_path = llm_config.get('vllm_model_path')
             vllm_url = llm_config.get('vllm_url', 'http://localhost:5000/v1/chat/completions')
             openrouter_model_path = llm_config.get('openrouter_model_path')
+            anthropic_model_path = llm_config.get('anthropic_model_path')
             
             if HAS_SGLANG and sgl_model_path:
                 # Use SGLang
@@ -756,6 +772,15 @@ class ZenohExecutiveNode:
                     vllm_model=self.vllm_model
                 )
                 logger.info(f'🚀 IncrementalPlanner initialized (vLLM) for {character_name}')
+            elif anthropic_model_path and self.anthropic_model:
+                # Use Anthropic API
+                self.incremental_planner = IncrementalPlanner(
+                    executor=self.infospace_executor,
+                    available_tools=self.available_tools,
+                    logger_instance=logger,
+                    anthropic_model_path=anthropic_model_path
+                )
+                logger.info(f'🚀 IncrementalPlanner initialized (Anthropic API) for {character_name}')
             elif openrouter_model_path and self.openrouter_model:
                 # Use OpenRouter
                 self.incremental_planner = IncrementalPlanner(
@@ -766,7 +791,7 @@ class ZenohExecutiveNode:
                 )
                 logger.info(f'🚀 IncrementalPlanner initialized (OpenRouter) for {character_name}')
             else:
-                logger.warning(f'⚠️  Neither SGLang, vLLM, nor OpenRouter configured - incremental planning disabled')
+                logger.warning(f'⚠️  Neither SGLang, vLLM, Anthropic, nor OpenRouter configured - incremental planning disabled')
         except Exception as e:
             logger.warning(f'⚠️  Failed to initialize IncrementalPlanner: {e}')
             import traceback

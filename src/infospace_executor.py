@@ -97,6 +97,10 @@ class InfospaceExecutor:
         self.openrouter_model = None
         self.openrouter_api_key = None
 
+        # Anthropic API config (set by executive_node if Anthropic is used)
+        self.anthropic_model = None
+        self.anthropic_api_key = None
+
         # Global interrupt flag (can be set by UI via executive_node control channel)
         self.interrupt_requested: bool = False
         
@@ -1420,6 +1424,90 @@ Only provide the result, followed by the </end> tag.""")
             logger.exception(f"vLLM generation error: {e}")
             return Response(success=False, error=str(e))
     
+    def _anthropic_generate(self, messages, max_tokens=2000, temperature=0.7, stops=None, is_json=False):
+        """
+        Generate text using Anthropic API directly.
+        Uses Messages API with anthropic SDK.
+        
+        Args:
+            messages: List of message strings or dicts with role/content
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature
+            stops: List of stop sequences
+            is_json: If True, parse response as JSON and return dict
+            
+        Returns:
+            Object with .success, .text, and .error attributes
+        """
+        class Response:
+            def __init__(self, success, text='', error=None):
+                self.success = success
+                self.text = text
+                self.error = error
+
+        try:
+            from anthropic import Anthropic
+            client = Anthropic(api_key=self.anthropic_api_key)
+
+            # Convert messages to Anthropic format (system + messages)
+            system_parts = []
+            api_messages = []
+            if isinstance(messages, list):
+                for msg in messages:
+                    if isinstance(msg, str):
+                        if msg.strip().startswith('<|system|>'):
+                            system_parts.append(msg.replace('<|system|>', '').strip())
+                        elif msg.strip().startswith('<|user|>'):
+                            api_messages.append({"role": "user", "content": msg.replace('<|user|>', '').strip()})
+                        elif msg.strip().startswith('<|assistant|>'):
+                            api_messages.append({"role": "assistant", "content": msg.replace('<|assistant|>', '').strip()})
+                        else:
+                            api_messages.append({"role": "user", "content": msg})
+                    elif isinstance(msg, dict):
+                        role = msg.get("role", "user")
+                        content = msg.get("content", "")
+                        if role == "system":
+                            system_parts.append(content)
+                        else:
+                            api_messages.append({"role": role, "content": content})
+            else:
+                api_messages = [{"role": "user", "content": str(messages)}]
+
+            system_text = "\n\n".join(system_parts) if system_parts else None
+            # Anthropic rejects empty/whitespace-only content blocks - filter them out
+            api_messages = [m for m in api_messages if m.get("content") and str(m["content"]).strip()]
+            if not api_messages:
+                return Response(success=False, error="No user messages to send")
+
+            kwargs = {
+                "model": self.anthropic_model,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+                "messages": api_messages,
+            }
+            if system_text:
+                kwargs["system"] = system_text
+            if stops:
+                stop_list = stops if isinstance(stops, list) else [stops]
+                # Anthropic rejects stop sequences that are empty or whitespace-only
+                stop_list = [s for s in stop_list if s is not None and str(s).strip()]
+                if stop_list:
+                    kwargs["stop_sequences"] = stop_list
+
+            response = client.messages.create(**kwargs)
+            result_text = response.content[0].text if response.content else None
+
+            if result_text is None:
+                return Response(success=False, error="Anthropic API returned no content")
+
+            if is_json:
+                result_text = self._parse_json_response(result_text, str(messages))
+
+            return Response(success=True, text=result_text)
+        except Exception as e:
+            logger.exception(f"Anthropic API error: {e}")
+            return Response(success=False, error=str(e))
+
     def _openrouter_generate(self, messages, max_tokens=2000, temperature=0.7, stops=None, is_json=False):
         """
         Generate text using OpenRouter API via HTTP.
@@ -1547,15 +1635,17 @@ Only provide the result, followed by the </end> tag.""")
                     processed_messages.append(msg)
             messages = processed_messages
         
-        # Use OpenRouter if configured, then vLLM, then SGLang
-        if self.openrouter_model and self.openrouter_api_key:
+        # Use Anthropic if configured, then OpenRouter, then vLLM, then SGLang
+        if self.anthropic_model and self.anthropic_api_key:
+            return self._anthropic_generate(messages, max_tokens, temperature, stops, is_json=is_json)
+        elif self.openrouter_model and self.openrouter_api_key:
             return self._openrouter_generate(messages, max_tokens, temperature, stops, is_json=is_json)
         elif self.vllm_model and self.vllm_url:
             return self._vllm_generate(messages, max_tokens, temperature, stops, is_json=is_json)
         elif self.runtime:
             return self._sglang_generate(messages, max_tokens, temperature, stops, is_json=is_json)
         else:
-            raise RuntimeError("No LLM backend available - ensure executive_node is started with sgl_model_path, vllm_model_path, or openrouter_model_path")
+            raise RuntimeError("No LLM backend available - ensure executive_node is started with sgl_model_path, vllm_model_path, anthropic_model_path, or openrouter_model_path")
     
     def _parse_json_response(self, response_text, original_prompt=None):
         """
@@ -1786,12 +1876,15 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             base_args['executor'] = self
             base_args['llm_generate'] = self.llm_generate
             
-            # Extract grobid URL from config if available (for PDF processing tools)
+            # Extract grobid URL and pdf_parser from config (for PDF processing tools)
             if self.executive_node:
                 llm_config = self.executive_node.character_config.get('llm_config', {})
                 grobid_url = llm_config.get('grobid')
                 if grobid_url:
                     base_args['grobid_url'] = grobid_url
+                pdf_parser = llm_config.get('pdf_parser')
+                if pdf_parser:
+                    base_args['pdf_parser'] = pdf_parser
                 
                 # Extract world_config if available (generalized for any external world API)
                 world_config = self.executive_node.character_config.get('world_config', {})
@@ -2247,19 +2340,26 @@ Make sure the string is in a format that can be parsed by the json.loads functio
     LOAD_MAX_COLLECTION_ITEMS = 16
 
     @staticmethod
-    def _parse_slice(slice_str: str, length: int) -> slice:
-        """Parse Python-style slice string into a slice object, clamped to length."""
+    def _parse_slice(slice_str: str, length: int) -> tuple:
+        """
+        Parse Python-style slice string into a slice object.
+        Returns (slice, None) on success, (None, error_msg) on validation failure.
+        Supports standard Python semantics including negative indices (e.g. "-500:" for last 500).
+        Rejects only when both start and stop are non-negative and stop < start.
+        """
         s = slice_str.strip()
         if ':' in s:
             parts = s.split(':', 1)
             start = int(parts[0]) if parts[0].strip() else None
             stop = int(parts[1]) if parts[1].strip() else None
-            return slice(start, stop)
-        # Single index
+            if start is not None and stop is not None and start >= 0 and stop >= 0 and stop < start:
+                return (None, f"load slice: stop must be >= start, got {start}:{stop}")
+            return (slice(start, stop), None)
+        # Single index (supports negative)
         idx = int(s)
         if idx < 0:
             idx = max(0, length + idx)
-        return slice(idx, idx + 1)
+        return (slice(idx, idx + 1), None)
 
     def _execute_load(self, action: Dict) -> Dict:
         """
@@ -2306,21 +2406,23 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 note_ids = []
             total = len(note_ids)
             
-            # Parse slice (items), default "0:5", ceiling LOAD_MAX_COLLECTION_ITEMS
+            # Parse slice (items), default "0:5", ceiling only when no slice
             if slice_arg:
-                sl = self._parse_slice(str(slice_arg), total)
+                sl, err = self._parse_slice(str(slice_arg), total)
+                if err:
+                    return self._create_uniform_return('failed', reason=err)
+                sliced_ids = note_ids[sl]
+                # No ceiling when slice is explicit (including ":" for full)
             else:
                 sl = slice(0, 5)
-            sliced_ids = note_ids[sl]
-            # Enforce ceiling
-            sliced_ids = sliced_ids[:self.LOAD_MAX_COLLECTION_ITEMS]
+                sliced_ids = note_ids[sl][:self.LOAD_MAX_COLLECTION_ITEMS]
             
             # Single-item slice: return the Note directly instead of wrapping in a Collection
             if len(sliced_ids) == 1 and slice_arg and ':' not in str(slice_arg).strip():
                 note_id = sliced_ids[0]
                 content = self._get_content(note_id)
                 content_str = str(content) if content is not None else ""
-                sliced_content = content_str[:self.LOAD_MAX_NOTE_CHARS]
+                sliced_content = content_str  # Full content for single-item unwrap
                 self._bind_variable(out_var, note_id)
                 prefixed_content = f"Note Content: {sliced_content}"
                 logger.info(f"Loaded {target_arg}[{slice_arg}] → {display_var} = {note_id} (Note, unwrapped from Collection)")
@@ -2349,14 +2451,16 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         content_str = str(content) if content is not None else ""
         total_chars = len(content_str)
         
-        # Parse slice (chars), default "0:4096", ceiling LOAD_MAX_NOTE_CHARS
+        # Parse slice (chars), default "0:4096", ceiling LOAD_MAX_NOTE_CHARS only when no slice
         if slice_arg:
-            sl = self._parse_slice(str(slice_arg), total_chars)
+            sl, err = self._parse_slice(str(slice_arg), total_chars)
+            if err:
+                return self._create_uniform_return('failed', reason=err)
+            sliced_content = content_str[sl]
+            # No ceiling when slice is explicit (including ":" for full content)
         else:
             sl = slice(0, self.LOAD_MAX_NOTE_CHARS)
-        sliced_content = content_str[sl]
-        # Enforce ceiling
-        sliced_content = sliced_content[:self.LOAD_MAX_NOTE_CHARS]
+            sliced_content = content_str[sl][:self.LOAD_MAX_NOTE_CHARS]
         
         self._bind_variable(out_var, resource_id)
         prefixed_content = f"Note Content: {sliced_content}"
