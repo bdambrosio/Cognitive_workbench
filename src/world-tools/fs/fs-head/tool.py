@@ -57,7 +57,7 @@ def tool(input_value=None, **kwargs):
 
     resource_manager = kwargs.get("resource_manager")
     agent_name = kwargs.get("agent_name", "fs-head")
-    world_name = kwargs.get("world_name", "")
+    world_name = kwargs.get("world_name", "") or (executor.world_name if executor else "")
 
     path_arg = kwargs.get("path") or input_value or kwargs.get("value")
     lines = int(kwargs.get("lines", 20))

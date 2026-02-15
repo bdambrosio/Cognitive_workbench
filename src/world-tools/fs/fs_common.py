@@ -61,7 +61,20 @@ def resolve_fs_path(path_value: Optional[str], world_name: str, start_path: Path
         rel_path = Path(rel_input)
         if rel_path.is_absolute():
             return None, None
-        candidate = (fs_root / rel_path).resolve()
+        # Normalize .. and . without resolving symlinks (resolve() would follow symlinks
+        # and fail _is_within_root when a symlink points outside fs_root)
+        norm_parts = []
+        for p in rel_path.parts:
+            if p in (".", ""):
+                continue
+            elif p == "..":
+                if norm_parts:
+                    norm_parts.pop()
+                else:
+                    return None, None  # path traversal escape attempt
+            else:
+                norm_parts.append(p)
+        candidate = fs_root.joinpath(*norm_parts) if norm_parts else fs_root
 
     if not _is_within_root(candidate, fs_root):
         return None, None

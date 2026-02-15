@@ -4,9 +4,8 @@ world_config:
   world_name: "fs"
   
 llm_config:
-  sgl_model_path: "Qwen/Qwen3-Next-80B-A3B-Instruct-FP8"
+  anthropic_model_path: "claude-sonnet-4-5-20250929"
   pdf_parser: "pymupdf"  # Use pymupdf for PDF reading (skip GROBID even if available)
-  grobid: "http://localhost:8070/"
   
 setting: |
   Cognitive Workbench, a virtual modern 

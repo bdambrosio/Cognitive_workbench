@@ -29,10 +29,12 @@ try:
         build_json_content,
         build_text_content,
         file_metadata,
+        get_fs_root,
         is_binary_file,
         read_json_file,
         read_text_file,
         resolve_fs_path,
+        _find_project_root,
     )
 except ImportError:
     import sys
@@ -42,16 +44,19 @@ except ImportError:
         build_json_content,
         build_text_content,
         file_metadata,
+        get_fs_root,
         is_binary_file,
         read_json_file,
         read_text_file,
         resolve_fs_path,
+        _find_project_root,
     )
 
 
-def _extract_pdf_text(pdf_path: Path, grobid_url: Optional[str] = None) -> Dict[str, Any]:
+def _extract_pdf_text(pdf_path: Path, grobid_url: Optional[str] = None, pdf_parser: Optional[str] = None) -> Dict[str, Any]:
     """
     Extract text from PDF file using GROBID (if available) or pymupdf fallback.
+    When pdf_parser is "pymupdf", use pymupdf only (skip GROBID even if available).
     Returns dict with text, format, metadata, page_count, char_count.
     """
     if not HAS_PYMUPDF:
@@ -61,8 +66,11 @@ def _extract_pdf_text(pdf_path: Path, grobid_url: Optional[str] = None) -> Dict[
     with pdf_path.open("rb") as f:
         content = f.read()
     
-    # Try GROBID first if available
-    if grobid_url and HAS_GROBID:
+    # Use pymupdf only when pdf_parser is explicitly "pymupdf"
+    use_pymupdf_only = (pdf_parser or "").lower() == "pymupdf"
+    
+    # Try GROBID first if available and not forcing pymupdf (use grobid_url from config or module default)
+    if HAS_GROBID and not use_pymupdf_only:
         try:
             # Extract title from filename
             title = pdf_path.stem or "document"
@@ -245,8 +253,9 @@ def tool(input_value=None, **kwargs):
 
     resource_manager = kwargs.get("resource_manager")
     agent_name = kwargs.get("agent_name", "fs-read")
-    world_name = kwargs.get("world_name", "")
-    grobid_url = kwargs.get("grobid_url")  # Get grobid_url from kwargs (from world_config)
+    world_name = kwargs.get("world_name", "") or (executor.world_name if executor else "")
+    grobid_url = kwargs.get("grobid_url")
+    pdf_parser = kwargs.get("pdf_parser")
 
     path_arg = kwargs.get("path") or input_value or kwargs.get("value")
     max_chars = kwargs.get("max_chars")
@@ -254,7 +263,6 @@ def tool(input_value=None, **kwargs):
 
     abs_path, rel_path = resolve_fs_path(path_arg, world_name, Path(__file__))
     if abs_path is None:
-        from ..fs_common import get_fs_root, _find_project_root
         fs_root = get_fs_root(world_name, Path(__file__))
         project_root = _find_project_root(Path(__file__))
         logger.error(f"fs-read: resolve_fs_path failed - world_name='{world_name}', fs_root={fs_root}, project_root={project_root}, path_arg='{path_arg}'")
@@ -292,7 +300,7 @@ def tool(input_value=None, **kwargs):
             if not HAS_PYMUPDF:
                 return executor._create_uniform_return("failed", reason="pymupdf not available for PDF extraction")
             try:
-                pdf_result = _extract_pdf_text(abs_path, grobid_url=grobid_url)
+                pdf_result = _extract_pdf_text(abs_path, grobid_url=grobid_url, pdf_parser=pdf_parser)
                 # Merge file metadata with PDF result
                 pdf_result["metadata"].update(meta)
                 # Apply max_chars limit if specified

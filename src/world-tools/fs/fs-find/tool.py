@@ -17,9 +17,11 @@ try:
         build_json_content,
         build_text_content,
         file_metadata,
+        get_fs_root,
         is_binary_file,
         is_documentation_file,
         resolve_fs_path,
+        _find_project_root,
     )
 except ImportError:
     import sys
@@ -29,9 +31,11 @@ except ImportError:
         build_json_content,
         build_text_content,
         file_metadata,
+        get_fs_root,
         is_binary_file,
         is_documentation_file,
         resolve_fs_path,
+        _find_project_root,
     )
 
 
@@ -149,8 +153,8 @@ def tool(input_value=None, **kwargs):
 
     resource_manager = kwargs.get("resource_manager")
     agent_name = kwargs.get("agent_name", "fs-find")
-    world_name = kwargs.get("world_name", "")
-    
+    world_name = kwargs.get("world_name", "") or (executor.world_name if executor else "")
+
     pattern_arg = kwargs.get("pattern") or input_value or kwargs.get("value")
     if not pattern_arg:
         return executor._create_uniform_return("failed", reason="pattern is required")
@@ -167,7 +171,6 @@ def tool(input_value=None, **kwargs):
 
     abs_path, rel_path = resolve_fs_path(path_arg, world_name, Path(__file__))
     if abs_path is None:
-        from ..fs_common import get_fs_root, _find_project_root
         fs_root = get_fs_root(world_name, Path(__file__))
         project_root = _find_project_root(Path(__file__))
         logger.error(f"fs-find: resolve_fs_path failed - world_name='{world_name}', fs_root={fs_root}, project_root={project_root}, tool_file={Path(__file__)}")
@@ -178,7 +181,6 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return("failed", reason="fs-find requires a directory path")
 
     # Get fs_root for relative path calculation
-    from ..fs_common import get_fs_root
     fs_root = get_fs_root(world_name, Path(__file__))
     if not fs_root:
         return executor._create_uniform_return("failed", reason="fs root not available")

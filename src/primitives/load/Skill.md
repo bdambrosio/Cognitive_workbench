@@ -24,16 +24,26 @@ description: Load persistent Note or Collection by ID or name, with optional sli
 
 | Target type | Units | Default | Ceiling |
 |---|---|---|---|
-| Note | characters | `"0:4096"` | 4096 chars |
-| Collection | items | `"0:5"` | 16 items |
+| Note | characters | `"0:4096"` | 4096 chars (default only) |
+| Collection | items | `"0:5"` | 16 items (default only) |
 
-Syntax follows Python slice notation: `"start:stop"`, `":stop"`, `"start:"`, `":"` (all up to ceiling).
+When slice is explicit (e.g. `":"` for full, `"0:10000"`), no ceiling — full requested range is returned. Syntax follows Python slice notation: `"start:stop"`, `":stop"`, `"start:"`, `":"` (all, no limit).
+
+**Validation:** Rejects only when both start and stop are non-negative and `stop < start`. Standard Python semantics supported, including negative indices.
 
 Examples:
-- `slice: ":"` — full content up to ceiling
+- `slice: ":"` — full content (no limit)
 - `slice: "0:1000"` — first 1000 chars of a Note
-- `slice: "-500:"` — last 500 chars of a Note
+- `slice: "1500:2000"` — chars 1500–2000 of a Note
+- `slice: "-500:"` — last 500 chars (Python semantics)
 - `slice: "0:10"` — first 10 items of a Collection
+
+**Chunked processing pattern** (for large Notes):
+```
+load(target=$doc, slice="0:500", out=$chunk1)  → process $chunk1
+load(target=$doc, slice="500:1000", out=$chunk2)  → process $chunk2
+load(target=$doc, slice="1500:2000", out=$chunk3)  → process $chunk3
+```
 
 ## OUTPUT
 
@@ -47,6 +57,7 @@ Examples:
 - Resource not found
 - Invalid resource ID/name
 - Missing parameters
+- Invalid slice: both start and stop non-negative and stop&lt;start
 
 **Empty content ≠ error** — null Notes return content, not failure.
 

@@ -292,7 +292,7 @@ All search primitives return structured Notes matching search-web/semantic-schol
 Use project to extract metadata fields (uri, source_id, score, etc.). For extracting information FROM text content, use extract (LLM-based).
 
 Persistence Operations:
-- load: Retrieve persistent Note or Collection by ID or name. Returns prefixed content ("Note Content: <text>" or "Collection Content: <ids>") truncated to 1024 chars. The prefix clarifies that the returned text is Note/Collection content, not domain-specific output. Use to get content into planner context.
+- load: Retrieve persistent Note or Collection by ID or name. Returns prefixed content ("Note Content: <text>" or "Collection Content: <ids>"). Use slice=":" for full content or slice="0:N" for explicit amount; no length limit when slice is explicit. Default slice "0:4096" (Notes) or "0:5" (Collections). Use to get content into planner context.
 - persist: Mark Note or Collection as persistent (saved to filesystem). Use after creating resources you want to keep.
 
 Collection Mutation Operations (require Collection):
@@ -442,12 +442,13 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "schema_hint": PRIMITIVE_DOCS["create-collection"]["schema_hint"]
         },
         "load": {
-            "description": "Load persistent Note or Collection by ID or name, with optional slice. Notes: slice is characters (default 0:4096). Collections: slice is items (default 0:5), returns a new Collection. Use slice=':' for full content (up to ceiling). Slicing a Collection returns a Collection usable by downstream tools.",
-            "full_description": "Load a Note or Collection into planner context. The 'slice' parameter controls how much content is returned, using Python-style syntax: '0:1000' (first 1000), '-1000:' (last 1000), ':' (everything up to ceiling), '5' (single item). For Notes, units are characters. For Collections, units are items — the result is a new Collection bound to out. The value string shows a content preview (Note ID + first 200 chars per item for Collections).",
+            "description": "Load persistent Note or Collection by ID or name, with optional slice. Notes: slice is characters (default 0:4096). Collections: slice is items (default 0:5), returns a new Collection. Use slice=':' for full content (no limit) or slice='0:N' for explicit amount. For large Notes, use chunked pattern: load slice='0:500' then slice='500:1000' etc.",
+            "full_description": "Load a Note or Collection into planner context. The 'slice' parameter controls how much content is returned, using Python-style syntax: '0:1000' (first 1000), '1500:2000' (chars 1500–2000), '-500:' (last 500), ':' (everything, no limit), '5' (single item). Standard Python semantics including negative indices. Rejects only when both start and stop are non-negative and stop<start. For Notes, units are characters. For Collections, units are items — the result is a new Collection bound to out. Chunked pattern for large content: load slice='0:500' → process → load slice='500:1000' → process → load slice='1500:2000' → process.",
             "examples": [
                 '{"type":"load","target":"$report","slice":":","out":"$full_report"}',
                 '{"type":"load","target":"$papers","slice":"0:3","out":"$top_papers"}',
-                '{"type":"load","target":"my-note","out":"$note_preview"}'
+                '{"type":"load","target":"$doc","slice":"0:500","out":"$chunk1"}',
+                '{"type":"load","target":"$doc","slice":"1500:2000","out":"$chunk3"}'
             ],
             "schema_hint": {"target": "string (ID or name) or $variable", "slice": "string (optional, e.g. '0:4096', ':', '0:5')", "out": "$variable"}
         },
@@ -2503,10 +2504,8 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                     s["final_answer"] = "Interrupted by user."
                     break
             
-            # Stage 3: Reflect
-            result_display = tool_result[:512]
-            if len(tool_result) > 512:
-                result_display += f"\n... [TRUNCATED - showing first 512 chars]"
+            # Stage 3: Reflect (full result - no truncation; load with slice=":" or explicit amount returns full content)
+            result_display = tool_result
             
             s += user(
                 f"=====\n"
@@ -3627,10 +3626,8 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                 state["final_answer"] = "Interrupted by user."
                 break
         
-        # Stage 3: Reflect
-        result_display = tool_result[:512]
-        if len(tool_result) > 512:
-            result_display += f"\n... [TRUNCATED - showing first 512 chars]"
+        # Stage 3: Reflect (full result - no truncation; load with slice=":" or explicit amount returns full content)
+        result_display = tool_result
         
         prompt += format_user(
             f"=====\n"
@@ -3943,7 +3940,7 @@ class IncrementalPlanner:
     def __init__(self, executor: InfospaceExecutor, available_tools: Dict[str, Dict], 
                 logger_instance=None, sgl_model_path: str = None, vllm_model_path: str = None,
                 vllm_url: str = "http://localhost:5000/v1/chat/completions", vllm_model: str = None,
-                openrouter_model_path: str = None):
+                openrouter_model_path: str = None, anthropic_model_path: str = None):
         """
         Initialize incremental planner.
         
@@ -3952,15 +3949,16 @@ class IncrementalPlanner:
             available_tools: Dict of tool_name -> metadata
             primitives_reference: Primitives reference text
             logger_instance: Optional logger
-            sgl_model_path: Path to local model for SGLang (optional if vLLM/OpenRouter is used)
-            vllm_model_path: Path to model for vLLM (optional if SGLang/OpenRouter is used)
+            sgl_model_path: Path to local model for SGLang (optional if vLLM/OpenRouter/Anthropic is used)
+            vllm_model_path: Path to model for vLLM (optional if SGLang/OpenRouter/Anthropic is used)
             vllm_url: vLLM API endpoint (default: http://localhost:5000/v1/chat/completions)
             vllm_model: vLLM model name (resolved from vLLM server if not provided)
-            openrouter_model_path: Model name for OpenRouter (optional if SGLang/vLLM is used)
+            openrouter_model_path: Model name for OpenRouter (optional if SGLang/vLLM/Anthropic is used)
+            anthropic_model_path: Model name for Anthropic API (optional if SGLang/vLLM/OpenRouter is used)
         """
-        # Require either SGLang, vLLM, or OpenRouter
-        if not HAS_SGLANG and not vllm_model_path and not openrouter_model_path:
-            raise ImportError("Neither SGLang, vLLM, nor OpenRouter available - at least one backend required")
+        # Require either SGLang, vLLM, OpenRouter, or Anthropic
+        if not HAS_SGLANG and not vllm_model_path and not openrouter_model_path and not anthropic_model_path:
+            raise ImportError("Neither SGLang, vLLM, OpenRouter, nor Anthropic available - at least one backend required")
         
         self.executor: InfospaceExecutor = executor
         self.available_tools = available_tools
@@ -3974,11 +3972,14 @@ class IncrementalPlanner:
         # Store OpenRouter config
         self.openrouter_model_path = openrouter_model_path
         
+        # Store Anthropic config
+        self.anthropic_model_path = anthropic_model_path
+        
         # SGLang runtime is now initialized in executive_node (optional)
         # Verify availability if SGLang is expected
         if sgl_model_path and not executor.runtime:
             self.logger.warning("SGLang runtime not available in executor - will use vLLM/OpenRouter if configured")
-        elif not vllm_model_path and not openrouter_model_path and not executor.runtime:
+        elif not vllm_model_path and not openrouter_model_path and not anthropic_model_path and not executor.runtime:
             self.logger.warning("Neither SGLang runtime nor vLLM/OpenRouter config available - incremental planner may have reduced functionality")
         
         # Build tool catalog
@@ -4212,8 +4213,8 @@ class IncrementalPlanner:
         Returns:
             Plan dict with 'plan' key containing actions
         """
-        if not HAS_SGLANG and not self.vllm_model_path and not self.openrouter_model_path:
-            return {'error': 'Neither SGLang, vLLM, nor OpenRouter available'}
+        if not HAS_SGLANG and not self.vllm_model_path and not self.openrouter_model_path and not self.anthropic_model_path:
+            return {'error': 'Neither SGLang, vLLM, OpenRouter, nor Anthropic available'}
         
         # Get world_model from executor
         if not hasattr(self.executor, 'world_model') or not self.executor.world_model:
@@ -4275,7 +4276,7 @@ class IncrementalPlanner:
                     similar_plan=None
                 )
             else:
-                return {'error': 'No planner backend available (SGLang, vLLM, or OpenRouter required)'}
+                return {'error': 'No planner backend available (SGLang, vLLM, Anthropic, or OpenRouter required)'}
 
             step = self._find_last_step(state, max_steps)
             # Safely check if done_<step> exists (may not exist if interrupted)
@@ -4337,8 +4338,8 @@ class IncrementalPlanner:
         Returns:
             Plan dict with 'plan' key containing actions
         """
-        if not HAS_SGLANG and not self.vllm_model_path and not self.openrouter_model_path:
-            return {'error': 'Neither SGLang, vLLM, nor OpenRouter available'}
+        if not HAS_SGLANG and not self.vllm_model_path and not self.openrouter_model_path and not self.anthropic_model_path:
+            return {'error': 'Neither SGLang, vLLM, OpenRouter, nor Anthropic available'}
         
         # Get world_model from executor
         if not hasattr(self.executor, 'world_model') or not self.executor.world_model:
@@ -4391,7 +4392,7 @@ class IncrementalPlanner:
             
             # Run planner (SGLang, vLLM, or OpenRouter)
             world_model = initial_world_model
-            if (self.vllm_model_path and self.vllm_model) or (self.openrouter_model_path and self.executor.openrouter_model):
+            if (self.vllm_model_path and self.vllm_model) or (self.openrouter_model_path and self.executor.openrouter_model) or (self.anthropic_model_path and self.executor.anthropic_model):
                 # Use vLLM/OpenRouter planner (both use same function since executor.llm_generate routes correctly)
                 state = tool_planner_infospace_vllm(
                     template=template,
@@ -4426,7 +4427,7 @@ class IncrementalPlanner:
                     vision_criteria=vision_criteria
                 )
             else:
-                return {'error': 'No planner backend available (SGLang, vLLM, or OpenRouter required)'}
+                return {'error': 'No planner backend available (SGLang, vLLM, Anthropic, or OpenRouter required)'}
 
             step = self._find_last_step(state, max_steps)
             # Safely check if done_<step> exists (may not exist if interrupted)
@@ -4487,7 +4488,7 @@ class IncrementalPlanner:
                 #reflect and retry
                 logger.info(f"Step {step} failed, reflecting and retrying")
                 # Use same backend selection logic as main planning path
-                if (self.vllm_model_path and self.vllm_model) or (self.openrouter_model_path and self.executor.openrouter_model):
+                if (self.vllm_model_path and self.vllm_model) or (self.openrouter_model_path and self.executor.openrouter_model) or (self.anthropic_model_path and self.executor.anthropic_model):
                     # Use vLLM/OpenRouter planner (both use same function since executor.llm_generate routes correctly)
                     state = tool_planner_infospace_vllm(
                         template=template,
@@ -4522,7 +4523,7 @@ class IncrementalPlanner:
                         vision_criteria=vision_criteria
                     )
                 else:
-                    logger.error('No planner backend available for retry (SGLang, vLLM, or OpenRouter required)')
+                    logger.error('No planner backend available for retry (SGLang, vLLM, Anthropic, or OpenRouter required)')
                     raise RuntimeError('No planner backend available for retry')
             
             # Extract plan actions from executor

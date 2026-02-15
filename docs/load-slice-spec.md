@@ -31,16 +31,25 @@ load(target, slice?, out)
 **Slice syntax**:
 - `"0:1000"` — first 1000 units (chars or items)
 - `"500:1500"` — middle range
-- `"-1000:"` — last 1000 units
-- `":"` — everything (up to max ceiling)
+- `"-500:"` — last 500 (Python negative-index semantics)
+- `":"` — everything (no limit)
 - `"5"` — single item (Collection) or char at position (Note, unlikely use)
 - Omitted — default slice applies
+
+**Validation:** Rejects only when both start and stop are non-negative and `stop < start`. Standard Python semantics supported, including negative indices (e.g. `"-500:"` for last 500).
+
+**Chunked processing pattern** (for large Notes):
+```
+load(target=$doc, slice="0:500", out=$chunk1)   → process $chunk1
+load(target=$doc, slice="500:1000", out=$chunk2)  → process $chunk2
+load(target=$doc, slice="1500:2000", out=$chunk3)  → process $chunk3
+```
 
 **Default slices**:
 - Note: `"0:4096"` (4x current 1024 default — enough for most single-document evaluation)
 - Collection: `"0:5"` (first 5 items)
 
-**Max ceiling**: `:` (everything) is capped at system-level constants: 4096 chars for Notes, 16 items for Collections. This prevents accidental context flooding while keeping ceilings practical. Defined as class constants on executor (`LOAD_MAX_NOTE_CHARS = 4096`, `LOAD_MAX_COLLECTION_ITEMS = 16`).
+**Max ceiling**: Ceilings apply only when slice is omitted (default). When slice is explicit (e.g. `":"` for full, `"0:10000"` for first 10k chars), no ceiling — the requested range is returned in full. Default slice `"0:4096"` for Notes and `"0:5"` for Collections use `LOAD_MAX_NOTE_CHARS` and `LOAD_MAX_COLLECTION_ITEMS` respectively.
 
 ### Output: two layers
 
