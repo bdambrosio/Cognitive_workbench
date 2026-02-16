@@ -57,19 +57,20 @@ def _success(executor: InfospaceExecutor, value: str,
         "success", value=value, resource_id=resource_id, extra=extra,
     )
 
+
 # ------------------------------
 # Note helper
 # ------------------------------
 
-def _create_note(content: Any, agent_name: str, resource_manager,
-                 source_skill: str = 'search-web') -> Optional[str]:
-    """Create a Note and return its ID."""
+def _create_note(text_content: str, agent_name: str, resource_manager,
+                 source_skill: str = 'search-web', tool_metadata: Optional[Dict] = None) -> Optional[str]:
+    """Create a Note. Content is text-only; metadata in tool_metadata (internal)."""
     if not resource_manager:
         logger.error("Resource manager not available")
         return None
-    format_type = 'json' if isinstance(content, dict) else 'text'
     success, note_id, error_msg, _location = resource_manager.create_note(
-        agent_name, content, format_type, source_skill, str(content)[:100], '', {}
+        agent_name, text_content, 'text', source_skill, (text_content or '')[:100], '',
+        {'tool_metadata': tool_metadata or {}}
     )
     if success:
         return note_id
@@ -319,17 +320,11 @@ def tool(input_value, **kwargs):
 
     resource_manager = kwargs.get('resource_manager')
 
-    # Build the Note content: structured dict the agent can work with
-    note_content = {
-        "query": query,
-        "synthesis": result["synthesis"],
-        "sources": result.get("sources", []),
-        "source_count": len(result.get("sources", [])),
-        "model": result.get("_model", CLAUDE_MODEL),
-        "elapsed_ms": result.get("_elapsed_ms", 0),
-    }
-
-    note_id = _create_note(note_content, agent_name, resource_manager)
+    # Text-only content: synthesis. Sources/query in tool_metadata (internal)
+    synthesis = result["synthesis"]
+    tool_meta = {"query": query, "sources": result.get("sources", []), "source_count": len(result.get("sources", [])),
+                 "model": result.get("_model", CLAUDE_MODEL), "elapsed_ms": result.get("_elapsed_ms", 0)}
+    note_id = _create_note(synthesis, agent_name, resource_manager, tool_metadata=tool_meta)
     if not note_id:
         return _fail(executor, 'Failed to create Note from search results')
 

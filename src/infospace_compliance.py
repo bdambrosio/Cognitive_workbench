@@ -14,9 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 # Operation compatibility table
-NOTE_ONLY_OPS = {"split", "as-json", "refine"}
+NOTE_ONLY_OPS = {"split", "as-json", "extract", "coerce"}
 COLLECTION_ONLY_OPS = {"map", "flatten"}
-BOTH_OPS = {"summarize", "relate"}
+BOTH_OPS = {"synthesize"}
 
 
 class ComplianceTracker:

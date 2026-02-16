@@ -17,7 +17,10 @@ Return the first N lines of a text file from the filesystem sandbox.
 ## Output
 
 Success returns:
-- `resource_id`: Note ID containing the head slice and metadata
+- `resource_id`: Note ID containing text content.
+- Note content format:
+  - metadata Note linked by meta Relation (path/line range/truncation metadata)
+  - body text with the first N lines
 
 ## Examples
 

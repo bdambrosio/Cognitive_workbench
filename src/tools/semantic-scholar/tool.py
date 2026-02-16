@@ -38,20 +38,21 @@ def _success(
 
 ss_api_key = os.getenv("SEMANTIC_SCHOLAR_API_KEY") or None
 
-def _create_note(content: Any, agent_name: str, resource_manager, source_skill: str = 'semantic-scholar') -> Optional[str]:
-    """Create a Note via resource_manager and return its ID."""
+def _create_note(text_content: str, agent_name: str, resource_manager, source_skill: str = 'semantic-scholar',
+                 tool_metadata: Optional[Dict] = None) -> Optional[str]:
+    """Create a Note via resource_manager. Content is text-only; metadata in tool_metadata (internal)."""
     if not resource_manager:
         logger.error("resource_manager required for creating Notes")
         return None
     
     success, note_id, error_msg, _ = resource_manager.create_note(
         character_name=agent_name,
-        content=content,
-        format_type='json' if isinstance(content, dict) else 'text',
+        content=text_content,
+        format_type='text',
         source_skill=source_skill,
-        source_value=str(content)[:100],
-        note_name='',  # Empty name for auto-generated notes
-        extra_props={}  # No extra properties
+        source_value=(text_content or '')[:100],
+        note_name='',
+        extra_props={'tool_metadata': tool_metadata or {}}
     )
     
     if success:
@@ -341,14 +342,16 @@ def tool(input_value, runtime=None, **kwargs):
             {"item_count": 0, "query": query},
         )
     
-    # Create a Note for each paper result (each is structured JSON)
+    # Create a Note for each paper result (text-only content, metadata in tool_metadata)
     note_ids = []
     for result in results:
-        note_id = _create_note(result, agent_name, resource_manager)
+        text_content = result.get('text', '') or ''
+        tool_meta = result.get('metadata', {})
+        note_id = _create_note(text_content, agent_name, resource_manager, tool_metadata=tool_meta)
         if note_id:
             note_ids.append(note_id)
         else:
-            logger.warning(f"Failed to create Note for paper: {result.get('metadata', {}).get('title', 'unknown')}")
+            logger.warning(f"Failed to create Note for paper: {tool_meta.get('title', 'unknown')}")
     
     if not note_ids:
         return _fail(executor, 'Failed to create any Notes from search results')

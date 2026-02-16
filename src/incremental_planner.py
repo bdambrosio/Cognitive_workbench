@@ -229,7 +229,15 @@ Types:
 - Collection: List of Note/Collection IDs 
   - Can be named (e.g., "my-collection") for stable referencing via load
   - Named Collections can be loaded by name or by ID (e.g., "Collection_456")
-- Variable: a session-local name referencing Notes/Collections. Variables *always* start with "$".
+- Relation: Typed directed link between two resources (source -> target)
+  - Relation IDs use format "Relation_###"
+  - Use create-relation / find-relations / related to manage graph links
+- Variable: a session-local name referencing Notes/Collections/Relations. Variables *always* start with "$".
+
+Note Content Format (text-only model):
+- Note content is always a string.
+- Metadata should be represented as a separate Note linked by Relation type "meta" (source content Note -> target metadata Note).
+- Structured ops (project/pluck/filter-structured/sort/join) work on Notes whose content is valid JSON text.
 
 Action Syntax:
 - An action is a JSON object specifying the application of a primitive or tool. 
@@ -239,6 +247,7 @@ Action Syntax:
 - Wrong: {"target": "my_variable"}
 - Note reference by ID or name: Use directly without $ (e.g., "target": "Note_123" or "target": "attention-note")
 - Collection reference by ID or name: Use directly without $ (e.g., "target": "Collection_456" or "target": "research-papers")
+- Relation reference by ID: Use directly without $ (e.g., "target": "Relation_12")
 - Literal strings: Use directly without $ (e.g., "value": "hello")
 - Literal numbers: Use directly without $ (e.g., "value": 123)
 - Literal booleans: Use directly without $ (e.g., "value": true)
@@ -265,6 +274,9 @@ Operation_name: applicable to: <Note | Collection | Note, Collection>;   Purpose
  - persist: Note, Collection;  Mark resource as persistent
  - discover-notes, discover-collections: N/A;  Global discovery (return Coll.)
  - search-within-collection: Collection;  Search indexed Collection
+- create-relation: Note/Collection + Note/Collection;  Create typed directed edge
+- find-relations: N/A;  Query relations by source/target/type (returns Collection of Relation IDs)
+- related: Note/Collection;  Get neighbors by relation type and direction
 
 Key distinctions:
 - split (Note→Coll): Transforms internal structure (array/lines) into separate items
@@ -273,23 +285,13 @@ Key distinctions:
 - persist: Mark resource as persistent (saved to filesystem)
 
 Discovery and Search Primitives:
-- discover-notes: Global discovery across all Notes (no target needed). Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type.
-- discover-collections: Global discovery across all Collections (no target needed). Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type.
-- search-within-collection: Search within a specific indexed Collection (requires target Collection, must be indexed first). Returns Collection of structured Notes with full matched chunk text, metadata.source_id, metadata.uri, metadata.score, metadata.type, metadata.chunk_index, metadata.chunk_total.
+- discover-notes: Global discovery across all Notes (no target needed). Returns Collection of Notes with text content.
+- discover-collections: Global discovery across all Collections (no target needed). Returns Collection of Notes with text content.
+- search-within-collection: Search within a specific indexed Collection (requires target Collection, must be indexed first). Returns Collection of Notes with matched chunk text.
 
 Discovery tools return Note or Collection candidates. Search-within tools search known containers. If you think you need a target field, you are not doing discovery.
 
-All search primitives return structured Notes matching search-web/semantic-scholar format:
-- text: Full text content (for search-within-collection: the matched chunk text; for discover-notes/discover-collections: full Note content)
-- format: "text" or "json"
-- metadata.source_id: Original Note/Collection ID (use project to extract: project with fields=["metadata.source_id"])
-- metadata.uri: URI field (Note/Collection ID or extracted URI from source)
-- metadata.score: Search relevance score (0.0-1.0)
-- metadata.type: "Note" or "Collection"
-- metadata.chunk_index, metadata.chunk_total: (search-within-collection only) Chunk position info
-- char_count: Length of text
-
-Use project to extract metadata fields (uri, source_id, score, etc.). For extracting information FROM text content, use extract (LLM-based).
+Note content is always a string. For extracting information FROM text content, use extract (LLM-based).
 
 Persistence Operations:
 - load: Retrieve persistent Note or Collection by ID or name. Returns prefixed content ("Note Content: <text>" or "Collection Content: <ids>"). Use slice=":" for full content or slice="0:N" for explicit amount; no length limit when slice is explicit. Default slice "0:4096" (Notes) or "0:5" (Collections). Use to get content into planner context.
@@ -303,25 +305,25 @@ Collection Mutation Operations (require Collection):
 - intersection: Items in both Collections (A ∩ B)
 - difference: Items in A but not B (A - B)
 
-Structured-data Collection Operations (require Notes of type dict/JSON):
-- project: Extract metadata/structured fields (SELECT columns) → new Collection with subset of fields
-- pluck: Extract single field as simple values → Collection of values  
+Structured-data Collection Operations (require Notes whose content is JSON string):
+- project: Extract fields from JSON content (SELECT columns) → new Collection
+- pluck: Extract single field as simple values → Collection of values
 - filter-structured: Filter by field conditions (WHERE clauses) → filtered Collection
 - sort: Sort by field value (ORDER BY) → sorted Collection
 - join: Combine two Collections on matching field (INNER JOIN) → merged Collection
 
 To take first N items from a Collection, use load with slice (e.g., load with slice="0:5"). This replaces the old head primitive.
 
-IMPORTANT: project/pluck extract NAMED FIELDS only (metadata.uri, metadata.title, etc.). They do NOT parse unstructured text.
-To extract information FROM text content, use extract (LLM-based extraction).
+IMPORTANT: project/pluck/filter-structured work only on Notes whose content is valid JSON (e.g., from create-note with dict value).
+To extract information FROM plain text content, use extract (LLM-based extraction).
 
 Use cases:
-- project: Extract metadata.uri from search results, get metadata.title+metadata.year from papers
-- pluck: Get just metadata.title as simple list, extract metadata.score for analysis
-- filter-structured: Papers after 2020, results with score>0.5, venue contains "NeurIPS"
-- sort: Rank by score (descending), chronological by year, alphabetical by title
+- project: Extract fields from JSON Notes (e.g., create-note with structured data)
+- pluck: Get single field from JSON Notes
+- filter-structured: Filter JSON Notes by field conditions
+- sort: Sort JSON Notes by field value
 - load with slice: Get top 5 after sorting (slice="0:5"), take first result (slice="0")
-- join: Merge papers with citation data, combine user info with profiles
+- join: Merge JSON Notes from two Collections on matching field
 
 Efficiency Heuristics:
 - Use tools directly on Notes for single items
@@ -413,6 +415,21 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             ],
             "schema_hint": {"value": "any content (string, number, boolean, array, object)", "name": "string (optional)", "out": "$variable"}
         },
+        "create-relation": {
+            "description": "Create a typed directed relation between two resources.",
+            "full_description": "Create a Relation edge source -> target with a required relation label (e.g., meta, related, supports). Source and target must resolve to Note or Collection IDs. Returns a Relation resource ID bound to out.",
+            "parameters": {
+                "source": "required: $variable or resource ID (source endpoint)",
+                "target_id": "required: $variable or resource ID (target endpoint)",
+                "relation": "required: relation type label string",
+                "out": "required: $variable for created Relation"
+            },
+            "examples": [
+                '{"type":"create-relation","source":"$paper_note","target_id":"$paper_meta_note","relation":"meta","out":"$paper_meta_rel"}',
+                '{"type":"create-relation","source":"$note_a","target_id":"$note_b","relation":"related","out":"$rel"}'
+            ],
+            "schema_hint": {"source": "$variable or resource ID", "target_id": "$variable or resource ID", "relation": "string", "out": "$variable"}
+        },
         "think": {
             "description": "generate an internal reflection on the state of the plan. Use for reasoning about the goal or the state of the plan, or to surface internal knowledge.",
             "full_description": "generate an internal thought that enriches the planning context for subsequent tool selections. The thought is appended to the internal SGLang conversation state, allowing the LLM to reference it in later reasoning. Thoughts are NOT persisted as Notes, NOT published to the UI, and NOT communicated to the user. Use this for tracking reasoning steps, making observations, or noting intermediate conclusions that inform later decisions.",
@@ -441,6 +458,12 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "examples": PRIMITIVE_DOCS["create-collection"].get("examples", []),
             "schema_hint": PRIMITIVE_DOCS["create-collection"]["schema_hint"]
         },
+        "create-relation": {
+            "description": PRIMITIVE_DOCS["create-relation"]["description"],
+            "full_description": PRIMITIVE_DOCS["create-relation"].get("full_description"),
+            "examples": PRIMITIVE_DOCS["create-relation"].get("examples", []),
+            "schema_hint": PRIMITIVE_DOCS["create-relation"]["schema_hint"]
+        },
         "load": {
             "description": "Load persistent Note or Collection by ID or name, with optional slice. Notes: slice is characters (default 0:4096). Collections: slice is items (default 0:5), returns a new Collection. Use slice=':' for full content (no limit) or slice='0:N' for explicit amount. For large Notes, use chunked pattern: load slice='0:500' then slice='500:1000' etc.",
             "full_description": "Load a Note or Collection into planner context. The 'slice' parameter controls how much content is returned, using Python-style syntax: '0:1000' (first 1000), '1500:2000' (chars 1500–2000), '-500:' (last 500), ':' (everything, no limit), '5' (single item). Standard Python semantics including negative indices. Rejects only when both start and stop are non-negative and stop<start. For Notes, units are characters. For Collections, units are items — the result is a new Collection bound to out. Chunked pattern for large content: load slice='0:500' → process → load slice='500:1000' → process → load slice='1500:2000' → process.",
@@ -457,15 +480,15 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "schema_hint": {"target": "$variable"}
         },
         "discover-notes": {
-            "description": "Global discovery across all Notes in the infospace using embedding-based retrieval. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches search-web/semantic-scholar for consistent project operations.",
+            "description": "Global discovery across all Notes using embedding-based retrieval. Returns Collection of Notes with text content.",
             "schema_hint": {"query": "string (query)", "out": "$variable", "limit": "int (optional, default 5)", "threshold": "float (optional, default 0.3)"}
         },
         "discover-collections": {
-            "description": "Global discovery across all Collections using embedding-based retrieval. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches search-web/semantic-scholar for consistent project operations.",
+            "description": "Global discovery across all Collections using embedding-based retrieval. Returns Collection of Notes with text content.",
             "schema_hint": {"query": "string (query)", "out": "$variable", "limit": "int (optional, default 3)", "threshold": "float (optional, default 0.3)"}
         },
         "search-within-collection": {
-            "description": "Search within a specific indexed Collection. Returns Collection of structured Notes each containing the full matched chunk text, metadata.source_id, metadata.uri, metadata.score, metadata.type, metadata.chunk_index, metadata.chunk_total. Format matches search-web/semantic-scholar for consistent project operations. Requires Collection to be indexed first.",
+            "description": "Search within a specific indexed Collection. Returns Collection of Notes with matched chunk text. Requires Collection to be indexed first.",
             "schema_hint": {"target": "$variable (indexed Collection)", "query": "string (query)", "out": "$variable", "limit": "int (optional, default 5)", "threshold": "float (optional, default 0.0)"}
         },
         "index": {
@@ -498,17 +521,17 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "examples": PRIMITIVE_DOCS["think"].get("examples", []),
             "schema_hint": PRIMITIVE_DOCS["think"]["schema_hint"]
         },
-        "say": {
-            "description": "Send text to target (User or agent). Fire-and-forget; does not wait for reply. Requires: value, target (default User).",
-            "schema_hint": {"target": "User or agent name", "value": "string"}
-        },
         "ask": {
-            "description": "Send question to target and wait for reply (blocks plan). Use when you need the reply in one step. Requires: value, out. Optional: target (default User).",
+            "description": "Send question to target and terminate current turn. Response will arrive in a future turn. Requires: value, out. Optional: target (default User).",
             "schema_hint": {"target": "User or agent name (optional)", "value": "string", "out": "$variable"}
         },
-        "listen": {
-            "description": "Wait for message from target without sending. Use after say when you need the reply in two steps. Requires: target, out.",
-            "schema_hint": {"target": "agent name", "out": "$variable"}
+        "find-relations": {
+            "description": "Find relations by source, target, and/or relation type. Returns a Collection of Relation IDs.",
+            "schema_hint": {"source": "$variable or resource ID (optional)", "target": "$variable or resource ID (optional)", "relation": "string (optional)", "out": "$variable"}
+        },
+        "related": {
+            "description": "Get resources related to target via relations. Returns a Collection of neighboring resource IDs.",
+            "schema_hint": {"target": "$variable or resource ID", "relation": "string (optional)", "direction": "string (optional: out|in|both)", "out": "$variable"}
         },
         "add": {
             "description": "Add a Note to an existing Collection (mutates Collection in place). When used with map to add multiple Notes, use collection parameter: {\"type\":\"map\",\"target\":\"$notes\",\"operation\":\"add\",\"collection\":\"$collection\",\"out\":\"$collection\"}",
@@ -535,42 +558,39 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "schema_hint": {"target": "$variable (Collection)", "out": "$variable"}
         },
         "project": {
-            "description": "Extract metadata/structured fields from each Note in Collection (SQL SELECT). Extracts NAMED FIELDS only (metadata.uri, metadata.title, etc.), does NOT parse unstructured text. For extracting info FROM text content, use extract instead.",
-            "full_description": "Project operation extracts specified fields from each Note in a Collection, similar to SQL SELECT. Input Collection must contain JSON/dict Notes. Output is a new Collection of projected Notes containing only the requested fields. Notes missing any requested field are excluded. Nested fields use dot notation (e.g., 'metadata.uri'). IMPORTANT: project is a field accessor for structured data - it extracts metadata fields (metadata.uri, metadata.title, metadata.year) or top-level JSON fields. It does NOT interpret or parse unstructured text content. To extract information FROM text (e.g., 'extract the nationality'), use extract (LLM-based).",
+            "description": "Extract fields from each Note in Collection (SQL SELECT). Works only on Notes whose content is JSON string. For extracting info FROM plain text, use extract instead.",
+            "full_description": "Project extracts specified fields from each Note in a Collection, similar to SQL SELECT. Input Collection must contain Notes whose content is valid JSON (parseable). Output is a new Collection of projected Notes. Notes missing any requested field are excluded. Nested fields use dot notation (e.g., 'title', 'metadata.year'). Does NOT parse unstructured text — use extract for that.",
             "examples": [
-                '{"type":"project","target":"$search_results","fields":["metadata.uri"],"out":"$urls"}',
-                '{"type":"project","target":"$papers","fields":["metadata.title","metadata.year"],"out":"$paper_info"}',
-                '{"type":"project","target":"$results","fields":["metadata.source_id","metadata.score"],"out":"$filtered"}'
+                '{"type":"project","target":"$results","fields":["uri","score"],"out":"$filtered"}',
+                '{"type":"project","target":"$papers","fields":["title","year"],"out":"$paper_info"}'
             ],
             "schema_hint": {"target": "$variable (Collection of dict Notes)", "fields": "array of field paths (strings)", "out": "$variable"}
         },
         "pluck": {
-            "description": "Extract single field value from each Note in Collection, returning Collection of simple values. Similar to project but returns raw values instead of dict Notes. Use when you need just one field as simple values (strings, numbers).",
-            "full_description": "Pluck extracts a single field from each Note in a Collection and returns a Collection of Notes containing just that field's value. Unlike project (which returns dict Notes), pluck returns simpler Notes. Notes missing the field are excluded. Use pluck for extracting a single attribute as values, use project for multiple fields as structured Notes.",
+            "description": "Extract single field value from each Note in Collection. Works only on Notes whose content is JSON string.",
+            "full_description": "Pluck extracts a single field from each Note in a Collection. Input Notes must have JSON content. Returns a Collection of Notes with just that field's value. Notes missing the field are excluded.",
             "examples": [
                 '{"type":"pluck","target":"$papers","field":"title","out":"$titles"}',
-                '{"type":"pluck","target":"$results","field":"metadata.score","out":"$scores"}'
+                '{"type":"pluck","target":"$results","field":"score","out":"$scores"}'
             ],
             "schema_hint": {"target": "$variable (Collection of dict Notes)", "field": "string (field path)", "out": "$variable"}
         },
         # head: deprecated, use load with slice instead. Executor still accepts head for backward compat.
         "sort": {
-            "description": "Sort Collection by a field value (SQL ORDER BY). Notes must be JSON/dict with sortable field. Default ascending order, use order:'desc' for descending.",
-            "full_description": "Sort a Collection by comparing a field in each Note. Input Collection must contain JSON/dict Notes with the specified field. Field must contain sortable values (numbers, strings, dates). Default is ascending order (A-Z, 0-9), set order:'desc' for descending (Z-A, 9-0). Notes missing the sort field are placed at end.",
+            "description": "Sort Collection by a field value (SQL ORDER BY). Notes must have JSON content with sortable field.",
+            "full_description": "Sort a Collection by a field in each Note. Input Notes must have JSON content. Default ascending, use order:'desc' for descending. Notes missing the sort field are placed at end.",
             "examples": [
-                '{"type":"sort","target":"$papers","by":"metadata.year","out":"$sorted_papers"}',
-                '{"type":"sort","target":"$results","by":"metadata.score","order":"desc","out":"$ranked"}',
-                '{"type":"sort","target":"$items","by":"title","out":"$alphabetical"}'
+                '{"type":"sort","target":"$papers","by":"year","out":"$sorted_papers"}',
+                '{"type":"sort","target":"$results","by":"score","order":"desc","out":"$ranked"}'
             ],
             "schema_hint": {"target": "$variable (Collection of dict Notes)", "by": "string (field path)", "order": "string (optional, 'asc' or 'desc', default 'asc')", "out": "$variable"}
         },
         "filter-structured": {
-            "description": "Filter Collection by field conditions (SQL WHERE clause). Use SQL-like syntax: field > value, field >= value, field == value, field != value, field < value, field <= value. Supports AND/OR for multiple conditions.",
-            "full_description": "Filter a Collection using SQL-like WHERE clause syntax. Input Collection must contain JSON/dict Notes with the specified fields. WHERE clause syntax: 'field > 100', 'year >= 2020', 'score == 1.0', 'title != null'. Multiple conditions: 'year > 2020 AND citations >= 100'. Field paths use dot notation: 'metadata.year > 2020'. Notes missing fields are excluded from results.",
+            "description": "Filter Collection by field conditions (SQL WHERE clause). Works only on Notes whose content is JSON string.",
+            "full_description": "Filter a Collection using SQL-like WHERE clause. Input Notes must have JSON content. Syntax: 'field > 100', 'year >= 2020', 'score == 1.0'. Multiple conditions: 'year > 2020 AND citations >= 100'. Notes missing fields are excluded.",
             "examples": [
-                '{"type":"filter-structured","target":"$papers","where":"metadata.year >= 2020","out":"$recent"}',
-                '{"type":"filter-structured","target":"$results","where":"metadata.score > 0.5","out":"$high_quality"}',
-                '{"type":"filter-structured","target":"$papers","where":"metadata.citations >= 100 AND metadata.year < 2025","out":"$highly_cited_recent"}'
+                '{"type":"filter-structured","target":"$papers","where":"year >= 2020","out":"$recent"}',
+                '{"type":"filter-structured","target":"$results","where":"score > 0.5","out":"$high_quality"}'
             ],
             "schema_hint": {"target": "$variable (Collection of dict Notes)", "where": "string (SQL WHERE clause)", "out": "$variable"}
         },
@@ -610,12 +630,12 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
     
     # Enhanced descriptions to prevent common confusions
     TOOL_DISAMBIGUATION = {
-        "search-web": "Search web and return Collection of structured Notes. Each Note has text (substantial keyword-filtered page content, up to ~8K chars per result), format, metadata.uri (URL), metadata.domain, char_count. Results already contain substantial text — use extract/synthesize directly on the Collection.",
-        "semantic-scholar": "Search academic papers and return Collection of structured Notes. Each Note has text (full paper text via GROBID, or abstract if PDF unavailable), format, metadata.title, metadata.authors, metadata.year, metadata.citations, metadata.venue, metadata.uri. Results already contain full text — use extract/synthesize directly on the Collection. Do NOT project metadata.uri for fetching.",
-        "fetch-text": "Fetch text from a SINGLE specific URL, Do NOT use on search-web or semantic-scholar results. Use ONLY when you have one URL/ID to fetch directly and do not already have the text.",
-        "discover-notes": "Global discovery across all Notes. Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type. Use project for metadata fields, extract for extracting info from text.",
-        "discover-collections": "Global discovery across all Collections. Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type. Use project for metadata fields, extract for extracting info from text.",
-        "search-within-collection": "Search within indexed Collection. Returns Collection of structured Notes with full matched chunk text, metadata.source_id, metadata.uri, metadata.score, metadata.type, metadata.chunk_index, metadata.chunk_total. Format matches search-web/semantic-scholar.",
+        "search-web": "Search web and return a single Note with synthesized text. Use extract/synthesize for further processing.",
+        "semantic-scholar": "Search academic papers and return Collection of Notes with text content (full paper via GROBID or abstract). Use extract/synthesize directly on the Collection.",
+        "fetch-text": "Fetch text from a SINGLE specific URL. Use ONLY when you have one URL to fetch directly and do not already have the text.",
+        "discover-notes": "Global discovery across all Notes. Returns Collection of Notes with text content.",
+        "discover-collections": "Global discovery across all Collections. Returns Collection of Notes with text content.",
+        "search-within-collection": "Search within indexed Collection. Returns Collection of Notes with matched chunk text.",
     }
     TOOL_SCHEMA_HINT_OVERRIDE = {}
     
@@ -720,7 +740,7 @@ def tool_catalog_text(tools: Dict[str, Dict]) -> str:
         lines.append("#INFOSPACE CORE")
         for name, meta in sorted(core_tools):
             if name == "ask":
-                lines.append("#COMMUNICATION (say=send only | ask=send+wait | listen=wait after say)")
+                lines.append("#COMMUNICATION (ask=send+end-turn)")
             lines.extend(format_tool(name, meta))
         lines.append("")  # Blank line before workflows
     
@@ -1105,7 +1125,6 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
     # Ensure 'out' field if tool produces output
     output_producing = ["create-note", "create-collection", "load", "discover-notes", "discover-collections", "search-within-collection", "map", 
                        "split", "flatten", "search-web", "semantic-scholar", "extract", "synthesize",
-                       "refine", "summarize", "relate",  # backward compat aliases
                        "generate-note", "assess", "extract-entities", "filter-semantic",
                        "fetch-text", "as-json", "as-markdown"]
     if tool_name in output_producing and "out" not in action:
@@ -1204,8 +1223,8 @@ def validate_codegen_block(code: str) -> tuple:
     - Forbidden patterns (imports, exec, file I/O, class/def, etc.)
     - Must contain 1-10 execute_action_tracked calls
     - Must contain at least one return executor._create_uniform_return
-    - Max 60 executable code lines (comments and blanks are free)
-    - Hard cap of 100 total lines
+    - Max 512 executable code lines (comments and blanks are free)
+    - Hard cap of 512 total lines
     
     Args:
         code: Python code string
@@ -1218,10 +1237,14 @@ def validate_codegen_block(code: str) -> tuple:
     
     lines = code.strip().splitlines()
     code_lines = [l for l in lines if l.strip() and not l.strip().startswith('#')]
-    if len(code_lines) > 60:
-        return False, f"Code block too long ({len(code_lines)} code lines, max 60)"
-    if len(lines) > 100:
-        return False, f"Code block too long ({len(lines)} total lines, max 100)"
+    if len(code_lines) > 512:
+        return False, f"Code block too long ({len(code_lines)} code lines, max 512)"
+    if len(lines) > 512:
+        return False, f"Code block too long ({len(lines)} total lines, max 512)"
+
+    # Prevent premature user delivery from Stage 2; final delivery happens after done gate.
+    if re.search(r'["\']type["\']\s*:\s*["\']say["\']', code):
+        return False, "Forbidden action in code block: say"
     
     # Check forbidden patterns
     for pattern in _CODEGEN_FORBIDDEN_PATTERNS:
@@ -1276,12 +1299,19 @@ def extract_code_block(raw_text: str) -> str:
     return text.strip()
 
 
+def count_codegen_action_calls(code: str) -> int:
+    """Count execute_action_tracked calls in a generated Stage 2 code block."""
+    if not code:
+        return 0
+    return len(re.findall(r'executor\.execute_action_tracked\s*\(', code))
+
+
 def execute_codegen_block(code: str, executor, method_name: str = "codegen") -> Dict:
     """
     Validate and execute an LLM-generated code block in a sandboxed namespace.
     
     The code is wrapped in a function so that 'return' statements work.
-    Only executor, json, and logger are available in the namespace.
+    Executor helpers for resource access are also available in the namespace.
     
     Args:
         code: Python code string (from extract_code_block)
@@ -1299,8 +1329,57 @@ def execute_codegen_block(code: str, executor, method_name: str = "codegen") -> 
     # Wrap code in a function so `return` works
     indented = textwrap.indent(code, "    ")
     wrapped = f"def _codegen_fn(executor):\n{indented}\n"
-    
-    namespace = {"executor": executor, "json": json, "logger": logger}
+
+    def _resolve_resource_id(ref):
+        if not isinstance(ref, str):
+            return None
+        if ref.startswith("$"):
+            return executor.plan_bindings_flat.get(ref[1:])
+        if ref in executor.plan_bindings_flat:
+            return executor.plan_bindings_flat.get(ref)
+        if ref.startswith("Note_") or ref.startswith("Collection_"):
+            return ref
+        return None
+
+    def _get_resource_content(ref):
+        resource_id = _resolve_resource_id(ref)
+        if not resource_id:
+            return None
+        return executor._get_content(resource_id)
+
+    def get_text(ref):
+        content = _get_resource_content(ref)
+        if content is None:
+            return ""
+        if isinstance(content, str):
+            return content
+        return json.dumps(content, ensure_ascii=False)
+
+    def get_json(ref):
+        content = _get_resource_content(ref)
+        if isinstance(content, dict):
+            return content
+        if isinstance(content, str):
+            try:
+                return json.loads(content)
+            except Exception:
+                return None
+        return None
+
+    def get_items(ref):
+        content = _get_resource_content(ref)
+        if isinstance(content, list):
+            return content
+        return []
+
+    namespace = {
+        "executor": executor,
+        "json": json,
+        "logger": logger,
+        "get_text": get_text,
+        "get_json": get_json,
+        "get_items": get_items,
+    }
     try:
         exec(wrapped, namespace)
         result = namespace["_codegen_fn"](executor)
@@ -1622,7 +1701,7 @@ def _compress_trace(trace_str: str) -> str:
 
 # Tools whose output is worth evaluating against the quality vision.
 # Auto-detected from bindings after each step — no LLM involvement.
-_ARTIFACT_PRODUCING_TOOLS = frozenset({"synthesize", "extract", "generate-note", "refine"})
+_ARTIFACT_PRODUCING_TOOLS = frozenset({"synthesize", "extract", "generate-note"})
 
 # Subset of artifact-producing tools that typically produce goal-level output.
 # A FAIL from the lightweight classifier on these triggers deep (subplanner) evaluation.
@@ -1689,7 +1768,7 @@ def _vision_eval_deep(vision_criteria: str, eval_target: str, classifier_result:
     Deep vision evaluation via subplanner. Has full access to all pipeline bindings
     and can issue load/inspect calls to verify content, coverage, and grounding.
     
-    Only fires when the lightweight classifier reports a FAIL on a goal-level artifact.
+    Invoked at the done gate as a read-only quality check on a goal-level artifact.
     Falls back to empty string on vLLM/OpenRouter (subplanner requires SGLang).
     
     Returns evaluation text or empty string if skipped/unavailable.
@@ -1732,7 +1811,9 @@ def _vision_eval_deep(vision_criteria: str, eval_target: str, classifier_result:
         f"4. For each criterion, report PASS or FAIL with a one-sentence evidence-based reason.\n"
         f"5. End with a one-line RECOMMENDATION for the parent planner (e.g., 'lower filter threshold', "
         f"'add section headers', 'broaden search terms').\n"
-        f"6. Return the evaluation report as your final answer. Do NOT use say — the report is returned "
+        f"6. On the final line, write exactly: STATUS: SATISFIED (if all criteria PASS and no revision needed) "
+        f"or STATUS: NEEDS_REVISION (if any FAIL or revision recommended).\n"
+        f"7. Return the evaluation report as your final answer. Do NOT regenerate the artifact and do NOT use say — the report is returned "
         f"to the parent planner as text, not delivered to any user."
     )
     
@@ -1747,6 +1828,53 @@ def _vision_eval_deep(vision_criteria: str, eval_target: str, classifier_result:
     except Exception as e:
         logger.warning(f"Vision eval deep failed: {e}")
     return ""
+
+
+def _resolve_eval_target_text(eval_target: str, executor) -> str:
+    """
+    Resolve eval target ($var or Note_ID) to stored Note content string.
+    Used for read-only quality-gate fallback delivery.
+    """
+    if not eval_target or not executor or not getattr(executor, "resource_manager", None):
+        return ""
+    try:
+        resource_id = None
+        if isinstance(eval_target, str) and eval_target.startswith("$"):
+            resource_id = executor.plan_bindings_flat.get(eval_target.lstrip("$"))
+        elif isinstance(eval_target, str) and eval_target.startswith("Note_"):
+            resource_id = eval_target
+        if not resource_id:
+            return ""
+        resource = executor.resource_manager.get_resource(resource_id)
+        if not resource:
+            return ""
+        content = resource.get("properties", {}).get("content", "")
+        if content is None:
+            return ""
+        return content if isinstance(content, str) else str(content)
+    except Exception:
+        return ""
+
+
+def _parse_deep_eval_status(deep_text: str) -> str:
+    """
+    Parse deep-eval status robustly.
+    Returns one of: "satisfied", "needs_revision", "unknown".
+    """
+    if not deep_text:
+        return "unknown"
+    text = str(deep_text).strip()
+    m = re.search(r"^\s*STATUS:\s*(SATISFIED|NEEDS_REVISION)\s*$", text, flags=re.IGNORECASE | re.MULTILINE)
+    if m:
+        status = m.group(1).strip().upper()
+        return "satisfied" if status == "SATISFIED" else "needs_revision"
+    lo = text.lower()
+    if any(k in lo for k in ["needs_revision", "needs revision", "revision needed", "any fail", "criterion_"]):
+        if "pass" not in lo or "fail" in lo:
+            return "needs_revision"
+    if any(k in lo for k in ["no revision needed", "all criteria pass", "all criteria are pass", "status: satisfied"]):
+        return "satisfied"
+    return "unknown"
 
 
 if HAS_SGLANG:
@@ -1896,8 +2024,8 @@ if HAS_SGLANG:
         
         # Stage 1: Analysis + tool selection
         system_parts = [f"Your task is to achieve\n#GOAL:\n{goal}\n\n"]
-        system_parts.append("You can choose tools/primitives (aka actions) , if and as needed, callling them with JSON arguments,")
-        system_parts.append("and loop over execute-step / reflect / refine until the goal is satisfied.")
+        system_parts.append("You can write code blocks to achieve the goal, including using tools/primitives (aka actions), if and as needed,")
+        system_parts.append("and loop over execute-step / reflect until the goal is satisfied.")
         system_parts.append(f"\n{INCREMENTAL_PLAN_SPECIFICATIONS}\n")
         system_parts.append(f"Complete primitive and tool catalog:\n{tools_catalog_text}\n#### END OF INFOSPACE TYPE SYSTEM, SPECIFICATIONS, AND TOOL CATALOG\n\n")
 
@@ -1929,12 +2057,12 @@ if HAS_SGLANG:
         system_parts.append(f"WORLD_MODEL: {json.dumps(world_model, indent=2)}\n")
         system_parts.append(f"CURRENT_TIME: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n")
         system_parts.append("""Follow this process to achieve the goal:
- - Stage 1 (once): Read the ABSTRACT_PLAN, select tools, identify first PHASE type (pipeline or deliberative).
+ - Stage 1 (once): Read the ABSTRACT_PLAN, select tools, state first task.
  - Stage 1.5 (once): Load and inject detailed docs for selected tools.
 Then you will work in repeated cycles:
- - Stage 2: For PIPELINE phases, write a code block (Option B) executing the full phase.
-            For DELIBERATIVE steps, pick a single tool (Option A).
- - Stage 3: Reflect on result, decide if goal done, set NEXT_TASK and NEXT_PHASE_TYPE.
+ - Stage 2: Write a Python code block for the current task.
+ - Execute the code block.
+ - Stage 3: Evaluate result — is the goal done? What is the next task?
 ALWAYS follow all formatting instructions exactly.
 
 """)        
@@ -1948,18 +2076,9 @@ ALWAYS follow all formatting instructions exactly.
             "2. TOOLS: Select tools you will need from the Complete primitive and tool catalog.\n"
             "   Include tools for the full plan, not just the first step.\n"
             "\n"
-            "3. PHASE TYPE: The ABSTRACT_PLAN includes phase hints. Evaluate the first phase:\n"
-            "   - Confirm or override the hint based on available resources and tools.\n"
-            "   - pipeline: 2-5 consecutive steps where each feeds the next,\n"
-            "     no observation-dependent branching. Execute as a code block.\n"
-            "   - deliberative: a single step where you must observe the result\n"
-            "     before deciding what to do next.\n"
-            "\n"
-            "4. FIRST TASK: State what to do first.\n"
-            "   - For pipeline phases: describe the ENTIRE phase as one task\n"
-            "     (e.g., 'Search for papers, filter to recent, extract metadata,\n"
-            "     and build comparison table').\n"
-            "   - For deliberative steps: describe just the single next step.\n"
+            "3. FIRST TASK: State what to do first.\n"
+            "   Describe the task concisely (e.g., 'Search for papers, filter to recent,\n"
+            "   extract metadata, and build comparison table').\n"
             "\n"
             "Respond using this format:\n"
             "<reasoning>\n"
@@ -1968,9 +2087,6 @@ ALWAYS follow all formatting instructions exactly.
             "<tools>\n"
             "JSON LIST OF TOOLS\n"
             "</tools>\n"
-            "<phase_type>\n"
-            "pipeline OR deliberative\n"
-            "</phase_type>\n"
             "<first_task>\n"
             "TASK DESCRIPTION\n"
             "</first_task>\n"
@@ -1983,9 +2099,6 @@ ALWAYS follow all formatting instructions exactly.
             "<tools>\n"
             + gen("selected_tools_json", max_tokens=96, temperature=GEN_TEMPERATURE, stop="</tools>")
             + "</tools>\n"
-            "<phase_type>\n"
-            + gen("phase_type", max_tokens=16, temperature=GEN_TEMPERATURE, stop="</phase_type>")
-            + "</phase_type>\n"
             "<first_task>\n"
             + gen("first_task", max_tokens=128, temperature=GEN_TEMPERATURE, stop="</first_task>")
             + "</first_task>\n"
@@ -1994,7 +2107,6 @@ ALWAYS follow all formatting instructions exactly.
         try:
             logger.info(f"Stage 1: Reasoning: {s['stage1_reasoning']}")
             logger.info(f"SELECTED_TOOLS_JSON: {s['selected_tools_json']}")
-            logger.info(f"PHASE_TYPE: {s['phase_type']}")
             logger.info(f"FIRST_TASK: {s['first_task']}")
         except KeyError as e:
             logger.warning(f"Stage 1 values not available: {e}")
@@ -2028,564 +2140,167 @@ ALWAYS follow all formatting instructions exactly.
             return s
         
         # Stage 2/3 format instructions
-        """
         s += user(
-            "#Stage 2-PRE: Instructions\n"
-            "Before choosing TOOL_NAME/ARGS for this step, you MUST first produce AGENT_STATE_HYPOTHESES.\n"
-            "Purpose:\n"
-            "- Make 'context' explicit as TRANSIENT beliefs about the agent's current\n"
-            "  affordances, constraints, or limitations.\n"
-            "- These hypotheses exist ONLY for the current planning attempt.\n"
-            "- They are NOT persistent world facts and must NOT be promoted to memory.\n"
-            "- They should meaningfully influence tool choice when more than one tool\n"
-            "  could plausibly apply.\n"
-            "\n"    
-            "# STAGE 2-PRE FORMAT (STRICT):\n"
-            "AGENT_STATE_HYPOTHESES: [<h1>, <h2>, ...]\n"
-            "AGENT_STATE_SUPPORT:\n"
-            "  - <h1>: <evidence pointer: tool result field / note id / variable / or \"none\">\n"
-            "  - <h2>: <evidence pointer ...>\n"
-            "\n"
-            "# STAGE 2-PRE RULES (STRICT):\n"
-            "- Max 6 hypotheses.\n"
-            "- Each hypothesis MUST be falsifiable (something a tool call or note could contradict).\n"
-            "- Prefer CONSTRAINTS, LIMITATIONS, or MISSING AFFORDANCES over confirmations.\n"
-            "- Each hypothesis should plausibly matter: if it were false, a different tool  choice might be reasonable.\n"
-            "- Hypotheses may reference ONLY information already observed before this step; they MUST NOT depend on the outcome of the tool about to be chosen.\n"
-            "- Hypotheses MUST describe epistemic or physical state of the agent (e.g., known/unknown, stable/unstable, blocked/unblocked); NOT communicative, procedural, or planning affordances.\n"
-            "- DO NOT describe future actions, plans, or tools.\n"
-            "- DO NOT restate the CURRENT_TASK or GOAL.\n"
-            "- DO NOT include generic truths about the system unless they constrain choice.\n"
-            "- These are NOT world-model facts.\n"
-            "\n"
-            "# OPTIONAL NULL CONTEXT:\n"
-            "- If the next step is logically forced (only one reasonable tool applies),\n"
-            "  you MAY output:\n"
-            "    AGENT_STATE_HYPOTHESES: []\n"
-            "    AGENT_STATE_SUPPORT: []\n"
-            "\n"
-            "Examples (do not include world annotations in your response):\n"       
-            "- 'Inventory contains at least one placeable solid block.' (minecraft)\n"
-            "- 'No placeable solid blocks are available in inventory.' (minecraft)\n"
-            "- 'Current position appears stable (on ground) rather than falling.' (minecraft)\n"
-            "- 'query-web returned no useful results.' (infospace)\n"
-            "- 'there is no more space in /data' (osworld)'\n"
-            ""
-            "#Stage 2 Instructions:\n"
-            "- Review the ABSTRACT_PLAN and determine progress on it towards the goal.\n"
-            "- Review the current AGENT_STATE_HYPOTHESES and AGENT_STATE_SUPPORT.\n"
-            "- Choose the next tool and its JSON args, from the Complete primitive and tool catalog, based on the current task, suggested ABSTRACT_PLAN, and the AGENT_STATE_HYPOTHESES and AGENT_STATE_SUPPORT.\n"
             "#Stage 2 FORMAT:\n"
-            "  TOOL_NAME: <name from the Complete primitive and tool catalog>\n"
-            "  TOOL_ARGS_JSON: <json object>\n\n"
-            "#Stage 2 VARIABLE LIFETIME:\n"
-            "  Variables created via 'out' parameters remain in scope. Chain by passing\n"
-            "  the variable name (e.g. target='$papers') to the next action.\n"
-            "\n"
-            "#Stage 2 NUMERIC ARGUMENTS:\n"
-            "  IMPORTANT: All numeric tool arguments (integers, floats) must be simple literals.\n"
-            "  Perform calculations in the THOUGHTS block first, then pass only the final computed value.\n"
-            "  Example: If you need yaw = current_yaw + pi, calculate it mentally (e.g., 1.0236 + 3.14159 = 4.16519),\n"
-            "           then use {\"yaw\": 4.16519} - NOT {\"yaw\": \"1.0236+3.14159\"}.\n"
-            "  Arithmetic expressions in JSON will cause parsing errors.\n\n"
-            "#Stage 3 FORMAT:\n"
-            "  THOUGHTS: <text>\n"
-            "  HYPOTHESES: [<hypothesis1>, <hypothesis2>, ...]\n"
-            "  AUDIT: for each hypothesis in HYPOTHESES:\n"
-            "    <hypothesis text>\n"
-            "    scope: <observational | observed-set | global>\n"
-            "    verdict: <SUPPORTED | UNSUPPORTED | CONTRADICTED>\n"
-            "  DONE: <YES or NO - is the entire GOAL satisfied?>\n"
-            "  NEXT_TASK: <next high-level subgoal, or blank if DONE=YES>\n"
-            "  REQUEST_TOOLS: <json array of tool names or empty array []>\n"
-            "#Stage 3 INSTRUCTIONS:\n"
-            "  HYPOTHESIS Instructions:\n"
-            "   - Identify unverified beliefs influencing your next step. Consider the following categories of hypotheses:\n"
-            "      1. DATA: Claims about completeness or optimality (e.g., 'These are the only results').\n"
-            "      2. SYSTEM: Beliefs about tool logic or failures (e.g., 'The tool failed because the query was too long').\n"
-            "      3. WORLD: Causal theories about the goal (e.g., 'The user likely wants the cheapest option, not the fastest').\n"
-            "   - Do NOT generate any hypothesis that was explicitly CONTRADICTED in a prior step unless it is substantively revised (narrowed, conditioned, or inverted)."
-            "\n"
-            "  AUDIT Instructions:\n"
-            "    - For each hypothesis, perform the following steps strictly and in order.\n"
-            "    - Do not reinterpret, soften, or add qualifiers to hypotheses. Audit only what is explicitly claimed:\n"
-            "      1. DECLARE SCOPE  \n"
-            "      - Classify the hypothesis as exactly one of:\n"
-            "        - observational: direct statement explicitly supported by a tool output\n"
-            "        - observed-set: comparison or claim limited to items actually observed\n"
-            "        - global: claim extending beyond observed data\n"
-            "        - If the hypothesis does not explicitly state its scope, assume it is global.\n"
-            "      2. AUDIT EVIDENCE VS SCOPE  \n"
-            "        - Assign exactly one verdict:\n"
-            "        - SUPPORTED: evidence fully supports the claim within its declared scope\n"
-            "        - UNSUPPORTED: evidence is insufficient or the scope exceeds the evidence\n"
-            "        - CONTRADICTED: evidence directly conflicts with the claim\n"
-            "      3. MANDATORY DOWNGRADES (apply without exception)\n"
-            "        - Hypotheses containing words such as 'nearest', 'closest', 'only', 'all', or 'none'\n"
-            "          require at least observed-set scope.\n"
-            "        - If tool output indicates sampling, partial, coarse, or non-exhaustive data,\n"
-            "          global hypotheses cannot be SUPPORTED.\n"
-            "        - Numeric or distance calculations do not imply optimality unless all candidates\n"
-            "          within the declared scope are explicitly compared.\n"
-            "      4. CONTRADICTION PERSISTENCE RULE (MANDATORY)\n"
-            "        - Any hypothesis that receives verdict: CONTRADICTED at this step MUST NOT reappear verbatim in HYPOTHESES in any subsequent step.\n"
-            "        - If a contradicted hypothesis is still believed to be partially relevant, it may reappear ONLY if it is explicitly revised in one of the following ways:\n"
-            "          a) Narrowed in scope (e.g., from global → observed-set or observational)\n"
-            "          b) Conditioned (e.g., adding explicit qualifiers or boundary conditions)\n"
-            "          c) Inverted into a negated or alternative hypothesis\n"
-            "        - Repeating a contradicted hypothesis with identical wording or trivial rephrasing (synonyms only) is a protocol violation.\n"
-            "        - If a contradicted hypothesis is not revised, it MUST be omitted entirely from future HYPOTHESES lists.\n"
-            "\n"
-            "  DONE Instructions:\n"
-            "  - Only mark DONE: YES after ALL required actions are executed\n"
-            "  - COMPLENESS CHECK: If the question asks for an attribute that can change over time (jobs, spouses, locations), you must verify if multiple values exist\n"
-            "  - DO NOT STOP at the first search result. If you find one answer (e.g., 'Ambassador to Czechoslovakia'), you must briefly verify no other equal-tier answers exist (e.g., 'Ambassador to Ghana') before finishing\n"
-            "  - If goal requires communicating to user, use 'say' primitive BEFORE marking done\n"
-            "  - When DONE=YES, NEXT_TASK must be blank (leave empty)\n\n"
-            "  NEXT_TASK Instructions:\n"
-            "  - If AUDIT yields any UNSUPPORTED or CONTRADICTED verdicts, the NEXT_TASK might be a remediation step (e.g., 'Broaden search', 'Switch tool', 'Verify source').\n"
-            "  - If AUDIT is fully SUPPORTED, propose the next logical step toward the #GOAL.\n"
-            "  - Must be concise, actionable, and distinct from the current task.\n"
-            "  - If DONE=YES, this field must be empty.\n\n"
-            "  REQUEST_TOOLS Instructions:\n"
-            "  - Always output valid JSON array: [] or [\"tool1\", \"tool2\"]\n"
-            "  - If no tools needed, output: []\n"
-            "  - If tools needed, output complete array on single line\n"
-            "  - Example: [\"project\", \"filter-structured\"]\n\n"
-            "  - If you realize you need a tool not initially selected, add it to REQUEST_TOOLS.\n"
-            "  - You'll receive its full documentation before the next step.\n\n"
-            "Follow these formats exactly."
-        )
-        """
-        s += user(
-            "#Stage 2-PRE: Instructions\n"
-            "Before choosing TOOL_NAME/ARGS for this step, you MUST first produce AGENT_STATE_HYPOTHESES.\n"
-            "Purpose:\n"
-            "- Make *context* explicit as TRANSIENT beliefs about the agent's current\n"
-            "  affordances, constraints, or limitations.\n"
-            "- These hypotheses exist ONLY for the current planning attempt.\n"
-            "- They are NOT persistent world facts and must NOT be promoted to memory.\n"
-            "- They should meaningfully influence tool choice when more than one tool\n"
-            "  could plausibly apply.\n"
-            "\n"
-            "# STAGE 2-PRE FORMAT (STRICT):\n"
-            "AGENT_STATE_HYPOTHESES: [<h1>, <h2>, ...]\n"
-            "AGENT_STATE_SUPPORT:\n"
-            "  - <h1>: <evidence pointer: tool result field / note id / variable / or \"none\">\n"
-            "  - <h2>: <evidence pointer ...>\n"
-            "\n"
-            "# STAGE 2-PRE RULES (STRICT):\n"
-            "- Max 6 hypotheses.\n"
-            "- Each hypothesis MUST be falsifiable (a tool call or note could contradict it).\n"
-            "- Prefer CONSTRAINTS, LIMITATIONS, or MISSING AFFORDANCES over confirmations.\n"
-            "- Each hypothesis must plausibly affect tool choice if false.\n"
-            "- Hypotheses may reference ONLY information observed before this step.\n"
-            "- Hypotheses MUST describe epistemic or physical state of the agent\n"
-            "  (e.g., known/unknown, available/unavailable, stable/unstable).\n"
-            "- DO NOT describe future actions, plans, or tools.\n"
-            "- DO NOT restate the CURRENT_TASK or GOAL.\n"
-            "- DO NOT include generic system truths unless they constrain choice.\n"
-            "- These are NOT world-model facts.\n"
-            "\n"
-            "# OPTIONAL NULL CONTEXT:\n"
-            "- If the next step is logically forced (only one reasonable tool applies),\n"
-            "  you MAY output:\n"
-            "    AGENT_STATE_HYPOTHESES: []\n"
-            "    AGENT_STATE_SUPPORT: []\n"
-            "\n"
-            "Examples (do not include world annotations in your response):\n"
-            "- 'Inventory contains at least one placeable solid block.'\n"
-            "- 'No placeable solid blocks are available in inventory.'\n"
-            "- 'Current position appears stable (on ground) rather than falling.'\n"
-            "- 'query-web returned no useful results.'\n"
-            "- 'there is no more space in /data'\n"
-            "\n"
-            "#Stage 2 Instructions:\n"
-            "- Review the ABSTRACT_PLAN and determine progress toward the goal.\n"
-            "- Review AGENT_STATE_HYPOTHESES and AGENT_STATE_SUPPORT (if present).\n"
-            "- Choose the next tool and its JSON args from the Complete primitive and tool catalog.\n"
-            "\n"
-            "#Stage 2 FORMAT:\n"
-            "  The format depends on the current PHASE_TYPE.\n"
-            "\n"
-            "  PIPELINE phases (CURRENT_TASK describes multiple known steps):\n"
-            "    You SHOULD use Option B (code block) to execute the entire phase.\n"
-            "    Only fall back to Option A if the phase truly requires just one tool call.\n"
-            "\n"
-            "  DELIBERATIVE steps (you need to observe before deciding next):\n"
-            "    Use Option A (single tool call).\n"
-            "    Option B is available if you realize 2-3 calls can be safely chained.\n"
-            "\n"
-            "  Option A - single tool call:\n"
-            "    TOOL_NAME: <name from the Complete primitive and tool catalog>\n"
-            "    TOOL_ARGS_JSON: <json object>\n"
-            "\n"
-            "  Option B - multi-step code block:\n"
-            "    TOOL_NAME: _code_block_\n"
-            "    TOOL_ARGS_JSON: {}\n"
-            "    CODE:\n"
-            "    ```python\n"
-            "    r1 = executor.execute_action_tracked({\"type\": \"search-web\", \"query\": \"transformers survey\", \"out\": \"$papers\"}, \"codegen\")\n"
-            "    if r1[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"search failed\")\n"
-            "    if len(r1[\"data\"]) < 3:  # too few results — broaden\n"
-            "        r1 = executor.execute_action_tracked({\"type\": \"search-web\", \"query\": \"transformer models overview\", \"out\": \"$papers\"}, \"codegen\")\n"
-            "    r2 = executor.execute_action_tracked({\"type\": \"synthesize\", \"target\": \"$papers\", \"focus\": \"key findings\", \"out\": \"$summary\"}, \"codegen\")\n"
-            "    if r2[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"synthesize failed\")\n"
-            "    return executor._create_uniform_return(\"success\", value=\"pipeline complete\", extra={\"item_count\": len(r1[\"data\"])})\n"
-            "    ```\n"
-            "    Rules for Option B:\n"
-            "    - Max 6 tool calls via executor.execute_action_tracked(action_dict, \"codegen\")\n"
-            "    - VARIABLE BINDING: \"out\": \"$name\" binds the result. Chain actions via target=\"$name\".\n"
-            "    - RETURN CONTRACT: r[\"status\"] — \"success\"/\"failed\". r[\"resource_id\"] — resource ID.\n"
-            "      r[\"data\"] — structured content: string for Notes, list of {\"text\":..., \"metadata\":...} for Collections.\n"
-            "      r.get(\"extra\",{}).get(\"item_count\") — item count for Collections.\n"
-            "      r[\"value\"] — display string (for humans, not for code logic).\n"
-            "    - if/else control flow and loops are allowed.\n"
-            "    - Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
+            "Write a Python code block to accomplish the CURRENT_TASK.\n"
+            "```python\n"
+            "r1 = executor.execute_action_tracked({\"type\": \"search-web\", \"query\": \"transformers survey\", \"out\": \"$papers\"}, \"codegen\")\n"
+            "if r1[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"search failed\")\n"
+            "r2 = executor.execute_action_tracked({\"type\": \"synthesize\", \"target\": \"$papers\", \"focus\": \"key findings\", \"out\": \"$summary\"}, \"codegen\")\n"
+            "if r2[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"synthesize failed\")\n"
+            "return executor._create_uniform_return(\"success\", value=\"done\")\n"
+            "```\n"
+            "Rules:\n"
+            "- use python code and / or tool calls to accomplish the CURRENT_TASK.\n"
+            "- Max 16 tool calls in a single code block via executor.execute_action_tracked(action_dict, \"codegen\")\n"
+            "- Prefer longer cohesive blocks: if CURRENT_TASK has connected subtasks, combine them in one block.\n"
+            "- Avoid single-call blocks unless that single call fully completes CURRENT_TASK.\n"
+            "- VARIABLE BINDING: \"out\": \"$name\" binds the result. Chain tool actions via target=\"$name\".\n"
+            "- RETURN CONTRACT: r[\"status\"] — \"success\"/\"failed\". r[\"resource_id\"] — resource ID.\n"
+            "  r[\"data\"] — for Notes always string; for Collections list of {\"text\": content} per item.\n"
+            "  Use get_text(\"$var\") or get_json(\"$var\") to inspect Note content.\n"
+            "  r.get(\"extra\",{}).get(\"item_count\") — item count for Collections.\n"
+            "  r[\"value\"] — display string (for humans, not for code logic).\n"
+            "- CODE BLOCK SCOPE: each step executes in a fresh function. Python locals do NOT persist across steps.\n"
+            "- CROSS-STEP ACCESS: use $bindings only. To inspect existing resources use helpers:\n"
+            "  get_text(\"$var\") -> string, get_json(\"$var\") -> dict or None, get_items(\"$collection\") -> list.\n"
+            "- TYPE SAFETY: r[\"data\"] for Notes is always string; use get_json() when structured access needed.\n"
+            "- if/else control flow and loops are allowed.\n"
+            "- Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
             "\n"
             "#Stage 2 VARIABLE LIFETIME:\n"
-            "  Variables created via 'out' parameters remain in scope. Chain by passing\n"
-            "  the variable name (e.g. target='$papers') to the next action.\n"
-            "\n"
-            "#Stage 2 NUMERIC ARGUMENTS:\n"
-            "  IMPORTANT: All numeric tool arguments must be simple literals.\n"
-            "  Perform calculations in THOUGHTS, then pass only the final value.\n"
-            "  Arithmetic expressions in JSON will cause parsing errors.\n"
+            "  Only variables created via 'out' persist across steps or code blocks.\n"
+            "  Chain by passing the variable name (e.g. target='$papers') to the next action.\n"
+            "  Temporary Python variables (r1, text, data, etc.) are code-block-local only.\n"
             "\n"
             "#Stage 3 FORMAT:\n"
-            "  THOUGHTS: <text>\n"
-            "  HYPOTHESES: [<hypothesis1>, <hypothesis2>, ...]\n"
-            "  AUDIT: for each hypothesis in HYPOTHESES:\n"
-            "    <hypothesis text>\n"
-            "    scope: <observational | observed-set | global>\n"
-            "    verdict: <SUPPORTED | UNSUPPORTED | CONTRADICTED>\n"
-            "  DONE: <YES or NO>\n"
-            "  NEXT_TASK: <next high-level subgoal or blank>\n"
-            "  NEXT_PHASE_TYPE: <pipeline or deliberative>\n"
-            "  REQUEST_TOOLS: <json array>\n"
+            "  THOUGHTS: <brief assessment of result and progress>\n"
+            "  DONE: <YES or NO — is the entire GOAL satisfied?>\n"
+            "  NEXT_TASK: <next task description, or blank if DONE=YES>\n"
+            "  REQUEST_TOOLS: <json array of tool names needing docs, or []>\n"
             "\n"
-            "#Stage 3 INSTRUCTIONS:\n"
-            "HYPOTHESES:\n"
-            "- Identify unverified beliefs influencing your next step.\n"
-            "- Consider the following categories:\n"
-            "  1. CONSTRAINT ASSUMPTIONS: what actions are allowed or meaningful.\n"
-            "  2. TRANSFORMATION ASSUMPTIONS: how inputs convert to outputs or quantities.\n"
-            "  3. STATE ASSUMPTIONS: existence, availability, or accessibility claims.\n"
-            "- Hypotheses must be explicit and falsifiable.\n"
-            "- Do NOT repeat any hypothesis previously marked CONTRADICTED unless revised.\n"
-            "\n"
-            "SPIRAL DETECTION:\n"
-            "- If the same tool has failed 2+ times consecutively with the same error,\n"
-            "  do NOT retry the same approach. Either:\n"
-            "  (a) Use a different tool to achieve the same sub-goal, or\n"
-            "  (b) Skip the failing step and proceed with available data, or\n"
-            "  (c) Use a code block to call the tool with explicit parameters.\n"
-            "- SEARCH-EVALUATE CAP: Do not run more than 2 search-then-evaluate cycles\n"
-            "  for the same quality criterion. If a criterion remains FAIL after 2 attempts,\n"
-            "  proceed with available data and note the limitation.\n"
-            "\n"
-            "AUDIT (STRICT):\n"
-            "1. DECLARE SCOPE\n"
-            "   - observational: directly supported by tool output\n"
-            "   - observed-set: limited to items actually observed\n"
-            "   - global: extends beyond observed data\n"
-            "   - If unstated, assume global\n"
-            "2. EVIDENCE VS SCOPE\n"
-            "   - SUPPORTED / UNSUPPORTED / CONTRADICTED\n"
-            "3. MANDATORY DOWNGRADES\n"
-            "   - Claims using 'only', 'all', 'none', 'nearest', 'closest' require observed-set scope.\n"
-            "   - Partial, sampled, or non-exhaustive tool outputs cannot SUPPORT global claims.\n"
-            "   - Numeric comparisons do not imply optimality unless all candidates are compared.\n"
-            "4. CONTRADICTION PERSISTENCE RULE\n"
-            "   - Any CONTRADICTED hypothesis MUST NOT reappear verbatim.\n"
-            "   - It may reappear ONLY if explicitly revised by narrowing, conditioning, or inversion.\n"
-            "\n"
-            "MANDATORY CONSEQUENCE RULE:\n"
-            "- If a hypothesis is UNSUPPORTED and the plan depends on it,\n"
-            "  NEXT_TASK MUST be a verification or retrieval step.\n"
-            "- Proceeding without remediation is a protocol violation.\n"
-            "\n"
-            "SUFFICIENCY VS RETRIEVAL RULE:\n"
-            "   - If the next decision depends on domain rules (recipes, transformations, constraints),\n"
-            "   - and those rules are already present in loaded Notes or world_model facts,\n"
-            "   - DO NOT initiate retrieval or search for confirmation.\n"
-            "   - If such rules are NOT present in loaded sources,\n"
-            "   - verification using world-relative facts or knowledge, retrieval from loaded/loadable sources, or search, is REQUIRED before reasoning forward.\n"
-            "RETRIEVAL FAILURE RULE:\n"
-            "- If an authoritative Collection is loaded but no underlying Note is examined,\n"
-            "  hypotheses depending on that information Should be marked UNSUPPORTED.\n"
-            "\n"
-            "GENERAL PRIOR RULE:\n"
-            "- Justification based solely on intuition or general knowledge MUST be marked UNSUPPORTED\n"
-            "  when authoritative documentation is available.\n"
-            "\n"
-            "DONE RULES:\n"
-            "- Mark DONE: YES only when all required actions are complete.\n"
+            "#Stage 3 RULES:\n"
+            "- DONE=YES only when ALL required actions are complete.\n"
             "- If DONE=YES, NEXT_TASK must be blank.\n"
-            "- If communication to user is required, use 'say' before DONE=YES.\n"
-            "\n"
-            "NEXT_TASK:\n"
-            "- If any hypothesis is UNSUPPORTED or CONTRADICTED, NEXT_TASK should remediate it.\n"
-            "- Otherwise, propose the next concrete step toward the goal.\n"
-            "\n"
-            "NEXT_PHASE_TYPE:\n"
-            "- If NEXT_TASK describes 2+ steps that form a deterministic pipeline\n"
-            "  (each feeds the next, no branching on results), set: pipeline\n"
-            "- If NEXT_TASK requires observing a result before deciding what follows,\n"
-            "  set: deliberative\n"
-            "- Default: deliberative\n"
-            "\n"
-            "REQUEST_TOOLS:\n"
-            "- Always output valid JSON: [] or [\"tool1\", \"tool2\"].\n"
-            "- Add tools here if new documentation is required.\n"
+            "- Do NOT use 'say' inside Stage 2 code blocks; final user delivery happens only after DONE=YES and quality checks.\n"
+            "- Efficiency rule: if prior step used only one tool call and GOAL is not done, set NEXT_TASK to combine adjacent subtasks.\n"
+            "- SPIRAL DETECTION: If the same tool has failed 2+ times consecutively,\n"
+            "  use a different approach or proceed with available data.\n"
+            "- REQUEST_TOOLS: Always valid JSON: [] or [\"tool1\", \"tool2\"].\n"
             "\n"
             "Follow these formats exactly."
         )
         s += assistant("Understood.\n\n")
 
-
-        # Main loop — initialize phase type from Stage 1
+        # Main loop
         current_task = s["first_task"].strip()
-        try:
-            current_phase_type = s["phase_type"].strip().lower()
-            if current_phase_type not in ("pipeline", "deliberative"):
-                current_phase_type = "deliberative"
-        except (KeyError, TypeError, AttributeError):
-            current_phase_type = "deliberative"
-        last_eval_target = ""  # Track most recent artifact for deep eval at done gate
-        deep_eval_continued = False  # Allow at most one deep-eval-driven continuation
+        last_eval_target = ""
         for step in range(max_steps):
             if _interrupt_requested(executor):
                 _clear_interrupt(executor)
                 s["final_answer"] = "Interrupted by user."
                 break
 
-            # --- STAGE 2-PRE: Agent-State Hypotheses (deliberative only) ---
-            if current_phase_type == "deliberative":
-                # Get observed voxel grid and AF1 if available (Minecraft-specific)
-                voxel_grid_text = None
-                af1_text = None
-                if executor and executor.world_name == "minecraft":
-                    try:
-                        import sys
-                        import os
-                        current_dir = os.path.dirname(__file__)
-                        minecraft_tools_root = os.path.abspath(os.path.join(current_dir, "world-tools", "minecraft"))
-                        if minecraft_tools_root not in sys.path:
-                            sys.path.insert(0, minecraft_tools_root)
-                        from local_grid import get_observed_voxel_grid_as_text  # type: ignore
-                        voxel_grid_text = get_observed_voxel_grid_as_text(executor, radius=2)
-                    except Exception:
-                        pass
-                    try:
-                        af1_text_val = executor.get_world_state("af1_text")
-                        if isinstance(af1_text_val, str) and af1_text_val.strip():
-                            af1_text = af1_text_val.strip()
-                    except Exception:
-                        pass
-                
-                prompt_parts = [
-                    f"STAGE 2-PRE (step {step + 1}/{max_steps}):\n",
-                    f"#GOAL: {goal_for_step}\n#END GOAL\n",
-                    f"CURRENT_TASK: {current_task}\n\n"
-                ]
-                if voxel_grid_text:
-                    prompt_parts.append(f"""#OBSERVED_VOXEL_GRID:\nExplicit voxel grid centered on agent (radius=1). Coordinates are relative: [dx, dy, dz].
-Each cell shows: block_id, solid (true/false), support (true/false).
-This is the only planner-visible structure that supports direct (dx,dy,dz) usage for tool arguments.
-{voxel_grid_text}
-#END OBSERVED_VOXEL_GRID\n\n""")
-                if af1_text:
-                    prompt_parts.append(f"""#AF1:\nContract-aware actionability summary (deterministic, derived from mc-observe).\n{af1_text}\n#END AF1\n\n""")
-                prompt_parts.append("Before choosing any tool, infer AGENT-STATE HYPOTHESES and AGENT-STATE-SUPPORT. Refer to STAGE 2-PRE Instructions.\n")
-                
-                s += user("".join(prompt_parts))
-
-                s += assistant(
-                    "AGENT_STATE_HYPOTHESES:\n"
-                    + gen(
-                        f"agent_state_hypotheses_{step}",
-                        max_tokens=256,
-                        temperature=GEN_TEMPERATURE,
-                        stop="\nAGENT_STATE_SUPPORT:"
-                    )
-                    + "\nAGENT_STATE_SUPPORT:\n"
-                    + gen(
-                        f"agent_state_support_{step}",
-                        max_tokens=256,
-                        temperature=GEN_TEMPERATURE,
-                        stop=["\n\n", "\nSTAGE", "\nTOOL_NAME:"]
-                    )
-                )
-            else:
-                # Pipeline phase: skip Stage 2-PRE entirely
-                logger.info(f"Step {step}: Pipeline phase — skipping Stage 2-PRE")
-
-            # Stage 2: Choose tool + args
+            # Stage 2: Generate and execute code block
             s += user(
                 f"STAGE 2 (step {step + 1}/{max_steps}):\n"
                 f"#GOAL: {goal_for_step}\n#END GOAL\n"
                 f"CURRENT_TASK: {current_task}\n"
-                f"PHASE_TYPE: {current_phase_type}\n"
-                "Choose tool and JSON args using Stage 2 FORMAT.\n"
+                "Write a Python code block using Stage 2 FORMAT.\n"
             )
             
             s += assistant(
-                "TOOL_NAME: "
-                + gen(f"tool_name_{step}", max_tokens=32, temperature=GEN_TEMPERATURE, stop="TOOL_ARGS_JSON")
-                + "\nTOOL_ARGS_JSON: "
-                + gen(f"tool_args_{step}", max_tokens=1024, temperature=GEN_TEMPERATURE, stop=["\n\n", "\nCODE:", "\nSTAGE", "\nTOOL_NAME:"])
-                + "\n"
+                "```python\n"
+                + gen(f"code_block_{step}", max_tokens=2048, temperature=GEN_TEMPERATURE, stop=["```"])
+                + "```\n"
             )
             
-            # Execute tool
-            tool_name = s[f"tool_name_{step}"].strip()
-            tool_args_json = s[f"tool_args_{step}"].strip()
+            code_text = s[f"code_block_{step}"].strip()
+            logger.info(f"Step {step}: Code block ({len(code_text)} chars):\n{code_text}")
+            call_count = count_codegen_action_calls(code_text)
+            logger.info(f"Step {step}: Code block action calls={call_count} (logged before execution)")
             
-            if tool_name == "_code_block_":
-                # Code-block path: generate CODE block with extended stop
-                s += assistant(
-                    "CODE:\n```python\n"
-                    + gen(f"code_block_{step}", max_tokens=2048, temperature=GEN_TEMPERATURE, stop=["```"])
-                    + "```\n"
-                )
-                code_text = s[f"code_block_{step}"].strip()
-                logger.info(f"Stage 2: Code block generated ({len(code_text)} chars)")
-                
-                # Interrupt checkpoint: after code-block gen, before execute
-                if _interrupt_requested(executor):
-                    _clear_interrupt(executor)
-                    s["final_answer"] = "Interrupted by user."
-                    break
-                
-                # Snapshot bindings before execution
-                bindings_before = dict(executor.plan_bindings_flat)
-                
-                result_dict = execute_codegen_block(code_text, executor, "codegen")
-                action = {"type": "_code_block_"}
-                tool_result = format_result_text(result_dict, action)
-                
-                # Track new bindings for Stage 3.1
-                bindings_after = executor.plan_bindings_flat
-                new_bindings = {k: v for k, v in bindings_after.items() if bindings_before.get(k) != v}
-                resource_id_before = None  # handled via new_bindings below
-                
-                logger.info(f"Step {step}: _code_block_ -> {tool_result[:100]}")
-                if new_bindings:
-                    logger.info(f"Step {step}: New bindings from code block: {new_bindings}")
-                
-                # Interrupt checkpoint: after code-block execution
-                if _interrupt_requested(executor):
-                    _clear_interrupt(executor)
-                    s["final_answer"] = "Interrupted by user."
-                    break
-            else:
-                action = sgl_to_infospace_action(tool_name, tool_args_json, step, executor.available_tools)
-                new_bindings = None
-                
-                # Track resource bindings before execution
-                out_var = action.get('out', '')
-                resource_id_before = None
-                if out_var:
-                    resource_id_before = executor.plan_bindings_flat.get(out_var.lstrip('$'))
-                
-                # Execute (method tools run in an inner loop but count as one outer step)
-                tool_info = executor.available_tools.get(tool_name, {})
-                if tool_info.get('type') == 'method':
-                    logger.warning(f"Step {step}: Method tools are obsolete; executing {tool_name} directly")
-                tool_result = execute_infospace_action(action, executor, executor.agent_name)
-                
-                logger.info(f"Stage 2: Choose tool + args\n{tool_name} -> {tool_args_json}")
-                logger.info(f"Step {step}: {tool_name} -> {tool_result[:100]}")
-                
-                # Interrupt checkpoint: after tool execution
-                if _interrupt_requested(executor):
-                    _clear_interrupt(executor)
-                    s["final_answer"] = "Interrupted by user."
-                    break
+            # Interrupt checkpoint: after code-block gen, before execute
+            if _interrupt_requested(executor):
+                _clear_interrupt(executor)
+                s["final_answer"] = "Interrupted by user."
+                break
             
-            # Stage 3: Reflect (full result - no truncation; load with slice=":" or explicit amount returns full content)
-            result_display = tool_result
+            # Snapshot bindings before execution
+            bindings_before = dict(executor.plan_bindings_flat)
+            result_dict = execute_codegen_block(code_text, executor, "codegen")
+            action = {"type": "_code_block_"}
+            tool_result = format_result_text(result_dict, action)
             
+            # Track new bindings
+            new_bindings = {k: v for k, v in executor.plan_bindings_flat.items() if bindings_before.get(k) != v}
+            
+            # Persist code block return value as Note when substantial
+            code_block_output_created = False
+            if result_dict.get('status') == 'success':
+                val = result_dict.get('value', '')
+                if isinstance(val, str) and len(val) > 80:
+                    executor.execute_action({"type": "create-note", "value": val, "out": "$code_block_output"})
+                    code_block_output_created = True
+            
+            logger.info(f"Step {step}: -> {tool_result[:100]}")
+            if new_bindings:
+                logger.info(f"Step {step}: New bindings: {new_bindings}")
+            
+            # Interrupt checkpoint: after code-block execution
+            if _interrupt_requested(executor):
+                _clear_interrupt(executor)
+                s["final_answer"] = "Interrupted by user."
+                break
+            
+            # Stage 3: Evaluate result
             s += user(
                 f"=====\n"
-                f"STAGE 3 - TOOL EXECUTION COMPLETE (step {step + 1}/{max_steps})\n"
+                f"STAGE 3 (step {step + 1}/{max_steps})\n"
                 f"=====\n\n"
-                f"Tool executed: `{tool_name}`\n"
-                f"Arguments: {tool_args_json}\n\n"
-                f">> ACTUAL RESULT (ground truth) <<\n"
-                f"{result_display}\n"
+                f">> RESULT (ground truth) <<\n"
+                f"{tool_result}\n"
                 f">> END RESULT <<\n\n"
-                f"INSTRUCTIONS:\n"
-                f"1. The result above is GROUND TRUTH. Use it exactly as shown.\n"
-                f"2. If reporting to user, use ONLY the values from the result above.\n"
-                f"3. Do NOT approximate, summarize, or invent values.\n"
-                f"4. Evaluate: Is the GOAL complete, including actual execution of all required actions, and achievement of all required information determinations, and outcomes? If yes, respond DONE: YES.\n"
-                f"   If no, determine the next action needed.\n\n"
-                f"Respond using Stage 3 FORMAT. Be concise.\n"
-                f"Ensure the REQUEST_TOOLS list is a valid JSON list of tool names.\n"
+                f"Evaluate: Is the GOAL fully achieved? Use ONLY the result above as ground truth.\n"
+                f"Respond using Stage 3 FORMAT.\n"
             )
             
-            # Stage 3.2 (pre-reflection): Vision evaluation before planner reflects
+            # Vision evaluation before planner reflects
             eval_target = ""
-            if tool_name == "_code_block_":
-                if new_bindings:
-                    eval_target = list(new_bindings.keys())[-1]
-            elif tool_name in _ARTIFACT_PRODUCING_TOOLS:
-                out_var = action.get('out', '')
-                if out_var:
-                    eval_target = out_var
+            if new_bindings:
+                preferred_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and (rid.startswith("Note_") or rid.startswith("Collection_")) and not str(k).startswith("_") and str(k) != "code_block_output"]
+                if preferred_keys:
+                    eval_target = "$" + preferred_keys[-1].lstrip("$")
+                else:
+                    last_key = list(new_bindings.keys())[-1]
+                    if not last_key.startswith('$'):
+                        last_key = '$' + last_key
+                    eval_target = last_key
+            elif code_block_output_created:
+                eval_target = "$code_block_output"
             if eval_target:
                 last_eval_target = eval_target
             if eval_target and vision_criteria:
-                logger.info(f"Step {step}: Vision eval auto-target: {eval_target} (tool={tool_name})")
+                logger.info(f"Step {step}: Vision eval target: {eval_target}")
                 compressed_ctx = _compress_trace(str(s))
                 vision_eval_text = _vision_eval_check(vision_criteria, eval_target, executor, compressed_context=compressed_ctx)
                 if vision_eval_text:
-                    s += user(f"VISION EVALUATION (quality check against criteria):\n{vision_eval_text}\nFAILs are advisory — attempt to address them if easy, but do NOT loop or search repeatedly to fix a single criterion. Proceed with available data after at most one retry.\n")
+                    s += user(f"VISION EVALUATION:\n{vision_eval_text}\nFAILs are advisory — attempt to address if easy, do NOT loop repeatedly. Proceed after at most one retry.\n")
                     s += assistant("Noted.\n")
             
+            # Stage 3: Simplified reflection (4 fields)
             s += assistant(
-                "\nTHOUGHTS: "
-                + gen(f"thoughts_{step}", max_tokens=128, temperature=GEN_TEMPERATURE, stop=["\nHYPOTHESES:", "HYPOTHESES:"])
-                +"\nHYPOTHESES: "
-                + gen(
-                    f"hypotheses_{step}",
-                    max_tokens=128,
-                    temperature=GEN_TEMPERATURE,
-                    stop=[
-                        "\nAUDIT:", "AUDIT:","\nDONE:", "DONE:","\nNEXT_TASK:", "NEXT_TASK:","\nREQUEST_TOOLS:", "REQUEST_TOOLS:", "\nTHOUGHTS:", "THOUGHTS:","\nHYPOTHESES:", "HYPOTHESES:"
-                    ]
-                )
-                +"\nAUDIT: "
-                + gen(f"assumption_audit_{step}",max_tokens=192,temperature=0.0,stop="\nDONE: ")
+                "THOUGHTS: "
+                + gen(f"thoughts_{step}", max_tokens=128, temperature=GEN_TEMPERATURE, stop="\nDONE:")
                 + "\nDONE: "
-                + gen(f"done_{step}", max_tokens=8, temperature=GEN_TEMPERATURE, stop="\nNEXT_TASK: ")
+                + gen(f"done_{step}", max_tokens=8, temperature=GEN_TEMPERATURE, stop="\nNEXT_TASK:")
                 + "\nNEXT_TASK: "
-                + gen(
-                    f"next_task_{step}",
-                    max_tokens=128,
-                    temperature=GEN_TEMPERATURE,
-                    stop=["\nNEXT_PHASE_TYPE:", "\nREQUEST_TOOLS: ", "\nTHOUGHTS:", "\nHYPOTHESES:", "\nAUDIT:", "\nDONE:", "\nNEXT_TASK:"]
-                )
-                + "\nNEXT_PHASE_TYPE: "
-                + gen(
-                    f"next_phase_type_{step}",
-                    max_tokens=16,
-                    temperature=GEN_TEMPERATURE,
-                    stop=["\nREQUEST_TOOLS:", "\n\n"]
-                )
+                + gen(f"next_task_{step}", max_tokens=128, temperature=GEN_TEMPERATURE, stop="\nREQUEST_TOOLS:")
                 + "\nREQUEST_TOOLS: "
-                + gen(
-                    f"request_tools_{step}",
-                    max_tokens=96,
-                    temperature=GEN_TEMPERATURE,
-                    stop=["\n\n", "\nTHOUGHTS:", "\nHYPOTHESES:", "\nAUDIT:", "\nDONE:", "\nNEXT_TASK:", "\nREQUEST_TOOLS:"]
-                )
+                + gen(f"request_tools_{step}", max_tokens=96, temperature=GEN_TEMPERATURE, stop=["\n\n", "\nTHOUGHTS:", "\nDONE:", "\nNEXT_TASK:", "\nREQUEST_TOOLS:"])
                 + "\n"
             )
-            # Safely log step fields (may not exist if step was interrupted or incomplete)
-            # ProgramState uses bracket notation and raises KeyError if key doesn't exist
+            
             def safe_get(state, key, default='N/A'):
                 try:
                     return state[key]
@@ -2593,93 +2308,60 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                     return default
             
             logger.info(f"THOUGHTS: {safe_get(s, f'thoughts_{step}')}")
-            logger.info(f"HYPOTHESES: {safe_get(s, f'hypotheses_{step}')}")
-            logger.info(f"ASSUMPTIONS: {safe_get(s, f'assumption_audit_{step}')}")
             logger.info(f"DONE: {safe_get(s, f'done_{step}')}")
             logger.info(f"NEXT_TASK: {safe_get(s, f'next_task_{step}')}")
             logger.info(f"REQUEST_TOOLS: {safe_get(s, f'request_tools_{step}')}")
             
             # Stage 3.1: Update resource indexes with commentary
             thoughts_text = s[f'thoughts_{step}'].strip()
-            if thoughts_text:
-                resource_ids_to_update = []
-                if new_bindings:
-                    # Code-block path: check all new bindings
-                    for var_name, rid in new_bindings.items():
-                        if rid and (rid.startswith('Note_') or rid.startswith('Collection_')):
-                            resource_ids_to_update.append(rid)
-                else:
-                    # Single-tool path: check the one out var
-                    out_var = action.get('out', '')
-                    if out_var:
-                        resource_id_after = executor.plan_bindings_flat.get(out_var.lstrip('$'))
-                        if resource_id_after and resource_id_after != resource_id_before:
-                            if resource_id_after.startswith('Note_') or resource_id_after.startswith('Collection_'):
-                                resource_ids_to_update.append(resource_id_after)
-                
-                for resource_id in resource_ids_to_update:
-                    try:
-                        if executor.resource_manager:
-                            executor.resource_manager.update_resource_commentary(resource_id, thoughts_text)
-                            logger.debug(f"Stage 3.1: Updated commentary for {resource_id} (created via {action.get('type')})")
-                        else:
-                            logger.debug(f"Stage 3.1: Resource manager not available for {resource_id}")
-                    except Exception as e:
-                        logger.debug(f"Stage 3.1: Failed to update commentary for {resource_id}: {e}")
+            if thoughts_text and new_bindings:
+                for var_name, rid in new_bindings.items():
+                    if rid and (rid.startswith('Note_') or rid.startswith('Collection_')):
+                        try:
+                            if executor.resource_manager:
+                                executor.resource_manager.update_resource_commentary(rid, thoughts_text)
+                                logger.debug(f"Stage 3.1: Updated commentary for {rid}")
+                        except Exception as e:
+                            logger.debug(f"Stage 3.1: Failed to update commentary for {rid}: {e}")
             
             # Stage 3.5: Dynamic tool loading (if requested)
             requested_tools_raw = s[f"request_tools_{step}"].strip()
             requested_tools = parse_request_tools(requested_tools_raw)
             if requested_tools:
                 logger.info(f"Step {step}: LLM requested additional tools: {requested_tools}")
-                # Filter to only tools that haven't had docs loaded yet
                 tools_to_load = [tool for tool in requested_tools if tool not in _loaded_skill_docs]
-                
                 if tools_to_load:
                     expanded_docs = load_skill_docs(tools_to_load, executor.available_tools)
                     if expanded_docs:
                         s += user(f"ADDITIONAL TOOL DOCUMENTATION:\n{expanded_docs}")
                         s += assistant("I have reviewed the additional tool documentation.\n")
                         logger.info(f"Stage 3.5: Loaded docs for {len(tools_to_load)} additional tools: {tools_to_load}")
-                        # Mark these tools as loaded
                         _loaded_skill_docs.update(tools_to_load)
                 else:
-                    logger.debug(f"Stage 3.5: All {len(requested_tools)} requested tools already have docs loaded, skipping")
+                    logger.debug(f"Stage 3.5: All requested tools already have docs loaded, skipping")
             elif requested_tools_raw and requested_tools_raw.lower() not in ["", "[]", "none", "null"]:
-                # Log warning only if there was actual content that failed to parse
                 logger.warning(f"Step {step}: Failed to parse REQUEST_TOOLS: {requested_tools_raw[:100]}")
             
             # Check if done
             done_raw = s[f"done_{step}"].strip().upper()
             if done_raw.startswith("YES"):
-                # Interrupt checkpoint: before verification/final answer
                 if _interrupt_requested(executor):
                     _clear_interrupt(executor)
                     s["final_answer"] = "Interrupted by user."
                     break
-                # --- [START NEW VERIFICATION LOGIC] ---
-                # Intercept the completion to force a self-audit
-                s += user(
-                    "STOP. Before providing the final answer, perform a verification step. \n"
-                    "Verify that the GOAL has been achieved, including actual execution of all required actions, and achievement of all required information determinations, and outcomes:\n"
-                    "#VERIFICATION_INSTRUCTIONS:\n"
-                    "        Inputs: GOAL, prior state, and current state\n"
-                    "        - what are the observable facts in STATE_AFTER that directly satisfy GOAL.\n"
-                    "        - what are the required GOAL actions and facts not observable in STATE_AFTER.\n"
-                    "        - based on the above, provide a candid VERIFICATION ANSWER: (SUCCESS, PARTIAL, INCONCLUSIVE):\n"
-                    "#OUTPUT FORMAT:\n"
-                    "        - VERIFICATION_ANSWER: <SUCCESS | PARTIAL | INCONCLUSIVE>\n"
-                    "#Respond using the OUTPUT FORMAT. Be concise.\n"
-                )
                 
+                # Verification
+                s += user(
+                    "STOP. Verify that the GOAL has been achieved:\n"
+                    "- What observable facts in the current state satisfy the GOAL?\n"
+                    "- What required actions or outcomes are missing?\n"
+                    "VERIFICATION_ANSWER: <SUCCESS | PARTIAL | INCONCLUSIVE>\n"
+                )
                 s += assistant(
                     "VERIFICATION_ANSWER: "
                     + gen("VERIFICATION_ANSWER", max_tokens=96, temperature=GEN_TEMPERATURE, stop="\n")
-
                 )
-                
                 logger.info(f"VERIFICATION ANSWER: {s['VERIFICATION_ANSWER']}")
-                # --- [END NEW VERIFICATION LOGIC] ---
                 
                 # Deep vision evaluation at done gate
                 if vision_criteria and last_eval_target:
@@ -2688,23 +2370,27 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                     shallow_text = _vision_eval_check(vision_criteria, last_eval_target, executor, compressed_context=compressed_ctx)
                     deep_text = _vision_eval_deep(vision_criteria, last_eval_target, shallow_text or "", executor, compressed_context=compressed_ctx)
                     if deep_text:
-                        s += user(f"DEEP VISION EVALUATION (final quality gate):\n{deep_text}\nIf issues found, you may revise your approach instead of finishing.\n")
+                        s += user(f"DEEP VISION EVALUATION (final quality gate, read-only):\n{deep_text}\nUse this only as QA signal. Do NOT run additional tool steps at done gate.\n")
                         s += assistant("Noted.\n")
                         logger.info(f"Done gate: Deep eval result injected")
-                        # If deep eval found issues, continue the loop (once)
-                        if not deep_eval_continued and "none needed" not in deep_text.lower():
-                            deep_eval_continued = True
-                            logger.info(f"Done gate: Deep eval found issues, continuing plan")
-                            continue
-                    elif shallow_text and not deep_eval_continued and "fail" in shallow_text.lower():
-                        # Deep eval unavailable; fall back to shallow eval — advisory only, one retry max
-                        deep_eval_continued = True
-                        s += user(f"VISION EVALUATION (final quality gate, shallow):\n{shallow_text}\nFAILs are advisory. Make one quick attempt to address if easy, otherwise finish with what you have.\n")
+                        deep_status = _parse_deep_eval_status(deep_text)
+                        if deep_status == "needs_revision":
+                            logger.info("Done gate: Deep eval returned NEEDS_REVISION; returning caveated frozen artifact (no reopen, no regeneration)")
+                            draft_text = _resolve_eval_target_text(last_eval_target, executor)
+                            caveat = (
+                                "Quality gate warning: deep evaluation found issues (STATUS: NEEDS_REVISION). "
+                                "Delivering best available draft from this cycle (not revised)."
+                            )
+                            s["VERIFICATION_ANSWER"] = "PARTIAL"
+                            s[f"done_{step}"] = "NO"
+                            s["final_answer"] = f"{caveat}\n\n{draft_text}" if draft_text else caveat
+                            break
+                    elif shallow_text and "fail" in shallow_text.lower():
+                        s += user(f"VISION EVALUATION (final quality gate, shallow, read-only):\n{shallow_text}\nFAILs are advisory. Do NOT run additional tool steps at done gate.\n")
                         s += assistant("Noted.\n")
-                        logger.info(f"Done gate: Shallow eval has FAILs and deep eval unavailable, continuing plan (advisory)")
-                        continue
+                        logger.info("Done gate: Shallow eval has FAILs (read-only advisory); proceeding to finalization")
                 
-                # Generate final answer using NEXT_TASK as prompt, or generic goal-focused prompt
+                # Generate final answer
                 next_task_raw = s[f"next_task_{step}"].strip()
                 if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
                     final_prompt = next_task_raw
@@ -2716,16 +2402,11 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                 logger.info(f"FINAL_ANSWER: {s['final_answer']}")
                 break
             
-            # Update current task and phase type for next iteration
+            # Update current task for next iteration
             next_task_raw = s[f"next_task_{step}"].strip()
             if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
                 current_task = next_task_raw
-                try:
-                    npt = s[f"next_phase_type_{step}"].strip().lower()
-                    current_phase_type = npt if npt in ("pipeline", "deliberative") else "deliberative"
-                except (KeyError, TypeError, AttributeError):
-                    current_phase_type = "deliberative"
-                logger.info(f"Step {step}: Next task: {current_task} (phase: {current_phase_type})")
+                logger.info(f"Step {step}: Next task: {current_task}")
             else:
                 logger.warning(f"Step {step}: No NEXT_TASK provided, stopping")
         
@@ -3157,8 +2838,8 @@ def tool_planner_infospace_vllm(template, goal: str, world_model: Dict, characte
     
     # Stage 1: Analysis + tool selection
     system_parts = [f"Your task is to achieve\n#GOAL:\n{goal}\n\n"]
-    system_parts.append("You can choose tools/primitives (aka actions), if and as needed, callling them with JSON arguments,")
-    system_parts.append("and loop over execute-step / reflect / refine until the goal is satisfied.")
+    system_parts.append("You can write code blocks to achieve the goal, including using tools/primitives (aka actions), if and as needed,")
+    system_parts.append("and loop over execute-step / reflect until the goal is satisfied.")
     system_parts.append(f"\n{INCREMENTAL_PLAN_SPECIFICATIONS}\n")
     system_parts.append(f"Complete primitive and tool catalog:\n{tools_catalog_text}\n#### END OF INFOSPACE TYPE SYSTEM, SPECIFICATIONS, AND TOOL CATALOG\n\n")
     
@@ -3187,12 +2868,12 @@ def tool_planner_infospace_vllm(template, goal: str, world_model: Dict, characte
     system_parts.append(f"WORLD_MODEL: {json.dumps(world_model, indent=2)}\n")
     system_parts.append(f"CURRENT_TIME: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
     system_parts.append("""Follow this process to achieve the goal:
- - Stage 1 (once): Read the ABSTRACT_PLAN, select tools, identify first PHASE type (pipeline or deliberative).
+ - Stage 1 (once): Read the ABSTRACT_PLAN, select tools, state first task.
  - Stage 1.5 (once): Load and inject detailed docs for selected tools.
 Then you will work in repeated cycles:
- - Stage 2: For PIPELINE phases, write a code block (Option B) executing the full phase.
-            For DELIBERATIVE steps, pick a single tool (Option A).
- - Stage 3: Reflect on result, decide if goal done, set NEXT_TASK and NEXT_PHASE_TYPE.
+ - Stage 2: Write a Python code block for the current task.
+ - Execute the code block.
+ - Stage 3: Evaluate result — is the goal done? What is the next task?
 ALWAYS follow all formatting instructions exactly.
 
 """)
@@ -3207,18 +2888,9 @@ ALWAYS follow all formatting instructions exactly.
         "2. TOOLS: Select tools you will need from the Complete primitive and tool catalog.\n"
         "   Include tools for the full plan, not just the first step.\n"
         "\n"
-        "3. PHASE TYPE: The ABSTRACT_PLAN includes phase hints. Evaluate the first phase:\n"
-        "   - Confirm or override the hint based on available resources and tools.\n"
-        "   - pipeline: 2-5 consecutive steps where each feeds the next,\n"
-        "     no observation-dependent branching. Execute as a code block.\n"
-        "   - deliberative: a single step where you must observe the result\n"
-        "     before deciding what to do next.\n"
-        "\n"
-        "4. FIRST TASK: State what to do first.\n"
-        "   - For pipeline phases: describe the ENTIRE phase as one task\n"
-        "     (e.g., 'Search for papers, filter to recent, extract metadata,\n"
-        "     and build comparison table').\n"
-        "   - For deliberative steps: describe just the single next step.\n"
+        "3. FIRST TASK: State what to do first.\n"
+        "   Describe the task concisely (e.g., 'Search for papers, filter to recent,\n"
+        "   extract metadata, and build comparison table').\n"
         "\n"
         "Respond using this format:\n"
         "<reasoning>\n"
@@ -3227,9 +2899,6 @@ ALWAYS follow all formatting instructions exactly.
         "<tools>\n"
         "JSON LIST OF TOOLS\n"
         "</tools>\n"
-        "<phase_type>\n"
-        "pipeline OR deliberative\n"
-        "</phase_type>\n"
         "<first_task>\n"
         "TASK DESCRIPTION\n"
         "</first_task>\n"
@@ -3243,16 +2912,11 @@ ALWAYS follow all formatting instructions exactly.
     stage1_full = stage1_block + "</first_task>"
     state["stage1_reasoning"] = _extract_tag_block(stage1_full, "reasoning")
     state["selected_tools_json"] = _extract_tag_block(stage1_full, "tools")
-    state["phase_type"] = _extract_tag_block(stage1_full, "phase_type").strip().lower()
     state["first_task"] = _extract_tag_block(stage1_full, "first_task")
-    # Normalize phase_type
-    if state["phase_type"] not in ("pipeline", "deliberative"):
-        state["phase_type"] = "deliberative"
     
     try:
         logger.info(f"Stage 1: Reasoning: {state.get('stage1_reasoning', 'N/A')}")
         logger.info(f"SELECTED_TOOLS_JSON: {state.get('selected_tools_json', 'N/A')}")
-        logger.info(f"PHASE_TYPE: {state.get('phase_type', 'N/A')}")
         logger.info(f"FIRST_TASK: {state.get('first_task', 'N/A')}")
     except KeyError as e:
         logger.warning(f"Stage 1 values not available: {e}")
@@ -3284,417 +2948,170 @@ ALWAYS follow all formatting instructions exactly.
     
     # Stage 2/3 format instructions
     prompt += format_user(
-        "#Stage 2-PRE: Instructions\n"
-        "Before choosing TOOL_NAME/ARGS for this step, you MUST first produce AGENT_STATE_HYPOTHESES.\n"
-        "Purpose:\n"
-        "- Make *context* explicit as TRANSIENT beliefs about the agent's current\n"
-        "  affordances, constraints, or limitations.\n"
-        "- These hypotheses exist ONLY for the current planning attempt.\n"
-        "- They are NOT persistent world facts and must NOT be promoted to memory.\n"
-        "- They should meaningfully influence tool choice when more than one tool\n"
-        "  could plausibly apply.\n"
-        "\n"
-        "# STAGE 2-PRE FORMAT (STRICT):\n"
-        "AGENT_STATE_HYPOTHESES: [<h1>, <h2>, ...]\n"
-        "AGENT_STATE_SUPPORT:\n"
-        "  - <h1>: <evidence pointer: tool result field / note id / variable / or \"none\">\n"
-        "  - <h2>: <evidence pointer ...>\n"
-        "\n"
-        "# STAGE 2-PRE RULES (STRICT):\n"
-        "- Max 6 hypotheses.\n"
-        "- Each hypothesis MUST be falsifiable (a tool call or note could contradict it).\n"
-        "- Prefer CONSTRAINTS, LIMITATIONS, or MISSING AFFORDANCES over confirmations.\n"
-        "- Each hypothesis must plausibly affect tool choice if false.\n"
-        "- Hypotheses may reference ONLY information observed before this step.\n"
-        "- Hypotheses MUST describe epistemic or physical state of the agent\n"
-        "  (e.g., known/unknown, available/unavailable, stable/unstable).\n"
-        "- DO NOT describe future actions, plans, or tools.\n"
-        "- DO NOT restate the CURRENT_TASK or GOAL.\n"
-        "- DO NOT include generic system truths unless they constrain choice.\n"
-        "- These are NOT world-model facts.\n"
-        "\n"
-        "# OPTIONAL NULL CONTEXT:\n"
-        "- If the next step is logically forced (only one reasonable tool applies),\n"
-        "  you MAY output:\n"
-        "    AGENT_STATE_HYPOTHESES: []\n"
-        "    AGENT_STATE_SUPPORT: []\n"
-        "\n"
-        "Examples (do not include world annotations in your response):\n"
-        "- 'Inventory contains at least one placeable solid block.'\n"
-        "- 'No placeable solid blocks are available in inventory.'\n"
-        "- 'Current position appears stable (on ground) rather than falling.'\n"
-        "- 'query-web returned no useful results.'\n"
-        "- 'there is no more space in /data'\n"
-        "\n"
-        "#Stage 2 Instructions:\n"
-        "- Review the ABSTRACT_PLAN and determine progress toward the goal.\n"
-        "- Review AGENT_STATE_HYPOTHESES and AGENT_STATE_SUPPORT (if present).\n"
-        "- Choose the next tool and its JSON args from the Complete primitive and tool catalog.\n"
-        "\n"
         "#Stage 2 FORMAT:\n"
-        "  The format depends on the current PHASE_TYPE.\n"
-        "\n"
-        "  PIPELINE phases (CURRENT_TASK describes multiple known steps):\n"
-        "    You SHOULD use Option B (code block) to execute the entire phase.\n"
-        "    Only fall back to Option A if the phase truly requires just one tool call.\n"
-        "\n"
-        "  DELIBERATIVE steps (you need to observe before deciding next):\n"
-        "    Use Option A (single tool call).\n"
-        "    Option B is available if you realize 2-3 calls can be safely chained.\n"
-        "\n"
-        "  Option A - single tool call:\n"
-        "    TOOL_NAME: <name from the Complete primitive and tool catalog>\n"
-        "    TOOL_ARGS_JSON: <json object>\n"
-        "\n"
-        "  Option B - multi-step code block:\n"
-        "    TOOL_NAME: _code_block_\n"
-        "    TOOL_ARGS_JSON: {}\n"
-        "    CODE:\n"
-        "    ```python\n"
-        "    r1 = executor.execute_action_tracked({\"type\": \"search-web\", \"query\": \"transformers survey\", \"out\": \"$papers\"}, \"codegen\")\n"
-        "    if r1[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"search failed\")\n"
-        "    if len(r1[\"data\"]) < 3:  # too few results — broaden\n"
-        "        r1 = executor.execute_action_tracked({\"type\": \"search-web\", \"query\": \"transformer models overview\", \"out\": \"$papers\"}, \"codegen\")\n"
-        "    r2 = executor.execute_action_tracked({\"type\": \"synthesize\", \"target\": \"$papers\", \"focus\": \"key findings\", \"out\": \"$summary\"}, \"codegen\")\n"
-        "    if r2[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"synthesize failed\")\n"
-        "    return executor._create_uniform_return(\"success\", value=\"pipeline complete\", extra={\"item_count\": len(r1[\"data\"])})\n"
-        "    ```\n"
-        "    Rules for Option B:\n"
-        "    - Max 6 tool calls via executor.execute_action_tracked(action_dict, \"codegen\")\n"
-        "    - VARIABLE BINDING: \"out\": \"$name\" binds the result. Chain actions via target=\"$name\".\n"
-        "    - RETURN CONTRACT: r[\"status\"] — \"success\"/\"failed\". r[\"resource_id\"] — resource ID.\n"
-        "      r[\"data\"] — structured content: string for Notes, list of {\"text\":..., \"metadata\":...} for Collections.\n"
-        "      r.get(\"extra\",{}).get(\"item_count\") — item count for Collections.\n"
-        "      r[\"value\"] — display string (for humans, not for code logic).\n"
-        "    - if/else control flow and loops are allowed.\n"
-        "    - Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
+        "Write a Python code block to accomplish the CURRENT_TASK.\n"
+        "```python\n"
+        "r1 = executor.execute_action_tracked({\"type\": \"search-web\", \"query\": \"transformers survey\", \"out\": \"$papers\"}, \"codegen\")\n"
+        "if r1[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"search failed\")\n"
+        "r2 = executor.execute_action_tracked({\"type\": \"synthesize\", \"target\": \"$papers\", \"focus\": \"key findings\", \"out\": \"$summary\"}, \"codegen\")\n"
+        "if r2[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"synthesize failed\")\n"
+        "return executor._create_uniform_return(\"success\", value=\"done\")\n"
+        "```\n"
+        "Rules:\n"
+        "- use python code and / or tool calls to accomplish the CURRENT_TASK.\n"
+        "- Max 16 tool calls in a single code block via executor.execute_action_tracked(action_dict, \"codegen\")\n"
+        "- Prefer longer cohesive blocks: if CURRENT_TASK has connected subtasks, combine them in one block.\n"
+        "- Avoid single-call blocks unless that single call fully completes CURRENT_TASK.\n"
+        "- VARIABLE BINDING: \"out\": \"$name\" binds the result. Chain tool actions via target=\"$name\".\n"
+        "- RETURN CONTRACT: r[\"status\"] — \"success\"/\"failed\". r[\"resource_id\"] — resource ID.\n"
+        "  r[\"data\"] — for Notes always string; for Collections list of {\"text\": content} per item.\n"
+        "  Use get_text(\"$var\") or get_json(\"$var\") to inspect Note content.\n"
+        "  r.get(\"extra\",{}).get(\"item_count\") — item count for Collections.\n"
+        "  r[\"value\"] — display string (for humans, not for code logic).\n"
+        "- CODE BLOCK SCOPE: each step executes in a fresh function. Python locals do NOT persist across steps.\n"
+        "- CROSS-STEP ACCESS: use $bindings only. To inspect existing resources use helpers:\n"
+        "  get_text(\"$var\") -> string, get_json(\"$var\") -> dict or None, get_items(\"$collection\") -> list.\n"
+        "- TYPE SAFETY: r[\"data\"] for Notes is always string; use get_json() when structured access needed.\n"
+        "- if/else control flow and loops are allowed.\n"
+        "- Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
         "\n"
         "#Stage 2 VARIABLE LIFETIME:\n"
-        "  Variables created via 'out' parameters remain in scope. Chain by passing\n"
-        "  the variable name (e.g. target='$papers') to the next action.\n"
-        "\n"
-        "#Stage 2 NUMERIC ARGUMENTS:\n"
-        "  IMPORTANT: All numeric tool arguments must be simple literals.\n"
-        "  Perform calculations in THOUGHTS, then pass only the final value.\n"
-        "  Arithmetic expressions in JSON will cause parsing errors.\n"
+        "  Only variables created via 'out' persist across steps or code blocks.\n"
+        "  Chain by passing the variable name (e.g. target='$papers') to the next action.\n"
+        "  Temporary Python variables (r1, text, data, etc.) are code-block-local only.\n"
         "\n"
         "#Stage 3 FORMAT:\n"
-        "  THOUGHTS: <text>\n"
-        "  HYPOTHESES: [<hypothesis1>, <hypothesis2>, ...]\n"
-        "  AUDIT: for each hypothesis in HYPOTHESES:\n"
-        "    <hypothesis text>\n"
-        "    scope: <observational | observed-set | global>\n"
-        "    verdict: <SUPPORTED | UNSUPPORTED | CONTRADICTED>\n"
-        "  DONE: <YES or NO>\n"
-        "  NEXT_TASK: <next high-level subgoal or blank>\n"
-        "  NEXT_PHASE_TYPE: <pipeline or deliberative>\n"
-        "  REQUEST_TOOLS: <json array>\n"
+        "  THOUGHTS: <brief assessment of result and progress>\n"
+        "  DONE: <YES or NO — is the entire GOAL satisfied?>\n"
+        "  NEXT_TASK: <next task description, or blank if DONE=YES>\n"
+        "  REQUEST_TOOLS: <json array of tool names needing docs, or []>\n"
         "\n"
-        "#Stage 3 INSTRUCTIONS:\n"
-        "HYPOTHESES:\n"
-        "- Identify unverified beliefs influencing your next step.\n"
-        "- Consider the following categories:\n"
-        "  1. CONSTRAINT ASSUMPTIONS: what actions are allowed or meaningful.\n"
-        "  2. TRANSFORMATION ASSUMPTIONS: how inputs convert to outputs or quantities.\n"
-        "  3. STATE ASSUMPTIONS: existence, availability, or accessibility claims.\n"
-        "- Hypotheses must be explicit and falsifiable.\n"
-        "- Do NOT repeat any hypothesis previously marked CONTRADICTED unless revised.\n"
-        "\n"
-        "SPIRAL DETECTION:\n"
-        "- If the same tool has failed 2+ times consecutively with the same error,\n"
-        "  do NOT retry the same approach. Either:\n"
-        "  (a) Use a different tool to achieve the same sub-goal, or\n"
-        "  (b) Skip the failing step and proceed with available data, or\n"
-        "  (c) Use a code block to call the tool with explicit parameters.\n"
-        "- SEARCH-EVALUATE CAP: Do not run more than 2 search-then-evaluate cycles\n"
-        "  for the same quality criterion. If a criterion remains FAIL after 2 attempts,\n"
-        "  proceed with available data and note the limitation.\n"
-        "\n"
-        "AUDIT (STRICT):\n"
-        "1. DECLARE SCOPE\n"
-        "   - observational: directly supported by tool output\n"
-        "   - observed-set: limited to items actually observed\n"
-        "   - global: extends beyond observed data\n"
-        "   - If unstated, assume global\n"
-        "2. EVIDENCE VS SCOPE\n"
-        "   - SUPPORTED / UNSUPPORTED / CONTRADICTED\n"
-        "3. MANDATORY DOWNGRADES\n"
-        "   - Claims using 'only', 'all', 'none', 'nearest', 'closest' require observed-set scope.\n"
-        "   - Partial, sampled, or non-exhaustive tool outputs cannot SUPPORT global claims.\n"
-        "   - Numeric comparisons do not imply optimality unless all candidates are compared.\n"
-        "4. CONTRADICTION PERSISTENCE RULE\n"
-        "   - Any CONTRADICTED hypothesis MUST NOT reappear verbatim.\n"
-        "   - It may reappear ONLY if explicitly revised by narrowing, conditioning, or inversion.\n"
-        "\n"
-        "MANDATORY CONSEQUENCE RULE:\n"
-        "- If a hypothesis is UNSUPPORTED and the plan depends on it,\n"
-        "  NEXT_TASK MUST be a verification or retrieval step.\n"
-        "- Proceeding without remediation is a protocol violation.\n"
-        "\n"
-        "SUFFICIENCY VS RETRIEVAL RULE:\n"
-        "   - If the next decision depends on domain rules (recipes, transformations, constraints),\n"
-        "   - and those rules are already present in loaded Notes or world_model facts,\n"
-        "   - DO NOT initiate retrieval or search for confirmation.\n"
-        "   - If such rules are NOT present in loaded sources,\n"
-        "   - verification using world-relative facts or knowledge, retrieval from loaded/loadable sources, or search, is REQUIRED before reasoning forward.\n"
-        "RETRIEVAL FAILURE RULE:\n"
-        "- If an authoritative Collection is loaded but no underlying Note is examined,\n"
-        "  hypotheses depending on that information Should be marked UNSUPPORTED.\n"
-        "\n"
-        "GENERAL PRIOR RULE:\n"
-        "- Justification based solely on intuition or general knowledge MUST be marked UNSUPPORTED\n"
-        "  when authoritative documentation is available.\n"
-        "\n"
-        "DONE RULES:\n"
-        "- Mark DONE: YES only when all required actions are complete.\n"
+        "#Stage 3 RULES:\n"
+        "- DONE=YES only when ALL required actions are complete.\n"
         "- If DONE=YES, NEXT_TASK must be blank.\n"
-        "- If communication to user is required, use 'say' before DONE=YES.\n"
-        "\n"
-        "NEXT_TASK:\n"
-        "- If any hypothesis is UNSUPPORTED or CONTRADICTED, NEXT_TASK should remediate it.\n"
-        "- Otherwise, propose the next concrete step toward the goal.\n"
-        "\n"
-        "NEXT_PHASE_TYPE:\n"
-        "- If NEXT_TASK describes 2+ steps that form a deterministic pipeline\n"
-        "  (each feeds the next, no branching on results), set: pipeline\n"
-        "- If NEXT_TASK requires observing a result before deciding what follows,\n"
-        "  set: deliberative\n"
-        "- Default: deliberative\n"
-        "\n"
-        "REQUEST_TOOLS:\n"
-        "- Always output valid JSON: [] or [\"tool1\", \"tool2\"].\n"
-        "- Add tools here if new documentation is required.\n"
+        "- Do NOT use 'say' inside Stage 2 code blocks; final user delivery happens only after DONE=YES and quality checks.\n"
+        "- Efficiency rule: if prior step used only one tool call and GOAL is not done, set NEXT_TASK to combine adjacent subtasks.\n"
+        "- SPIRAL DETECTION: If the same tool has failed 2+ times consecutively,\n"
+        "  use a different approach or proceed with available data.\n"
+        "- REQUEST_TOOLS: Always valid JSON: [] or [\"tool1\", \"tool2\"].\n"
         "\n"
         "Follow these formats exactly."
     )
     
     prompt += format_assistant("Understood.\n\n")
     
-    # Main loop — initialize phase type from Stage 1
+    # Main loop
     current_task = state.get("first_task", "").strip()
     if not current_task:
         logger.warning("No first_task found, using goal as initial task")
         current_task = goal_for_step
-    current_phase_type = state.get("phase_type", "deliberative")
-    last_eval_target = ""  # Track most recent artifact for deep eval at done gate
-    deep_eval_continued = False  # Allow at most one deep-eval-driven continuation
-    
+    last_eval_target = ""
     for step in range(max_steps):
         if _interrupt_requested(executor):
             _clear_interrupt(executor)
             state["final_answer"] = "Interrupted by user."
             break
         
-        # --- STAGE 2-PRE: Agent-State Hypotheses (deliberative only) ---
-        if current_phase_type == "deliberative":
-            voxel_grid_text = None
-            af1_text = None
-            if executor and executor.world_name == "minecraft":
-                try:
-                    import sys
-                    import os
-                    current_dir = os.path.dirname(__file__)
-                    minecraft_tools_root = os.path.abspath(os.path.join(current_dir, "world-tools", "minecraft"))
-                    if minecraft_tools_root not in sys.path:
-                        sys.path.insert(0, minecraft_tools_root)
-                    from local_grid import get_observed_voxel_grid_as_text  # type: ignore
-                    voxel_grid_text = get_observed_voxel_grid_as_text(executor, radius=2)
-                except Exception:
-                    pass
-                try:
-                    af1_text_val = executor.get_world_state("af1_text")
-                    if isinstance(af1_text_val, str) and af1_text_val.strip():
-                        af1_text = af1_text_val.strip()
-                except Exception:
-                    pass
-            
-            prompt_parts = [
-                f"STAGE 2-PRE (step {step + 1}/{max_steps}):\n",
-                f"#GOAL: {goal_for_step}\n#END GOAL\n",
-                f"CURRENT_TASK: {current_task}\n\n"
-            ]
-            if voxel_grid_text:
-                prompt_parts.append(f"""#OBSERVED_VOXEL_GRID:\nExplicit voxel grid centered on agent (radius=1). Coordinates are relative: [dx, dy, dz].
-Each cell shows: block_id, solid (true/false), support (true/false).
-This is the only planner-visible structure that supports direct (dx,dy,dz) usage for tool arguments.
-{voxel_grid_text}
-#END OBSERVED_VOXEL_GRID\n\n""")
-            if af1_text:
-                prompt_parts.append(f"""#AF1:\nContract-aware actionability summary (deterministic, derived from mc-observe).\n{af1_text}\n#END AF1\n\n""")
-            prompt_parts.append("Before choosing any tool, infer AGENT-STATE HYPOTHESES and AGENT-STATE-SUPPORT. Refer to STAGE 2-PRE Instructions.\n")
-            
-            prompt += format_user("".join(prompt_parts))
-
-            prompt += format_assistant("")
-            stage2pre_block = vllm_gen(f"stage2pre_block_{step}", prompt, state, max_tokens=512, temperature=GEN_TEMPERATURE, executor=executor)
-            prompt += stage2pre_block + "\n"
-            state[f"agent_state_hypotheses_{step}"] = _extract_between_labels(stage2pre_block, "AGENT_STATE_HYPOTHESES:", "AGENT_STATE_SUPPORT:")
-            state[f"agent_state_support_{step}"] = _extract_after_label(stage2pre_block, "AGENT_STATE_SUPPORT:").strip()
-        else:
-            # Pipeline phase: skip Stage 2-PRE entirely
-            logger.info(f"Step {step}: Pipeline phase — skipping Stage 2-PRE")
-            state[f"agent_state_hypotheses_{step}"] = "[]"
-            state[f"agent_state_support_{step}"] = ""
-        
-        # Stage 2: Choose tool + args
+        # Stage 2: Generate code block
         prompt += format_user(
             f"STAGE 2 (step {step + 1}/{max_steps}):\n"
             f"#GOAL: {goal_for_step}\n#END GOAL\n"
             f"CURRENT_TASK: {current_task}\n"
-            f"PHASE_TYPE: {current_phase_type}\n"
-            "Choose tool and JSON args using Stage 2 FORMAT.\n"
+            "Write a Python code block using Stage 2 FORMAT.\n"
         )
 
-        # --- STAGE 2: single generation + label parsing ---
-        prompt += format_assistant("")
-        stage2_block = vllm_gen(f"stage2_block_{step}", prompt, state, max_tokens=384, temperature=GEN_TEMPERATURE, executor=executor)
-        prompt += stage2_block + "\n"
-        tool_name_val = _extract_line_value(stage2_block, "TOOL_NAME:")
-        tool_args_raw = _extract_after_label(stage2_block, "TOOL_ARGS_JSON:").strip()
-        # Defensive cleanup in case the model echoes labels
-        if tool_name_val.startswith("TOOL_NAME:"):
-            tool_name_val = tool_name_val[len("TOOL_NAME:"):].strip()
-        tool_args_val = _extract_braced_json_object(tool_args_raw)
-        state[f"tool_name_{step}"] = tool_name_val
-        state[f"tool_args_{step}"] = tool_args_val
+        prompt += format_assistant("```python\n")
+        code_raw = vllm_gen(f"code_block_{step}", prompt, state, max_tokens=2048, temperature=GEN_TEMPERATURE, stop=["```"], executor=executor)
+        prompt += code_raw + "```\n"
+        code_text = code_raw.strip()
         
-        # Execute tool
-        tool_name = state.get(f"tool_name_{step}", "").strip()
-        tool_args_json = state.get(f"tool_args_{step}", "").strip()
+        logger.info(f"Step {step}: Code block ({len(code_text)} chars):\n{code_text}")
+        call_count = count_codegen_action_calls(code_text)
+        logger.info(f"Step {step}: Code block action calls={call_count} (logged before execution)")
         
-        if tool_name == "_code_block_":
-            # Code-block path: extract code from stage2_block or do follow-up gen
-            code_text = extract_code_block(stage2_block)
-            if not code_text:
-                # Code wasn't in initial gen (token limit); do follow-up gen
-                prompt += format_assistant("CODE:\n```python\n")
-                code_raw = vllm_gen(f"code_block_{step}", prompt, state, max_tokens=2048, temperature=GEN_TEMPERATURE, stop=["```"], executor=executor)
-                prompt += code_raw + "```\n"
-                code_text = code_raw.strip()
-            
-            logger.info(f"Stage 2: Code block generated ({len(code_text)} chars)")
-            
-            # Interrupt checkpoint: after code-block gen, before execute
-            if _interrupt_requested(executor):
-                _clear_interrupt(executor)
-                state["final_answer"] = "Interrupted by user."
-                break
-            
-            # Snapshot bindings before execution
-            bindings_before = dict(executor.plan_bindings_flat)
-            
-            result_dict = execute_codegen_block(code_text, executor, "codegen")
-            action = {"type": "_code_block_"}
-            tool_result = format_result_text(result_dict, action)
-            
-            # Track new bindings for Stage 3.1
-            bindings_after = executor.plan_bindings_flat
-            new_bindings = {k: v for k, v in bindings_after.items() if bindings_before.get(k) != v}
-            resource_id_before = None
-            
-            logger.info(f"Step {step}: _code_block_ -> {tool_result[:100]}")
-            if new_bindings:
-                logger.info(f"Step {step}: New bindings from code block: {new_bindings}")
-            
-            # Interrupt checkpoint: after code-block execution
-            if _interrupt_requested(executor):
-                _clear_interrupt(executor)
-                state["final_answer"] = "Interrupted by user."
-                break
-        else:
-            action = sgl_to_infospace_action(tool_name, tool_args_json, step, executor.available_tools)
-            new_bindings = None
-            
-            # Track resource bindings before execution
-            out_var = action.get('out', '')
-            resource_id_before = None
-            if out_var:
-                resource_id_before = executor.plan_bindings_flat.get(out_var.lstrip('$'))
-            
-            # Execute (method tools run in an inner loop but count as one outer step)
-            tool_info = executor.available_tools.get(tool_name, {})
-            if tool_info.get('type') == 'method':
-                logger.warning(f"Step {step}: Method tools are obsolete; executing {tool_name} directly")
-            tool_result = execute_infospace_action(action, executor, executor.agent_name)
-            
-            logger.info(f"Stage 2: Choose tool + args\n{tool_name} -> {tool_args_json}")
-            logger.info(f"Step {step}: {tool_name} -> {tool_result[:100]}")
-            
-            # Interrupt checkpoint: after tool execution
-            if _interrupt_requested(executor):
-                _clear_interrupt(executor)
-                state["final_answer"] = "Interrupted by user."
-                break
+        # Interrupt checkpoint: after code-block gen, before execute
+        if _interrupt_requested(executor):
+            _clear_interrupt(executor)
+            state["final_answer"] = "Interrupted by user."
+            break
         
-        # Stage 3: Reflect (full result - no truncation; load with slice=":" or explicit amount returns full content)
-        result_display = tool_result
+        # Snapshot bindings before execution
+        bindings_before = dict(executor.plan_bindings_flat)
+        result_dict = execute_codegen_block(code_text, executor, "codegen")
+        action = {"type": "_code_block_"}
+        tool_result = format_result_text(result_dict, action)
         
+        # Track new bindings
+        new_bindings = {k: v for k, v in executor.plan_bindings_flat.items() if bindings_before.get(k) != v}
+        
+        # Persist code block return value as Note when substantial
+        code_block_output_created = False
+        if result_dict.get('status') == 'success':
+            val = result_dict.get('value', '')
+            if isinstance(val, str) and len(val) > 80:
+                executor.execute_action({"type": "create-note", "value": val, "out": "$code_block_output"})
+                code_block_output_created = True
+        
+        logger.info(f"Step {step}: -> {tool_result[:100]}")
+        if new_bindings:
+            logger.info(f"Step {step}: New bindings: {new_bindings}")
+        
+        # Interrupt checkpoint: after code-block execution
+        if _interrupt_requested(executor):
+            _clear_interrupt(executor)
+            state["final_answer"] = "Interrupted by user."
+            break
+        
+        # Stage 3: Evaluate result
         prompt += format_user(
             f"=====\n"
-            f"STAGE 3 - TOOL EXECUTION COMPLETE (step {step + 1}/{max_steps})\n"
+            f"STAGE 3 (step {step + 1}/{max_steps})\n"
             f"=====\n\n"
-            f"Tool executed: `{tool_name}`\n"
-            f"Arguments: {tool_args_json}\n\n"
-            f">> ACTUAL RESULT (ground truth) <<\n"
-            f"{result_display}\n"
+            f">> RESULT (ground truth) <<\n"
+            f"{tool_result}\n"
             f">> END RESULT <<\n\n"
-            f"INSTRUCTIONS:\n"
-            f"1. The result above is GROUND TRUTH. Use it exactly as shown.\n"
-            f"2. If reporting to user, use ONLY the values from the result above.\n"
-            f"3. Do NOT approximate, summarize, or invent values.\n"
-            f"4. Evaluate: Is the GOAL complete, including actual execution of all required actions, and achievement of all required information determinations, and outcomes? If yes, respond DONE: YES.\n"
-            f"   If no, determine the next action needed.\n\n"
-            f"Respond using Stage 3 FORMAT. Be concise.\n"
-            f"Ensure the REQUEST_TOOLS list is a valid JSON list of tool names.\n"
+            f"Evaluate: Is the GOAL fully achieved? Use ONLY the result above as ground truth.\n"
+            f"Respond using Stage 3 FORMAT.\n"
         )
-
-        # Stage 3.2 (pre-reflection): Vision evaluation before planner reflects
+        
+        # Vision evaluation before planner reflects
         eval_target = ""
-        if tool_name == "_code_block_":
-            if new_bindings:
-                eval_target = list(new_bindings.keys())[-1]
-        elif tool_name in _ARTIFACT_PRODUCING_TOOLS:
-            out_var = action.get('out', '')
-            if out_var:
-                eval_target = out_var
+        if new_bindings:
+            preferred_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and (rid.startswith("Note_") or rid.startswith("Collection_")) and not str(k).startswith("_") and str(k) != "code_block_output"]
+            if preferred_keys:
+                eval_target = "$" + preferred_keys[-1].lstrip("$")
+            else:
+                last_key = list(new_bindings.keys())[-1]
+                if not last_key.startswith('$'):
+                    last_key = '$' + last_key
+                eval_target = last_key
+        elif code_block_output_created:
+            eval_target = "$code_block_output"
         if eval_target:
             last_eval_target = eval_target
         if eval_target and vision_criteria:
-            logger.info(f"Step {step}: Vision eval auto-target: {eval_target} (tool={tool_name})")
+            logger.info(f"Step {step}: Vision eval target: {eval_target}")
             compressed_ctx = _compress_trace(prompt)
             vision_eval_text = _vision_eval_check(vision_criteria, eval_target, executor, compressed_context=compressed_ctx)
             if vision_eval_text:
-                prompt += format_user(f"VISION EVALUATION (quality check against criteria):\n{vision_eval_text}\nFAILs are advisory — attempt to address them if easy, but do NOT loop or search repeatedly to fix a single criterion. Proceed with available data after at most one retry.\n")
+                prompt += format_user(f"VISION EVALUATION:\n{vision_eval_text}\nFAILs are advisory — attempt to address if easy, do NOT loop repeatedly. Proceed after at most one retry.\n")
                 prompt += format_assistant("Noted.\n")
 
-        # --- STAGE 3: single generation + label parsing ---
+        # Stage 3: simplified reflection (4 fields)
         prompt += format_assistant("")
-        stage3_block = vllm_gen(f"stage3_block_{step}", prompt, state, max_tokens=768, temperature=GEN_TEMPERATURE, executor=executor)
+        stage3_block = vllm_gen(f"stage3_block_{step}", prompt, state, max_tokens=384, temperature=GEN_TEMPERATURE, executor=executor)
         prompt += stage3_block + "\n"
 
-        thoughts_val = _extract_between_labels(stage3_block, "THOUGHTS:", "HYPOTHESES:")
-        hypotheses_val = _extract_between_labels(stage3_block, "HYPOTHESES:", "AUDIT:")
-        audit_val = _extract_between_labels(stage3_block, "AUDIT:", "DONE:")
+        thoughts_val = _extract_between_labels(stage3_block, "THOUGHTS:", "DONE:")
         done_val = _extract_line_value(stage3_block, "DONE:")
-        # Try NEXT_TASK -> NEXT_PHASE_TYPE -> REQUEST_TOOLS chain
-        next_task_val = _extract_between_labels(stage3_block, "NEXT_TASK:", "NEXT_PHASE_TYPE:")
-        next_phase_type_val = _extract_between_labels(stage3_block, "NEXT_PHASE_TYPE:", "REQUEST_TOOLS:")
-        if not next_task_val.strip():
-            # Fallback: model may have omitted NEXT_PHASE_TYPE
-            next_task_val = _extract_between_labels(stage3_block, "NEXT_TASK:", "REQUEST_TOOLS:")
-            next_phase_type_val = ""
+        next_task_val = _extract_between_labels(stage3_block, "NEXT_TASK:", "REQUEST_TOOLS:")
         request_tools_val = _extract_after_label(stage3_block, "REQUEST_TOOLS:").strip()
 
         state[f"thoughts_{step}"] = thoughts_val
-        state[f"hypotheses_{step}"] = hypotheses_val
-        state[f"assumption_audit_{step}"] = audit_val
         state[f"done_{step}"] = done_val
         state[f"next_task_{step}"] = next_task_val
-        npt = next_phase_type_val.strip().lower()
-        state[f"next_phase_type_{step}"] = npt if npt in ("pipeline", "deliberative") else "deliberative"
         state[f"request_tools_{step}"] = _strip_code_fences(request_tools_val)
         
-        # Safely log step fields
         def safe_get(state_dict, key, default='N/A'):
             try:
                 return state_dict[key]
@@ -3702,37 +3119,21 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                 return default
         
         logger.info(f"THOUGHTS: {safe_get(state, f'thoughts_{step}')}")
-        logger.info(f"HYPOTHESES: {safe_get(state, f'hypotheses_{step}')}")
-        logger.info(f"ASSUMPTIONS: {safe_get(state, f'assumption_audit_{step}')}")
         logger.info(f"DONE: {safe_get(state, f'done_{step}')}")
         logger.info(f"NEXT_TASK: {safe_get(state, f'next_task_{step}')}")
         logger.info(f"REQUEST_TOOLS: {safe_get(state, f'request_tools_{step}')}")
         
         # Stage 3.1: Update resource indexes with commentary
         thoughts_text = state.get(f'thoughts_{step}', '').strip()
-        if thoughts_text:
-            resource_ids_to_update = []
-            if new_bindings:
-                # Code-block path: check all new bindings
-                for var_name, rid in new_bindings.items():
-                    if rid and (rid.startswith('Note_') or rid.startswith('Collection_')):
-                        resource_ids_to_update.append(rid)
-            else:
-                # Single-tool path: check the one out var
-                out_var = action.get('out', '')
-                if out_var:
-                    resource_id_after = executor.plan_bindings_flat.get(out_var.lstrip('$'))
-                    if resource_id_after and resource_id_after != resource_id_before:
-                        if resource_id_after.startswith('Note_') or resource_id_after.startswith('Collection_'):
-                            resource_ids_to_update.append(resource_id_after)
-            
-            for resource_id in resource_ids_to_update:
-                try:
-                    if executor.resource_manager:
-                        executor.resource_manager.update_resource_commentary(resource_id, thoughts_text)
-                        logger.debug(f"Stage 3.1: Updated commentary for {resource_id}")
-                except Exception as e:
-                    logger.debug(f"Stage 3.1: Failed to update commentary for {resource_id}: {e}")
+        if thoughts_text and new_bindings:
+            for var_name, rid in new_bindings.items():
+                if rid and (rid.startswith('Note_') or rid.startswith('Collection_')):
+                    try:
+                        if executor.resource_manager:
+                            executor.resource_manager.update_resource_commentary(rid, thoughts_text)
+                            logger.debug(f"Stage 3.1: Updated commentary for {rid}")
+                    except Exception as e:
+                        logger.debug(f"Stage 3.1: Failed to update commentary for {rid}: {e}")
         
         # Stage 3.5: Dynamic tool loading
         requested_tools_raw = state.get(f"request_tools_{step}", "").strip()
@@ -3740,7 +3141,6 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
         if requested_tools:
             logger.info(f"Step {step}: LLM requested additional tools: {requested_tools}")
             tools_to_load = [tool for tool in requested_tools if tool not in _loaded_skill_docs]
-            
             if tools_to_load:
                 expanded_docs = load_skill_docs(tools_to_load, executor.available_tools)
                 if expanded_docs:
@@ -3749,42 +3149,33 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                     logger.info(f"Stage 3.5: Loaded docs for {len(tools_to_load)} additional tools: {tools_to_load}")
                     _loaded_skill_docs.update(tools_to_load)
             else:
-                logger.debug(f"Stage 3.5: All {len(requested_tools)} requested tools already have docs loaded, skipping")
+                logger.debug(f"Stage 3.5: All requested tools already have docs loaded, skipping")
         elif requested_tools_raw and requested_tools_raw.lower() not in ["", "[]", "none", "null"]:
             logger.warning(f"Step {step}: Failed to parse REQUEST_TOOLS: {requested_tools_raw[:100]}")
         
         # Check if done
         done_raw = state.get(f"done_{step}", "").strip().upper()
         if done_raw.startswith("YES"):
-            # Interrupt checkpoint: before verification/final answer
             if _interrupt_requested(executor):
                 _clear_interrupt(executor)
                 state["final_answer"] = "Interrupted by user."
                 break
-            # Verification logic
-            prompt += format_user(
-                "STOP. Before providing the final answer, perform a verification step. \n"
-                "Verify that the GOAL has been achieved, including actual execution of all required actions, and achievement of all required information determinations, and outcomes:\n"
-                "#VERIFICATION_INSTRUCTIONS:\n"
-                "        Inputs: GOAL, prior state, and current state\n"
-                "        - what are the observable facts in STATE_AFTER that directly satisfy GOAL.\n"
-                "        - what are the required GOAL actions and facts not observable in STATE_AFTER.\n"
-                "        - based on the above, provide a candid VERIFICATION ANSWER: (SUCCESS, PARTIAL, INCONCLUSIVE):\n"
-                "#OUTPUT FORMAT:\n"
-                "        - VERIFICATION_ANSWER: <SUCCESS | PARTIAL | INCONCLUSIVE>\n"
-                "#Respond using the OUTPUT FORMAT. Be concise.\n"
-            )
             
+            # Verification
+            prompt += format_user(
+                "STOP. Verify that the GOAL has been achieved:\n"
+                "- What observable facts in the current state satisfy the GOAL?\n"
+                "- What required actions or outcomes are missing?\n"
+                "VERIFICATION_ANSWER: <SUCCESS | PARTIAL | INCONCLUSIVE>\n"
+            )
             prompt += format_assistant("VERIFICATION_ANSWER: ")
             verification_raw = vllm_gen("VERIFICATION_ANSWER", prompt, state, max_tokens=96, temperature=GEN_TEMPERATURE, stop="\n", executor=executor)
-            # Deterministic cleanup: take last non-empty line and strip label if echoed
             vlines = [ln.strip() for ln in str(verification_raw).splitlines() if ln.strip()]
             cleaned = vlines[-1] if vlines else str(verification_raw).strip()
             if cleaned.startswith("VERIFICATION_ANSWER:"):
                 cleaned = cleaned[len("VERIFICATION_ANSWER:"):].strip()
             state["VERIFICATION_ANSWER"] = cleaned
             prompt += cleaned + "\n"
-            
             logger.info(f"VERIFICATION ANSWER: {state.get('VERIFICATION_ANSWER', 'N/A')}")
             
             # Deep vision evaluation at done gate
@@ -3794,21 +3185,25 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                 shallow_text = _vision_eval_check(vision_criteria, last_eval_target, executor, compressed_context=compressed_ctx)
                 deep_text = _vision_eval_deep(vision_criteria, last_eval_target, shallow_text or "", executor, compressed_context=compressed_ctx)
                 if deep_text:
-                    prompt += format_user(f"DEEP VISION EVALUATION (final quality gate):\n{deep_text}\nIf issues found, you may revise your approach instead of finishing.\n")
+                    prompt += format_user(f"DEEP VISION EVALUATION (final quality gate, read-only):\n{deep_text}\nUse this only as QA signal. Do NOT run additional tool steps at done gate.\n")
                     prompt += format_assistant("Noted.\n")
                     logger.info(f"Done gate: Deep eval result injected")
-                    # If deep eval found issues, continue the loop (once)
-                    if not deep_eval_continued and "none needed" not in deep_text.lower():
-                        deep_eval_continued = True
-                        logger.info(f"Done gate: Deep eval found issues, continuing plan")
-                        continue
-                elif shallow_text and not deep_eval_continued and "fail" in shallow_text.lower():
-                    # Deep eval unavailable; fall back to shallow eval — advisory only, one retry max
-                    deep_eval_continued = True
-                    prompt += format_user(f"VISION EVALUATION (final quality gate, shallow):\n{shallow_text}\nFAILs are advisory. Make one quick attempt to address if easy, otherwise finish with what you have.\n")
+                    deep_status = _parse_deep_eval_status(deep_text)
+                    if deep_status == "needs_revision":
+                        logger.info("Done gate: Deep eval returned NEEDS_REVISION; returning caveated frozen artifact (no reopen, no regeneration)")
+                        draft_text = _resolve_eval_target_text(last_eval_target, executor)
+                        caveat = (
+                            "Quality gate warning: deep evaluation found issues (STATUS: NEEDS_REVISION). "
+                            "Delivering best available draft from this cycle (not revised)."
+                        )
+                        state["VERIFICATION_ANSWER"] = "PARTIAL"
+                        state[f"done_{step}"] = "NO"
+                        state["final_answer"] = f"{caveat}\n\n{draft_text}" if draft_text else caveat
+                        break
+                elif shallow_text and "fail" in shallow_text.lower():
+                    prompt += format_user(f"VISION EVALUATION (final quality gate, shallow, read-only):\n{shallow_text}\nFAILs are advisory. Do NOT run additional tool steps at done gate.\n")
                     prompt += format_assistant("Noted.\n")
-                    logger.info(f"Done gate: Shallow eval has FAILs and deep eval unavailable, continuing plan (advisory)")
-                    continue
+                    logger.info("Done gate: Shallow eval has FAILs (read-only advisory); proceeding to finalization")
             
             # Generate final answer
             next_task_raw = state.get(f"next_task_{step}", "").strip()
@@ -3823,12 +3218,11 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
             logger.info(f"FINAL_ANSWER: {state.get('final_answer', 'N/A')}")
             break
         
-        # Update current task and phase type for next iteration
+        # Update current task for next iteration
         next_task_raw = state.get(f"next_task_{step}", "").strip()
         if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
             current_task = next_task_raw
-            current_phase_type = state.get(f"next_phase_type_{step}", "deliberative")
-            logger.info(f"Step {step}: Next task: {current_task} (phase: {current_phase_type})")
+            logger.info(f"Step {step}: Next task: {current_task}")
         else:
             logger.warning(f"Step {step}: No NEXT_TASK provided, stopping")
     
@@ -4299,6 +3693,7 @@ class IncrementalPlanner:
                 final_answer = 'Planning completed'
             
             error_count = getattr(self.executor, '_plan_error_count', 0)
+            verification_answer = str(state.get('VERIFICATION_ANSWER', '')).strip().upper() if isinstance(state, dict) else ""
             # Safely determine success status (handle interrupt case)
             success = False
             if f'done_{step}' in state:
@@ -4311,12 +3706,22 @@ class IncrementalPlanner:
             # If interrupted, final_answer will be "Interrupted by user."
             elif final_answer == "Interrupted by user.":
                 success = False
+            if final_answer == "Interrupted by user.":
+                quality_status = "interrupted"
+            elif success:
+                quality_status = "passed"
+            elif verification_answer == "PARTIAL":
+                quality_status = "needs_revision"
+            else:
+                quality_status = "failed"
             
             return {
                 'plan': None,
                 'response': final_answer,
                 'task_state': None,
                 'success': success,
+                'quality_status': quality_status,
+                'verification_answer': verification_answer,
                 'error_count': error_count,
                 'skip_validation': True  # Plan already executed, no need to validate
             }
@@ -4455,7 +3860,7 @@ class IncrementalPlanner:
             if hasattr(self.executor, 'world_model') and self.executor.world_model:
                 self.executor.world_model.update(reflection_content)
                 self.executor.world_model.save()
-                # Get updated world_model for retry if needed
+                # Get updated world_model snapshot
                 world_model = self.executor.world_model.get()
             else:
                 logger.warning("WorldModel not available, skipping update")
@@ -4475,57 +3880,6 @@ class IncrementalPlanner:
                 {"seq": seq, "ts": now_iso, "agent": agent_name, "world": world_name, "goal": goal, "reflection_frame": reflection_content},
             )
 
-            # Safely check done_<step> before retry logic
-            should_retry = False
-            if step < max_steps and f'done_{step}' in state:
-                try:
-                    done_str = state[f'done_{step}']
-                    if done_str and isinstance(done_str, str) and done_str.strip().upper().startswith("NO"):
-                        should_retry = True
-                except (KeyError, TypeError, AttributeError):
-                    pass
-            if should_retry:
-                #reflect and retry
-                logger.info(f"Step {step} failed, reflecting and retrying")
-                # Use same backend selection logic as main planning path
-                if (self.vllm_model_path and self.vllm_model) or (self.openrouter_model_path and self.executor.openrouter_model) or (self.anthropic_model_path and self.executor.anthropic_model):
-                    # Use vLLM/OpenRouter planner (both use same function since executor.llm_generate routes correctly)
-                    state = tool_planner_infospace_vllm(
-                        template=template,
-                        goal=goal,
-                        world_model=world_model,
-                        character_context=character_context,
-                        recent_context=recent_context,
-                        tools_catalog_text=self.tools_catalog_text,
-                        executor=self.executor,
-                        trace_file=self.trace_file,
-                        max_steps=max_steps,
-                        preplan="No preplan provided",
-                        similar_plan=similar_plans[0] if similar_plans else None,
-                        vllm_url=self.vllm_url,
-                        model=self.vllm_model,
-                        vision_criteria=vision_criteria
-                    )
-                elif HAS_SGLANG and self.executor.runtime:
-                    # Use SGLang planner
-                    state = tool_planner_infospace.run(
-                        template=template,
-                        goal=goal,
-                        world_model=world_model,
-                        character_context=character_context,
-                        recent_context=recent_context,
-                        tools_catalog_text=self.tools_catalog_text,
-                        executor=self.executor,
-                        trace_file=self.trace_file,
-                        max_steps=max_steps,
-                        preplan="No preplan provided",
-                        similar_plan=similar_plans[0] if similar_plans else None,
-                        vision_criteria=vision_criteria
-                    )
-                else:
-                    logger.error('No planner backend available for retry (SGLang, vLLM, Anthropic, or OpenRouter required)')
-                    raise RuntimeError('No planner backend available for retry')
-            
             # Extract plan actions from executor
             plan_actions = getattr(self.executor, '_plan_actions', [])
             self.executor._plan_actions = plan_actions
@@ -4537,6 +3891,7 @@ class IncrementalPlanner:
                 final_answer = 'Planning completed'
             
             error_count = getattr(self.executor, '_plan_error_count', 0)
+            verification_answer = str(state.get('VERIFICATION_ANSWER', '')).strip().upper() if isinstance(state, dict) else ""
             # Safely determine success status (handle interrupt case)
             success = False
             if f'done_{step}' in state:
@@ -4549,12 +3904,22 @@ class IncrementalPlanner:
             # If interrupted, final_answer will be "Interrupted by user."
             elif final_answer == "Interrupted by user.":
                 success = False
+            if final_answer == "Interrupted by user.":
+                quality_status = "interrupted"
+            elif success:
+                quality_status = "passed"
+            elif verification_answer == "PARTIAL":
+                quality_status = "needs_revision"
+            else:
+                quality_status = "failed"
             
             return {
                 'plan': plan_actions,
                 'response': final_answer,
                 'task_state': task_state,
                 'success': success,
+                'quality_status': quality_status,
+                'verification_answer': verification_answer,
                 'error_count': error_count,
                 'skip_validation': True  # Plan already executed, no need to validate
             }
@@ -4621,29 +3986,16 @@ Instructions:
    - Describe a minimal, ordered sequence of conceptual steps  
      that a tool-using planner would follow to solve the goal.  
      Describe *what must be achieved*, not how to call tools.
-   - For each step, mark whether the next step DEPENDS on 
-     observing this step's result to decide what to do, 
-     or whether the next step is KNOWN in advance regardless of the result.
-   - Group consecutive KNOWN steps into phases. 
-     A phase is a block of steps where the planner already knows 
-     what to do and doesn't need to deliberate between steps.
    - Include fallback logic **only if the goal plausibly needs it**  
      (e.g., multi-source lookup, ambiguous values, missing information).
    - Do not include JSON, tool calls, URLs, or domain-specific knowledge.  
      The output must be a brief strategic outline, not an answer to the goal.
-   - Annotate each phase with (phase-hint: pipeline) or (phase-hint: deliberative).
-     These are tentative hints — the planner may confirm or override them.
 
 Format:
 ABSTRACT_PLAN:
-PHASE 1 (phase-hint: pipeline): 
-  - <step>
-  - <step>
-PHASE 2 (phase-hint: deliberative): 
-  - <step> [depends on phase 1 results]
-PHASE 3 (phase-hint: pipeline):
-  - <step>
-  - <step>
+STEP 1: <what to achieve>
+STEP 2: <what to achieve>
+STEP 3: <what to achieve>
 END_PLAN
 """
 
@@ -4912,6 +4264,5 @@ REFLECTION_FRAME_SCHEMA:
         reflection_prompt = reflection_prompt.replace("{REFLECTION_FRAME_SCHEMA}", json.dumps(REFLECTION_FRAME_SCHEMA, indent=2))
         reflection_prompt = reflection_prompt.replace("{trace}", trace)
         reflection = self.executor.llm_generate(reflection_prompt, max_tokens=4096, is_json=True, temperature=0.0)
-        logger.info(f"Reflection: {json.dumps(reflection.text, indent=2)}")
 
         return reflection.text

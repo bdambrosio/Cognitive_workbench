@@ -19,13 +19,26 @@ Read a file from the filesystem sandbox and return its content as a Note. Suppor
 ## File Types
 
 - **Text files**: Read as plain text
-- **JSON files**: Parsed and returned as structured data
-- **PDF files**: Extracted using GROBID (if `grobid_url` provided) or pymupdf fallback. Returns text with PDF metadata (title, author, page count, etc.)
+- **JSON files**: Returned as text (JSON string body)
+- **PDF files**: Extracted using GROBID (if `grobid_url` provided) or pymupdf fallback. Returns extracted text body
 
 ## Output
 
 Success returns:
-- `resource_id`: Note ID containing structured content and metadata
+- `resource_id`: Note ID containing text content.
+- Note content format:
+  - metadata Note linked by meta Relation (path/format/size/mtime and parser metadata)
+  - body text (file content)
+
+Example content shape:
+```text
+<file contents...>
+```
+
+Related metadata Note content shape:
+```json
+{"path":"docs/readme.md","format":"text","size":1234,"mtime":"2026-02-15T10:00:00"}
+```
 
 ## Examples
 

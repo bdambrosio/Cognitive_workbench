@@ -1,7 +1,7 @@
 ---
 name: search-web
 type: python
-description: "Search web using Claude Sonnet with web_search tool. Returns a single Note with synthesized findings and structured source list."
+description: "Search web using Claude Sonnet with web_search tool. Returns a single text Note with synthesized findings."
 ---
 
 # search-web
@@ -30,13 +30,9 @@ Let Claude decide where to look. Tell it *what* you need to know.
 ## Output
 
 Success (`status: "success"`):
-- `resource_id`: Note ID containing a structured dict with:
-  - `synthesis`: Readable, detailed research note with attributions (the primary content — multiple paragraphs, specific facts, not a thin summary)
-  - `sources`: List of source dicts, each with `url`, `domain`, `title`, `excerpt`
-  - `source_count`: Number of sources found
-  - `query`: Original query
-  - `model`: Claude model used
-  - `elapsed_ms`: Total API call time
+- `resource_id`: Note ID containing text content.
+- Note content is synthesized body text (primary output).
+- Metadata is stored in a separate metadata Note linked by a `meta` Relation.
 
 Failure (`status: "failed"`):
 - `reason`: Error description (e.g., `no_results`, `CLAUDE_API_KEY environment variable required`)
@@ -49,25 +45,13 @@ Failure (`status: "failed"`):
 - Sources are preserved for citation, follow-up, or credibility assessment
 - Requires `CLAUDE_API_KEY` environment variable
 
-## Content Structure
+## Metadata Access
 
-The returned Note contains this JSON structure:
+Tool metadata (`query`, `source_count`, `sources`, `model`, `elapsed_ms`) is linked as a metadata Note via a `meta` Relation.
+
+Metadata Note content shape:
 ```json
-{
-  "query": "original search query",
-  "synthesis": "Detailed research findings with attributions. Multiple paragraphs covering key findings, areas of agreement/disagreement across sources, and specific facts...",
-  "sources": [
-    {
-      "url": "https://example.com/article",
-      "domain": "example.com",
-      "title": "Article Title",
-      "excerpt": "Key relevant content from this source"
-    }
-  ],
-  "source_count": 7,
-  "model": "claude-sonnet-4-5-20250929",
-  "elapsed_ms": 12500
-}
+{"query":"original search query","source_count":7,"sources":[{"url":"https://example.com/article","domain":"example.com","title":"Article Title","excerpt":"..."}],"model":"claude-sonnet-4-5-20250929","elapsed_ms":12500}
 ```
 
 ## Key Differences from Google CSE Version
@@ -96,7 +80,7 @@ The returned Note contains this JSON structure:
 **Access source URLs for follow-up:**
 ```json
 {"type":"search-web","query":"recent papers on RLHF alternatives","out":"$search"}
-{"type":"project","target":"$search","fields":["sources"],"out":"$source_list"}
+{"type":"pluck","target":"$search","field":"metadata.sources","out":"$source_list"}
 ```
 
 **Combine with academic search:**
@@ -108,9 +92,9 @@ The returned Note contains this JSON structure:
 
 ## Planning Notes
 
-- The `synthesis` field is the primary output — it is substantive and actionable, not a stub
-- Use `extract` on the Note to pull out specific aspects of the synthesis
-- Use `project` with `fields: ["sources"]` to get the source list for citation or fetch-text follow-up
+- The body text is the primary output — substantive and actionable, not a stub
+- Use `extract` on the Note to pull out specific aspects of the synthesis text
+- Use relation primitives (`related`, `find-relations`) to access metadata Notes when needed
 - For complete unfiltered page content from a specific URL found in sources, use `fetch-text`
 - Typical latency is 15-45 seconds (Claude performs multiple web searches internally)
 - Default timeout is 120 seconds — complex queries with many searches may take 60+ seconds

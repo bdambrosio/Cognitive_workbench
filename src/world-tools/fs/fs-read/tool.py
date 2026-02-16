@@ -4,6 +4,7 @@ Reads text, JSON, or PDF files under scenarios/<world_name>/fs.
 """
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -25,9 +26,6 @@ except ImportError:
 
 try:
     from ..fs_common import (
-        build_binary_content,
-        build_json_content,
-        build_text_content,
         file_metadata,
         get_fs_root,
         is_binary_file,
@@ -40,9 +38,6 @@ except ImportError:
     import sys
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from fs_common import (
-        build_binary_content,
-        build_json_content,
-        build_text_content,
         file_metadata,
         get_fs_root,
         is_binary_file,
@@ -187,7 +182,7 @@ def _find_existing_note(resource_manager, rel_path: str, file_mtime: float, max_
             
             # Check if this is a placeholder Note
             is_placeholder = props.get('placeholder', False)
-            note_content = props.get('content', {})
+            tool_meta = props.get('tool_metadata', {})
             
             # If it's a placeholder, we can always update it (don't check mtime)
             if is_placeholder:
@@ -195,14 +190,9 @@ def _find_existing_note(resource_manager, rel_path: str, file_mtime: float, max_
                 return note_id, True
             
             # For filled Notes, check if max_chars differs (cache miss if different)
-            if max_chars is not None:
-                # If user requested truncation, check if cached Note was truncated
-                if isinstance(note_content, dict):
-                    note_meta = note_content.get('metadata', {})
-                    if note_meta.get('truncated'):
-                        # Cached Note was truncated, but we don't know the original max_chars
-                        # Re-read to be safe (could optimize later by storing max_chars)
-                        continue
+            if max_chars is not None and tool_meta.get('truncated'):
+                # Cached Note was truncated, re-read to match requested max_chars
+                continue
             
             # Check file modification time vs Note creation time
             created_at_str = props.get('created_at', '')
@@ -224,17 +214,17 @@ def _find_existing_note(resource_manager, rel_path: str, file_mtime: float, max_
     return None, False
 
 
-def _create_note(resource_manager, agent_name: str, content: Dict[str, Any], rel_path: str) -> Optional[str]:
+def _create_note(resource_manager, agent_name: str, text_content: str, rel_path: str, tool_metadata: Optional[Dict] = None) -> Optional[str]:
     if not resource_manager:
         return None
     success, note_id, error_msg, _ = resource_manager.create_note(
         agent_name,
-        content,
-        "json",
+        text_content,
+        "text",
         "fs-read",
         rel_path,
         rel_path,
-        {"kind": "fs-file"}
+        {"kind": "fs-file", "tool_metadata": tool_metadata or {}}
     )
     if not success:
         logger.error(f"fs-read: failed to create Note for {rel_path}: {error_msg}")
@@ -245,7 +235,7 @@ def _create_note(resource_manager, agent_name: str, content: Dict[str, Any], rel
 def tool(input_value=None, **kwargs):
     """
     Read a file under scenarios/<world_name>/fs.
-    Returns a Note containing structured content and metadata.
+    Returns a text Note with file content; metadata is linked separately.
     """
     executor = kwargs.get("executor")
     if not executor:
@@ -293,44 +283,54 @@ def tool(input_value=None, **kwargs):
             original_content = props.get('content')
             original_placeholder_flag = props.get('placeholder', False)
 
-    # Read file content
+    # Read file content (text-only; metadata in tool_metadata)
     try:
-        # Check for PDF files
+        text_content = ""
+        tool_meta = dict(meta)
+        
         if abs_path.suffix.lower() == ".pdf":
             if not HAS_PYMUPDF:
                 return executor._create_uniform_return("failed", reason="pymupdf not available for PDF extraction")
             try:
                 pdf_result = _extract_pdf_text(abs_path, grobid_url=grobid_url, pdf_parser=pdf_parser)
-                # Merge file metadata with PDF result
-                pdf_result["metadata"].update(meta)
-                # Apply max_chars limit if specified
-                if max_chars and pdf_result.get("text"):
-                    text = pdf_result["text"]
-                    if len(text) > int(max_chars):
-                        pdf_result["text"] = text[:int(max_chars)]
-                        pdf_result["metadata"]["truncated"] = True
-                content = pdf_result
+                text_content = pdf_result.get("text", "") or ""
+                pdf_meta = pdf_result.get("metadata", {})
+                tool_meta.update({"format": "pdf", "page_count": pdf_result.get("page_count", 0),
+                                 "pdf_metadata": pdf_meta.get("pdf_metadata", {})})
+                for k, v in pdf_meta.items():
+                    if k != "pdf_metadata":
+                        tool_meta[k] = v
+                if max_chars and len(text_content) > int(max_chars):
+                    text_content = text_content[:int(max_chars)]
+                    tool_meta["truncated"] = True
             except Exception as e:
                 logger.error(f"fs-read: PDF extraction failed for {rel_path}: {e}")
                 return executor._create_uniform_return("failed", reason=f"PDF extraction failed: {str(e)}")
         elif is_binary_file(abs_path):
-            content = build_binary_content(meta)
+            text_content = "(binary file)"
+            tool_meta["format"] = "binary"
         else:
-            data = None
             if force_json or abs_path.suffix.lower() == ".json":
                 data = read_json_file(abs_path)
-            if data is not None:
-                content = build_json_content(data, meta)
+                if data is not None:
+                    text_content = json.dumps(data, ensure_ascii=False)
+                    tool_meta["format"] = "json"
+                else:
+                    text_content = read_text_file(abs_path, max_chars=int(max_chars) if max_chars else None)
+                    tool_meta["format"] = "text"
+                    if max_chars is not None and len(text_content) >= int(max_chars):
+                        tool_meta["truncated"] = True
             else:
-                text = read_text_file(abs_path, max_chars=int(max_chars) if max_chars else None)
-                if max_chars is not None and len(text) >= int(max_chars):
-                    meta["truncated"] = True
-                content = build_text_content(text, meta)
+                text_content = read_text_file(abs_path, max_chars=int(max_chars) if max_chars else None)
+                tool_meta["format"] = "text"
+                if max_chars is not None and len(text_content) >= int(max_chars):
+                    tool_meta["truncated"] = True
         
         # Update existing placeholder Note or create new Note
         if existing_note_id and is_placeholder:
-            # Update placeholder Note
-            success, error_msg = resource_manager.update_note_content(existing_note_id, content, reindex=True)
+            success, error_msg = resource_manager.update_note_content(
+                existing_note_id, text_content, reindex=True, tool_metadata=tool_meta
+            )
             if not success:
                 logger.error(f"fs-read: failed to update placeholder Note {existing_note_id}: {error_msg}")
                 # Revert to original placeholder state
@@ -350,8 +350,7 @@ def tool(input_value=None, **kwargs):
             summary = f"read {rel_path or '/'}"
             return executor._create_uniform_return("success", value=summary, resource_id=existing_note_id)
         else:
-            # Create new Note
-            note_id = _create_note(resource_manager, agent_name, content, rel_path)
+            note_id = _create_note(resource_manager, agent_name, text_content, rel_path, tool_metadata=tool_meta)
             if not note_id:
                 return executor._create_uniform_return("failed", reason="fs-read failed to create note")
             

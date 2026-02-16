@@ -120,20 +120,16 @@ def tool(input_value=None, runtime=None, **kwargs):
     
     # Handle Note ID input
     if isinstance(pdf_path, str) and pdf_path.startswith('Note_'):
-        # Get Note content and extract PDF path or URL
-        note_resource = resource_manager.get_resource(pdf_path)
+        note_id = pdf_path
+        note_resource = resource_manager.get_resource(note_id)
         if not note_resource:
-            return _fail(executor, f'Note {pdf_path} not found')
+            return _fail(executor, f'Note {note_id} not found')
         
-        note_content = note_resource.get('properties', {}).get('content', {})
-        if isinstance(note_content, dict):
-            # Check for pdf_url or source_url in metadata
-            metadata = note_content.get('metadata', {})
-            pdf_path = metadata.get('pdf_url') or metadata.get('source_url') or metadata.get('uri')
-            if not pdf_path:
-                return _fail(executor, f'Note {pdf_path} does not contain PDF URL in metadata')
-        else:
-            return _fail(executor, f'Note {pdf_path} content is not structured')
+        props = note_resource.get('properties', {})
+        tool_meta = props.get('tool_metadata', {})
+        pdf_path = tool_meta.get('pdf_url') or tool_meta.get('source_url') or tool_meta.get('uri')
+        if not pdf_path:
+            return _fail(executor, f'Note {note_id} does not contain PDF URL in tool_metadata')
     
     if not isinstance(pdf_path, str):
         return _fail(executor, 'path must be a string (file path or URL)')

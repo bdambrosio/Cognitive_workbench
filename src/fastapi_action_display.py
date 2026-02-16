@@ -821,6 +821,16 @@ class FastAPIActionDisplayNode:
                 f"cognitive/{actual_character_name}/memory/close_dialog",
                 json.dumps({'entity_name': 'User'})
             )
+
+            # Also issue immediate stop/interrupt so any active ask/wait exits now.
+            stop_payload = json.dumps({"timestamp": datetime.now().isoformat()}).encode()
+            interrupt_payload = json.dumps({
+                "timestamp": datetime.now().isoformat(),
+                "source": "ui",
+                "command": "interrupt"
+            }).encode("utf-8")
+            self.session.put(f"cognitive/{actual_character_name}/control/stop", stop_payload)
+            self.session.put(f"cognitive/{actual_character_name}/control/interrupt", interrupt_payload)
             
             logger.info(f"User ended dialog with {actual_character_name}")
             return {"success": True, "message": f"Dialog ended with {actual_character_name}"}
@@ -1951,6 +1961,35 @@ Generated: {generated_at}
         .log-toggle.collapsed::after {
             transform: rotate(-90deg);
         }
+        .response-panel {
+            background: #2d2d2d;
+            border: 1px solid #404040;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .response-panel h3 {
+            margin: 0 0 8px 0;
+            color: #00d4ff;
+            font-size: 14px;
+        }
+        .response-meta {
+            color: #888;
+            font-size: 11px;
+            margin-bottom: 8px;
+        }
+        .response-content {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 10px;
+            color: #e0e0e0;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.45;
+            white-space: pre-wrap;
+            min-height: 60px;
+        }
         .input-section { 
             background: #2d2d2d; 
             padding: 10px; 
@@ -2002,6 +2041,14 @@ Generated: {generated_at}
             border-left: 3px solid #00d4ff; 
             background: #1a1a1a; 
             border-radius: 4px;
+            cursor: pointer;
+        }
+        .action-entry:hover {
+            background: #202020;
+        }
+        .action-entry.selected {
+            border-left-color: #ffe66d;
+            background: #252525;
         }
         .character-name { 
             font-weight: bold; 
@@ -2305,6 +2352,12 @@ Generated: {generated_at}
                 <div class="header">
                     <h1>🖥️ Zenoh Action Display</h1>
                     <p>Real-time action monitoring and text input</p>
+                </div>
+
+                <div class="response-panel">
+                    <h3>Agent Response</h3>
+                    <div class="response-meta" id="responseMeta">Click an action entry to view full content.</div>
+                    <div class="response-content" id="responseContent">(no response selected)</div>
                 </div>
                 
                 <div class="log-toggle" id="logToggle" onclick="toggleLog()">
@@ -2998,6 +3051,40 @@ Generated: {generated_at}
                 return `<a href="#" class="resource-link" data-resource-id="${match}">${match}</a>`;
             });
         }
+
+        function truncateForLog(text, maxLen = 220) {
+            if (!text) return '';
+            const normalized = String(text).replace(/\s+/g, ' ').trim();
+            if (normalized.length <= maxLen) return normalized;
+            return `${normalized.slice(0, maxLen)}...`;
+        }
+
+        function extractFullResponseText(actionData) {
+            if (!actionData) return '';
+            if (actionData.is_text_only) {
+                return String(actionData.text || actionData.input_text || actionData.llm_response || '');
+            }
+            if (actionData.llm_response) return String(actionData.llm_response);
+            if (actionData.result !== undefined && actionData.result !== null && actionData.result !== '') {
+                return typeof actionData.result === 'object' ? JSON.stringify(actionData.result, null, 2) : String(actionData.result);
+            }
+            if (actionData.value !== undefined && actionData.value !== null && actionData.value !== '') {
+                return typeof actionData.value === 'object' ? JSON.stringify(actionData.value, null, 2) : String(actionData.value);
+            }
+            if (actionData.input_text) return String(actionData.input_text);
+            return '';
+        }
+
+        function setSelectedResponse(entryElement, actionData, fullText) {
+            document.querySelectorAll('.action-entry.selected').forEach(el => el.classList.remove('selected'));
+            entryElement.classList.add('selected');
+            const responseMeta = document.getElementById('responseMeta');
+            const responseContent = document.getElementById('responseContent');
+            const type = (actionData.action_type || 'action').toUpperCase();
+            const character = (actionData.character || 'unknown').toUpperCase();
+            responseMeta.textContent = `[${character}] ${type}`;
+            responseContent.textContent = fullText || '(no response content)';
+        }
         
         function addActionEntry(actionData) {
             console.log('Adding action entry:', actionData);
@@ -3048,7 +3135,7 @@ Generated: {generated_at}
             if (actionData.is_text_only) {
                 const textContent = actionData.text || actionData.input_text || actionData.llm_response || '';
                 if (textContent) {
-                    html += `<br><span class="response-text">"${makeResourceIdsClickable(textContent)}"</span>`;
+                    html += `<br><span class="response-text">"${makeResourceIdsClickable(truncateForLog(textContent))}"</span>`;
                 }
             } else {
                 // Display action details if available
@@ -3141,7 +3228,7 @@ Generated: {generated_at}
                 
                 // Display LLM response if available
                 if (actionData.llm_response) {
-                    const clickableResponse = makeResourceIdsClickable(String(actionData.llm_response));
+                    const clickableResponse = makeResourceIdsClickable(truncateForLog(String(actionData.llm_response)));
                     html += `<br><span class="response-text">Response: ${clickableResponse}</span>`;
                 }
                 
@@ -3164,9 +3251,17 @@ Generated: {generated_at}
             }
             
             entry.innerHTML = html;
+            const fullResponseText = extractFullResponseText(actionData);
+            entry.addEventListener('click', function() {
+                setSelectedResponse(entry, actionData, fullResponseText);
+            });
             const actionLog = document.getElementById('actionLog');
             actionLog.appendChild(entry);
             actionLog.scrollTop = actionLog.scrollHeight;
+            // Auto-focus full response panel for user-facing text actions.
+            if (actionData.is_text_only && fullResponseText) {
+                setSelectedResponse(entry, actionData, fullResponseText);
+            }
         }
         
         // REMOVED: isTurnInProgress() - button states now come from backend via turn_state_update

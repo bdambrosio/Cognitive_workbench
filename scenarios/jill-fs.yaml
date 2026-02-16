@@ -4,7 +4,7 @@ world_config:
   world_name: "fs"
   
 llm_config:
-  sgl_model_path: "Qwen/Qwen3-Next-80B-A3B-Instruct-FP8"
+  sgl_model_path: "Qwen/Qwen3-Coder-Next-FP8" #"Qwen/Qwen3-Next-80B-A3B-Instruct-FP8"
   pdf_parser: "pymupdf"  # Use pymupdf for PDF reading (skip GROBID even if available)
   grobid: "http://localhost:8070/"
   

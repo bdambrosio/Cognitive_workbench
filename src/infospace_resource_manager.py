@@ -538,7 +538,7 @@ class ResourceIndexer:
 
 class InfospaceResourceManager:
     """
-    Manages Notes, Collections, and indexing for infospace maps.
+    Manages Notes, Collections, Relations, and indexing for infospace maps.
     
     Responsibilities:
     - Note and Collection creation
@@ -566,6 +566,7 @@ class InfospaceResourceManager:
         # Resource counters
         self.note_counter = 0
         self.collection_counter = 0
+        self.relation_counter = 0
         
         # Named resource registries
         self.named_collections: Dict[str, str] = {}
@@ -646,9 +647,10 @@ class InfospaceResourceManager:
         logger.info("📝 Created system Note_null resource")
 
     def _sync_counters_from_registry(self):
-        """Ensure counters match highest existing Note_/Collection_ IDs."""
+        """Ensure counters match highest existing Note_/Collection_/Relation_ IDs."""
         max_note = 0
         max_collection = 0
+        max_relation = 0
         for resource_id in self.resource_registry.keys():
             if resource_id.startswith('Note_'):
                 suffix = resource_id.split('_', 1)[1]
@@ -658,10 +660,15 @@ class InfospaceResourceManager:
                 suffix = resource_id.split('_', 1)[1]
                 if suffix.isdigit():
                     max_collection = max(max_collection, int(suffix))
-        if max_note != self.note_counter or max_collection != self.collection_counter:
-            logger.info(f"🔢 Resynced counters (notes={max_note}, collections={max_collection})")
+            elif resource_id.startswith('Relation_'):
+                suffix = resource_id.split('_', 1)[1]
+                if suffix.isdigit():
+                    max_relation = max(max_relation, int(suffix))
+        if max_note != self.note_counter or max_collection != self.collection_counter or max_relation != self.relation_counter:
+            logger.info(f"🔢 Resynced counters (notes={max_note}, collections={max_collection}, relations={max_relation})")
         self.note_counter = max_note
         self.collection_counter = max_collection
+        self.relation_counter = max_relation
 
     # ==================== Core Accessors ====================
 
@@ -700,6 +707,13 @@ class InfospaceResourceManager:
             self._cleanup_collection(resource_id)
         elif resource_id.startswith('Note_'):
             self._cleanup_note(resource_id)
+        elif resource_id.startswith('Relation_'):
+            self._cleanup_relation(resource_id)
+
+        # Cascade-delete any Relation touching this Note/Collection.
+        # Rule: relation is removed whenever either endpoint is removed.
+        if resource_id.startswith('Note_') or resource_id.startswith('Collection_'):
+            self._remove_relations_for_endpoint(resource_id)
 
         # Remove from name registries
         self._remove_named_reference(resource_id, type_name, resource)
@@ -729,6 +743,9 @@ class InfospaceResourceManager:
                 return resource_id
             collection_name = props.get('collection_name')
             if collection_name and str(collection_name).capitalize() == canonical:
+                return resource_id
+            relation_name = props.get('relation_name')
+            if relation_name and str(relation_name).capitalize() == canonical:
                 return resource_id
         return None
 
@@ -762,6 +779,27 @@ class InfospaceResourceManager:
             if isinstance(content, list) and note_id in content:
                 props['content'] = [nid for nid in content if nid != note_id]
                 props['item_count'] = len(props['content'])
+
+    def _cleanup_relation(self, relation_id: str):
+        """No-op hook for relation cleanup symmetry."""
+        return
+
+    def _remove_relations_for_endpoint(self, endpoint_id: str):
+        """Remove relations where endpoint_id is source or target."""
+        relation_ids = []
+        for rid, rdata in self.resource_registry.items():
+            if not isinstance(rid, str) or not rid.startswith('Relation_'):
+                continue
+            props = rdata.get('properties', {})
+            if props.get('source') == endpoint_id or props.get('target') == endpoint_id:
+                relation_ids.append(rid)
+
+        for relation_id in relation_ids:
+            # Direct pop avoids recursive cascade work for relation objects.
+            relation_resource = self.resource_registry.pop(relation_id, None)
+            if relation_resource:
+                self._remove_named_reference(relation_id, 'Relation', relation_resource)
+                logger.info(f"Removed relation {relation_id} due to endpoint deletion: {endpoint_id}")
 
     def _remove_named_reference(self, resource_id: str, type_name: str, resource: Dict[str, Any]):
         """Best-effort cleanup of named lookups."""
@@ -866,6 +904,11 @@ class InfospaceResourceManager:
         except AttributeError:
             return False, None, "Note resource type not available in this map", None
         
+        # Normalize content to string (text-only model: no native dict/list in storage)
+        if isinstance(content, (dict, list)):
+            stored_content = json.dumps(content, sort_keys=True)
+        else:
+            stored_content = str(content) if content is not None else ""
         # Build Note resource data structure
         note_data = {
             'name': note_id,
@@ -874,7 +917,7 @@ class InfospaceResourceManager:
             'description': f"Note artifact created by {source_skill}",
             'remove_on_take': False,
             'properties': {
-                'content': content,
+                'content': stored_content,
                 'format': format_type,
                 'created_by': canonical_character_name,
                 'created_at': datetime.now().isoformat(),
@@ -886,19 +929,15 @@ class InfospaceResourceManager:
         
         # Compute metadata
         try:
-            if isinstance(content, (dict, list)):
-                content_str = json.dumps(content, sort_keys=True)
-                note_data['properties']['content_type'] = 'json'
-            else:
-                content_str = str(content)
-                note_data['properties']['content_type'] = 'text'
+            content_str = stored_content
+            note_data['properties']['content_type'] = 'json' if isinstance(content, (dict, list)) else 'text'
             note_data['properties']['length'] = len(content_str)
             note_data['properties']['fingerprint'] = hashlib.sha1(content_str.encode('utf-8')).hexdigest()
         except Exception as e:
             logger.warning(f"Failed to compute Note metadata: {e}")
         
-        # Merge allowed extra properties
-        allowed_fields = {'kind', 'parent_id', 'order', 'span', 'section', 'source', 'entity', 'edge', 'exclude_from_index'}
+        # Merge allowed extra properties (tool_metadata: internal only, planner/tools have no access)
+        allowed_fields = {'kind', 'parent_id', 'order', 'span', 'section', 'source', 'entity', 'edge', 'exclude_from_index', 'tool_metadata', 'placeholder'}
         for key in allowed_fields:
             if key in extra_props:
                 note_data['properties'][key] = extra_props[key]
@@ -916,10 +955,17 @@ class InfospaceResourceManager:
         # Index the Note immediately (for Stage 0 retrieval) unless excluded
         if not note_data['properties'].get('exclude_from_index', False):
             self.resource_indexer.index_note(note_id, commentary="")
+
+        # Metadata reification: tool_metadata is stored as a separate metadata Note
+        # linked by a typed Relation (note -> metadata note, relation_type='meta').
+        tool_metadata = note_data['properties'].get('tool_metadata')
+        if isinstance(tool_metadata, dict) and tool_metadata:
+            self._upsert_note_tool_metadata_relation(note_id, tool_metadata, canonical_character_name)
         
         return True, note_id, None, location
     
-    def update_note_content(self, note_id: str, new_content: Any, reindex: bool = True) -> Tuple[bool, Optional[str]]:
+    def update_note_content(self, note_id: str, new_content: Any, reindex: bool = True,
+                           tool_metadata: Optional[Dict] = None) -> Tuple[bool, Optional[str]]:
         """
         Update the content of an existing Note.
         
@@ -927,6 +973,7 @@ class InfospaceResourceManager:
             note_id: Note ID to update
             new_content: New content to set
             reindex: Whether to re-index the Note after update
+            tool_metadata: Optional tool metadata to merge (internal only)
             
         Returns:
             Tuple of (success, error_msg)
@@ -939,18 +986,21 @@ class InfospaceResourceManager:
         if not note_data:
             return False, f"Note {note_id} not found"
         
-        # Update content
-        note_data['properties']['content'] = new_content
-        
-        # Update format type based on content
+        # Normalize content to string (text-only model)
         if isinstance(new_content, (dict, list)):
+            stored_content = json.dumps(new_content, sort_keys=True)
             note_data['properties']['format'] = 'json'
             note_data['properties']['content_type'] = 'json'
-            content_str = json.dumps(new_content, sort_keys=True)
         else:
+            stored_content = str(new_content) if new_content is not None else ""
             note_data['properties']['format'] = 'text'
             note_data['properties']['content_type'] = 'text'
-            content_str = str(new_content)
+        note_data['properties']['content'] = stored_content
+        if tool_metadata is not None:
+            note_data['properties']['tool_metadata'] = tool_metadata
+            if isinstance(tool_metadata, dict) and tool_metadata:
+                self._upsert_note_tool_metadata_relation(note_id, tool_metadata, note_data['properties'].get('created_by', 'System'))
+        content_str = stored_content
         
         # Update metadata
         note_data['properties']['length'] = len(content_str)
@@ -962,6 +1012,54 @@ class InfospaceResourceManager:
         
         logger.info(f"📝 Updated Note {note_id} content")
         return True, None
+
+    def _upsert_note_tool_metadata_relation(self, note_id: str, tool_metadata: Dict[str, Any], character_name: str):
+        """Create/update Note->meta Note relation for tool metadata."""
+        if not isinstance(note_id, str) or not note_id.startswith('Note_'):
+            return
+        if not isinstance(tool_metadata, dict) or not tool_metadata:
+            return
+
+        metadata_note_id = None
+        for rel in self.find_relations(source_id=note_id, relation_type='meta'):
+            target_id = rel.get('properties', {}).get('target')
+            if isinstance(target_id, str) and target_id.startswith('Note_') and target_id in self.resource_registry:
+                metadata_note_id = target_id
+                break
+
+        meta_text = json.dumps(tool_metadata, ensure_ascii=False, sort_keys=True)
+        if metadata_note_id:
+            self.update_note_content(metadata_note_id, meta_text, reindex=False)
+        else:
+            success, metadata_note_id, error_msg, _ = self.create_note(
+                character_name=character_name,
+                content=meta_text,
+                format_type='text',
+                source_skill='meta-relation',
+                source_value=note_id,
+                note_name='',
+                extra_props={'kind': 'metadata', 'source': note_id, 'exclude_from_index': True}
+            )
+            if not success or not metadata_note_id:
+                logger.warning(f"Failed creating metadata Note for {note_id}: {error_msg}")
+                return
+
+            rel_success, relation_id, rel_error, _ = self.create_relation(
+                character_name=character_name,
+                source_id=note_id,
+                target_id=metadata_note_id,
+                relation_type='meta',
+                extra_props={'exclude_from_index': True}
+            )
+            if not rel_success:
+                logger.warning(f"Failed creating meta relation for {note_id}: {rel_error}")
+            else:
+                logger.info(f"Linked metadata for {note_id} via {relation_id}")
+
+        source_note = self.resource_registry.get(note_id, {})
+        source_persistent = bool(source_note.get('properties', {}).get('persistent', False))
+        if source_persistent and metadata_note_id:
+            self.mark_persistent(metadata_note_id, character_name)
     
     # ==================== Collection Creation ====================
     
@@ -1049,6 +1147,90 @@ class InfospaceResourceManager:
         self.resource_indexer.index_collection(collection_id, commentary="")
         
         return True, collection_id, None, location
+
+    # ==================== Relation Creation ====================
+
+    def create_relation(self, character_name: str, source_id: str, target_id: str, relation_type: str,
+                        relation_name: str = '', extra_props: Optional[Dict[str, Any]] = None) -> Tuple[bool, Optional[str], Optional[str], Optional[Tuple[int, int]]]:
+        """
+        Create a Relation resource (typed directed edge): source -> target.
+
+        Args:
+            character_name: Agent creating the relation
+            source_id: Source Note/Collection ID
+            target_id: Target Note/Collection ID
+            relation_type: Relation type label (e.g., 'meta')
+            relation_name: Optional stable name
+            extra_props: Optional extra properties
+
+        Returns:
+            Tuple of (success, relation_id, error_msg, location)
+        """
+        if not character_name:
+            return False, None, "Missing character_name", None
+        if not isinstance(source_id, str) or not source_id:
+            return False, None, "Missing source_id", None
+        if not isinstance(target_id, str) or not target_id:
+            return False, None, "Missing target_id", None
+        if not isinstance(relation_type, str) or not relation_type.strip():
+            return False, None, "Missing relation_type", None
+        if source_id not in self.resource_registry:
+            return False, None, f"Source resource not found: {source_id}", None
+        if target_id not in self.resource_registry:
+            return False, None, f"Target resource not found: {target_id}", None
+
+        canonical_character_name = character_name.capitalize()
+        location = (0, 0)
+        self.relation_counter += 1
+        relation_id = f"Relation_{self.relation_counter}"
+
+        try:
+            relation_resource_type = self.resource_types.Relation
+        except AttributeError:
+            return False, None, "Relation resource type not available in this map", None
+
+        relation_props = {
+            'source': source_id,
+            'target': target_id,
+            'relation_type': relation_type.strip(),
+            'content': json.dumps({'source': source_id, 'target': target_id, 'type': relation_type.strip()}, sort_keys=True),
+            'format': 'text',
+            'created_by': canonical_character_name,
+            'created_at': datetime.now().isoformat(),
+            'relation_name': relation_name
+        }
+        if isinstance(extra_props, dict):
+            relation_props.update(extra_props)
+
+        relation_data = {
+            'name': relation_id,
+            'type': relation_resource_type,
+            'location': location,
+            'description': f"Relation {source_id} -[{relation_type.strip()}]-> {target_id}",
+            'remove_on_take': False,
+            'properties': relation_props
+        }
+
+        self.resource_registry[relation_id] = relation_data
+        logger.info(f"🔗 Created Relation {relation_id}: {source_id} -[{relation_type.strip()}]-> {target_id}")
+        return True, relation_id, None, location
+
+    def find_relations(self, source_id: Optional[str] = None, target_id: Optional[str] = None,
+                       relation_type: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Find relation resources matching optional source/target/type filters."""
+        matches: List[Dict[str, Any]] = []
+        for resource_id, resource_data in self.resource_registry.items():
+            if not resource_id.startswith('Relation_'):
+                continue
+            props = resource_data.get('properties', {})
+            if source_id and props.get('source') != source_id:
+                continue
+            if target_id and props.get('target') != target_id:
+                continue
+            if relation_type and props.get('relation_type') != relation_type:
+                continue
+            matches.append({'id': resource_id, 'properties': props})
+        return matches
     
     # ==================== Collection Mutation ====================
     
@@ -1107,7 +1289,7 @@ class InfospaceResourceManager:
     
     def mark_persistent(self, resource_id: str, character_name: str) -> Tuple[bool, Optional[str]]:
         """
-        Mark a Note or Collection as persistent.
+        Mark a Note, Collection, or Relation as persistent.
         If Collection, also persists all Notes in it that aren't already persistent.
         
         Args:
@@ -1142,6 +1324,23 @@ class InfospaceResourceManager:
         resource['properties']['persistent'] = True
         resource['properties']['persisted_at'] = datetime.now().isoformat()
         resource['properties']['persisted_by'] = character_name
+
+        # Persist linked relations whenever an endpoint is persistent.
+        # Rule: if either endpoint is persistent, relation should be persistent.
+        if resource_id.startswith('Note_') or resource_id.startswith('Collection_'):
+            rel_count = 0
+            for rid, rdata in self.resource_registry.items():
+                if not rid.startswith('Relation_'):
+                    continue
+                props = rdata.get('properties', {})
+                if props.get('source') == resource_id or props.get('target') == resource_id:
+                    if not rdata.get('properties', {}).get('persistent', False):
+                        rdata['properties']['persistent'] = True
+                        rdata['properties']['persisted_at'] = datetime.now().isoformat()
+                        rdata['properties']['persisted_by'] = character_name
+                        rel_count += 1
+            if rel_count:
+                logger.info(f"💾 Auto-persisted {rel_count} Relations linked to {resource_id}")
         
         logger.info(f"💾 Marked {resource_id} as persistent by {character_name}")
         
@@ -1509,13 +1708,14 @@ class InfospaceResourceManager:
     
     def save_resources(self) -> Dict[str, Any]:
         """
-        Collect Note and Collection instances for persistence.
+        Collect Note, Collection, and Relation instances for persistence.
         
         Returns:
             Dict with note_instances, note_counter, collection_instances, collection_counter
         """
         note_instances = {}
         collection_instances = {}
+        relation_instances = {}
         
         for resource_id, resource_data in self.resource_registry.items():
             resource_type = resource_data.get('type')
@@ -1543,6 +1743,21 @@ class InfospaceResourceManager:
                     }
                     collection_instances[resource_id] = info_serialized
                     logger.debug(f"Saving persistent Collection {resource_id}")
+            elif type_name == 'Relation':
+                props = resource_data.get('properties', {})
+                source_id = props.get('source')
+                target_id = props.get('target')
+                source_persistent = bool(self.resource_registry.get(source_id, {}).get('properties', {}).get('persistent', False))
+                target_persistent = bool(self.resource_registry.get(target_id, {}).get('properties', {}).get('persistent', False))
+                if props.get('persistent', False) or source_persistent or target_persistent:
+                    info_serialized = {
+                        'name': resource_data.get('name'),
+                        'location': list(resource_data.get('location', (0, 0))),
+                        'description': resource_data.get('description'),
+                        'properties': props
+                    }
+                    relation_instances[resource_id] = info_serialized
+                    logger.debug(f"Saving Relation {resource_id}")
         
         # Scan persistent Collections for non-persistent Notes before save (for logging edge cases)
         # Notes should be auto-persisted when Collection is persisted, but check for Notes added after
@@ -1569,12 +1784,14 @@ class InfospaceResourceManager:
             'note_instances': note_instances,
             'note_counter': self.note_counter,
             'collection_instances': collection_instances,
-            'collection_counter': self.collection_counter
+            'collection_counter': self.collection_counter,
+            'relation_instances': relation_instances,
+            'relation_counter': self.relation_counter
         }
     
     def load_resources(self, world_data: Dict):
         """
-        Restore Note and Collection instances from persisted data.
+        Restore Note, Collection, and Relation instances from persisted data.
         
         Args:
             world_data: Dict containing note_instances and collection_instances
@@ -1653,6 +1870,37 @@ class InfospaceResourceManager:
                     removed_count = original_len - len(content)
                     if removed_count > 0:
                         logger.warning(f"Cleaned {removed_count} dangling note_ids from restored persistent Collection '{info_id}'")
+
+        # Restore Relation instances
+        if 'relation_instances' in world_data:
+            try:
+                self.relation_counter = world_data.get('relation_counter', 0)
+                relation_type = getattr(self.resource_types, 'Relation', None)
+
+                if relation_type:
+                    instances = world_data['relation_instances']
+                    for info_id, info_data in instances.items():
+                        props = info_data.get('properties', {})
+                        source_id = props.get('source')
+                        target_id = props.get('target')
+                        # Drop dangling persisted relations.
+                        if source_id not in self.resource_registry or target_id not in self.resource_registry:
+                            logger.warning(f"Skipping dangling Relation '{info_id}' (source={source_id}, target={target_id})")
+                            continue
+
+                        resource_data = {
+                            'name': info_data['name'],
+                            'type': relation_type,
+                            'location': tuple(info_data.get('location', (0, 0))),
+                            'description': info_data.get('description', ''),
+                            'remove_on_take': False,
+                            'properties': props
+                        }
+                        self.resource_registry[info_id] = resource_data
+
+                    logger.info(f"📂 Restored {len(instances)} Relation instances, counter at {self.relation_counter}")
+            except Exception as e:
+                logger.error(f"Error restoring Relation instances: {e}")
         
         # Load resource indexes and re-index persistent resources
         self.resource_indexer.load_indexes(self.world_name)
@@ -1680,7 +1928,9 @@ class InfospaceResourceManager:
                 'note_instances': resource_data['note_instances'],
                 'note_counter': resource_data['note_counter'],
                 'collection_instances': resource_data['collection_instances'],
-                'collection_counter': resource_data['collection_counter']
+                'collection_counter': resource_data['collection_counter'],
+                'relation_instances': resource_data.get('relation_instances', {}),
+                'relation_counter': resource_data.get('relation_counter', 0)
             }
             
             with open(target_file, 'w') as f:
