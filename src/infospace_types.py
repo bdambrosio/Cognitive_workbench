@@ -92,3 +92,4 @@ class InfospaceResources(Enum):
 
     Note = auto()
     Collection = auto()
+    Relation = auto()

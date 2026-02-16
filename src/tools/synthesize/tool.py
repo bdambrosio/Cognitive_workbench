@@ -536,9 +536,6 @@ def tool(input_value, runtime=None, **kwargs):
     other = kwargs.get('other')
     focus = kwargs.get('focus', '')
     fmt = kwargs.get('format', 'narrative')
-    # Backward compat: accept 'style' as alias for 'format' (from old summarize)
-    if 'style' in kwargs and 'format' not in kwargs:
-        fmt = kwargs['style']
     compression_ratio = kwargs.get('compression_ratio', 3.0)
     instruction = kwargs.get('instruction', '')
     heartbeat = kwargs.get('heartbeat')

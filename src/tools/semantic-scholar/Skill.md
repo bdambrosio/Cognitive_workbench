@@ -1,12 +1,12 @@
 ---
 name: semantic-scholar
 type: python
-description: "Search academic papers. Returns Collection of JSON Notes with fields text (full paper text via GROBID when PDF available, otherwise abstract), metadata.title, metadata.authors, metadata.year, metadata.citations, metadata.uri (alias: pdf_url), metadata.venue"
+description: "Search academic papers. Returns Collection of text Notes with paper text (full text via GROBID when available, otherwise abstract)."
 ---
 
 # semantic-scholar
 
-Search academic papers using Semantic Scholar API. Returns Collection of structured Notes with full paper text when PDF available.
+Search academic papers using Semantic Scholar API. Returns Collection of text Notes with full paper text when PDF available.
 
 ## Input
 
@@ -16,16 +16,9 @@ Search academic papers using Semantic Scholar API. Returns Collection of structu
 ## Output
 
 Success (`status: "success"`):
-- `resource_id`: Collection ID containing structured Notes, each with:
-  - `text`: Full paper text (via GROBID) or abstract
-  - `format`: "paper"
-  - `metadata.title`: Paper title
-  - `metadata.authors`: List of authors
-  - `metadata.year`: Publication year
-  - `metadata.citations`: Citation count
-  - `metadata.uri`: PDF URL (may be null for paywalled papers)
-  - `metadata.venue`: Conference/journal name
-  - `char_count`: Character count
+- `resource_id`: Collection ID containing text Notes.
+- Each Note content is body text: full paper text (via GROBID) or abstract.
+- Paper metadata is stored in a separate metadata Note linked by a `meta` Relation.
 
 ## Behavior
 
@@ -34,26 +27,9 @@ Success (`status: "success"`):
 - Requires `SEMANTIC_SCHOLAR_API_KEY` environment variable
 - Requires `grobid_url` in YAML config for full text extraction
 
-## Content Structure
+## Metadata Access
 
-Each Note in the returned Collection has the following JSON structure:
-```json
-{
-  "text": "Full paper text or abstract...",
-  "format": "paper",
-  "metadata": {
-    "title": "Paper Title",
-    "authors": ["Author 1", "Author 2"],
-    "year": 2023,
-    "citations": 150,
-    "uri": "https://example.com/paper.pdf",
-    "venue": "NeurIPS"
-  },
-  "char_count": 5000
-}
-```
-
-**Important:** All result data is in the Note's `content` field (a dict). Engine metadata (creation date, source tool, etc.) is separate and accessed via `get_resource_metadata()`, not via `content['metadata']`.
+Paper metadata (title/authors/year/citations/venue/uri/doi/paper_id/pdf_url) is linked as metadata Notes via `meta` Relations.
 
 ## Key Principle
 
@@ -74,13 +50,6 @@ Each Note in the returned Collection has the following JSON structure:
 {"type":"synthesize","target":"$innovations","focus":"comparison of approaches","out":"$report"}
 ```
 
-**Filter by year then analyze:**
-```json
-{"type":"filter-structured","target":"$papers","where":"metadata.year > 2020","out":"$recent_papers"}
-{"type":"synthesize","target":"$recent_papers","focus":"recent advances","out":"$summary"}
-```
-
-**Extract paper metadata:**
-```json
-{"type":"project","target":"$papers","fields":["metadata.title","metadata.year","metadata.citations"],"out":"$paper_info"}
-```
+**Metadata workflow:**
+- Use relation primitives (`find-relations`, `related`) to fetch `meta` Notes for paper Notes.
+- Then run structured operations (`project`, `filter-structured`, `sort`) on those metadata Notes.

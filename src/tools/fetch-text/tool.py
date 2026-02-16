@@ -92,30 +92,9 @@ def tool(url_or_content: str, runtime=None, **kwargs) -> str:
             else:
                 return _fail(executor, "resource_manager not available")
             
-            # If content is structured JSON (from search-web/semantic-scholar), extract text field
-            if isinstance(content, dict):
-                # Check if it's a structured Note with 'text' field
-                if 'text' in content:
-                    # Return the structured content as-is (already has text, format, metadata, char_count)
-                    return _success(executor, json.dumps(content))
-                else:
-                    # Other structured content - return as JSON
-                    payload = {
-                        "text": json.dumps(content),
-                        "format": "json",
-                        "metadata": {"source_id": url_or_content},
-                        "char_count": len(json.dumps(content))
-                    }
-                    return _success(executor, json.dumps(payload), payload)
-            else:
-                # Plain text content - return as text
-                payload = {
-                    "text": str(content),
-                    "format": "text",
-                    "metadata": {"source_id": url_or_content},
-                    "char_count": len(str(content))
-                }
-                return _success(executor, json.dumps(payload), payload)
+            # Text-only: content is string, return as-is
+            text = str(content) if content is not None else ""
+            return _success(executor, text)
         except Exception as e:
             logger.error(f"Failed to retrieve Note {url_or_content}: {e}")
             return _fail(executor, "Failed to retrieve Note", extra={"exception": str(e)})

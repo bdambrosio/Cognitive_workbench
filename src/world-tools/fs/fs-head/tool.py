@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 try:
     from ..fs_common import (
-        build_text_content,
         file_metadata,
         is_binary_file,
         resolve_fs_path,
@@ -22,24 +21,24 @@ except ImportError:
     import sys
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from fs_common import (
-        build_text_content,
         file_metadata,
         is_binary_file,
         resolve_fs_path,
     )
 
 
-def _create_note(resource_manager, agent_name: str, content: Dict[str, Any], rel_path: str, note_name: str) -> Optional[str]:
+def _create_note(resource_manager, agent_name: str, text_content: str, rel_path: str, note_name: str,
+                 tool_metadata: Optional[Dict[str, Any]] = None) -> Optional[str]:
     if not resource_manager:
         return None
     success, note_id, error_msg, _ = resource_manager.create_note(
         agent_name,
-        content,
-        "json",
+        text_content,
+        "text",
         "fs-head",
         rel_path,
         note_name,
-        {"kind": "fs-slice"}
+        {"kind": "fs-slice", "tool_metadata": tool_metadata or {}}
     )
     if not success:
         logger.error(f"fs-head: failed to create Note for {rel_path}: {error_msg}")
@@ -84,9 +83,8 @@ def tool(input_value=None, **kwargs):
     text = "".join(chunk)
     meta = file_metadata(abs_path, rel_path)
     meta.update({"line_start": 1, "line_end": len(chunk), "truncated": truncated})
-    content = build_text_content(text, meta)
     note_name = f"{rel_path or '/'}#head:{lines}"
-    note_id = _create_note(resource_manager, agent_name, content, rel_path, note_name)
+    note_id = _create_note(resource_manager, agent_name, text, rel_path, note_name, tool_metadata=meta)
     if not note_id:
         return executor._create_uniform_return("failed", reason="fs-head failed to create note")
 

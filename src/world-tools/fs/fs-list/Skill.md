@@ -22,6 +22,9 @@ List files and directories within the filesystem sandbox for the current world.
 Success returns:
 - `resource_id`: Collection ID
 - Collection items are Notes (files) and Collections (subdirectories)
+- File Notes are placeholders with text content:
+  - metadata Note linked by meta Relation (path/size/mtime/format)
+  - body text `(placeholder)`
 
 ## Examples
 

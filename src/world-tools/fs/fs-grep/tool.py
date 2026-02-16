@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 try:
     from ..fs_common import (
-        build_text_content,
         file_metadata,
         get_fs_root,
         is_binary_file,
@@ -26,7 +25,6 @@ except ImportError:
     import sys
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from fs_common import (
-        build_text_content,
         file_metadata,
         get_fs_root,
         is_binary_file,
@@ -37,17 +35,18 @@ except ImportError:
     )
 
 
-def _create_note(resource_manager, agent_name: str, content: Dict[str, Any], rel_path: str, note_name: str) -> Optional[str]:
+def _create_note(resource_manager, agent_name: str, text_content: str, rel_path: str, note_name: str,
+                 tool_metadata: Optional[Dict[str, Any]] = None) -> Optional[str]:
     if not resource_manager:
         return None
     success, note_id, error_msg, _ = resource_manager.create_note(
         agent_name,
-        content,
-        "json",
+        text_content,
+        "text",
         "fs-grep",
         rel_path,
         note_name,
-        {"kind": "fs-grep"}
+        {"kind": "fs-grep", "tool_metadata": tool_metadata or {}}
     )
     if not success:
         logger.error(f"fs-grep: failed to create Note for {rel_path}: {error_msg}")
@@ -172,9 +171,8 @@ def tool(input_value=None, **kwargs):
                 rel = file_path.relative_to(root).as_posix() if root in file_path.parents or root == file_path else file_path.name
             meta = file_metadata(file_path, rel)
             meta.update({"line": idx + 1, "pattern": pattern, "context": context_lines})
-            content = build_text_content(snippet, meta)
             note_name = f"{rel}#L{idx + 1}"
-            note_id = _create_note(resource_manager, agent_name, content, rel, note_name)
+            note_id = _create_note(resource_manager, agent_name, snippet, rel, note_name, tool_metadata=meta)
             if note_id:
                 note_ids.append(note_id)
                 matches += 1

@@ -818,9 +818,8 @@ class ZenohExecutiveNode:
         self._dialog_purposes = {}  # {agent_name: original_purpose} for topic anchoring
         self._dialog_cooldowns = {}  # {agent_name: timestamp} suppress re-open after close
         
-        # Ask/listen primitive state
+        # Ask primitive state
         self.awaiting_ask_response = False
-        self.awaiting_listen_response = False
         
         # Track last action outputs for plan_result
         self.last_say_text = ''
@@ -1031,6 +1030,11 @@ class ZenohExecutiveNode:
             data = json.loads(payload_bytes.decode('utf-8'))
             entity_name = data.get('entity_name', 'User')
             self.memory.close_dialog(entity_name)
+            # End-dialog should immediately terminate any in-progress ask/wait.
+            self.interrupt_requested = True
+            if self.infospace_executor:
+                self.infospace_executor.interrupt_requested = True
+            self.awaiting_ask_response = False
             logger.info(f'🔚 {self.character_name} closed dialog with {entity_name} (from UI)')
             self._publish_execution_state()
         except Exception as e:
@@ -1116,8 +1120,8 @@ class ZenohExecutiveNode:
                 else:
                     try:
                         # Priority order: Text input → Normal OODA
-                        # Skip if ask/listen primitive is polling text_input_queue directly
-                        if self.text_input_queue and not self.awaiting_ask_response and not self.awaiting_listen_response:
+                        # Skip if ask primitive is polling text_input_queue directly
+                        if self.text_input_queue and not self.awaiting_ask_response:
                             self._process_text_input()
                         self._run_ooda_loop()
                         
@@ -1213,7 +1217,7 @@ class ZenohExecutiveNode:
             # Add action-specific fields for UI display
             # Handle both hyphenated and non-hyphenated action types
             action_types_to_handle = ['create-note', 'createnote', 'create-collection', 'createcollection', 
-                                     'split', 'flatten', 'map', 'summarize', 'search-web', 'semantic-scholar']
+                                     'split', 'flatten', 'map', 'synthesize', 'search-web', 'semantic-scholar']
             if normalized_type in action_types_to_handle:
                 target = action.get('target', '')
                 value = action.get('value', '')
@@ -1451,6 +1455,8 @@ class ZenohExecutiveNode:
             'status': 'complete' if self.current_plan.get('success') else 'failed',
             'final_thoughts': final_thoughts,
             'final_content': final_content,
+            'quality_status': self.current_plan.get('quality_status', 'unknown'),
+            'verification_answer': self.current_plan.get('verification_answer', ''),
             'bindings': bindings,
             'timestamp': datetime.now().isoformat(),
             'character': self.character_name,
@@ -1465,13 +1471,15 @@ class ZenohExecutiveNode:
         last_say = (getattr(self, 'last_say_text', '') or '').strip()
         final_thoughts_clean = final_thoughts.strip() if final_thoughts else ''
         
+        interrupted_final = final_thoughts_clean == "Interrupted by user."
+
         # Determine what to save to conversation
         response_to_save = None
         if last_say and len(last_say) > 0:
             # Use actual 'say' action content if it exists
             response_to_save = last_say
             logger.debug(f'Using actual say action content for conversation: {last_say[:50]}...')
-        elif final_thoughts_clean and len(final_thoughts_clean) >= 20 and final_thoughts_clean.replace(' ', '').replace('.', '').replace(',', '').replace('!', '').replace('?', '').strip():
+        elif (not interrupted_final) and final_thoughts_clean and len(final_thoughts_clean) >= 20 and final_thoughts_clean.replace(' ', '').replace('.', '').replace(',', '').replace('!', '').replace('?', '').strip():
             # Fall back to FINAL_ANSWER if no actual say action
             response_to_save = final_thoughts_clean
             logger.debug(f'Using FINAL_ANSWER for conversation (no say action found): {final_thoughts_clean[:50]}...')
@@ -1484,7 +1492,7 @@ class ZenohExecutiveNode:
         # Only publish if final_thoughts is non-empty, meaningful, and different from last_say_text
         # (to avoid duplicating the actual say action that was already published)
         # Require meaningful content: at least 20 chars and not just whitespace/punctuation
-        if final_thoughts_clean and len(final_thoughts_clean) >= 20 and final_thoughts_clean.replace(' ', '').replace('.', '').replace(',', '').replace('!', '').replace('?', '').strip():
+        if (not interrupted_final) and final_thoughts_clean and len(final_thoughts_clean) >= 20 and final_thoughts_clean.replace(' ', '').replace('.', '').replace(',', '').replace('!', '').replace('?', '').strip():
             # Only publish if final_thoughts is different from the last say action
             # This prevents duplicating the actual say action content
             if final_thoughts_clean != last_say:
@@ -1590,7 +1598,7 @@ class ZenohExecutiveNode:
 
     def _archive_conversation(self):
         """
-        Archive conversation on shutdown: summarize conversation collection and add to conversation_history.
+        Archive conversation on shutdown: synthesize conversation collection and add to conversation_history.
         Only archives if conversation collection exists and is not empty.
         """
         logger.info(f'📝 Starting conversation archiving for {self.character_name}...')
@@ -1632,16 +1640,15 @@ class ZenohExecutiveNode:
             
             logger.info(f'📝 Archiving conversation with {conv_size} items...')
             
-            # Summarize conversation collection using summarize tool
-            # The summarize tool creates a Note and binds it to $summary
-            summarize_action = {"type": "summarize", "target":  "$conv", "out": "$summary"}
+            # Summarize conversation collection using synthesize tool
+            summarize_action = {"type": "synthesize", "target":  "$conv", "focus": "concise conversation summary", "out": "$summary"}
             summarize_result = self.infospace_executor.execute_action(summarize_action)
             
             if summarize_result.get('status') != 'success':
-                logger.warning(f'Failed to summarize conversation: {summarize_result.get("reason", "unknown")}')
+                logger.warning(f'Failed to synthesize conversation: {summarize_result.get("reason", "unknown")}')
                 return
             
-            # The summarize tool already created a Note and bound it to $summary
+            # The synthesize tool already created a Note and bound it to $summary
             # Get the Note ID from the result (resource_id) or from plan_bindings
             summary_note_id = summarize_result.get('resource_id')
             if not summary_note_id:
@@ -1664,7 +1671,7 @@ class ZenohExecutiveNode:
                 logger.warning(f'Failed to persist summary note: {persist_result.get("reason", "unknown")}')
                 # Continue anyway - note will be saved when resource manager saves
             
-            # Add the summary note (already created by summarize tool) to conversation_history
+            # Add the summary note (already created by synthesize tool) to conversation_history
             add_action = {"type": "add", "target": "conversation_history", "value": "$summary", "out": "conversation_history"}
             add_result = self.infospace_executor.execute_action(add_action)
             
@@ -1984,8 +1991,22 @@ class ZenohExecutiveNode:
                     text_preview = str(entry['text'])[:200]
                     recent_turns += f"{entry['source']}: {text_preview}\n"
 
+        # Include character, setting, and capabilities so envision knows what the agent can do
+        char_desc = (self.character_config.get('character') or '')[:500]
+        setting = (self.character_config.get('setting') or '')[:600]
+        capabilities = (self.character_config.get('capabilities') or '')[:500]
+        context_lines = []
+        if char_desc:
+            context_lines.append(f"CHARACTER: {char_desc}")
+        if setting:
+            context_lines.append(f"SETTING/WORLD: {setting}")
+        if capabilities:
+            context_lines.append(f"CAPABILITIES: {capabilities}")
+        context_block = "\n".join(context_lines) + "\n\n" if context_lines else ""
+
         purpose_line = f"CONVERSATION PURPOSE: {purpose}\n" if purpose else ""
         prompt = (
+            f"{context_block}"
             f"{purpose_line}"
             f"RECENT DIALOG:\n{recent_turns}\n"
             f"INCOMING MESSAGE from {source}:\n{message[:500]}\n\n"
@@ -2595,11 +2616,16 @@ class ZenohExecutiveNode:
         """Handle stop command - stop autonomous mode and pause execution."""
         try:
             logger.info(f'⏹️ Stop command received by {self.character_name}')
+            # Treat stop as an immediate interrupt signal so blocking waits can exit.
+            self.interrupt_requested = True
+            if self.infospace_executor:
+                self.infospace_executor.interrupt_requested = True
             self.autonomous_mode = False
             self.execution_mode = 'step'
             self.execution_paused = True
             # Note: continuous_mode is NOT cleared here - user must toggle it off explicitly
             self.awaiting_user_input = False  # Clear awaiting flag
+            self.awaiting_ask_response = False
             self._publish_execution_state()
         except Exception as e:
             logger.error(f'Error handling stop command: {e}')
@@ -3409,8 +3435,16 @@ class ZenohExecutiveNode:
                 if result.get('response', None):
                     self.infospace_executor.execute_action({"type": "say", "target": "user", "value": result.get('response')})
             else:
-                logger.error(f"Error in _plan: {result.get('error', 'Unknown error')}")
-                traceback.print_exc()
+                if result.get('response') == "Interrupted by user.":
+                    logger.info(f"Planning interrupted for {self.character_name}; clearing current plan for clean terminal ask turn.")
+                    self.current_plan = None
+                elif result.get('response'):
+                    logger.warning(
+                        f"Plan returned non-success with response (quality_status={result.get('quality_status', 'unknown')}, "
+                        f"verification_answer={result.get('verification_answer', '')}); not treating as internal error."
+                    )
+                else:
+                    logger.error(f"Error in _plan: {result.get('error', 'Unknown error')}")
                 return
             if self.current_plan:
                 self._publish_current_plan()

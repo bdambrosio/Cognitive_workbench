@@ -32,7 +32,7 @@ INFOSPACE_PRIMITIVES = frozenset({
     'search-within-collection', 'discover-notes', 'discover-collections', 'say',
     'think', 'ask', 'coerce', 'map', 'flatten', 'add', 'split', 'size', 'union',
     'intersection', 'difference', 'remove', 'project', 'pluck', 'head',
-    'filter-structured', 'sort', 'join',
+    'filter-structured', 'sort', 'join', 'create-relation', 'find-relations', 'related',
 })
 
 
@@ -475,6 +475,16 @@ class InfospaceExecutor:
         logger.debug(f"_get_content({resource_id}): content type={type(content)}, is_none={content is None}, is_empty_str={content == ''}")
         return content
     
+    def _parse_note_content_to_dict(self, content: Any) -> Optional[Dict]:
+        """Parse Note content to dict from JSON text only."""
+        if isinstance(content, str) and content.strip():
+            try:
+                parsed = json.loads(content.strip())
+                return parsed if isinstance(parsed, dict) else None
+            except (json.JSONDecodeError, TypeError):
+                return None
+        return None
+    
     def get_resource_metadata(self, resource_id: str) -> Optional[Dict]:
         """
         Fetch metadata for a given resource ID.
@@ -608,45 +618,23 @@ class InfospaceExecutor:
         content = props.get('content', '')
         kind = props.get('kind', '')
         
-        # fs-file: show filename from text field or metadata.name
+        # Use tool_metadata (internal) for display; content is always string
+        tool_meta = props.get('tool_metadata', {})
         if kind == 'fs-file':
-            if isinstance(content, dict):
-                # Check text field, but skip if None (placeholder Notes)
-                if 'text' in content and content['text'] is not None:
-                    filename = str(content['text']).strip()
-                    if filename:
-                        return filename[:max_length]
-                # Fall back to metadata.name (for placeholder Notes)
-                if 'metadata' in content and isinstance(content['metadata'], dict):
-                    name = content['metadata'].get('name', '')
-                    if name:
-                        return name[:max_length]
+            name = tool_meta.get('name', '') or props.get('source_value', '')
+            if name:
+                return name[:max_length]
             return note_id
         
-        # Structured Notes: try metadata.title, then metadata.uri
-        if isinstance(content, dict):
-            metadata = content.get('metadata', {})
-            if isinstance(metadata, dict):
-                title = metadata.get('title', '')
-                if title:
-                    return title[:max_length]
-                uri = metadata.get('uri', '') or metadata.get('url', '')
-                if uri:
-                    # Truncate URI if too long
-                    if len(uri) > max_length:
-                        return uri[:max_length-3] + '...'
-                    return uri
+        title = tool_meta.get('title', '')
+        if title:
+            return title[:max_length]
+        uri = tool_meta.get('uri', '') or tool_meta.get('url', '')
+        if uri:
+            return uri[:max_length] if len(uri) <= max_length else uri[:max_length-3] + '...'
         
         # Text content: show truncated preview
-        if isinstance(content, dict) and 'text' in content:
-            text = str(content['text']).strip()
-            if text:
-                # Remove newlines for display
-                text = text.replace('\n', ' ').replace('\r', ' ')
-                if len(text) > max_length:
-                    return text[:max_length-3] + '...'
-                return text
-        elif isinstance(content, str) and content:
+        if isinstance(content, str) and content:
             text = content.replace('\n', ' ').replace('\r', ' ')
             if len(text) > max_length:
                 return text[:max_length-3] + '...'
@@ -779,15 +767,16 @@ class InfospaceExecutor:
                 if result['data'] is None or (data is None and isinstance(result['data'], str) and result['data'] == value):
                     content = props.get('content')
                     if resource_id.startswith('Note_'):
-                        result['data'] = content  # string
+                        # Text-only model: r["data"] always string for Notes (defensive normalize)
+                        result['data'] = content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
                     elif resource_id.startswith('Collection_') and isinstance(content, list):
                         # Build structured items: text + metadata per Note
                         items = []
                         for item_id in content:
                             item_resource = self.resource_manager.get_resource(item_id)
                             if item_resource:
-                                item_props = item_resource.get('properties', {})
-                                items.append({'text': item_props.get('content', ''), 'metadata': {k: v for k, v in item_props.items() if k != 'content'}})
+                                item_content = item_resource.get('properties', {}).get('content', '')
+                                items.append({'text': item_content if isinstance(item_content, str) else str(item_content)})
                         result['data'] = items
         
         return result
@@ -909,6 +898,9 @@ class InfospaceExecutor:
             'apply': self._execute_apply,
             'create-note': self._execute_create_note,
             'create-collection': self._execute_create_collection,
+            'create-relation': self._execute_create_relation,
+            'find-relations': self._execute_find_relations,
+            'related': self._execute_related,
             'persist': self._execute_persist,
             'load': self._execute_load,
             'index': self._execute_index,
@@ -919,7 +911,6 @@ class InfospaceExecutor:
             'say': self._execute_say,
             'think': self._execute_think,
             'ask': self._execute_ask,
-            'listen': self._execute_listen,
             # Phase 2: Data Operations (whole-value only)
             'coerce': self._execute_coerce,
             'map': self._execute_map,
@@ -1450,28 +1441,32 @@ Only provide the result, followed by the </end> tag.""")
             client = Anthropic(api_key=self.anthropic_api_key)
 
             # Convert messages to Anthropic format (system + messages)
+            # Normalize all content: Anthropic rejects assistant content ending with trailing whitespace
+            def _norm(s):
+                return s.rstrip() if isinstance(s, str) else s
+
             system_parts = []
             api_messages = []
             if isinstance(messages, list):
                 for msg in messages:
                     if isinstance(msg, str):
                         if msg.strip().startswith('<|system|>'):
-                            system_parts.append(msg.replace('<|system|>', '').strip())
+                            system_parts.append(_norm(msg.replace('<|system|>', '').strip()))
                         elif msg.strip().startswith('<|user|>'):
-                            api_messages.append({"role": "user", "content": msg.replace('<|user|>', '').strip()})
+                            api_messages.append({"role": "user", "content": _norm(msg.replace('<|user|>', '').strip())})
                         elif msg.strip().startswith('<|assistant|>'):
-                            api_messages.append({"role": "assistant", "content": msg.replace('<|assistant|>', '').strip()})
+                            api_messages.append({"role": "assistant", "content": _norm(msg.replace('<|assistant|>', '').strip())})
                         else:
-                            api_messages.append({"role": "user", "content": msg})
+                            api_messages.append({"role": "user", "content": _norm(msg)})
                     elif isinstance(msg, dict):
                         role = msg.get("role", "user")
-                        content = msg.get("content", "")
+                        content = _norm(msg.get("content", ""))
                         if role == "system":
                             system_parts.append(content)
                         else:
                             api_messages.append({"role": role, "content": content})
             else:
-                api_messages = [{"role": "user", "content": str(messages)}]
+                api_messages = [{"role": "user", "content": _norm(str(messages))}]
 
             system_text = "\n\n".join(system_parts) if system_parts else None
             # Anthropic rejects empty/whitespace-only content blocks - filter them out
@@ -1944,7 +1939,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 
                 # Detect resource ID if not explicitly set
                 if resource_id is None and isinstance(value, str):
-                    if value.startswith('Note_') or value.startswith('Collection_'):
+                    if value.startswith('Note_') or value.startswith('Collection_') or value.startswith('Relation_'):
                         resource_id = value
                 
                 return self._create_uniform_return('success', value=value, resource_id=resource_id)
@@ -1965,7 +1960,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                     logger.info(f"Python tool '{tool_name}' returned null indicator")
                     return self._create_uniform_return('success', value=None, resource_id=None)
                 # Check if result is a resource ID
-                elif stripped.startswith('Note_') or stripped.startswith('Collection_'):
+                elif stripped.startswith('Note_') or stripped.startswith('Collection_') or stripped.startswith('Relation_'):
                     logger.info(f"Python tool '{tool_name}' returned resource ID: {stripped}")
                     return self._create_uniform_return('success', value=stripped, resource_id=stripped)
             
@@ -2080,6 +2075,128 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         display_var = self._normalize_var_for_log(out_var)
         logger.error(f"Collection creation failed for {display_var}")
         return self._create_uniform_return('failed', reason='Failed to create Collection')
+
+    def _execute_create_relation(self, action: Dict) -> Dict:
+        """
+        Create a typed directed relation between two resources.
+
+        Required: source/target/relation/out
+        Shorthand supported: target as source and value as target.
+        """
+        if not self.resource_manager:
+            return self._create_uniform_return('failed', reason='Resource manager not available')
+
+        out_var = action.get('out')
+        source_arg = action.get('source', action.get('target'))
+        target_arg = action.get('target_id', action.get('to', action.get('value')))
+        relation_type = action.get('relation', action.get('relation_type'))
+        relation_name = action.get('name', '')
+        extra_props = action.get('properties') if isinstance(action.get('properties'), dict) else None
+
+        if not out_var:
+            return self._create_uniform_return('failed', reason='create-relation requires out')
+        if not source_arg or not target_arg or not relation_type:
+            return self._create_uniform_return('failed', reason='create-relation requires source, target, and relation')
+
+        try:
+            source_id = self._resolve_id(source_arg)
+            target_id = self._resolve_id(target_arg)
+        except ValueError as e:
+            return self._create_uniform_return('failed', reason=str(e))
+
+        if not isinstance(source_id, str) or not (source_id.startswith('Note_') or source_id.startswith('Collection_')):
+            return self._create_uniform_return('failed', reason=f'Invalid source for relation: {source_id}')
+        if not isinstance(target_id, str) or not (target_id.startswith('Note_') or target_id.startswith('Collection_')):
+            return self._create_uniform_return('failed', reason=f'Invalid target for relation: {target_id}')
+
+        success, relation_id, error_msg, _ = self.resource_manager.create_relation(
+            self.agent_name, source_id, target_id, str(relation_type), relation_name=relation_name, extra_props=extra_props
+        )
+        if not success or not relation_id:
+            return self._create_uniform_return('failed', reason=error_msg or 'Failed to create relation')
+
+        self._bind_variable(out_var, relation_id)
+        return self._create_uniform_return('success', value=f"{source_id} -[{relation_type}]-> {target_id}", resource_id=relation_id)
+
+    def _execute_find_relations(self, action: Dict) -> Dict:
+        """Find relations by optional source/target/type filters."""
+        if not self.resource_manager:
+            return self._create_uniform_return('failed', reason='Resource manager not available')
+
+        out_var = action.get('out')
+        if not out_var:
+            return self._create_uniform_return('failed', reason='find-relations requires out')
+
+        source_arg = action.get('source')
+        target_arg = action.get('target')
+        relation_type = action.get('relation', action.get('relation_type'))
+
+        try:
+            source_id = self._resolve_id(source_arg) if source_arg is not None else None
+            target_id = self._resolve_id(target_arg) if target_arg is not None else None
+        except ValueError as e:
+            return self._create_uniform_return('failed', reason=str(e))
+
+        matches = self.resource_manager.find_relations(source_id=source_id, target_id=target_id, relation_type=relation_type)
+        relation_ids = [m.get('id') for m in matches if isinstance(m.get('id'), str)]
+        collection_id = self._create_collection(relation_ids, 'find-relations')
+        if not collection_id:
+            return self._create_uniform_return('failed', reason='Failed to create relation result collection')
+
+        self._bind_variable(out_var, collection_id)
+        return self._create_uniform_return('success', value=self._format_collection_value(collection_id), resource_id=collection_id)
+
+    def _execute_related(self, action: Dict) -> Dict:
+        """
+        Get resources related to a source resource.
+
+        Required: target, out
+        Optional: relation (type filter), direction ('out'|'in'|'both', default 'both')
+        """
+        if not self.resource_manager:
+            return self._create_uniform_return('failed', reason='Resource manager not available')
+
+        source_arg = action.get('target')
+        out_var = action.get('out')
+        relation_type = action.get('relation', action.get('relation_type'))
+        direction = str(action.get('direction', 'both')).lower()
+
+        if not source_arg or not out_var:
+            return self._create_uniform_return('failed', reason='related requires target and out')
+
+        try:
+            source_id = self._resolve_id(source_arg)
+        except ValueError as e:
+            return self._create_uniform_return('failed', reason=str(e))
+
+        if not isinstance(source_id, str) or not (
+            source_id.startswith('Note_') or source_id.startswith('Collection_') or source_id.startswith('Relation_')
+        ):
+            return self._create_uniform_return('failed', reason=f'Invalid related target: {source_id}')
+
+        related_ids: List[str] = []
+        seen = set()
+
+        if direction in ('out', 'both'):
+            for rel in self.resource_manager.find_relations(source_id=source_id, relation_type=relation_type):
+                target_id = rel.get('properties', {}).get('target')
+                if isinstance(target_id, str) and target_id not in seen:
+                    seen.add(target_id)
+                    related_ids.append(target_id)
+
+        if direction in ('in', 'both'):
+            for rel in self.resource_manager.find_relations(target_id=source_id, relation_type=relation_type):
+                origin_id = rel.get('properties', {}).get('source')
+                if isinstance(origin_id, str) and origin_id not in seen:
+                    seen.add(origin_id)
+                    related_ids.append(origin_id)
+
+        collection_id = self._create_collection(related_ids, 'related-resources')
+        if not collection_id:
+            return self._create_uniform_return('failed', reason='Failed to create related result collection')
+
+        self._bind_variable(out_var, collection_id)
+        return self._create_uniform_return('success', value=self._format_collection_value(collection_id), resource_id=collection_id)
     
     # ==================== Storage Operations ====================
     
@@ -2180,7 +2297,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         Helper to persist a Note as a resource.
         
         Args:
-            value: Content to persist
+            value: Content to persist (string, or dict with 'text' for search results)
             source_context: Description for logging (e.g., 'save_primitive', 'apply_result')
             properties: Optional dict of extra properties to attach
             note_name: Optional stable name for referencing
@@ -2199,10 +2316,23 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             logger.error("Resource manager not available")
             return None
         
-        format_type = 'json' if isinstance(value, (dict, list)) else 'text'
+        # Search result format: dict with text + metadata -> text-only content, metadata in tool_metadata
+        props = dict(properties or {})
+        if isinstance(value, dict) and 'text' in value:
+            content = value.get('text', '') or ''
+            tool_meta = value.get('metadata', {})
+            if tool_meta:
+                props['tool_metadata'] = {**(props.get('tool_metadata') or {}), **tool_meta}
+            format_type = 'text'
+        elif isinstance(value, (dict, list)):
+            content = json.dumps(value, sort_keys=True)
+            format_type = 'text'
+        else:
+            content = str(value) if value is not None else ""
+            format_type = 'text'
         
         success, note_id, error_msg, location = self.resource_manager.create_note(
-            self.agent_name, value, format_type, source_context, str(value)[:100], note_name, properties or {}
+            self.agent_name, content, format_type, source_context, (content or '')[:100], note_name, props
         )
         
         if success:
@@ -2240,7 +2370,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             resource_id = None
         
         # If not resolved as variable or literal ID, try as named resource
-        if not isinstance(resource_id, str) or not (resource_id.startswith('Collection_') or resource_id.startswith('Note_')):
+        if not isinstance(resource_id, str) or not (resource_id.startswith('Collection_') or resource_id.startswith('Note_') or resource_id.startswith('Relation_')):
             if self.resource_manager:
                 resolved_id = self.resource_manager._resolve_resource_id(target_arg)
                 if resolved_id:
@@ -2250,8 +2380,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             else:
                 return self._create_uniform_return('failed', reason=f'Target "{target_arg}" is not a bound variable or resource ID, and resource manager not available')
         
-        if not isinstance(resource_id, str) or not (resource_id.startswith('Collection_') or resource_id.startswith('Note_')):
-            return self._create_uniform_return('failed', reason=f'Target must be a Note or Collection ID, got: {resource_id}')
+        if not isinstance(resource_id, str) or not (resource_id.startswith('Collection_') or resource_id.startswith('Note_') or resource_id.startswith('Relation_')):
+            return self._create_uniform_return('failed', reason=f'Target must be a Note, Collection, or Relation ID, got: {resource_id}')
         
         # Mark as persistent using resource manager
         if not self.resource_manager:
@@ -2878,12 +3008,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
     
     def _execute_ask(self, action: Dict) -> Dict:
         """
-        Ask user a question and wait for response via polling.
-        
-        Publishes question to UI, then polls for user response.
-        Zenoh callbacks run in separate threads, so while we sleep,
-        _process_text_input can receive and store the response.
-        
+        Ask target a question and terminate current turn immediately.
+
         Required: type, value, out
         Optional: target (defaults to 'User')
         """
@@ -2922,107 +3048,18 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             self.session.put(f"cognitive/{target}/sense_data", json.dumps(sense_data))
         
         display_var = self._normalize_var_for_log(out_var)
-        logger.info(f"❓ Ask: '{question_text}' → awaiting response for {display_var}")
-        
-        # Mark that we're awaiting ask response
-        self.executive_node.awaiting_ask_response = True
-        
-        # Poll for response (with timeout)
-        import time
-        timeout = 300  # 5 minutes
-        start_time = time.time()
-        
-        while time.time() - start_time < timeout:
-            time.sleep(0.1)  # Release GIL, allow Zenoh callbacks to add to queue
-            
-            # Check if text input arrived in queue
-            if self.executive_node.text_input_queue:
-                # Process the text input directly
-                sense_data = self.executive_node.text_input_queue.pop(0)
-                content = sense_data['content']
-                close_flag = False
-                try:
-                    content_data = json.loads(content)
-                    response_text = content_data.get('text', '')
-                    close_flag = content_data.get('close', False)
-                except (json.JSONDecodeError, TypeError):
-                    response_text = str(content)
-                
-                response_text = response_text.strip().strip('"').strip("'")
-                
-                if response_text:
-                    self.executive_node.awaiting_ask_response = False
-                    
-                    # If responder sent close flag, close our dialog with them
-                    if close_flag and target != 'User':
-                        try:
-                            self.executive_node.memory.close_dialog(target)
-                            self.executive_node._dialog_cooldowns[target] = time.time()
-                            self.executive_node._dialog_purposes.pop(target, None)
-                            logger.info(f"Ask: dialog closed by {target} (close flag)")
-                        except Exception as e:
-                            logger.warning(f"Ask close_dialog failed for {target}: {e}")
-                    
-                    # Don't publish response action - the User's say is already in the log
-                    # Publishing both creates redundant entries
-                    
-                    # Create Note with response
-                    response_note_id = self._persist_note(response_text, 'ask-response')
-                    if response_note_id:
-                        self._bind_variable(out_var, response_note_id)
-                        logger.info(f"✅ Ask response received: '{response_text[:50]}...' → {out_var} = {response_note_id}")
-                        # Return truncated response text, resource_id is Note ID
-                        return self._create_uniform_return('success', value=response_text, resource_id=response_note_id)
-                    else:
-                        self._bind_variable(out_var, "Note_null")
-                        return self._create_uniform_return('success', value="", resource_id="Note_null")
-        
-        # Timeout - no response received
+        logger.info(f"❓ Ask: '{question_text}' → terminating turn ({display_var}=Note_null)")
+        self._bind_variable(out_var, "Note_null")
         self.executive_node.awaiting_ask_response = False
-        logger.warning(f"⏱️ Ask timeout after {timeout}s: no user response")
-        self._bind_variable(out_var, "Note_null")
-        return self._create_uniform_return('failed', reason=f'User response timeout after {timeout}s')
-    
-    def _execute_listen(self, action: Dict) -> Dict:
-        """
-        Wait for a message from target without sending. Use after say when you need the reply.
-        Required: target, out. Polls text_input_queue for message from target.
-        """
-        import time
-        target = action.get('target')
-        out_var = action.get('out')
-        if not target or not out_var:
-            return self._create_uniform_return('failed', reason='listen requires target and out')
-        
-        self.executive_node.awaiting_listen_response = True
-        timeout = 300
-        start_time = time.time()
-        
-        while time.time() - start_time < timeout:
-            time.sleep(0.1)
-            queue = self.executive_node.text_input_queue
-            for i, sense_data in enumerate(queue):
-                try:
-                    content_data = json.loads(sense_data['content'])
-                    if content_data.get('source') != target:
-                        continue
-                except (json.JSONDecodeError, TypeError, KeyError):
-                    continue
-                queue.pop(i)
-                response_text = content_data.get('text', sense_data.get('content', '')).strip().strip('"').strip("'")
-                self.executive_node.awaiting_listen_response = False
-                response_note_id = self._persist_note(response_text, 'listen-response')
-                if response_note_id:
-                    self._bind_variable(out_var, response_note_id)
-                else:
-                    self._bind_variable(out_var, "Note_null")
-                logger.info(f"✅ Listen: response from {target} → {out_var}")
-                return self._create_uniform_return('success', value=response_text, resource_id=response_note_id or "Note_null")
-        
-        self.executive_node.awaiting_listen_response = False
-        logger.warning(f"⏱️ Listen timeout after {timeout}s: no message from {target}")
-        self._bind_variable(out_var, "Note_null")
-        return self._create_uniform_return('failed', reason=f'Listen timeout: no message from {target}')
+        # Terminal dialog action model: end this turn after ask.
+        self.interrupt_requested = True
+        if self.executive_node:
+            self.executive_node.interrupt_requested = True
+            self.executive_node.execution_mode = 'step'
+            self.executive_node.execution_paused = True
+            self.executive_node.awaiting_user_input = False
+            self.executive_node._publish_execution_state()
+        return self._create_uniform_return('success', value=str(question_text), resource_id="Note_null")
     
     # ==================== Phase 2: Data Operations ====================
     
@@ -3218,6 +3255,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             if content is None and note_id != "Note_null":
                 logger.warning(f"Failed to fetch content for {note_id}, skipping")
                 continue
+            structured_content = content if isinstance(content, dict) else self._parse_note_content_to_dict(content)
             
             # Apply operation based on type
             if isinstance(operation, str):
@@ -3242,13 +3280,13 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                         fields = additional_args.get('fields', additional_args.get('value', {}).get('fields'))
                         if not fields or not isinstance(fields, list):
                             result = {'status': 'failed', 'reason': 'project requires fields list'}
-                        elif not isinstance(content, dict):
+                        elif not isinstance(structured_content, dict):
                             result = {'status': 'failed', 'reason': f'Cannot project from non-dict Note {note_id}'}
                         else:
                             projected = {}
                             all_fields_found = True
                             for field in fields:
-                                value = content
+                                value = structured_content
                                 parts = field.split('.')
                                 for part in parts:
                                     if isinstance(value, dict) and part in value:
@@ -3279,10 +3317,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                         field = additional_args.get('field', additional_args.get('value', {}).get('field'))
                         if not field:
                             result = {'status': 'failed', 'reason': 'pluck requires field parameter'}
-                        elif not isinstance(content, dict):
+                        elif not isinstance(structured_content, dict):
                             result = {'status': 'failed', 'reason': f'Cannot pluck from non-dict Note {note_id}'}
                         else:
-                            value = content
+                            value = structured_content
                             for part in field.split('.'):
                                 if isinstance(value, dict) and part in value:
                                     value = value[part]
@@ -3339,13 +3377,13 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                             fields = tool_args.get('fields', tool_args.get('value', {}).get('fields'))
                             if not fields or not isinstance(fields, list):
                                 result = {'status': 'failed', 'reason': 'project requires fields list'}
-                            elif not isinstance(content, dict):
+                            elif not isinstance(structured_content, dict):
                                 result = {'status': 'failed', 'reason': f'Cannot project from non-dict Note {note_id}'}
                             else:
                                 projected = {}
                                 all_fields_found = True
                                 for field in fields:
-                                    value = content
+                                    value = structured_content
                                     parts = field.split('.')
                                     for part in parts:
                                         if isinstance(value, dict) and part in value:
@@ -3375,10 +3413,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                             field = tool_args.get('field', tool_args.get('value', {}).get('field'))
                             if not field:
                                 result = {'status': 'failed', 'reason': 'pluck requires field parameter'}
-                            elif not isinstance(content, dict):
+                            elif not isinstance(structured_content, dict):
                                 result = {'status': 'failed', 'reason': f'Cannot pluck from non-dict Note {note_id}'}
                             else:
-                                value = content
+                                value = structured_content
                                 for part in field.split('.'):
                                     if isinstance(value, dict) and part in value:
                                         value = value[part]
@@ -4179,13 +4217,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # Project each Note
         projected_ids = []
         for note_id in note_ids:
-            content = self._get_content(note_id)
+            content = self._parse_note_content_to_dict(self._get_content(note_id))
             if content is None:
-                continue
-            
-            # Extract fields from JSON content
-            if not isinstance(content, dict):
-                logger.warning(f"Cannot project from non-dict Note {note_id}")
                 continue
             
             projected = {}
@@ -4273,9 +4306,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # Extract field value from each Note
         plucked_ids = []
         for note_id in note_ids:
-            content = self._get_content(note_id)
-            if not isinstance(content, dict):
-                logger.warning(f"Cannot pluck from non-dict Note {note_id}")
+            content = self._parse_note_content_to_dict(self._get_content(note_id))
+            if content is None:
                 continue
             
             # Navigate nested fields
@@ -4401,8 +4433,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # Filter each Note
         filtered_ids = []
         for note_id in note_ids:
-            content = self._get_content(note_id)
-            if not isinstance(content, dict):
+            content = self._parse_note_content_to_dict(self._get_content(note_id))
+            if content is None:
                 continue
             
             try:
@@ -4457,8 +4489,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # Extract sort keys
         items_with_keys = []
         for note_id in note_ids:
-            content = self._get_content(note_id)
-            if not isinstance(content, dict):
+            content = self._parse_note_content_to_dict(self._get_content(note_id))
+            if content is None:
                 continue
             
             # Navigate to sort field
@@ -4534,8 +4566,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # Build right index
         right_index = {}
         for note_id in right_ids:
-            content = self._get_content(note_id)
-            if not isinstance(content, dict):
+            content = self._parse_note_content_to_dict(self._get_content(note_id))
+            if content is None:
                 continue
             
             # Navigate to right key
@@ -4557,8 +4589,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         matched_left = set()
         
         for left_note_id in left_ids:
-            left_content = self._get_content(left_note_id)
-            if not isinstance(left_content, dict):
+            left_content = self._parse_note_content_to_dict(self._get_content(left_note_id))
+            if left_content is None:
                 continue
             
             # Navigate to left key
@@ -4640,9 +4672,6 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             'extract': 'instruction',    # extract expects 'instruction' (required)
             'synthesize': 'focus',       # synthesize expects 'focus' (optional)
             'generate-note': 'prompt',   # generate-note expects 'prompt' (required)
-            'refine': 'instruction',     # refine → extract (backward compat)
-            'summarize': 'focus',        # summarize → synthesize (backward compat)
-            'relate': 'instruction',     # relate → synthesize (backward compat)
             'text-find': 'pattern',      # text-find expects 'pattern' (required)
             'matches': 'pattern',         # matches expects 'pattern' (required)
             'filter-semantic': 'predicate',  # filter-semantic expects 'predicate' (required)
@@ -5221,7 +5250,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             return resource_id
         
         # If starts with Note_ or Collection_, validate and return as-is (literal ID)
-        if value.startswith('Note_') or value.startswith('Collection_'):
+        if value.startswith('Note_') or value.startswith('Collection_') or value.startswith('Relation_'):
             # Could optionally validate existence via resource query here
             return value
         
@@ -5249,7 +5278,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # If no variable patterns found, check if it's a literal Note/Collection ID or named resource
         if not matches:
             # If literal ID format, fetch its content
-            if value.startswith('Note_') or value.startswith('Collection_'):
+            if value.startswith('Note_') or value.startswith('Collection_') or value.startswith('Relation_'):
                 content = self._get_content(value)
                 if content is not None:
                     return content
@@ -5266,7 +5295,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 return var_name
             
             # If it's a resource ID, fetch content from resource manager
-            if isinstance(resource_id, str) and (resource_id.startswith('Note_') or resource_id.startswith('Collection_')):
+            if isinstance(resource_id, str) and (resource_id.startswith('Note_') or resource_id.startswith('Collection_') or resource_id.startswith('Relation_')):
                 return self._get_content(resource_id)
             
             # Otherwise return as-is
@@ -5281,7 +5310,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 logger.debug(f"Resolving template variable {var_ref} → {resource_id}")
                 
                 # If it's a resource ID, fetch content from resource manager
-                if isinstance(resource_id, str) and (resource_id.startswith('Note_') or resource_id.startswith('Collection_')):
+                if isinstance(resource_id, str) and (resource_id.startswith('Note_') or resource_id.startswith('Collection_') or resource_id.startswith('Relation_')):
                     resolved_content = self._get_content(resource_id)
                     if resolved_content is None:
                         logger.warning(f"Could not resolve content for {var_ref} (resource_id: {resource_id}), leaving as-is")
@@ -5315,8 +5344,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # Check if value is a Collection_N ID
         if isinstance(value, str) and value.startswith('Collection_'):
             return 'Collection'
-        # Legacy: list values (pre-Collection ID implementation)
-        return 'Collection' if isinstance(value, list) else 'Note'
+        return 'Note'
     
     def _bind_variable(self, var_name: str, resource_id: str):
         """Bind variable name to resource ID in current scope (top of stack)"""
@@ -5664,52 +5692,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 last_action_result = result.copy()
                 
                 # Publish action result for UI display (if executive_node available)
-                # Skip say/ask - they self-publish; listen is silent wait
-                if self.executive_node and stype not in ('say', 'ask', 'listen'):
+                # Skip say/ask - they self-publish
+                if self.executive_node and stype not in ('say', 'ask'):
                     self.executive_node._publish_action_result(step, result, stype, datetime.now())
-                
-                # Check for suspension (ask action)
-                if stype == 'ask' and result.get('status') == 'success':
-                    # Ask action sets up suspension state - return continuation
-                    out_var = step.get('out')
-                    
-                    # Store state for continuation
-                    self._sync_suspension_state = {
-                        'step_stack': step_stack,
-                        'executed_steps': executed_steps,
-                        'max_steps': max_steps,
-                        'max_depth': max_depth,
-                        'plan': plan,
-                        'out_var': out_var
-                    }
-                    
-                    def continue_ask(response_value):
-                        """Continue execution after ask response received"""
-                        if not self._sync_suspension_state:
-                            return {'status': 'failed', 'reason': 'No suspension state to continue'}
-                        state = self._sync_suspension_state
-                        self._sync_suspension_state = None
-                        
-                        # Bind response to variable
-                        if response_value:
-                            response_note_id = self._persist_note(response_value, 'ask-response')
-                            if response_note_id:
-                                self._bind_variable(state['out_var'], response_note_id)
-                        else:
-                            self._bind_variable(state['out_var'], "Note_null")
-                        
-                        # Continue execution
-                        return self._resume_sync_execution(state)
-                    
-                    return {
-                        'status': 'suspended',
-                        'reason': 'ask',
-                        'action': step,
-                        'out_var': out_var,
-                        'executed_steps': executed_steps,
-                        'continue': continue_ask,
-                        'last_action_result': last_action_result
-                    }
                 
                 # Handle while loop completion (checked in frame completion logic above)
                 
@@ -5901,46 +5886,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 last_action_result = result.copy()
                 
                 # Publish action result for UI display (if executive_node available)
-                # Skip say/ask - they self-publish; listen is silent wait
-                if self.executive_node and stype not in ('say', 'ask', 'listen'):
+                # Skip say/ask - they self-publish
+                if self.executive_node and stype not in ('say', 'ask'):
                     self.executive_node._publish_action_result(step, result, stype, datetime.now())
-                
-                # Check for ask suspension
-                if stype == 'ask' and result.get('status') == 'success':
-                    out_var = step.get('out')
-                    self._sync_suspension_state = {
-                        'step_stack': step_stack,
-                        'executed_steps': executed_steps,
-                        'max_steps': max_steps,
-                        'max_depth': max_depth,
-                        'plan': plan,
-                        'out_var': out_var
-                    }
-                    
-                    def continue_ask(response_value):
-                        if not self._sync_suspension_state:
-                            return {'status': 'failed', 'reason': 'No suspension state to continue'}
-                        state = self._sync_suspension_state
-                        self._sync_suspension_state = None
-                        
-                        if response_value:
-                            response_note_id = self._persist_note(response_value, 'ask-response')
-                            if response_note_id:
-                                self._bind_variable(state['out_var'], response_note_id)
-                        else:
-                            self._bind_variable(state['out_var'], "Note_null")
-                        
-                        return self._resume_sync_execution(state)
-                    
-                    return {
-                        'status': 'suspended',
-                        'reason': 'ask',
-                        'action': step,
-                        'out_var': out_var,
-                        'executed_steps': executed_steps,
-                        'continue': continue_ask,
-                        'last_action_result': last_action_result
-                    }
                 
                 # While loop completion handled in frame completion logic above
                 
@@ -6125,13 +6073,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             logger.info(f"🧪 FAILED: {', '.join(failed_list)}")
         
         # Restore state
-        # Handle backward compatibility: if saved_bindings is a dict, convert to stack
-        if isinstance(saved_bindings, dict):
-            self.plan_bindings = [saved_bindings]
-        elif isinstance(saved_bindings, list):
-            self.plan_bindings = saved_bindings
-        else:
-            self.plan_bindings = [{}]
+        self.plan_bindings = saved_bindings if isinstance(saved_bindings, list) else [{}]
         
         logger.info("🧪 ================================================")
         

@@ -33,6 +33,9 @@ Find files by filename pattern (glob) within the filesystem sandbox for the curr
 Success returns:
 - `resource_id`: Collection ID containing matching file Notes
 - Collection items are Notes (files) with same structure as `fs-list` file Notes
+- Matching file Notes are placeholders with text content:
+  - metadata Note linked by meta Relation (path/size/mtime/format)
+  - body text `(placeholder)`
 
 ## Examples
 

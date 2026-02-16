@@ -10,36 +10,35 @@ from infospace_executor import InfospaceExecutor
 logger = logging.getLogger(__name__)
 
 
+def _get_note_resource(resource_id: str, resource_manager) -> Optional[Dict]:
+    """Fetch resource (with properties) for a Note ID."""
+    if resource_id == "Note_null" or not resource_manager:
+        return None
+    return resource_manager.get_resource(resource_id)
+
+
 def _get_content(resource_id: str, resource_manager) -> Any:
-    """Fetch content for a resource ID."""
-    if resource_id == "Note_null":
-        return None
-    
-    if not resource_manager:
-        logger.error("Resource manager not available")
-        return None
-    
-    resource = resource_manager.get_resource(resource_id)
+    """Fetch content for a resource ID (Note: string, Collection: list of note_ids)."""
+    resource = resource_manager.get_resource(resource_id) if resource_manager else None
     if not resource:
         return None
-    
     return resource.get('properties', {}).get('content')
 
 
-def _create_note(content: Any, agent_name: str, resource_manager, source_skill: str = 'format-citation') -> Optional[str]:
-    """Create a Note via resource_manager and return its ID."""
+def _create_note(text_content: str, agent_name: str, resource_manager, source_skill: str = 'format-citation',
+                 tool_metadata: Optional[Dict] = None) -> Optional[str]:
+    """Create a Note. Content is text-only."""
     if not resource_manager:
         logger.error("resource_manager required for creating Notes")
         return None
-    
     success, note_id, error_msg, _ = resource_manager.create_note(
         character_name=agent_name,
-        content=content,
-        format_type='json' if isinstance(content, dict) else 'text',
+        content=text_content,
+        format_type='text',
         source_skill=source_skill,
-        source_value=str(content)[:100],
+        source_value=(text_content or '')[:100],
         note_name='',
-        extra_props={}
+        extra_props={'tool_metadata': tool_metadata or {}}
     )
     
     if success:
@@ -181,33 +180,18 @@ def _format_bibtex(metadata: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _format_note_citation(note_content: Any) -> Optional[str]:
+def _format_note_citation(tool_metadata: Dict) -> Optional[str]:
     """
-    Extract metadata from Note content and format as BibTeX citation.
+    Extract metadata from tool_metadata and format as BibTeX citation.
     
     Args:
-        note_content: Note content (dict with metadata or plain text)
+        tool_metadata: tool_metadata from Note properties (title, authors, year, etc.)
         
     Returns:
         BibTeX citation string, or None if formatting fails
     """
     try:
-        # Handle structured Note content
-        if isinstance(note_content, dict):
-            metadata = note_content.get('metadata', {})
-            if not metadata:
-                # If no metadata, try to use top-level fields
-                metadata = {
-                    'title': note_content.get('title'),
-                    'authors': note_content.get('authors', []),
-                    'year': note_content.get('year', 0),
-                    'venue': note_content.get('venue', ''),
-                    'doi': note_content.get('doi'),
-                }
-        else:
-            # Plain text Note - cannot extract metadata
-            logger.warning("Note content is not structured; cannot extract citation metadata")
-            return None
+        metadata = tool_metadata or {}
         
         # Validate required fields
         if not metadata.get('title'):
@@ -329,36 +313,26 @@ def tool(input_value: Any, runtime=None, **kwargs):
             failed_count += 1
             continue
         
-        # Get Note content
-        note_content = _get_content(note_id, resource_manager)
-        if note_content is None:
-            logger.warning(f"Note {note_id} not found or has no content; skipping")
+        # Get Note resource (content + tool_metadata)
+        resource = _get_note_resource(note_id, resource_manager)
+        if not resource:
+            logger.warning(f"Note {note_id} not found; skipping")
             failed_count += 1
             continue
+        props = resource.get('properties', {})
+        tool_meta = props.get('tool_metadata', {})
         
-        # Format citation
-        bibtex_citation = _format_note_citation(note_content)
+        # Format citation from tool_metadata (semantic-scholar stores title, authors, year there)
+        bibtex_citation = _format_note_citation(tool_meta)
         if bibtex_citation is None:
-            logger.warning(f"Failed to format citation for Note {note_id}; continuing with remaining Notes")
+            logger.warning(f"Failed to format citation for Note {note_id} (missing metadata); skipping")
             failed_count += 1
             continue
         
-        # Create new Note with formatted citation
-        citation_note_content = {
-            "text": bibtex_citation,
-            "format": "citation",
-            "metadata": {
-                "citation_format": "bibtex",
-                "source_note": note_id
-            },
-            "char_count": len(bibtex_citation)
-        }
-        
-        # Preserve original metadata if available
-        if isinstance(note_content, dict) and 'metadata' in note_content:
-            citation_note_content['metadata']['original_metadata'] = note_content['metadata']
-        
-        citation_note_id = _create_note(citation_note_content, agent_name, resource_manager)
+        citation_note_id = _create_note(
+            bibtex_citation, agent_name, resource_manager,
+            tool_metadata={"citation_format": "bibtex", "source_note": note_id, "original_metadata": tool_meta}
+        )
         if citation_note_id:
             formatted_note_ids.append(citation_note_id)
         else:
@@ -402,13 +376,9 @@ def tool(input_value: Any, runtime=None, **kwargs):
             return _fail(executor, 'Failed to format citation', extra={"failed_count": failed_count})
         
         note_id = formatted_note_ids[0]
-        # Get the citation text for display
+        # Get the citation text for display (content is string)
         citation_note_content = _get_content(note_id, resource_manager)
-        citation_text = ""
-        if isinstance(citation_note_content, dict):
-            citation_text = citation_note_content.get('text', '')
-        elif isinstance(citation_note_content, str):
-            citation_text = citation_note_content
+        citation_text = str(citation_note_content) if citation_note_content else ""
         
         display_text = f"Citation formatted: {citation_text[:100]}..." if citation_text else "Citation formatted"
         return _success(

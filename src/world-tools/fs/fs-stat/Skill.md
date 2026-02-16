@@ -16,7 +16,10 @@ Return metadata for a file or directory in the filesystem sandbox.
 ## Output
 
 Success returns:
-- `resource_id`: Note ID containing metadata
+- `resource_id`: Note ID containing text content.
+- Note content format:
+  - metadata Note linked by meta Relation (file/directory metadata)
+  - body text with JSON-form metadata
 
 ## Examples
 

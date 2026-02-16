@@ -22,6 +22,9 @@ Search text files for a regex pattern and return match snippets as Notes.
 
 Success returns:
 - `resource_id`: Collection ID of match Notes
+- Match Notes are text with:
+  - metadata Note linked by meta Relation (path/line/pattern/context and file metadata)
+  - body text snippet for the match
 
 ## Examples
 
