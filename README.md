@@ -14,7 +14,7 @@ This repo is experimental research software. It prioritizes **inspectable agent 
 
 Core ideas:
 - **Incremental planning**: the planner interleaves reasoning and tool execution.
-- **Infospace memory**: Notes + Collections are treated as working memory.
+- **Infospace memory**: Notes + Collections + Relations are treated as working memory.
 - **World integrations** (optional): scenario-specific “world tools” (e.g., Minecraft, fs) can be loaded per character.
 
 ## Recent Updates (2026-02)
@@ -27,6 +27,12 @@ Core ideas:
 **Code blocks & uniform_return**:
 - **`r["data"]`** now holds structured content: string for Notes, list of `{"text":..., "metadata":...}` for Collections. Code blocks can inspect results (e.g. `if len(r["data"]) < 3: broaden_search()`).
 - `r["value"]` remains the display string for humans. Planner instructions simplified.
+
+**Infospace metadata + relations**:
+- **Text-only Note content**: planner-facing Note content is string-only (plain text or JSON serialized as text).
+- **Metadata reification**: metadata is no longer embedded in Note text headers.
+- Metadata is stored in a separate Note and linked via a typed **Relation** (`relation="meta"`), with the content Note as source.
+- Relation lifecycle follows endpoints: relations persist when either endpoint is persistent, and are removed when either endpoint is removed.
 
 **UI**:
 - Action log timestamps now show per-action execution time (not cached simulation time).
@@ -87,13 +93,14 @@ Open the UI at `http://localhost:3000` if it doesn't auto-open a browser window
 
 ## How tools work
 
-### Infospace: Notes & Collections (planner-facing)
+### Infospace: Notes, Collections, Relations (planner-facing)
 
-The planner “thinks” and communicates through an **Infospace** of **Notes** and **Collections**:
-- **Note**: a single resource containing either free-form text *or* a structured object (dict/JSON)
+The planner “thinks” and communicates through an **Infospace** of **Notes**, **Collections**, and **Relations**:
+- **Note**: a single resource with string content (free-form text or JSON serialized as text)
 - **Collection**: an ordered list of Notes (often produced by search, filtering, mapping, joins, etc.)
+- **Relation**: a typed directed edge between resources (e.g., `meta`, `related`, `supports`)
 
-Most built-in tools are CRUD + processing utilities over Notes/Collections (load/save/query/map/filter/project/summarize…).
+Most built-in tools are CRUD + processing utilities over Notes/Collections/Relations (load/save/query/map/filter/project/synthesize/create-relation/find-relations/related…).
 
 ### Schema + implementation (tool authoring)
 
