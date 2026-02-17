@@ -3410,6 +3410,10 @@ class ZenohExecutiveNode:
             self.plan_bindings_cache = {}
             self.goal_source = 'ui'
             self.awaiting_user_input = False
+            # New user submit starts a fresh planning turn; consume any stale interrupt from prior End/Stop.
+            self.interrupt_requested = False
+            if self.infospace_executor:
+                self.infospace_executor.interrupt_requested = False
             logger.info(f'🛑 {self.character_name} interrupting existing plan for new goal')
             
             if not self.observations:
