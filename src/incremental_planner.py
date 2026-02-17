@@ -443,6 +443,19 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             ],
             "schema_hint": {"value": "string or $variable"}
         },
+        "bind": {
+            "description": "Bind a variable to an existing resource without creating or changing content.",
+            "full_description": "Alias an existing Note/Collection/Relation to a new variable via out. This is useful to mark a canonical artifact variable (for example $goal_artifact) at the end of a code block. bind does not mutate resources.",
+            "parameters": {
+                "target": "required: $variable, resource ID, or named resource",
+                "out": "required: destination $variable"
+            },
+            "examples": [
+                '{"type":"bind","target":"$final_report","out":"$goal_artifact"}',
+                '{"type":"bind","target":"Note_42","out":"$goal_artifact"}'
+            ],
+            "schema_hint": {"target": "$variable or resource ID or name", "out": "$variable"}
+        },
     }
     
     primitive_tools = {
@@ -520,6 +533,12 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "full_description": PRIMITIVE_DOCS["think"].get("full_description"),
             "examples": PRIMITIVE_DOCS["think"].get("examples", []),
             "schema_hint": PRIMITIVE_DOCS["think"]["schema_hint"]
+        },
+        "bind": {
+            "description": PRIMITIVE_DOCS["bind"]["description"],
+            "full_description": PRIMITIVE_DOCS["bind"].get("full_description"),
+            "examples": PRIMITIVE_DOCS["bind"].get("examples", []),
+            "schema_hint": PRIMITIVE_DOCS["bind"]["schema_hint"]
         },
         "ask": {
             "description": "Send question to target and terminate current turn. Response will arrive in a future turn. Requires: value, out. Optional: target (default User).",
@@ -1125,7 +1144,7 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
     # Ensure 'out' field if tool produces output
     output_producing = ["create-note", "create-collection", "load", "discover-notes", "discover-collections", "search-within-collection", "map", 
                        "split", "flatten", "search-web", "semantic-scholar", "extract", "synthesize",
-                       "generate-note", "assess", "extract-entities", "filter-semantic",
+                       "generate-note", "assess", "extract-entities", "filter-semantic", "bind",
                        "fetch-text", "as-json", "as-markdown"]
     if tool_name in output_producing and "out" not in action:
         action["out"] = f"$step_{step}_result"
@@ -1856,6 +1875,43 @@ def _resolve_eval_target_text(eval_target: str, executor) -> str:
         return ""
 
 
+def _ensure_goal_artifact_binding(executor) -> str:
+    """Ensure a canonical $goal_artifact Note binding exists."""
+    if not executor:
+        return ""
+    try:
+        existing = executor.plan_bindings_flat.get("goal_artifact")
+        if isinstance(existing, str) and existing.startswith("Note_"):
+            return "$goal_artifact"
+        executor.execute_action({"type": "create-note", "value": "", "out": "$goal_artifact"})
+        return "$goal_artifact"
+    except Exception as e:
+        logger.warning(f"Failed to initialize $goal_artifact: {e}")
+        return ""
+
+
+def _sync_goal_artifact_from_target(executor, source_eval_target: str) -> str:
+    """Copy source eval target text into canonical $goal_artifact Note."""
+    if not executor or not source_eval_target:
+        return ""
+    try:
+        goal_artifact_id = executor.plan_bindings_flat.get("goal_artifact")
+        if not goal_artifact_id or not isinstance(goal_artifact_id, str) or not goal_artifact_id.startswith("Note_"):
+            return ""
+        source_text = _resolve_eval_target_text(source_eval_target, executor)
+        if source_text is None:
+            source_text = ""
+        if executor.resource_manager:
+            ok, err = executor.resource_manager.update_note_content(goal_artifact_id, source_text)
+            if not ok:
+                logger.warning(f"Failed to update $goal_artifact ({goal_artifact_id}): {err}")
+                return ""
+        return "$goal_artifact"
+    except Exception as e:
+        logger.warning(f"Failed to sync $goal_artifact from {source_eval_target}: {e}")
+        return ""
+
+
 def _parse_deep_eval_status(deep_text: str) -> str:
     """
     Parse deep-eval status robustly.
@@ -2183,6 +2239,7 @@ ALWAYS follow all formatting instructions exactly.
             "- DONE=YES only when ALL required actions are complete.\n"
             "- If DONE=YES, NEXT_TASK must be blank.\n"
             "- Do NOT use 'say' inside Stage 2 code blocks; final user delivery happens only after DONE=YES and quality checks.\n"
+            "- Use bind only when you have a concrete final candidate artifact (e.g., bind $final_report -> $goal_artifact); if no final candidate yet, do not bind.\n"
             "- Efficiency rule: if prior step used only one tool call and GOAL is not done, set NEXT_TASK to combine adjacent subtasks.\n"
             "- SPIRAL DETECTION: If the same tool has failed 2+ times consecutively,\n"
             "  use a different approach or proceed with available data.\n"
@@ -2194,7 +2251,9 @@ ALWAYS follow all formatting instructions exactly.
 
         # Main loop
         current_task = s["first_task"].strip()
-        last_eval_target = ""
+        goal_artifact_var = _ensure_goal_artifact_binding(executor)
+        last_eval_target = goal_artifact_var if goal_artifact_var else ""
+        stall_guard_state = {"prev_signature": None, "repeat_count": 0}
         for step in range(max_steps):
             if _interrupt_requested(executor):
                 _clear_interrupt(executor)
@@ -2279,13 +2338,14 @@ ALWAYS follow all formatting instructions exactly.
             elif code_block_output_created:
                 eval_target = "$code_block_output"
             if eval_target:
-                last_eval_target = eval_target
+                synced_eval_target = _sync_goal_artifact_from_target(executor, eval_target)
+                last_eval_target = synced_eval_target or eval_target
             if eval_target and vision_criteria:
-                logger.info(f"Step {step}: Vision eval target: {eval_target}")
+                logger.info(f"Step {step}: Vision eval target: {last_eval_target}")
                 compressed_ctx = _compress_trace(str(s))
-                vision_eval_text = _vision_eval_check(vision_criteria, eval_target, executor, compressed_context=compressed_ctx)
+                vision_eval_text = _vision_eval_check(vision_criteria, last_eval_target, executor, compressed_context=compressed_ctx)
                 if vision_eval_text:
-                    s += user(f"VISION EVALUATION:\n{vision_eval_text}\nFAILs are advisory — attempt to address if easy, do NOT loop repeatedly. Proceed after at most one retry.\n")
+                    s += user(f"VISION EVALUATION:\n{vision_eval_text}\nFAILs are advisory — attempt to address if easy, do NOT loop repeatedly. Proceed after at most three retries.\n")
                     s += assistant("Noted.\n")
             
             # Stage 3: Simplified reflection (4 fields)
@@ -2344,6 +2404,7 @@ ALWAYS follow all formatting instructions exactly.
             
             # Check if done
             done_raw = s[f"done_{step}"].strip().upper()
+            next_task_raw = s[f"next_task_{step}"].strip()
             if done_raw.startswith("YES"):
                 if _interrupt_requested(executor):
                     _clear_interrupt(executor)
@@ -2401,9 +2462,23 @@ ALWAYS follow all formatting instructions exactly.
                 s += assistant(gen("final_answer", max_tokens=256, temperature=GEN_TEMPERATURE, stop=["</end>"]))
                 logger.info(f"FINAL_ANSWER: {s['final_answer']}")
                 break
+
+            stall_reason = _stall_guard_check(
+                stall_guard_state,
+                done_raw=done_raw,
+                next_task_raw=next_task_raw,
+                code_text=code_text
+            )
+            if stall_reason:
+                logger.info(stall_reason)
+                draft_text = _resolve_eval_target_text(last_eval_target, executor) if last_eval_target else ""
+                caveat = "Loop guard: repeated planning pattern detected. Delivering best available draft from this cycle."
+                s["VERIFICATION_ANSWER"] = "PARTIAL"
+                s[f"done_{step}"] = "NO"
+                s["final_answer"] = f"{caveat}\n\n{draft_text}" if draft_text else caveat
+                break
             
             # Update current task for next iteration
-            next_task_raw = s[f"next_task_{step}"].strip()
             if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
                 current_task = next_task_raw
                 logger.info(f"Step {step}: Next task: {current_task}")
@@ -2414,6 +2489,36 @@ ALWAYS follow all formatting instructions exactly.
         if executor and _interrupt_requested(executor):
             _clear_interrupt(executor)
             s["final_answer"] = "Interrupted by user."
+        
+        # Step-limit fallback: one last synthesis pass if we have a usable candidate.
+        if "final_answer" not in s:
+            draft_text = _resolve_eval_target_text(last_eval_target, executor) if last_eval_target else ""
+            if isinstance(draft_text, str) and draft_text.strip():
+                logger.info("Step limit reached: running one last-chance synthesize pass")
+                synth_r = executor.execute_action({
+                    "type": "synthesize",
+                    "target": last_eval_target,
+                    "focus": "Produce the best final artifact for the goal using available draft content.",
+                    "format": "comprehensive",
+                    "out": "$last_chance_final"
+                })
+                final_text = draft_text
+                if isinstance(synth_r, dict) and synth_r.get("status") == "success":
+                    executor.execute_action({"type": "bind", "target": "$last_chance_final", "out": "$goal_artifact"})
+                    synthesized = _resolve_eval_target_text("$last_chance_final", executor)
+                    if isinstance(synthesized, str) and synthesized.strip():
+                        final_text = synthesized
+                caveat = "Step limit reached. Delivering best available draft after one last-chance synthesis pass."
+                s["VERIFICATION_ANSWER"] = "PARTIAL"
+                if max_steps > 0:
+                    s[f"done_{max_steps - 1}"] = "NO"
+                s["final_answer"] = f"{caveat}\n\n{final_text}"
+            else:
+                caveat = "Step limit reached before a usable final candidate artifact was produced."
+                s["VERIFICATION_ANSWER"] = "PARTIAL"
+                if max_steps > 0:
+                    s[f"done_{max_steps - 1}"] = "NO"
+                s["final_answer"] = caveat
         
         # Write full conversation state to trace file (file-only, not console)
         if trace_file:
@@ -2990,6 +3095,7 @@ ALWAYS follow all formatting instructions exactly.
         "- DONE=YES only when ALL required actions are complete.\n"
         "- If DONE=YES, NEXT_TASK must be blank.\n"
         "- Do NOT use 'say' inside Stage 2 code blocks; final user delivery happens only after DONE=YES and quality checks.\n"
+        "- Use bind only when you have a concrete final candidate artifact (e.g., bind $final_report -> $goal_artifact); if no final candidate yet, do not bind.\n"
         "- Efficiency rule: if prior step used only one tool call and GOAL is not done, set NEXT_TASK to combine adjacent subtasks.\n"
         "- SPIRAL DETECTION: If the same tool has failed 2+ times consecutively,\n"
         "  use a different approach or proceed with available data.\n"
@@ -3005,7 +3111,9 @@ ALWAYS follow all formatting instructions exactly.
     if not current_task:
         logger.warning("No first_task found, using goal as initial task")
         current_task = goal_for_step
-    last_eval_target = ""
+    goal_artifact_var = _ensure_goal_artifact_binding(executor)
+    last_eval_target = goal_artifact_var if goal_artifact_var else ""
+    stall_guard_state = {"prev_signature": None, "repeat_count": 0}
     for step in range(max_steps):
         if _interrupt_requested(executor):
             _clear_interrupt(executor)
@@ -3088,13 +3196,14 @@ ALWAYS follow all formatting instructions exactly.
         elif code_block_output_created:
             eval_target = "$code_block_output"
         if eval_target:
-            last_eval_target = eval_target
+            synced_eval_target = _sync_goal_artifact_from_target(executor, eval_target)
+            last_eval_target = synced_eval_target or eval_target
         if eval_target and vision_criteria:
-            logger.info(f"Step {step}: Vision eval target: {eval_target}")
+            logger.info(f"Step {step}: Vision eval target: {last_eval_target}")
             compressed_ctx = _compress_trace(prompt)
-            vision_eval_text = _vision_eval_check(vision_criteria, eval_target, executor, compressed_context=compressed_ctx)
+            vision_eval_text = _vision_eval_check(vision_criteria, last_eval_target, executor, compressed_context=compressed_ctx)
             if vision_eval_text:
-                prompt += format_user(f"VISION EVALUATION:\n{vision_eval_text}\nFAILs are advisory — attempt to address if easy, do NOT loop repeatedly. Proceed after at most one retry.\n")
+                prompt += format_user(f"VISION EVALUATION:\n{vision_eval_text}\nFAILs are advisory — attempt to address if easy, do NOT loop repeatedly. Proceed after at most three retries.\n")
                 prompt += format_assistant("Noted.\n")
 
         # Stage 3: simplified reflection (4 fields)
@@ -3155,6 +3264,7 @@ ALWAYS follow all formatting instructions exactly.
         
         # Check if done
         done_raw = state.get(f"done_{step}", "").strip().upper()
+        next_task_raw = state.get(f"next_task_{step}", "").strip()
         if done_raw.startswith("YES"):
             if _interrupt_requested(executor):
                 _clear_interrupt(executor)
@@ -3217,9 +3327,23 @@ ALWAYS follow all formatting instructions exactly.
             prompt += final_answer
             logger.info(f"FINAL_ANSWER: {state.get('final_answer', 'N/A')}")
             break
+
+        stall_reason = _stall_guard_check(
+            stall_guard_state,
+            done_raw=done_raw,
+            next_task_raw=next_task_raw,
+            code_text=code_text
+        )
+        if stall_reason:
+            logger.info(stall_reason)
+            draft_text = _resolve_eval_target_text(last_eval_target, executor) if last_eval_target else ""
+            caveat = "Loop guard: repeated planning pattern detected. Delivering best available draft from this cycle."
+            state["VERIFICATION_ANSWER"] = "PARTIAL"
+            state[f"done_{step}"] = "NO"
+            state["final_answer"] = f"{caveat}\n\n{draft_text}" if draft_text else caveat
+            break
         
         # Update current task for next iteration
-        next_task_raw = state.get(f"next_task_{step}", "").strip()
         if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
             current_task = next_task_raw
             logger.info(f"Step {step}: Next task: {current_task}")
@@ -3230,6 +3354,36 @@ ALWAYS follow all formatting instructions exactly.
     if executor and _interrupt_requested(executor):
         _clear_interrupt(executor)
         state["final_answer"] = "Interrupted by user."
+    
+    # Step-limit fallback: one last synthesis pass if we have a usable candidate.
+    if "final_answer" not in state:
+        draft_text = _resolve_eval_target_text(last_eval_target, executor) if last_eval_target else ""
+        if isinstance(draft_text, str) and draft_text.strip():
+            logger.info("Step limit reached: running one last-chance synthesize pass")
+            synth_r = executor.execute_action({
+                "type": "synthesize",
+                "target": last_eval_target,
+                "focus": "Produce the best final artifact for the goal using available draft content.",
+                "format": "comprehensive",
+                "out": "$last_chance_final"
+            })
+            final_text = draft_text
+            if isinstance(synth_r, dict) and synth_r.get("status") == "success":
+                executor.execute_action({"type": "bind", "target": "$last_chance_final", "out": "$goal_artifact"})
+                synthesized = _resolve_eval_target_text("$last_chance_final", executor)
+                if isinstance(synthesized, str) and synthesized.strip():
+                    final_text = synthesized
+            caveat = "Step limit reached. Delivering best available draft after one last-chance synthesis pass."
+            state["VERIFICATION_ANSWER"] = "PARTIAL"
+            if max_steps > 0:
+                state[f"done_{max_steps - 1}"] = "NO"
+            state["final_answer"] = f"{caveat}\n\n{final_text}"
+        else:
+            caveat = "Step limit reached before a usable final candidate artifact was produced."
+            state["VERIFICATION_ANSWER"] = "PARTIAL"
+            if max_steps > 0:
+                state[f"done_{max_steps - 1}"] = "NO"
+            state["final_answer"] = caveat
     
     # Write full conversation state to trace file
     if trace_file:
@@ -3323,6 +3477,56 @@ def _clear_interrupt(executor: "InfospaceExecutor") -> None:
     exec_node = getattr(executor, "executive_node", None)
     if exec_node and hasattr(exec_node, "interrupt_requested"):
         exec_node.interrupt_requested = False
+
+
+def _normalize_loop_text(text: str) -> str:
+    """Normalize text for stable loop-signature comparisons."""
+    if not text:
+        return ""
+    normalized = re.sub(r"[^a-z0-9\s]", " ", str(text).lower())
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized
+
+
+def _extract_action_types_from_code(code_text: str) -> List[str]:
+    """Extract action types from code block for simple repetition detection."""
+    if not code_text:
+        return []
+    return re.findall(r'["\']type["\']\s*:\s*["\']([^"\']+)["\']', code_text)
+
+
+def _stall_guard_check(
+    guard_state: Dict[str, Any],
+    done_raw: str,
+    next_task_raw: str,
+    code_text: str
+) -> Optional[str]:
+    """
+    Detect repeated plan loops using deterministic structural signatures.
+    Returns a reason string when the loop should be stopped, else None.
+    """
+    if str(done_raw).strip().upper().startswith("YES"):
+        guard_state["prev_signature"] = None
+        guard_state["repeat_count"] = 0
+        return None
+
+    next_task_sig = _normalize_loop_text(next_task_raw)[:220]
+    action_sig = tuple(_extract_action_types_from_code(code_text)[:8])
+    signature = (next_task_sig, action_sig)
+
+    prev_signature = guard_state.get("prev_signature")
+    repeat_count = int(guard_state.get("repeat_count", 0))
+    if signature == prev_signature and (next_task_sig or action_sig):
+        repeat_count += 1
+    else:
+        repeat_count = 0
+
+    guard_state["prev_signature"] = signature
+    guard_state["repeat_count"] = repeat_count
+
+    if repeat_count >= 2:
+        return "Loop guard: repeated NEXT_TASK/code signature without convergence."
+    return None
 
 
 

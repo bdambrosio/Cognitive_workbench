@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 INFOSPACE_PRIMITIVES = frozenset({
     'apply', 'create-note', 'create-collection', 'persist', 'load', 'index', 'organize',
     'search-within-collection', 'discover-notes', 'discover-collections', 'say',
-    'think', 'ask', 'coerce', 'map', 'flatten', 'add', 'split', 'size', 'union',
+    'think', 'ask', 'bind', 'coerce', 'map', 'flatten', 'add', 'split', 'size', 'union',
     'intersection', 'difference', 'remove', 'project', 'pluck', 'head',
     'filter-structured', 'sort', 'join', 'create-relation', 'find-relations', 'related',
 })
@@ -911,6 +911,7 @@ class InfospaceExecutor:
             'say': self._execute_say,
             'think': self._execute_think,
             'ask': self._execute_ask,
+            'bind': self._execute_bind,
             # Phase 2: Data Operations (whole-value only)
             'coerce': self._execute_coerce,
             'map': self._execute_map,
@@ -3060,6 +3061,41 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             self.executive_node.awaiting_user_input = False
             self.executive_node._publish_execution_state()
         return self._create_uniform_return('success', value=str(question_text), resource_id="Note_null")
+
+    def _execute_bind(self, action: Dict) -> Dict:
+        """
+        Bind out variable to an existing Note/Collection/Relation resource.
+
+        Required: target, out
+        """
+        target_arg = action.get('target')
+        out_var = action.get('out')
+        if not target_arg or not out_var:
+            return self._create_uniform_return('failed', reason='bind requires target and out')
+
+        # Resolve to resource ID ($var, literal ID, or named resource)
+        try:
+            resource_id = self._resolve_id(target_arg)
+        except ValueError:
+            resource_id = None
+
+        if not isinstance(resource_id, str) or not (resource_id.startswith('Note_') or resource_id.startswith('Collection_') or resource_id.startswith('Relation_')):
+            if self.resource_manager:
+                resolved_id = self.resource_manager._resolve_resource_id(str(target_arg))
+                if resolved_id:
+                    resource_id = resolved_id
+                else:
+                    return self._create_uniform_return('failed', reason=f'bind target "{target_arg}" is not a bound variable, resource ID, or named resource')
+            else:
+                return self._create_uniform_return('failed', reason='Resource manager not available for name resolution')
+
+        if self.resource_manager and not self.resource_manager.get_resource(resource_id):
+            return self._create_uniform_return('failed', reason=f'bind target resource not found: {resource_id}')
+
+        self._bind_variable(out_var, resource_id)
+        display_var = self._normalize_var_for_log(out_var)
+        logger.info(f"🔗 Bound {display_var} → {resource_id}")
+        return self._create_uniform_return('success', value=resource_id, resource_id=resource_id)
     
     # ==================== Phase 2: Data Operations ====================
     
@@ -3244,7 +3280,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             # Create operations (create new resources, not transform existing ones)
             'create-note', 'create-collection',
             # User interaction (doesn't make sense in map)
-            'ask',
+            'ask', 'bind',
         }
         
         # Apply operation to each Note
