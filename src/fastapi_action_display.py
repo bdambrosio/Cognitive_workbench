@@ -1328,6 +1328,23 @@ Generated: {generated_at}
                 logger.error(f"Error getting plan bindings: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
         
+        @self.app.get("/api/tasks/{character}")
+        async def get_tasks(character: str):
+            """Get active tasks for a character."""
+            try:
+                selector = f"cognitive/{character}/tasks"
+                replies = self.session.get(selector, timeout=2.0)
+                for reply in replies:
+                    if hasattr(reply, 'ok') and reply.ok is not None:
+                        payload_bytes = reply.ok.payload.to_bytes()
+                        response = json.loads(payload_bytes.decode('utf-8'))
+                        if response.get('success'):
+                            return {"success": True, "tasks": response.get('tasks', [])}
+                return {"success": True, "tasks": []}
+            except Exception as e:
+                logger.error(f"Error getting tasks: {e}")
+                return {"success": False, "message": str(e)}
+        
         @self.app.get("/api/characters")
         async def get_characters():
             """Get list of active characters that have announced themselves."""
@@ -2283,6 +2300,7 @@ Generated: {generated_at}
                     <div class="character-data-tab" data-tab="goals">Goals</div>
                     <div class="character-data-tab" data-tab="plans">Plans</div>
                     <div class="character-data-tab" data-tab="state">State</div>
+                    <div class="character-data-tab" data-tab="tasks">Tasks</div>
                 </div>
                 
                 <!-- Character data content -->
@@ -2328,6 +2346,15 @@ Generated: {generated_at}
                         <div id="worldStateDisplay">
                             <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
                                 Select a character to view world state
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tasks tab content -->
+                    <div class="character-data-panel" id="tasksPanel">
+                        <div id="tasksList">
+                            <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
+                                Select a character to view tasks
                             </div>
                         </div>
                     </div>
@@ -2788,6 +2815,10 @@ Generated: {generated_at}
                 // Load world state
                 const character = activeCharacter || 'Jill';
                 loadWorldState(character);
+            } else if (tabName === 'tasks') {
+                document.getElementById('tasksPanel').classList.add('active');
+                const character = activeCharacter || 'Jill';
+                loadTasksList(character);
             }
         }
         
@@ -4371,6 +4402,74 @@ Generated: {generated_at}
             } catch (error) {
                 listDiv.innerHTML = `<div style="color: #ff4757; text-align: center; padding: 20px;">❌ Error: ${error.message}</div>`;
             }
+        }
+        
+        async function loadTasksList(character) {
+            const listDiv = document.getElementById('tasksList');
+            if (!listDiv) return;
+            listDiv.innerHTML = '<div style="color: #f39c12; text-align: center; padding: 20px;">⏳ Loading...</div>';
+            try {
+                const response = await fetch(`/api/tasks/${character}`);
+                const result = await response.json();
+                if (!result.success) {
+                    listDiv.innerHTML = `<div style="color: #ff4757; text-align: center; padding: 20px;">❌ ${result.message || 'Error'}</div>`;
+                    return;
+                }
+                const tasks = result.tasks || [];
+                if (tasks.length === 0) {
+                    listDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No active tasks. Type "task: &lt;description&gt;" to create one.</div>';
+                    return;
+                }
+                const escapedChar = character.replace(/'/g, "\\'");
+                let html = '';
+                tasks.forEach((t, i) => {
+                    const plan = t.abstract_plan || [];
+                    const total = plan.length;
+                    const curr = t.current_step || 1;
+                    const status = t.status || 'unknown';
+                    const taskId = `task-acc-${i}`;
+                    html += `
+                        <div class="task-accordion-item" style="border: 1px solid #404040; border-radius: 4px; margin-bottom: 8px; overflow: hidden;">
+                            <div class="task-accordion-header" onclick="toggleTaskAccordion('${taskId}')" style="padding: 8px 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
+                                <div style="flex: 1; min-width: 0;">
+                                    <span style="font-weight: bold; color: #00d4ff;">${escapeHtml(t.name || t.task_id || 'Task')}</span>
+                                    <span style="margin-left: 6px; font-size: 10px; padding: 2px 6px; border-radius: 3px; background: #404040;">${status}</span>
+                                    ${total ? `<span style="margin-left: 4px; color: #888; font-size: 11px;">${curr}/${total}</span>` : ''}
+                                </div>
+                                <div onclick="event.stopPropagation();">
+                                    <button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', 'proceed')" style="background: #00d4ff; color: #1a1a1a; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer; margin-right: 4px;">Proceed</button>
+                                    <button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', 'terminate ${t.task_id || ''}')" style="background: #ff6b6b; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer;">Terminate</button>
+                                </div>
+                            </div>
+                            <div id="${taskId}" class="task-accordion-body" style="display: none; padding: 10px; border-top: 1px solid #404040; background: #1e1e1e; font-size: 11px;">
+                                <pre style="white-space: pre-wrap; margin: 0; font-size: 10px; overflow-x: auto;">${escapeHtml(JSON.stringify(t, null, 2))}</pre>
+                            </div>
+                        </div>
+                    `;
+                });
+                listDiv.innerHTML = html;
+            } catch (error) {
+                listDiv.innerHTML = `<div style="color: #ff4757; text-align: center; padding: 20px;">❌ ${error.message}</div>`;
+            }
+        }
+        
+        function toggleTaskAccordion(id) {
+            const el = document.getElementById(id);
+            if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        async function sendTaskCommand(character, cmd) {
+            try {
+                const response = await fetch('/api/text_input', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ character: character, message: cmd })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    if (activeCharacter === character) loadTasksList(character);
+                }
+            } catch (e) { console.error('sendTaskCommand:', e); }
         }
         
         function updateWorldStateDisplay(data) {

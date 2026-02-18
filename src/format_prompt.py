@@ -597,15 +597,15 @@ def load_trace_section():
         QMessageBox.critical(window, "Error", f"Failed to read trace file: {str(e)}")
         return
     
-    # Find all lines starting with "ProgramState(<|im_start|>system" in trace file
-    search_prefix = "ProgramState(<|im_start|>system"
+    # Find all lines starting with supported section markers in trace file
+    search_prefixes = ["ProgramState(<|im_start|>system", "Planning session:"]
     match_indices = []
     for i in range(len(trace_lines) - 1, -1, -1):
-        if trace_lines[i].startswith(search_prefix):
+        if any(trace_lines[i].startswith(prefix) for prefix in search_prefixes):
             match_indices.append(i)
     
     if not match_indices:
-        QMessageBox.warning(window, "Error", f"No line starting with '{search_prefix}' found in trace file.")
+        QMessageBox.warning(window, "Error", f"No line starting with any of {search_prefixes} found in trace file.")
         return
     
     # Get the last n sections (or all if fewer than n exist)

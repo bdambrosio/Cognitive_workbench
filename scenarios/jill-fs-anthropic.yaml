@@ -4,7 +4,7 @@ world_config:
   world_name: "fs"
   
 llm_config:
-  anthropic_model_path: "claude-sonnet-4-5-20250929"
+  anthropic_model_path: "claude-sonnet-4-6"
   pdf_parser: "pymupdf"  # Use pymupdf for PDF reading (skip GROBID even if available)
   
 setting: |

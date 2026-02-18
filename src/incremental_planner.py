@@ -1240,7 +1240,7 @@ def validate_codegen_block(code: str) -> tuple:
     
     Checks:
     - Forbidden patterns (imports, exec, file I/O, class/def, etc.)
-    - Must contain 1-10 execute_action_tracked calls
+    - Must contain 1-16 execute_action_tracked calls
     - Must contain at least one return executor._create_uniform_return
     - Max 512 executable code lines (comments and blanks are free)
     - Hard cap of 512 total lines
@@ -1271,12 +1271,12 @@ def validate_codegen_block(code: str) -> tuple:
         if match:
             return False, f"Forbidden pattern: {match.group()}"
     
-    # Count execute_action_tracked calls (must be 1-10)
+    # Count execute_action_tracked calls (must be 1-16)
     call_count = len(re.findall(r'executor\.execute_action_tracked\s*\(', code))
     if call_count < 1:
         return False, "No execute_action_tracked() calls found"
-    if call_count > 10:
-        return False, f"Too many execute_action_tracked() calls ({call_count}, max 10)"
+    if call_count > 16:
+        return False, f"Too many execute_action_tracked() calls ({call_count}, max 16)"
     
     # Must have a return with _create_uniform_return
     if 'executor._create_uniform_return' not in code:
@@ -1340,6 +1340,8 @@ def execute_codegen_block(code: str, executor, method_name: str = "codegen") -> 
     Returns:
         uniform_return dict
     """
+    # Defensive normalization: some backends may still return fenced blocks.
+    code = extract_code_block(code)
     ok, reason = validate_codegen_block(code)
     if not ok:
         logger.warning(f"Code block validation failed: {reason}")
@@ -2270,8 +2272,8 @@ ALWAYS follow all formatting instructions exactly.
             
             s += assistant(
                 "```python\n"
-                + gen(f"code_block_{step}", max_tokens=2048, temperature=GEN_TEMPERATURE, stop=["```"])
-                + "```\n"
+                + gen(f"code_block_{step}", max_tokens=2048, temperature=GEN_TEMPERATURE, stop=["\n```"])
+                + "\n```\n"
             )
             
             code_text = s[f"code_block_{step}"].strip()
@@ -3129,8 +3131,8 @@ ALWAYS follow all formatting instructions exactly.
         )
 
         prompt += format_assistant("```python\n")
-        code_raw = vllm_gen(f"code_block_{step}", prompt, state, max_tokens=2048, temperature=GEN_TEMPERATURE, stop=["```"], executor=executor)
-        prompt += code_raw + "```\n"
+        code_raw = vllm_gen(f"code_block_{step}", prompt, state, max_tokens=2048, temperature=GEN_TEMPERATURE, stop=["\n```"], executor=executor)
+        prompt += code_raw + "\n```\n"
         code_text = code_raw.strip()
         
         logger.info(f"Step {step}: Code block ({len(code_text)} chars):\n{code_text}")
@@ -3835,9 +3837,13 @@ class IncrementalPlanner:
             # Extract context components
             character_context = ""
             recent_context = ""
+            situation_context = ""
             if context:
                 character_context = context.get('character_context', '')
                 recent_context = context.get('recent_context', '')
+                situation_context = context.get('situation_context', '')
+            if situation_context:
+                recent_context = f"\n# SITUATION AWARENESS\n{situation_context}\n" + recent_context
                 
             #
            
@@ -3972,9 +3978,13 @@ class IncrementalPlanner:
             # Extract context components
             character_context = ""
             recent_context = ""
+            situation_context = ""
             if context:
                 character_context = context.get('character_context', '')
                 recent_context = context.get('recent_context', '')
+                situation_context = context.get('situation_context', '')
+            if situation_context:
+                recent_context = f"\n# SITUATION AWARENESS\n{situation_context}\n" + recent_context
             recent_context += self.build_context(goal=goal)
                 
             # Find similar plans using plan guidance
@@ -4205,7 +4215,7 @@ END_PLAN
 
         abstract_plan = self.executor.llm_generate(ABSTRACT_PLAN_PROMPT, max_tokens=256, temperature=GEN_TEMPERATURE, stops=["\nEND_PLAN:", "END_PLAN:"])
         if not abstract_plan.success or not abstract_plan.text:
-            error_msg = abstract_plan.error or "Unknown error"
+            error_msg = getattr(abstract_plan, "error", None) or "Unknown error"
             logger.error(f"_preplan failed: {error_msg}")
             return "No preplan available"
         return abstract_plan.text.strip()
