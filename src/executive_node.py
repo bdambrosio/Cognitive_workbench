@@ -618,20 +618,7 @@ class ZenohExecutiveNode:
                 )
         self.llm_generate = llm_generate
         
-        # Initialize memory module (wraps EntityModel and discourse)
-        from memory import Memory
-        from pathlib import Path
-        # Memory path relative to project root (where data/ directory exists)
-        project_root = Path(__file__).parent.parent  # src/ -> project root
-        memory_path = project_root / "data" / "memory" / f"{self.character_name}_memory.json"
-        self.memory = Memory(
-            character_name=self.character_name,
-            llm_generate=self.llm_generate,
-            persistence_path=str(memory_path)
-        )
-        logger.info(f'🧠 Memory module initialized for {self.character_name}')
-        
-        # Subscriber for save_all command (forward to memory and resource_manager)
+        # Subscriber for save_all command (save resource_manager state)
         self.save_subscriber = self.session.declare_subscriber(
             "cognitive/save_all",
             self._handle_save_command
@@ -736,6 +723,27 @@ class ZenohExecutiveNode:
         
         # Initialize conversation collections
         self._initialize_conversation_collections()
+        
+        # Load living context (situation note) — must follow executor + resource manager init
+        self.situation_context = ""
+        self._load_situation_note()
+        from conversation_store import ConversationStore
+        self.conversation_store = ConversationStore(
+            resource_manager=self.resource_manager,
+            character_name=self.character_name,
+            logger=logger
+        )
+        self.conversation_store.initialize()
+        
+        # Initialize task manager
+        from task_manager import TaskManager
+        self.task_manager = TaskManager(
+            resource_manager=self.resource_manager,
+            executor=self.infospace_executor,
+            character_name=self.character_name
+        )
+        if not self.benchmark_mode:
+            self.task_manager.initialize()
         
         # Initialize planners (reused across all goals)
  
@@ -964,6 +972,11 @@ class ZenohExecutiveNode:
             self._plan_bindings_query_handler
         )
         
+        self.tasks_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/tasks",
+            self._tasks_query_handler
+        )
+        
         self.world_state_queryable = self.session.declare_queryable(
             f"cognitive/{character_name}/world_state",
             self._world_state_query_handler
@@ -1013,10 +1026,9 @@ class ZenohExecutiveNode:
         self.shutdown_requested = True
     
     def _handle_save_command(self, sample):
-        """Handle save_all command - save memory and resource_manager state."""
+        """Handle save_all command - save resource_manager state."""
         try:
             logger.info(f'💾 {self.character_name} received save_all command')
-            self.memory.save()
             if self.resource_manager:
                 self.resource_manager.save_to_file()
                 logger.info(f'💾 Saved resource manager state for {self.map_name}')
@@ -1029,7 +1041,9 @@ class ZenohExecutiveNode:
             payload_bytes = sample.payload.to_bytes()
             data = json.loads(payload_bytes.decode('utf-8'))
             entity_name = data.get('entity_name', 'User')
-            self.memory.close_dialog(entity_name)
+            self.conversation_store.close_dialog(entity_name)
+            self._dialog_cooldowns[entity_name] = time.time()
+            self._dialog_purposes.pop(entity_name, None)
             # End-dialog should immediately terminate any in-progress ask/wait.
             self.interrupt_requested = True
             if self.infospace_executor:
@@ -1473,20 +1487,11 @@ class ZenohExecutiveNode:
         
         interrupted_final = final_thoughts_clean == "Interrupted by user."
 
-        # Determine what to save to conversation
-        response_to_save = None
-        if last_say and len(last_say) > 0:
-            # Use actual 'say' action content if it exists
-            response_to_save = last_say
-            logger.debug(f'Using actual say action content for conversation: {last_say[:50]}...')
-        elif (not interrupted_final) and final_thoughts_clean and len(final_thoughts_clean) >= 20 and final_thoughts_clean.replace(' ', '').replace('.', '').replace(',', '').replace('!', '').replace('?', '').strip():
+        # Save fallback response to conversation only when no explicit say action occurred.
+        if (not last_say) and (not interrupted_final) and final_thoughts_clean and len(final_thoughts_clean) >= 20 and final_thoughts_clean.replace(' ', '').replace('.', '').replace(',', '').replace('!', '').replace('?', '').strip():
             # Fall back to FINAL_ANSWER if no actual say action
-            response_to_save = final_thoughts_clean
             logger.debug(f'Using FINAL_ANSWER for conversation (no say action found): {final_thoughts_clean[:50]}...')
-        
-        # Save to conversation if we have content
-        if response_to_save:
-            self._add_to_conversation(f"{self.character_name} responds: {response_to_save}")
+            self.conversation_store.record_outgoing("User", final_thoughts_clean, act_type="response")
         
         # Publish final_answer as a "say" action to User so it appears in action log
         # Only publish if final_thoughts is non-empty, meaningful, and different from last_say_text
@@ -1520,6 +1525,13 @@ class ZenohExecutiveNode:
         elif final_thoughts_clean:
             # Log when we skip due to insufficient content (for debugging)
             logger.debug(f'Skipping final_answer publication - content too short or only punctuation: "{final_thoughts_clean[:50]}..."')
+
+        # Update living context (situation note) after non-trivial goal completion
+        if not interrupted_final and self.current_goal and plan_result.get('status') in ('complete', 'failed'):
+            try:
+                self._update_situation_note(self.current_goal.name, plan_result)
+            except Exception as e:
+                logger.warning(f'Error in post-goal situation note update: {e}')
 
     def _initialize_conversation_collections(self):
         """
@@ -1595,6 +1607,337 @@ class ZenohExecutiveNode:
             logger.error(f'Error initializing conversation collections: {e}')
             import traceback
             traceback.print_exc()
+
+    def _load_situation_note(self):
+        """Load the living context (_situation) note at startup."""
+        if self.benchmark_mode:
+            logger.info('Benchmark mode: skipping situation note load')
+            return
+        if not self.infospace_executor:
+            logger.warning('Infospace executor not available, skipping situation note load')
+            return
+        try:
+            result = self.infospace_executor.execute_action({"type": "load", "target": "_situation", "out": "$_situation"})
+            if result.get('status') == 'success' and result.get('resource_id'):
+                content = self.infospace_executor._get_content(result['resource_id'])
+                if content and isinstance(content, str) and content.strip():
+                    self.situation_context = content.strip()
+                    logger.info(f'✓ Loaded situation note ({len(self.situation_context)} chars)')
+                else:
+                    logger.info('Situation note exists but is empty')
+            else:
+                logger.info('No situation note found (first run or not yet created)')
+        except Exception as e:
+            logger.warning(f'Error loading situation note: {e}')
+
+    def _build_situation_context(self) -> str:
+        """Build situation context from task state + persisted situation note."""
+        parts = []
+        if hasattr(self, 'task_manager'):
+            task_summary = self.task_manager.situation_summary()
+            if task_summary:
+                parts.append(task_summary)
+        if self.situation_context:
+            parts.append(self.situation_context)
+        return "\n\n".join(parts)
+
+    def _update_situation_note(self, goal_text: str, plan_result: dict):
+        """Update the living context (_situation) note after goal completion."""
+        if self.benchmark_mode or not self.infospace_executor:
+            return
+        try:
+            current = self.situation_context or "(No prior situation note — this is the first entry.)"
+            status = plan_result.get('status', 'unknown')
+            summary = (plan_result.get('final_thoughts') or '')[:500]
+
+            char_desc = (self.character_config.get('character') or self.character_name)[:200]
+            prompt_system = (
+                f"You maintain a concise living-context note for {self.character_name}. "
+                f"Character: {char_desc}\n"
+                "The note tracks: active projects and their states, what is blocked, recent decisions, "
+                "and what to do next. Keep it under 600 words. Drop anything no longer relevant. "
+                "Output ONLY the updated note text, no preamble."
+            )
+            prompt_user = (
+                f"## CURRENT SITUATION NOTE\n{current}\n\n"
+                f"## JUST COMPLETED\nGoal: {goal_text}\nOutcome: {status}\nSummary: {summary}\n\n"
+                "Write the updated situation note."
+            )
+
+            response = self.infospace_executor.llm_generate(
+                [prompt_system, prompt_user], max_tokens=1200, temperature=0.3
+            )
+            if not response.success or not response.text or not response.text.strip():
+                logger.warning(f'Situation note update LLM call failed: {getattr(response, "error", "empty")}')
+                return
+
+            new_content = response.text.strip()
+
+            # Backup current note to _situation_prev before overwriting
+            self._write_named_note('_situation_prev', self.situation_context or '')
+
+            # Write updated note
+            self._write_named_note('_situation', new_content)
+            self.situation_context = new_content
+            logger.info(f'✓ Updated situation note ({len(new_content)} chars)')
+        except Exception as e:
+            logger.warning(f'Error updating situation note: {e}')
+
+    def _consolidate_situation_note(self):
+        """Final situation note consolidation at shutdown."""
+        if self.benchmark_mode or not self.infospace_executor:
+            return
+        if self.plan_counter == 0 and not self.situation_context:
+            logger.info('No goals executed and no situation note — skipping consolidation')
+            return
+        try:
+            current = self._build_situation_context() or "(empty)"
+            char_desc = (self.character_config.get('character') or self.character_name)[:200]
+            prompt_system = (
+                f"You maintain a concise living-context note for {self.character_name}. "
+                f"Character: {char_desc}\n"
+                "A session is ending. Consolidate the note for next startup. "
+                "Keep it under 600 words. Drop stale items. Output ONLY the note text."
+            )
+            prompt_user = (
+                f"## CURRENT SITUATION NOTE\n{current}\n\n"
+                f"Session summary: {self.plan_counter} goal(s) attempted this session.\n"
+                "Write the consolidated situation note for next session."
+            )
+            response = self.infospace_executor.llm_generate(
+                [prompt_system, prompt_user], max_tokens=1200, temperature=0.3
+            )
+            if response.success and response.text and response.text.strip():
+                new_content = response.text.strip()
+                self._write_named_note('_situation_prev', self.situation_context or '')
+                self._write_named_note('_situation', new_content)
+                self.situation_context = new_content
+                logger.info(f'✓ Consolidated situation note at shutdown ({len(new_content)} chars)')
+            else:
+                logger.warning(f'Situation consolidation LLM call failed, keeping existing note')
+        except Exception as e:
+            logger.warning(f'Error consolidating situation note at shutdown: {e}')
+
+    def _write_named_note(self, name: str, content: str):
+        """Create or overwrite a named Note via the resource manager."""
+        # Try to load existing note by name
+        result = self.infospace_executor.execute_action({"type": "load", "target": name, "out": f"$_{name}_tmp"})
+        if result.get('status') == 'success' and result.get('resource_id'):
+            note_id = result['resource_id']
+            success, err = self.resource_manager.update_note_content(note_id, content)
+            if not success:
+                logger.warning(f'Failed to update note {name}: {err}')
+        else:
+            # Create new named note
+            self.infospace_executor.execute_action({"type": "create-note", "value": content, "name": name, "out": f"$_{name}_tmp"})
+            # Persist it
+            self.infospace_executor.execute_action({"type": "persist", "target": f"$_{name}_tmp"})
+
+    # ------------------------------------------------------------------
+    # Task lifecycle handlers
+    # ------------------------------------------------------------------
+
+    def _character_desc_short(self) -> str:
+        """Return a concise character description for task prompts."""
+        desc = (self.character_config.get('character') or '')[:400]
+        caps = (self.character_config.get('capabilities') or '')[:300]
+        parts = []
+        if desc:
+            parts.append(desc.strip())
+        if caps:
+            parts.append(f"Capabilities: {caps.strip()}")
+        return "\n".join(parts) if parts else self.character_name
+
+    def _handle_task_create(self, description: str):
+        """User entered 'task: <description>'. Create task and submit planning goal."""
+        from task_manager import TASK_PLANNING
+        if not description:
+            self._say_to_user("Please provide a task description after 'task:'.")
+            return
+        task_id, task = self.task_manager.create_task(description)
+        self.task_manager.set_status(task_id, TASK_PLANNING)
+        self.task_manager.set_active_task_goal(task_id, "plan")
+        goal_text = self.task_manager.planning_goal_text(task, self._character_desc_short())
+        logger.info(f'📋 {self.character_name} Planning task {task_id}: {description[:80]}')
+        self.parse_and_set_goal("", goal_text)
+
+    def _handle_task_proceed(self):
+        """User said 'proceed'. Find the oldest step_ready task and execute its next step."""
+        from task_manager import TASK_STEP_READY, TASK_EXECUTING
+        active = self.task_manager.get_active_tasks()
+        ready = [t for t in active if t.get("status") == TASK_STEP_READY]
+        if not ready:
+            self._say_to_user("No tasks are ready for the next step. Use 'tasks' to see current task states.")
+            return
+        task = ready[0]
+        task_id = task["task_id"]
+        step_num = task.get("current_step", 1)
+        self.task_manager.set_status(task_id, TASK_EXECUTING)
+        self.task_manager.set_active_task_goal(task_id, "execute", step_num)
+        goal_text = self.task_manager.step_execution_goal_text(task, self._character_desc_short())
+        logger.info(f'▶️ {self.character_name} Executing step {step_num} of task {task_id}')
+        self.parse_and_set_goal("", goal_text)
+
+    def _handle_task_terminate(self, task_id: str = None):
+        """User said 'terminate' or 'terminate task_X'. Abandon the specified or most recent task."""
+        from task_manager import TASK_ABANDONED, TERMINAL_STATUSES
+        active = self.task_manager.get_active_tasks()
+        if not active:
+            self._say_to_user("No active tasks to terminate.")
+            return
+        if task_id:
+            task = next((t for t in active if t.get("task_id") == task_id), None)
+            if not task:
+                self._say_to_user(f"Task '{task_id}' not found or already completed.")
+                return
+        else:
+            task = active[-1]
+            task_id = task["task_id"]
+        self.task_manager.set_status(task_id, TASK_ABANDONED)
+        self.task_manager.clear_active_task_goal()
+        self._say_to_user(f"Task '{task['name']}' has been abandoned.")
+        logger.info(f'🛑 {self.character_name} Abandoned task {task_id}')
+
+    def _handle_task_list(self):
+        """User said 'tasks'. Report all active task states."""
+        tasks = self.task_manager.get_active_tasks()
+        if not tasks:
+            self._say_to_user("No active tasks.")
+            return
+        lines = []
+        for t in tasks:
+            plan = t.get("abstract_plan", [])
+            total = len(plan)
+            completed = sum(1 for s in plan if s.get("status") == "completed")
+            lines.append(f"• [{t['status']}] {t['name']} — step {t.get('current_step', '?')}/{total} ({completed} done)")
+            if t.get("blockers"):
+                lines.append(f"  Blocked: {'; '.join(t['blockers'])}")
+        self._say_to_user("Active tasks:\n" + "\n".join(lines))
+
+    def _handle_task_goal_completed(self, result: Dict[str, Any]):
+        """Called after a task-related goal completes. Drives the task state machine."""
+        from task_manager import (TASK_STEP_READY, TASK_REVIEWING, TASK_BLOCKED,
+                                  TASK_COMPLETED, TASK_EXECUTING)
+        atg = self.task_manager.active_task_goal
+        if not atg:
+            return
+        task_id = atg["task_id"]
+        goal_type = atg["goal_type"]
+        self.task_manager.clear_active_task_goal()
+
+        task = self.task_manager.get_task(task_id)
+        if not task:
+            logger.warning(f"Task {task_id} not found after goal completion")
+            return
+
+        if goal_type == "plan":
+            self._handle_plan_goal_completed(task_id, task, result)
+        elif goal_type == "execute":
+            self._handle_execute_goal_completed(task_id, task, result)
+        elif goal_type == "review":
+            self._handle_review_goal_completed(task_id, task, result)
+
+    def _handle_plan_goal_completed(self, task_id: str, task: Dict, result: Dict):
+        """Planning goal finished — parse the draft plan and present to user."""
+        from task_manager import TASK_STEP_READY, TASK_ABANDONED
+        plan_steps = self._read_and_delete_draft_note("_task_plan_draft")
+        if plan_steps and isinstance(plan_steps, list):
+            self.task_manager.set_abstract_plan(task_id, plan_steps)
+            task = self.task_manager.get_task(task_id)
+            plan = task.get("abstract_plan", [])
+            plan_summary = "\n".join(f"  {s['step']}. {s['description']}" for s in plan)
+            self._say_to_user(
+                f"Task accepted: \"{task['name']}\"\n"
+                f"Plan ({len(plan)} steps):\n{plan_summary}\n\n"
+                f"Say 'proceed' to start step 1, or 'terminate' to abandon."
+            )
+        else:
+            response = (result.get("response") or "")[:500]
+            self.task_manager.set_status(task_id, TASK_ABANDONED)
+            self._say_to_user(f"Task could not be planned: {response}")
+
+    def _handle_execute_goal_completed(self, task_id: str, task: Dict, result: Dict):
+        """Step execution finished — auto-submit review goal."""
+        from task_manager import TASK_REVIEWING
+        self.task_manager.set_status(task_id, TASK_REVIEWING)
+        step_num = task.get("current_step", 1)
+        self.task_manager.set_active_task_goal(task_id, "review", step_num)
+        goal_text = self.task_manager.review_goal_text(task, result, self._character_desc_short())
+        logger.info(f'🔍 {self.character_name} Reviewing step {step_num} of task {task_id}')
+        self.parse_and_set_goal("", goal_text)
+
+    def _handle_review_goal_completed(self, task_id: str, task: Dict, result: Dict):
+        """Review goal finished — parse review note, update task, report to user."""
+        from task_manager import TASK_STEP_READY, TASK_BLOCKED, TASK_COMPLETED
+        review = self._read_and_delete_draft_note("_task_review")
+        outcome = ""
+        artifacts = []
+        if review and isinstance(review, dict):
+            outcome = review.get("step_outcome", "")
+            artifacts = review.get("artifacts", [])
+            if review.get("blocked"):
+                self.task_manager.update_task(task_id, blockers=[review.get("block_reason", "unknown")])
+                self.task_manager.set_status(task_id, TASK_BLOCKED)
+                self._say_to_user(
+                    f"Task \"{task['name']}\" is blocked: {review.get('block_reason', 'unknown')}\n"
+                    f"Step outcome: {outcome}"
+                )
+                return
+            revised = review.get("revised_remaining_steps")
+            if revised and isinstance(revised, list):
+                self.task_manager.complete_current_step(task_id, outcome, artifacts)
+                task = self.task_manager.get_task(task_id)
+                if task and task.get("status") != TASK_COMPLETED:
+                    self.task_manager.update_remaining_plan(task_id, revised)
+            else:
+                self.task_manager.complete_current_step(task_id, outcome, artifacts)
+        else:
+            response = (result.get("response") or "step completed")[:300]
+            self.task_manager.complete_current_step(task_id, response, [])
+
+        task = self.task_manager.get_task(task_id)
+        if not task:
+            return
+        if task.get("status") == TASK_COMPLETED:
+            self._say_to_user(
+                f"Task \"{task['name']}\" is complete!\n"
+                f"Last step outcome: {outcome or 'done'}"
+            )
+        else:
+            plan = task.get("abstract_plan", [])
+            idx = task.get("current_step", 1) - 1
+            next_desc = plan[idx]["description"] if 0 <= idx < len(plan) else "unknown"
+            arts_str = ", ".join(artifacts) if artifacts else "none recorded"
+            self._say_to_user(
+                f"Step {task.get('current_step', 1) - 1} complete: {outcome or 'done'}\n"
+                f"Artifacts: {arts_str}\n"
+                f"Next step ({task.get('current_step', '?')} of {len(plan)}): {next_desc}\n\n"
+                f"Say 'proceed' for next step, or 'terminate' to abandon."
+            )
+
+    def _read_and_delete_draft_note(self, note_name: str) -> Any:
+        """Load a named Note, parse its JSON content, delete it, return parsed data."""
+        result = self.infospace_executor.execute_action({"type": "load", "target": note_name, "out": "$_draft_tmp"})
+        if result.get("status") != "success" or not result.get("resource_id"):
+            return None
+        note_id = result["resource_id"]
+        content = self.infospace_executor._get_content(note_id)
+        # Clean up the draft note
+        try:
+            self.resource_manager.delete_resource(note_id)
+        except Exception:
+            pass
+        if not content:
+            return None
+        try:
+            return json.loads(content) if isinstance(content, str) else content
+        except (json.JSONDecodeError, TypeError):
+            return content
+
+    def _say_to_user(self, text: str):
+        """Send a message to user via the say action."""
+        if self.infospace_executor:
+            self.infospace_executor.execute_action({"type": "say", "target": "user", "value": text})
 
     def _archive_conversation(self):
         """
@@ -1686,73 +2029,6 @@ class ZenohExecutiveNode:
             traceback.print_exc()
         finally:
             logger.info(f'📝 Conversation archiving completed for {self.character_name}')
-
-    def _add_to_conversation(self, content: str):
-        """
-        Create a note with content and add it to the 'conversation' collection.
-        Creates the collection if it doesn't exist.
-        """
-        if self.benchmark_mode:
-            return  # Skip adding to conversation in benchmark mode
-        
-        if not self.infospace_executor:
-            logger.warning('Infospace executor not available, skipping conversation note creation')
-            return
-        
-        try:
-            # Create note with content
-            create_action = {
-                "type": "create-note",
-                "value": content,
-                "out": "$conv_note"
-            }
-            result = self.infospace_executor.execute_action(create_action)
-            if result.get('status') != 'success':
-                logger.warning(f'Failed to create conversation note: {result.get("reason", "unknown")}')
-                return
-            
-            note_id = result.get('resource_id')
-            if not note_id:
-                logger.warning(f'Created conversation note but no resource_id returned')
-                return
-            
-            # Ensure conversation collection exists
-            load_action = {
-                "type": "load",
-                "target": "conversation",
-                "out": "$conv"
-            }
-            load_result = self.infospace_executor.execute_action(load_action)
-            
-            if load_result.get('status') != 'success' or not load_result.get('resource_id'):
-                # Collection doesn't exist, create it
-                create_collection_action = {
-                    "type": "create-collection",
-                    "name": "conversation",
-                    "out": "$conv"
-                }
-                create_result = self.infospace_executor.execute_action(create_collection_action)
-                if create_result.get('status') != 'success':
-                    logger.warning(f'Failed to create conversation collection: {create_result.get("reason", "unknown")}')
-                    return
-            
-            # Add note to conversation collection
-            add_action = {
-                "type": "add",
-                "target": "conversation",
-                "value": "$conv_note",
-                "out": "conversation"
-            }
-            add_result = self.infospace_executor.execute_action(add_action)
-            if add_result.get('status') == 'success':
-                logger.debug(f'✓ Added note to conversation collection')
-            else:
-                logger.warning(f'Failed to add note to conversation: {add_result.get("reason", "unknown")}')
-                
-        except Exception as e:
-            logger.error(f'Error adding to conversation: {e}')
-            import traceback
-            traceback.print_exc()
 
     def _create_character_note(self):
         """
@@ -1862,15 +2138,27 @@ class ZenohExecutiveNode:
                     logger.info(f'📥 {self.character_name} Received goal: "{goal_preview}"')
                     self.parse_and_set_goal("", clean_input[5:].strip())
                     return  # Don't process as speech
+                elif clean_input.startswith('task:'):
+                    self._handle_task_create(clean_input[5:].strip())
+                    return
+                elif clean_input.strip().lower() in ('proceed', 'proceed task', 'next step'):
+                    self._handle_task_proceed()
+                    return
+                elif clean_input.strip().lower().startswith('terminate'):
+                    parts = clean_input.strip().split()
+                    task_id = parts[1] if len(parts) > 1 and parts[1].startswith('task_') else None
+                    self._handle_task_terminate(task_id=task_id)
+                    return
+                elif clean_input.strip().lower() in ('tasks', 'task list', 'list tasks'):
+                    self._handle_task_list()
+                    return
                 else:
                     # Regular user input
                     self._create_character_note()
-                    self._add_to_conversation(f"User says: {clean_input}")
-
                     # End-of-conversation keywords
                     end_phrases = ('goodbye', 'bye', 'end conversation', "we're done", "that's all", 'done talking')
                     if clean_input.strip().lower() in end_phrases:
-                        self.memory.close_dialog("User")
+                        self.conversation_store.close_dialog("User")
                         logger.info(f'📥 {self.character_name} User ended conversation')
                         return
 
@@ -1887,13 +2175,7 @@ class ZenohExecutiveNode:
                         self.parse_and_set_goal("", f"{goal_text}{context}")
                     else:
                         # User talking to character — treat as conversation (initiate or continue)
-                        in_conversation = False
-                        try:
-                            entity = self.memory.get_or_create_entity("User")
-                            if entity.active and entity.dialogs and len(entity.dialogs[-1]) > 0:
-                                in_conversation = True
-                        except Exception:
-                            pass
+                        in_conversation = self.conversation_store.is_dialog_active("User") and self.conversation_store.get_turn_count("User") > 0
                         # Side note: when initiating (no prior dialog), envision has less context; fallback handles it
                         envision = self._envision_conversation_turn("User", clean_input, "")
                         goal_text = "Continue dialog with User" if in_conversation else "Respond to User"
@@ -1917,14 +2199,13 @@ class ZenohExecutiveNode:
                     return
                 self._last_agent_message[source] = clean_input
                 self._create_character_note()
-                self._add_to_conversation(f"{source} says: {clean_input}")
                 goal_preview = clean_input[:80] + ('...' if len(clean_input) > 80 else '')
                 logger.info(f'📥 {self.character_name} Received message from {source}: "{goal_preview}"')
 
                 # Close flag: other agent signaled end of conversation — record but don't reply
                 if close_flag:
                     logger.info(f'📥 {self.character_name} Dialog closed by {source} (close flag)')
-                    self.memory.close_dialog(source)
+                    self.conversation_store.close_dialog(source)
                     self._dialog_cooldowns[source] = time.time()
                     self._dialog_purposes.pop(source, None)
                     return
@@ -1952,21 +2233,12 @@ class ZenohExecutiveNode:
                 turn_count = 0
                 should_close = False
                 try:
-                    entity = self.memory.get_or_create_entity(source)
-                    if entity.dialogs:
-                        turn_count = len(entity.dialogs[-1])
+                    turn_count = self.conversation_store.get_turn_count(source)
                 except Exception:
                     pass
                 if turn_count >= 8:
                     should_close = True
                     logger.info(f'📥 {self.character_name} Enforcing closure: turn_count={turn_count}')
-                elif turn_count >= 4:
-                    # After a few exchanges, check if dialog should naturally end
-                    try:
-                        char_context = self.character_config.get('character', self.character_name)
-                        should_close = entity.natural_dialog_end(char_context)
-                    except Exception:
-                        pass
                 if should_close:
                     context += "\n\nThis conversation should end now. Send a BRIEF closing statement. Your say action MUST include close: true."
                 elif turn_count >= 6:
@@ -1984,7 +2256,7 @@ class ZenohExecutiveNode:
         """Lightweight LLM call to characterize the conversational moment."""
         # Gather recent dialog turns for context
         recent_turns = ""
-        entity_data = self.memory.get_entity_data(source, limit=6, scope='current')
+        entity_data = self.conversation_store.get_entity_context(source, limit=6, scope='current')
         if entity_data and 'conversation_history' in entity_data:
             for entry in entity_data['conversation_history'][-6:]:
                 if isinstance(entry, dict) and 'source' in entry and 'text' in entry:
@@ -2012,9 +2284,10 @@ class ZenohExecutiveNode:
             f"INCOMING MESSAGE from {source}:\n{message[:500]}\n\n"
             f"You are {self.character_name}. Given this conversational moment, provide:\n"
             f"1. TURN_INTENT: What conversational move is {source} making? (1 sentence)\n"
-            f"2. MY_MOVE: What conversational move should {self.character_name} make in response? "
-            f"Do NOT echo or paraphrase — add new insight, push back, or ask a follow-up. "
-            f"If the conversation's purpose has been achieved, say so and wrap up. (1 sentence)\n"
+            f"2. MY_MOVE: Name the dialogue act you should perform next. \n"
+            f"  - Describe it as an action (e.g., 'comply and report contents of $goal_artifact'), not as the response itself.\n"
+            f"  - Do not generate response content here.\n"
+            f"  - If the conversation's purpose has been achieved, indicate you should say so and wrap up. (1 sentence)\n"
         )
 
         try:
@@ -2229,6 +2502,7 @@ class ZenohExecutiveNode:
             context = {
                 'variables': self.infospace_executor.plan_bindings_flat if self.infospace_executor else {},
                 'character_context': character_context,
+                'situation_context': self._build_situation_context(),
                 'recent_context': recent_context,
                 'executor': self.infospace_executor  # Pass executor for incremental planner
             }
@@ -2278,9 +2552,8 @@ class ZenohExecutiveNode:
                     logger.warning(f'⚠️ Text input queue size {len(self.text_input_queue)} > 3, dropping oldest')
                     self.text_input_queue.pop(0)
                 
-                # Add conversation entry to memory (default entity is "User")
-                entity_name = source if source != 'console' else "User"
-                self.memory.add_conversation_entry(entity_name, source, text_input)
+                # Add conversation entry to note/collection conversation store
+                self.conversation_store.record_incoming(source, text_input, close=bool(content_data.get('close', False)) if 'content_data' in locals() else False)
                 
                 # Auto-unpause for goal commands so they execute immediately
                 if text_input.strip().startswith('goal:') and self.execution_paused:
@@ -2509,7 +2782,9 @@ class ZenohExecutiveNode:
                 logger.error("Resource manager not available, cannot clear transients")
                 return
             
-            PRESERVED_COLLECTIONS = {'conversation', 'conversation_history'}
+            PRESERVED_COLLECTIONS = {'conversation', 'conversation_history', '_tasks'}
+            PRESERVED_NOTES = {'_situation', '_situation_prev'}
+            PRESERVED_NOTE_PREFIXES = ('_task_',)
             
             deleted_notes = 0
             deleted_collections = 0
@@ -2522,6 +2797,11 @@ class ZenohExecutiveNode:
                     continue
                 
                 if resource_id.startswith('Note_') and resource_id != 'Note_null':
+                    note_name = props.get('note_name')
+                    if note_name and (note_name in PRESERVED_NOTES or note_name.startswith(PRESERVED_NOTE_PREFIXES)):
+                        continue
+                    if any(self.resource_manager.named_notes.get(pn) == resource_id for pn in PRESERVED_NOTES):
+                        continue
                     to_delete.append(resource_id)
                 elif resource_id.startswith('Collection_'):
                     collection_name = props.get('collection_name')
@@ -2562,7 +2842,9 @@ class ZenohExecutiveNode:
                 logger.error("Resource manager not available, cannot clear persistents")
                 return
             
-            PRESERVED_COLLECTIONS = {'conversation', 'conversation_history'}
+            PRESERVED_COLLECTIONS = {'conversation', 'conversation_history', '_tasks'}
+            PRESERVED_NOTES = {'_situation', '_situation_prev'}
+            PRESERVED_NOTE_PREFIXES = ('_task_',)
             
             deleted_notes = 0
             deleted_collections = 0
@@ -2575,6 +2857,11 @@ class ZenohExecutiveNode:
                     continue
                 
                 if resource_id.startswith('Note_') and resource_id != 'Note_null':
+                    note_name = props.get('note_name')
+                    if note_name and (note_name in PRESERVED_NOTES or note_name.startswith(PRESERVED_NOTE_PREFIXES)):
+                        continue
+                    if any(self.resource_manager.named_notes.get(pn) == resource_id for pn in PRESERVED_NOTES):
+                        continue
                     to_delete.append(resource_id)
                 elif resource_id.startswith('Collection_'):
                     collection_name = props.get('collection_name')
@@ -2653,10 +2940,7 @@ class ZenohExecutiveNode:
         try:
             active_dialog = False
             try:
-                for entity in self.memory.entity_models.values():
-                    if entity.active and entity.dialogs and len(entity.dialogs[-1]) > 0:
-                        active_dialog = True
-                        break
+                active_dialog = self.conversation_store.has_active_dialogs()
             except Exception:
                 pass
             state_data = {
@@ -2900,8 +3184,10 @@ class ZenohExecutiveNode:
             except (json.JSONDecodeError, UnicodeDecodeError, AttributeError):
                 pass  # Default to False if payload parsing fails
         
-        # Collections to preserve (by name) - conversation collections should persist across benchmark runs
-        PRESERVED_COLLECTIONS = {'conversation', 'conversation_history'}
+        # Collections and Notes to preserve (by name) - should persist across benchmark runs
+        PRESERVED_COLLECTIONS = {'conversation', 'conversation_history', '_tasks'}
+        PRESERVED_NOTES = {'_situation', '_situation_prev'}
+        PRESERVED_NOTE_PREFIXES = ('_task_',)
         
         deleted_notes = 0
         deleted_collections = 0
@@ -2914,6 +3200,12 @@ class ZenohExecutiveNode:
                 continue
             
             if resource_id.startswith('Note_') and resource_id != 'Note_null':
+                note_name = props.get('note_name')
+                if note_name and (note_name in PRESERVED_NOTES or note_name.startswith(PRESERVED_NOTE_PREFIXES)):
+                    logger.debug(f"Preserving special Note: {note_name}")
+                    continue
+                if any(self.resource_manager.named_notes.get(pn) == resource_id for pn in PRESERVED_NOTES):
+                    continue
                 to_delete.append(resource_id)
             elif resource_id.startswith('Collection_'):
                 # Skip preserved named Collections (conversation and conversation_history)
@@ -3125,6 +3417,19 @@ class ZenohExecutiveNode:
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
         except Exception as e:
             logger.error(f'Error in plan_bindings query handler: {e}')
+            response = {'success': False, 'error': str(e)}
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+    
+    def _tasks_query_handler(self, query):
+        """Handle query for active tasks."""
+        try:
+            tasks = []
+            if hasattr(self, 'task_manager') and self.task_manager:
+                tasks = self.task_manager.get_active_tasks()
+            response = {'success': True, 'tasks': tasks}
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+        except Exception as e:
+            logger.error(f'Error in tasks query handler: {e}')
             response = {'success': False, 'error': str(e)}
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
     
@@ -3432,6 +3737,12 @@ class ZenohExecutiveNode:
             result = self._plan(template, self.current_goal)
             # Publish complete goal result for external consumers (e.g., eval scripts)
             self._publish_goal_result(result)
+
+            # Drive task state machine if this goal was task-related
+            if self.task_manager.active_task_goal:
+                self._handle_task_goal_completed(result)
+                return
+
             if result.get('success', False):
                 self.current_plan = result.get('plan', {})
                 self._publish_current_plan()
@@ -3464,7 +3775,7 @@ class ZenohExecutiveNode:
         """Get recent memory entries from memory module."""
         try:
             # Get entity data for User (default entity)
-            entity_data = self.memory.get_entity_data("User", limit=num_entries, scope='all')
+            entity_data = self.conversation_store.get_entity_context("User", limit=num_entries, scope='all')
             if entity_data:
                 return entity_data.get('conversation_history', [])
             return []
@@ -3550,7 +3861,7 @@ class ZenohExecutiveNode:
  
     def get_entity_context(self, entity_name: str, limit: int = 20, scope='all') -> Dict[str, Any]:
         """
-        Get entity data from memory module for context.
+        Get entity data from conversation store for context.
         
         Args:
             entity_name: Name of the entity to query (defaults to "User" if not provided)
@@ -3566,7 +3877,7 @@ class ZenohExecutiveNode:
             entity_name = "User"
         
         try:
-            entity_data = self.memory.get_entity_data(entity_name, limit=limit, scope=scope)
+            entity_data = self.conversation_store.get_entity_context(entity_name, limit=limit, scope=scope)
             if entity_data:
                 logger.info(f'👥 Retrieved entity context for {entity_name}')
                 return entity_data
@@ -3584,6 +3895,12 @@ class ZenohExecutiveNode:
             
             logger.info(f'Executive Node shutdown initiated for {self.character_name}...')
             
+            # Consolidate situation note while LLM is still available
+            try:
+                self._consolidate_situation_note()
+            except Exception as e:
+                logger.error(f'Error consolidating situation note during shutdown: {e}')
+            
             # Archive conversation if it exists and is not empty (do this first before saving state)
             try:
                 self._archive_conversation()
@@ -3591,13 +3908,6 @@ class ZenohExecutiveNode:
                 logger.error(f'Error archiving conversation during shutdown: {e}')
                 import traceback
                 traceback.print_exc()
-            
-            # Save memory before shutdown
-            try:
-                self.memory.save()
-                logger.info(f'💾 Saved memory state for {self.character_name}')
-            except Exception as e:
-                logger.error(f'Error saving memory during shutdown: {e}')
             
             # Save resource manager
             if self.resource_manager:

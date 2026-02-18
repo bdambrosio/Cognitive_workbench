@@ -1474,6 +1474,9 @@ Only provide the result, followed by the </end> tag.""")
             api_messages = [m for m in api_messages if m.get("content") and str(m["content"]).strip()]
             if not api_messages:
                 return Response(success=False, error="No user messages to send")
+            # Some Anthropic models reject assistant prefill: final turn must be user.
+            if api_messages[-1].get("role") != "user":
+                api_messages[-1]["role"] = "user"
 
             kwargs = {
                 "model": self.anthropic_model,
@@ -1560,6 +1563,9 @@ Only provide the result, followed by the </end> tag.""")
                 "messages": chat_messages,
                 "max_tokens": max_tokens,
                 "temperature": temperature,
+                "reasoning": {"effort": "low"},
+                "top_p": 1.0,
+                "stream": False,
             }
             if stops:
                 if isinstance(stops, list):
@@ -1596,10 +1602,13 @@ Only provide the result, followed by the </end> tag.""")
             message = choices[0].get("message", {})
             result_text = message.get("content")
             
-            # Handle None or empty content
+            # Handle None or empty content (models may return empty during warm-up or for unsupported params)
             if result_text is None:
                 logger.warning(f"OpenRouter API returned None content. Message: {message}, Full response: {result}")
                 return Response(success=False, error="OpenRouter API returned None content")
+            if isinstance(result_text, str) and not result_text.strip():
+                logger.warning(f"OpenRouter API returned empty content. Message: {message}")
+                return Response(success=False, error="OpenRouter API returned empty content")
             
             # Post-process JSON if requested
             if is_json:
@@ -2963,13 +2972,21 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         self.executive_node.action_counter += 1
         if hasattr(self.executive_node, 'last_say_text'):
             self.executive_node.last_say_text = value_str
+        if hasattr(self.executive_node, 'conversation_store') and self.executive_node.conversation_store:
+            self.executive_node.conversation_store.record_outgoing(
+                target=target,
+                text=value_str,
+                act_type='say',
+                close=bool(action.get('close'))
+            )
         
         logger.info(f"Say [{target}]: {value_str}")
         
         # If close flag set, close our own dialog with the target and set cooldown
         if action.get('close') and target.lower() != 'user':
             try:
-                self.executive_node.memory.close_dialog(target)
+                if hasattr(self.executive_node, 'conversation_store') and self.executive_node.conversation_store:
+                    self.executive_node.conversation_store.close_dialog(target)
                 self.executive_node._dialog_cooldowns[target] = time.time()
                 self.executive_node._dialog_purposes.pop(target, None)
                 logger.info(f"Say [{target}]: dialog closed (close flag)")
@@ -3037,6 +3054,13 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         }
         self.executive_node.action_publisher.put(json.dumps(action_data))
         self.executive_node.action_counter += 1
+        if hasattr(self.executive_node, 'conversation_store') and self.executive_node.conversation_store:
+            self.executive_node.conversation_store.record_outgoing(
+                target=target,
+                text=str(question_text),
+                act_type='ask',
+                close=False
+            )
         
         # For non-User targets, also send question to target's sense_data so they actually hear it
         if target != 'User':
