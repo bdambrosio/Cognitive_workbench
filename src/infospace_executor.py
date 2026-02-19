@@ -221,7 +221,7 @@ class InfospaceExecutor:
             if self.resource_manager:
                 existing_id = self.resource_manager._resolve_resource_id(world_name)
                 if existing_id and existing_id.startswith('Collection_'):
-                    success, error_msg = self.resource_manager.delete_resource(existing_id)
+                    success, error_msg = self.delete_resource_and_unbind(existing_id)
                     if success:
                         logger.info(f"Deleted existing world documentation Collection '{world_name}' for recreation")
                     else:
@@ -5423,6 +5423,27 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # Track last out resource for plan_result
         if self.executive_node:
             self.executive_node.last_out_resource_id = resource_id
+
+    def _remove_bindings_for_resource(self, resource_id: str) -> int:
+        """Remove all binding variables currently pointing to resource_id."""
+        if not resource_id:
+            return 0
+        removed = 0
+        for scope in self.plan_bindings:
+            to_remove = [k for k, v in scope.items() if v == resource_id]
+            for key in to_remove:
+                del scope[key]
+                removed += 1
+        if removed:
+            logger.debug(f"Removed {removed} bindings for deleted resource {resource_id}")
+        return removed
+
+    def delete_resource_and_unbind(self, resource_id: str) -> Tuple[bool, Optional[str]]:
+        """Delete resource and clear any bound variables that reference it."""
+        success, error_msg = self.resource_manager.delete_resource(resource_id)
+        if success:
+            self._remove_bindings_for_resource(resource_id)
+        return success, error_msg
     
     def push_binding_scope(self, copy_outer: bool = True):
         """

@@ -1763,7 +1763,7 @@ class ZenohExecutiveNode:
 
     def _handle_task_proceed(self, task_id: str = None):
         """User said 'proceed' (or 'proceed task_X'). Execute the requested ready task."""
-        from task_manager import TASK_STEP_READY, TASK_EXECUTING
+        from task_manager import TASK_BLOCKED, TASK_STEP_READY, TASK_EXECUTING
         active = self.task_manager.get_active_tasks()
         ready = [t for t in active if t.get("status") == TASK_STEP_READY]
         if not ready:
@@ -1778,12 +1778,51 @@ class ZenohExecutiveNode:
             task = ready[0]
         task_id = task["task_id"]
         step_num = task.get("current_step", 1)
+        missing_inputs = self._missing_step_inputs(task)
+        if missing_inputs:
+            reason = f"Missing required input artifacts for step {step_num}: {', '.join(missing_inputs)}"
+            self.task_manager.update_task(task_id, blockers=[reason])
+            self.task_manager.set_status(task_id, TASK_BLOCKED)
+            self._say_to_user(
+                f"Task \"{task['name']}\" is blocked.\n"
+                f"{reason}\n"
+                f"Provide or create these artifacts, then say 'unblock {task_id}'."
+            )
+            logger.info(f'⛔ {self.character_name} Blocked task {task_id}: {reason}')
+            return
         pre_resource_ids = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
         self.task_manager.set_status(task_id, TASK_EXECUTING)
         self.task_manager.set_active_task_goal(task_id, "execute", step_num, pre_resource_ids=list(pre_resource_ids))
         goal_text = self.task_manager.step_execution_goal_text(task, self._character_desc_short())
         logger.info(f'▶️ {self.character_name} Executing step {step_num} of task {task_id}')
         self.parse_and_set_goal("", goal_text)
+
+    def _missing_step_inputs(self, task: Dict) -> List[str]:
+        """Return unresolved declared inputs for the task's current step."""
+        if not self.resource_manager:
+            return []
+        plan = task.get("abstract_plan", [])
+        idx = task.get("current_step", 1) - 1
+        if idx < 0 or idx >= len(plan):
+            return []
+        step = plan[idx] if isinstance(plan[idx], dict) else {}
+        inputs = step.get("input_artifacts", [])
+        if not isinstance(inputs, list):
+            inputs = [inputs] if inputs else []
+        missing = []
+        for item in inputs:
+            if not isinstance(item, str):
+                item = str(item)
+            name = item.strip()
+            if not name:
+                continue
+            resolved_id = None
+            if hasattr(self.resource_manager, "_resolve_resource_id"):
+                resolved_id = self.resource_manager._resolve_resource_id(name)
+            if resolved_id or self.resource_manager.get_resource(name):
+                continue
+            missing.append(name)
+        return missing
 
     def _handle_task_reuse(self, task_id: str = None):
         """User said 'reuse task_X'. Reset a completed task to step 1 while preserving its plan."""
@@ -1946,10 +1985,10 @@ class ZenohExecutiveNode:
         from task_manager import TASK_STEP_READY, TASK_BLOCKED, TASK_COMPLETED
         review = self._read_and_delete_draft_note("_task_review")
         outcome = ""
-        artifacts = []
+        output_artifacts = []
         if review and isinstance(review, dict):
             outcome = review.get("step_outcome", "")
-            artifacts = review.get("artifacts", [])
+            output_artifacts = review.get("output_artifacts", [])
             if review.get("blocked"):
                 self.task_manager.update_task(task_id, blockers=[review.get("block_reason", "unknown")])
                 self.task_manager.set_status(task_id, TASK_BLOCKED)
@@ -1960,12 +1999,12 @@ class ZenohExecutiveNode:
                 return
             revised = review.get("revised_remaining_steps")
             if revised and isinstance(revised, list):
-                self.task_manager.complete_current_step(task_id, outcome, artifacts)
+                self.task_manager.complete_current_step(task_id, outcome, output_artifacts)
                 task = self.task_manager.get_task(task_id)
                 if task and task.get("status") != TASK_COMPLETED:
                     self.task_manager.update_remaining_plan(task_id, revised)
             else:
-                self.task_manager.complete_current_step(task_id, outcome, artifacts)
+                self.task_manager.complete_current_step(task_id, outcome, output_artifacts)
         else:
             response = (result.get("response") or "step completed")[:300]
             self.task_manager.complete_current_step(task_id, response, [])
@@ -1983,10 +2022,10 @@ class ZenohExecutiveNode:
             plan = task.get("abstract_plan", [])
             idx = task.get("current_step", 1) - 1
             next_desc = plan[idx]["description"] if 0 <= idx < len(plan) else "unknown"
-            arts_str = ", ".join(artifacts) if artifacts else "none recorded"
+            arts_str = ", ".join(output_artifacts) if output_artifacts else "none recorded"
             self._say_to_user(
                 f"Step {task.get('current_step', 1) - 1} complete: {outcome or 'done'}\n"
-                f"Artifacts: {arts_str}\n"
+                f"Output artifacts: {arts_str}\n"
                 f"Next step ({task.get('current_step', '?')} of {len(plan)}): {next_desc}\n\n"
                 f"Say 'proceed' for next step, or 'terminate' to abandon."
             )
@@ -2006,7 +2045,8 @@ class ZenohExecutiveNode:
 
         keep_ids = set(task.get("artifacts", []))
         for step in task.get("abstract_plan", []):
-            for art in step.get("artifacts", []) or []:
+            step_outputs = step.get("output_artifacts", [])
+            for art in step_outputs or []:
                 if isinstance(art, str):
                     keep_ids.add(art)
                     keep_ids.add(art.strip())
@@ -2038,7 +2078,7 @@ class ZenohExecutiveNode:
                 continue
             if resource_id == "Note_null":
                 continue
-            success, _ = self.resource_manager.delete_resource(resource_id)
+            success, _ = self._delete_resource_and_unbind(resource_id)
             if success:
                 deleted += 1
         if deleted:
@@ -2053,7 +2093,7 @@ class ZenohExecutiveNode:
         content = self.infospace_executor._get_content(note_id)
         # Clean up the draft note
         try:
-            self.resource_manager.delete_resource(note_id)
+            self._delete_resource_and_unbind(note_id)
         except Exception:
             pass
         if not content:
@@ -2067,6 +2107,17 @@ class ZenohExecutiveNode:
         """Send a message to user via the say action."""
         if self.infospace_executor:
             self.infospace_executor.execute_action({"type": "say", "target": "user", "value": text})
+
+    def _delete_resource_and_unbind(self, resource_id: str):
+        """Delete a resource and clear any binding variables targeting it."""
+        if not self.resource_manager:
+            return False, "Resource manager not available"
+        if self.infospace_executor and hasattr(self.infospace_executor, "delete_resource_and_unbind"):
+            return self.infospace_executor.delete_resource_and_unbind(resource_id)
+        success, error_msg = self.resource_manager.delete_resource(resource_id)
+        if success and self.infospace_executor and hasattr(self.infospace_executor, "_remove_bindings_for_resource"):
+            self.infospace_executor._remove_bindings_for_resource(resource_id)
+        return success, error_msg
 
     def _archive_conversation(self):
         """
@@ -2853,12 +2904,12 @@ class ZenohExecutiveNode:
                     deleted_notes = 0
                     for note_id in note_ids:
                         if isinstance(note_id, str) and note_id.startswith('Note_'):
-                            success, _ = self.resource_manager.delete_resource(note_id)
+                            success, _ = self._delete_resource_and_unbind(note_id)
                             if success:
                                 deleted_notes += 1
                     
                     # Delete the Collection itself
-                    success, error_msg = self.resource_manager.delete_resource(collection_id)
+                    success, error_msg = self._delete_resource_and_unbind(collection_id)
                     if success:
                         logger.info(f"🗑️ Cleared map '{map_name}' ({collection_id}) - deleted {deleted_notes} Notes")
                     else:
@@ -2958,7 +3009,7 @@ class ZenohExecutiveNode:
                     to_delete.append(resource_id)
             
             for resource_id in to_delete:
-                success, _ = self.resource_manager.delete_resource(resource_id)
+                success, _ = self._delete_resource_and_unbind(resource_id)
                 if success:
                     if resource_id.startswith('Note_'):
                         deleted_notes += 1
@@ -3018,7 +3069,7 @@ class ZenohExecutiveNode:
                     to_delete.append(resource_id)
             
             for resource_id in to_delete:
-                success, _ = self.resource_manager.delete_resource(resource_id)
+                success, _ = self._delete_resource_and_unbind(resource_id)
                 if success:
                     if resource_id.startswith('Note_'):
                         deleted_notes += 1
@@ -3285,7 +3336,7 @@ class ZenohExecutiveNode:
                 return
             
             resource_id = key_parts[-1]
-            success, error_msg = self.resource_manager.delete_resource(resource_id)
+            success, error_msg = self._delete_resource_and_unbind(resource_id)
             
             if success:
                 response = {
@@ -3368,7 +3419,7 @@ class ZenohExecutiveNode:
                 to_delete.append(resource_id)
         
         for resource_id in to_delete:
-            success, _ = self.resource_manager.delete_resource(resource_id)
+            success, _ = self._delete_resource_and_unbind(resource_id)
             if success:
                 if resource_id.startswith('Note_'):
                     deleted_notes += 1
@@ -3451,7 +3502,7 @@ class ZenohExecutiveNode:
                     note_null_id = resource_id
                 else:
                     # Delete all other resources (including persistent ones for benchmark hygiene)
-                    self.resource_manager.delete_resource(resource_id)
+                    self._delete_resource_and_unbind(resource_id)
             
             # Reset counters (Note_null counts as 1 if it exists)
             if note_null_id:
