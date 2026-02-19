@@ -377,11 +377,12 @@ def main():
     signal.signal(signal.SIGINT, _signal_handler)
 
     # Also listen for Zenoh shutdown requests
+    launcher_shutdown_sub = None
     if zenoh_session:
         def _zenoh_shutdown(sample):
             logger.warning("Received shutdown request via Zenoh")
             shutdown_event.set()
-        zenoh_session.declare_subscriber("cognitive/launcher/shutdown", _zenoh_shutdown)
+        launcher_shutdown_sub = zenoh_session.declare_subscriber("cognitive/launcher/shutdown", _zenoh_shutdown)
 
     try:
         # Block until shutdown requested
@@ -433,13 +434,37 @@ def main():
             except Exception:
                 pass
 
-    # Shutdown SGLang runtime
+    # Shutdown SGLang runtime: send SIGTERM for graceful drain, wait, then SIGKILL fallback
     if runtime:
-        try:
-            runtime.shutdown()
-            logger.info("SGLang Runtime shut down")
-        except Exception as e:
-            logger.warning(f"Error shutting down runtime: {e}")
+        import signal as _signal
+        import psutil as _psutil
+        pid = getattr(runtime, "pid", None)
+        runtime_shutdown_done = threading.Event()
+        def _shutdown_runtime():
+            try:
+                if pid is not None:
+                    try:
+                        os.kill(pid, _signal.SIGTERM)
+                        logger.info(f"Sent SIGTERM to SGLang Runtime (pid={pid})")
+                        _psutil.Process(pid).wait(timeout=20)
+                        logger.info("SGLang Runtime exited gracefully")
+                    except _psutil.NoSuchProcess:
+                        logger.info("SGLang Runtime already exited")
+                    except _psutil.TimeoutExpired:
+                        logger.warning("SGLang Runtime did not exit after SIGTERM; forcing kill")
+                        runtime.shutdown()
+                    except ProcessLookupError:
+                        logger.info("SGLang Runtime already exited")
+                else:
+                    runtime.shutdown()
+                    logger.info("SGLang Runtime shut down")
+            except Exception as e:
+                logger.warning(f"Error shutting down runtime: {e}")
+            finally:
+                runtime_shutdown_done.set()
+        threading.Thread(target=_shutdown_runtime, name="runtime-shutdown", daemon=True).start()
+        if not runtime_shutdown_done.wait(timeout=30):
+            logger.warning("Timed out shutting down SGLang Runtime; continuing exit")
 
     # Close Zenoh
     if zenoh_session:

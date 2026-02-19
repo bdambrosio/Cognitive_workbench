@@ -1739,8 +1739,8 @@ class ZenohExecutiveNode:
 
     def _character_desc_short(self) -> str:
         """Return a concise character description for task prompts."""
-        desc = (self.character_config.get('character') or '')[:400]
-        caps = (self.character_config.get('capabilities') or '')[:300]
+        desc = (self.character_config.get('character') or '')[:600]
+        caps = (self.character_config.get('capabilities') or '')[:600]
         parts = []
         if desc:
             parts.append(desc.strip())
@@ -1761,35 +1761,78 @@ class ZenohExecutiveNode:
         logger.info(f'📋 {self.character_name} Planning task {task_id}: {description[:80]}')
         self.parse_and_set_goal("", goal_text)
 
-    def _handle_task_proceed(self):
-        """User said 'proceed'. Find the oldest step_ready task and execute its next step."""
+    def _handle_task_proceed(self, task_id: str = None):
+        """User said 'proceed' (or 'proceed task_X'). Execute the requested ready task."""
         from task_manager import TASK_STEP_READY, TASK_EXECUTING
         active = self.task_manager.get_active_tasks()
         ready = [t for t in active if t.get("status") == TASK_STEP_READY]
         if not ready:
             self._say_to_user("No tasks are ready for the next step. Use 'tasks' to see current task states.")
             return
-        task = ready[0]
+        if task_id:
+            task = next((t for t in ready if t.get("task_id") == task_id), None)
+            if not task:
+                self._say_to_user(f"Task '{task_id}' is not ready. Use 'tasks' to inspect status.")
+                return
+        else:
+            task = ready[0]
         task_id = task["task_id"]
         step_num = task.get("current_step", 1)
+        pre_resource_ids = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
         self.task_manager.set_status(task_id, TASK_EXECUTING)
-        self.task_manager.set_active_task_goal(task_id, "execute", step_num)
+        self.task_manager.set_active_task_goal(task_id, "execute", step_num, pre_resource_ids=list(pre_resource_ids))
         goal_text = self.task_manager.step_execution_goal_text(task, self._character_desc_short())
         logger.info(f'▶️ {self.character_name} Executing step {step_num} of task {task_id}')
         self.parse_and_set_goal("", goal_text)
 
+    def _handle_task_reuse(self, task_id: str = None):
+        """User said 'reuse task_X'. Reset a completed task to step 1 while preserving its plan."""
+        from task_manager import TASK_COMPLETED
+        if not task_id:
+            self._say_to_user("Please specify which task to reuse, e.g. 'reuse task_3'.")
+            return
+        task = self.task_manager.get_task(task_id)
+        if not task:
+            self._say_to_user(f"Task '{task_id}' not found.")
+            return
+        if task.get("status") != TASK_COMPLETED:
+            self._say_to_user(f"Task '{task_id}' is not completed, so it cannot be reused.")
+            return
+        reset = self.task_manager.reset_for_reuse(task_id)
+        if not reset:
+            self._say_to_user(f"Failed to reset task '{task_id}' for reuse.")
+            return
+        self._say_to_user(f"Task \"{task['name']}\" reset to step 1. Say 'proceed {task_id}' to start.")
+        logger.info(f'🔁 {self.character_name} Reused task {task_id}')
+
     def _handle_task_terminate(self, task_id: str = None):
         """User said 'terminate' or 'terminate task_X'. Abandon the specified or most recent task."""
         from task_manager import TASK_ABANDONED, TERMINAL_STATUSES
+        if task_id:
+            task = self.task_manager.get_task(task_id)
+            if not task:
+                self._say_to_user(f"Task '{task_id}' not found.")
+                return
+            if task.get("status") in TERMINAL_STATUSES:
+                deleted = self.task_manager.delete_task(task_id)
+                if not deleted:
+                    self._say_to_user(f"Task '{task_id}' could not be removed.")
+                    return
+                if self.task_manager.active_task_goal and self.task_manager.active_task_goal.get("task_id") == task_id:
+                    self.task_manager.clear_active_task_goal()
+                self._say_to_user(f"Task '{task['name']}' has been removed.")
+                logger.info(f'🗑️ {self.character_name} Removed task {task_id}')
+                return
+            self.task_manager.set_status(task_id, TASK_ABANDONED)
+            self.task_manager.clear_active_task_goal()
+            self._say_to_user(f"Task '{task['name']}' has been abandoned.")
+            logger.info(f'🛑 {self.character_name} Abandoned task {task_id}')
+            return
+
         active = self.task_manager.get_active_tasks()
         if not active:
             self._say_to_user("No active tasks to terminate.")
             return
-        if task_id:
-            task = next((t for t in active if t.get("task_id") == task_id), None)
-            if not task:
-                self._say_to_user(f"Task '{task_id}' not found or already completed.")
-                return
         else:
             task = active[-1]
             task_id = task["task_id"]
@@ -1797,6 +1840,28 @@ class ZenohExecutiveNode:
         self.task_manager.clear_active_task_goal()
         self._say_to_user(f"Task '{task['name']}' has been abandoned.")
         logger.info(f'🛑 {self.character_name} Abandoned task {task_id}')
+
+    def _handle_task_unblock(self, task_id: str = None):
+        """User said 'unblock' or 'unblock task_X'. Clear blockers and set back to step_ready."""
+        from task_manager import TASK_BLOCKED, TASK_STEP_READY
+        active = self.task_manager.get_active_tasks()
+        blocked = [t for t in active if t.get("status") == TASK_BLOCKED]
+        if not blocked:
+            self._say_to_user("No blocked tasks to unblock.")
+            return
+        if task_id:
+            task = next((t for t in blocked if t.get("task_id") == task_id), None)
+            if not task:
+                self._say_to_user(f"Task '{task_id}' is not blocked.")
+                return
+        else:
+            task = blocked[0]
+            task_id = task["task_id"]
+        self.task_manager.update_task(task_id, blockers=[])
+        self.task_manager.set_status(task_id, TASK_STEP_READY)
+        step = task.get("current_step", 1)
+        self._say_to_user(f"Task \"{task['name']}\" unblocked. Step {step} is ready. Say 'proceed' to retry.")
+        logger.info(f'🔓 {self.character_name} Unblocked task {task_id} at step {step}')
 
     def _handle_task_list(self):
         """User said 'tasks'. Report all active task states."""
@@ -1829,6 +1894,16 @@ class ZenohExecutiveNode:
         if not task:
             logger.warning(f"Task {task_id} not found after goal completion")
             return
+
+        if goal_type == "execute" and self.resource_manager:
+            pre_ids = set(atg.get("pre_resource_ids", []) or [])
+            now_ids = set(self.resource_manager.resource_registry.keys())
+            new_ids = [rid for rid in (now_ids - pre_ids) if rid != "Note_null"]
+            if new_ids:
+                existing = task.get("task_created_resources", [])
+                merged = list(dict.fromkeys(existing + new_ids))
+                self.task_manager.update_task(task_id, task_created_resources=merged)
+                task = self.task_manager.get_task(task_id) or task
 
         if goal_type == "plan":
             self._handle_plan_goal_completed(task_id, task, result)
@@ -1899,6 +1974,7 @@ class ZenohExecutiveNode:
         if not task:
             return
         if task.get("status") == TASK_COMPLETED:
+            self._cleanup_completed_task_resources(task_id)
             self._say_to_user(
                 f"Task \"{task['name']}\" is complete!\n"
                 f"Last step outcome: {outcome or 'done'}"
@@ -1914,6 +1990,59 @@ class ZenohExecutiveNode:
                 f"Next step ({task.get('current_step', '?')} of {len(plan)}): {next_desc}\n\n"
                 f"Say 'proceed' for next step, or 'terminate' to abandon."
             )
+
+    def _cleanup_completed_task_resources(self, task_id: str):
+        """
+        Conservative cleanup for completed tasks.
+        Deletes only task-created, non-persistent resources that are not explicitly kept.
+        """
+        task = self.task_manager.get_task(task_id)
+        if not task or not self.resource_manager:
+            return
+
+        created_ids = set(task.get("task_created_resources", []))
+        if not created_ids:
+            return
+
+        keep_ids = set(task.get("artifacts", []))
+        for step in task.get("abstract_plan", []):
+            for art in step.get("artifacts", []) or []:
+                if isinstance(art, str):
+                    keep_ids.add(art)
+                    keep_ids.add(art.strip())
+                    if hasattr(self.resource_manager, "_resolve_resource_id"):
+                        resolved = self.resource_manager._resolve_resource_id(art)
+                        if resolved:
+                            keep_ids.add(resolved)
+        preserved_collections = {"conversation", "conversation_history", "_tasks"}
+        preserved_notes = {"_situation", "_situation_prev"}
+        deleted = 0
+        for resource_id in created_ids:
+            if resource_id in keep_ids:
+                continue
+            resource = self.resource_manager.get_resource(resource_id)
+            if not resource:
+                continue
+            props = resource.get("properties", {})
+            if props.get("persistent", False):
+                continue
+            note_name = props.get("note_name", "")
+            collection_name = props.get("collection_name", "")
+            if note_name in preserved_notes:
+                continue
+            if collection_name in preserved_collections:
+                continue
+            if note_name.startswith("_task_"):
+                continue
+            if note_name in {"_task_plan_draft", "_task_review"}:
+                continue
+            if resource_id == "Note_null":
+                continue
+            success, _ = self.resource_manager.delete_resource(resource_id)
+            if success:
+                deleted += 1
+        if deleted:
+            logger.info(f"🧹 Cleaned {deleted} non-kept task resources for {task_id}")
 
     def _read_and_delete_draft_note(self, note_name: str) -> Any:
         """Load a named Note, parse its JSON content, delete it, return parsed data."""
@@ -2141,13 +2270,25 @@ class ZenohExecutiveNode:
                 elif clean_input.startswith('task:'):
                     self._handle_task_create(clean_input[5:].strip())
                     return
-                elif clean_input.strip().lower() in ('proceed', 'proceed task', 'next step'):
-                    self._handle_task_proceed()
+                elif clean_input.strip().lower().startswith('proceed') or clean_input.strip().lower() == 'next step':
+                    parts = clean_input.strip().split()
+                    task_id = parts[1] if len(parts) > 1 and parts[1].startswith('task_') else None
+                    self._handle_task_proceed(task_id=task_id)
                     return
                 elif clean_input.strip().lower().startswith('terminate'):
                     parts = clean_input.strip().split()
                     task_id = parts[1] if len(parts) > 1 and parts[1].startswith('task_') else None
                     self._handle_task_terminate(task_id=task_id)
+                    return
+                elif clean_input.strip().lower().startswith('reuse'):
+                    parts = clean_input.strip().split()
+                    task_id = parts[1] if len(parts) > 1 and parts[1].startswith('task_') else None
+                    self._handle_task_reuse(task_id=task_id)
+                    return
+                elif clean_input.strip().lower().startswith('unblock'):
+                    parts = clean_input.strip().split()
+                    task_id = parts[1] if len(parts) > 1 and parts[1].startswith('task_') else None
+                    self._handle_task_unblock(task_id=task_id)
                     return
                 elif clean_input.strip().lower() in ('tasks', 'task list', 'list tasks'):
                     self._handle_task_list()
@@ -3421,11 +3562,11 @@ class ZenohExecutiveNode:
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
     
     def _tasks_query_handler(self, query):
-        """Handle query for active tasks."""
+        """Handle query for tasks (active + terminal)."""
         try:
             tasks = []
             if hasattr(self, 'task_manager') and self.task_manager:
-                tasks = self.task_manager.get_active_tasks()
+                tasks = self.task_manager.get_all_tasks()
             response = {'success': True, 'tasks': tasks}
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
         except Exception as e:
