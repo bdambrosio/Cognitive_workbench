@@ -4432,6 +4432,9 @@ Generated: {generated_at}
                     const curr = t.current_step || 1;
                     const status = t.status || 'unknown';
                     const taskId = `task-acc-${i}`;
+                    const currStep = (curr >= 1 && curr <= total) ? (plan[curr - 1] || {}) : {};
+                    const currInputs = Array.isArray(currStep.input_artifacts) ? currStep.input_artifacts : [];
+                    const currOutputs = Array.isArray(currStep.output_artifacts) ? currStep.output_artifacts : [];
                     html += `
                         <div class="task-accordion-item" style="border: 1px solid #404040; border-radius: 4px; margin-bottom: 8px; overflow: hidden;">
                             <div class="task-accordion-header" onclick="toggleTaskAccordion('${taskId}')" style="padding: 8px 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
@@ -4439,6 +4442,7 @@ Generated: {generated_at}
                                     <span style="font-weight: bold; color: #00d4ff;">${escapeHtml(t.name || t.task_id || 'Task')}</span>
                                     <span style="margin-left: 6px; font-size: 10px; padding: 2px 6px; border-radius: 3px; background: #404040;">${status}</span>
                                     ${total ? `<span style="margin-left: 4px; color: #888; font-size: 11px;">${curr}/${total}</span>` : ''}
+                                    ${total ? `<div style="margin-top: 3px; color: #a8b3c7; font-size: 10px;">in: ${escapeHtml(currInputs.join(', ') || 'none')} | out: ${escapeHtml(currOutputs.join(', ') || 'none')}</div>` : ''}
                                 </div>
                                 <div onclick="event.stopPropagation();">
                                     ${status === 'blocked'
