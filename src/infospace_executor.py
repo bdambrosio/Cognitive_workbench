@@ -362,7 +362,7 @@ class InfospaceExecutor:
             from incremental_planner import IncrementalPlanner, HAS_SGLANG
         except ImportError as e:
             logger.error(f"Subplanner unavailable: {e}")
-            return f"Subplanner unavailable: {e}"
+            return {"success": False, "error": f"Subplanner unavailable: {e}"}
         
         if not HAS_SGLANG or not self.runtime:
             msg = "Subplanner requires SGLang runtime; unavailable in current configuration"
@@ -385,7 +385,7 @@ class InfospaceExecutor:
                 result = planner.generate_subplan(template='', goal=goal, context=None, max_steps=max_steps)
             except Exception as exc:
                 logger.error(f"Subplanner execution error: {exc}")
-                return f"Subplanner execution error: {exc}"
+                return {"success": False, "error": f"Subplanner execution error: {exc}"}
             
             if result.get('success'):
                 # Fix: use 'response' not 'reasoning' (generate_subplan returns 'response')
@@ -400,6 +400,7 @@ class InfospaceExecutor:
                         reasoning = reasoning.replace(f"${var_name}", res_id)
                         reasoning = reasoning.replace(var_name, res_id)
                 
+                result['response'] = reasoning
                 # Retrieve executed plan actions
                 plan_actions = getattr(self, '_plan_actions', [])
                 
@@ -415,9 +416,11 @@ class InfospaceExecutor:
                 
                 plan_text = "\n".join([f"- {a}" for a in formatted_plan])
                 logger.info(f"Executed sub-plan: \n{reasoning}\n\nEXECUTED SUB-PLAN:\n{plan_text}")
-                return f"{reasoning}\n\nEXECUTED SUB-PLAN:\n{plan_text}"
+                return result
             
-            return f"Subplanner failed: {result.get('error', 'unknown error')}"
+            result["success"] = False 
+            result["error"] = result.get('error', 'unknown error')
+            return result
         finally:
             # Always pop the subplanner scope when done
             self.pop_binding_scope()

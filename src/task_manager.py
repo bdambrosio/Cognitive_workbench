@@ -53,6 +53,7 @@ def _new_task(task_id: str, description: str) -> Dict[str, Any]:
         "current_step": 0,
         "blockers": [],
         "artifacts": [],
+        "task_created_resources": [],
         "notes": "",
     }
 
@@ -127,6 +128,21 @@ class TaskManager:
         self._save_task(task)
         logger.info(f"Created {task_id}: {description[:80]}")
         return task_id, task
+
+    def delete_task(self, task_id: str) -> bool:
+        """Delete a task note by task id."""
+        note_name = TASK_NOTE_PREFIX + task_id.replace("task_", "")
+        note_id = self.resource_manager.named_notes.get(note_name)
+        if not note_id and hasattr(self.resource_manager, "_resolve_resource_id"):
+            note_id = self.resource_manager._resolve_resource_id(note_name)
+        if not note_id:
+            logger.warning(f"Task note not found for delete: {task_id}")
+            return False
+        deleted, error = self.resource_manager.delete_resource(note_id)
+        if not deleted:
+            logger.warning(f"Failed to delete task {task_id}: {error}")
+            return False
+        return True
 
     def get_task(self, task_id: str) -> Optional[Dict]:
         """Load a task by id."""
@@ -245,6 +261,30 @@ class TaskManager:
         new_current = len(completed) + 1
         return self.update_task(task_id, abstract_plan=new_plan, current_step=new_current)
 
+    def reset_for_reuse(self, task_id: str) -> Optional[Dict]:
+        """Reset a completed task back to step 1 while preserving the plan text."""
+        task = self.get_task(task_id)
+        if not task:
+            return None
+        plan = task.get("abstract_plan", [])
+        for i, step in enumerate(plan):
+            step.setdefault("step", i + 1)
+            step["status"] = STEP_PENDING
+            step["outcome"] = ""
+            step["artifacts"] = []
+        if plan:
+            plan[0]["status"] = STEP_READY
+        return self.update_task(
+            task_id,
+            status=TASK_STEP_READY,
+            current_step=1,
+            blockers=[],
+            artifacts=[],
+            task_created_resources=[],
+            notes="",
+            abstract_plan=plan,
+        )
+
     # ------------------------------------------------------------------
     # Active task-goal tracking (which goal is running for which task)
     # ------------------------------------------------------------------
@@ -253,9 +293,11 @@ class TaskManager:
     def active_task_goal(self) -> Optional[Dict[str, Any]]:
         return self._active_task_goal
 
-    def set_active_task_goal(self, task_id: str, goal_type: str, step_number: int = 0):
+    def set_active_task_goal(self, task_id: str, goal_type: str, step_number: int = 0, **extra_fields):
         """Record that the currently-running goal is task-related."""
         self._active_task_goal = {"task_id": task_id, "goal_type": goal_type, "step_number": step_number}
+        if extra_fields:
+            self._active_task_goal.update(extra_fields)
 
     def clear_active_task_goal(self):
         self._active_task_goal = None
@@ -267,12 +309,13 @@ class TaskManager:
     def planning_goal_text(self, task: Dict, character_desc: str) -> str:
         """Generate goal text for the plan-generation phase."""
         return (
-            f"You have been given a new task:\n"
+            f"You are producing a plan. Answer without performing the target task, using only think and create-note tools:\n"
+            f"Given your full set of tools and capabilities, could you plausibly accomplish this:\n"
             f"\"{task['description']}\"\n\n"
-            f"Your character:\n{character_desc}\n\n"
             f"Assess whether this task is feasible with your available tools and capabilities.\n"
-            f"If feasible, create a Note named '_task_plan_draft' containing a JSON array of "
-            f"high-level steps (3-7 steps). Each step should be a JSON object with keys: "
+            f"If feasible, create a Note named '_task_plan_draft' containing a JSON array containing "
+            f"a minimal set of correct and robust high-level steps (3-7 steps) for achieving the task.\n"
+            f" Each step should be a JSON object with keys:\n "
             f"\"description\" (what to accomplish) and \"expected_artifacts\" (what to produce).\n"
             f"If not feasible, explain why in your FINAL_ANSWER and create no Note.\n"
             f"Output ONLY the JSON array in the Note, no wrapper object."

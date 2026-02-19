@@ -1784,7 +1784,7 @@ END_EVAL"""
     return ""
 
 
-def _vision_eval_deep(vision_criteria: str, eval_target: str, classifier_result: str, executor, compressed_context: str = "") -> str:
+def _vision_eval_deep(vision_criteria: str, eval_target: str, classifier_result: str, executor: InfospaceExecutor, compressed_context: str = "") -> str:
     """
     Deep vision evaluation via subplanner. Has full access to all pipeline bindings
     and can issue load/inspect calls to verify content, coverage, and grounding.
@@ -1840,12 +1840,12 @@ def _vision_eval_deep(vision_criteria: str, eval_target: str, classifier_result:
     
     try:
         logger.info(f"Vision eval deep: starting subplanner for {eval_target}")
-        result = executor.call_subplanner(goal=eval_goal, max_steps=6)
-        if result and not result.startswith("Subplanner failed") and not result.startswith("Subplanner requires"):
-            logger.info(f"Vision eval deep for {eval_target}: {result[:200]}")
-            return result
+        result = executor.call_subplanner(goal=eval_goal, max_steps=8)
+        if result and result.get("success"):
+            logger.info(f"Vision eval deep for {eval_target}: {result['response'][:200]}")
+            return result["response"]
         else:
-            logger.warning(f"Vision eval deep returned: {result[:100] if result else '(empty)'}")
+            logger.warning(f"Vision eval deep returned: {result.get('error', '(empty)')[:100] if result else '(empty)'}")
     except Exception as e:
         logger.warning(f"Vision eval deep failed: {e}")
     return ""
@@ -3880,7 +3880,7 @@ class IncrementalPlanner:
                     similar_plan=None
                 )
             else:
-                return {'error': 'No planner backend available (SGLang, vLLM, Anthropic, or OpenRouter required)'}
+                return {"success": False, 'error': 'No planner backend available (SGLang, vLLM, Anthropic, or OpenRouter required)'}
 
             step = self._find_last_step(state, max_steps)
             # Safely check if done_<step> exists (may not exist if interrupted)
@@ -3938,7 +3938,7 @@ class IncrementalPlanner:
         except Exception as e:
             self.logger.error(f"Incremental planning failed: {e}")
             traceback.print_exc()
-            return {'error': str(e)}
+            return {"success": False, 'error': str(e)}
 
 
     def generate_plan(self, template, goal: str, context: Dict = None, max_steps: int = 16) -> Dict:
@@ -4046,7 +4046,7 @@ class IncrementalPlanner:
                     vision_criteria=vision_criteria
                 )
             else:
-                return {'error': 'No planner backend available (SGLang, vLLM, Anthropic, or OpenRouter required)'}
+                return {"success": False, 'error': 'No planner backend available (SGLang, vLLM, Anthropic, or OpenRouter required)'}
 
             step = self._find_last_step(state, max_steps)
             # Safely check if done_<step> exists (may not exist if interrupted)
@@ -4140,7 +4140,7 @@ class IncrementalPlanner:
         except Exception as e:
             self.logger.error(f"Incremental planning failed: {e}")
             traceback.print_exc()
-            return {"success": False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
 
     def _generate_vision(self, goal_text: str) -> str:

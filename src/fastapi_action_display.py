@@ -1425,6 +1425,7 @@ Generated: {generated_at}
             try:
                 if self.shutdown_in_progress:
                     return {"success": False, "message": "Shutdown already in progress"}
+                self.shutdown_in_progress = True
                 
                 # First save all data
                 save_data = {
@@ -1447,6 +1448,7 @@ Generated: {generated_at}
                     pass
                 return {"success": True, "message": "Save and shutdown requested"}
             except Exception as e:
+                self.shutdown_in_progress = False
                 return {"success": False, "message": f"Error: {str(e)}"}
         
         @self.app.get("/api/character/{character_name}/inventory")
@@ -1501,6 +1503,7 @@ Generated: {generated_at}
             try:
                 if self.shutdown_in_progress:
                     return {"success": False, "message": "Shutdown already in progress"}
+                self.shutdown_in_progress = True
                 try:
                     self.launcher_shutdown_publisher.put(json.dumps({
                         "timestamp": datetime.now().isoformat(),
@@ -1511,6 +1514,7 @@ Generated: {generated_at}
                     pass
                 return {"success": True, "message": "Shutdown requested"}
             except Exception as e:
+                self.shutdown_in_progress = False
                 return {"success": False, "message": f"Error: {str(e)}"}
         
         @self.app.post("/api/time/delay")
@@ -4437,8 +4441,13 @@ Generated: {generated_at}
                                     ${total ? `<span style="margin-left: 4px; color: #888; font-size: 11px;">${curr}/${total}</span>` : ''}
                                 </div>
                                 <div onclick="event.stopPropagation();">
-                                    <button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', 'proceed')" style="background: #00d4ff; color: #1a1a1a; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer; margin-right: 4px;">Proceed</button>
-                                    <button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', 'terminate ${t.task_id || ''}')" style="background: #ff6b6b; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer;">Terminate</button>
+                                    ${status === 'blocked'
+                                        ? `<button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', 'unblock ${t.task_id || ''}')" style="background: #f39c12; color: #1a1a1a; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer; margin-right: 4px;">Unblock</button>`
+                                        : status === 'completed'
+                                            ? `<button onclick="event.stopPropagation(); proceedOrReuseTask('${escapedChar}', '${t.task_id || ''}', '${(t.name || '').replace(/'/g, "\\'")}')" style="background: #9b59b6; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer; margin-right: 4px;">Proceed (Reuse)</button>`
+                                            : `<button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', 'proceed ${t.task_id || ''}')" style="background: #00d4ff; color: #1a1a1a; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer; margin-right: 4px;">Proceed</button>`
+                                    }
+                                    <button onclick="event.stopPropagation(); confirmTerminateTask('${escapedChar}', '${t.task_id || ''}', '${(t.name || '').replace(/'/g, "\\'")}')" style="background: #ff6b6b; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer;">Terminate</button>
                                 </div>
                             </div>
                             <div id="${taskId}" class="task-accordion-body" style="display: none; padding: 10px; border-top: 1px solid #404040; background: #1e1e1e; font-size: 11px;">
@@ -4468,8 +4477,33 @@ Generated: {generated_at}
                 const result = await response.json();
                 if (result.success) {
                     if (activeCharacter === character) loadTasksList(character);
+                    return true;
                 }
-            } catch (e) { console.error('sendTaskCommand:', e); }
+                return false;
+            } catch (e) {
+                console.error('sendTaskCommand:', e);
+                return false;
+            }
+        }
+
+        async function sendTaskCommandSequence(character, commands) {
+            for (const cmd of commands) {
+                const ok = await sendTaskCommand(character, cmd);
+                if (!ok) return false;
+            }
+            return true;
+        }
+
+        function confirmTerminateTask(character, taskId, taskName) {
+            const label = taskName || taskId || 'this task';
+            if (!confirm(`Terminate ${label}?`)) return;
+            sendTaskCommand(character, `terminate ${taskId}`);
+        }
+
+        function proceedOrReuseTask(character, taskId, taskName) {
+            const label = taskName || taskId || 'this task';
+            if (!confirm(`Reuse existing plan for ${label} and proceed from step 1?`)) return;
+            sendTaskCommandSequence(character, [`reuse ${taskId}`, `proceed ${taskId}`]);
         }
         
         function updateWorldStateDisplay(data) {
