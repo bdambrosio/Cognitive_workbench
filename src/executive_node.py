@@ -2195,7 +2195,7 @@ class ZenohExecutiveNode:
                 # Continue anyway - note will be saved when resource manager saves
             
             # Add the summary note (already created by synthesize tool) to conversation_history
-            add_action = {"type": "add", "target": "conversation_history", "value": "$summary", "out": "conversation_history"}
+            add_action = {"type": "add", "target": "conversation_history", "value": "$summary", "out": "$conversation_history"}
             add_result = self.infospace_executor.execute_action(add_action)
             
             if add_result.get('status') == 'success':
@@ -2690,13 +2690,26 @@ class ZenohExecutiveNode:
                 result_str = self._truncate_result(last_action.result)
                 recent_context += f"\n# Last action:\n  {last_action.action.get('type')}: {last_action.action.get('target')} - {result_str}\n"
             
+            # Resolve declared output_artifacts for the current task step (used as eval target hint)
+            step_output_artifacts = []
+            active_goal = self.task_manager.active_task_goal if self.task_manager else None
+            if active_goal and active_goal.get("goal_type") == "execute":
+                task_for_context = self.task_manager.get_task(active_goal["task_id"])
+                if task_for_context:
+                    plan_steps = task_for_context.get("abstract_plan", [])
+                    step_idx = task_for_context.get("current_step", 1) - 1
+                    if 0 <= step_idx < len(plan_steps):
+                        oa = plan_steps[step_idx].get("output_artifacts", [])
+                        step_output_artifacts = oa if isinstance(oa, list) else ([oa] if oa else [])
+
             # Build context for planner (always needed for infospace)
             context = {
                 'variables': self.infospace_executor.plan_bindings_flat if self.infospace_executor else {},
                 'character_context': character_context,
                 'situation_context': self._build_situation_context(),
                 'recent_context': recent_context,
-                'executor': self.infospace_executor  # Pass executor for incremental planner
+                'executor': self.infospace_executor,  # Pass executor for incremental planner
+                'output_artifacts': step_output_artifacts,
             }
             
             # Initialize plan identifiers before plan generation (needed for incremental planner action tracking)

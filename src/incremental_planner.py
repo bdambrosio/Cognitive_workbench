@@ -1309,10 +1309,20 @@ def extract_code_block(raw_text: str) -> str:
     if text.upper().startswith("CODE:"):
         text = text[5:].strip()
     
-    # Try to extract from triple backtick fences
+    # Try to extract from complete triple backtick fences
     fence_match = re.search(r'```(?:python)?\s*\n(.*?)```', text, re.DOTALL)
     if fence_match:
         return fence_match.group(1).strip()
+
+    # Handle incomplete fenced blocks (common when generation is stopped at closing fence)
+    # e.g. "```python\n...code..." or "```\n...code..."
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].strip().startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        return "\n".join(lines).strip()
     
     # Fallback: return everything (may already be raw code)
     return text.strip()
@@ -1790,16 +1800,10 @@ def _vision_eval_deep(vision_criteria: str, eval_target: str, classifier_result:
     and can issue load/inspect calls to verify content, coverage, and grounding.
     
     Invoked at the done gate as a read-only quality check on a goal-level artifact.
-    Falls back to empty string on vLLM/OpenRouter (subplanner requires SGLang).
     
     Returns evaluation text or empty string if skipped/unavailable.
     """
     if not vision_criteria or not eval_target:
-        return ""
-    
-    # Subplanner requires SGLang runtime
-    if not HAS_SGLANG or not getattr(executor, 'runtime', None):
-        logger.debug("Vision eval deep: skipped (requires SGLang runtime)")
         return ""
     
     # Build the evaluation goal for the subplanner
@@ -2045,7 +2049,7 @@ if HAS_SGLANG:
     
     @function
     def tool_planner_infospace(s, template, goal: str, world_model: Dict, character_context: str, recent_context: str, 
-                              tools_catalog_text: str, executor, trace_file=None, max_steps: int = 16, similar_plan: Dict = None, preplan: str = None, vision_criteria: str = ""):
+                              tools_catalog_text: str, executor, trace_file=None, max_steps: int = 16, similar_plan: Dict = None, preplan: str = None, vision_criteria: str = "", output_artifacts: List[str] = None):
         """
         SGLang incremental planner for infospace goals.
         
@@ -2254,7 +2258,16 @@ ALWAYS follow all formatting instructions exactly.
         # Main loop
         current_task = s["first_task"].strip()
         goal_artifact_var = _ensure_goal_artifact_binding(executor)
-        last_eval_target = goal_artifact_var if goal_artifact_var else ""
+        # Fix B: seed eval target from declared step output_artifacts (first one); fall back to $goal_artifact
+        _declared_output_artifacts = output_artifacts or []
+        if _declared_output_artifacts:
+            first_oa = _declared_output_artifacts[0].strip()
+            if not first_oa.startswith("$"):
+                first_oa = "$" + first_oa
+            last_eval_target = first_oa
+            logger.info(f"Eval target seeded from declared output_artifacts: {last_eval_target}")
+        else:
+            last_eval_target = goal_artifact_var if goal_artifact_var else ""
         stall_guard_state = {"prev_signature": None, "repeat_count": 0}
         for step in range(max_steps):
             if _interrupt_requested(executor):
@@ -2327,17 +2340,28 @@ ALWAYS follow all formatting instructions exactly.
             )
             
             # Vision evaluation before planner reflects
+            # Fix B: if declared output_artifacts are present, check if the first one is now bound
             eval_target = ""
-            if new_bindings:
-                preferred_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and (rid.startswith("Note_") or rid.startswith("Collection_")) and not str(k).startswith("_") and str(k) != "code_block_output"]
-                if preferred_keys:
-                    eval_target = "$" + preferred_keys[-1].lstrip("$")
+            if _declared_output_artifacts and executor:
+                first_oa = _declared_output_artifacts[0].strip()
+                lookup_key = first_oa.lstrip("$")
+                resolved = executor.plan_bindings_flat.get(lookup_key) or executor.plan_bindings_flat.get("$" + lookup_key)
+                if resolved:
+                    eval_target = "$" + lookup_key
+            # Fix A fallback: prefer last Collection over last Note when no declared output matched yet
+            if not eval_target and new_bindings:
+                collection_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and rid.startswith("Collection_") and not str(k).startswith("_") and str(k) != "code_block_output"]
+                note_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and rid.startswith("Note_") and not str(k).startswith("_") and str(k) != "code_block_output"]
+                if collection_keys:
+                    eval_target = "$" + collection_keys[-1].lstrip("$")
+                elif note_keys:
+                    eval_target = "$" + note_keys[-1].lstrip("$")
                 else:
                     last_key = list(new_bindings.keys())[-1]
                     if not last_key.startswith('$'):
                         last_key = '$' + last_key
                     eval_target = last_key
-            elif code_block_output_created:
+            if not eval_target and code_block_output_created:
                 eval_target = "$code_block_output"
             if eval_target:
                 synced_eval_target = _sync_goal_artifact_from_target(executor, eval_target)
@@ -2810,7 +2834,7 @@ def vllm_gen_multi(prompt: str, state: Dict[str, Any], specs: List[Dict],
 def tool_planner_infospace_vllm(template, goal: str, world_model: Dict, character_context: str, recent_context: str, 
                                  tools_catalog_text: str, executor, trace_file=None, max_steps: int = 16, 
                                  similar_plan: Dict = None, preplan: str = None, vllm_url: str = None,
-                                 model: str = None, vision_criteria: str = ""):
+                                 model: str = None, vision_criteria: str = "", output_artifacts: List[str] = None):
     """
     vLLM-based incremental planner for infospace goals (alternative to SGLang version).
     
@@ -3114,7 +3138,16 @@ ALWAYS follow all formatting instructions exactly.
         logger.warning("No first_task found, using goal as initial task")
         current_task = goal_for_step
     goal_artifact_var = _ensure_goal_artifact_binding(executor)
-    last_eval_target = goal_artifact_var if goal_artifact_var else ""
+    # Fix B: seed eval target from declared step output_artifacts (first one); fall back to $goal_artifact
+    _declared_output_artifacts = output_artifacts or []
+    if _declared_output_artifacts:
+        first_oa = _declared_output_artifacts[0].strip()
+        if not first_oa.startswith("$"):
+            first_oa = "$" + first_oa
+        last_eval_target = first_oa
+        logger.info(f"Eval target seeded from declared output_artifacts: {last_eval_target}")
+    else:
+        last_eval_target = goal_artifact_var if goal_artifact_var else ""
     stall_guard_state = {"prev_signature": None, "repeat_count": 0}
     for step in range(max_steps):
         if _interrupt_requested(executor):
@@ -3185,17 +3218,29 @@ ALWAYS follow all formatting instructions exactly.
         )
         
         # Vision evaluation before planner reflects
+        # Fix B: if declared output_artifacts are present, check if the first one is now bound
         eval_target = ""
-        if new_bindings:
-            preferred_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and (rid.startswith("Note_") or rid.startswith("Collection_")) and not str(k).startswith("_") and str(k) != "code_block_output"]
-            if preferred_keys:
-                eval_target = "$" + preferred_keys[-1].lstrip("$")
+        if _declared_output_artifacts and executor:
+            first_oa = _declared_output_artifacts[0].strip()
+            lookup_key = first_oa.lstrip("$")
+            resolved = executor.plan_bindings_flat.get(lookup_key) or executor.plan_bindings_flat.get("$" + lookup_key)
+            if resolved:
+                oa_var = "$" + lookup_key
+                eval_target = oa_var
+        # Fix A fallback: prefer last Collection over last Note when no declared output matched yet
+        if not eval_target and new_bindings:
+            collection_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and rid.startswith("Collection_") and not str(k).startswith("_") and str(k) != "code_block_output"]
+            note_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and rid.startswith("Note_") and not str(k).startswith("_") and str(k) != "code_block_output"]
+            if collection_keys:
+                eval_target = "$" + collection_keys[-1].lstrip("$")
+            elif note_keys:
+                eval_target = "$" + note_keys[-1].lstrip("$")
             else:
                 last_key = list(new_bindings.keys())[-1]
                 if not last_key.startswith('$'):
                     last_key = '$' + last_key
                 eval_target = last_key
-        elif code_block_output_created:
+        if not eval_target and code_block_output_created:
             eval_target = "$code_block_output"
         if eval_target:
             synced_eval_target = _sync_goal_artifact_from_target(executor, eval_target)
@@ -3779,6 +3824,56 @@ class IncrementalPlanner:
                 break
         return last_step if last_step >= 0 else max_steps - 1
     
+    def _run_tool_planner_backend(
+        self,
+        template,
+        goal: str,
+        world_model: Dict,
+        character_context: str,
+        recent_context: str,
+        max_steps: int,
+        preplan: str,
+        similar_plan: Optional[Dict] = None,
+        vision_criteria: str = "",
+        output_artifacts: Optional[List[str]] = None,
+    ):
+        """Run the core tool planner using any configured backend."""
+        if (self.vllm_model_path and self.vllm_model) or (self.openrouter_model_path and self.executor.openrouter_model) or (self.anthropic_model_path and self.executor.anthropic_model):
+            return tool_planner_infospace_vllm(
+                template=template,
+                goal=goal,
+                world_model=world_model,
+                character_context=character_context,
+                recent_context=recent_context,
+                tools_catalog_text=self.tools_catalog_text,
+                executor=self.executor,
+                trace_file=self.trace_file,
+                max_steps=max_steps,
+                preplan=preplan,
+                similar_plan=similar_plan,
+                vllm_url=self.vllm_url,
+                model=self.vllm_model,
+                vision_criteria=vision_criteria,
+                output_artifacts=output_artifacts or [],
+            )
+        if HAS_SGLANG and self.executor.runtime:
+            return tool_planner_infospace.run(
+                template=template,
+                goal=goal,
+                world_model=world_model,
+                character_context=character_context,
+                recent_context=recent_context,
+                tools_catalog_text=self.tools_catalog_text,
+                executor=self.executor,
+                trace_file=self.trace_file,
+                max_steps=max_steps,
+                preplan=preplan,
+                similar_plan=similar_plan,
+                vision_criteria=vision_criteria,
+                output_artifacts=output_artifacts or [],
+            )
+        raise RuntimeError("No planner backend available (SGLang, vLLM, Anthropic, or OpenRouter required)")
+
     def __del__(self):
         """Cleanup: close trace file on instance destruction."""
         if hasattr(self, 'trace_file') and self.trace_file:
@@ -3847,40 +3942,18 @@ class IncrementalPlanner:
                 
             #
            
-            # Run planner (SGLang or vLLM)
             world_model = initial_world_model
-            if self.vllm_model_path and self.vllm_model:
-                # Use vLLM planner
-                state = tool_planner_infospace_vllm(
-                    template=template,
-                    goal=goal,
-                    world_model=world_model,
-                    character_context=character_context,
-                    recent_context=recent_context,
-                    tools_catalog_text=self.tools_catalog_text,
-                    executor=self.executor,
-                    trace_file=self.trace_file,
-                    max_steps=max_steps,
-                    preplan=preplan,
-                    similar_plan=None
-                )
-            elif HAS_SGLANG and self.executor.runtime:
-                # Use SGLang planner
-                state = tool_planner_infospace.run(
-                    template=template,
-                    goal=goal,
-                    world_model=world_model,
-                    character_context=character_context,
-                    recent_context=recent_context,
-                    tools_catalog_text=self.tools_catalog_text,
-                    executor=self.executor,
-                    trace_file=self.trace_file,
-                    max_steps=max_steps,
-                    preplan=preplan,
-                    similar_plan=None
-                )
-            else:
-                return {"success": False, 'error': 'No planner backend available (SGLang, vLLM, Anthropic, or OpenRouter required)'}
+            state = self._run_tool_planner_backend(
+                template=template,
+                goal=goal,
+                world_model=world_model,
+                character_context=character_context,
+                recent_context=recent_context,
+                max_steps=max_steps,
+                preplan=preplan,
+                similar_plan=None,
+                vision_criteria="",
+            )
 
             step = self._find_last_step(state, max_steps)
             # Safely check if done_<step> exists (may not exist if interrupted)
@@ -3979,10 +4052,12 @@ class IncrementalPlanner:
             character_context = ""
             recent_context = ""
             situation_context = ""
+            output_artifacts = []
             if context:
                 character_context = context.get('character_context', '')
                 recent_context = context.get('recent_context', '')
                 situation_context = context.get('situation_context', '')
+                output_artifacts = context.get('output_artifacts', []) or []
             if situation_context:
                 recent_context = f"\n# SITUATION AWARENESS\n{situation_context}\n" + recent_context
             recent_context += self.build_context(goal=goal)
@@ -4009,44 +4084,19 @@ class IncrementalPlanner:
                 for line in traceback.format_stack():
                     logger.error(line.rstrip())
             
-            # Run planner (SGLang, vLLM, or OpenRouter)
             world_model = initial_world_model
-            if (self.vllm_model_path and self.vllm_model) or (self.openrouter_model_path and self.executor.openrouter_model) or (self.anthropic_model_path and self.executor.anthropic_model):
-                # Use vLLM/OpenRouter planner (both use same function since executor.llm_generate routes correctly)
-                state = tool_planner_infospace_vllm(
-                    template=template,
-                    goal=goal,
-                    world_model=world_model,
-                    character_context=character_context,
-                    recent_context=recent_context,
-                    tools_catalog_text=self.tools_catalog_text,
-                    executor=self.executor,
-                    trace_file=self.trace_file,
-                    max_steps=max_steps,
-                    preplan=preplan,
-                    similar_plan=similar_plans[0] if similar_plans else None,
-                    vllm_url=self.vllm_url,
-                    model=self.vllm_model,
-                    vision_criteria=vision_criteria
-                )
-            elif HAS_SGLANG and self.executor.runtime:
-                # Use SGLang planner
-                state = tool_planner_infospace.run(
-                    template=template,
-                    goal=goal,
-                    world_model=world_model,
-                    character_context=character_context,
-                    recent_context=recent_context,
-                    tools_catalog_text=self.tools_catalog_text,
-                    executor=self.executor,
-                    trace_file=self.trace_file,
-                    max_steps=max_steps,
-                    preplan=preplan,
-                    similar_plan=similar_plans[0] if similar_plans else None,
-                    vision_criteria=vision_criteria
-                )
-            else:
-                return {"success": False, 'error': 'No planner backend available (SGLang, vLLM, Anthropic, or OpenRouter required)'}
+            state = self._run_tool_planner_backend(
+                template=template,
+                goal=goal,
+                world_model=world_model,
+                character_context=character_context,
+                recent_context=recent_context,
+                max_steps=max_steps,
+                preplan=preplan,
+                similar_plan=similar_plans[0] if similar_plans else None,
+                vision_criteria=vision_criteria,
+                output_artifacts=output_artifacts,
+            )
 
             step = self._find_last_step(state, max_steps)
             # Safely check if done_<step> exists (may not exist if interrupted)
