@@ -4441,7 +4441,7 @@ Generated: {generated_at}
                                 <div style="flex: 1; min-width: 0;">
                                     <span style="font-weight: bold; color: #00d4ff;">${escapeHtml(t.name || t.task_id || 'Task')}</span>
                                     <span style="margin-left: 6px; font-size: 10px; padding: 2px 6px; border-radius: 3px; background: #404040;">${status}</span>
-                                    ${total ? `<span style="margin-left: 4px; color: #888; font-size: 11px;">${curr}/${total}</span>` : ''}
+                                    ${total ? `<span style="margin-left: 4px; color: #888; font-size: 11px;">Phase ${curr}/${total}</span>` : ''}
                                     ${total ? `<div style="margin-top: 3px; color: #a8b3c7; font-size: 10px;">in: ${escapeHtml(currInputs.join(', ') || 'none')} | out: ${escapeHtml(currOutputs.join(', ') || 'none')}</div>` : ''}
                                 </div>
                                 <div onclick="event.stopPropagation();">
