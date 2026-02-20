@@ -4445,12 +4445,8 @@ Generated: {generated_at}
                                     ${total ? `<div style="margin-top: 3px; color: #a8b3c7; font-size: 10px;">in: ${escapeHtml(currInputs.join(', ') || 'none')} | out: ${escapeHtml(currOutputs.join(', ') || 'none')}</div>` : ''}
                                 </div>
                                 <div onclick="event.stopPropagation();">
-                                    ${status === 'blocked'
-                                        ? `<button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', 'unblock ${t.task_id || ''}')" style="background: #f39c12; color: #1a1a1a; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer; margin-right: 4px;">Unblock</button>`
-                                        : status === 'completed'
-                                            ? `<button onclick="event.stopPropagation(); proceedOrReuseTask('${escapedChar}', '${t.task_id || ''}', '${(t.name || '').replace(/'/g, "\\'")}')" style="background: #9b59b6; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer; margin-right: 4px;">Proceed (Reuse)</button>`
-                                            : `<button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', 'proceed ${t.task_id || ''}')" style="background: #00d4ff; color: #1a1a1a; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer; margin-right: 4px;">Proceed</button>`
-                                    }
+                                    ${status !== 'blocked' ? `<button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', 'proceed ${t.task_id || ''}')" style="background: #00d4ff; color: #1a1a1a; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer; margin-right: 4px;">Proceed</button>` : `<button onclick="event.stopPropagation(); confirmUnblockTask('${escapedChar}', '${t.task_id || ''}', '${(t.name || '').replace(/'/g, "\\'")}')" style="background: #f39c12; color: #1a1a1a; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer; margin-right: 4px;">Unblock</button>`}
+                                    <button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', 'reuse ${t.task_id || ''}')" style="background: #9b59b6; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer; margin-right: 4px;">Reuse</button>
                                     <button onclick="event.stopPropagation(); confirmTerminateTask('${escapedChar}', '${t.task_id || ''}', '${(t.name || '').replace(/'/g, "\\'")}')" style="background: #ff6b6b; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer;">Terminate</button>
                                 </div>
                             </div>
@@ -4504,10 +4500,10 @@ Generated: {generated_at}
             sendTaskCommand(character, `terminate ${taskId}`);
         }
 
-        function proceedOrReuseTask(character, taskId, taskName) {
+        function confirmUnblockTask(character, taskId, taskName) {
             const label = taskName || taskId || 'this task';
-            if (!confirm(`Reuse existing plan for ${label} and proceed from step 1?`)) return;
-            sendTaskCommandSequence(character, [`reuse ${taskId}`, `proceed ${taskId}`]);
+            if (!confirm(`Unblock ${label}? This clears blocked status.`)) return;
+            sendTaskCommand(character, `unblock ${taskId}`);
         }
         
         function updateWorldStateDisplay(data) {

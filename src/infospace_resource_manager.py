@@ -1346,6 +1346,43 @@ class InfospaceResourceManager:
         
         return True, None
     
+    def set_resource_name(self, resource_id: str, name: str) -> Tuple[bool, Optional[str]]:
+        """
+        Assign or update the stable name of an existing Note or Collection.
+        Registers the name for lookup (load by name, _resolve_resource_id).
+        
+        Args:
+            resource_id: Note or Collection ID
+            name: Stable name to assign (e.g., "berkeley_weather_report")
+            
+        Returns:
+            Tuple of (success, error_msg)
+        """
+        if not name or not isinstance(name, str) or not name.strip():
+            return False, "Name must be a non-empty string"
+        name = name.strip()
+        resource = self.resource_registry.get(resource_id)
+        if not resource:
+            return False, f"Resource {resource_id} not found"
+        props = resource.get('properties', {})
+        if resource_id.startswith('Note_'):
+            old_name = props.get('note_name')
+            if old_name and self.named_notes.get(old_name) == resource_id:
+                del self.named_notes[old_name]
+            props['note_name'] = name
+            self.named_notes[name] = resource_id
+            logger.info(f"📝 Named Note {resource_id} as '{name}'")
+        elif resource_id.startswith('Collection_'):
+            old_name = props.get('collection_name')
+            if old_name and self.named_collections.get(old_name) == resource_id:
+                del self.named_collections[old_name]
+            props['collection_name'] = name
+            self.named_collections[name] = resource_id
+            logger.info(f"📚 Named Collection {resource_id} as '{name}'")
+        else:
+            return False, f"Cannot set name on {resource_id} (only Notes and Collections supported)"
+        return True, None
+    
     # ==================== Indexing ====================
     
     def index_collection(self, agent_name: str, collection_id: str,

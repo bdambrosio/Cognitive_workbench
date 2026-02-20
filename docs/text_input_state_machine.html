@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Executive Node — Text Input State Machine</title>
+<style>
+  body {
+    margin: 0; padding: 20px;
+    background: #1a1a2e; color: #e0e0e0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+  }
+  h1 { color: #e0e0e0; font-size: 1.4em; margin-bottom: 4px; }
+  .subtitle { color: #888; font-size: 0.9em; margin-bottom: 20px; }
+  .mermaid {
+    background: #16213e; border-radius: 12px; padding: 24px;
+    overflow-x: auto;
+  }
+  .legend {
+    margin-top: 20px; padding: 16px; background: #16213e;
+    border-radius: 8px; font-size: 0.85em; line-height: 1.6;
+  }
+  .legend h3 { margin-top: 0; color: #a0c4ff; }
+  .legend code { background: #0f3460; padding: 2px 6px; border-radius: 3px; color: #e8d44d; }
+</style>
+</head>
+<body>
+
+<h1>Executive Node — Text Input Processing State Machine</h1>
+<p class="subtitle">Traces how UI pane text inputs flow through sense_data_callback → main loop → _process_text_input</p>
+
+<div class="mermaid">
+flowchart TD
+    subgraph INGRESS["① sense_data_callback"]
+        A1["📥 Receive sense_data\nfrom UI / console"] --> A2{"Parse content\nas JSON?"}
+        A2 -->|"✓ JSON"| A3["Extract text, source"]
+        A2 -->|"✗ fallback"| A4["Plain text\nsource = 'console'"]
+        A3 --> A5["Enqueue to text_input_queue\n(max 3, FIFO drop)"]
+        A4 --> A5
+        A5 --> A6["conversation_store\n.record_incoming()"]
+        A6 --> A7{"Starts with\n'goal:' & paused?"}
+        A7 -->|yes| A8["🚀 Auto-unpause\npublish state"]
+        A7 -->|no| A9["Wait in queue"]
+    end
+
+    subgraph MAINLOOP["② Main Loop (run)"]
+        B1{"execution_paused?"} -->|yes| B2["Scan queue for\ngoal:/User/agent triggers"]
+        B2 -->|"found"| B3["Unpause"]
+        B2 -->|"nothing"| B4["sleep(0.2)"]
+        B1 -->|no| B5{"awaiting_ask_response?"}
+        B5 -->|yes| B7["⏭ Skip queue\n(ask polls directly)"]
+        B5 -->|no| B6{"Queue\nnon-empty?"}
+        B6 -->|yes| C0["_process_text_input()"]
+        B6 -->|no| B7
+        B7 --> B8["_run_ooda_loop()"]
+        B3 --> B5
+    end
+
+    subgraph PROCESS["③ _process_text_input — User routing"]
+        C0 --> C1["Pop from queue\nparse content/source"]
+        C1 --> C2{"source?"}
+        C2 -->|"User"| D1
+        C2 -->|"agent"| E1
+
+        D1{"Starts with '{' ?"} -->|"valid action JSON"| D1a["🔧 Direct execute\nvia infospace_executor"]
+        D1 -->|no| D2{"'goal:' prefix?"}
+        D2 -->|yes| D2a["🎯 parse_and_set_goal()\nclear plan, plan immediately"]
+        D2 -->|no| D3{"'task:' prefix?"}
+        D3 -->|yes| D3a["📋 _handle_task_create()"]
+        D3 -->|no| D4{"'proceed'\n'next step'?"}
+        D4 -->|yes| D4a["▶ _handle_task_proceed()"]
+        D4 -->|no| D5{"'terminate'?"}
+        D5 -->|yes| D5a["⛔ _handle_task_terminate()"]
+        D5 -->|no| D6{"'reuse' / 'unblock'\n'tasks'?"}
+        D6 -->|yes| D6a["Task management\ncommand handlers"]
+        D6 -->|no| D7{"End phrase?\ngoodbye/bye/done"}
+        D7 -->|yes| D7a["🔚 close_dialog('User')"]
+        D7 -->|no| D8{"Mentions agent +\ndialog keyword?"}
+        D8 -->|yes| D8a["🗣 Wrap as dialog goal\n'Initiate dialog with {agent}'"]
+        D8 -->|no| D9["💬 Regular conversation"]
+        D9 --> D10["_envision_conversation_turn()\ngoal = 'Respond to User'\nparse_and_set_goal()"]
+    end
+
+    subgraph AGENT["③b _process_text_input — Agent routing"]
+        E1{"Duplicate\nmessage?"} -->|yes| E1a["Skip"]
+        E1 -->|no| E2{"close_flag?"}
+        E2 -->|yes| E2a["close_dialog(source)\nset cooldown"]
+        E2 -->|no| E3{"Within 10s\ncooldown?"}
+        E3 -->|yes| E3a["Suppress"]
+        E3 -->|no| E4["_envision_conversation_turn()"]
+        E4 --> E5{"turn_count ≥ 8?"}
+        E5 -->|yes| E5a["Enforce closure\nin context"]
+        E5 -->|no| E5b["Normal dialog goal"]
+        E5a --> E6["parse_and_set_goal()\n'Continue dialog with {source}'"]
+        E5b --> E6
+    end
+
+    A8 --> B1
+    A9 --> B1
+
+    style INGRESS fill:#0f3460,stroke:#a0c4ff,color:#fff
+    style MAINLOOP fill:#1a1a40,stroke:#7b68ee,color:#fff
+    style PROCESS fill:#1e3a2b,stroke:#66bb6a,color:#fff
+    style AGENT fill:#3a1a1a,stroke:#ef5350,color:#fff
+</div>
+
+<div class="legend">
+<h3>Key State Variables</h3>
+<p><code>text_input_queue</code> — FIFO buffer (max 3), fed by sense_data_callback, consumed by _process_text_input</p>
+<p><code>execution_paused</code> — gates the main loop; auto-cleared by goal commands and User/agent input</p>
+<p><code>awaiting_ask_response</code> — when true, the ask primitive polls text_input_queue directly, so _process_text_input skips</p>
+<p><code>interrupt_requested</code> — set by stop/interrupt commands; checked at step boundaries by planner</p>
+<p><code>continuous_mode</code> — NOT cleared by stop; user must toggle explicitly</p>
+
+<h3>Dispatch Priority (User source)</h3>
+<p>Direct JSON action → goal: → task: → proceed → terminate → reuse/unblock/tasks → end phrase → dialog-with-agent → regular conversation (envision + goal)</p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' },
+    themeVariables: {
+      primaryColor: '#1e3a5f',
+      primaryTextColor: '#e0e0e0',
+      lineColor: '#7b68ee',
+      secondaryColor: '#0f3460',
+      tertiaryColor: '#1a1a40'
+    }
+  });
+</script>
+</body>
+</html>

@@ -2338,10 +2338,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
     def _execute_persist(self, action: Dict) -> Dict:
         """
         Mark a Note or Collection as persistent (saved to filesystem).
+        Optional name assigns a stable name for later loading by name.
         
         Required: target
-        
-        Once marked persistent, Note or Collection is saved to filesystem on next persist cycle.
+        Optional: name (stable name for load by name, e.g., "berkeley_weather_report")
         
         Target can be:
         - $variable referencing a Note or Collection
@@ -2349,6 +2349,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         - Named resource name (e.g., "minecraft_map", "Jill-minecraft_map")
         """
         target_arg = action.get('target')
+        name_arg = action.get('name')
         
         if not target_arg:
             return self._create_uniform_return('failed', reason='persist requires target')
@@ -2383,13 +2384,18 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         success, error_msg = self.resource_manager.mark_persistent(resource_id, self.agent_name)
         
-        if success:
-            logger.info(f"Marked {resource_id} as persistent")
-            # Return empty value, resource_id is the persisted resource
-            return self._create_uniform_return('success', value=None, resource_id=resource_id)
-        else:
+        if not success:
             logger.error(f'Failed to persist resource: {error_msg}')
             return self._create_uniform_return('failed', reason=error_msg or 'Unknown error')
+        
+        # Optionally assign name for load-by-name
+        if name_arg and isinstance(name_arg, str) and name_arg.strip():
+            name_success, name_err = self.resource_manager.set_resource_name(resource_id, name_arg.strip())
+            if not name_success:
+                logger.warning(f"Persist succeeded but name assignment failed: {name_err}")
+        
+        logger.info(f"Marked {resource_id} as persistent")
+        return self._create_uniform_return('success', value=None, resource_id=resource_id)
     
     def search_resources(self, queries: List[str], k_notes: int = 3, k_collections: int = 2, threshold: float = 0.3) -> Dict:
         """
@@ -2489,11 +2495,12 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         Load a persistent Note or Collection by resource ID or name.
         
-        Required: target, out
-        Optional: slice (Python-style slice string, e.g. "0:4096", "-1000:", ":")
+        Required: target
+        Optional: out (bind loaded resource to variable; omit to load content into context only),
+                  slice (Python-style slice string, e.g. "0:4096", "-1000:", ":")
         
         For Notes: slice units are characters. Default "0:4096".
-        For Collections: slice units are items. Default "0:5". Returns a new Collection.
+        For Collections: slice units are items. Default "0:5". With out: returns new Collection; without out: returns content preview.
         """
         target_arg = action.get('target')
         out_var = action.get('out')
@@ -2501,9 +2508,6 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         if not target_arg:
             return self._create_uniform_return('failed', reason='load requires target')
-        
-        if not out_var:
-            return self._create_uniform_return('failed', reason='load requires out')
         
         # Resolve target (handles $var, resource names, and IDs)
         var_name, error = self._resolve_target_var(target_arg)
@@ -2521,7 +2525,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if not resource:
             return self._create_uniform_return('failed', reason=f'Resource not found: {resource_id}')
         
-        display_var = self._normalize_var_for_log(out_var)
+        display_var = self._normalize_var_for_log(out_var) if out_var else "(context)"
         
         # --- Collection path ---
         if resource_id.startswith('Collection_'):
@@ -2547,16 +2551,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 content = self._get_content(note_id)
                 content_str = str(content) if content is not None else ""
                 sliced_content = content_str  # Full content for single-item unwrap
-                self._bind_variable(out_var, note_id)
+                if out_var:
+                    self._bind_variable(out_var, note_id)
                 prefixed_content = f"Note Content: {sliced_content}"
                 logger.info(f"Loaded {target_arg}[{slice_arg}] → {display_var} = {note_id} (Note, unwrapped from Collection)")
                 return self._create_uniform_return('success', value=prefixed_content, resource_id=note_id)
-            
-            # Create new Collection from slice
-            collection_id = self._create_collection(sliced_ids, f'load_slice')
-            if not collection_id:
-                return self._create_uniform_return('failed', reason='Failed to create Collection from slice')
-            self._bind_variable(out_var, collection_id)
             
             # Build content preview: each item as "Note_ID: first 200 chars..."
             preview_lines = [f"Collection Content ({len(sliced_ids)}/{total} items):"]
@@ -2566,8 +2565,16 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 preview_lines.append(f"- {nid}: {preview}")
             prefixed_content = "\n".join(preview_lines)
             
-            logger.info(f"Loaded {target_arg} → {display_var} = {collection_id} (Collection, {len(sliced_ids)}/{total} items)")
-            return self._create_uniform_return('success', value=prefixed_content, resource_id=collection_id,
+            if out_var:
+                collection_id = self._create_collection(sliced_ids, f'load_slice')
+                if not collection_id:
+                    return self._create_uniform_return('failed', reason='Failed to create Collection from slice')
+                self._bind_variable(out_var, collection_id)
+                logger.info(f"Loaded {target_arg} → {display_var} = {collection_id} (Collection, {len(sliced_ids)}/{total} items)")
+                return self._create_uniform_return('success', value=prefixed_content, resource_id=collection_id,
+                                                   extra={"item_count": len(sliced_ids), "total_items": total})
+            logger.info(f"Loaded {target_arg} → {display_var} (Collection preview, {len(sliced_ids)}/{total} items)")
+            return self._create_uniform_return('success', value=prefixed_content, resource_id=resource_id,
                                                extra={"item_count": len(sliced_ids), "total_items": total})
         
         # --- Note path ---
@@ -2586,7 +2593,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             sl = slice(0, self.LOAD_MAX_NOTE_CHARS)
             sliced_content = content_str[sl][:self.LOAD_MAX_NOTE_CHARS]
         
-        self._bind_variable(out_var, resource_id)
+        if out_var:
+            self._bind_variable(out_var, resource_id)
         prefixed_content = f"Note Content: {sliced_content}"
         
         logger.info(f"Loaded {target_arg} → {display_var} = {resource_id} (Note, {len(sliced_content)}/{total_chars} chars)")

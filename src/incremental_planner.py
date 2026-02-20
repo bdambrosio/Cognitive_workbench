@@ -478,19 +478,19 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "schema_hint": PRIMITIVE_DOCS["create-relation"]["schema_hint"]
         },
         "load": {
-            "description": "Load persistent Note or Collection by ID or name, with optional slice. Notes: slice is characters (default 0:4096). Collections: slice is items (default 0:5), returns a new Collection. Use slice=':' for full content (no limit) or slice='0:N' for explicit amount. For large Notes, use chunked pattern: load slice='0:500' then slice='500:1000' etc.",
-            "full_description": "Load a Note or Collection into planner context. The 'slice' parameter controls how much content is returned, using Python-style syntax: '0:1000' (first 1000), '1500:2000' (chars 1500–2000), '-500:' (last 500), ':' (everything, no limit), '5' (single item). Standard Python semantics including negative indices. Rejects only when both start and stop are non-negative and stop<start. For Notes, units are characters. For Collections, units are items — the result is a new Collection bound to out. Chunked pattern for large content: load slice='0:500' → process → load slice='500:1000' → process → load slice='1500:2000' → process.",
+            "description": "Load persistent Note or Collection by ID or name, with optional slice. Notes: slice is characters (default 0:4096). Collections: slice is items (default 0:5), returns a new Collection. Use slice=':' for full content (no limit) or slice='0:N' for explicit amount. Omit 'out' to load content into context only (no variable binding).",
+            "full_description": "Load a Note or Collection into planner context. The 'slice' parameter controls how much content is returned, using Python-style syntax: '0:1000' (first 1000), '1500:2000' (chars 1500–2000), '-500:' (last 500), ':' (everything, no limit), '5' (single item). Standard Python semantics including negative indices. Rejects only when both start and stop are non-negative and stop<start. For Notes, units are characters. For Collections, units are items — the result is a new Collection bound to out. Omit 'out' to load content into context only (no variable binding). Chunked pattern for large content: load slice='0:500' → process → load slice='500:1000' → process.",
             "examples": [
                 '{"type":"load","target":"$report","slice":":","out":"$full_report"}',
+                '{"type":"load","target":"Note_42","slice":":"}',
                 '{"type":"load","target":"$papers","slice":"0:3","out":"$top_papers"}',
-                '{"type":"load","target":"$doc","slice":"0:500","out":"$chunk1"}',
-                '{"type":"load","target":"$doc","slice":"1500:2000","out":"$chunk3"}'
+                '{"type":"load","target":"$doc","slice":"0:500","out":"$chunk1"}'
             ],
-            "schema_hint": {"target": "string (ID or name) or $variable", "slice": "string (optional, e.g. '0:4096', ':', '0:5')", "out": "$variable"}
+            "schema_hint": {"target": "string (ID or name) or $variable", "slice": "string (optional, e.g. '0:4096', ':', '0:5')", "out": "$variable (optional, omit to load into context only)"}
         },
         "persist": {
-            "description": "Mark Note/Collection as persistent. Use this to save the Note/Collection to the filesystem.",
-            "schema_hint": {"target": "$variable"}
+            "description": "Mark Note/Collection as persistent (saved to filesystem). Optional name assigns a stable name for load-by-name (e.g., persist target=$report name=berkeley_weather_report).",
+            "schema_hint": {"target": "$variable", "name": "string (optional, stable name for load by name)"}
         },
         "discover-notes": {
             "description": "Global discovery across all Notes using embedding-based retrieval. Returns Collection of Notes with text content.",
@@ -1829,6 +1829,7 @@ def _vision_eval_deep(vision_criteria: str, eval_target: str, classifier_result:
         f"{context_block}\n\n"
         f"INSTRUCTIONS:\n"
         f"1. Use load with slice=\":\" to inspect {eval_target} in full.\n"
+        f"2. Use assess or think to check the quality of the artifact.\n"
         f"2. If criteria involve coverage or completeness, load upstream variables "
         f"(e.g., source collections) to check how many items were retained vs. discarded.\n"
         f"3. If criteria involve specificity or accuracy, load source Notes to verify "
