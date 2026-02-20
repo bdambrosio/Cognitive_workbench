@@ -371,19 +371,18 @@ class ResourceBrowser:
             document.getElementById('notes-count').textContent = currentResources.notes.length;
             document.getElementById('collections-count').textContent = currentResources.collections.length;
             
-            notesList.innerHTML = currentResources.notes
-                .map(r => {
-                    const resId = r.id || r.name;
-                    return `<div class="resource-item" onclick="selectResource('${resId}')" oncontextmenu="showContextMenu(event, '${resId}'); return false;">${resId}</div>`;
-                })
-                .join('');
-            
-            collectionsList.innerHTML = currentResources.collections
-                .map(r => {
-                    const resId = r.id || r.name;
-                    return `<div class="resource-item" onclick="selectResource('${resId}')" oncontextmenu="showContextMenu(event, '${resId}'); return false;">${resId}</div>`;
-                })
-                .join('');
+            function resourceItemHtml(r) {
+                const resId = r.id || r.name;
+                const props = r.properties || {};
+                const friendlyName = props.note_name || props.collection_name || '';
+                const nameHtml = friendlyName
+                    ? `<div style="color:#9cdcfe;font-size:11px;margin-top:1px;">${escapeHtml(friendlyName)}</div>`
+                    : '';
+                return `<div class="resource-item" data-resource-id="${resId}" onclick="selectResource('${resId}')" oncontextmenu="showContextMenu(event, '${resId}'); return false;">${resId}${nameHtml}</div>`;
+            }
+
+            notesList.innerHTML = currentResources.notes.map(resourceItemHtml).join('');
+            collectionsList.innerHTML = currentResources.collections.map(resourceItemHtml).join('');
         }
         
         function showContextMenu(event, resourceId) {
@@ -437,7 +436,7 @@ class ResourceBrowser:
         async function selectResource(resourceId) {
             // Update selected styling
             document.querySelectorAll('.resource-item').forEach(el => {
-                el.classList.toggle('selected', el.textContent === resourceId);
+                el.classList.toggle('selected', el.dataset.resourceId === resourceId);
             });
             
             selectedResource = resourceId;
@@ -490,6 +489,7 @@ class ResourceBrowser:
             const type = resourceId.startsWith('Note_') ? 'Note' : 'Collection';
             const content = resource.content || '';
             const metadata = resource.properties || {};
+            const friendlyName = metadata.note_name || metadata.collection_name || '';
             
             let metadataHtml = '';
             if (Object.keys(metadata).length > 0) {
@@ -503,7 +503,7 @@ class ResourceBrowser:
             
             display.innerHTML = `
                 <div class="content-header">
-                    <div class="content-title">${escapeHtml(resourceId)}</div>
+                    <div class="content-title">${escapeHtml(resourceId)}${friendlyName ? `<span style="color:#9cdcfe;font-size:13px;font-weight:normal;margin-left:8px;">${escapeHtml(friendlyName)}</span>` : ''}</div>
                     <button class="copy-btn" onclick="copyContent()">📋 Copy</button>
                 </div>
                 ${metadataHtml}
