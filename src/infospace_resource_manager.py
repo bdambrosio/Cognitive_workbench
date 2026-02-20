@@ -733,21 +733,36 @@ class InfospaceResourceManager:
             return self.named_collections[name_or_id]
 
         canonical = name_or_id.capitalize()
+        matches = []
         for resource_id, resource_data in self.resource_registry.items():
+            matched = False
             if str(resource_data.get('name', '')).capitalize() == canonical:
-                return resource_id
-
-            props = resource_data.get('properties', {})
-            note_name = props.get('note_name')
-            if note_name and str(note_name).capitalize() == canonical:
-                return resource_id
-            collection_name = props.get('collection_name')
-            if collection_name and str(collection_name).capitalize() == canonical:
-                return resource_id
-            relation_name = props.get('relation_name')
-            if relation_name and str(relation_name).capitalize() == canonical:
-                return resource_id
-        return None
+                matched = True
+            if not matched:
+                props = resource_data.get('properties', {})
+                note_name = props.get('note_name')
+                if note_name and str(note_name).capitalize() == canonical:
+                    matched = True
+                collection_name = props.get('collection_name')
+                if not matched and collection_name and str(collection_name).capitalize() == canonical:
+                    matched = True
+                relation_name = props.get('relation_name')
+                if not matched and relation_name and str(relation_name).capitalize() == canonical:
+                    matched = True
+            if matched:
+                matches.append(resource_id)
+        if not matches:
+            return None
+        if len(matches) == 1:
+            return matches[0]
+        # Multiple matches: return the most recently created (highest numeric suffix)
+        def _numeric_suffix(rid):
+            parts = rid.rsplit('_', 1)
+            try:
+                return int(parts[-1])
+            except (ValueError, IndexError):
+                return -1
+        return max(matches, key=_numeric_suffix)
 
     def _cleanup_collection(self, collection_id: str):
         """Remove tracking state for a collection."""
