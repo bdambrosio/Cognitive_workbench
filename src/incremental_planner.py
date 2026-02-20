@@ -4008,7 +4008,7 @@ class IncrementalPlanner:
             self.goal = goal
 
             preplan = self._preplan(goal)
-            vision_criteria = self._generate_vision(goal)
+            vision_criteria = self._generate_vision(context.get('vision_goal', goal) if context else goal)
             # Extract context components
             character_context = ""
             recent_context = ""
@@ -4156,22 +4156,20 @@ class IncrementalPlanner:
 
     def _generate_vision(self, goal_text: str) -> str:
         """Generate evaluable quality criteria from the goal (vision for the target artifact)."""
-        VISION_PROMPT = f"""Given the following goal, generate 2-4 concrete, evaluable quality criteria that define what a good output looks like.
+        VISION_PROMPT = f"""Given the following goal, generate 1-3 criteria that check for CLEAR FAILURE MODES only.
 
 GOAL:
 {goal_text}
 
 Instructions:
-- Each criterion should be a testable predicate (answerable as true/false against the output).
-- Focus on quality dimensions: depth, specificity, coverage, structure.
-- Be deliberately open on content (which topics, which specifics) — those emerge from the material.
-- Numeric criteria (e.g., min_sources: 8) will be checked in code.
-- Qualitative criteria (e.g., "contains specific method names, not just category labels") will be checked via LLM assessment.
-- If the goal is simple or direct (e.g., a factual lookup), return "No vision criteria needed."
+- Only check for obvious failures: empty output, completely off-topic content, or structurally broken output (e.g., JSON parse error when JSON is required).
+- Do NOT check quality, depth, specificity, coverage, credibility, recency, or source verification.
+- Do NOT check content correctness (dates, numbers, facts) — the agent is not a fact-checker.
+- If no obvious failure modes apply (e.g., a simple lookup or report), return "No vision criteria needed."
+- Prefer returning "No vision criteria needed." over generating speculative criteria.
 
 Format — number each criterion with a short label:
-1. label: "testable predicate or numeric threshold"
-2. label: "testable predicate or numeric threshold"
+1. label: "testable predicate"
 END_VISION"""
 
         result = self.executor.llm_generate(VISION_PROMPT, max_tokens=192, temperature=GEN_TEMPERATURE, stops=["\nEND_VISION", "END_VISION"])

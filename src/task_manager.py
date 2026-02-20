@@ -375,24 +375,31 @@ class TaskManager:
         for s in plan[:idx]:
             if s.get("status") == STEP_COMPLETED:
                 outputs = ", ".join(s.get("output_artifacts", [])) or "none"
-                completed_summary += f"  Step {s['step']}: {s['description']} → {s.get('outcome', 'done')} [outputs: {outputs}]\n"
+                completed_summary += f"  Phase {s['step']}: {s['description']} → {s.get('outcome', 'done')} [outputs: {outputs}]\n"
 
-        remaining_summary = ""
-        for s in plan[idx + 1:]:
-            remaining_summary += f"  Step {s['step']}: {s['description']}\n"
+        next_phases = plan[idx + 1:]
         step_inputs = ", ".join(step.get("input_artifacts", [])) or "none"
         step_outputs = ", ".join(step.get("output_artifacts", [])) or "none declared"
 
+        scope_fence = ""
+        if next_phases:
+            next_desc = next_phases[0]['description']
+            next_num = next_phases[0]['step']
+            scope_fence = (
+                f"SCOPE BOUNDARY: The output of this phase will be consumed by Phase {next_num}: \"{next_desc}\". "
+                f"Do NOT perform any processing belonging to Phase {next_num} or later during this phase.\n"
+            )
+
         return (
-            f"You are executing a multi-step task.\n"
+            f"You are executing a multi-phase task.\n"
             f"Task: \"{task['description']}\"\n\n"
             f"Your character:\n{character_desc}\n\n"
-            f"{'Prior steps completed:\\n' + completed_summary if completed_summary else ''}"
-            f"CURRENT STEP ({step['step']} of {len(plan)}): {step['description']}\n"
+            f"{'Prior phases completed:\\n' + completed_summary if completed_summary else ''}"
+            f"CURRENT PHASE ({step['step']} of {len(plan)}): {step['description']}\n"
             f"Declared inputs: {step_inputs}\n"
             f"Declared outputs: {step_outputs}\n"
-            f"{'Remaining steps after this:\\n' + remaining_summary if remaining_summary else ''}\n"
-            f"Execute this step. Persist any important output Notes."
+            f"{scope_fence}\n"
+            f"Execute this phase. Persist any important output Notes."
         )
 
     def review_goal_text(self, task: Dict, goal_result: Dict, character_desc: str) -> str:
@@ -404,22 +411,22 @@ class TaskManager:
         final_thoughts = (goal_result.get("response") or "")[:500]
 
         return (
-            f"You just completed a step in a multi-step task. Now review the results.\n"
+            f"You just completed a phase in a multi-phase task. Now review the results.\n"
             f"Task: \"{task['description']}\"\n"
-            f"Step just executed ({idx + 1} of {len(plan)}): {step_desc}\n"
+            f"Phase just executed ({idx + 1} of {len(plan)}): {step_desc}\n"
             f"Outcome: {'success' if success else 'failed'}\n"
             f"Summary: {final_thoughts}\n\n"
             f"Your character:\n{character_desc}\n\n"
             f"Do the following:\n"
-            f"1. Load and inspect the Notes/Collections created during this step.\n"
+            f"1. Load and inspect the Notes/Collections created during this phase.\n"
             f"2. Identify which artifacts are valuable outputs vs intermediate scratch.\n"
             f"3. Delete intermediate artifacts that are not needed going forward.\n"
             f"4. Persist valuable output artifacts.\n"
-            f"5. Assess whether the remaining plan steps are still appropriate given the actual results.\n"
+            f"5. Assess whether the remaining plan phases are still appropriate given the actual results.\n"
             f"6. Create a Note named '_task_review' with a JSON object containing:\n"
             f"   - \"step_outcome\": brief description of what was accomplished\n"
-            f"   - \"output_artifacts\": list of resource names/IDs worth exporting to later steps\n"
-            f"   - \"revised_remaining_steps\": updated array of remaining steps "
+            f"   - \"output_artifacts\": list of resource names/IDs worth exporting to later phases\n"
+            f"   - \"revised_remaining_steps\": updated array of remaining phases "
             f"(same format as planning: objects with \"description\", \"input_artifacts\", and \"output_artifacts\"), "
             f"or null if no changes needed\n"
             f"   - \"blocked\": true/false — is the task blocked?\n"

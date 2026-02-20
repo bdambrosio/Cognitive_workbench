@@ -1808,7 +1808,7 @@ class ZenohExecutiveNode:
         self.task_manager.set_status(task_id, TASK_EXECUTING)
         self.task_manager.set_active_task_goal(task_id, "execute", step_num, pre_resource_ids=list(pre_resource_ids))
         goal_text = self.task_manager.step_execution_goal_text(task, self._character_desc_short())
-        logger.info(f'▶️ {self.character_name} Executing step {step_num} of task {task_id}')
+        logger.info(f'▶️ {self.character_name} Executing phase {step_num} of task {task_id}')
         self.parse_and_set_goal("", goal_text)
 
     def _missing_step_inputs(self, task: Dict) -> List[str]:
@@ -1857,7 +1857,7 @@ class ZenohExecutiveNode:
         if not reset:
             self._say_to_user(f"Failed to reset task '{task_id}' for reuse.")
             return
-        self._say_to_user(f"Task \"{task['name']}\" reset to step 1. Say 'proceed {task_id}' to start.")
+        self._say_to_user(f"Task \"{task['name']}\" reset to phase 1. Say 'proceed {task_id}' to start.")
         logger.info(f'🔁 {self.character_name} Reused task {task_id}')
 
     def _handle_task_terminate(self, task_id: str = None):
@@ -1979,7 +1979,7 @@ class ZenohExecutiveNode:
             self._say_to_user(
                 f"Task accepted: \"{task['name']}\"\n"
                 f"Plan ({len(plan)} steps):\n{plan_summary}\n\n"
-                f"Say 'proceed' to start step 1, or 'terminate' to abandon."
+                f"Say 'proceed' to start phase 1, or 'terminate' to abandon."
             )
         else:
             response = (result.get("response") or "")[:500]
@@ -2719,6 +2719,16 @@ class ZenohExecutiveNode:
                         oa = plan_steps[step_idx].get("output_artifacts", [])
                         step_output_artifacts = oa if isinstance(oa, list) else ([oa] if oa else [])
 
+            # Build scoped vision goal for step execution (avoids _generate_vision using the full task description)
+            vision_goal = goal_text
+            if active_goal and active_goal.get("goal_type") == "execute" and task_for_context:
+                step_idx = task_for_context.get("current_step", 1) - 1
+                plan_steps = task_for_context.get("abstract_plan", [])
+                if 0 <= step_idx < len(plan_steps):
+                    step_desc = plan_steps[step_idx].get("description", "")
+                    step_outs = ", ".join(step_output_artifacts) or "none declared"
+                    vision_goal = f"Step: {step_desc}\nDeclared outputs: {step_outs}"
+
             # Build context for planner (always needed for infospace)
             context = {
                 'variables': self.infospace_executor.plan_bindings_flat if self.infospace_executor else {},
@@ -2727,6 +2737,7 @@ class ZenohExecutiveNode:
                 'recent_context': recent_context,
                 'executor': self.infospace_executor,  # Pass executor for incremental planner
                 'output_artifacts': step_output_artifacts,
+                'vision_goal': vision_goal,
             }
             
             # Initialize plan identifiers before plan generation (needed for incremental planner action tracking)
