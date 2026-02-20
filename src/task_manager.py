@@ -349,12 +349,17 @@ class TaskManager:
             f"Given your full set of tools and capabilities, could you plausibly accomplish this:\n\n"
             f"\"{task['description']}\"\n\n"
 
-            f"If feasible, create a Note named '_task_plan_draft' containing a JSON array containing "
-            f"a Minimal set of correct and robust high-level steps (1-5 steps) for achieving the task.\n"
-            f" Each step will be a goal provided to the planner to execute. A step should be a JSON object with keys:\n "
-            f"\"description\", \"input_artifacts\", and \"output_artifacts\".\n"
+            f"If feasible, create a Note named '_task_plan_draft' containing a JSON array of steps.\n"
+            f"IMPORTANT: Each step is a FULL planning session that can execute many tool calls "
+            f"(search, load, synthesize, create-note, say, etc.) in sequence. "
+            f"Do NOT split sequential tool operations into separate steps. "
+            f"Only create a new step when there is a genuine pause point: "
+            f"human input needed, an external dependency, or a fundamentally different capability. "
+            f"Prefer 1-2 steps. A task that searches, processes, and reports is ONE step.\n"
+            f"Each step is a JSON object with keys: \"description\", \"input_artifacts\", \"output_artifacts\".\n"
             f"Rules: input_artifacts must reference existing resources or prior-step output_artifacts. "
-            f"output_artifacts must name only artifacts this step exports for later steps.\n"
+            f"output_artifacts must name only artifacts this step exports for later steps. "
+            f"The final step's output_artifacts should contain the deliverable.\n"
             f"If not feasible, explain why in your FINAL_ANSWER and create no Note.\n"
             f"Output ONLY the JSON array in the Note, no wrapper object."
         )
@@ -520,10 +525,8 @@ class TaskManager:
                 changed = True
 
             input_artifacts = self._normalize_artifact_list(step.get("input_artifacts"))
-            if not input_artifacts:
-                input_artifacts = list(available_outputs)
-                if step.get("input_artifacts") != input_artifacts:
-                    changed = True
+            if step.get("input_artifacts") != input_artifacts:
+                changed = True
             step["input_artifacts"] = input_artifacts
 
             output_artifacts = self._normalize_artifact_list(step.get("output_artifacts"))
