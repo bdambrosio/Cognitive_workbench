@@ -359,15 +359,10 @@ class InfospaceExecutor:
             String summary/report from the nested planner (or error message).
         """
         try:
-            from incremental_planner import IncrementalPlanner, HAS_SGLANG
+            from incremental_planner import IncrementalPlanner
         except ImportError as e:
             logger.error(f"Subplanner unavailable: {e}")
             return {"success": False, "error": f"Subplanner unavailable: {e}"}
-        
-        if not HAS_SGLANG or not self.runtime:
-            msg = "Subplanner requires SGLang runtime; unavailable in current configuration"
-            logger.warning(msg)
-            return msg
         
         # Push new binding scope for subplanner (copy outer scope for read access)
         logger.info(f"Pushing binding scope for subplanner, goal: {goal}")
@@ -378,7 +373,12 @@ class InfospaceExecutor:
             planner = IncrementalPlanner(
                 executor=self,
                 available_tools=self.available_tools,
-                logger_instance=logger
+                logger_instance=logger,
+                vllm_model_path=self.vllm_model if self.vllm_model else None,
+                vllm_url=self.vllm_url,
+                vllm_model=self.vllm_model,
+                openrouter_model_path=self.openrouter_model if self.openrouter_model else None,
+                anthropic_model_path=self.anthropic_model if self.anthropic_model else None,
             )
                    
             try:
@@ -936,32 +936,13 @@ class InfospaceExecutor:
             'join': self._execute_join,
         }
         
-        # Validate 'out' field has $ prefix or is a named resource
+        # Validate 'out' field is assignment-style variable (must start with $)
         if 'out' in action:
             out_val = action['out']
-            if isinstance(out_val, str) and out_val and not out_val.startswith('$'):
-                # Check if it's a named resource (Collection or Note)
-                if self.resource_manager:
-                    # Use _resolve_resource_id to get the actual resource ID
-                    resolved_id = self.resource_manager._resolve_resource_id(out_val)
-                    if resolved_id:
-                        # Verify resource exists
-                        resource = self.resource_manager.get_resource(resolved_id)
-                        if resource:
-                            # Valid named resource - bind it to a variable with same name
-                            self._bind_variable(out_val, resolved_id)
-                        else:
-                            error_msg = f"Invalid 'out' field: '{out_val}' resolved to {resolved_id} but resource not found"
-                            logger.error(error_msg)
-                            return self._create_uniform_return('failed', reason=error_msg)
-                    else:
-                        error_msg = f"Invalid 'out' field: '{out_val}' must start with $ or be a named resource"
-                        logger.error(error_msg)
-                        return self._create_uniform_return('failed', reason=error_msg)
-                else:
-                    error_msg = f"Invalid 'out' field: '{out_val}' must start with $ (use '${out_val}')"
-                    logger.error(error_msg)
-                    return self._create_uniform_return('failed', reason=error_msg)
+            if not isinstance(out_val, str) or not out_val or not out_val.startswith('$'):
+                error_msg = f"Invalid 'out' field: '{out_val}' must be a variable name starting with $"
+                logger.error(error_msg)
+                return self._create_uniform_return('failed', reason=error_msg)
         
         # Truncate action log for readability (keep full data for execution)
         action_str = json.dumps(action)
@@ -6022,14 +6003,14 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 'target': 'question-decomposer',
                 'value': 'how much wood can a wood chuck chuck?',
                 'reason': 'test apply',
-                'out': 'test_output',
+                'out': '$test_output',
                 'expect': 'test output'
             },
             'create': {
                 'type': 'create',
                 'kind': 'Note',
                 'value': 'test note content',
-                'out': 'test_note',
+                'out': '$test_note',
                 'expect': 'test create'
             },
             'index': {
@@ -6047,7 +6028,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 'target': '$test_data',
                 'value': 'test query',
                 'mode': 'keyword',
-                'out': 'test_results',
+                'out': '$test_results',
                 'expect': 'test search results'
             },
             'say': {
@@ -6065,41 +6046,41 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 'type': 'extract',
                 'target': {'test': 'value'},
                 'field': 'test',
-                'out': 'test_extracted',
+                'out': '$test_extracted',
                 'expect': 'test extract'
             },
             'filter': {
                 'type': 'filter',
                 'target': [{'val': 1}, {'val': 2}, {'val': 3}],
                 'condition': {'field': 'val', 'operator': 'gt', 'value': 0},
-                'out': 'test_filtered',
+                'out': '$test_filtered',
                 'expect': 'test filter'
             },
             'map': {
                 'type': 'map',
                 'target': '$test_filtered',
                 'operation': {'type': 'extract', 'field': 'val'},
-                'out': 'test_mapped',
+                'out': '$test_mapped',
                 'expect': 'test map'
             },
             'merge': {
                 'type': 'merge',
                 'targets': [{'a': 1}, {'b': 2}],
-                'out': 'test_merged',
+                'out': '$test_merged',
                 'expect': 'test merge'
             },
             'coerce': {
                 'type': 'coerce',
                 'target': [[1, 2], [3, 4]],
                 'operation': 'flatten',
-                'out': 'test_coerced',
+                'out': '$test_coerced',
                 'expect': 'test coerce'
             },
             'aggregate': {
                 'type': 'aggregate',
                 'target': [1, 2, 3],
                 'operation': 'count',
-                'out': 'test_aggregated',
+                'out': '$test_aggregated',
                 'expect': 'test aggregate'
             },
             'sort': {
@@ -6107,20 +6088,20 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 'target': [{'val': 3}, {'val': 1}, {'val': 2}],
                 'by': 'val',
                 'order': 'asc',
-                'out': 'test_sorted',
+                'out': '$test_sorted',
                 'expect': 'test sort'
             },
             'group_by': {
                 'type': 'group_by',
                 'target': [{'type': 'a'}, {'type': 'b'}],
                 'by': 'type',
-                'out': 'test_grouped',
+                'out': '$test_grouped',
                 'expect': 'test group'
             },
             'compare': {
                 'type': 'compare',
                 'targets': ['test', 'test'],
-                'out': 'test_compared',
+                'out': '$test_compared',
                 'expect': 'test compare'
             }
         }
