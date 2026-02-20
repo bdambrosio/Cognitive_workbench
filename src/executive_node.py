@@ -1809,12 +1809,18 @@ class ZenohExecutiveNode:
         inputs = step.get("input_artifacts", [])
         if not isinstance(inputs, list):
             inputs = [inputs] if inputs else []
+        outputs = step.get("output_artifacts", [])
+        if not isinstance(outputs, list):
+            outputs = [outputs] if outputs else []
+        output_set = {str(o).strip().lstrip("$") for o in outputs if o}
         missing = []
         for item in inputs:
             if not isinstance(item, str):
                 item = str(item)
             name = item.strip()
             if not name:
+                continue
+            if name.lstrip("$") in output_set:
                 continue
             resolved_id = None
             if hasattr(self.resource_manager, "_resolve_resource_id"):
@@ -1825,17 +1831,13 @@ class ZenohExecutiveNode:
         return missing
 
     def _handle_task_reuse(self, task_id: str = None):
-        """User said 'reuse task_X'. Reset a completed task to step 1 while preserving its plan."""
-        from task_manager import TASK_COMPLETED
+        """User said 'reuse task_X'. Reset task to step 1, restoring initial plan."""
         if not task_id:
             self._say_to_user("Please specify which task to reuse, e.g. 'reuse task_3'.")
             return
         task = self.task_manager.get_task(task_id)
         if not task:
             self._say_to_user(f"Task '{task_id}' not found.")
-            return
-        if task.get("status") != TASK_COMPLETED:
-            self._say_to_user(f"Task '{task_id}' is not completed, so it cannot be reused.")
             return
         reset = self.task_manager.reset_for_reuse(task_id)
         if not reset:
@@ -1971,14 +1973,15 @@ class ZenohExecutiveNode:
             self._say_to_user(f"Task could not be planned: {response}")
 
     def _handle_execute_goal_completed(self, task_id: str, task: Dict, result: Dict):
-        """Step execution finished — auto-submit review goal."""
+        """Step execution finished — auto-submit review goal (via subplanner, no vision eval)."""
         from task_manager import TASK_REVIEWING
         self.task_manager.set_status(task_id, TASK_REVIEWING)
         step_num = task.get("current_step", 1)
         self.task_manager.set_active_task_goal(task_id, "review", step_num)
         goal_text = self.task_manager.review_goal_text(task, result, self._character_desc_short())
         logger.info(f'🔍 {self.character_name} Reviewing step {step_num} of task {task_id}')
-        self.parse_and_set_goal("", goal_text)
+        review_result = self.infospace_executor.call_subplanner(goal=goal_text, max_steps=8)
+        self._handle_task_goal_completed(review_result if isinstance(review_result, dict) else {"success": False, "response": str(review_result)})
 
     def _handle_review_goal_completed(self, task_id: str, task: Dict, result: Dict):
         """Review goal finished — parse review note, update task, report to user."""

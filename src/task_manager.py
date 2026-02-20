@@ -8,6 +8,7 @@ produced along the way. The executive node orchestrates task lifecycle by
 submitting goals to the planner; this module handles data and state only.
 """
 
+import copy
 import json
 import logging
 from datetime import datetime
@@ -240,7 +241,10 @@ class TaskManager:
         )
         if plan:
             plan[0]["status"] = STEP_READY
-        return self.update_task(task_id, abstract_plan=plan, current_step=1, status=TASK_STEP_READY)
+        updates = {"abstract_plan": plan, "current_step": 1, "status": TASK_STEP_READY}
+        if "initial_abstract_plan" not in task or not task.get("initial_abstract_plan"):
+            updates["initial_abstract_plan"] = copy.deepcopy(plan)
+        return self.update_task(task_id, **updates)
 
     def complete_current_step(self, task_id: str, outcome: str = "", output_artifacts: List[str] = None) -> Optional[Dict]:
         """Mark current step completed and advance to next."""
@@ -294,11 +298,11 @@ class TaskManager:
         return self.update_task(task_id, abstract_plan=new_plan, current_step=new_current)
 
     def reset_for_reuse(self, task_id: str) -> Optional[Dict]:
-        """Reset a completed task back to step 1 while preserving the plan text."""
+        """Reset task to step 1, restoring initial plan if cached."""
         task = self.get_task(task_id)
         if not task:
             return None
-        plan = task.get("abstract_plan", [])
+        plan = copy.deepcopy(task.get("initial_abstract_plan") or task.get("abstract_plan", []))
         for i, step in enumerate(plan):
             step.setdefault("step", i + 1)
             step["status"] = STEP_PENDING
