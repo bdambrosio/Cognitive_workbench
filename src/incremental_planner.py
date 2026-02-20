@@ -445,14 +445,14 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
         },
         "bind": {
             "description": "Bind a variable to an existing resource without creating or changing content.",
-            "full_description": "Alias an existing Note/Collection/Relation to a new variable via out. This is useful to mark a canonical artifact variable (for example $goal_artifact) at the end of a code block. bind does not mutate resources.",
+            "full_description": "Alias an existing Note/Collection/Relation to a new variable via out. bind does not mutate resources.",
             "parameters": {
                 "target": "required: $variable, resource ID, or named resource",
                 "out": "required: destination $variable"
             },
             "examples": [
-                '{"type":"bind","target":"$final_report","out":"$goal_artifact"}',
-                '{"type":"bind","target":"Note_42","out":"$goal_artifact"}'
+                '{"type":"bind","target":"$draft","out":"$final_report"}',
+                '{"type":"bind","target":"Note_42","out":"$summary"}'
             ],
             "schema_hint": {"target": "$variable or resource ID or name", "out": "$variable"}
         },
@@ -1742,19 +1742,18 @@ _GOAL_LEVEL_TOOLS = frozenset({"synthesize", "_code_block_"})
 def _vision_eval_check(vision_criteria: str, eval_target: str, executor, compressed_context: str = "") -> str:
     """
     Lightweight vision evaluation against planner-declared eval_target.
+    eval_target may be a concrete resource ID (Note_xxx) or a $variable.
     Returns evaluation text (pass/fail per criterion) or empty string if skipped.
     """
     if not vision_criteria or not eval_target:
         return ""
     
-    # Resolve eval_target variable to resource content
-    var_key = eval_target.lstrip('$')
-    res_id = executor.plan_bindings_flat.get(var_key)
+    res_id = _resolve_eval_target_id(eval_target, executor)
     if not res_id or not executor.resource_manager:
         return ""
     
-    # Use load with slice=":" to get full content up to ceiling
-    load_result = executor.execute_action({"type": "load", "target": eval_target, "slice": ":", "out": f"$_vision_eval_{var_key}"})
+    load_target = res_id if res_id == eval_target else eval_target
+    load_result = executor.execute_action({"type": "load", "target": load_target, "slice": ":", "out": f"$_vision_eval_{res_id}"})
     artifact_preview = load_result.get('data', '')
     if not artifact_preview:
         return ""
@@ -1856,6 +1855,19 @@ def _vision_eval_deep(vision_criteria: str, eval_target: str, classifier_result:
     return ""
 
 
+def _resolve_eval_target_id(eval_target: str, executor) -> str:
+    """Resolve $var or Note_ID/Collection_ID to a concrete resource ID, or return ''."""
+    if not eval_target or not executor:
+        return ""
+    if isinstance(eval_target, str) and (eval_target.startswith("Note_") or eval_target.startswith("Collection_")):
+        return eval_target
+    if isinstance(eval_target, str) and eval_target.startswith("$"):
+        rid = executor.plan_bindings_flat.get(eval_target.lstrip("$"))
+        if isinstance(rid, str) and (rid.startswith("Note_") or rid.startswith("Collection_")):
+            return rid
+    return ""
+
+
 def _resolve_eval_target_text(eval_target: str, executor) -> str:
     """
     Resolve eval target ($var or Note_ID) to stored Note content string.
@@ -1882,41 +1894,6 @@ def _resolve_eval_target_text(eval_target: str, executor) -> str:
         return ""
 
 
-def _ensure_goal_artifact_binding(executor) -> str:
-    """Ensure a canonical $goal_artifact Note binding exists."""
-    if not executor:
-        return ""
-    try:
-        existing = executor.plan_bindings_flat.get("goal_artifact")
-        if isinstance(existing, str) and existing.startswith("Note_"):
-            return "$goal_artifact"
-        executor.execute_action({"type": "create-note", "value": "", "out": "$goal_artifact"})
-        return "$goal_artifact"
-    except Exception as e:
-        logger.warning(f"Failed to initialize $goal_artifact: {e}")
-        return ""
-
-
-def _sync_goal_artifact_from_target(executor, source_eval_target: str) -> str:
-    """Copy source eval target text into canonical $goal_artifact Note."""
-    if not executor or not source_eval_target:
-        return ""
-    try:
-        goal_artifact_id = executor.plan_bindings_flat.get("goal_artifact")
-        if not goal_artifact_id or not isinstance(goal_artifact_id, str) or not goal_artifact_id.startswith("Note_"):
-            return ""
-        source_text = _resolve_eval_target_text(source_eval_target, executor)
-        if source_text is None:
-            source_text = ""
-        if executor.resource_manager:
-            ok, err = executor.resource_manager.update_note_content(goal_artifact_id, source_text)
-            if not ok:
-                logger.warning(f"Failed to update $goal_artifact ({goal_artifact_id}): {err}")
-                return ""
-        return "$goal_artifact"
-    except Exception as e:
-        logger.warning(f"Failed to sync $goal_artifact from {source_eval_target}: {e}")
-        return ""
 
 
 def _parse_deep_eval_status(deep_text: str) -> str:
@@ -2246,7 +2223,6 @@ ALWAYS follow all formatting instructions exactly.
             "- DONE=YES only when ALL required actions are complete.\n"
             "- If DONE=YES, NEXT_TASK must be blank.\n"
             "- Do NOT use 'say' inside Stage 2 code blocks; final user delivery happens only after DONE=YES and quality checks.\n"
-            "- Use bind only when you have a concrete final candidate artifact (e.g., bind $final_report -> $goal_artifact); if no final candidate yet, do not bind.\n"
             "- Efficiency rule: if prior step used only one tool call and GOAL is not done, set NEXT_TASK to combine adjacent subtasks.\n"
             "- SPIRAL DETECTION: If the same tool has failed 2+ times consecutively,\n"
             "  use a different approach or proceed with available data.\n"
@@ -2258,17 +2234,14 @@ ALWAYS follow all formatting instructions exactly.
 
         # Main loop
         current_task = s["first_task"].strip()
-        goal_artifact_var = _ensure_goal_artifact_binding(executor)
-        # Fix B: seed eval target from declared step output_artifacts (first one); fall back to $goal_artifact
         _declared_output_artifacts = output_artifacts or []
-        if _declared_output_artifacts:
-            first_oa = _declared_output_artifacts[0].strip()
-            if not first_oa.startswith("$"):
-                first_oa = "$" + first_oa
-            last_eval_target = first_oa
-            logger.info(f"Eval target seeded from declared output_artifacts: {last_eval_target}")
-        else:
-            last_eval_target = goal_artifact_var if goal_artifact_var else ""
+        last_eval_target = ""
+        if _declared_output_artifacts and executor:
+            first_oa = _declared_output_artifacts[0].strip().lstrip("$")
+            rid = _resolve_eval_target_id("$" + first_oa, executor)
+            if rid:
+                last_eval_target = rid
+                logger.info(f"Eval target seeded from declared output_artifacts: {last_eval_target}")
         stall_guard_state = {"prev_signature": None, "repeat_count": 0}
         for step in range(max_steps):
             if _interrupt_requested(executor):
@@ -2340,33 +2313,30 @@ ALWAYS follow all formatting instructions exactly.
                 f"Respond using Stage 3 FORMAT.\n"
             )
             
-            # Vision evaluation before planner reflects
-            # Fix B: if declared output_artifacts are present, check if the first one is now bound
+            # Vision evaluation before planner reflects — resolve to concrete resource ID
             eval_target = ""
             if _declared_output_artifacts and executor:
                 first_oa = _declared_output_artifacts[0].strip()
                 lookup_key = first_oa.lstrip("$")
-                resolved = executor.plan_bindings_flat.get(lookup_key) or executor.plan_bindings_flat.get("$" + lookup_key)
-                if resolved:
-                    eval_target = "$" + lookup_key
-            # Fix A fallback: prefer last Collection over last Note when no declared output matched yet
+                rid = executor.plan_bindings_flat.get(lookup_key) or executor.plan_bindings_flat.get("$" + lookup_key)
+                if rid:
+                    eval_target = rid
             if not eval_target and new_bindings:
                 collection_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and rid.startswith("Collection_") and not str(k).startswith("_") and str(k) != "code_block_output"]
                 note_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and rid.startswith("Note_") and not str(k).startswith("_") and str(k) != "code_block_output"]
                 if collection_keys:
-                    eval_target = "$" + collection_keys[-1].lstrip("$")
+                    eval_target = new_bindings[collection_keys[-1]]
                 elif note_keys:
-                    eval_target = "$" + note_keys[-1].lstrip("$")
+                    eval_target = new_bindings[note_keys[-1]]
                 else:
                     last_key = list(new_bindings.keys())[-1]
-                    if not last_key.startswith('$'):
-                        last_key = '$' + last_key
-                    eval_target = last_key
+                    eval_target = new_bindings[last_key]
             if not eval_target and code_block_output_created:
-                eval_target = "$code_block_output"
+                rid = executor.plan_bindings_flat.get("code_block_output")
+                if rid:
+                    eval_target = rid
             if eval_target:
-                synced_eval_target = _sync_goal_artifact_from_target(executor, eval_target)
-                last_eval_target = synced_eval_target or eval_target
+                last_eval_target = eval_target
             if eval_target and vision_criteria:
                 logger.info(f"Step {step}: Vision eval target: {last_eval_target}")
                 compressed_ctx = _compress_trace(str(s))
@@ -2531,7 +2501,6 @@ ALWAYS follow all formatting instructions exactly.
                 })
                 final_text = draft_text
                 if isinstance(synth_r, dict) and synth_r.get("status") == "success":
-                    executor.execute_action({"type": "bind", "target": "$last_chance_final", "out": "$goal_artifact"})
                     synthesized = _resolve_eval_target_text("$last_chance_final", executor)
                     if isinstance(synthesized, str) and synthesized.strip():
                         final_text = synthesized
@@ -3122,7 +3091,6 @@ ALWAYS follow all formatting instructions exactly.
         "- DONE=YES only when ALL required actions are complete.\n"
         "- If DONE=YES, NEXT_TASK must be blank.\n"
         "- Do NOT use 'say' inside Stage 2 code blocks; final user delivery happens only after DONE=YES and quality checks.\n"
-        "- Use bind only when you have a concrete final candidate artifact (e.g., bind $final_report -> $goal_artifact); if no final candidate yet, do not bind.\n"
         "- Efficiency rule: if prior step used only one tool call and GOAL is not done, set NEXT_TASK to combine adjacent subtasks.\n"
         "- SPIRAL DETECTION: If the same tool has failed 2+ times consecutively,\n"
         "  use a different approach or proceed with available data.\n"
@@ -3138,17 +3106,14 @@ ALWAYS follow all formatting instructions exactly.
     if not current_task:
         logger.warning("No first_task found, using goal as initial task")
         current_task = goal_for_step
-    goal_artifact_var = _ensure_goal_artifact_binding(executor)
-    # Fix B: seed eval target from declared step output_artifacts (first one); fall back to $goal_artifact
     _declared_output_artifacts = output_artifacts or []
-    if _declared_output_artifacts:
-        first_oa = _declared_output_artifacts[0].strip()
-        if not first_oa.startswith("$"):
-            first_oa = "$" + first_oa
-        last_eval_target = first_oa
-        logger.info(f"Eval target seeded from declared output_artifacts: {last_eval_target}")
-    else:
-        last_eval_target = goal_artifact_var if goal_artifact_var else ""
+    last_eval_target = ""
+    if _declared_output_artifacts and executor:
+        first_oa = _declared_output_artifacts[0].strip().lstrip("$")
+        rid = _resolve_eval_target_id("$" + first_oa, executor)
+        if rid:
+            last_eval_target = rid
+            logger.info(f"Eval target seeded from declared output_artifacts: {last_eval_target}")
     stall_guard_state = {"prev_signature": None, "repeat_count": 0}
     for step in range(max_steps):
         if _interrupt_requested(executor):
@@ -3218,34 +3183,30 @@ ALWAYS follow all formatting instructions exactly.
             f"Respond using Stage 3 FORMAT.\n"
         )
         
-        # Vision evaluation before planner reflects
-        # Fix B: if declared output_artifacts are present, check if the first one is now bound
+        # Vision evaluation before planner reflects — resolve to concrete resource ID
         eval_target = ""
         if _declared_output_artifacts and executor:
             first_oa = _declared_output_artifacts[0].strip()
             lookup_key = first_oa.lstrip("$")
-            resolved = executor.plan_bindings_flat.get(lookup_key) or executor.plan_bindings_flat.get("$" + lookup_key)
-            if resolved:
-                oa_var = "$" + lookup_key
-                eval_target = oa_var
-        # Fix A fallback: prefer last Collection over last Note when no declared output matched yet
+            rid = executor.plan_bindings_flat.get(lookup_key) or executor.plan_bindings_flat.get("$" + lookup_key)
+            if rid:
+                eval_target = rid
         if not eval_target and new_bindings:
             collection_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and rid.startswith("Collection_") and not str(k).startswith("_") and str(k) != "code_block_output"]
             note_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and rid.startswith("Note_") and not str(k).startswith("_") and str(k) != "code_block_output"]
             if collection_keys:
-                eval_target = "$" + collection_keys[-1].lstrip("$")
+                eval_target = new_bindings[collection_keys[-1]]
             elif note_keys:
-                eval_target = "$" + note_keys[-1].lstrip("$")
+                eval_target = new_bindings[note_keys[-1]]
             else:
                 last_key = list(new_bindings.keys())[-1]
-                if not last_key.startswith('$'):
-                    last_key = '$' + last_key
-                eval_target = last_key
+                eval_target = new_bindings[last_key]
         if not eval_target and code_block_output_created:
-            eval_target = "$code_block_output"
+            rid = executor.plan_bindings_flat.get("code_block_output")
+            if rid:
+                eval_target = rid
         if eval_target:
-            synced_eval_target = _sync_goal_artifact_from_target(executor, eval_target)
-            last_eval_target = synced_eval_target or eval_target
+            last_eval_target = eval_target
         if eval_target and vision_criteria:
             logger.info(f"Step {step}: Vision eval target: {last_eval_target}")
             compressed_ctx = _compress_trace(prompt)
@@ -3417,7 +3378,6 @@ ALWAYS follow all formatting instructions exactly.
             })
             final_text = draft_text
             if isinstance(synth_r, dict) and synth_r.get("status") == "success":
-                executor.execute_action({"type": "bind", "target": "$last_chance_final", "out": "$goal_artifact"})
                 synthesized = _resolve_eval_target_text("$last_chance_final", executor)
                 if isinstance(synthesized, str) and synthesized.strip():
                     final_text = synthesized
@@ -4209,8 +4169,9 @@ Instructions:
 - Qualitative criteria (e.g., "contains specific method names, not just category labels") will be checked via LLM assessment.
 - If the goal is simple or direct (e.g., a factual lookup), return "No vision criteria needed."
 
-Format (one criterion per line):
-criterion_name: "testable predicate or numeric threshold"
+Format — number each criterion with a short label:
+1. label: "testable predicate or numeric threshold"
+2. label: "testable predicate or numeric threshold"
 END_VISION"""
 
         result = self.executor.llm_generate(VISION_PROMPT, max_tokens=192, temperature=GEN_TEMPERATURE, stops=["\nEND_VISION", "END_VISION"])

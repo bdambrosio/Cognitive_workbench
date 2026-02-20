@@ -1790,6 +1790,20 @@ class ZenohExecutiveNode:
             )
             logger.info(f'⛔ {self.character_name} Blocked task {task_id}: {reason}')
             return
+        if self.infospace_executor:
+            self.infospace_executor.clear_plan_state()
+            plan = task.get("abstract_plan", [])
+            step = plan[step_num - 1] if 0 < step_num <= len(plan) else {}
+            for art_name in step.get("input_artifacts", []):
+                if not isinstance(art_name, str) or not art_name.strip():
+                    continue
+                name = art_name.strip()
+                resolved = None
+                if hasattr(self.resource_manager, "_resolve_resource_id"):
+                    resolved = self.resource_manager._resolve_resource_id(name)
+                if resolved:
+                    self.infospace_executor._bind_variable(name, resolved)
+                    logger.debug(f"Step {step_num} pre-seeded ${name} → {resolved}")
         pre_resource_ids = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
         self.task_manager.set_status(task_id, TASK_EXECUTING)
         self.task_manager.set_active_task_goal(task_id, "execute", step_num, pre_resource_ids=list(pre_resource_ids))
@@ -2480,7 +2494,7 @@ class ZenohExecutiveNode:
             f"You are {self.character_name}. Given this conversational moment, provide:\n"
             f"1. TURN_INTENT: What conversational move is {source} making? (1 sentence)\n"
             f"2. MY_MOVE: Name the dialogue act you should perform next. \n"
-            f"  - Describe it as an action (e.g., 'comply and report contents of $goal_artifact'), not as the response itself.\n"
+            f"  - Describe it as an action (e.g., 'comply and report the target artifact contents'), not as the response itself.\n"
             f"  - Do not generate response content here.\n"
             f"  - If the conversation's purpose has been achieved, indicate you should say so and wrap up. (1 sentence)\n"
         )
