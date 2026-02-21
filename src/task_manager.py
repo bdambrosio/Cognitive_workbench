@@ -56,6 +56,7 @@ def _new_task(task_id: str, description: str) -> Dict[str, Any]:
         "artifacts": [],
         "task_created_resources": [],
         "notes": "",
+        "schedule_mode": "manual",
     }
 
 

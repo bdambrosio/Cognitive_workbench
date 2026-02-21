@@ -744,7 +744,20 @@ class ZenohExecutiveNode:
         )
         if not self.benchmark_mode:
             self.task_manager.initialize()
-        
+
+        # Initialize task scheduler (auto-proceed timer)
+        from task_scheduler import TaskScheduler
+        sched_cfg = self.character_config.get('task_scheduler', {})
+        self.task_scheduler = TaskScheduler(
+            character_name=self.character_name,
+            interval=sched_cfg.get('interval', 15.0),
+            enabled=sched_cfg.get('enabled', False),
+        )
+        self.task_scheduler.start(
+            check_fn=self._scheduler_eligible_tasks,
+            proceed_fn=self._scheduler_proceed_task,
+        )
+
         # Initialize planners (reused across all goals)
  
         # IncrementalPlanner for plan generation (SGLang or vLLM-based)
@@ -895,7 +908,15 @@ class ZenohExecutiveNode:
             f"cognitive/{character_name}/control/clear_persistents",
             self.handle_clear_persistents
         )
-        
+        self.control_scheduler_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/task_scheduler",
+            self._handle_scheduler_control
+        )
+        self.control_task_schedule_mode_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/task_schedule_mode",
+            self._handle_task_schedule_mode
+        )
+
         # === ZENOH PUBLICATION ===
         # NAME: execution_state_update
         # TOPIC: cognitive/{character}/execution_state
@@ -1844,6 +1865,76 @@ class ZenohExecutiveNode:
             missing.append(name)
         return missing
 
+    # ── Task scheduler callbacks ────────────────────────────────────
+
+    def _scheduler_eligible_tasks(self):
+        """Return tasks the scheduler may auto-proceed (called from scheduler thread)."""
+        from task_manager import TASK_STEP_READY
+        from datetime import date, datetime as _dt
+        if self.execution_mode == 'autonomous':
+            return []  # don't interfere with autonomous goal generation
+        active = self.task_manager.get_active_tasks()
+        eligible = []
+        for t in active:
+            if t.get("status") != TASK_STEP_READY:
+                continue
+            if self._missing_step_inputs(t):
+                continue
+            mode = t.get("schedule_mode", "manual")
+            if mode in ("auto", "recurring"):
+                eligible.append(t)
+            elif mode == "daily":
+                run_at = t.get("run_at", "")          # "HH:MM"
+                last_run = t.get("last_run_date", "")  # "YYYY-MM-DD"
+                today = date.today().isoformat()
+                if not run_at or last_run == today:
+                    continue
+                now = _dt.now().strftime("%H:%M")
+                if now >= run_at:
+                    eligible.append(t)
+        return eligible
+
+    def _scheduler_proceed_task(self, task_id):
+        """Enqueue a synthetic 'proceed' command (called from scheduler thread)."""
+        from datetime import date
+        task = self.task_manager.get_task(task_id)
+        if task and task.get("schedule_mode") == "daily":
+            self.task_manager.update_task(task_id, last_run_date=date.today().isoformat())
+        command = json.dumps({"text": f"proceed {task_id}", "source": "scheduler"})
+        self.text_input_queue.append({"content": command})
+        self.execution_paused = False
+        self._publish_execution_state()
+
+    def _handle_scheduler_control(self, sample):
+        """Zenoh callback for scheduler enable/disable/interval changes."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            if 'enable' in data:
+                self.task_scheduler.set_enabled(bool(data['enable']))
+            if 'interval' in data:
+                self.task_scheduler.set_interval(float(data['interval']))
+            self._publish_execution_state()
+        except Exception as e:
+            logger.error(f'Error in scheduler control handler: {e}')
+
+    def _handle_task_schedule_mode(self, sample):
+        """Zenoh callback for per-task schedule mode changes."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            task_id = data.get("task_id")
+            mode = data.get("schedule_mode")
+            if not task_id or mode not in ("manual", "auto", "recurring", "daily"):
+                logger.warning(f"Invalid task_schedule_mode payload: {data}")
+                return
+            updates = {"schedule_mode": mode}
+            if mode == "daily" and data.get("run_at"):
+                updates["run_at"] = data["run_at"]
+            self.task_manager.update_task(task_id, **updates)
+            logger.info(f"Task {task_id} schedule_mode set to '{mode}'" +
+                        (f" run_at={updates.get('run_at')}" if "run_at" in updates else ""))
+        except Exception as e:
+            logger.error(f"Error in task_schedule_mode handler: {e}")
+
     def _handle_task_reuse(self, task_id: str = None):
         """User said 'reuse task_X'. Reset task to step 1, restoring initial plan."""
         if not task_id:
@@ -2013,6 +2104,7 @@ class ZenohExecutiveNode:
                     f"Task \"{task['name']}\" is blocked: {review.get('block_reason', 'unknown')}\n"
                     f"Step outcome: {outcome}"
                 )
+                self.task_scheduler.notify_task_terminal(task_id)
                 return
             revised = review.get("revised_remaining_steps")
             if revised and isinstance(revised, list):
@@ -2035,6 +2127,13 @@ class ZenohExecutiveNode:
                 f"Task \"{task['name']}\" is complete!\n"
                 f"Last step outcome: {outcome or 'done'}"
             )
+            if task.get("schedule_mode") in ("recurring", "daily"):
+                self.task_manager.reset_for_reuse(task_id)
+                mode_label = "Recurring" if task.get("schedule_mode") == "recurring" else "Daily"
+                self._say_to_user(f"{mode_label} task \"{task['name']}\" reset to phase 1.")
+                self.task_scheduler.notify_step_completed(task_id)
+            else:
+                self.task_scheduler.notify_task_terminal(task_id)
         else:
             plan = task.get("abstract_plan", [])
             idx = task.get("current_step", 1) - 1
@@ -2046,6 +2145,7 @@ class ZenohExecutiveNode:
                 f"Next step ({task.get('current_step', '?')} of {len(plan)}): {next_desc}\n\n"
                 f"Say 'proceed' for next step, or 'terminate' to abandon."
             )
+            self.task_scheduler.notify_step_completed(task_id)
 
     def _cleanup_completed_task_resources(self, task_id: str):
         """
@@ -2327,6 +2427,13 @@ class ZenohExecutiveNode:
                     self._publish_action_result(action_dict if 'action_dict' in locals() else {}, error_result, action_type, timestamp)
                     return
             
+            # Handle scheduler-issued proceed commands
+            if source == 'scheduler' and clean_input.strip().lower().startswith('proceed'):
+                parts = clean_input.strip().split()
+                task_id = parts[1] if len(parts) > 1 and parts[1].startswith('task_') else None
+                self._handle_task_proceed(task_id=task_id)
+                return
+
             # Handle special commands from User BEFORE processing as dialog
             if source == 'User':
                 if clean_input.startswith('goal:'):
@@ -3182,6 +3289,7 @@ class ZenohExecutiveNode:
                 'character': self.character_name,
                 'continuous_mode': self.continuous_mode,
                 'active_dialog': active_dialog,
+                'task_scheduler': self.task_scheduler.get_status() if hasattr(self, 'task_scheduler') else None,
                 'timestamp': time.time()
             }
             self.execution_state_publisher.put(json.dumps(state_data).encode('utf-8'))
@@ -4127,7 +4235,11 @@ class ZenohExecutiveNode:
             self._shutting_down = True
             
             logger.info(f'Executive Node shutdown initiated for {self.character_name}...')
-            
+
+            # Stop task scheduler
+            if hasattr(self, 'task_scheduler'):
+                self.task_scheduler.stop()
+
             # Consolidate situation note while LLM is still available
             try:
                 self._consolidate_situation_note()
