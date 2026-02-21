@@ -19,7 +19,7 @@ import logging
 import shutil
 from datetime import datetime
 from typing import Dict, List, Any, Set
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Body
 from fastapi.responses import HTMLResponse, FileResponse
 import uvicorn
 from pathlib import Path
@@ -908,6 +908,28 @@ class FastAPIActionDisplayNode:
                 logger.error(f"Error in toggle_continuous: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
         
+        @self.app.post("/api/task_scheduler/{character}")
+        async def toggle_task_scheduler(character: str, data: dict = Body(...)):
+            """Control task scheduler (enable/disable, interval)."""
+            try:
+                payload = json.dumps(data).encode()
+                self.session.put(f"cognitive/{character}/control/task_scheduler", payload)
+                return {"success": True}
+            except Exception as e:
+                logger.error(f"Error in toggle_task_scheduler: {e}")
+                return {"success": False, "message": str(e)}
+
+        @self.app.post("/api/task_schedule_mode/{character}")
+        async def set_task_schedule_mode(character: str, data: dict = Body(...)):
+            """Set per-task schedule mode (manual/auto/recurring)."""
+            try:
+                payload = json.dumps(data).encode()
+                self.session.put(f"cognitive/{character}/control/task_schedule_mode", payload)
+                return {"success": True}
+            except Exception as e:
+                logger.error(f"Error in set_task_schedule_mode: {e}")
+                return {"success": False, "message": str(e)}
+
         @self.app.post("/api/control/clear_world_model")
         async def clear_world_model():
             """Clear world model."""
@@ -2356,6 +2378,19 @@ Generated: {generated_at}
                     
                     <!-- Tasks tab content -->
                     <div class="character-data-panel" id="tasksPanel">
+                        <div id="taskSchedulerBar" style="padding: 6px 10px; border-bottom: 1px solid #404040; display: flex; align-items: center; gap: 8px; font-size: 11px;">
+                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                                <input type="checkbox" id="schedulerToggle" onchange="toggleScheduler(this.checked)">
+                                Auto-proceed
+                            </label>
+                            <span id="schedulerStatus" style="color: #888; font-size: 10px;">disabled</span>
+                            <label style="margin-left: auto; display: flex; align-items: center; gap: 3px;">
+                                Interval:
+                                <input type="number" id="schedulerInterval" value="1" min="1" max="1440"
+                                       style="width: 45px; background: #333; color: #ccc; border: 1px solid #555; font-size: 10px; padding: 2px;"
+                                       onchange="updateSchedulerInterval(this.value)">m
+                            </label>
+                        </div>
                         <div id="tasksList">
                             <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
                                 Select a character to view tasks
@@ -2905,7 +2940,11 @@ Generated: {generated_at}
             
             // Update character data display based on active tab
             updateCharacterDataDisplay(characterName);
-            
+
+            // Sync scheduler UI to this character's cached state (or reset to defaults)
+            const tabData = characterTabs.get(characterName);
+            updateSchedulerUI(tabData?.schedulerState || { enabled: false, interval: 60 });
+
             console.log(`Selected character tab: ${characterName}`);
         }
         
@@ -3392,6 +3431,15 @@ Generated: {generated_at}
             
             console.log(`✅ Applied button states: autonomous=${stateData.buttons.autonomous ? stateData.buttons.autonomous.enabled : 'N/A'}, ` +
                        `stop=${stateData.buttons.stop.enabled}, active_dialog=${stateData.active_dialog}`);
+
+            // Cache scheduler state per character and update UI if it's the active character
+            if (stateData.task_scheduler && stateData.character) {
+                const tabData = characterTabs.get(stateData.character);
+                if (tabData) tabData.schedulerState = stateData.task_scheduler;
+                if (stateData.character === activeCharacter) {
+                    updateSchedulerUI(stateData.task_scheduler);
+                }
+            }
         }
         
         function handleTurnStart(turnData) {
@@ -4444,9 +4492,16 @@ Generated: {generated_at}
                                     ${total ? `<span style="margin-left: 4px; color: #888; font-size: 11px;">Phase ${curr}/${total}</span>` : ''}
                                     ${total ? `<div style="margin-top: 3px; color: #a8b3c7; font-size: 10px;">in: ${escapeHtml(currInputs.join(', ') || 'none')} | out: ${escapeHtml(currOutputs.join(', ') || 'none')}</div>` : ''}
                                 </div>
-                                <div onclick="event.stopPropagation();">
-                                    ${status !== 'blocked' ? `<button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', 'proceed ${t.task_id || ''}')" style="background: #00d4ff; color: #1a1a1a; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer; margin-right: 4px;">Proceed</button>` : `<button onclick="event.stopPropagation(); confirmUnblockTask('${escapedChar}', '${t.task_id || ''}', '${(t.name || '').replace(/'/g, "\\'")}')" style="background: #f39c12; color: #1a1a1a; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer; margin-right: 4px;">Unblock</button>`}
-                                    <button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', 'reuse ${t.task_id || ''}')" style="background: #9b59b6; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer; margin-right: 4px;">Reuse</button>
+                                <div onclick="event.stopPropagation();" style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+                                    <select onchange="event.stopPropagation(); onScheduleModeChange('${escapedChar}', '${t.task_id || ''}', this)" style="background: #2a2a2a; color: #ccc; border: 1px solid #555; padding: 3px 6px; border-radius: 3px; font-size: 11px; cursor: pointer;">
+                                        <option value="manual" ${(t.schedule_mode || 'manual') === 'manual' ? 'selected' : ''}>Manual</option>
+                                        <option value="auto" ${t.schedule_mode === 'auto' ? 'selected' : ''}>Auto</option>
+                                        <option value="recurring" ${t.schedule_mode === 'recurring' ? 'selected' : ''}>Recurring</option>
+                                        <option value="daily" ${t.schedule_mode === 'daily' ? 'selected' : ''}>Daily</option>
+                                    </select>
+                                    <input type="time" value="${t.run_at || ''}" onchange="event.stopPropagation(); setTaskRunAt('${escapedChar}', '${t.task_id || ''}', this.value)" style="display:${t.schedule_mode === 'daily' ? 'inline' : 'none'}; background: #2a2a2a; color: #ccc; border: 1px solid #555; padding: 3px 4px; border-radius: 3px; font-size: 11px;" title="Daily run time (24h)" />
+                                    ${status !== 'blocked' ? `<button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', 'proceed ${t.task_id || ''}')" style="background: #00d4ff; color: #1a1a1a; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer;">Proceed</button>` : `<button onclick="event.stopPropagation(); confirmUnblockTask('${escapedChar}', '${t.task_id || ''}', '${(t.name || '').replace(/'/g, "\\'")}')" style="background: #f39c12; color: #1a1a1a; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer;">Unblock</button>`}
+                                    <button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', 'reuse ${t.task_id || ''}')" style="background: #9b59b6; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer;">Reuse</button>
                                     <button onclick="event.stopPropagation(); confirmTerminateTask('${escapedChar}', '${t.task_id || ''}', '${(t.name || '').replace(/'/g, "\\'")}')" style="background: #ff6b6b; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer;">Terminate</button>
                                 </div>
                             </div>
@@ -4494,6 +4549,44 @@ Generated: {generated_at}
             return true;
         }
 
+        async function setTaskScheduleMode(character, taskId, mode, runAt) {
+            try {
+                const body = { task_id: taskId, schedule_mode: mode };
+                if (runAt) body.run_at = runAt;
+                await fetch(`/api/task_schedule_mode/${character}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                loadTasksList(character);
+            } catch (e) {
+                console.error('setTaskScheduleMode:', e);
+            }
+        }
+
+        function onScheduleModeChange(character, taskId, selectEl) {
+            const mode = selectEl.value;
+            // Show/hide the time picker sibling
+            const timeInput = selectEl.nextElementSibling;
+            if (timeInput && timeInput.type === 'time') {
+                timeInput.style.display = mode === 'daily' ? 'inline' : 'none';
+            }
+            const runAt = (mode === 'daily' && timeInput) ? timeInput.value : undefined;
+            setTaskScheduleMode(character, taskId, mode, runAt);
+        }
+
+        async function setTaskRunAt(character, taskId, runAt) {
+            try {
+                await fetch(`/api/task_schedule_mode/${character}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task_id: taskId, schedule_mode: 'daily', run_at: runAt })
+                });
+            } catch (e) {
+                console.error('setTaskRunAt:', e);
+            }
+        }
+
         function confirmTerminateTask(character, taskId, taskName) {
             const label = taskName || taskId || 'this task';
             if (!confirm(`Terminate ${label}?`)) return;
@@ -4505,7 +4598,51 @@ Generated: {generated_at}
             if (!confirm(`Unblock ${label}? This clears blocked status.`)) return;
             sendTaskCommand(character, `unblock ${taskId}`);
         }
-        
+
+        async function toggleScheduler(enabled) {
+            if (!activeCharacter) return;
+            try {
+                await fetch(`/api/task_scheduler/${activeCharacter}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enable: enabled })
+                });
+            } catch (e) { console.error('toggleScheduler:', e); }
+        }
+
+        async function updateSchedulerInterval(minutes) {
+            if (!activeCharacter) return;
+            const mins = Math.max(1, Math.min(1440, parseInt(minutes) || 1));
+            try {
+                await fetch(`/api/task_scheduler/${activeCharacter}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ interval: mins * 60 })
+                });
+            } catch (e) { console.error('updateSchedulerInterval:', e); }
+        }
+
+        function updateSchedulerUI(schedulerState) {
+            if (!schedulerState) return;
+            const toggle = document.getElementById('schedulerToggle');
+            const status = document.getElementById('schedulerStatus');
+            const interval = document.getElementById('schedulerInterval');
+            if (toggle) toggle.checked = schedulerState.enabled;
+            if (interval) interval.value = Math.round((schedulerState.interval || 60) / 60);
+            if (status) {
+                if (!schedulerState.enabled) {
+                    status.textContent = 'disabled';
+                    status.style.color = '#888';
+                } else if (schedulerState.executing_task_id) {
+                    status.textContent = 'running: ' + schedulerState.executing_task_id;
+                    status.style.color = '#4ecdc4';
+                } else {
+                    status.textContent = 'waiting';
+                    status.style.color = '#f39c12';
+                }
+            }
+        }
+
         function updateWorldStateDisplay(data) {
             // Only update if state tab is active and matches current character
             const activeTab = document.querySelector('.character-data-tab.active');
@@ -5298,9 +5435,11 @@ Generated: {generated_at}
                         'tooltip': 'Click to pause execution' if stop_enabled else 'Not running'
                     }
                 },
+                'task_scheduler': state_data.get('task_scheduler'),
+                'character': state_data.get('character', ''),
                 'timestamp': state_data.get('timestamp', time.time())
             }
-            
+
             logger.info(f"🆕 Received execution_state: paused={paused}, mode={mode}, autonomous_enabled={step_enabled or run_enabled}")
             
             # Forward formatted state to websockets for UI rendering

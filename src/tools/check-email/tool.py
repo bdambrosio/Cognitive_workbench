@@ -328,7 +328,7 @@ def tool(input_value, runtime=None, **kwargs):
 
     # Credentials from environment
     gmail_address = os.getenv('GMAIL_ADDRESS', '').strip()
-    gmail_password = os.getenv('GMAIL_APP_PASSWORD', '').strip()
+    gmail_password = os.getenv('GMAIL_APP_PASSWORD', '')
     if not gmail_address or not gmail_password:
         return _fail(executor,
                      'GMAIL_ADDRESS and GMAIL_APP_PASSWORD environment variables required')

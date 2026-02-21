@@ -3020,13 +3020,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         Ask target a question and terminate current turn immediately.
 
-        Required: type, value, out
-        Optional: target (defaults to 'User')
+        Required: value
+        Optional: target (defaults to 'User'), out
         """
         out_var = action.get('out')
-        if not out_var:
-            return self._create_uniform_return('failed', reason='ask requires out field')
-        
+
         question_text = self._resolve_value(action.get('value'))
         if question_text is None:
             return self._create_uniform_return('failed', reason='ask requires value')
@@ -3064,9 +3062,12 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             }
             self.session.put(f"cognitive/{target}/sense_data", json.dumps(sense_data))
         
-        display_var = self._normalize_var_for_log(out_var)
-        logger.info(f"❓ Ask: '{question_text}' → terminating turn ({display_var}=Note_null)")
-        self._bind_variable(out_var, "Note_null")
+        if out_var:
+            display_var = self._normalize_var_for_log(out_var)
+            logger.info(f"❓ Ask: '{question_text}' → terminating turn ({display_var}=Note_null)")
+            self._bind_variable(out_var, "Note_null")
+        else:
+            logger.info(f"❓ Ask: '{question_text}' → terminating turn")
         self.executive_node.awaiting_ask_response = False
         # Terminal dialog action model: end this turn after ask.
         self.interrupt_requested = True
@@ -4180,57 +4181,81 @@ Make sure the string is in a format that can be parsed by the json.loads functio
     
     def _execute_remove(self, action: Dict) -> Dict:
         """
-        Remove a Note from a Collection (mutates Collection).
-        
-        Required: target, value, out
+        Remove a resource or a Note from a Collection.
+
+        Delete a resource (Note or Collection):
+            {"type": "remove", "target": "Note_123"}
+            {"type": "remove", "target": "Collection_5"}
+
+        Remove a Note from a Collection (out is optional):
+            {"type": "remove", "target": "$my_collection", "value": "$my_note"}
         """
-        error = self._validate_required_fields(action, 'target', 'value', 'out')
+        error = self._validate_required_fields(action, 'target')
         if error:
             return self._create_uniform_return('failed', reason=error)
-        
+
         target_arg = action.get('target')
         value_arg = action.get('value')
         out_var = action.get('out')
-        
+
+        # --- Delete-resource path: target is a bare resource ID, no value ---
+        if not value_arg:
+            resource_id = self._resolve_id(target_arg)
+            if not resource_id:
+                resource_id = target_arg
+            if not isinstance(resource_id, str) or (
+                not resource_id.startswith('Note_') and not resource_id.startswith('Collection_')
+            ):
+                return self._create_uniform_return('failed', reason=f'remove: target must be a Note or Collection ID, got: {resource_id}')
+            if not self.resource_manager:
+                return self._create_uniform_return('failed', reason='Resource manager not available')
+            success, error_msg = self.delete_resource_and_unbind(resource_id)
+            if success:
+                logger.info(f"Deleted {resource_id}")
+                return self._create_uniform_return('success', value=f'deleted {resource_id}')
+            else:
+                return self._create_uniform_return('failed', reason=error_msg or f'Failed to delete {resource_id}')
+
+        # --- Remove-from-collection path: target is a Collection, value is the Note ---
         collection_var, error = self._resolve_target_var(target_arg)
         if error:
             return self._create_uniform_return('failed', reason=f'remove: {error}')
-        
+
         collection_id = self._get_binding(collection_var)
         if collection_id is None:
             return self._create_uniform_return('failed', reason=f'Collection variable not bound: {collection_var}')
-        
+
         if not isinstance(collection_id, str) or not collection_id.startswith('Collection_'):
             return self._create_uniform_return('failed', reason=f'Variable {collection_var} is not a Collection')
-        
-        # Resolve value to Note ID (handles both $var and literal Note IDs)
+
         note_id = self._resolve_id(value_arg)
         if not isinstance(note_id, str) or not note_id.startswith('Note_'):
             return self._create_uniform_return('failed', reason=f'Value must be a Note ID, got: {note_id}')
-        
-        # Get current Collection content
+
         note_ids = self._dereference_collection(collection_var)
         if note_id not in note_ids:
             logger.warning(f"Note {note_id} not in Collection {collection_id}, nothing to remove")
-            self._bind_variable(out_var, collection_id)
+            if out_var:
+                self._bind_variable(out_var, collection_id)
             collection_value = self._format_collection_value(collection_id)
             return self._create_uniform_return('success', value=collection_value, resource_id=collection_id)
-        
-        # Remove from list
+
         note_ids.remove(note_id)
-        
-        # Update Collection using resource manager
+
         if not self.resource_manager:
             return self._create_uniform_return('failed', reason='Resource manager not available')
-        
+
         success, item_count, error_msg = self.resource_manager.add_to_collection(
             collection_id, None, self.agent_name, 'update', note_ids
         )
-        
+
         if success:
-            self._bind_variable(out_var, collection_id)
-            display_var = self._normalize_var_for_log(out_var)
-            logger.info(f"Removed {note_id} from {collection_id} (now {len(note_ids)} items) → {display_var}")
+            if out_var:
+                self._bind_variable(out_var, collection_id)
+                display_var = self._normalize_var_for_log(out_var)
+                logger.info(f"Removed {note_id} from {collection_id} (now {len(note_ids)} items) → {display_var}")
+            else:
+                logger.info(f"Removed {note_id} from {collection_id} (now {len(note_ids)} items)")
             collection_value = self._format_collection_value(collection_id)
             return self._create_uniform_return('success', value=collection_value, resource_id=collection_id)
         else:
@@ -5775,8 +5800,17 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 if result.get('status') == 'failed':
                     # Action failed - log but continue
                     logger.warning(f"Step {executed_steps} failed: {result.get('reason')}")
-                
+
                 current['idx'] = idx + 1
+
+                # Propagate interrupt (e.g. ask fired inside a codeblock)
+                if self.interrupt_requested:
+                    return {
+                        'status': 'suspended',
+                        'reason': 'interrupted',
+                        'executed_steps': executed_steps,
+                        'last_action_result': last_action_result
+                    }
                 
             except Exception as e:
                 logger.error(f"Error executing step {executed_steps}: {e}")
