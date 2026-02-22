@@ -28,7 +28,7 @@ All parameters are optional:
 Success (`status: "success"`):
 - `resource_id`: Collection ID containing text Notes.
 - Each Note's content is the email body text (plain text preferred, HTML tag-stripped as fallback).
-- Email headers (subject, from, to, date, message_id) are stored in tool_metadata linked via `meta` Relation.
+- Email headers (subject, from, to, date, message_id) are stored as metadata accessible via `get-metadata`.
 
 Failure (`status: "failed"`):
 - `reason`: Error description (e.g., `GMAIL_ADDRESS and GMAIL_APP_PASSWORD environment variables required`, `authentication_failed`)

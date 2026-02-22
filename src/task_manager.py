@@ -350,17 +350,17 @@ class TaskManager:
             f"Given your full set of tools and capabilities, could you plausibly accomplish this:\n\n"
             f"\"{task['description']}\"\n\n"
 
-            f"If feasible, create a Note named '_task_plan_draft' containing a JSON array of steps.\n"
-            f"IMPORTANT: Each step is a FULL planning session that can execute many tool calls "
+            f"If feasible, create a Note named '_task_plan_draft' containing a JSON array of phases.\n"
+            f"IMPORTANT: Each phase is a FULL execution session that can run many tool calls "
             f"(search, load, synthesize, create-note, say, etc.) in sequence. "
-            f"Do NOT split sequential tool operations into separate steps. "
-            f"Only create a new step when there is a genuine pause point: "
+            f"Do NOT split sequential tool operations into separate phases. "
+            f"Only create a new phase when there is a genuine pause point: "
             f"human input needed, an external dependency, or a fundamentally different capability. "
-            f"Prefer 1-2 steps. A task that searches, processes, and reports is ONE step.\n"
-            f"Each step is a JSON object with keys: \"description\", \"input_artifacts\", \"output_artifacts\".\n"
-            f"Rules: input_artifacts must reference existing resources or prior-step output_artifacts. "
-            f"output_artifacts must name only artifacts this step exports for later steps. "
-            f"The final step's output_artifacts should contain the deliverable.\n"
+            f"Prefer 1-2 phases. A task that searches, processes, and reports is ONE phase.\n"
+            f"Each phase is a JSON object with keys: \"description\", \"input_artifacts\", \"output_artifacts\".\n"
+            f"Rules: input_artifacts lists what the phase needs (may be empty or unavailable on first run). "
+            f"output_artifacts must name only artifacts this phase exports for later phases. "
+            f"The final phase's output_artifacts should contain the deliverable.\n"
             f"If not feasible, explain why in your FINAL_ANSWER and create no Note.\n"
             f"Output ONLY the JSON array in the Note, no wrapper object."
         )
@@ -403,30 +403,50 @@ class TaskManager:
             f"Execute this phase. Persist any important output Notes."
         )
 
-    def review_goal_text(self, task: Dict, goal_result: Dict, character_desc: str) -> str:
+    def review_goal_text(self, task: Dict, goal_result: Dict, character_desc: str, phase_resources: list = None) -> str:
         """Generate goal text for the post-step review phase."""
         plan = task.get("abstract_plan", [])
         idx = task.get("current_step", 1) - 1
-        step_desc = plan[idx]["description"] if 0 <= idx < len(plan) else "unknown"
+        step = plan[idx] if 0 <= idx < len(plan) else {}
+        step_desc = step.get("description", "unknown")
+        declared_outputs = step.get("output_artifacts", [])
         success = goal_result.get("success", False)
         final_thoughts = (goal_result.get("response") or "")[:500]
+
+        # Build the resource list section
+        if phase_resources:
+            resource_lines = []
+            for r in phase_resources:
+                name_part = f" \"{r['name']}\"" if r.get("name") else ""
+                snippet_part = f" — {r['snippet']}" if r.get("snippet") else ""
+                resource_lines.append(f"  {r['id']} ({r['type']}{name_part}){snippet_part}")
+            resources_section = "Resources created during this phase:\n" + "\n".join(resource_lines)
+        else:
+            resources_section = "No resources were created during this phase."
+
+        declared_str = ", ".join(declared_outputs) if declared_outputs else "none"
 
         return (
             f"You just completed a phase in a multi-phase task. Now review the results.\n"
             f"Task: \"{task['description']}\"\n"
             f"Phase just executed ({idx + 1} of {len(plan)}): {step_desc}\n"
+            f"Declared outputs for this phase: {declared_str}\n"
             f"Outcome: {'success' if success else 'failed'}\n"
             f"Summary: {final_thoughts}\n\n"
             f"Your character:\n{character_desc}\n\n"
+            f"{resources_section}\n\n"
             f"Do the following:\n"
-            f"1. Load and inspect the Notes/Collections created during this phase.\n"
-            f"2. Identify which artifacts are valuable outputs vs intermediate scratch.\n"
-            f"3. Delete intermediate artifacts that are not needed going forward.\n"
-            f"4. Persist valuable output artifacts.\n"
-            f"5. Assess whether the remaining plan phases are still appropriate given the actual results.\n"
-            f"6. Create a Note named '_task_review' with a JSON object containing:\n"
+            f"1. From the list above, identify which resources are the real deliverables for this phase "
+            f"(i.e. the actual outputs matching the declared outputs: {declared_str}). "
+            f"Use the resource IDs directly — do not load them unless you need to disambiguate.\n"
+            f"2. Delete any intermediate scratch resources from the list that are not deliverables.\n"
+            f"3. Assess whether the remaining plan phases are still appropriate given the actual results.\n"
+            f"4. Create a Note named '_task_review' with a JSON object containing:\n"
             f"   - \"step_outcome\": brief description of what was accomplished\n"
-            f"   - \"output_artifacts\": list of resource names/IDs worth exporting to later phases\n"
+            f"   - \"output_artifacts\": list of resource IDs (e.g. [\"Note_123\", \"Note_456\"]) "
+            f"that are the deliverables for this phase\n"
+            f"   - \"output_artifact_names\": mapping of declared output name to resource ID "
+            f"(e.g. {{\"forecast_data\": \"Note_123\"}}), for any you can confidently match\n"
             f"   - \"revised_remaining_steps\": updated array of remaining phases "
             f"(same format as planning: objects with \"description\", \"input_artifacts\", and \"output_artifacts\"), "
             f"or null if no changes needed\n"
@@ -449,7 +469,7 @@ class TaskManager:
             total = len(plan)
             completed = sum(1 for s in plan if s.get("status") == STEP_COMPLETED)
             status = t.get("status", "unknown")
-            lines.append(f"- [{status}] {t['name']} (step {t.get('current_step', '?')}/{total}, {completed} done)")
+            lines.append(f"- [{status}] {t['name']} (phase {t.get('current_step', '?')}/{total}, {completed} done)")
             if t.get("blockers"):
                 lines.append(f"  Blocked: {'; '.join(t['blockers'])}")
             current_idx = t.get("current_step", 1) - 1

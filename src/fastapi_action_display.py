@@ -930,6 +930,39 @@ class FastAPIActionDisplayNode:
                 logger.error(f"Error in set_task_schedule_mode: {e}")
                 return {"success": False, "message": str(e)}
 
+        @self.app.post("/api/goal_schedule_mode/{character}")
+        async def set_goal_schedule_mode(character: str, data: dict = Body(...)):
+            """Set per-goal schedule mode (manual/auto/recurring/daily)."""
+            try:
+                payload = json.dumps(data).encode()
+                self.session.put(f"cognitive/{character}/control/goal_schedule_mode", payload)
+                return {"success": True}
+            except Exception as e:
+                logger.error(f"Error in set_goal_schedule_mode: {e}")
+                return {"success": False, "message": str(e)}
+
+        @self.app.post("/api/goal_rename/{character}")
+        async def rename_goal(character: str, data: dict = Body(...)):
+            """Rename a scheduled goal."""
+            try:
+                payload = json.dumps(data).encode()
+                self.session.put(f"cognitive/{character}/control/goal_rename", payload)
+                return {"success": True}
+            except Exception as e:
+                logger.error(f"Error in rename_goal: {e}")
+                return {"success": False, "message": str(e)}
+
+        @self.app.post("/api/goal_cache/{character}")
+        async def goal_cache(character: str, data: dict = Body(...)):
+            """Manage scheduled goal cache operations."""
+            try:
+                payload = json.dumps(data).encode()
+                self.session.put(f"cognitive/{character}/control/goal_cache", payload)
+                return {"success": True}
+            except Exception as e:
+                logger.error(f"Error in goal_cache: {e}")
+                return {"success": False, "message": str(e)}
+
         @self.app.post("/api/control/clear_world_model")
         async def clear_world_model():
             """Clear world model."""
@@ -1365,6 +1398,23 @@ Generated: {generated_at}
                 return {"success": True, "tasks": []}
             except Exception as e:
                 logger.error(f"Error getting tasks: {e}")
+                return {"success": False, "message": str(e)}
+
+        @self.app.get("/api/scheduled_goals/{character}")
+        async def get_scheduled_goals(character: str):
+            """Get scheduled goals for a character."""
+            try:
+                selector = f"cognitive/{character}/scheduled_goals"
+                replies = self.session.get(selector, timeout=2.0)
+                for reply in replies:
+                    if hasattr(reply, 'ok') and reply.ok is not None:
+                        payload_bytes = reply.ok.payload.to_bytes()
+                        response = json.loads(payload_bytes.decode('utf-8'))
+                        if response.get('success'):
+                            return {"success": True, "goals": response.get("goals", [])}
+                return {"success": True, "goals": []}
+            except Exception as e:
+                logger.error(f"Error getting scheduled goals: {e}")
                 return {"success": False, "message": str(e)}
         
         @self.app.get("/api/characters")
@@ -2326,7 +2376,7 @@ Generated: {generated_at}
                     <div class="character-data-tab" data-tab="goals">Goals</div>
                     <div class="character-data-tab" data-tab="plans">Plans</div>
                     <div class="character-data-tab" data-tab="state">State</div>
-                    <div class="character-data-tab" data-tab="tasks">Tasks</div>
+                    <div class="character-data-tab" data-tab="tasks">Schedule</div>
                 </div>
                 
                 <!-- Character data content -->
@@ -4461,52 +4511,50 @@ Generated: {generated_at}
             if (!listDiv) return;
             listDiv.innerHTML = '<div style="color: #f39c12; text-align: center; padding: 20px;">⏳ Loading...</div>';
             try {
-                const response = await fetch(`/api/tasks/${character}`);
+                const response = await fetch(`/api/scheduled_goals/${character}`);
                 const result = await response.json();
                 if (!result.success) {
                     listDiv.innerHTML = `<div style="color: #ff4757; text-align: center; padding: 20px;">❌ ${result.message || 'Error'}</div>`;
                     return;
                 }
-                const tasks = result.tasks || [];
-                if (tasks.length === 0) {
-                    listDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No active tasks. Type "task: &lt;description&gt;" to create one.</div>';
+                const goals = result.goals || [];
+                if (goals.length === 0) {
+                    listDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No scheduled goals. Type "goal: &lt;description&gt;" to create one.</div>';
                     return;
                 }
                 const escapedChar = character.replace(/'/g, "\\'");
                 let html = '';
-                tasks.forEach((t, i) => {
-                    const plan = t.abstract_plan || [];
-                    const total = plan.length;
-                    const curr = t.current_step || 1;
-                    const status = t.status || 'unknown';
-                    const taskId = `task-acc-${i}`;
-                    const currStep = (curr >= 1 && curr <= total) ? (plan[curr - 1] || {}) : {};
-                    const currInputs = Array.isArray(currStep.input_artifacts) ? currStep.input_artifacts : [];
-                    const currOutputs = Array.isArray(currStep.output_artifacts) ? currStep.output_artifacts : [];
+                goals.forEach((g, i) => {
+                    const status = g.status || 'ready';
+                    const taskId = `goal-acc-${i}`;
+                    const hasCache = Array.isArray(g.cached_plan_actions) && g.cached_plan_actions.length > 0;
+                    const cacheLabel = hasCache ? `${g.cached_plan_actions.length} cached action(s)` : 'no cache';
                     html += `
                         <div class="task-accordion-item" style="border: 1px solid #404040; border-radius: 4px; margin-bottom: 8px; overflow: hidden;">
-                            <div class="task-accordion-header" onclick="toggleTaskAccordion('${taskId}')" style="padding: 8px 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
-                                <div style="flex: 1; min-width: 0;">
-                                    <span style="font-weight: bold; color: #00d4ff;">${escapeHtml(t.name || t.task_id || 'Task')}</span>
+                            <div class="task-accordion-header" onclick="toggleTaskAccordion('${taskId}')" style="padding: 8px 10px; cursor: pointer; display: flex; align-items: stretch; gap: 8px;">
+                                <div style="flex: 1; min-width: 0; padding-right: 4px;">
+                                    <input type="text" value="${escapeHtml(g.name || g.goal_id || 'Goal')}" onchange="event.stopPropagation(); setGoalName('${escapedChar}', '${g.goal_id || ''}', this.value)" style="width: 100%; background: #2a2a2a; color: #00d4ff; border: 1px solid #555; padding: 3px 4px; border-radius: 3px; font-size: 11px; font-weight: bold;" />
                                     <span style="margin-left: 6px; font-size: 10px; padding: 2px 6px; border-radius: 3px; background: #404040;">${status}</span>
-                                    ${total ? `<span style="margin-left: 4px; color: #888; font-size: 11px;">Phase ${curr}/${total}</span>` : ''}
-                                    ${total ? `<div style="margin-top: 3px; color: #a8b3c7; font-size: 10px;">in: ${escapeHtml(currInputs.join(', ') || 'none')} | out: ${escapeHtml(currOutputs.join(', ') || 'none')}</div>` : ''}
+                                    <span style="margin-left: 4px; color: #888; font-size: 11px;">${escapeHtml(g.goal_id || '')}</span>
+                                    <div style="margin-top: 3px; color: #a8b3c7; font-size: 10px;">${cacheLabel}</div>
+                                    <div style="margin-top: 3px; color: #8f9bb3; font-size: 10px;">${escapeHtml((g.goal_text || '').slice(0, 140))}${(g.goal_text || '').length > 140 ? '...' : ''}</div>
                                 </div>
-                                <div onclick="event.stopPropagation();" style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
-                                    <select onchange="event.stopPropagation(); onScheduleModeChange('${escapedChar}', '${t.task_id || ''}', this)" style="background: #2a2a2a; color: #ccc; border: 1px solid #555; padding: 3px 6px; border-radius: 3px; font-size: 11px; cursor: pointer;">
-                                        <option value="manual" ${(t.schedule_mode || 'manual') === 'manual' ? 'selected' : ''}>Manual</option>
-                                        <option value="auto" ${t.schedule_mode === 'auto' ? 'selected' : ''}>Auto</option>
-                                        <option value="recurring" ${t.schedule_mode === 'recurring' ? 'selected' : ''}>Recurring</option>
-                                        <option value="daily" ${t.schedule_mode === 'daily' ? 'selected' : ''}>Daily</option>
+                                <div onclick="event.stopPropagation();" style="display: flex; flex-direction: column; align-items: stretch; gap: 3px; min-width: 90px;">
+                                    <select onchange="event.stopPropagation(); onScheduleModeChange('${escapedChar}', '${g.goal_id || ''}', this)" style="background: #2a2a2a; color: #ccc; border: 1px solid #555; padding: 3px 4px; border-radius: 3px; font-size: 11px; cursor: pointer; width: 100%;">
+                                        <option value="manual" ${(g.schedule_mode || 'manual') === 'manual' ? 'selected' : ''}>Manual</option>
+                                        <option value="auto" ${g.schedule_mode === 'auto' ? 'selected' : ''}>Auto</option>
+                                        <option value="recurring" ${g.schedule_mode === 'recurring' ? 'selected' : ''}>Recurring</option>
+                                        <option value="daily" ${g.schedule_mode === 'daily' ? 'selected' : ''}>Daily</option>
                                     </select>
-                                    <input type="time" value="${t.run_at || ''}" onchange="event.stopPropagation(); setTaskRunAt('${escapedChar}', '${t.task_id || ''}', this.value)" style="display:${t.schedule_mode === 'daily' ? 'inline' : 'none'}; background: #2a2a2a; color: #ccc; border: 1px solid #555; padding: 3px 4px; border-radius: 3px; font-size: 11px;" title="Daily run time (24h)" />
-                                    ${status !== 'blocked' ? `<button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', 'proceed ${t.task_id || ''}')" style="background: #00d4ff; color: #1a1a1a; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer;">Proceed</button>` : `<button onclick="event.stopPropagation(); confirmUnblockTask('${escapedChar}', '${t.task_id || ''}', '${(t.name || '').replace(/'/g, "\\'")}')" style="background: #f39c12; color: #1a1a1a; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer;">Unblock</button>`}
-                                    <button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', 'reuse ${t.task_id || ''}')" style="background: #9b59b6; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer;">Reuse</button>
-                                    <button onclick="event.stopPropagation(); confirmTerminateTask('${escapedChar}', '${t.task_id || ''}', '${(t.name || '').replace(/'/g, "\\'")}')" style="background: #ff6b6b; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer;">Terminate</button>
+                                    <input type="time" value="${g.run_at || ''}" onchange="event.stopPropagation(); setTaskRunAt('${escapedChar}', '${g.goal_id || ''}', this.value)" style="display:${g.schedule_mode === 'daily' ? 'block' : 'none'}; background: #2a2a2a; color: #ccc; border: 1px solid #555; padding: 3px 4px; border-radius: 3px; font-size: 11px; width: 100%; box-sizing: border-box;" title="Daily run time (24h)" />
+                                    <button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', 'proceed ${g.goal_id || ''}')" style="background: #00d4ff; color: #1a1a1a; border: none; padding: 4px 0; border-radius: 3px; font-size: 11px; cursor: pointer; width: 100%;">Proceed</button>
+                                    <button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', 'reuse ${g.goal_id || ''}')" style="background: #9b59b6; color: white; border: none; padding: 4px 0; border-radius: 3px; font-size: 11px; cursor: pointer; width: 100%;">Reuse</button>
+                                    <button onclick="event.stopPropagation(); clearGoalCache('${escapedChar}', '${g.goal_id || ''}')" style="background: #607d8b; color: white; border: none; padding: 4px 0; border-radius: 3px; font-size: 11px; cursor: pointer; width: 100%;">Clear Cache</button>
+                                    <button onclick="event.stopPropagation(); confirmTerminateTask('${escapedChar}', '${g.goal_id || ''}', '${(g.name || '').replace(/'/g, "\\'")}')" style="background: #ff6b6b; color: white; border: none; padding: 4px 0; border-radius: 3px; font-size: 11px; cursor: pointer; width: 100%;">Terminate</button>
                                 </div>
                             </div>
                             <div id="${taskId}" class="task-accordion-body" style="display: none; padding: 10px; border-top: 1px solid #404040; background: #1e1e1e; font-size: 11px;">
-                                <pre style="white-space: pre-wrap; margin: 0; font-size: 10px; overflow-x: auto;">${escapeHtml(JSON.stringify(t, null, 2))}</pre>
+                                <pre style="white-space: pre-wrap; margin: 0; font-size: 10px; overflow-x: auto;">${escapeHtml(JSON.stringify(g, null, 2))}</pre>
                             </div>
                         </div>
                     `;
@@ -4551,9 +4599,9 @@ Generated: {generated_at}
 
         async function setTaskScheduleMode(character, taskId, mode, runAt) {
             try {
-                const body = { task_id: taskId, schedule_mode: mode };
+                const body = { goal_id: taskId, schedule_mode: mode };
                 if (runAt) body.run_at = runAt;
-                await fetch(`/api/task_schedule_mode/${character}`, {
+                await fetch(`/api/goal_schedule_mode/${character}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
@@ -4577,10 +4625,10 @@ Generated: {generated_at}
 
         async function setTaskRunAt(character, taskId, runAt) {
             try {
-                await fetch(`/api/task_schedule_mode/${character}`, {
+                await fetch(`/api/goal_schedule_mode/${character}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ task_id: taskId, schedule_mode: 'daily', run_at: runAt })
+                    body: JSON.stringify({ goal_id: taskId, schedule_mode: 'daily', run_at: runAt })
                 });
             } catch (e) {
                 console.error('setTaskRunAt:', e);
@@ -4593,10 +4641,31 @@ Generated: {generated_at}
             sendTaskCommand(character, `terminate ${taskId}`);
         }
 
-        function confirmUnblockTask(character, taskId, taskName) {
-            const label = taskName || taskId || 'this task';
-            if (!confirm(`Unblock ${label}? This clears blocked status.`)) return;
-            sendTaskCommand(character, `unblock ${taskId}`);
+        async function setGoalName(character, goalId, name) {
+            try {
+                await fetch(`/api/goal_rename/${character}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ goal_id: goalId, name: name })
+                });
+                loadTasksList(character);
+            } catch (e) {
+                console.error('setGoalName:', e);
+            }
+        }
+
+        async function clearGoalCache(character, goalId) {
+            try {
+                await fetch(`/api/goal_cache/${character}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ goal_id: goalId, action: 'clear' })
+                });
+                sendTaskCommand(character, `clear-cache ${goalId}`);
+                loadTasksList(character);
+            } catch (e) {
+                console.error('clearGoalCache:', e);
+            }
         }
 
         async function toggleScheduler(enabled) {

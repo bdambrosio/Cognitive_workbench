@@ -18,7 +18,7 @@ Search academic papers using Semantic Scholar API. Returns Collection of text No
 Success (`status: "success"`):
 - `resource_id`: Collection ID containing text Notes.
 - Each Note content is body text: full paper text (via GROBID) or abstract.
-- Paper metadata is stored in a separate metadata Note linked by a `meta` Relation.
+- Paper metadata is stored transparently and accessible via `get-metadata`.
 
 ## Behavior
 
@@ -29,7 +29,7 @@ Success (`status: "success"`):
 
 ## Metadata Access
 
-Paper metadata (title/authors/year/citations/venue/uri/doi/paper_id/pdf_url) is linked as metadata Notes via `meta` Relations.
+Paper metadata (title/authors/year/citations/venue/uri/doi/paper_id/pdf_url) is accessible via `get-metadata`.
 
 ## Key Principle
 
@@ -51,5 +51,5 @@ Paper metadata (title/authors/year/citations/venue/uri/doi/paper_id/pdf_url) is 
 ```
 
 **Metadata workflow:**
-- Use relation primitives (`find-relations`, `related`) to fetch `meta` Notes for paper Notes.
-- Then run structured operations (`project`, `filter-structured`, `sort`) on those metadata Notes.
+- Use `get-metadata` to retrieve metadata attached to a paper Note (e.g., authors, year, citations).
+- Then run structured operations (`project`, `filter-structured`, `sort`) on the returned metadata text.

@@ -33,6 +33,7 @@ INFOSPACE_PRIMITIVES = frozenset({
     'think', 'ask', 'bind', 'coerce', 'map', 'flatten', 'add', 'split', 'size', 'union',
     'intersection', 'difference', 'remove', 'project', 'pluck', 'head',
     'filter-structured', 'sort', 'join', 'create-relation', 'find-relations', 'related',
+    'get-metadata', 'set-metadata',
 })
 
 
@@ -904,6 +905,8 @@ class InfospaceExecutor:
             'create-relation': self._execute_create_relation,
             'find-relations': self._execute_find_relations,
             'related': self._execute_related,
+            'get-metadata': self._execute_get_metadata,
+            'set-metadata': self._execute_set_metadata,
             'persist': self._execute_persist,
             'load': self._execute_load,
             'index': self._execute_index,
@@ -2191,7 +2194,77 @@ Make sure the string is in a format that can be parsed by the json.loads functio
 
         self._bind_variable(out_var, collection_id)
         return self._create_uniform_return('success', value=self._format_collection_value(collection_id), resource_id=collection_id)
-    
+
+    def _execute_get_metadata(self, action: Dict) -> Dict:
+        """Retrieve metadata attached to a Note or Collection via 'meta' relation.
+
+        Required: target (Note/Collection ID, name, or $variable)
+        Optional: out ($variable — bound to the metadata Note ID if present)
+        Returns the metadata text as value, or empty string if no metadata exists.
+        """
+        if not self.resource_manager:
+            return self._create_uniform_return('failed', reason='Resource manager not available')
+        target_arg = action.get('target')
+        if not target_arg:
+            return self._create_uniform_return('failed', reason='get-metadata requires target')
+        try:
+            resource_id = self._resolve_id(target_arg)
+        except ValueError as e:
+            return self._create_uniform_return('failed', reason=str(e))
+        if not isinstance(resource_id, str) or not (
+            resource_id.startswith('Note_') or resource_id.startswith('Collection_')
+        ):
+            return self._create_uniform_return('failed', reason=f'get-metadata target must be a Note or Collection: {resource_id}')
+        meta_note_id = self.resource_manager.get_metadata_note_id(resource_id)
+        if not meta_note_id:
+            out_var = action.get('out')
+            if out_var:
+                self._bind_variable(out_var, '')
+            return self._create_uniform_return('success', value='', resource_id=None)
+        meta_resource = self.resource_manager.get_resource(meta_note_id)
+        meta_text = (meta_resource or {}).get('properties', {}).get('content', '') if meta_resource else ''
+        out_var = action.get('out')
+        if out_var:
+            self._bind_variable(out_var, meta_note_id)
+        return self._create_uniform_return('success', value=meta_text, resource_id=meta_note_id)
+
+    def _execute_set_metadata(self, action: Dict) -> Dict:
+        """Attach or update metadata on a Note or Collection via 'meta' relation.
+
+        Required: target (Note/Collection ID, name, or $variable), value (metadata text string)
+        Optional: out ($variable — bound to the metadata Note ID)
+        The operation is idempotent: updates existing metadata if already present.
+        """
+        if not self.resource_manager:
+            return self._create_uniform_return('failed', reason='Resource manager not available')
+        target_arg = action.get('target')
+        value_arg = action.get('value')
+        if not target_arg:
+            return self._create_uniform_return('failed', reason='set-metadata requires target')
+        if value_arg is None:
+            return self._create_uniform_return('failed', reason='set-metadata requires value')
+        try:
+            resource_id = self._resolve_id(target_arg)
+        except ValueError as e:
+            return self._create_uniform_return('failed', reason=str(e))
+        if not isinstance(resource_id, str) or not (
+            resource_id.startswith('Note_') or resource_id.startswith('Collection_')
+        ):
+            return self._create_uniform_return('failed', reason=f'set-metadata target must be a Note or Collection: {resource_id}')
+        # Resolve value: if it's a variable or resource ref, load its content
+        if isinstance(value_arg, str) and value_arg.startswith('$'):
+            resolved_val = self._resolve_value(value_arg)
+            meta_text = str(resolved_val) if resolved_val is not None else ''
+        else:
+            meta_text = str(value_arg)
+        meta_note_id = self.resource_manager.upsert_metadata(resource_id, meta_text, self.agent_name)
+        if not meta_note_id:
+            return self._create_uniform_return('failed', reason=f'Failed to set metadata on {resource_id}')
+        out_var = action.get('out')
+        if out_var:
+            self._bind_variable(out_var, meta_note_id)
+        return self._create_uniform_return('success', value=meta_text, resource_id=meta_note_id)
+
     # ==================== Storage Operations ====================
     
     def _extract_text_preview(self, content: Any, max_chars: int = 200) -> Tuple[str, str]:

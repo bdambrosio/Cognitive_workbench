@@ -94,7 +94,9 @@ class TaskScheduler:
                 eligible = self._check_fn()
                 if eligible:
                     task = eligible[0]  # oldest first (already sorted by creation)
-                    tid = task["task_id"]
+                    tid = task.get("task_id") or task.get("goal_id") or task.get("id")
+                    if not tid:
+                        continue
                     self._executing_task_id = tid
                     self._last_action = f"auto-proceeding {tid}"
                     logger.info(f"TaskScheduler: auto-proceeding {tid} "

@@ -32,7 +32,7 @@ Let Claude decide where to look. Tell it *what* you need to know.
 Success (`status: "success"`):
 - `resource_id`: Note ID containing text content.
 - Note content is synthesized body text (primary output).
-- Metadata is stored in a separate metadata Note linked by a `meta` Relation.
+- Metadata is stored transparently and accessible via `get-metadata`.
 
 Failure (`status: "failed"`):
 - `reason`: Error description (e.g., `no_results`, `CLAUDE_API_KEY environment variable required`)
@@ -47,7 +47,7 @@ Failure (`status: "failed"`):
 
 ## Metadata Access
 
-Tool metadata (`query`, `source_count`, `sources`, `model`, `elapsed_ms`) is linked as a metadata Note via a `meta` Relation.
+Tool metadata (`query`, `source_count`, `sources`, `model`, `elapsed_ms`) is accessible via `get-metadata`.
 
 Metadata Note content shape:
 ```json
@@ -94,7 +94,7 @@ Metadata Note content shape:
 
 - The body text is the primary output — substantive and actionable, not a stub
 - Use `extract` on the Note to pull out specific aspects of the synthesis text
-- Use relation primitives (`related`, `find-relations`) to access metadata Notes when needed
+- Use `get-metadata` to access tool metadata (query, sources, model, elapsed_ms)
 - For complete unfiltered page content from a specific URL found in sources, use `fetch-text`
 - Typical latency is 15-45 seconds (Claude performs multiple web searches internally)
 - Default timeout is 120 seconds — complex queries with many searches may take 60+ seconds
