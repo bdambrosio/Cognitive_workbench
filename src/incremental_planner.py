@@ -229,14 +229,11 @@ Types:
 - Collection: List of Note/Collection IDs 
   - Can be named (e.g., "my-collection") for stable referencing via load
   - Named Collections can be loaded by name or by ID (e.g., "Collection_456")
-- Relation: Typed directed link between two resources (source -> target)
-  - Relation IDs use format "Relation_###"
-  - Use create-relation / find-relations / related to manage graph links
-- Variable: a session-local name referencing Notes/Collections/Relations. Variables *always* start with "$".
+- Variable: a session-local name referencing Notes or Collections. Variables *always* start with "$".
 
 Note Content Format (text-only model):
 - Note content is always a string.
-- Metadata should be represented as a separate Note linked by Relation type "meta" (source content Note -> target metadata Note).
+- Metadata is stored transparently by the system. Use get-metadata / set-metadata to read and write it.
 - Structured ops (project/pluck/filter-structured/sort/join) work on Notes whose content is valid JSON text.
 
 Action Syntax:
@@ -247,7 +244,6 @@ Action Syntax:
 - Wrong: {"target": "my_variable"}
 - Note reference by ID or name: Use directly without $ (e.g., "target": "Note_123" or "target": "attention-note")
 - Collection reference by ID or name: Use directly without $ (e.g., "target": "Collection_456" or "target": "research-papers")
-- Relation reference by ID: Use directly without $ (e.g., "target": "Relation_12")
 - Literal strings: Use directly without $ (e.g., "value": "hello")
 - Literal numbers: Use directly without $ (e.g., "value": 123)
 - Literal booleans: Use directly without $ (e.g., "value": true)
@@ -274,9 +270,8 @@ Operation_name: applicable to: <Note | Collection | Note, Collection>;   Purpose
  - persist: Note, Collection;  Mark resource as persistent
  - discover-notes, discover-collections: N/A;  Global discovery (return Coll.)
  - search-within-collection: Collection;  Search indexed Collection
-- create-relation: Note/Collection + Note/Collection;  Create typed directed edge
-- find-relations: N/A;  Query relations by source/target/type (returns Collection of Relation IDs)
-- related: Note/Collection;  Get neighbors by relation type and direction
+ - get-metadata: Note, Collection;  Retrieve system metadata attached to a resource
+ - set-metadata: Note, Collection;  Attach or update metadata on a resource
 
 Key distinctions:
 - split (Note→Coll): Transforms internal structure (array/lines) into separate items
@@ -415,20 +410,32 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             ],
             "schema_hint": {"value": "any content (string, number, boolean, array, object)", "name": "string (optional)", "out": "$variable"}
         },
-        "create-relation": {
-            "description": "Create a typed directed relation between two resources.",
-            "full_description": "Create a Relation edge source -> target with a required relation label (e.g., meta, related, supports). Source and target must resolve to Note or Collection IDs. Returns a Relation resource ID bound to out.",
+        "get-metadata": {
+            "description": "Retrieve metadata attached to a Note or Collection.",
+            "full_description": "Returns the metadata text associated with the target Note or Collection (stored transparently by the system). Returns an empty string if no metadata exists. If out is provided, the variable is bound to the metadata Note ID.",
             "parameters": {
-                "source": "required: $variable or resource ID (source endpoint)",
-                "target_id": "required: $variable or resource ID (target endpoint)",
-                "relation": "required: relation type label string",
-                "out": "required: $variable for created Relation"
+                "target": "required: $variable, Note/Collection ID, or name",
+                "out": "optional: $variable — bound to the metadata Note ID if metadata exists"
             },
             "examples": [
-                '{"type":"create-relation","source":"$paper_note","target_id":"$paper_meta_note","relation":"meta","out":"$paper_meta_rel"}',
-                '{"type":"create-relation","source":"$note_a","target_id":"$note_b","relation":"related","out":"$rel"}'
+                '{"type":"get-metadata","target":"$search_result","out":"$meta"}',
+                '{"type":"get-metadata","target":"Note_123","out":"$note_meta"}'
             ],
-            "schema_hint": {"source": "$variable or resource ID", "target_id": "$variable or resource ID", "relation": "string", "out": "$variable"}
+            "schema_hint": {"target": "$variable or resource ID or name", "out": "$variable (optional)"}
+        },
+        "set-metadata": {
+            "description": "Attach or update metadata on a Note or Collection.",
+            "full_description": "Associates a metadata text string with the target Note or Collection. Idempotent: updates existing metadata if already present. If out is provided, the variable is bound to the metadata Note ID.",
+            "parameters": {
+                "target": "required: $variable, Note/Collection ID, or name",
+                "value": "required: metadata text (string, may be JSON)",
+                "out": "optional: $variable — bound to the metadata Note ID"
+            },
+            "examples": [
+                '{"type":"set-metadata","target":"$report","value":"{\\"source\\": \\"weather.gov\\", \\"retrieved\\": \\"2026-02-21\\"}"}',
+                '{"type":"set-metadata","target":"$report","value":"$meta_text","out":"$meta_note"}'
+            ],
+            "schema_hint": {"target": "$variable or resource ID or name", "value": "string or $variable", "out": "$variable (optional)"}
         },
         "think": {
             "description": "generate an internal reflection on the state of the plan. Use for reasoning about the goal or the state of the plan, or to surface internal knowledge.",
@@ -471,11 +478,17 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "examples": PRIMITIVE_DOCS["create-collection"].get("examples", []),
             "schema_hint": PRIMITIVE_DOCS["create-collection"]["schema_hint"]
         },
-        "create-relation": {
-            "description": PRIMITIVE_DOCS["create-relation"]["description"],
-            "full_description": PRIMITIVE_DOCS["create-relation"].get("full_description"),
-            "examples": PRIMITIVE_DOCS["create-relation"].get("examples", []),
-            "schema_hint": PRIMITIVE_DOCS["create-relation"]["schema_hint"]
+        "get-metadata": {
+            "description": PRIMITIVE_DOCS["get-metadata"]["description"],
+            "full_description": PRIMITIVE_DOCS["get-metadata"].get("full_description"),
+            "examples": PRIMITIVE_DOCS["get-metadata"].get("examples", []),
+            "schema_hint": PRIMITIVE_DOCS["get-metadata"]["schema_hint"]
+        },
+        "set-metadata": {
+            "description": PRIMITIVE_DOCS["set-metadata"]["description"],
+            "full_description": PRIMITIVE_DOCS["set-metadata"].get("full_description"),
+            "examples": PRIMITIVE_DOCS["set-metadata"].get("examples", []),
+            "schema_hint": PRIMITIVE_DOCS["set-metadata"]["schema_hint"]
         },
         "load": {
             "description": "Load persistent Note or Collection by ID or name, with optional slice. Notes: slice is characters (default 0:4096). Collections: slice is items (default 0:5), returns a new Collection. Use slice=':' for full content (no limit) or slice='0:N' for explicit amount. Omit 'out' to load content into context only (no variable binding).",
@@ -543,14 +556,6 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
         "ask": {
             "description": "Send question to target and terminate current turn. Response will arrive in a future turn. Requires: value, out. Optional: target (default User).",
             "schema_hint": {"target": "User or agent name (optional)", "value": "string", "out": "$variable"}
-        },
-        "find-relations": {
-            "description": "Find relations by source, target, and/or relation type. Returns a Collection of Relation IDs.",
-            "schema_hint": {"source": "$variable or resource ID (optional)", "target": "$variable or resource ID (optional)", "relation": "string (optional)", "out": "$variable"}
-        },
-        "related": {
-            "description": "Get resources related to target via relations. Returns a Collection of neighboring resource IDs.",
-            "schema_hint": {"target": "$variable or resource ID", "relation": "string (optional)", "direction": "string (optional: out|in|both)", "out": "$variable"}
         },
         "add": {
             "description": "Add a Note to an existing Collection (mutates Collection in place). When used with map to add multiple Notes, use collection parameter: {\"type\":\"map\",\"target\":\"$notes\",\"operation\":\"add\",\"collection\":\"$collection\",\"out\":\"$collection\"}",
@@ -1277,11 +1282,18 @@ def validate_codegen_block(code: str) -> tuple:
         return False, "No execute_action_tracked() calls found"
     if call_count > 16:
         return False, f"Too many execute_action_tracked() calls ({call_count}, max 16)"
-    
+
     # Must have a return with _create_uniform_return
     if 'executor._create_uniform_return' not in code:
         return False, "Missing return executor._create_uniform_return(...)"
-    
+
+    # Reject silent-failure patterns: bare except or except followed immediately by continue/pass
+    # execute_action_tracked never raises, so these swallow nothing and hide all errors
+    if re.search(r'^\s*except\s*:\s*$', code, re.MULTILINE):
+        return False, "Bare 'except:' not allowed — execute_action_tracked never raises. Check r['status'] instead."
+    if re.search(r'^\s*except\b[^:]*:\s*(continue|pass)\s*$', code, re.MULTILINE):
+        return False, "Silent 'except: continue/pass' not allowed. Track errors explicitly and check r['status']."
+
     return True, ""
 
 
@@ -1402,6 +1414,12 @@ def execute_codegen_block(code: str, executor, method_name: str = "codegen") -> 
         if isinstance(content, list):
             return content
         return []
+
+    # Expose helpers both as free functions and executor methods.
+    # This prevents common codegen failures like calling executor.get_json(...).
+    executor.get_text = get_text
+    executor.get_json = get_json
+    executor.get_items = get_items
 
     namespace = {
         "executor": executor,
@@ -2183,12 +2201,30 @@ ALWAYS follow all formatting instructions exactly.
         s += user(
             "#Stage 2 FORMAT:\n"
             "Write a Python code block to accomplish the CURRENT_TASK.\n"
+            "Linear example:\n"
             "```python\n"
             "r1 = executor.execute_action_tracked({\"type\": \"search-web\", \"query\": \"transformers survey\", \"out\": \"$papers\"}, \"codegen\")\n"
             "if r1[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"search failed\")\n"
             "r2 = executor.execute_action_tracked({\"type\": \"synthesize\", \"target\": \"$papers\", \"focus\": \"key findings\", \"out\": \"$summary\"}, \"codegen\")\n"
             "if r2[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"synthesize failed\")\n"
             "return executor._create_uniform_return(\"success\", value=\"done\")\n"
+            "```\n"
+            "Loop example (multi-item processing):\n"
+            "```python\n"
+            "items = executor.get_items(\"$inbox\")  # list of resource IDs\n"
+            "total = len(items)\n"
+            "ok = 0\n"
+            "errors = []\n"
+            "for item_id in items:\n"
+            "    r = executor.execute_action_tracked({\"type\": \"extract\", \"target\": item_id, \"instruction\": \"get subject\", \"out\": \"$subject\"}, \"codegen\")\n"
+            "    if r[\"status\"] == \"success\":\n"
+            "        subj = executor.get_json(\"$subject\")\n"
+            "        ok += 1\n"
+            "    else:\n"
+            "        errors.append(r.get(\"reason\", \"unknown\"))\n"
+            "if ok == 0:\n"
+            "    return executor._create_uniform_return(\"failed\", reason=f\"All {total} items failed: {errors[:3]}\")\n"
+            "return executor._create_uniform_return(\"success\", value=f\"Processed {ok}/{total}\", extra={\"errors\": errors})\n"
             "```\n"
             "Rules:\n"
             "- use python code and / or tool calls to accomplish the CURRENT_TASK.\n"
@@ -2198,15 +2234,19 @@ ALWAYS follow all formatting instructions exactly.
             "- VARIABLE BINDING: \"out\": \"$name\" binds the result. Chain tool actions via target=\"$name\".\n"
             "- RETURN CONTRACT: r[\"status\"] — \"success\"/\"failed\". r[\"resource_id\"] — resource ID.\n"
             "  r[\"data\"] — for Notes always string; for Collections list of {\"text\": content} per item.\n"
-            "  Use get_text(\"$var\") or get_json(\"$var\") to inspect Note content.\n"
+            "  Use executor.get_text(\"$var\") or executor.get_json(\"$var\") to inspect Note content.\n"
             "  r.get(\"extra\",{}).get(\"item_count\") — item count for Collections.\n"
             "  r[\"value\"] — display string (for humans, not for code logic).\n"
             "- CODE BLOCK SCOPE: each step executes in a fresh function. Python locals do NOT persist across steps.\n"
-            "- CROSS-STEP ACCESS: use $bindings only. To inspect existing resources use helpers:\n"
-            "  get_text(\"$var\") -> string, get_json(\"$var\") -> dict or None, get_items(\"$collection\") -> list.\n"
-            "- TYPE SAFETY: r[\"data\"] for Notes is always string; use get_json() when structured access needed.\n"
+            "- CROSS-STEP ACCESS: use $bindings only. To inspect existing resources use executor helper methods:\n"
+            "  executor.get_text(\"$var\") -> string, executor.get_json(\"$var\") -> dict or None, executor.get_items(\"$collection\") -> list.\n"
+            "- TYPE SAFETY: r[\"data\"] for Notes is always string; use executor.get_json() when structured access needed.\n"
+            "- STRUCTURED VALUES: pass dicts/lists directly as value — do not pre-serialize with json.dumps().\n"
             "- if/else control flow and loops are allowed.\n"
             "- Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
+            "- LOOP PATTERN: execute_action_tracked never raises — do NOT use try/except in loops.\n"
+            "  Track ok/errors counts explicitly. Return failed if zero items succeeded.\n"
+            "  Include counts in the return value: f\"Processed {ok}/{total}\".\n"
             "\n"
             "#Stage 2 VARIABLE LIFETIME:\n"
             "  Only variables created via 'out' persist across steps or code blocks.\n"
@@ -2226,6 +2266,8 @@ ALWAYS follow all formatting instructions exactly.
             "- Efficiency rule: if prior step used only one tool call and GOAL is not done, set NEXT_TASK to combine adjacent subtasks.\n"
             "- SPIRAL DETECTION: If the same tool has failed 2+ times consecutively,\n"
             "  use a different approach or proceed with available data.\n"
+            "- PARTIAL FAILURE: For tasks processing multiple items, check the value string for counts.\n"
+            "  '0 of N processed' is a failure — set DONE=NO and retry with a corrected approach.\n"
             "- REQUEST_TOOLS: Always valid JSON: [] or [\"tool1\", \"tool2\"].\n"
             "\n"
             "Follow these formats exactly."
@@ -2277,6 +2319,7 @@ ALWAYS follow all formatting instructions exactly.
             # Snapshot bindings before execution
             bindings_before = dict(executor.plan_bindings_flat)
             result_dict = execute_codegen_block(code_text, executor, "codegen")
+            logger.info(f"Step {step}: plan_actions count: {len(getattr(executor, '_plan_actions', []))}")
             action = {"type": "_code_block_"}
             tool_result = format_result_text(result_dict, action)
             
@@ -3147,6 +3190,7 @@ ALWAYS follow all formatting instructions exactly.
         # Snapshot bindings before execution
         bindings_before = dict(executor.plan_bindings_flat)
         result_dict = execute_codegen_block(code_text, executor, "codegen")
+        logger.info(f"Step {step}: plan_actions count: {len(getattr(executor, '_plan_actions', []))}")
         action = {"type": "_code_block_"}
         tool_result = format_result_text(result_dict, action)
         

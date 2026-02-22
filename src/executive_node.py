@@ -20,7 +20,7 @@ import argparse
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Union, Optional
+from typing import Dict, List, Any, Union, Optional, Tuple
 from dataclasses import dataclass, asdict
 from weakref import WeakValueDictionary
 
@@ -62,6 +62,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger('executive_node')
 logger.setLevel(logging.INFO)
+
+SCHEDULED_GOAL_NOTE_PREFIX = "_scheduled_goal_"
+SCHEDULED_GOALS_COLLECTION = "_scheduled_goals"
 
 # Import LLM client
 from llm_client import ZenohLLMClient
@@ -744,6 +747,9 @@ class ZenohExecutiveNode:
         )
         if not self.benchmark_mode:
             self.task_manager.initialize()
+        self._scheduled_goal_counter = 0
+        self._active_scheduled_goal_id = None
+        self._initialize_scheduled_goals()
 
         # Initialize task scheduler (auto-proceed timer)
         from task_scheduler import TaskScheduler
@@ -754,8 +760,8 @@ class ZenohExecutiveNode:
             enabled=sched_cfg.get('enabled', False),
         )
         self.task_scheduler.start(
-            check_fn=self._scheduler_eligible_tasks,
-            proceed_fn=self._scheduler_proceed_task,
+            check_fn=self._scheduler_eligible_goals,
+            proceed_fn=self._scheduler_proceed_goal,
         )
 
         # Initialize planners (reused across all goals)
@@ -916,6 +922,18 @@ class ZenohExecutiveNode:
             f"cognitive/{character_name}/control/task_schedule_mode",
             self._handle_task_schedule_mode
         )
+        self.control_goal_schedule_mode_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/goal_schedule_mode",
+            self._handle_goal_schedule_mode
+        )
+        self.control_goal_rename_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/goal_rename",
+            self._handle_goal_rename
+        )
+        self.control_goal_cache_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/goal_cache",
+            self._handle_goal_cache
+        )
 
         # === ZENOH PUBLICATION ===
         # NAME: execution_state_update
@@ -996,6 +1014,10 @@ class ZenohExecutiveNode:
         self.tasks_queryable = self.session.declare_queryable(
             f"cognitive/{character_name}/tasks",
             self._tasks_query_handler
+        )
+        self.scheduled_goals_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/scheduled_goals",
+            self._scheduled_goals_query_handler
         )
         
         self.world_state_queryable = self.session.declare_queryable(
@@ -1144,7 +1166,7 @@ class ZenohExecutiveNode:
                             text = content
                             source = 'console'
                         # Unpause for explicit goals, User text, or messages from other agents
-                        if text.strip().startswith('goal:') or source == 'User' or source not in ('unknown', 'console'):
+                        if text.strip().lower().startswith('goal:') or source == 'User' or source not in ('unknown', 'console'):
                             logger.info(f'🚀 Goal/User input in queue, unpausing execution')
                             self.execution_paused = False
                             self._publish_execution_state()
@@ -1769,6 +1791,259 @@ class ZenohExecutiveNode:
             parts.append(f"Capabilities: {caps.strip()}")
         return "\n".join(parts) if parts else self.character_name
 
+    def _initialize_scheduled_goals(self):
+        """Ensure scheduled goals collection exists and initialize ID counter."""
+        result = self.infospace_executor.execute_action({"type": "load", "target": SCHEDULED_GOALS_COLLECTION, "out": "$_scheduled_goals_col"})
+        if result.get("status") != "success" or not result.get("resource_id"):
+            self.infospace_executor.execute_action({"type": "create-collection", "name": SCHEDULED_GOALS_COLLECTION, "out": "$_scheduled_goals_col"})
+            self.infospace_executor.execute_action({"type": "persist", "target": "$_scheduled_goals_col"})
+            logger.info("Created _scheduled_goals collection")
+        max_id = 0
+        for name in list(self.resource_manager.named_notes.keys()):
+            if name.startswith(SCHEDULED_GOAL_NOTE_PREFIX):
+                try:
+                    num = int(name[len(SCHEDULED_GOAL_NOTE_PREFIX):])
+                    max_id = max(max_id, num)
+                except ValueError:
+                    pass
+        self._scheduled_goal_counter = max_id
+
+    def _scheduled_goal_note_name(self, goal_id: str) -> str:
+        return SCHEDULED_GOAL_NOTE_PREFIX + goal_id.replace("goal_", "")
+
+    def _scheduled_goals_note_ids(self) -> List[str]:
+        col_id = self.resource_manager.named_collections.get(SCHEDULED_GOALS_COLLECTION)
+        if not col_id and hasattr(self.resource_manager, "_resolve_resource_id"):
+            col_id = self.resource_manager._resolve_resource_id(SCHEDULED_GOALS_COLLECTION)
+        if col_id:
+            res = self.resource_manager.get_resource(col_id)
+            if res:
+                content = res.get("properties", {}).get("content", [])
+                if isinstance(content, list):
+                    return content
+        return [self.resource_manager.named_notes[n] for n in self.resource_manager.named_notes if n.startswith(SCHEDULED_GOAL_NOTE_PREFIX)]
+
+    def _new_scheduled_goal(self, goal_id: str, goal_text: str, name: Optional[str] = None) -> Dict[str, Any]:
+        now = datetime.now().isoformat()
+        base_name = (name or goal_text or "Scheduled goal").strip()
+        return {
+            "goal_id": goal_id,
+            "name": base_name[:120],
+            "goal_text": goal_text,
+            "status": "ready",
+            "created": now,
+            "updated": now,
+            "schedule_mode": "manual",
+            "run_at": "",
+            "last_run_date": "",
+            "cached_plan_actions": [],
+            "is_running": False,
+            "last_result": "",
+            "name_customized": False,
+        }
+
+    def _normalize_scheduled_goal(self, goal: Dict[str, Any]) -> Tuple[Dict[str, Any], bool]:
+        changed = False
+        if not isinstance(goal, dict):
+            return self._new_scheduled_goal("goal_0", ""), True
+        for key, default in {
+            "goal_id": "",
+            "name": "",
+            "goal_text": "",
+            "status": "ready",
+            "created": datetime.now().isoformat(),
+            "updated": datetime.now().isoformat(),
+            "schedule_mode": "manual",
+            "run_at": "",
+            "last_run_date": "",
+            "cached_plan_actions": [],
+            "is_running": False,
+            "last_result": "",
+            "name_customized": False,
+        }.items():
+            if key not in goal:
+                goal[key] = default
+                changed = True
+        if not isinstance(goal.get("cached_plan_actions"), list):
+            goal["cached_plan_actions"] = []
+            changed = True
+        if goal.get("schedule_mode") not in ("manual", "auto", "recurring", "daily"):
+            goal["schedule_mode"] = "manual"
+            changed = True
+        return goal, changed
+
+    def _save_scheduled_goal(self, goal: Dict[str, Any]):
+        goal_id = goal["goal_id"]
+        note_name = self._scheduled_goal_note_name(goal_id)
+        content = json.dumps(goal, ensure_ascii=False, indent=2)
+        result = self.infospace_executor.execute_action({"type": "load", "target": note_name, "out": "$_scheduled_goal_save_tmp"})
+        if result.get("status") == "success" and result.get("resource_id"):
+            self.resource_manager.update_note_content(result["resource_id"], content)
+            return
+        create_result = self.infospace_executor.execute_action({"type": "create-note", "value": content, "name": note_name, "out": "$_scheduled_goal_save_tmp"})
+        note_id = create_result.get("resource_id")
+        self.infospace_executor.execute_action({"type": "persist", "target": "$_scheduled_goal_save_tmp"})
+        col_id = self.resource_manager.named_collections.get(SCHEDULED_GOALS_COLLECTION) or self.resource_manager._resolve_resource_id(SCHEDULED_GOALS_COLLECTION)
+        if col_id and note_id:
+            added, _, err = self.resource_manager.add_to_collection(col_id, note_id, self.character_name, operation="add")
+            if not added:
+                logger.warning(f"Failed to add scheduled goal note to {SCHEDULED_GOALS_COLLECTION}: {err}")
+
+    def _all_scheduled_goals(self) -> List[Dict[str, Any]]:
+        goals: List[Dict[str, Any]] = []
+        for note_id in self._scheduled_goals_note_ids():
+            content = self.infospace_executor._get_content(note_id)
+            if not content:
+                continue
+            try:
+                goal = json.loads(content) if isinstance(content, str) else content
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if not isinstance(goal, dict):
+                continue
+            goal, changed = self._normalize_scheduled_goal(goal)
+            if changed and goal.get("goal_id"):
+                self._save_scheduled_goal(goal)
+            goals.append(goal)
+        goals.sort(key=lambda g: g.get("created", ""))
+        return goals
+
+    def _get_scheduled_goal(self, goal_id: str) -> Optional[Dict[str, Any]]:
+        if not goal_id:
+            return None
+        for goal in self._all_scheduled_goals():
+            if goal.get("goal_id") == goal_id:
+                return goal
+        return None
+
+    def _update_scheduled_goal(self, goal_id: str, **fields) -> Optional[Dict[str, Any]]:
+        goal = self._get_scheduled_goal(goal_id)
+        if not goal:
+            return None
+        goal.update(fields)
+        goal["updated"] = datetime.now().isoformat()
+        self._save_scheduled_goal(goal)
+        return goal
+
+    def _delete_scheduled_goal(self, goal_id: str) -> bool:
+        note_name = self._scheduled_goal_note_name(goal_id)
+        note_id = self.resource_manager.named_notes.get(note_name)
+        if not note_id and hasattr(self.resource_manager, "_resolve_resource_id"):
+            note_id = self.resource_manager._resolve_resource_id(note_name)
+        if not note_id:
+            return False
+        deleted, _ = self.infospace_executor.delete_resource_and_unbind(note_id)
+        return bool(deleted)
+
+    def _upsert_scheduled_goal(self, goal_text: str) -> Dict[str, Any]:
+        cleaned = (goal_text or "").strip()
+        if not cleaned:
+            self._scheduled_goal_counter += 1
+            goal_id = f"goal_{self._scheduled_goal_counter}"
+            goal = self._new_scheduled_goal(goal_id, cleaned)
+            self._save_scheduled_goal(goal)
+            return goal
+        for goal in self._all_scheduled_goals():
+            if goal.get("goal_text", "").strip() == cleaned:
+                updates = {"goal_text": cleaned, "status": "ready", "updated": datetime.now().isoformat()}
+                if not goal.get("name_customized"):
+                    updates["name"] = cleaned[:120]
+                goal.update(updates)
+                self._save_scheduled_goal(goal)
+                return goal
+        self._scheduled_goal_counter += 1
+        goal_id = f"goal_{self._scheduled_goal_counter}"
+        goal = self._new_scheduled_goal(goal_id, cleaned)
+        self._save_scheduled_goal(goal)
+        return goal
+
+    def _set_scheduled_goal_result(self, goal_id: str, result: Dict[str, Any], used_cache: bool = False):
+        goal = self._get_scheduled_goal(goal_id)
+        if not goal:
+            return
+        success = bool(result and result.get("success"))
+        updates: Dict[str, Any] = {
+            "is_running": False,
+            "status": "completed" if success else "failed",
+            "last_result": (result.get("response") if isinstance(result, dict) else "") or (result.get("error") if isinstance(result, dict) else "") or "",
+        }
+        if not used_cache:
+            plan_actions = result.get("plan") if isinstance(result, dict) else None
+            if isinstance(plan_actions, list):
+                updates["cached_plan_actions"] = plan_actions
+        self._update_scheduled_goal(goal_id, **updates)
+        if self._active_scheduled_goal_id == goal_id:
+            self._active_scheduled_goal_id = None
+        if hasattr(self, "task_scheduler"):
+            self.task_scheduler.notify_step_completed(goal_id)
+
+    def _handle_goal_proceed(self, goal_id: str = None, source: str = "user"):
+        if not goal_id:
+            self._say_to_user("Please specify which goal to proceed, e.g. 'proceed goal_1'.")
+            return
+        goal = self._get_scheduled_goal(goal_id)
+        if not goal:
+            self._say_to_user(f"Goal '{goal_id}' not found.")
+            return
+        self._active_scheduled_goal_id = goal_id
+        self._update_scheduled_goal(goal_id, is_running=True, status="running")
+        result: Dict[str, Any] = {}
+        used_cache = False
+        try:
+            cached_actions = goal.get("cached_plan_actions") or []
+            if isinstance(cached_actions, list) and cached_actions:
+                used_cache = True
+                sync_result = self.infospace_executor.execute_plan_sync(cached_actions, max_steps=1000)
+                result = {"success": sync_result.get("status") == "success", "response": sync_result.get("reason") or "", "plan": cached_actions}
+            else:
+                result = self.parse_and_set_goal("", goal.get("goal_text", "")) or {}
+        except Exception as e:
+            result = {"success": False, "error": str(e)}
+        self._set_scheduled_goal_result(goal_id, result, used_cache=used_cache)
+        if source != "scheduler":
+            status = "completed" if result.get("success") else "failed"
+            self._say_to_user(f"Goal '{goal.get('name') or goal_id}' {status}.")
+
+    def _handle_goal_reuse(self, goal_id: str = None):
+        if not goal_id:
+            self._say_to_user("Please specify which goal to reuse, e.g. 'reuse goal_1'.")
+            return
+        goal = self._update_scheduled_goal(goal_id, status="ready", is_running=False, last_result="", last_run_date="")
+        if not goal:
+            self._say_to_user(f"Goal '{goal_id}' not found.")
+            return
+        self._say_to_user(f"Goal \"{goal.get('name') or goal_id}\" reset and ready.")
+
+    def _handle_goal_terminate(self, goal_id: str = None):
+        if not goal_id:
+            self._say_to_user("Please specify which goal to terminate, e.g. 'terminate goal_1'.")
+            return
+        goal = self._get_scheduled_goal(goal_id)
+        if not goal:
+            self._say_to_user(f"Goal '{goal_id}' not found.")
+            return
+        if goal.get("is_running") or self._active_scheduled_goal_id == goal_id:
+            self.interrupt_requested = True
+            if self.infospace_executor:
+                self.infospace_executor.interrupt_requested = True
+            self._update_scheduled_goal(goal_id, status="interrupted", is_running=False)
+            if hasattr(self, "task_scheduler"):
+                self.task_scheduler.notify_task_terminal(goal_id)
+            self._say_to_user(f"Goal '{goal.get('name') or goal_id}' interrupted.")
+            return
+        deleted = self._delete_scheduled_goal(goal_id)
+        if deleted:
+            self._say_to_user(f"Goal '{goal.get('name') or goal_id}' has been removed.")
+        else:
+            self._say_to_user(f"Goal '{goal_id}' could not be removed.")
+
+    def _handle_goal_cache_clear(self, goal_id: str):
+        goal = self._update_scheduled_goal(goal_id, cached_plan_actions=[], status="ready")
+        if not goal:
+            self._say_to_user(f"Goal '{goal_id}' not found.")
+            return
+        self._say_to_user(f"Goal '{goal.get('name') or goal_id}' cache cleared.")
+
     def _handle_task_create(self, description: str):
         """User entered 'task: <description>'. Create task and submit planning goal."""
         from task_manager import TASK_PLANNING
@@ -1799,18 +2074,20 @@ class ZenohExecutiveNode:
             task = ready[0]
         task_id = task["task_id"]
         step_num = task.get("current_step", 1)
-        missing_inputs = self._missing_step_inputs(task)
-        if missing_inputs:
-            reason = f"Missing required input artifacts for step {step_num}: {', '.join(missing_inputs)}"
-            self.task_manager.update_task(task_id, blockers=[reason])
-            self.task_manager.set_status(task_id, TASK_BLOCKED)
-            self._say_to_user(
-                f"Task \"{task['name']}\" is blocked.\n"
-                f"{reason}\n"
-                f"Provide or create these artifacts, then say 'unblock {task_id}'."
-            )
-            logger.info(f'⛔ {self.character_name} Blocked task {task_id}: {reason}')
-            return
+        # Skip input validation for phase 1 — bootstrap inputs may not exist yet
+        if step_num > 1:
+            missing_inputs = self._missing_step_inputs(task)
+            if missing_inputs:
+                reason = f"Missing required input artifacts for phase {step_num}: {', '.join(missing_inputs)}"
+                self.task_manager.update_task(task_id, blockers=[reason])
+                self.task_manager.set_status(task_id, TASK_BLOCKED)
+                self._say_to_user(
+                    f"Task \"{task['name']}\" is blocked.\n"
+                    f"{reason}\n"
+                    f"Provide or create these artifacts, then say 'unblock {task_id}'."
+                )
+                logger.info(f'⛔ {self.character_name} Blocked task {task_id}: {reason}')
+                return
         if self.infospace_executor:
             self.infospace_executor.clear_plan_state()
             plan = task.get("abstract_plan", [])
@@ -1824,7 +2101,7 @@ class ZenohExecutiveNode:
                     resolved = self.resource_manager._resolve_resource_id(name)
                 if resolved:
                     self.infospace_executor._bind_variable(name, resolved)
-                    logger.debug(f"Step {step_num} pre-seeded ${name} → {resolved}")
+                    logger.debug(f"Phase {step_num} pre-seeded ${name} → {resolved}")
         pre_resource_ids = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
         self.task_manager.set_status(task_id, TASK_EXECUTING)
         self.task_manager.set_active_task_goal(task_id, "execute", step_num, pre_resource_ids=list(pre_resource_ids))
@@ -1865,42 +2142,38 @@ class ZenohExecutiveNode:
             missing.append(name)
         return missing
 
-    # ── Task scheduler callbacks ────────────────────────────────────
+    # ── Goal scheduler callbacks ────────────────────────────────────
 
-    def _scheduler_eligible_tasks(self):
-        """Return tasks the scheduler may auto-proceed (called from scheduler thread)."""
-        from task_manager import TASK_STEP_READY
+    def _scheduler_eligible_goals(self):
+        """Return scheduled goals eligible for auto-proceed."""
         from datetime import date, datetime as _dt
         if self.execution_mode == 'autonomous':
             return []  # don't interfere with autonomous goal generation
-        active = self.task_manager.get_active_tasks()
         eligible = []
-        for t in active:
-            if t.get("status") != TASK_STEP_READY:
+        for goal in self._all_scheduled_goals():
+            if goal.get("is_running"):
                 continue
-            if self._missing_step_inputs(t):
-                continue
-            mode = t.get("schedule_mode", "manual")
+            mode = goal.get("schedule_mode", "manual")
             if mode in ("auto", "recurring"):
-                eligible.append(t)
+                eligible.append(goal)
             elif mode == "daily":
-                run_at = t.get("run_at", "")          # "HH:MM"
-                last_run = t.get("last_run_date", "")  # "YYYY-MM-DD"
+                run_at = goal.get("run_at", "")
+                last_run = goal.get("last_run_date", "")
                 today = date.today().isoformat()
                 if not run_at or last_run == today:
                     continue
                 now = _dt.now().strftime("%H:%M")
                 if now >= run_at:
-                    eligible.append(t)
+                    eligible.append(goal)
         return eligible
 
-    def _scheduler_proceed_task(self, task_id):
-        """Enqueue a synthetic 'proceed' command (called from scheduler thread)."""
+    def _scheduler_proceed_goal(self, goal_id):
+        """Enqueue a synthetic goal proceed command (called from scheduler thread)."""
         from datetime import date
-        task = self.task_manager.get_task(task_id)
-        if task and task.get("schedule_mode") == "daily":
-            self.task_manager.update_task(task_id, last_run_date=date.today().isoformat())
-        command = json.dumps({"text": f"proceed {task_id}", "source": "scheduler"})
+        goal = self._get_scheduled_goal(goal_id)
+        if goal and goal.get("schedule_mode") == "daily":
+            self._update_scheduled_goal(goal_id, last_run_date=date.today().isoformat())
+        command = json.dumps({"text": f"proceed {goal_id}", "source": "scheduler"})
         self.text_input_queue.append({"content": command})
         self.execution_paused = False
         self._publish_execution_state()
@@ -1934,6 +2207,51 @@ class ZenohExecutiveNode:
                         (f" run_at={updates.get('run_at')}" if "run_at" in updates else ""))
         except Exception as e:
             logger.error(f"Error in task_schedule_mode handler: {e}")
+
+    def _handle_goal_schedule_mode(self, sample):
+        """Zenoh callback for per-goal schedule mode changes."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            goal_id = data.get("goal_id")
+            mode = data.get("schedule_mode")
+            if not goal_id or mode not in ("manual", "auto", "recurring", "daily"):
+                logger.warning(f"Invalid goal_schedule_mode payload: {data}")
+                return
+            updates = {"schedule_mode": mode}
+            if mode == "daily":
+                updates["run_at"] = data.get("run_at", "")
+            self._update_scheduled_goal(goal_id, **updates)
+            logger.info(f"Goal {goal_id} schedule_mode set to '{mode}'")
+        except Exception as e:
+            logger.error(f"Error in goal_schedule_mode handler: {e}")
+
+    def _handle_goal_rename(self, sample):
+        """Zenoh callback for scheduled goal rename."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            goal_id = data.get("goal_id")
+            name = (data.get("name") or "").strip()
+            if not goal_id or not name:
+                logger.warning(f"Invalid goal_rename payload: {data}")
+                return
+            self._update_scheduled_goal(goal_id, name=name[:120], name_customized=True)
+            logger.info(f"Goal {goal_id} renamed to '{name[:120]}'")
+        except Exception as e:
+            logger.error(f"Error in goal_rename handler: {e}")
+
+    def _handle_goal_cache(self, sample):
+        """Zenoh callback for scheduled goal cache operations."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            goal_id = data.get("goal_id")
+            action = data.get("action")
+            if action != "clear" or not goal_id:
+                logger.warning(f"Invalid goal_cache payload: {data}")
+                return
+            self._update_scheduled_goal(goal_id, cached_plan_actions=[], status="ready")
+            logger.info(f"Cleared cached plan_actions for {goal_id}")
+        except Exception as e:
+            logger.error(f"Error in goal_cache handler: {e}")
 
     def _handle_task_reuse(self, task_id: str = None):
         """User said 'reuse task_X'. Reset task to step 1, restoring initial plan."""
@@ -2020,7 +2338,7 @@ class ZenohExecutiveNode:
             plan = t.get("abstract_plan", [])
             total = len(plan)
             completed = sum(1 for s in plan if s.get("status") == "completed")
-            lines.append(f"• [{t['status']}] {t['name']} — step {t.get('current_step', '?')}/{total} ({completed} done)")
+            lines.append(f"• [{t['status']}] {t['name']} — phase {t.get('current_step', '?')}/{total} ({completed} done)")
             if t.get("blockers"):
                 lines.append(f"  Blocked: {'; '.join(t['blockers'])}")
         self._say_to_user("Active tasks:\n" + "\n".join(lines))
@@ -2041,20 +2359,21 @@ class ZenohExecutiveNode:
             logger.warning(f"Task {task_id} not found after goal completion")
             return
 
+        phase_new_ids: list = []
         if goal_type == "execute" and self.resource_manager:
             pre_ids = set(atg.get("pre_resource_ids", []) or [])
             now_ids = set(self.resource_manager.resource_registry.keys())
-            new_ids = [rid for rid in (now_ids - pre_ids) if rid != "Note_null"]
-            if new_ids:
+            phase_new_ids = [rid for rid in (now_ids - pre_ids) if rid != "Note_null"]
+            if phase_new_ids:
                 existing = task.get("task_created_resources", [])
-                merged = list(dict.fromkeys(existing + new_ids))
+                merged = list(dict.fromkeys(existing + phase_new_ids))
                 self.task_manager.update_task(task_id, task_created_resources=merged)
                 task = self.task_manager.get_task(task_id) or task
 
         if goal_type == "plan":
             self._handle_plan_goal_completed(task_id, task, result)
         elif goal_type == "execute":
-            self._handle_execute_goal_completed(task_id, task, result)
+            self._handle_execute_goal_completed(task_id, task, result, phase_new_ids)
         elif goal_type == "review":
             self._handle_review_goal_completed(task_id, task, result)
 
@@ -2077,13 +2396,14 @@ class ZenohExecutiveNode:
             self.task_manager.set_status(task_id, TASK_ABANDONED)
             self._say_to_user(f"Task could not be planned: {response}")
 
-    def _handle_execute_goal_completed(self, task_id: str, task: Dict, result: Dict):
+    def _handle_execute_goal_completed(self, task_id: str, task: Dict, result: Dict, phase_new_ids: list = None):
         """Step execution finished — auto-submit review goal (via subplanner, no vision eval)."""
         from task_manager import TASK_REVIEWING
         self.task_manager.set_status(task_id, TASK_REVIEWING)
         step_num = task.get("current_step", 1)
         self.task_manager.set_active_task_goal(task_id, "review", step_num)
-        goal_text = self.task_manager.review_goal_text(task, result, self._character_desc_short())
+        phase_resources = self._summarize_phase_resources(phase_new_ids or [])
+        goal_text = self.task_manager.review_goal_text(task, result, self._character_desc_short(), phase_resources)
         logger.info(f'🔍 {self.character_name} Reviewing step {step_num} of task {task_id}')
         review_result = self.infospace_executor.call_subplanner(goal=goal_text, max_steps=8)
         self._handle_task_goal_completed(review_result if isinstance(review_result, dict) else {"success": False, "response": str(review_result)})
@@ -2097,6 +2417,13 @@ class ZenohExecutiveNode:
         if review and isinstance(review, dict):
             outcome = review.get("step_outcome", "")
             output_artifacts = review.get("output_artifacts", [])
+            # Register declared-name → resource-ID mappings so downstream phases can resolve by name
+            name_map = review.get("output_artifact_names")
+            if name_map and isinstance(name_map, dict) and self.resource_manager:
+                for art_name, rid in name_map.items():
+                    if isinstance(art_name, str) and isinstance(rid, str) and rid:
+                        self.resource_manager.named_notes[art_name] = rid
+                        logger.debug(f"Registered output artifact name '{art_name}' → {rid}")
             if review.get("blocked"):
                 self.task_manager.update_task(task_id, blockers=[review.get("block_reason", "unknown")])
                 self.task_manager.set_status(task_id, TASK_BLOCKED)
@@ -2115,7 +2442,7 @@ class ZenohExecutiveNode:
             else:
                 self.task_manager.complete_current_step(task_id, outcome, output_artifacts)
         else:
-            response = (result.get("response") or "step completed")[:300]
+            response = (result.get("response") or "phase completed")[:300]
             self.task_manager.complete_current_step(task_id, response, [])
 
         task = self.task_manager.get_task(task_id)
@@ -2140,12 +2467,34 @@ class ZenohExecutiveNode:
             next_desc = plan[idx]["description"] if 0 <= idx < len(plan) else "unknown"
             arts_str = ", ".join(output_artifacts) if output_artifacts else "none recorded"
             self._say_to_user(
-                f"Step {task.get('current_step', 1) - 1} complete: {outcome or 'done'}\n"
+                f"Phase {task.get('current_step', 1) - 1} complete: {outcome or 'done'}\n"
                 f"Output artifacts: {arts_str}\n"
                 f"Next step ({task.get('current_step', '?')} of {len(plan)}): {next_desc}\n\n"
                 f"Say 'proceed' for next step, or 'terminate' to abandon."
             )
             self.task_scheduler.notify_step_completed(task_id)
+
+    def _summarize_phase_resources(self, resource_ids: list) -> list:
+        """Build a compact summary of resources created during a phase for the review prompt."""
+        summaries = []
+        for rid in resource_ids:
+            if not self.resource_manager:
+                break
+            resource = self.resource_manager.get_resource(rid)
+            if not resource:
+                continue
+            props = resource.get("properties", {})
+            rtype = resource.get("type")
+            type_name = rtype.name if hasattr(rtype, "name") else str(rtype)
+            name = props.get("note_name", "") or props.get("collection_name", "") or ""
+            content = props.get("content", "")
+            if isinstance(content, list):
+                snippet = f"[Collection with {len(content)} items]"
+            else:
+                raw = str(content) if content else ""
+                snippet = (raw[:120] + "…") if len(raw) > 120 else raw
+            summaries.append({"id": rid, "type": type_name, "name": name, "snippet": snippet})
+        return summaries
 
     def _cleanup_completed_task_resources(self, task_id: str):
         """
@@ -2430,35 +2779,62 @@ class ZenohExecutiveNode:
             # Handle scheduler-issued proceed commands
             if source == 'scheduler' and clean_input.strip().lower().startswith('proceed'):
                 parts = clean_input.strip().split()
-                task_id = parts[1] if len(parts) > 1 and parts[1].startswith('task_') else None
-                self._handle_task_proceed(task_id=task_id)
+                target_id = parts[1] if len(parts) > 1 else None
+                if target_id and target_id.startswith('goal_'):
+                    self._handle_goal_proceed(goal_id=target_id, source='scheduler')
+                else:
+                    task_id = target_id if target_id and target_id.startswith('task_') else None
+                    self._handle_task_proceed(task_id=task_id)
                 return
 
             # Handle special commands from User BEFORE processing as dialog
             if source == 'User':
-                if clean_input.startswith('goal:'):
-                    # Explicit goal command - process as before
+                if clean_input.strip().lower().startswith('goal:'):
+                    # Explicit goal command - process as before (case-insensitive prefix)
                     goal_preview = clean_input[:80] + ('...' if len(clean_input) > 80 else '')
                     logger.info(f'📥 {self.character_name} Received goal: "{goal_preview}"')
-                    self.parse_and_set_goal("", clean_input[5:].strip())
+                    goal_text = clean_input[5:].strip()
+                    scheduled_goal = self._upsert_scheduled_goal(goal_text)
+                    result = self.parse_and_set_goal("", goal_text) or {}
+                    self._set_scheduled_goal_result(scheduled_goal["goal_id"], result, used_cache=False)
                     return  # Don't process as speech
                 elif clean_input.startswith('task:'):
                     self._handle_task_create(clean_input[5:].strip())
                     return
                 elif clean_input.strip().lower().startswith('proceed') or clean_input.strip().lower() == 'next step':
                     parts = clean_input.strip().split()
-                    task_id = parts[1] if len(parts) > 1 and parts[1].startswith('task_') else None
-                    self._handle_task_proceed(task_id=task_id)
+                    target_id = parts[1] if len(parts) > 1 else None
+                    if target_id and target_id.startswith('goal_'):
+                        self._handle_goal_proceed(goal_id=target_id)
+                    else:
+                        task_id = target_id if target_id and target_id.startswith('task_') else None
+                        self._handle_task_proceed(task_id=task_id)
                     return
                 elif clean_input.strip().lower().startswith('terminate'):
                     parts = clean_input.strip().split()
-                    task_id = parts[1] if len(parts) > 1 and parts[1].startswith('task_') else None
-                    self._handle_task_terminate(task_id=task_id)
+                    target_id = parts[1] if len(parts) > 1 else None
+                    if target_id and target_id.startswith('goal_'):
+                        self._handle_goal_terminate(goal_id=target_id)
+                    else:
+                        task_id = target_id if target_id and target_id.startswith('task_') else None
+                        self._handle_task_terminate(task_id=task_id)
                     return
                 elif clean_input.strip().lower().startswith('reuse'):
                     parts = clean_input.strip().split()
-                    task_id = parts[1] if len(parts) > 1 and parts[1].startswith('task_') else None
-                    self._handle_task_reuse(task_id=task_id)
+                    target_id = parts[1] if len(parts) > 1 else None
+                    if target_id and target_id.startswith('goal_'):
+                        self._handle_goal_reuse(goal_id=target_id)
+                    else:
+                        task_id = target_id if target_id and target_id.startswith('task_') else None
+                        self._handle_task_reuse(task_id=task_id)
+                    return
+                elif clean_input.strip().lower().startswith('clear-cache'):
+                    parts = clean_input.strip().split()
+                    goal_id = parts[1] if len(parts) > 1 and parts[1].startswith('goal_') else None
+                    if goal_id:
+                        self._handle_goal_cache_clear(goal_id=goal_id)
+                    else:
+                        self._say_to_user("Please specify which goal cache to clear, e.g. 'clear-cache goal_1'.")
                     return
                 elif clean_input.strip().lower().startswith('unblock'):
                     parts = clean_input.strip().split()
@@ -2896,7 +3272,7 @@ class ZenohExecutiveNode:
                 self.conversation_store.record_incoming(source, text_input, close=bool(content_data.get('close', False)) if 'content_data' in locals() else False)
                 
                 # Auto-unpause for goal commands so they execute immediately
-                if text_input.strip().startswith('goal:') and self.execution_paused:
+                if text_input.strip().lower().startswith('goal:') and self.execution_paused:
                     logger.info(f'🚀 Goal received, unpausing execution')
                     self.execution_paused = False
                     self._publish_execution_state()
@@ -3773,6 +4149,17 @@ class ZenohExecutiveNode:
             logger.error(f'Error in tasks query handler: {e}')
             response = {'success': False, 'error': str(e)}
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+
+    def _scheduled_goals_query_handler(self, query):
+        """Handle query for scheduled goals."""
+        try:
+            goals = self._all_scheduled_goals()
+            response = {"success": True, "goals": goals}
+            query.reply(query.key_expr, json.dumps(response).encode("utf-8"))
+        except Exception as e:
+            logger.error(f"Error in scheduled goals query handler: {e}")
+            response = {"success": False, "error": str(e)}
+            query.reply(query.key_expr, json.dumps(response).encode("utf-8"))
     
     def _world_state_query_handler(self, query):
         """Handle query for current world state."""
@@ -4082,7 +4469,7 @@ class ZenohExecutiveNode:
             # Drive task state machine if this goal was task-related
             if self.task_manager.active_task_goal:
                 self._handle_task_goal_completed(result)
-                return
+                return result
 
             if result.get('success', False):
                 self.current_plan = result.get('plan', {})
@@ -4101,16 +4488,16 @@ class ZenohExecutiveNode:
                     )
                 else:
                     logger.error(f"Error in _plan: {result.get('error', 'Unknown error')}")
-                return
+                return result
             if self.current_plan:
                 self._publish_current_plan()
                 self.plan_just_generated = True
-            return
+            return result
             
         except Exception as e:
             logger.error(f"Goal parsing failed for {self.character_name}: {e}")
             traceback.print_exc()
-            return
+            return {"success": False, "error": str(e)}
 
     def _get_recent_chat_memories(self, num_entries: int) -> List[Dict[str, Any]]:
         """Get recent memory entries from memory module."""

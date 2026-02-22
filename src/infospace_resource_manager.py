@@ -1028,52 +1028,75 @@ class InfospaceResourceManager:
         logger.info(f"📝 Updated Note {note_id} content")
         return True, None
 
-    def _upsert_note_tool_metadata_relation(self, note_id: str, tool_metadata: Dict[str, Any], character_name: str):
-        """Create/update Note->meta Note relation for tool metadata."""
-        if not isinstance(note_id, str) or not note_id.startswith('Note_'):
-            return
-        if not isinstance(tool_metadata, dict) or not tool_metadata:
-            return
+    def upsert_metadata(self, resource_id: str, meta_text: str, character_name: str) -> Optional[str]:
+        """Create or update a 'meta' relation from resource_id to a metadata Note.
+
+        Works for both Notes and Collections. Returns the metadata Note ID, or None on failure.
+        """
+        if not isinstance(resource_id, str) or not (
+            resource_id.startswith('Note_') or resource_id.startswith('Collection_')
+        ):
+            return None
 
         metadata_note_id = None
-        for rel in self.find_relations(source_id=note_id, relation_type='meta'):
+        for rel in self.find_relations(source_id=resource_id, relation_type='meta'):
             target_id = rel.get('properties', {}).get('target')
             if isinstance(target_id, str) and target_id.startswith('Note_') and target_id in self.resource_registry:
                 metadata_note_id = target_id
                 break
 
-        meta_text = json.dumps(tool_metadata, ensure_ascii=False, sort_keys=True)
         if metadata_note_id:
             self.update_note_content(metadata_note_id, meta_text, reindex=False)
+            return metadata_note_id
         else:
             success, metadata_note_id, error_msg, _ = self.create_note(
                 character_name=character_name,
                 content=meta_text,
                 format_type='text',
                 source_skill='meta-relation',
-                source_value=note_id,
+                source_value=resource_id,
                 note_name='',
-                extra_props={'kind': 'metadata', 'source': note_id, 'exclude_from_index': True}
+                extra_props={'kind': 'metadata', 'source': resource_id, 'exclude_from_index': True}
             )
             if not success or not metadata_note_id:
-                logger.warning(f"Failed creating metadata Note for {note_id}: {error_msg}")
-                return
-
+                logger.warning(f"Failed creating metadata Note for {resource_id}: {error_msg}")
+                return None
             rel_success, relation_id, rel_error, _ = self.create_relation(
                 character_name=character_name,
-                source_id=note_id,
+                source_id=resource_id,
                 target_id=metadata_note_id,
                 relation_type='meta',
                 extra_props={'exclude_from_index': True}
             )
             if not rel_success:
-                logger.warning(f"Failed creating meta relation for {note_id}: {rel_error}")
-            else:
-                logger.info(f"Linked metadata for {note_id} via {relation_id}")
+                logger.warning(f"Failed creating meta relation for {resource_id}: {rel_error}")
+                return None
+            logger.info(f"Linked metadata for {resource_id} via {relation_id}")
+            return metadata_note_id
+
+    def get_metadata_note_id(self, resource_id: str) -> Optional[str]:
+        """Return the metadata Note ID linked via 'meta' relation, or None."""
+        for rel in self.find_relations(source_id=resource_id, relation_type='meta'):
+            target_id = rel.get('properties', {}).get('target')
+            if isinstance(target_id, str) and target_id.startswith('Note_') and target_id in self.resource_registry:
+                return target_id
+        return None
+
+    def _upsert_note_tool_metadata_relation(self, note_id: str, tool_metadata: Dict[str, Any], character_name: str):
+        """Create/update Note->meta Note relation for tool metadata. Delegates to upsert_metadata."""
+        if not isinstance(note_id, str) or not note_id.startswith('Note_'):
+            return
+        if not isinstance(tool_metadata, dict) or not tool_metadata:
+            return
+
+        meta_text = json.dumps(tool_metadata, ensure_ascii=False, sort_keys=True)
+        metadata_note_id = self.upsert_metadata(note_id, meta_text, character_name)
+        if not metadata_note_id:
+            return
 
         source_note = self.resource_registry.get(note_id, {})
         source_persistent = bool(source_note.get('properties', {}).get('persistent', False))
-        if source_persistent and metadata_note_id:
+        if source_persistent:
             self.mark_persistent(metadata_note_id, character_name)
     
     # ==================== Collection Creation ====================
