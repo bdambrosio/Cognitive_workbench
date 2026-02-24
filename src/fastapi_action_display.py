@@ -214,6 +214,7 @@ class FastAPIActionDisplayNode:
         
         # Track active characters
         self.active_characters: Set[str] = set()
+        self.character_scheduler_defaults: Dict[str, Dict[str, Any]] = {}
         self.character_publishers: Dict[str, Any] = {}
         self.last_character_name: str = None
         
@@ -1420,7 +1421,10 @@ Generated: {generated_at}
         @self.app.get("/api/characters")
         async def get_characters():
             """Get list of active characters that have announced themselves."""
-            return {"characters": list(self.active_characters)}
+            return {
+                "characters": list(self.active_characters),
+                "scheduler_defaults": self.character_scheduler_defaults,
+            }
         
         @self.app.get("/api/world_state/{character}")
         async def get_world_state(character: str):
@@ -2438,8 +2442,11 @@ Generated: {generated_at}
                                 Interval:
                                 <input type="number" id="schedulerInterval" value="1" min="1" max="1440"
                                        style="width: 45px; background: #333; color: #ccc; border: 1px solid #555; font-size: 10px; padding: 2px;"
-                                       onchange="updateSchedulerInterval(this.value)">m
+                                       onblur="updateSchedulerInterval(this.value)">m
                             </label>
+                        </div>
+                        <div id="schedulerEvents" style="max-height: 130px; overflow-y: auto; border-bottom: 1px solid #404040; padding: 6px 10px; font-size: 11px; color: #bbb;">
+                            <div style="color: #777; font-style: italic;">No scheduler events yet.</div>
                         </div>
                         <div id="tasksList">
                             <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
@@ -2694,6 +2701,18 @@ Generated: {generated_at}
                     // Check if this is an announcement to create a character tab
                     if (data.action_type === 'announcement') {
                         createCharacterTab(data.character);
+                        try {
+                            const cfg = (data.raw_data && data.raw_data.character_config && data.raw_data.character_config.task_scheduler) || null;
+                            if (cfg) {
+                                const tabData = characterTabs.get(data.character);
+                                if (tabData) {
+                                    tabData.schedulerState = {
+                                        enabled: !!cfg.enabled,
+                                        interval: Math.max(60, parseInt((parseFloat(cfg.interval) || 15) * 60))
+                                    };
+                                }
+                            }
+                        } catch (e) {}
                         try { announcedCharacters.add(data.character); } catch (e) {}
                         // Auto-fill character input with the first (and only) character
                         const characterInput = document.getElementById('characterInput');
@@ -2922,6 +2941,13 @@ Generated: {generated_at}
                         if (!characterTabs.has(character)) {
                             createCharacterTab(character);
                             announcedCharacters.add(character);
+                        }
+                        const defaults = data.scheduler_defaults && data.scheduler_defaults[character];
+                        if (defaults) {
+                            const tabData = characterTabs.get(character);
+                            if (tabData && !tabData.schedulerState) {
+                                tabData.schedulerState = defaults;
+                            }
                         }
                     });
                     // Auto-select first character if none selected
@@ -4696,6 +4722,7 @@ Generated: {generated_at}
             const toggle = document.getElementById('schedulerToggle');
             const status = document.getElementById('schedulerStatus');
             const interval = document.getElementById('schedulerInterval');
+            const eventsDiv = document.getElementById('schedulerEvents');
             if (toggle) toggle.checked = schedulerState.enabled;
             if (interval) interval.value = Math.round((schedulerState.interval || 60) / 60);
             if (status) {
@@ -4708,6 +4735,21 @@ Generated: {generated_at}
                 } else {
                     status.textContent = 'waiting';
                     status.style.color = '#f39c12';
+                }
+            }
+            if (eventsDiv) {
+                const events = Array.isArray(schedulerState.events) ? schedulerState.events : [];
+                if (!events.length) {
+                    eventsDiv.innerHTML = '<div style="color: #777; font-style: italic;">No scheduler events yet.</div>';
+                } else {
+                    const rows = events.slice(-12).reverse().map((evt) => {
+                        const t = evt.ts ? evt.ts.split('T').pop().slice(0, 8) : '--:--:--';
+                        const head = `${t} ${String(evt.event || '').toUpperCase()} ${evt.goal_id || ''}`.trim();
+                        const tail = evt.status ? ` [${evt.status}]` : (evt.reason ? ` (${evt.reason})` : '');
+                        const details = evt.result ? ` - ${evt.result}` : '';
+                        return `<div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(head + tail + details)}</div>`;
+                    });
+                    eventsDiv.innerHTML = rows.join('');
                 }
             }
         }
@@ -6137,6 +6179,15 @@ Generated: {generated_at}
     def _handle_character_announcement(self, action_data: Dict[str, Any], character_name: str):
         """Handle character announcement actions."""
         self.active_characters.add(character_name)
+        try:
+            sched_cfg = (action_data.get('character_config') or {}).get('task_scheduler', {})
+            interval_min = float(sched_cfg.get('interval', 15))
+            self.character_scheduler_defaults[character_name] = {
+                "enabled": bool(sched_cfg.get('enabled', False)),
+                "interval": max(60, int(interval_min * 60)),
+            }
+        except Exception:
+            self.character_scheduler_defaults[character_name] = {"enabled": False, "interval": 60}
         
         # Set active character name for direct control (first announced character)
         if self.active_character_name is None:

@@ -66,6 +66,10 @@ logger.setLevel(logging.INFO)
 SCHEDULED_GOAL_NOTE_PREFIX = "_scheduled_goal_"
 SCHEDULED_GOALS_COLLECTION = "_scheduled_goals"
 
+
+def _is_goal_cmd(s):
+    return s and s.strip().lower().startswith('goal:')
+
 # Import LLM client
 from llm_client import ZenohLLMClient
 
@@ -754,15 +758,21 @@ class ZenohExecutiveNode:
         # Initialize task scheduler (auto-proceed timer)
         from task_scheduler import TaskScheduler
         sched_cfg = self.character_config.get('task_scheduler', {})
+        interval_min = sched_cfg.get('interval', 15)  # minutes (consistent with UI)
         self.task_scheduler = TaskScheduler(
             character_name=self.character_name,
-            interval=sched_cfg.get('interval', 15.0),
+            interval=float(interval_min) * 60.0,  # convert to seconds
             enabled=sched_cfg.get('enabled', False),
         )
         self.task_scheduler.start(
             check_fn=self._scheduler_eligible_goals,
             proceed_fn=self._scheduler_proceed_goal,
         )
+        self._scheduler_events = []
+        self._scheduler_event_limit = 40
+        self._scheduler_event_keys = set()
+        self._scheduler_event_lock = threading.Lock()
+        self._scheduler_started_goals = set()
 
         # Initialize planners (reused across all goals)
  
@@ -1166,7 +1176,7 @@ class ZenohExecutiveNode:
                             text = content
                             source = 'console'
                         # Unpause for explicit goals, User text, or messages from other agents
-                        if text.strip().lower().startswith('goal:') or source == 'User' or source not in ('unknown', 'console'):
+                        if _is_goal_cmd(text) or source == 'User' or source not in ('unknown', 'console'):
                             logger.info(f'🚀 Goal/User input in queue, unpausing execution')
                             self.execution_paused = False
                             self._publish_execution_state()
@@ -1972,10 +1982,20 @@ class ZenohExecutiveNode:
             if isinstance(plan_actions, list):
                 updates["cached_plan_actions"] = plan_actions
         self._update_scheduled_goal(goal_id, **updates)
+        if goal_id in self._scheduler_started_goals:
+            self._scheduler_started_goals.discard(goal_id)
+        self._record_scheduler_event(
+            "end",
+            goal_id=goal_id,
+            goal_name=goal.get("name", "") or goal.get("goal_text", "")[:80],
+            status=updates["status"],
+            result=updates["last_result"],
+        )
         if self._active_scheduled_goal_id == goal_id:
             self._active_scheduled_goal_id = None
         if hasattr(self, "task_scheduler"):
             self.task_scheduler.notify_step_completed(goal_id)
+        self._publish_execution_state()
 
     def _handle_goal_proceed(self, goal_id: str = None, source: str = "user"):
         if not goal_id:
@@ -1987,19 +2007,18 @@ class ZenohExecutiveNode:
             return
         self._active_scheduled_goal_id = goal_id
         self._update_scheduled_goal(goal_id, is_running=True, status="running")
+        self._record_scheduler_event(
+            "start",
+            goal_id=goal_id,
+            goal_name=goal.get("name", "") or goal.get("goal_text", "")[:80],
+        )
         result: Dict[str, Any] = {}
-        used_cache = False
         try:
-            cached_actions = goal.get("cached_plan_actions") or []
-            if isinstance(cached_actions, list) and cached_actions:
-                used_cache = True
-                sync_result = self.infospace_executor.execute_plan_sync(cached_actions, max_steps=1000)
-                result = {"success": sync_result.get("status") == "success", "response": sync_result.get("reason") or "", "plan": cached_actions}
-            else:
-                result = self.parse_and_set_goal("", goal.get("goal_text", "")) or {}
+            # Always replan on proceed - cached plans have stale Note IDs from the prior run
+            result = self.parse_and_set_goal("", goal.get("goal_text", "")) or {}
         except Exception as e:
             result = {"success": False, "error": str(e)}
-        self._set_scheduled_goal_result(goal_id, result, used_cache=used_cache)
+        self._set_scheduled_goal_result(goal_id, result, used_cache=False)
         if source != "scheduler":
             status = "completed" if result.get("success") else "failed"
             self._say_to_user(f"Goal '{goal.get('name') or goal_id}' {status}.")
@@ -2027,8 +2046,17 @@ class ZenohExecutiveNode:
             if self.infospace_executor:
                 self.infospace_executor.interrupt_requested = True
             self._update_scheduled_goal(goal_id, status="interrupted", is_running=False)
+            if goal_id in self._scheduler_started_goals:
+                self._scheduler_started_goals.discard(goal_id)
+                self._record_scheduler_event(
+                    "end",
+                    goal_id=goal_id,
+                    goal_name=goal.get("name", "") or goal.get("goal_text", "")[:80],
+                    status="interrupted",
+                )
             if hasattr(self, "task_scheduler"):
                 self.task_scheduler.notify_task_terminal(goal_id)
+            self._publish_execution_state()
             self._say_to_user(f"Goal '{goal.get('name') or goal_id}' interrupted.")
             return
         deleted = self._delete_scheduled_goal(goal_id)
@@ -2144,6 +2172,24 @@ class ZenohExecutiveNode:
 
     # ── Goal scheduler callbacks ────────────────────────────────────
 
+    def _record_scheduler_event(self, event: str, goal_id: str = "", goal_name: str = "", status: str = "", result: str = "", reason: str = "", dedupe_key: str = ""):
+        with self._scheduler_event_lock:
+            if dedupe_key and dedupe_key in self._scheduler_event_keys:
+                return
+            if dedupe_key:
+                self._scheduler_event_keys.add(dedupe_key)
+            self._scheduler_events.append({
+                "ts": datetime.now().isoformat(timespec="seconds"),
+                "event": event,
+                "goal_id": goal_id,
+                "goal_name": goal_name,
+                "status": status,
+                "result": (result or "")[:180],
+                "reason": (reason or "")[:120],
+            })
+            if len(self._scheduler_events) > self._scheduler_event_limit:
+                self._scheduler_events = self._scheduler_events[-self._scheduler_event_limit:]
+
     def _scheduler_eligible_goals(self):
         """Return scheduled goals eligible for auto-proceed."""
         from datetime import date, datetime as _dt
@@ -2163,14 +2209,37 @@ class ZenohExecutiveNode:
                 if not run_at or last_run == today:
                     continue
                 now = _dt.now().strftime("%H:%M")
-                if now >= run_at:
-                    eligible.append(goal)
+                if now < run_at:
+                    continue
+                # Skip if we're past run_at + interval (missed window)
+                try:
+                    h, m = map(int, run_at.split(":"))
+                    deadline_min = h * 60 + m + int(self.task_scheduler.interval // 60)
+                    now_min = _dt.now().hour * 60 + _dt.now().minute
+                    if now_min > deadline_min:
+                        self._record_scheduler_event(
+                            "skip",
+                            goal_id=goal.get("goal_id", ""),
+                            goal_name=goal.get("name", "") or goal.get("goal_text", "")[:80],
+                            reason="outside run window",
+                            dedupe_key=f"skip:{goal.get('goal_id', '')}:{today}",
+                        )
+                        continue
+                except Exception:
+                    pass
+                eligible.append(goal)
         return eligible
 
     def _scheduler_proceed_goal(self, goal_id):
         """Enqueue a synthetic goal proceed command (called from scheduler thread)."""
         from datetime import date
         goal = self._get_scheduled_goal(goal_id)
+        self._scheduler_started_goals.add(goal_id)
+        self._record_scheduler_event(
+            "start",
+            goal_id=goal_id,
+            goal_name=(goal.get("name", "") if goal else "") or (goal.get("goal_text", "")[:80] if goal else ""),
+        )
         if goal and goal.get("schedule_mode") == "daily":
             self._update_scheduled_goal(goal_id, last_run_date=date.today().isoformat())
         command = json.dumps({"text": f"proceed {goal_id}", "source": "scheduler"})
@@ -2789,8 +2858,7 @@ class ZenohExecutiveNode:
 
             # Handle special commands from User BEFORE processing as dialog
             if source == 'User':
-                if clean_input.strip().lower().startswith('goal:'):
-                    # Explicit goal command - process as before (case-insensitive prefix)
+                if _is_goal_cmd(clean_input):
                     goal_preview = clean_input[:80] + ('...' if len(clean_input) > 80 else '')
                     logger.info(f'📥 {self.character_name} Received goal: "{goal_preview}"')
                     goal_text = clean_input[5:].strip()
@@ -3272,7 +3340,7 @@ class ZenohExecutiveNode:
                 self.conversation_store.record_incoming(source, text_input, close=bool(content_data.get('close', False)) if 'content_data' in locals() else False)
                 
                 # Auto-unpause for goal commands so they execute immediately
-                if text_input.strip().lower().startswith('goal:') and self.execution_paused:
+                if _is_goal_cmd(text_input) and self.execution_paused:
                     logger.info(f'🚀 Goal received, unpausing execution')
                     self.execution_paused = False
                     self._publish_execution_state()
@@ -3659,13 +3727,17 @@ class ZenohExecutiveNode:
                 active_dialog = self.conversation_store.has_active_dialogs()
             except Exception:
                 pass
+            scheduler_state = self.task_scheduler.get_status() if hasattr(self, 'task_scheduler') else None
+            if scheduler_state is not None:
+                with self._scheduler_event_lock:
+                    scheduler_state['events'] = list(self._scheduler_events[-20:])
             state_data = {
                 'paused': self.execution_paused,
                 'mode': self.execution_mode,
                 'character': self.character_name,
                 'continuous_mode': self.continuous_mode,
                 'active_dialog': active_dialog,
-                'task_scheduler': self.task_scheduler.get_status() if hasattr(self, 'task_scheduler') else None,
+                'task_scheduler': scheduler_state,
                 'timestamp': time.time()
             }
             self.execution_state_publisher.put(json.dumps(state_data).encode('utf-8'))

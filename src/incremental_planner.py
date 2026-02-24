@@ -1236,6 +1236,7 @@ _CODEGEN_FORBIDDEN_PATTERNS = [
     r'\bsys\b\.', r'\bsubprocess\b',
     r'\bglobals\b\s*\(', r'\blocals\b\s*\(',
     r'\bsetattr\b\s*\(', r'\bdelattr\b\s*\(',
+    r':=',  # walrus operator — invalid inside exec() on some Python versions and causes subtle bugs
 ]
 
 
@@ -1851,11 +1852,12 @@ def _vision_eval_deep(vision_criteria: str, eval_target: str, classifier_result:
         f"(e.g., source collections) to check how many items were retained vs. discarded.\n"
         f"3. If criteria involve specificity or accuracy, load source Notes to verify "
         f"that claimed details actually appear in source material.\n"
-        f"4. For each criterion, report PASS or FAIL with a one-sentence evidence-based reason.\n"
+        f"4. For each criterion, report PASS, FAIL, or INAPPLICABLE with a one-sentence evidence-based reason. "
+        f"Use INAPPLICABLE when a criterion does not apply to the artifact (e.g., json_parse_error for plain-text output).\n"
         f"5. End with a one-line RECOMMENDATION for the parent planner (e.g., 'lower filter threshold', "
-        f"'add section headers', 'broaden search terms').\n"
-        f"6. On the final line, write exactly: STATUS: SATISFIED (if all criteria PASS and no revision needed) "
-        f"or STATUS: NEEDS_REVISION (if any FAIL or revision recommended).\n"
+        f"'add section headers', 'broaden search terms', or 'remove X criterion' if a criterion is inapplicable).\n"
+        f"6. On the final line, write exactly: STATUS: SATISFIED (if all applicable criteria PASS; INAPPLICABLE criteria do not affect STATUS) "
+        f"or STATUS: NEEDS_REVISION (only when an applicable criterion FAILs; INAPPLICABLE criteria do not cause NEEDS_REVISION).\n"
         f"7. Return the evaluation report as your final answer. Do NOT regenerate the artifact and do NOT use say — the report is returned "
         f"to the parent planner as text, not delivered to any user."
     )
@@ -1918,6 +1920,8 @@ def _parse_deep_eval_status(deep_text: str) -> str:
     """
     Parse deep-eval status robustly.
     Returns one of: "satisfied", "needs_revision", "unknown".
+    When NEEDS_REVISION is returned but the RECOMMENDATION says to remove/reframe a criterion
+    (i.e., the criterion was inapplicable), treat as satisfied.
     """
     if not deep_text:
         return "unknown"
@@ -1925,10 +1929,22 @@ def _parse_deep_eval_status(deep_text: str) -> str:
     m = re.search(r"^\s*STATUS:\s*(SATISFIED|NEEDS_REVISION)\s*$", text, flags=re.IGNORECASE | re.MULTILINE)
     if m:
         status = m.group(1).strip().upper()
-        return "satisfied" if status == "SATISFIED" else "needs_revision"
+        raw = "satisfied" if status == "SATISFIED" else "needs_revision"
+        if raw == "needs_revision":
+            rec_m = re.search(r"RECOMMENDATION[:\s]+(.+?)(?:\n|$)", text, flags=re.IGNORECASE | re.DOTALL)
+            if rec_m:
+                rec = rec_m.group(1).lower()
+                if ("remove" in rec or "reframe" in rec) and "criterion" in rec:
+                    return "satisfied"
+        return raw
     lo = text.lower()
     if any(k in lo for k in ["needs_revision", "needs revision", "revision needed", "any fail", "criterion_"]):
         if "pass" not in lo or "fail" in lo:
+            rec_m = re.search(r"RECOMMENDATION[:\s]+(.+?)(?:\n|$)", text, flags=re.IGNORECASE | re.DOTALL)
+            if rec_m:
+                rec = rec_m.group(1).lower()
+                if ("remove" in rec or "reframe" in rec) and "criterion" in rec:
+                    return "satisfied"
             return "needs_revision"
     if any(k in lo for k in ["no revision needed", "all criteria pass", "all criteria are pass", "status: satisfied"]):
         return "satisfied"
@@ -4148,6 +4164,23 @@ class IncrementalPlanner:
                 hist_dir / "reflection_frame.jsonl",
                 {"seq": seq, "ts": now_iso, "agent": agent_name, "world": world_name, "goal": goal, "reflection_frame": reflection_content},
             )
+            if reflection_content.get("failure_mode") == "missing_affordance":
+                task = reflection_content.get("task_state") or {}
+                self._append_jsonl(
+                    hist_dir / "create_tool_opportunities.jsonl",
+                    {
+                        "seq": seq,
+                        "ts": now_iso,
+                        "agent": agent_name,
+                        "world": world_name,
+                        "goal": goal,
+                        "failure_evidence": reflection_content.get("failure_evidence", []),
+                        "open_questions": reflection_content.get("open_questions", []),
+                        "immediate_blockers": task.get("immediate_blockers", []),
+                        "available_tools": list(self.tools.keys()),
+                        "compressed_trace": compressed_trace,
+                    },
+                )
 
             # Extract plan actions from executor
             plan_actions = getattr(self.executor, '_plan_actions', [])
@@ -4207,6 +4240,9 @@ GOAL:
 
 Instructions:
 - Only check for obvious failures: empty output, completely off-topic content, or structurally broken output (e.g., JSON parse error when JSON is required).
+- Do NOT generate json_parse_error or JSON-related criteria unless the goal explicitly requires JSON output.
+- For run-script, shell scripts, or fire-and-forget tools, output is typically plain text — do NOT assume JSON.
+- For simple execution goals (e.g., "run script X", "execute Y"), prefer "No vision criteria needed."
 - Do NOT check quality, depth, specificity, coverage, credibility, recency, or source verification.
 - Do NOT check content correctness (dates, numbers, facts) — the agent is not a fact-checker.
 - If no obvious failure modes apply (e.g., a simple lookup or report), return "No vision criteria needed."

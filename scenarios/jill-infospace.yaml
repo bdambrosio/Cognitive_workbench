@@ -17,6 +17,10 @@ characters:
     manual: true
     manual_response: false
 
+    task_scheduler:
+      enabled: true
+      interval: 15   # minutes
+
     character: |
       Jill, a young AI assistant. Jill works as research assistant for User, a retired AI professor and entrepreneur.
       Jill is widely knowledgeable in Philosophy, cognitive science, and neuroscience as well as computer science and AI. 
