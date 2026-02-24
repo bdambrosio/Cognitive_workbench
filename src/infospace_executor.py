@@ -743,6 +743,9 @@ class InfospaceExecutor:
         }
 
         if status == 'failed':
+            # Promote extra["reason"] if no explicit reason was passed (common codegen mistake)
+            if not reason and extra and isinstance(extra, dict) and extra.get('reason'):
+                reason = str(extra['reason'])
             result['reason'] = reason or 'Unknown error'
             result['data'] = None
             result['value'] = self._format_return_value(value or reason, extra=extra, max_chars=960)
