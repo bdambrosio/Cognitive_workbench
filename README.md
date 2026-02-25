@@ -1,202 +1,160 @@
 # Cognitive Workbench
 
-Code as Laboratory for LLM cognitive architecture research.
+A research framework for autonomous agents with incremental planning, persistent memory, and tool use.
 
 [![Status: Research Laboratory](https://img.shields.io/badge/status-research_laboratory-purple.svg)]()
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-**Beware! I've modified several .yaml launch pages to use Qwen3-Next-80B-A3B. At the moment SGLang needs a simple one-line patch to run this model, see the llm wiki page!**
+## What This Is
 
-## What this is
+Cognitive Workbench is experimental research software for studying LLM-based cognitive architectures. It prioritizes **inspectable agent behavior** and fast iteration over stability.
 
-This repo is experimental research software. It prioritizes **inspectable agent behavior** and fast iteration over stability.
+The core idea: an **incremental planner** that interleaves reasoning with tool execution. Rather than generating a complete plan and then executing it, the planner generates one step at a time, runs it, observes the result, and decides what to do next. This tight feedback loop — combined with persistent memory, reflective quality control, and autonomous goal scheduling — produces agents that can pursue complex goals over extended periods.
 
-Core ideas:
-- **Incremental planning**: the planner interleaves reasoning and tool execution.
-- **Infospace memory**: Notes + Collections + Relations are treated as working memory.
-- **World integrations** (optional): scenario-specific “world tools” (e.g., Minecraft, fs) can be loaded per character.
+```
+User: "goal: Find recent papers on multi-agent coordination"
+                    │
+         ┌──────────▼──────────┐
+         │   Executive Node    │  OODA loop: Observe → Orient → Decide → Act
+         │   (goal queue,      │
+         │    scheduling)      │
+         └──────────┬──────────┘
+                    │
+         ┌──────────▼──────────┐
+         │ Incremental Planner │  Stage 0: Retrieve context (FAISS)
+         │                     │  Stage 1: Analyze + select tools
+         │  ┌───────────────┐  │  Stage 2: Generate code → Execute → Evaluate
+         │  │ Reason → Act  │──│──────► repeat until done
+         │  │ ← Observe     │  │
+         │  └───────────────┘  │  Reflect: learn from execution trace
+         └──────────┬──────────┘
+                    │
+         ┌──────────▼──────────┐
+         │ Infospace Executor   │  Primitives + Tools
+         │                     │  Notes + Collections + Relations
+         │  search-web, say,   │  FAISS semantic search
+         │  create-note, ...   │  Persistent memory
+         └─────────────────────┘
+```
 
-## Recent Updates (2026-02)
+## Key Features
 
-**Conversation & dialog**:
-- **Envisioning** for User and agent-to-agent dialogs: lightweight LLM call produces "their move" / "your move" framing so the planner sees conversational context, not just raw messages.
-- **End button** turns red when a dialog is active (User or agent-to-agent); grey when closed. User can interrupt internal agent-to-agent conversations.
-- Fixed `conversation_history` vs `recent_conversation` mismatch so envisioning sees actual dialog history.
+- **[Incremental Planning](docs/architecture.md)** — the planner interleaves LLM reasoning with tool execution, adapting its approach based on real results
+- **[Goal Scheduling](docs/goals-and-scheduling.md)** — submit goals with `goal:` prefix; schedule them for manual, automatic, recurring, or daily-at-time execution
+- **[Envisioning & Quality Control](docs/envisioning-and-quality-control.md)** — lightweight LLM framing for coherent dialog; post-execution reflection for failure recovery and learning
+- **[Infospace Memory](docs/architecture.md#infospace-memory-model)** — Notes, Collections, and Relations as structured working memory with FAISS semantic search
+- **[Extensible Tools](docs/tools-and-primitives.md)** — 20+ built-in tools (web search, email, academic papers, shell scripts) plus world-specific integrations
+- **[Missing Affordance Monitoring](docs/envisioning-and-quality-control.md#missing-affordance-monitoring)** — automatic detection and logging of capability gaps for future tool development
+- **[World Integrations](docs/configuration.md#available-scenarios)** — optional worlds (Minecraft, file system, desktop automation, ScienceWorld) with specialized tools
+- **[Web UI](docs/ui-guide.md)** — real-time dashboard with action log, goal scheduling, and resource browser
 
-**Code blocks & uniform_return**:
-- **`r["data"]`** now holds structured content: string for Notes, list of `{"text":..., "metadata":...}` for Collections. Code blocks can inspect results (e.g. `if len(r["data"]) < 3: broaden_search()`).
-- `r["value"]` remains the display string for humans. Planner instructions simplified.
+## Quick Start
 
-**Infospace metadata + relations**:
-- **Text-only Note content**: planner-facing Note content is string-only (plain text or JSON serialized as text).
-- **Metadata reification**: metadata is no longer embedded in Note text headers.
-- Metadata is stored in a separate Note and linked via a typed **Relation** (`relation="meta"`), with the content Note as source.
-- Relation lifecycle follows endpoints: relations persist when either endpoint is persistent, and are removed when either endpoint is removed.
-
-**UI**:
-- Action log timestamps now show per-action execution time (not cached simulation time).
-
-**World tools**:
-- **File system (fs)** world: `jill-fs.yaml` with fs-list, fs-read, fs-grep, fs-find, fs-head, fs-stat. Scenario data under `scenarios/fs/`.
-
-**Repository**:
-- `scenarios/*/` and `src/musings/` added to `.gitignore`.
-
-## Wiki (recommended entry points)
-
-The GitHub wiki is intended to be the primary long-form documentation surface.
-
-- [Architecture overview](https://github.com/bdambrosio/Cognitive_workbench/wiki/Architecture)
-- [Incremental planner](https://github.com/bdambrosio/Cognitive_workbench/wiki/Incremental-Planner)
-- [Infospace memory (Notes & Collections)](https://github.com/bdambrosio/Cognitive_workbench/wiki/Infospace)
-- [Tools & primitives (uniform return, tool catalog)](https://github.com/bdambrosio/Cognitive_workbench/wiki/Tools)
-- [World integrations (world_config, world_state)](https://github.com/bdambrosio/Cognitive_workbench/wiki/Worlds)
-- [Minecraft guide](https://github.com/bdambrosio/Cognitive_workbench/wiki/Minecraft)
-- [UI guide (FastAPI + WebSockets)](https://github.com/bdambrosio/Cognitive_workbench/wiki/UI)
-- [Troubleshooting](https://github.com/bdambrosio/Cognitive_workbench/wiki/Troubleshooting)
-
-If you rename these pages later, update the links here.
-
-## Quick start
-
-### Prerequisites
-
-- Python 3.10+
-- An LLM backend configured for your environment (SGLang is commonly used for planning)
-
-### Install
+### 1. Install
 
 ```bash
+git clone https://github.com/bdambrosio/Cognitive_workbench.git
+cd Cognitive_workbench
 python3 -m venv zenoh_venv
 source zenoh_venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Run (UI)
+### 2. Configure an LLM backend
 
-From `src/`, run the launcher with UI enabled.
+**Option A — Local GPU (SGLang):** Edit `scenarios/jill-infospace.yaml` and set `sgl_model_path` to your preferred model.
+
+**Option B — Cloud API (no GPU needed):**
+```bash
+export OPENROUTER_API_KEY="sk-or-v1-..."   # from openrouter.ai
+```
+
+### 3. Run
 
 ```bash
 cd src
-python3 launcher.py <character_name>-<world>.yaml --ui --resource-browser
-```
-The core agent is jill-infospace. this gives you the full infospace reasoner, web-search, semantic-scholar search, and base tool set.
-
-```bash
-python3 launcher.py jill-infospace.yaml --ui --resource-browser
+python3 launcher.py ../scenarios/jill-infospace.yaml --ui --resource-browser
+# Or for OpenRouter:
+python3 launcher.py ../scenarios/jill-infospace-openrouter.yaml --ui --resource-browser
 ```
 
-Open the UI at `http://localhost:3000` if it doesn't auto-open a browser window
-
-**Note - the .yaml file defines the llm to be loaded into SGLang. you will probably want to edit that!**
-
-## How tools work
-
-### Infospace: Notes, Collections, Relations (planner-facing)
-
-The planner “thinks” and communicates through an **Infospace** of **Notes**, **Collections**, and **Relations**:
-- **Note**: a single resource with string content (free-form text or JSON serialized as text)
-- **Collection**: an ordered list of Notes (often produced by search, filtering, mapping, joins, etc.)
-- **Relation**: a typed directed edge between resources (e.g., `meta`, `related`, `supports`)
-
-Most built-in tools are CRUD + processing utilities over Notes/Collections/Relations (load/save/query/map/filter/project/synthesize/create-relation/find-relations/related…).
-
-### Schema + implementation (tool authoring)
-
-Tools are defined by:
-- `Skill.md`: tool interface / contract (inputs, outputs, behavior)
-- `tool.py`: implementation
-
-Core tools live in `src/tools/`. World-specific tools live in `src/world-tools/<world_name>/`.
-
-### Tool execution envelope: uniform_return (executor-facing)
-
-Tool results return a `uniform_return` dict: `status`, `value` (display string), `data` (structured content for code blocks), `resource_id`, `extra`. For Notes, `data` is the text; for Collections, `data` is a list of `{"text":..., "metadata":...}`. For full details, see the wiki “Tools” page.
-
-### Tool catalog ordering and sources
-
-The planner sees tools grouped by **source**:
-- World tools first (e.g., `#MINECRAFT`)
-- Then core infospace tools (`#INFOSPACE CORE`)
-
-Each tool entry includes a `source` field: `"core"` or `"<world_name>"`.
-
-## Worlds: loading, state, and UI
-
-World integrations are enabled per character via `world_name` in the `world_config` section of the .yaml.
-
-Key mechanics:
-- World tools are loaded from `src/world-tools/<world_name>/`.
-- `InfospaceExecutor` maintains a persistent `world_state` dict for the active world.
-- The UI has a **State** tab that displays `world_state` (updates on `set_world_state`).
-
-## Minecraft (current state)
-
-Minecraft support lives under `src/world-tools/minecraft/`.
-
-Highlights:
-- Navigation history is tracked in `world_state.nav` as a **list** (most recent first, bounded).
-- Yaw is normalized to **0–360**.
-- `minecraft/init` is auto-run on executor initialization (if present) to normalize pose and seed nav state.
-- Mapping uses a **SpatialMap** compiled representation (`mc-map-update`, `mc-map-query`, `mc-map-visualize`).
-  - Legacy map-Collection queries are deprecated; SpatialMap is the source of truth.
-
-**⚠️ Breaking Change (2026-01)**: Minecraft now integrates **VoxelAffordanceModel** L0 perceptual inference:
-- candidate for world-specific perceptual models
-- Requires PyTorch (`torch>=2.9.1`) and `zstandard>=0.22.0` (added to `requirements.txt`)
-- L0 inference pipeline initializes automatically via `minecraft/init` tool
-- Perceptual frames are computed and stored in `world_state.perceptual_frame` after each grid update
-- Access via `local_grid.get_latest_perceptual_frame()` or `get_latest_perceptual_frame_as_str()`
-- **Impact**: If VoxelAffordanceModel repo is missing, inference gracefully degrades (logs warning, continues without perceptual frames)
-- The `voxel_affordance_model/` directory is gitignored; clone separately if needed
-
-### Recent Updates (2026-01)
-
-**Navigation-First Observation**:
-- `mc-observe-blocks` now uses **navigation surface scanning** (`nav_surface`) instead of visual occlusion-based scanning.
-- Scans 2D (x,z) cells within a forward cone (yaw ±60°, pitch -60° to +90°) and probes downward to find supporting blocks.
-- Non-supporting cover blocks (snow layers, grass) don't occlude navigation surface detection.
-- Default radius: **7 blocks** (max 7).
-
-**Spatial Map Improvements**:
-- **Query-time attributes**: "blocked", "step_up", "step_down" are computed dynamically relative to current position (not stored statically).
-- Removed agent-relative data (`delta_y_from_agent`) from map storage.
-- Support detection uses `adjacent_blocks['down']` for reliable ground detection.
-- Map cells store absolute `support_y`; surface = `support_y + 1`.
-
-**Path Planning**:
-- `path-frontier` now **over-approximates** frontier candidates (default `allow_unknown=True`).
-- Handles climb/descend actions (y±1) correctly in simulation.
-- Returns frontier positions even with partial map coverage.
-
-**Observation Tools**:
-- `mc-observe-blocks`, `mc-observe-entities`, `mc-observe-items` all use **cone-based visibility** (120° horizontal, pitch -60° to +90°).
-- Default radius: **7 blocks** (max 7).
-- Entities/items include `dx`, `dy`, `dz` offsets and `distance` from agent position.
-
-## Repository structure (high level)
-
+Open [http://localhost:3000](http://localhost:3000) and type:
 ```
-src/
-  executive_node.py
-  infospace_executor.py
-  incremental_planner.py
-  fastapi_action_display.py
-  tools/
-  world-tools/
-    minecraft/
-    fs/
-scenarios/
-tests/
+goal: Find and summarize recent papers on transformer architectures
 ```
 
-Note: `scenarios/*/` and `src/musings/` are gitignored (runtime data).
+See [Getting Started](docs/getting-started.md) for full setup details, environment variables, and troubleshooting.
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| **[Getting Started](docs/getting-started.md)** | Installation, credentials, LLM backend setup, first run |
+| **[Architecture](docs/architecture.md)** | Core cognitive architecture — incremental planner, OODA loop, infospace memory |
+| **[Goals & Scheduling](docs/goals-and-scheduling.md)** | Goal submission (`goal:` prefix), scheduled goals, daily-at-time, autonomous execution |
+| **[Envisioning & QC](docs/envisioning-and-quality-control.md)** | Conversational envisioning, reflection, failure recovery, missing affordance monitoring |
+| **[Tools & Primitives](docs/tools-and-primitives.md)** | Infospace primitives, tool catalog, run-script, plan tools |
+| **[Configuration](docs/configuration.md)** | Scenario YAML reference, available scenarios, directory structure |
+| **[UI Guide](docs/ui-guide.md)** | Web dashboard, resource browser, API endpoints |
+| **[Tool Development](docs/TOOL_DEVELOPMENT_GUIDE.md)** | Creating new tools (`Skill.md` + `tool.py`) |
+| **[Background](BACKGROUND.md)** | Research motivation and philosophy |
+| **[Contributor Guidelines](src/AGENTS.md)** | Code style, testing, commit conventions |
+
+## How It Works (In Brief)
+
+1. **You submit a goal**: `goal: Monitor stock prices and alert on changes > 5%`
+2. **The Executive Node** queues it and invokes the Incremental Planner
+3. **The Planner** retrieves relevant context (FAISS), selects tools, then enters a generate-execute-evaluate loop:
+   - LLM writes a code block calling tools (`search-web`, `stock-price`, `create-note`, etc.)
+   - Executor runs it, returns structured results
+   - LLM evaluates: done? next step? error recovery?
+4. **Reflection** analyzes the full execution trace — updates task state, world model, tool insights
+5. **If it failed** with a missing capability, the gap is logged for future tool development
+6. **Scheduled goals** can repeat daily at a set time, or auto-proceed through multi-step workflows
+
+## Available Scenarios
+
+| Scenario | World | Backend |
+|----------|-------|---------|
+| `jill-infospace.yaml` | Core infospace | SGLang (local GPU) |
+| `jill-infospace-openrouter.yaml` | Core infospace | OpenRouter (cloud) |
+| `jill-fs.yaml` | File system | SGLang |
+| `jill-fs-anthropic.yaml` | File system | Anthropic Claude |
+| `jill-minecraft.yaml` | Minecraft 3D world | SGLang |
+| `jill-osworld.yaml` | Desktop automation | SGLang |
+| `jill-scienceworld.yaml` | Science simulation | SGLang |
+| `jack-and-jill.yaml` | Multi-agent | SGLang |
+
+See [Configuration](docs/configuration.md) for details on each.
+
+## Repository Structure
+
+```
+Cognitive_workbench/
+├── README.md                          # This file
+├── BACKGROUND.md                      # Research philosophy
+├── requirements.txt                   # Python dependencies
+├── docs/                              # Detailed documentation
+├── scenarios/                         # Scenario YAML files + runtime data
+└── src/
+    ├── launcher.py                    # Entry point
+    ├── executive_node.py              # OODA loop coordinator
+    ├── incremental_planner.py         # Core planner (the heart of the system)
+    ├── infospace_executor.py           # Primitives + tool execution
+    ├── infospace_resource_manager.py   # Notes/Collections/Relations + FAISS
+    ├── fastapi_action_display.py      # Web UI
+    ├── task_scheduler.py              # Autonomous goal scheduling
+    ├── tools/                         # Core tools (search-web, run-script, etc.)
+    ├── world-tools/                   # World-specific tools (minecraft, fs, etc.)
+    ├── scripts/                       # Shell scripts for run-script tool
+    └── utils/                         # Shared utilities
+```
 
 ## Contributing
 
-See `src/AGENTS.md` for repository guidelines and contributor expectations.
+See [src/AGENTS.md](src/AGENTS.md) for repository guidelines, code style, and commit conventions.
 
 ## License
 
-MIT License - see `LICENSE`.
+MIT License — see [LICENSE](LICENSE).
