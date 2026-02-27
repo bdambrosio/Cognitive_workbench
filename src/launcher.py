@@ -54,12 +54,13 @@ def load_scenario(config_file: str) -> dict:
         return yaml.safe_load(f)
 
 
-def parse_characters(config_data: dict, llm_config: dict, world_config: dict, setting) -> List[Dict[str, Any]]:
+def parse_characters(config_data: dict, llm_config: dict, world_config: dict, setting, alt_llm_config: dict = None) -> List[Dict[str, Any]]:
     """Return a list of (name, config) tuples from the YAML characters section."""
     characters_config = config_data.get('characters', [])
     ontology = config_data.get('Ontology', False)
     activities = config_data.get('Activities', False)
     result = []
+    alt_llm = alt_llm_config if alt_llm_config else {}
 
     if isinstance(characters_config, dict):
         for name, config in characters_config.items():
@@ -68,6 +69,7 @@ def parse_characters(config_data: dict, llm_config: dict, world_config: dict, se
             new_config['activities'] = activities
             new_config['characters'] = characters_config.copy()
             new_config['llm_config'] = llm_config
+            new_config['alt_llm_config'] = alt_llm
             new_config['world_config'] = world_config
             new_config['setting'] = setting
             result.append((name.capitalize(), new_config))
@@ -80,6 +82,7 @@ def parse_characters(config_data: dict, llm_config: dict, world_config: dict, se
                 new_config['activities'] = activities
                 new_config['characters'] = characters_config
                 new_config['llm_config'] = llm_config
+                new_config['alt_llm_config'] = alt_llm
                 new_config['world_config'] = world_config
                 new_config['setting'] = setting
                 result.append((name.capitalize(), new_config))
@@ -280,6 +283,7 @@ def main():
 
     scenario_name = Path(args.config_file).stem
     llm_config = config_data.get('llm_config', {})
+    alt_llm_config = config_data.get('alt_llm_config', {})
     world_config = config_data.get('world_config', {})
     world_name = (world_config.get('world_name') if world_config else None) or scenario_name or 'infospace'
     setting = config_data.get('setting', {})
@@ -290,7 +294,7 @@ def main():
         os.environ['CWB_MAX_TURNS'] = str(int(max_turns))
 
     # ---- Parse characters ----
-    characters = parse_characters(config_data, llm_config, world_config, setting)
+    characters = parse_characters(config_data, llm_config, world_config, setting, alt_llm_config)
 
     # Command-line override
     if args.characters:

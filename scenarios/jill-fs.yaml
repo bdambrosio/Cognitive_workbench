@@ -2,11 +2,14 @@
 
 world_config:
   world_name: "fs"
+  scheduled_goals_world: "jill"
   
 llm_config:
-  sgl_model_path: "Qwen/Qwen3-Coder-Next-FP8" #"Qwen/Qwen3-Next-80B-A3B-Instruct-FP8"
-  pdf_parser: "pymupdf"  # Use pymupdf for PDF reading (skip GROBID even if available)
+  sgl_model_path:  "Qwen/Qwen3-Next-80B-A3B-Instruct-FP8" #"Qwen/Qwen3-Coder-Next-FP8" Qwen/Qwen3-30B-A3B-Instruct-2507" #Qwen/Qwen3-VL-2B-Instruct" #Qwen/Qwen3-8B" # Qwen/Qwen3-VL-8B-Instruct" #Qwen/Qwen3-4B-Instruct-2507" #/home/bruce/vllm/models/Qwen3-Coder-30B-A3B-Instruct" 
   grobid: "http://localhost:8070/"
+
+alt_llm_config:
+  openrouter_model_path: "qwen/qwen3-235b-a22b-2507"
   
 setting: |
   Cognitive Workbench, a virtual modern 
@@ -52,6 +55,10 @@ characters:
   Jill:
     manual: true
     manual_response: false
+
+    task_scheduler:
+      enabled: true
+      interval: 15   # minutes
 
     character: |
       Jill, a young AI assistant. Jill works as research assistant for User, a retired AI professor and entrepreneur.

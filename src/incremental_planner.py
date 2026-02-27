@@ -22,8 +22,11 @@ from infospace_executor import InfospaceExecutor
 from plan_guidance import PlanGuidance
 from tool_model import ToolModel
 from world_model import WORLD_MODEL_SCHEMA, empty_world_model
-# Global temperature setting for all gen() calls
-GEN_TEMPERATURE = 0.5
+# Per-stage temperature settings for gen() calls
+GEN_TEMPERATURE = 0.5          # Default / fallback
+CODE_TEMPERATURE = 0.2         # Stage 2 code generation — low for correctness
+SELECT_TEMPERATURE = 0.1       # Tool selection, DONE/EVAL_TARGET classification — low for reliability
+REFLECT_TEMPERATURE = GEN_TEMPERATURE  # Reasoning, thoughts, next-task planning
 
 # Configure logging with file handler
 # Add file handler directly to this module's logger (doesn't interfere with root logger config)
@@ -774,10 +777,12 @@ def tool_catalog_text(tools: Dict[str, Dict]) -> str:
     lines.append("- search-web → synthesize (with focus) — direct Collection analysis")
     lines.append("- search-web → map(extract) → synthesize — two-phase with per-item extraction")
     lines.append("- search-web → filter-structured → synthesize — filtered then analyzed")
+    lines.append("- search-web → filter-semantic(predicate=...) → synthesize — semantic content filtering")
     lines.append("- search-web already returns substantial page content in 'text' field (keyword-filtered, up to ~8K chars per result) — use extract/synthesize directly")
     lines.append("- semantic-scholar → synthesize (with focus) — direct Collection analysis")
     lines.append("- semantic-scholar → map(extract) → synthesize — two-phase with per-item extraction")
     lines.append("- semantic-scholar → filter-structured → synthesize — filtered then analyzed")
+    lines.append("- semantic-scholar → filter-semantic(predicate=...) → synthesize — semantic content filtering")
     lines.append("- semantic-scholar already returns full paper text (via GROBID) in 'text' field of each Note — do NOT project metadata.uri for fetching")
     lines.append("- For comparison: synthesize with format=\"comparison\" and other= (requires two inputs)")
     lines.append("- fetch-text is for SINGLE URLs only, NOT for Collections from search-web/semantic-scholar")
@@ -2097,8 +2102,8 @@ if HAS_SGLANG:
                 logger.warning(f"Stage 0: Failed to retrieve resources: {e}")
         
         # Stage 1: Analysis + tool selection
-        system_parts = [f"Your task is to achieve\n#GOAL:\n{goal}\n\n"]
-        system_parts.append("You can write code blocks to achieve the goal, including using tools/primitives (aka actions), if and as needed,")
+        # Goal is placed at the end of the system prompt (high-attention zone)
+        system_parts = ["You can write code blocks to achieve the goal, including using tools/primitives (aka actions), if and as needed,"]
         system_parts.append("and loop over execute-step / reflect until the goal is satisfied.")
         system_parts.append(f"\n{INCREMENTAL_PLAN_SPECIFICATIONS}\n")
         system_parts.append(f"Complete primitive and tool catalog:\n{tools_catalog_text}\n#### END OF INFOSPACE TYPE SYSTEM, SPECIFICATIONS, AND TOOL CATALOG\n\n")
@@ -2130,6 +2135,7 @@ if HAS_SGLANG:
 
         system_parts.append(f"WORLD_MODEL: {json.dumps(world_model, indent=2)}\n")
         system_parts.append(f"CURRENT_TIME: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n")
+        system_parts.append(f"\n#GOAL:\n{goal}\n")
         system_parts.append("""Follow this process to achieve the goal:
  - Stage 1 (once): Read the ABSTRACT_PLAN, select tools, state first task.
  - Stage 1.5 (once): Load and inject detailed docs for selected tools.
@@ -2168,13 +2174,13 @@ ALWAYS follow all formatting instructions exactly.
         
         s += assistant(
             "<reasoning>\n"
-            + gen("stage1_reasoning", max_tokens=64, temperature=GEN_TEMPERATURE, stop="</reasoning>")
+            + gen("stage1_reasoning", max_tokens=192, temperature=REFLECT_TEMPERATURE, stop="</reasoning>")
             + "</reasoning>\n"
             "<tools>\n"
-            + gen("selected_tools_json", max_tokens=96, temperature=GEN_TEMPERATURE, stop="</tools>")
+            + gen("selected_tools_json", max_tokens=96, temperature=SELECT_TEMPERATURE, stop="</tools>")
             + "</tools>\n"
             "<first_task>\n"
-            + gen("first_task", max_tokens=128, temperature=GEN_TEMPERATURE, stop="</first_task>")
+            + gen("first_task", max_tokens=128, temperature=REFLECT_TEMPERATURE, stop="</first_task>")
             + "</first_task>\n"
         )
         
@@ -2271,6 +2277,7 @@ ALWAYS follow all formatting instructions exactly.
             "\n"
             "#Stage 3 FORMAT:\n"
             "  THOUGHTS: <brief assessment of result and progress>\n"
+            "  EVAL_TARGET: <single $variable (e.g. $report) of the key output artifact from this step, or NONE if no significant artifact>\n"
             "  DONE: <YES or NO — is the entire GOAL satisfied?>\n"
             "  NEXT_TASK: <next task description, or blank if DONE=YES>\n"
             "  REQUEST_TOOLS: <json array of tool names needing docs, or []>\n"
@@ -2313,11 +2320,12 @@ ALWAYS follow all formatting instructions exactly.
                 f"#GOAL: {goal_for_step}\n#END GOAL\n"
                 f"CURRENT_TASK: {current_task}\n"
                 "Write a Python code block using Stage 2 FORMAT.\n"
+                "Reminder: chain via $bindings (out=\"$name\"), end with return executor._create_uniform_return(...), max 16 tool calls. Locals don't persist across steps. No try/except — check r[\"status\"] instead.\n"
             )
-            
+
             s += assistant(
                 "```python\n"
-                + gen(f"code_block_{step}", max_tokens=2048, temperature=GEN_TEMPERATURE, stop=["\n```"])
+                + gen(f"code_block_{step}", max_tokens=2048, temperature=CODE_TEMPERATURE, stop=["\n```"])
                 + "\n```\n"
             )
             
@@ -2342,12 +2350,23 @@ ALWAYS follow all formatting instructions exactly.
             # Track new bindings
             new_bindings = {k: v for k, v in executor.plan_bindings_flat.items() if bindings_before.get(k) != v}
             
-            # Persist code block return value as Note when substantial
+            # Persist code block return value as Note when substantial.
+            # Use 'data' (full structured content) in preference to 'value' (truncated display string)
+            # so that the Note — and therefore the eval target — contains real content.
             code_block_output_created = False
             if result_dict.get('status') == 'success':
-                val = result_dict.get('value', '')
-                if isinstance(val, str) and len(val) > 80:
-                    executor.execute_action({"type": "create-note", "value": val, "out": "$code_block_output"})
+                raw = result_dict.get('data')
+                if raw is None:
+                    raw = result_dict.get('value', '')
+                if isinstance(raw, list):
+                    raw = '\n'.join(str(x) for x in raw)
+                elif isinstance(raw, dict):
+                    import json as _json
+                    raw = _json.dumps(raw, ensure_ascii=False)
+                else:
+                    raw = str(raw) if raw is not None else ''
+                if isinstance(raw, str) and len(raw) > 80:
+                    executor.execute_action({"type": "create-note", "value": raw, "out": "$code_block_output"})
                     code_block_output_created = True
             
             logger.info(f"Step {step}: -> {tool_result[:100]}")
@@ -2357,14 +2376,22 @@ ALWAYS follow all formatting instructions exactly.
             # Interrupt checkpoint: after code-block execution
             if _interrupt_requested(executor):
                 _clear_interrupt(executor)
+                # Ask to User intentionally sets interrupt to pause for response - treat as success, not failure
+                plan_actions = getattr(executor, '_plan_actions', [])
+                last_ask = plan_actions and plan_actions[-1].get('type') == 'ask' and str(plan_actions[-1].get('target', '')).lower() == 'user'
+                if last_ask:
+                    s["ask_completed_successfully"] = True
                 s["final_answer"] = "Interrupted by user."
                 break
             
             # Stage 3: Evaluate result
+            bindings_summary = ", ".join(f"${k}={v}" for k, v in new_bindings.items() if not str(k).startswith("_")) if new_bindings else "none"
             s += user(
                 f"=====\n"
                 f"STAGE 3 (step {step + 1}/{max_steps})\n"
                 f"=====\n\n"
+                f"CURRENT_TASK: {current_task}\n"
+                f"NEW_BINDINGS: {bindings_summary}\n\n"
                 f">> RESULT (ground truth) <<\n"
                 f"{tool_result}\n"
                 f">> END RESULT <<\n\n"
@@ -2396,24 +2423,35 @@ ALWAYS follow all formatting instructions exactly.
                     eval_target = rid
             if eval_target:
                 last_eval_target = eval_target
-            if eval_target and vision_criteria:
-                logger.info(f"Step {step}: Vision eval target: {last_eval_target}")
+            # Mid-loop vision eval: only run on declared output artifacts (not every intermediate binding)
+            run_mid_vision = False
+            if eval_target and vision_criteria and _declared_output_artifacts and executor:
+                for oa in _declared_output_artifacts:
+                    oa_key = oa.strip().lstrip("$")
+                    oa_rid = executor.plan_bindings_flat.get(oa_key) or executor.plan_bindings_flat.get("$" + oa_key)
+                    if oa_rid and oa_rid == eval_target:
+                        run_mid_vision = True
+                        break
+            if run_mid_vision:
+                logger.info(f"Step {step}: Vision eval target (declared artifact): {last_eval_target}")
                 compressed_ctx = _compress_trace(str(s))
                 vision_eval_text = _vision_eval_check(vision_criteria, last_eval_target, executor, compressed_context=compressed_ctx)
                 if vision_eval_text:
                     s += user(f"VISION EVALUATION:\n{vision_eval_text}\nFAILs are advisory — attempt to address if easy, do NOT loop repeatedly. Proceed after at most three retries.\n")
                     s += assistant("Noted.\n")
             
-            # Stage 3: Simplified reflection (4 fields)
+            # Stage 3: Structured reflection (5 fields)
             s += assistant(
                 "THOUGHTS: "
-                + gen(f"thoughts_{step}", max_tokens=128, temperature=GEN_TEMPERATURE, stop="\nDONE:")
+                + gen(f"thoughts_{step}", max_tokens=128, temperature=REFLECT_TEMPERATURE, stop="\nEVAL_TARGET:")
+                + "\nEVAL_TARGET: "
+                + gen(f"eval_target_{step}", max_tokens=32, temperature=SELECT_TEMPERATURE, stop="\nDONE:")
                 + "\nDONE: "
-                + gen(f"done_{step}", max_tokens=8, temperature=GEN_TEMPERATURE, stop="\nNEXT_TASK:")
+                + gen(f"done_{step}", max_tokens=8, temperature=SELECT_TEMPERATURE, stop="\nNEXT_TASK:")
                 + "\nNEXT_TASK: "
-                + gen(f"next_task_{step}", max_tokens=128, temperature=GEN_TEMPERATURE, stop="\nREQUEST_TOOLS:")
+                + gen(f"next_task_{step}", max_tokens=128, temperature=REFLECT_TEMPERATURE, stop="\nREQUEST_TOOLS:")
                 + "\nREQUEST_TOOLS: "
-                + gen(f"request_tools_{step}", max_tokens=96, temperature=GEN_TEMPERATURE, stop=["\n\n", "\nTHOUGHTS:", "\nDONE:", "\nNEXT_TASK:", "\nREQUEST_TOOLS:"])
+                + gen(f"request_tools_{step}", max_tokens=96, temperature=SELECT_TEMPERATURE, stop=["\n\n", "\nTHOUGHTS:", "\nDONE:", "\nNEXT_TASK:", "\nREQUEST_TOOLS:", "\nEVAL_TARGET:"])
                 + "\n"
             )
             
@@ -2424,9 +2462,18 @@ ALWAYS follow all formatting instructions exactly.
                     return default
             
             logger.info(f"THOUGHTS: {safe_get(s, f'thoughts_{step}')}")
+            logger.info(f"EVAL_TARGET: {safe_get(s, f'eval_target_{step}')}")
             logger.info(f"DONE: {safe_get(s, f'done_{step}')}")
             logger.info(f"NEXT_TASK: {safe_get(s, f'next_task_{step}')}")
             logger.info(f"REQUEST_TOOLS: {safe_get(s, f'request_tools_{step}')}")
+
+            # Update last_eval_target from LLM-declared EVAL_TARGET (overrides heuristic)
+            llm_eval_target_raw = safe_get(s, f"eval_target_{step}", "").strip()
+            if llm_eval_target_raw and llm_eval_target_raw.upper() != "NONE":
+                llm_rid = _resolve_eval_target_id(llm_eval_target_raw, executor)
+                if llm_rid:
+                    last_eval_target = llm_rid
+                    logger.info(f"Step {step}: LLM-declared eval target resolved: {last_eval_target}")
             
             # Stage 3.1: Update resource indexes with commentary
             thoughts_text = s[f'thoughts_{step}'].strip()
@@ -2476,7 +2523,7 @@ ALWAYS follow all formatting instructions exactly.
                 )
                 s += assistant(
                     "VERIFICATION_ANSWER: "
-                    + gen("VERIFICATION_ANSWER", max_tokens=96, temperature=GEN_TEMPERATURE, stop="\n")
+                    + gen("VERIFICATION_ANSWER", max_tokens=96, temperature=SELECT_TEMPERATURE, stop="\n")
                 )
                 logger.info(f"VERIFICATION ANSWER: {s['VERIFICATION_ANSWER']}")
                 
@@ -2509,13 +2556,13 @@ ALWAYS follow all formatting instructions exactly.
                 
                 # Generate final answer
                 next_task_raw = s[f"next_task_{step}"].strip()
-                if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
+                if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a", "blank", "(blank)"]:
                     final_prompt = next_task_raw
                 else:
                     final_prompt = "Summarize the results with focus on the original goal"
                 
                 s += user(f"FINAL TASK: {final_prompt}\nProvide a final response or answer. End your response with </end>")
-                s += assistant(gen("final_answer", max_tokens=256, temperature=GEN_TEMPERATURE, stop=["</end>"]))
+                s += assistant(gen("final_answer", max_tokens=256, temperature=REFLECT_TEMPERATURE, stop=["</end>"]))
                 logger.info(f"FINAL_ANSWER: {s['final_answer']}")
                 break
 
@@ -2535,7 +2582,7 @@ ALWAYS follow all formatting instructions exactly.
                 break
             
             # Update current task for next iteration
-            if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
+            if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a", "blank", "(blank)"]:
                 current_task = next_task_raw
                 logger.info(f"Step {step}: Next task: {current_task}")
             else:
@@ -3213,12 +3260,23 @@ ALWAYS follow all formatting instructions exactly.
         # Track new bindings
         new_bindings = {k: v for k, v in executor.plan_bindings_flat.items() if bindings_before.get(k) != v}
         
-        # Persist code block return value as Note when substantial
+        # Persist code block return value as Note when substantial.
+        # Use 'data' (full structured content) in preference to 'value' (truncated display string)
+        # so that the Note — and therefore the eval target — contains real content.
         code_block_output_created = False
         if result_dict.get('status') == 'success':
-            val = result_dict.get('value', '')
-            if isinstance(val, str) and len(val) > 80:
-                executor.execute_action({"type": "create-note", "value": val, "out": "$code_block_output"})
+            raw = result_dict.get('data')
+            if raw is None:
+                raw = result_dict.get('value', '')
+            if isinstance(raw, list):
+                raw = '\n'.join(str(x) for x in raw)
+            elif isinstance(raw, dict):
+                import json as _json
+                raw = _json.dumps(raw, ensure_ascii=False)
+            else:
+                raw = str(raw) if raw is not None else ''
+            if isinstance(raw, str) and len(raw) > 80:
+                executor.execute_action({"type": "create-note", "value": raw, "out": "$code_block_output"})
                 code_block_output_created = True
         
         logger.info(f"Step {step}: -> {tool_result[:100]}")
@@ -3228,6 +3286,11 @@ ALWAYS follow all formatting instructions exactly.
         # Interrupt checkpoint: after code-block execution
         if _interrupt_requested(executor):
             _clear_interrupt(executor)
+            # Ask to User intentionally sets interrupt to pause for response - treat as success, not failure
+            plan_actions = getattr(executor, '_plan_actions', [])
+            last_ask = plan_actions and plan_actions[-1].get('type') == 'ask' and str(plan_actions[-1].get('target', '')).lower() == 'user'
+            if last_ask:
+                state["ask_completed_successfully"] = True
             state["final_answer"] = "Interrupted by user."
             break
         
@@ -4008,10 +4071,11 @@ class IncrementalPlanner:
                 except (KeyError, TypeError, AttributeError):
                     pass
             # If interrupted, final_answer will be "Interrupted by user."
+            # Exception: ask to User completed successfully (intentional pause, not failure)
             elif final_answer == "Interrupted by user.":
-                success = False
+                success = bool(state.get("ask_completed_successfully", False))
             if final_answer == "Interrupted by user.":
-                quality_status = "interrupted"
+                quality_status = "interrupted" if not success else "passed"
             elif success:
                 quality_status = "passed"
             elif verification_answer == "PARTIAL":
@@ -4204,10 +4268,11 @@ class IncrementalPlanner:
                 except (KeyError, TypeError, AttributeError):
                     pass
             # If interrupted, final_answer will be "Interrupted by user."
+            # Exception: ask to User completed successfully (intentional pause, not failure)
             elif final_answer == "Interrupted by user.":
-                success = False
+                success = bool(state.get("ask_completed_successfully", False))
             if final_answer == "Interrupted by user.":
-                quality_status = "interrupted"
+                quality_status = "interrupted" if not success else "passed"
             elif success:
                 quality_status = "passed"
             elif verification_answer == "PARTIAL":

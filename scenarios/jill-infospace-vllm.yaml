@@ -2,6 +2,7 @@
 
 world_config:
   world_name: "infolab"
+  scheduled_goals_world: "jill"
   
 llm_config:
   vllm_model_path: "Qwen/Qwen3-Next-80B-A3B-Instruct-FP8"
@@ -16,6 +17,10 @@ characters:
   Jill:
     manual: true
     manual_response: false
+
+    task_scheduler:
+      enabled: true
+      interval: 15   # minutes
 
     character: |
       Jill, a young AI assistant. Jill works as research assistant for User, a retired AI professor and entrepreneur.

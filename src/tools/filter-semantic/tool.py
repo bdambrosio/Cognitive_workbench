@@ -84,7 +84,9 @@ def tool(input_value: Any, runtime=None, **kwargs) -> str:
 
     resource_manager = kwargs.get('resource_manager')
     predicate = kwargs.get('predicate')
-    # If no predicate but value is in kwargs (planner mistake: used 'value' instead of 'predicate'), use value as predicate
+    # Fallbacks for common planner mis-generations of the parameter name
+    if not predicate and 'condition' in kwargs:
+        predicate = kwargs.get('condition')
     if not predicate and 'value' in kwargs:
         predicate = kwargs.get('value')
     

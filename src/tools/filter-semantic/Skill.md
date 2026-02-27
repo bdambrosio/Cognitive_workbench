@@ -1,12 +1,12 @@
 ---
 name: filter-semantic
 type: python
-description: "Evaluate complex text criteria on each item in a Collection and return a new Collection of matching items. Use to identify relevant items in a Collection"
+description: "Semantic filter: evaluate each Collection item against a `predicate` string and return matching items (target, predicate, [mode])"
 ---
 
 # filter-semantic
 
-Apply flexible, natural-language filtering criteria to Collections. Evaluates each item against specified conditions using LLM.
+Apply flexible, natural-language filtering to Collections. Evaluates each item against the `predicate` string using LLM.
 
 ## Input
 

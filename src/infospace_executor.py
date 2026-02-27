@@ -36,6 +36,8 @@ INFOSPACE_PRIMITIVES = frozenset({
     'get-metadata', 'set-metadata',
 })
 
+ALT_LLM_TOOLS = frozenset({'synthesize', 'extract', 'extract-struct', 'extract-references', 'refine'})
+
 
 class InfospaceExecutor:
     """
@@ -97,10 +99,20 @@ class InfospaceExecutor:
         # OpenRouter config (set by executive_node if OpenRouter is used)
         self.openrouter_model = None
         self.openrouter_api_key = None
+        self.openrouter_provider = None
 
         # Anthropic API config (set by executive_node if Anthropic is used)
         self.anthropic_model = None
         self.anthropic_api_key = None
+
+        # Alt LLM config (for synthesize, extract, extract-struct, extract-references, refine)
+        self.alt_openrouter_model = None
+        self.alt_openrouter_api_key = None
+        self.alt_openrouter_provider = None
+        self.alt_vllm_model = None
+        self.alt_vllm_url = None
+        self.alt_anthropic_model = None
+        self.alt_anthropic_api_key = None
 
         # Global interrupt flag (can be set by UI via executive_node control channel)
         self.interrupt_requested: bool = False
@@ -591,9 +603,9 @@ class InfospaceExecutor:
                 extra_parts.append(f"{key}: {val}")
             extra_str = ', '.join(extra_parts)
             
-            # Truncate extra to 64 chars if needed
-            if len(extra_str) > 64:
-                extra_str = extra_str[:61] + '...'
+            # Truncate extra to 256 chars if needed (increased from 64 to preserve list data in trace)
+            if len(extra_str) > 256:
+                extra_str = extra_str[:253] + '...'
             
             # Append with space separator
             return f"{content_str} [{extra_str}]"
@@ -1202,8 +1214,9 @@ Only provide the result, followed by the </end> tag.""")
             
             full_prompt = "".join(prompt_parts)
             
-            # Call LLM using unified wrapper
-            llm_response = self.llm_generate(
+            # Call LLM using unified wrapper (use alt for selected tools when configured, else main)
+            generate_fn = self._alt_llm_generate if tool_name in ALT_LLM_TOOLS else self.llm_generate
+            llm_response = generate_fn(
                 messages=[full_prompt],
                 bindings={},
                 max_tokens=1000,
@@ -1302,7 +1315,7 @@ Only provide the result, followed by the </end> tag.""")
             logger.exception(f"SGLang generation error: {e}")
             return Response(success=False, error=str(e))
     
-    def _vllm_generate(self, messages, max_tokens=2000, temperature=0.7, stops=None, is_json=False):
+    def _vllm_generate(self, messages, max_tokens=2000, temperature=0.7, stops=None, is_json=False, use_alt=False):
         """
         Generate text using vLLM API via HTTP.
         Uses /v1/chat/completions endpoint with messages array format for consistency.
@@ -1313,12 +1326,16 @@ Only provide the result, followed by the </end> tag.""")
             temperature: Sampling temperature
             stops: List of stop sequences
             is_json: If True, parse response as JSON and return dict
+            use_alt: If True, use alt_vllm_* config (for alt_llm_config)
             
         Returns:
             Object with .success, .text, and .error attributes (matching llm_client response)
             If is_json=True, .text will be a dict (parsed JSON) instead of string
         """
         import requests
+        
+        model = self.alt_vllm_model if use_alt else self.vllm_model
+        url = self.alt_vllm_url if use_alt else self.vllm_url
         
         class Response:
             def __init__(self, success, text='', error=None):
@@ -1355,7 +1372,7 @@ Only provide the result, followed by the </end> tag.""")
             
             # Prepare payload
             payload = {
-                "model": self.vllm_model,
+                "model": model,
                 "messages": chat_messages,
                 "max_tokens": max_tokens+256, # allow for reasoning
                 "temperature": temperature,
@@ -1370,8 +1387,8 @@ Only provide the result, followed by the </end> tag.""")
             
             
             # Call vLLM API
-            logger.debug(f"Calling vLLM API: {self.vllm_url} with model {self.vllm_model}")
-            response = requests.post(self.vllm_url, json=payload, timeout=120)
+            logger.debug(f"Calling vLLM API: {url} with model {model}")
+            response = requests.post(url, json=payload, timeout=120)
             response.raise_for_status()  # Fail fast
             
             result = response.json()
@@ -1406,7 +1423,7 @@ Only provide the result, followed by the </end> tag.""")
             logger.exception(f"vLLM generation error: {e}")
             return Response(success=False, error=str(e))
     
-    def _anthropic_generate(self, messages, max_tokens=2000, temperature=0.7, stops=None, is_json=False):
+    def _anthropic_generate(self, messages, max_tokens=2000, temperature=0.7, stops=None, is_json=False, use_alt=False):
         """
         Generate text using Anthropic API directly.
         Uses Messages API with anthropic SDK.
@@ -1421,6 +1438,9 @@ Only provide the result, followed by the </end> tag.""")
         Returns:
             Object with .success, .text, and .error attributes
         """
+        model = self.alt_anthropic_model if use_alt else self.anthropic_model
+        api_key = self.alt_anthropic_api_key if use_alt else self.anthropic_api_key
+        
         class Response:
             def __init__(self, success, text='', error=None):
                 self.success = success
@@ -1429,7 +1449,7 @@ Only provide the result, followed by the </end> tag.""")
 
         try:
             from anthropic import Anthropic
-            client = Anthropic(api_key=self.anthropic_api_key)
+            client = Anthropic(api_key=api_key)
 
             # Convert messages to Anthropic format (system + messages)
             # Normalize all content: Anthropic rejects assistant content ending with trailing whitespace
@@ -1469,7 +1489,7 @@ Only provide the result, followed by the </end> tag.""")
                 api_messages[-1]["role"] = "user"
 
             kwargs = {
-                "model": self.anthropic_model,
+                "model": model,
                 "max_tokens": max_tokens,
                 "temperature": temperature,
                 "messages": api_messages,
@@ -1497,7 +1517,7 @@ Only provide the result, followed by the </end> tag.""")
             logger.exception(f"Anthropic API error: {e}")
             return Response(success=False, error=str(e))
 
-    def _openrouter_generate(self, messages, max_tokens=2000, temperature=0.7, stops=None, is_json=False):
+    def _openrouter_generate(self, messages, max_tokens=2000, temperature=0.7, stops=None, is_json=False, use_alt=False):
         """
         Generate text using OpenRouter API via HTTP.
         Uses /v1/chat/completions endpoint with messages array format (OpenAI-compatible).
@@ -1508,12 +1528,17 @@ Only provide the result, followed by the </end> tag.""")
             temperature: Sampling temperature
             stops: List of stop sequences
             is_json: If True, parse response as JSON and return dict
+            use_alt: If True, use alt_openrouter_* config (for alt_llm_config)
             
         Returns:
             Object with .success, .text, and .error attributes (matching llm_client response)
             If is_json=True, .text will be a dict (parsed JSON) instead of string
         """
         import requests
+        
+        model = self.alt_openrouter_model if use_alt else self.openrouter_model
+        api_key = self.alt_openrouter_api_key if use_alt else self.openrouter_api_key
+        provider = self.alt_openrouter_provider if use_alt else self.openrouter_provider
         
         class Response:
             def __init__(self, success, text='', error=None):
@@ -1549,7 +1574,7 @@ Only provide the result, followed by the </end> tag.""")
             
             # Prepare payload (OpenRouter uses OpenAI-compatible format)
             payload = {
-                "model": self.openrouter_model,
+                "model": model,
                 "messages": chat_messages,
                 "max_tokens": max_tokens,
                 "temperature": temperature,
@@ -1562,16 +1587,18 @@ Only provide the result, followed by the </end> tag.""")
                     payload["stop"] = stops
                 else:
                     payload["stop"] = [stops]
+            if provider:
+                payload["provider"] = {"order": [provider], "allow_fallbacks": True}
             
             # Call OpenRouter API
             headers = {
-                "Authorization": f"Bearer {self.openrouter_api_key}",
+                "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
                 "HTTP-Referer": "https://github.com/cognitive-workbench",  # Optional but recommended
                 "X-Title": "Cognitive Workbench"  # Optional but recommended
             }
             
-            logger.debug(f"Calling OpenRouter API with model {self.openrouter_model}")
+            logger.debug(f"Calling OpenRouter API with model {model}")
             response = requests.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 json=payload,
@@ -1641,6 +1668,33 @@ Only provide the result, followed by the </end> tag.""")
             return self._sglang_generate(messages, max_tokens, temperature, stops, is_json=is_json)
         else:
             raise RuntimeError("No LLM backend available - ensure executive_node is started with sgl_model_path, vllm_model_path, anthropic_model_path, or openrouter_model_path")
+    
+    def _alt_llm_generate(self, messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
+        """Unified LLM generation using alt backend when configured; falls back to main llm_generate otherwise."""
+        if bindings and isinstance(messages, list):
+            processed_messages = []
+            for msg in messages:
+                if isinstance(msg, str):
+                    processed_msg = msg
+                    for key, value in bindings.items():
+                        processed_msg = processed_msg.replace(f"{{${key}}}", str(value))
+                    processed_messages.append(processed_msg)
+                else:
+                    processed_messages.append(msg)
+            messages = processed_messages
+        has_alt = (
+            (self.alt_anthropic_model and self.alt_anthropic_api_key) or
+            (self.alt_openrouter_model and self.alt_openrouter_api_key) or
+            (self.alt_vllm_model and self.alt_vllm_url)
+        )
+        if has_alt:
+            if self.alt_anthropic_model and self.alt_anthropic_api_key:
+                return self._anthropic_generate(messages, max_tokens, temperature, stops, is_json=is_json, use_alt=True)
+            elif self.alt_openrouter_model and self.alt_openrouter_api_key:
+                return self._openrouter_generate(messages, max_tokens, temperature, stops, is_json=is_json, use_alt=True)
+            elif self.alt_vllm_model and self.alt_vllm_url:
+                return self._vllm_generate(messages, max_tokens, temperature, stops, is_json=is_json, use_alt=True)
+        return self.llm_generate(messages, bindings=None, max_tokens=max_tokens, temperature=temperature, is_json=is_json, stops=stops)
     
     def _parse_json_response(self, response_text, original_prompt=None):
         """
@@ -1911,6 +1965,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         for key, value in self._tool_base_args_cache.items():
             if key not in resolved_args:
                 resolved_args[key] = value
+        
+        # Use alt_llm_generate for selected tools (uses alt backend when configured, else main)
+        if tool_name in ALT_LLM_TOOLS:
+            resolved_args['llm_generate'] = self._alt_llm_generate
         
         # Execute tool
         try:
