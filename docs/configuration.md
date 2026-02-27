@@ -23,6 +23,10 @@ llm_config:
   grobid: "http://localhost:8070/"    # Optional: GROBID PDF parsing server
   pdf_parser: "pymupdf"               # "pymupdf" or "grobid" (default: grobid if available)
 
+# --- Alt LLM (optional) ---
+# alt_llm_config:                      # Optional: second LLM for extraction/synthesis tools
+#   openrouter_model_path: "anthropic/claude-3.5-sonnet"  # No grobid here
+
 # --- World Description ---
 setting: |
   Cognitive Workbench, a research framework for building autonomous agents
@@ -68,6 +72,17 @@ characters:
 | `anthropic_model_path` | | Anthropic model ID (e.g., `claude-sonnet-4-6`) |
 | `grobid` | No | GROBID server URL for PDF parsing |
 | `pdf_parser` | No | `"pymupdf"` or `"grobid"` (default: grobid if configured) |
+
+#### `alt_llm_config` (optional)
+
+Optional second LLM backend used by content-processing tools: `synthesize`, `extract`, `extract-struct`, `extract-references`, `refine`. LLM-only (no grobid). When absent, those tools use the main `llm_config` backend.
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `openrouter_model_path` | One of these | OpenRouter model ID |
+| `vllm_model_path` | | vLLM model name |
+| `anthropic_model_path` | | Anthropic model ID |
+| `openrouter_provider` | No | OpenRouter provider pin (see main llm_config) |
 
 #### `characters`
 

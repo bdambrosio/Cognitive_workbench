@@ -2,6 +2,7 @@
 
 world_config:
   world_name: "fs"
+  scheduled_goals_world: "jill"  # Shared scheduled goals across all Jill scenarios
   
 llm_config:
   anthropic_model_path: "claude-sonnet-4-6"
@@ -51,6 +52,10 @@ characters:
   Jill:
     manual: true
     manual_response: false
+
+    task_scheduler:
+      enabled: true
+      interval: 15   # minutes
 
     character: |
       Jill, a young AI assistant. Jill works as research assistant for User, a retired AI professor and entrepreneur.

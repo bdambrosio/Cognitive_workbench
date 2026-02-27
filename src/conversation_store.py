@@ -160,6 +160,25 @@ class ConversationStore:
             return None
         return None
 
+    def is_ask_only_conversation(self) -> bool:
+        """Return True if the conversation has exactly one turn and it is an outgoing ask."""
+        collection_id = self._ensure_conversation_collection()
+        if not collection_id or not self.resource_manager:
+            return False
+        collection = self.resource_manager.get_resource(collection_id)
+        if not collection:
+            return False
+        note_ids = collection.get("properties", {}).get("content", [])
+        if not isinstance(note_ids, list) or len(note_ids) != 1:
+            return False
+        note_id = note_ids[0]
+        if not isinstance(note_id, str) or not note_id.startswith("Note_"):
+            return False
+        turn = self._parse_turn_note(note_id)
+        if not turn:
+            return False
+        return turn.get("act_type") == "ask" and turn.get("direction") == "out"
+
     def _get_all_entity_turns(self, entity: str) -> List[Dict[str, Any]]:
         collection_id = self._ensure_conversation_collection()
         if not collection_id:

@@ -1,0 +1,11 @@
+name: "Hugging Face Daily Papers"
+description: "Check email for the Hugging Face daily papers digest, verify date, extract paper titles, and report the full list."
+
+test_goal: >
+  goal: Use check-email to fetch emails from daily_papers_digest@notifications.huggingface.co.
+  Filter by date: the email must be from yesterday or today. The date may appear in the body
+  (e.g. "24 Feb", "Daily Papers for 2026-02-24") rather than in RFC headers — check both.
+  Extract the paper titles. The Hugging Face digest format concatenates titles on one line as
+  "TitleOne (N ▲)TitleTwo (N ▲)..."; split on the " (N ▲)" separator pattern to get individual titles.
+  Report the complete list of titles to the user — do not use placeholders like [Title 1].
+  Include the actual extracted titles in your final response.

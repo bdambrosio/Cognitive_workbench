@@ -2,9 +2,11 @@
 
 world_config:
   world_name: "infolab"
+  scheduled_goals_world: "jill"
   
 llm_config:
-  openrouter_model_path: "deepseek/deepseek-v3.2" #"qwen/qwen3.5-397b-a17b"
+  openrouter_model_path: "qwen/qwen3-235b-a22b-2507" #"qwen/qwen3.5-397b-a17b"
+  openrouter_provider: "cerebras/fp16"
   grobid: "http://localhost:8070/"
   
 setting: |
@@ -16,6 +18,10 @@ characters:
   Jill:
     manual: true
     manual_response: false
+
+    task_scheduler:
+      enabled: true
+      interval: 15   # minutes
 
     character: |
       Jill, a young AI assistant. Jill works as research assistant for User, a retired AI professor and entrepreneur.

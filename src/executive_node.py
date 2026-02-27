@@ -451,6 +451,7 @@ class ZenohExecutiveNode:
         vllm_model_path = llm_config.get('vllm_model_path')
         vllm_url = llm_config.get('vllm_url', 'http://localhost:5000/v1/chat/completions')
         openrouter_model_path = llm_config.get('openrouter_model_path')
+        openrouter_provider = llm_config.get('openrouter_provider')
         anthropic_model_path = llm_config.get('anthropic_model_path')
         
         self.runtime = None
@@ -459,8 +460,16 @@ class ZenohExecutiveNode:
         self.vllm_url = None
         self.openrouter_model = None
         self.openrouter_api_key = None
+        self.openrouter_provider = None
         self.anthropic_model = None
         self.anthropic_api_key = None
+        self.alt_openrouter_model = None
+        self.alt_openrouter_api_key = None
+        self.alt_openrouter_provider = None
+        self.alt_vllm_model = None
+        self.alt_vllm_url = None
+        self.alt_anthropic_model = None
+        self.alt_anthropic_api_key = None
         
         # Check SGLang availability
         HAS_SGLANG = False
@@ -487,6 +496,7 @@ class ZenohExecutiveNode:
                 raise ValueError("OPENROUTER_API_KEY environment variable required for OpenRouter")
             self.openrouter_model = openrouter_model_path
             self.openrouter_api_key = api_key
+            self.openrouter_provider = openrouter_provider
             logger.info(f"✅ OpenRouter configured with model: {openrouter_model_path}")
         
         # Initialize vLLM model resolution if configured (only if OpenRouter not configured)
@@ -516,6 +526,47 @@ class ZenohExecutiveNode:
             except Exception as e:
                 logger.error(f"❌ Failed to query vLLM server: {e}")
                 raise  # Fail fast
+        
+        # Initialize alt LLM backend if alt_llm_config present (for synthesize, extract, etc.)
+        alt_llm_config = self.character_config.get('alt_llm_config', {})
+        if alt_llm_config:
+            alt_anthropic = alt_llm_config.get('anthropic_model_path')
+            alt_openrouter = alt_llm_config.get('openrouter_model_path')
+            alt_openrouter_prov = alt_llm_config.get('openrouter_provider')
+            alt_vllm = alt_llm_config.get('vllm_model_path')
+            alt_vllm_url = alt_llm_config.get('vllm_url', 'http://localhost:5000/v1/chat/completions')
+            if alt_anthropic:
+                api_key = os.getenv('CLAUDE_API_KEY')
+                if api_key:
+                    self.alt_anthropic_model = alt_anthropic
+                    self.alt_anthropic_api_key = api_key
+                    logger.info(f"✅ Alt LLM (Anthropic) configured: {alt_anthropic}")
+                else:
+                    logger.warning("⚠️ alt_llm_config has anthropic_model_path but CLAUDE_API_KEY not set - alt LLM disabled")
+            elif alt_openrouter:
+                api_key = os.getenv('OPENROUTER_API_KEY')
+                if api_key:
+                    self.alt_openrouter_model = alt_openrouter
+                    self.alt_openrouter_api_key = api_key
+                    self.alt_openrouter_provider = alt_openrouter_prov
+                    logger.info(f"✅ Alt LLM (OpenRouter) configured: {alt_openrouter}")
+                else:
+                    logger.warning("⚠️ alt_llm_config has openrouter_model_path but OPENROUTER_API_KEY not set - alt LLM disabled")
+            elif alt_vllm:
+                try:
+                    import requests
+                    response = requests.get('http://localhost:5000/v1/models', timeout=10)
+                    response.raise_for_status()
+                    data = response.json()
+                    if data.get('data') and len(data['data']) > 0:
+                        available = [m['id'] for m in data['data']]
+                        self.alt_vllm_model = alt_vllm if alt_vllm in available else available[0]
+                        self.alt_vllm_url = alt_vllm_url
+                        logger.info(f"✅ Alt LLM (vLLM) configured: {self.alt_vllm_model}")
+                    else:
+                        logger.warning("⚠️ alt_llm_config vLLM: no models found - alt LLM disabled")
+                except Exception as e:
+                    logger.warning(f"⚠️ alt_llm_config vLLM init failed: {e} - alt LLM disabled")
         
         # Initialize SGLang.Runtime - accept externally-provided runtime (shared across agents)
         # or create a new one if running standalone
@@ -548,8 +599,8 @@ class ZenohExecutiveNode:
                         dtype="auto",
                         tp_size=1,
                         mem_fraction_static=0.9,
-                        fp8_gemm_runner_backend="triton",
-                        attention_backend="flashinfer"
+                        fp8_gemm_backend="triton",
+                        attention_backend="triton"
                     )
                 else:
                     self.runtime = sgl.Runtime(
@@ -688,9 +739,20 @@ class ZenohExecutiveNode:
         if self.openrouter_model and self.openrouter_api_key:
             self.infospace_executor.openrouter_model = self.openrouter_model
             self.infospace_executor.openrouter_api_key = self.openrouter_api_key
+            self.infospace_executor.openrouter_provider = self.openrouter_provider
         if self.anthropic_model and self.anthropic_api_key:
             self.infospace_executor.anthropic_model = self.anthropic_model
             self.infospace_executor.anthropic_api_key = self.anthropic_api_key
+        if self.alt_openrouter_model and self.alt_openrouter_api_key:
+            self.infospace_executor.alt_openrouter_model = self.alt_openrouter_model
+            self.infospace_executor.alt_openrouter_api_key = self.alt_openrouter_api_key
+            self.infospace_executor.alt_openrouter_provider = self.alt_openrouter_provider
+        if self.alt_vllm_model and self.alt_vllm_url:
+            self.infospace_executor.alt_vllm_model = self.alt_vllm_model
+            self.infospace_executor.alt_vllm_url = self.alt_vllm_url
+        if self.alt_anthropic_model and self.alt_anthropic_api_key:
+            self.infospace_executor.alt_anthropic_model = self.alt_anthropic_model
+            self.infospace_executor.alt_anthropic_api_key = self.alt_anthropic_api_key
         logger.info(f'🧩 Infospace executor initialized for {character_name}')
         
         # Build available_tools for models: loaded tools + infospace primitives (load, persist, etc.)
@@ -1084,6 +1146,8 @@ class ZenohExecutiveNode:
             logger.info(f'💾 {self.character_name} received save_all command')
             if self.resource_manager:
                 self.resource_manager.save_to_file()
+                if getattr(self.resource_manager, 'scheduled_goals_base_dir', None):
+                    self.resource_manager.save_scheduled_goals_to_file()
                 logger.info(f'💾 Saved resource manager state for {self.map_name}')
         except Exception as e:
             logger.error(f'Error handling save command: {e}')
@@ -1889,6 +1953,8 @@ class ZenohExecutiveNode:
         result = self.infospace_executor.execute_action({"type": "load", "target": note_name, "out": "$_scheduled_goal_save_tmp"})
         if result.get("status") == "success" and result.get("resource_id"):
             self.resource_manager.update_note_content(result["resource_id"], content)
+            if hasattr(self.resource_manager, 'save_scheduled_goals_to_file') and self.resource_manager.scheduled_goals_base_dir:
+                self.resource_manager.save_scheduled_goals_to_file()
             return
         create_result = self.infospace_executor.execute_action({"type": "create-note", "value": content, "name": note_name, "out": "$_scheduled_goal_save_tmp"})
         note_id = create_result.get("resource_id")
@@ -1898,6 +1964,8 @@ class ZenohExecutiveNode:
             added, _, err = self.resource_manager.add_to_collection(col_id, note_id, self.character_name, operation="add")
             if not added:
                 logger.warning(f"Failed to add scheduled goal note to {SCHEDULED_GOALS_COLLECTION}: {err}")
+        if hasattr(self.resource_manager, 'save_scheduled_goals_to_file') and self.resource_manager.scheduled_goals_base_dir:
+            self.resource_manager.save_scheduled_goals_to_file()
 
     def _all_scheduled_goals(self) -> List[Dict[str, Any]]:
         goals: List[Dict[str, Any]] = []
@@ -1943,6 +2011,8 @@ class ZenohExecutiveNode:
         if not note_id:
             return False
         deleted, _ = self.infospace_executor.delete_resource_and_unbind(note_id)
+        if deleted and hasattr(self.resource_manager, 'save_scheduled_goals_to_file') and self.resource_manager.scheduled_goals_base_dir:
+            self.resource_manager.save_scheduled_goals_to_file()
         return bool(deleted)
 
     def _upsert_scheduled_goal(self, goal_text: str) -> Dict[str, Any]:
@@ -2695,6 +2765,10 @@ class ZenohExecutiveNode:
             if conv_size == 0:
                 logger.info('Conversation collection is empty, skipping archiving')
                 return
+
+            if conv_size == 1 and self.conversation_store.is_ask_only_conversation():
+                logger.info('Conversation has only a single ask turn, skipping archiving')
+                return
             
             logger.info(f'📝 Archiving conversation with {conv_size} items...')
             
@@ -2850,6 +2924,7 @@ class ZenohExecutiveNode:
                 parts = clean_input.strip().split()
                 target_id = parts[1] if len(parts) > 1 else None
                 if target_id and target_id.startswith('goal_'):
+                    self.conversation_store.close_dialog("User")
                     self._handle_goal_proceed(goal_id=target_id, source='scheduler')
                 else:
                     task_id = target_id if target_id and target_id.startswith('task_') else None
@@ -2861,6 +2936,7 @@ class ZenohExecutiveNode:
                 if _is_goal_cmd(clean_input):
                     goal_preview = clean_input[:80] + ('...' if len(clean_input) > 80 else '')
                     logger.info(f'📥 {self.character_name} Received goal: "{goal_preview}"')
+                    self.conversation_store.close_dialog("User")
                     goal_text = clean_input[5:].strip()
                     scheduled_goal = self._upsert_scheduled_goal(goal_text)
                     result = self.parse_and_set_goal("", goal_text) or {}
@@ -2873,6 +2949,7 @@ class ZenohExecutiveNode:
                     parts = clean_input.strip().split()
                     target_id = parts[1] if len(parts) > 1 else None
                     if target_id and target_id.startswith('goal_'):
+                        self.conversation_store.close_dialog("User")
                         self._handle_goal_proceed(goal_id=target_id)
                     else:
                         task_id = target_id if target_id and target_id.startswith('task_') else None
