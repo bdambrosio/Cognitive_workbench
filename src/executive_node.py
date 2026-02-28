@@ -589,6 +589,19 @@ class ZenohExecutiveNode:
                     mem_fraction_static=0.82,
                     attention_backend="triton"
                 )
+                elif 'Qwen2.5-72B-Instruct-FP8' in sgl_model_path: # patch for FP8 models as of 1/9/2026
+                    logger.info(f"🚀 Initializing SGLang Runtime with FP8 patch!")
+                    self.runtime = sgl.Runtime(
+                        model_path=sgl_model_path,
+                        tokenizer_path=sgl_model_path,
+                        device="cuda",
+                        context_length=32768,
+                        dtype="auto",
+                        tp_size=1,
+                        mem_fraction_static=0.9#,
+                        #fp8_gemm_backend="triton",
+                        #attention_backend="triton"
+                    )
                 elif 'FP8' in sgl_model_path: # patch for FP8 models as of 1/9/2026
                     logger.info(f"🚀 Initializing SGLang Runtime with FP8 patch!")
                     self.runtime = sgl.Runtime(
@@ -1146,8 +1159,6 @@ class ZenohExecutiveNode:
             logger.info(f'💾 {self.character_name} received save_all command')
             if self.resource_manager:
                 self.resource_manager.save_to_file()
-                if getattr(self.resource_manager, 'scheduled_goals_base_dir', None):
-                    self.resource_manager.save_scheduled_goals_to_file()
                 logger.info(f'💾 Saved resource manager state for {self.map_name}')
         except Exception as e:
             logger.error(f'Error handling save command: {e}')
@@ -1953,8 +1964,6 @@ class ZenohExecutiveNode:
         result = self.infospace_executor.execute_action({"type": "load", "target": note_name, "out": "$_scheduled_goal_save_tmp"})
         if result.get("status") == "success" and result.get("resource_id"):
             self.resource_manager.update_note_content(result["resource_id"], content)
-            if hasattr(self.resource_manager, 'save_scheduled_goals_to_file') and self.resource_manager.scheduled_goals_base_dir:
-                self.resource_manager.save_scheduled_goals_to_file()
             return
         create_result = self.infospace_executor.execute_action({"type": "create-note", "value": content, "name": note_name, "out": "$_scheduled_goal_save_tmp"})
         note_id = create_result.get("resource_id")
@@ -1964,8 +1973,6 @@ class ZenohExecutiveNode:
             added, _, err = self.resource_manager.add_to_collection(col_id, note_id, self.character_name, operation="add")
             if not added:
                 logger.warning(f"Failed to add scheduled goal note to {SCHEDULED_GOALS_COLLECTION}: {err}")
-        if hasattr(self.resource_manager, 'save_scheduled_goals_to_file') and self.resource_manager.scheduled_goals_base_dir:
-            self.resource_manager.save_scheduled_goals_to_file()
 
     def _all_scheduled_goals(self) -> List[Dict[str, Any]]:
         goals: List[Dict[str, Any]] = []
@@ -2011,8 +2018,6 @@ class ZenohExecutiveNode:
         if not note_id:
             return False
         deleted, _ = self.infospace_executor.delete_resource_and_unbind(note_id)
-        if deleted and hasattr(self.resource_manager, 'save_scheduled_goals_to_file') and self.resource_manager.scheduled_goals_base_dir:
-            self.resource_manager.save_scheduled_goals_to_file()
         return bool(deleted)
 
     def _upsert_scheduled_goal(self, goal_text: str) -> Dict[str, Any]:

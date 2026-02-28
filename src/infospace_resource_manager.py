@@ -560,7 +560,6 @@ class InfospaceResourceManager:
         """
         self.world_name = world_name
         self.agent_name = agent_name
-        self.scheduled_goals_base_dir: Optional[Path] = None
         self.resource_types = ResourceTypeRegistry(InfospaceResources)
         self.resource_registry: Dict[str, Dict[str, Any]] = {}
         
@@ -605,14 +604,6 @@ class InfospaceResourceManager:
         
         # File persistence path
         self.resources_file = self.base_dir / "resources.json"
-        
-        # Optional shared base for scheduled goals (e.g. scenarios/jill/resources/Jill/)
-        sg_world = world_config.get('scheduled_goals_world') if world_config else None
-        if sg_world and self.agent_name:
-            current_dir = Path(__file__).parent
-            project_root = current_dir.parent
-            self.scheduled_goals_base_dir = project_root / "scenarios" / str(sg_world) / "resources" / self.agent_name
-            self.scheduled_goals_base_dir.mkdir(parents=True, exist_ok=True)
         
         # Resource indexer for Stage 0 retrieval (pass base_dir for indexes)
         self.resource_indexer = ResourceIndexer(self, self.base_dir)
@@ -2047,122 +2038,12 @@ class InfospaceResourceManager:
                 self.load_resources(save_data)
                 loaded = True
             
-            # Merge scheduled goals from shared location if configured
-            if self.scheduled_goals_base_dir:
-                sg_file = self.scheduled_goals_base_dir / "resources.json"
-                if sg_file.exists():
-                    with open(sg_file, 'r') as f:
-                        sg_data = json.load(f)
-                    self._merge_scheduled_goals_from(sg_data)
-                    logger.info(f"📂 Merged scheduled goals from {sg_file}")
-                elif loaded:
-                    # Migrate: main file has goals, shared file doesn't — write them now
-                    self.save_scheduled_goals_to_file()
-            
             self._sync_counters_from_registry()
             if loaded:
                 logger.info(f"📂 Loaded resources from {target_file}")
             return loaded
         except Exception as e:
             logger.error(f"Error loading resources from file: {e}")
-            return False
-    
-    def _merge_scheduled_goals_from(self, save_data: Dict):
-        """Merge _scheduled_goals collection and _scheduled_goal_* notes from save_data into registry."""
-        note_type = getattr(self.resource_types, 'Note', None)
-        collection_type = getattr(self.resource_types, 'Collection', None)
-        if not note_type or not collection_type:
-            return
-        for info_id, info_data in save_data.get('note_instances', {}).items():
-            note_name = info_data.get('properties', {}).get('note_name', '')
-            if note_name.startswith('_scheduled_goal_'):
-                resource_data = {
-                    'name': info_data['name'],
-                    'type': note_type,
-                    'location': tuple(info_data.get('location', (0, 0))),
-                    'description': info_data.get('description', ''),
-                    'remove_on_take': False,
-                    'properties': info_data.get('properties', {})
-                }
-                resource_data['properties']['persistent'] = True
-                self.resource_registry[info_id] = resource_data
-                self.named_notes[note_name] = info_id
-        for info_id, info_data in save_data.get('collection_instances', {}).items():
-            coll_name = info_data.get('properties', {}).get('collection_name', '')
-            if coll_name == '_scheduled_goals':
-                resource_data = {
-                    'name': info_data['name'],
-                    'type': collection_type,
-                    'location': tuple(info_data.get('location', (0, 0))),
-                    'description': info_data.get('description', ''),
-                    'remove_on_take': False,
-                    'properties': info_data.get('properties', {})
-                }
-                resource_data['properties']['persistent'] = True
-                self.resource_registry[info_id] = resource_data
-                self.named_collections[coll_name] = info_id
-                break
-    
-    def save_scheduled_goals_to_file(self) -> bool:
-        """Save only _scheduled_goals and _scheduled_goal_* resources to the shared file."""
-        if not self.scheduled_goals_base_dir:
-            return False
-        try:
-            sg_file = self.scheduled_goals_base_dir / "resources.json"
-            note_instances = {}
-            collection_instances = {}
-            for resource_id, resource_data in self.resource_registry.items():
-                type_name = resource_data.get('type')
-                tn = type_name.name if hasattr(type_name, 'name') else str(type_name)
-                if tn == 'Note':
-                    note_name = resource_data.get('properties', {}).get('note_name', '')
-                    if note_name.startswith('_scheduled_goal_'):
-                        note_instances[resource_id] = {
-                            'name': resource_data.get('name'),
-                            'location': list(resource_data.get('location', (0, 0))),
-                            'description': resource_data.get('description', ''),
-                            'properties': resource_data.get('properties', {})
-                        }
-                elif tn == 'Collection':
-                    coll_name = resource_data.get('properties', {}).get('collection_name', '')
-                    if coll_name == '_scheduled_goals':
-                        collection_instances[resource_id] = {
-                            'name': resource_data.get('name'),
-                            'location': list(resource_data.get('location', (0, 0))),
-                            'description': resource_data.get('description', ''),
-                            'properties': resource_data.get('properties', {})
-                        }
-                        break
-            if not note_instances and not collection_instances:
-                return True
-            def _max_note_id():
-                nums = []
-                for r in note_instances:
-                    if r.startswith('Note_') and r[5:].isdigit():
-                        nums.append(int(r[5:]))
-                return max(nums) if nums else 0
-            def _max_coll_id():
-                nums = []
-                for r in collection_instances:
-                    if r.startswith('Collection_') and r[11:].isdigit():
-                        nums.append(int(r[11:]))
-                return max(nums) if nums else 0
-            save_data = {
-                'world_name': self.world_name,
-                'timestamp': datetime.now().isoformat(),
-                'note_instances': note_instances,
-                'note_counter': _max_note_id(),
-                'collection_instances': collection_instances,
-                'collection_counter': _max_coll_id(),
-                'relation_instances': {},
-                'relation_counter': 0
-            }
-            with open(sg_file, 'w') as f:
-                json.dump(save_data, f, indent=2)
-            logger.info(f"💾 Saved scheduled goals to {sg_file}")
-            return True
-        except Exception as e:
-            logger.error(f"Error saving scheduled goals: {e}")
             return False
     
     # ==================== Public Query Methods ====================
