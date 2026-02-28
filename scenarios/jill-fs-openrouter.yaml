@@ -2,8 +2,7 @@
 
 world_config:
   world_name: "fs"
-  scheduled_goals_world: "jill"
-  
+
 llm_config:
   openrouter_model_path: "qwen/qwen3.5-397b-a17b"
   grobid: "http://localhost:8070/"

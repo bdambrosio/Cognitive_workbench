@@ -2,8 +2,7 @@
 
 world_config:
   world_name: "fs"
-  scheduled_goals_world: "jill"  # Shared scheduled goals across all Jill scenarios
-  
+
 llm_config:
   anthropic_model_path: "claude-sonnet-4-6"
   pdf_parser: "pymupdf"  # Use pymupdf for PDF reading (skip GROBID even if available)

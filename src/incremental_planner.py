@@ -1819,62 +1819,111 @@ END_EVAL"""
 
 def _vision_eval_deep(vision_criteria: str, eval_target: str, classifier_result: str, executor: InfospaceExecutor, compressed_context: str = "") -> str:
     """
-    Deep vision evaluation via subplanner. Has full access to all pipeline bindings
-    and can issue load/inspect calls to verify content, coverage, and grounding.
-    
+    Deep vision evaluation via single LLM call with full artifact and upstream
+    source context.  Cross-references the artifact against source materials and
+    reports PASS/FAIL/INAPPLICABLE per criterion.
+
     Invoked at the done gate as a read-only quality check on a goal-level artifact.
-    
-    Returns evaluation text or empty string if skipped/unavailable.
+
+    Returns evaluation text (containing STATUS: SATISFIED or STATUS: NEEDS_REVISION)
+    or empty string if skipped/unavailable.
     """
     if not vision_criteria or not eval_target:
         return ""
-    
-    # Build the evaluation goal for the subplanner
-    bindings_summary = ""
+
+    # --- 1. Parse criteria ------------------------------------------------
+    criteria_parts = re.split(r'^\d+\.\s*', vision_criteria.strip(), flags=re.MULTILINE)
+    criteria_parts = [c.strip() for c in criteria_parts if c.strip()]
+    if not criteria_parts:
+        return ""
+    numbered_criteria = "\n".join(f"{i+1}. {c}" for i, c in enumerate(criteria_parts))
+
+    # --- 2. Load full artifact --------------------------------------------
+    res_id = _resolve_eval_target_id(eval_target, executor)
+    if not res_id or not executor.resource_manager:
+        return ""
+
+    load_target = res_id if res_id == eval_target else eval_target
     try:
-        bindings = executor.plan_bindings_flat
-        if bindings:
-            binding_lines = [f"  ${k} = {v}" for k, v in bindings.items() if not k.startswith('_')]
-            bindings_summary = "\n".join(binding_lines)
+        load_result = executor.execute_action({"type": "load", "target": load_target, "slice": ":"})
+        artifact_text = str(load_result.get("data", ""))
+    except Exception as e:
+        logger.warning(f"Vision eval deep: failed to load artifact {eval_target}: {e}")
+        return ""
+    if not artifact_text:
+        return ""
+
+    # --- 3. Load upstream source previews (max 3, ~2000 chars each) -------
+    #   Only Note_ bindings — these are actual pipeline intermediates.
+    #   Collections (conversation_history, infolab, etc.) are ambient context
+    #   and would pollute the cross-reference evaluation.
+    source_sections = []
+    try:
+        bindings = executor.plan_bindings_flat or {}
+        seen = 0
+        for var_name, var_val in bindings.items():
+            if seen >= 3:
+                break
+            if var_name.startswith("_"):
+                continue
+            if not isinstance(var_val, str):
+                continue
+            # Skip the eval target itself
+            if var_val == res_id:
+                continue
+            # Only load Notes (pipeline artifacts), not Collections (ambient context)
+            if not var_val.startswith("Note_"):
+                continue
+            try:
+                src_result = executor.execute_action({"type": "load", "target": f"${var_name}", "slice": ":"})
+                src_data = str(src_result.get("data", ""))[:2000]
+                if src_data:
+                    source_sections.append(f"--- ${var_name} ({var_val}) ---\n{src_data}")
+                    seen += 1
+            except Exception:
+                pass
     except Exception:
         pass
-    
-    context_block = ""
-    if compressed_context:
-        context_block = f"\n\nEXECUTION TRACE (compressed):\n{compressed_context}"
-    
-    eval_goal = (
-        f"You are a quality evaluator. Your task is to evaluate the artifact in {eval_target} "
-        f"against the quality criteria below. You have access to ALL pipeline variables via load.\n\n"
-        f"QUALITY CRITERIA:\n{vision_criteria}\n\n"
-        f"CLASSIFIER RESULT (lightweight, may be based on truncated content):\n{classifier_result}\n\n"
-        f"AVAILABLE VARIABLES:\n{bindings_summary}\n"
-        f"{context_block}\n\n"
-        f"INSTRUCTIONS:\n"
-        f"1. Use load with slice=\":\" to inspect {eval_target} in full.\n"
-        f"2. Use assess or think to check the quality of the artifact.\n"
-        f"2. If criteria involve coverage or completeness, load upstream variables "
-        f"(e.g., source collections) to check how many items were retained vs. discarded.\n"
-        f"3. If criteria involve specificity or accuracy, load source Notes to verify "
-        f"that claimed details actually appear in source material.\n"
-        f"4. For each criterion, report PASS, FAIL, or INAPPLICABLE with a one-sentence evidence-based reason. "
-        f"Use INAPPLICABLE when a criterion does not apply to the artifact (e.g., json_parse_error for plain-text output).\n"
-        f"5. End with a one-line RECOMMENDATION for the parent planner (e.g., 'lower filter threshold', "
-        f"'add section headers', 'broaden search terms', or 'remove X criterion' if a criterion is inapplicable).\n"
-        f"6. On the final line, write exactly: STATUS: SATISFIED (if all applicable criteria PASS; INAPPLICABLE criteria do not affect STATUS) "
-        f"or STATUS: NEEDS_REVISION (only when an applicable criterion FAILs; INAPPLICABLE criteria do not cause NEEDS_REVISION).\n"
-        f"7. Return the evaluation report as your final answer. Do NOT regenerate the artifact and do NOT use say — the report is returned "
-        f"to the parent planner as text, not delivered to any user."
-    )
-    
+
+    sources_block = ""
+    if source_sections:
+        sources_block = "\nUPSTREAM SOURCES (for cross-reference):\n" + "\n\n".join(source_sections) + "\n"
+
+    # --- 4. Build prompt --------------------------------------------------
+    classifier_block = ""
+    if classifier_result:
+        classifier_block = f"\nSHALLOW CLASSIFIER RESULT (may be based on truncated content):\n{classifier_result}\n"
+
+    eval_prompt = f"""You are a quality evaluator. Evaluate the artifact below against each criterion.
+Cross-reference the artifact against the upstream sources to verify coverage, accuracy, and grounding.
+
+QUALITY CRITERIA:
+{numbered_criteria}
+{classifier_block}{sources_block}
+ARTIFACT ({eval_target}):
+{artifact_text}
+
+INSTRUCTIONS:
+- For each criterion, report PASS, FAIL, or INAPPLICABLE with a one-sentence evidence-based reason.
+- Use INAPPLICABLE when a criterion does not apply to the artifact (e.g., json_parse_error for plain-text output).
+- End with a one-line RECOMMENDATION for the parent planner (e.g., 'lower filter threshold', 'add section headers', 'broaden search terms', or 'remove X criterion' if inapplicable).
+- On the final line, write exactly: STATUS: SATISFIED (if all applicable criteria PASS; INAPPLICABLE criteria do not affect STATUS) or STATUS: NEEDS_REVISION (only when an applicable criterion FAILs).
+
+Format:
+1. criterion_name: PASS|FAIL|INAPPLICABLE - reason
+...
+RECOMMENDATION: <one line>
+STATUS: SATISFIED or NEEDS_REVISION
+END_EVAL"""
+
+    # --- 5. Single LLM call -----------------------------------------------
     try:
-        logger.info(f"Vision eval deep: starting subplanner for {eval_target}")
-        result = executor.call_subplanner(goal=eval_goal, max_steps=8)
-        if result and result.get("success"):
-            logger.info(f"Vision eval deep for {eval_target}: {result['response'][:200]}")
-            return result["response"]
-        else:
-            logger.warning(f"Vision eval deep returned: {result.get('error', '(empty)')[:100] if result else '(empty)'}")
+        logger.info(f"Vision eval deep: evaluating {eval_target} ({len(criteria_parts)} criteria, {len(source_sections)} upstream sources)")
+        result = executor.llm_generate(eval_prompt, max_tokens=512, temperature=0.1, stops=["\nEND_EVAL", "END_EVAL"])
+        if result.success and result.text:
+            eval_text = result.text.strip()
+            logger.info(f"Vision eval deep for {eval_target}: {eval_text[:200]}")
+            return eval_text
     except Exception as e:
         logger.warning(f"Vision eval deep failed: {e}")
     return ""
@@ -2308,6 +2357,7 @@ ALWAYS follow all formatting instructions exactly.
                 last_eval_target = rid
                 logger.info(f"Eval target seeded from declared output_artifacts: {last_eval_target}")
         stall_guard_state = {"prev_signature": None, "repeat_count": 0}
+        deep_eval_retried = False
         for step in range(max_steps):
             if _interrupt_requested(executor):
                 _clear_interrupt(executor)
@@ -2539,17 +2589,29 @@ ALWAYS follow all formatting instructions exactly.
                         logger.info(f"Done gate: Deep eval result injected")
                         deep_status = _parse_deep_eval_status(deep_text)
                         if deep_status == "needs_revision":
-                            logger.info("Done gate: Deep eval returned NEEDS_REVISION; returning caveated frozen artifact (no reopen, no regeneration)")
-                            draft_text = _resolve_eval_target_text(last_eval_target, executor)
-                            caveat = (
-                                "Quality gate warning: deep evaluation found issues (STATUS: NEEDS_REVISION). "
-                                "Delivering best available draft from this cycle (not revised)."
-                            )
-                            s["VERIFICATION_ANSWER"] = "PARTIAL"
-                            s[f"done_{step}"] = "NO"
-                            s["final_answer"] = f"{caveat}\n\n{draft_text}" if draft_text else caveat
-                            break
-                    elif shallow_text and "fail" in shallow_text.lower():
+                            if not deep_eval_retried:
+                                deep_eval_retried = True
+                                logger.info("Done gate: Deep eval returned NEEDS_REVISION; reopening loop for one retry")
+                                s += user(
+                                    f"QUALITY GATE FAILED — you must revise the artifact in {last_eval_target}.\n"
+                                    f"Issues found:\n{deep_text}\n\n"
+                                    f"Regenerate or fix the artifact to address the FAILed criteria, then mark DONE again."
+                                )
+                                s += assistant("Understood. I will revise the artifact to address the failed criteria.\n")
+                                s[f"done_{step}"] = "NO"
+                                continue
+                            else:
+                                logger.info("Done gate: Deep eval returned NEEDS_REVISION on retry; freezing artifact")
+                                draft_text = _resolve_eval_target_text(last_eval_target, executor)
+                                caveat = (
+                                    "Quality gate warning: deep evaluation found issues after retry (STATUS: NEEDS_REVISION). "
+                                    "Delivering best available draft from this cycle."
+                                )
+                                s["VERIFICATION_ANSWER"] = "PARTIAL"
+                                s[f"done_{step}"] = "NO"
+                                s["final_answer"] = f"{caveat}\n\n{draft_text}" if draft_text else caveat
+                                break
+                    if shallow_text and "fail" in shallow_text.lower():
                         s += user(f"VISION EVALUATION (final quality gate, shallow, read-only):\n{shallow_text}\nFAILs are advisory. Do NOT run additional tool steps at done gate.\n")
                         s += assistant("Noted.\n")
                         logger.info("Done gate: Shallow eval has FAILs (read-only advisory); proceeding to finalization")
@@ -3221,6 +3283,7 @@ ALWAYS follow all formatting instructions exactly.
             last_eval_target = rid
             logger.info(f"Eval target seeded from declared output_artifacts: {last_eval_target}")
     stall_guard_state = {"prev_signature": None, "repeat_count": 0}
+    deep_eval_retried = False
     for step in range(max_steps):
         if _interrupt_requested(executor):
             _clear_interrupt(executor)
@@ -3432,17 +3495,29 @@ ALWAYS follow all formatting instructions exactly.
                     logger.info(f"Done gate: Deep eval result injected")
                     deep_status = _parse_deep_eval_status(deep_text)
                     if deep_status == "needs_revision":
-                        logger.info("Done gate: Deep eval returned NEEDS_REVISION; returning caveated frozen artifact (no reopen, no regeneration)")
-                        draft_text = _resolve_eval_target_text(last_eval_target, executor)
-                        caveat = (
-                            "Quality gate warning: deep evaluation found issues (STATUS: NEEDS_REVISION). "
-                            "Delivering best available draft from this cycle (not revised)."
-                        )
-                        state["VERIFICATION_ANSWER"] = "PARTIAL"
-                        state[f"done_{step}"] = "NO"
-                        state["final_answer"] = f"{caveat}\n\n{draft_text}" if draft_text else caveat
-                        break
-                elif shallow_text and "fail" in shallow_text.lower():
+                        if not deep_eval_retried:
+                            deep_eval_retried = True
+                            logger.info("Done gate: Deep eval returned NEEDS_REVISION; reopening loop for one retry")
+                            prompt += format_user(
+                                f"QUALITY GATE FAILED — you must revise the artifact in {last_eval_target}.\n"
+                                f"Issues found:\n{deep_text}\n\n"
+                                f"Regenerate or fix the artifact to address the FAILed criteria, then mark DONE again."
+                            )
+                            prompt += format_assistant("Understood. I will revise the artifact to address the failed criteria.\n")
+                            state[f"done_{step}"] = "NO"
+                            continue
+                        else:
+                            logger.info("Done gate: Deep eval returned NEEDS_REVISION on retry; freezing artifact")
+                            draft_text = _resolve_eval_target_text(last_eval_target, executor)
+                            caveat = (
+                                "Quality gate warning: deep evaluation found issues after retry (STATUS: NEEDS_REVISION). "
+                                "Delivering best available draft from this cycle."
+                            )
+                            state["VERIFICATION_ANSWER"] = "PARTIAL"
+                            state[f"done_{step}"] = "NO"
+                            state["final_answer"] = f"{caveat}\n\n{draft_text}" if draft_text else caveat
+                            break
+                if shallow_text and "fail" in shallow_text.lower():
                     prompt += format_user(f"VISION EVALUATION (final quality gate, shallow, read-only):\n{shallow_text}\nFAILs are advisory. Do NOT run additional tool steps at done gate.\n")
                     prompt += format_assistant("Noted.\n")
                     logger.info("Done gate: Shallow eval has FAILs (read-only advisory); proceeding to finalization")

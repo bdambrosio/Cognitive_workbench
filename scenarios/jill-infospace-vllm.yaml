@@ -2,8 +2,7 @@
 
 world_config:
   world_name: "infolab"
-  scheduled_goals_world: "jill"
-  
+
 llm_config:
   vllm_model_path: "Qwen/Qwen3-Next-80B-A3B-Instruct-FP8"
   grobid: "http://localhost:8070/"
