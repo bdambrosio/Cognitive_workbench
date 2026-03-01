@@ -45,17 +45,3 @@ Failure: reason (syntax error in generated code, LLM failure, name already stage
 {"type":"create-tool","name":"fetch-rss","description":"Fetch and parse an RSS feed, returning recent items as a Note","requirements":"Use feedparser library. Accept 'url' parameter. Return a Note with the 10 most recent items as JSON (title, link, published, summary).","out":"$result"}
 ```
 
-## Offline Analysis
-
-When the planner fails with `missing_affordance`, opportunities are logged to `logs/planner_history/create_tool_opportunities.jsonl`.
-
-To process the log and generate tools from inferred specs:
-
-```bash
-cd src
-python3 tools/create-tool/analyze.py --list          # List entries
-python3 tools/create-tool/analyze.py --last 3        # Process last 3
-python3 tools/create-tool/analyze.py --entry 42      # Process specific seq
-```
-
-Uses `VLLM_URL` and `VLLM_MODEL` env vars, or `--vllm-url` and `--vllm-model`.

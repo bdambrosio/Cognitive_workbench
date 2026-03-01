@@ -3,6 +3,10 @@ name: extract
 type: python
 flattens_collections: false
 description: "Derive content from a single Note via LLM-guided extraction, compression, or transformation. Output is grounded entirely in the input — no new information is introduced."
+schema_hint:
+  target: "$variable (single Note, required)"
+  instruction: "string (what to extract or how to transform, required)"
+  out: "$variable (optional)"
 ---
 
 # extract

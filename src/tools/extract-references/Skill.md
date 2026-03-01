@@ -16,7 +16,7 @@ Extract bibliography/references from PDF files using GROBID. Returns a Collectio
 
 ## Output
 
-Success returns:
+Success (`status: "success"`):
 - `resource_id`: Collection ID containing Notes (one Note per reference)
 - Each Note contains:
   - `data`: Structured reference metadata (title, authors, year, venue, doi, url)
@@ -34,5 +34,5 @@ Success returns:
 ```json
 {"type":"extract-references","path":"/path/to/paper.pdf","out":"$refs"}
 {"type":"extract-references","path":"$paper_note","out":"$refs"}
-{"type":"extract-references","path":"$refs","format-citation":"bibtex","out":"$bibtex"}
+{"type":"format-citation","target":"$refs","format":"bibtex","out":"$bibtex"}
 ```

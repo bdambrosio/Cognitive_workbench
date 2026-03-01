@@ -3,6 +3,13 @@ name: synthesize
 type: python
 flattens_collections: true
 description: "Integrate content across multiple documents to produce new understanding. Use for cross-document synthesis, comparison, and reporting from Collections."
+schema_hint:
+  target: "$variable (Collection or Note, required)"
+  other: "$variable (second input for comparison, optional)"
+  focus: "string (what to attend to, optional)"
+  format: "string (narrative|comparison|executive|technical|comprehensive, default: narrative)"
+  instruction: "string (free-form override, optional)"
+  out: "$variable (optional)"
 ---
 
 # synthesize

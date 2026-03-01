@@ -2,6 +2,11 @@
 name: calculate
 type: python
 description: "Numerically evaluate mathematical expressions using SymPy"
+schema_hint:
+  value: "string (math expression, required)"
+  variables: "dict (variable substitutions, optional)"
+  precision: "int (decimal places, default: 10)"
+  out: "$variable (optional)"
 ---
 
 # calculate

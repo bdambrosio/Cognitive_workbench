@@ -54,14 +54,6 @@ Metadata Note content shape:
 {"query":"original search query","source_count":7,"sources":[{"url":"https://example.com/article","domain":"example.com","title":"Article Title","excerpt":"..."}],"model":"claude-sonnet-4-5-20250929","elapsed_ms":12500}
 ```
 
-## Key Differences from Google CSE Version
-
-- **Single Note, not Collection**: No need to iterate/map over results — the synthesis is ready to use
-- **Pre-synthesized**: Claude has already read, evaluated, and synthesized the sources
-- **No local dependencies**: No `wordfreq`, `unstructured`, GROBID, or HTML extraction needed
-- **No `llm_generate` needed**: The tool calls Claude directly; does not use the workbench LLM
-- **Better for opinion/forum content**: Claude can access and synthesize content that Google CSE returns but raw HTTP fetches often can't read (JavaScript-rendered pages, etc.)
-
 ## Common Workflows
 
 **Direct use (most common — synthesis is already done):**
@@ -96,6 +88,3 @@ Metadata Note content shape:
 - Use `extract` on the Note to pull out specific aspects of the synthesis text
 - Use `get-metadata` to access tool metadata (query, sources, model, elapsed_ms)
 - For complete unfiltered page content from a specific URL found in sources, use `fetch-text`
-- Typical latency is 15-45 seconds (Claude performs multiple web searches internally)
-- Default timeout is 120 seconds — complex queries with many searches may take 60+ seconds
-- Cost is ~$0.01-0.05 per search call at current Sonnet API pricing
