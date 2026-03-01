@@ -72,7 +72,7 @@ pip install -r requirements.txt
 export OPENROUTER_API_KEY="sk-or-v1-..."   # from openrouter.ai
 ```
 
-**Alt Model for semantic processing: **
+**Alt Model for semantic processing:**
 Some tools, like refine, extract-struct, filter-semantic, assess, perform complex semantic processing of text (e.g. extracting field from json). If your basic llm isn't up to the task, you can provide a heavier weight model for these to use:
 ```yaml
 alt_llm_config:
@@ -82,7 +82,9 @@ alt_llm_config:
 ### 3. Run
 
 ```bash
+source zenoh_env/bin/activate # or however you setup your venv
 cd src
+
 python3 launcher.py ../scenarios/jill-infospace.yaml --ui --resource-browser
 # Or for OpenRouter:
 python3 launcher.py ../scenarios/jill-infospace-openrouter.yaml --ui --resource-browser
