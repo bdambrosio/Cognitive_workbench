@@ -10,7 +10,7 @@ A research framework for autonomous agents with incremental planning, persistent
 
 Cognitive Workbench is experimental research software for studying LLM-based cognitive architectures. It prioritizes **inspectable agent behavior** and fast iteration over stability.
 
-The core idea: an **incremental planner** that interleaves reasoning with tool execution. Rather than generating a complete plan and then executing it, the planner generates one step at a time, runs it, observes the result, and decides what to do next. This tight feedback loop — combined with persistent memory, reflective quality control, and autonomous goal scheduling — produces agents that can pursue complex goals over extended periods.
+The core idea: an **incremental planner** that interleaves reasoning with tool execution. Rather than generating a complete plan and then executing it, the planner generates one step at a time, runs it, observes the result, and decides what to do next. This tight feedback loop — combined with persistent memory, reflective quality control, and autonomous goal scheduling — produces agents that can pursue complex goals over extended periods. (AI gen'd chart below, not quite right, but close enough)
 
 ```
 User: "goal: Find recent papers on multi-agent coordination"
@@ -63,11 +63,20 @@ pip install -r requirements.txt
 
 ### 2. Configure an LLM backend
 
-**Option A — Local GPU (SGLang):** Edit `scenarios/jill-infospace.yaml` and set `sgl_model_path` to your preferred model.
+**Option A — Local GPU (SGLang):** 
+ - Edit `scenarios/jill-infospace.yaml` and set `sgl_model_path` to your preferred model. SGLang can be finicky, sorry, but use of @function makes reasoning loop so much faster.
+ - Or `scenarios/jill-infospace-vllm.yaml` and set `vllm_model_path` to your preferred model.
 
 **Option B — Cloud API (no GPU needed):**
 ```bash
 export OPENROUTER_API_KEY="sk-or-v1-..."   # from openrouter.ai
+```
+
+**Alt Model for semantic processing: **
+Some tools, like refine, extract-struct, filter-semantic, assess, perform complex semantic processing of text (e.g. extracting field from json). If your basic llm isn't up to the task, you can provide a heavier weight model for these to use:
+```yaml
+alt_llm_config:
+  openrouter_model_path: "qwen/qwen3-235b-a22b-2507"
 ```
 
 ### 3. Run
