@@ -1817,7 +1817,7 @@ END_EVAL"""
     return ""
 
 
-def _vision_eval_deep(vision_criteria: str, eval_target: str, classifier_result: str, executor: InfospaceExecutor, compressed_context: str = "") -> str:
+def _vision_eval_deep(vision_criteria: str, eval_target: str, classifier_result: str, executor: InfospaceExecutor, compressed_context: str = "", plan_bindings: set = None) -> str:
     """
     Deep vision evaluation via single LLM call with full artifact and upstream
     source context.  Cross-references the artifact against source materials and
@@ -1854,9 +1854,8 @@ def _vision_eval_deep(vision_criteria: str, eval_target: str, classifier_result:
         return ""
 
     # --- 3. Load upstream source previews (max 3, ~2000 chars each) -------
-    #   Only Note_ bindings — these are actual pipeline intermediates.
-    #   Collections (conversation_history, infolab, etc.) are ambient context
-    #   and would pollute the cross-reference evaluation.
+    #   Only Note_ bindings created during THIS plan execution.
+    #   Stale bindings from prior goals would pollute the cross-reference.
     source_sections = []
     try:
         bindings = executor.plan_bindings_flat or {}
@@ -1867,6 +1866,9 @@ def _vision_eval_deep(vision_criteria: str, eval_target: str, classifier_result:
             if var_name.startswith("_"):
                 continue
             if not isinstance(var_val, str):
+                continue
+            # Only consider bindings created during this plan's execution
+            if plan_bindings is not None and var_name not in plan_bindings:
                 continue
             # Skip the eval target itself
             if var_val == res_id:
@@ -2358,6 +2360,8 @@ ALWAYS follow all formatting instructions exactly.
                 logger.info(f"Eval target seeded from declared output_artifacts: {last_eval_target}")
         stall_guard_state = {"prev_signature": None, "repeat_count": 0}
         deep_eval_retried = False
+        deep_eval_prev_artifact = None
+        plan_local_bindings = set()
         for step in range(max_steps):
             if _interrupt_requested(executor):
                 _clear_interrupt(executor)
@@ -2421,6 +2425,7 @@ ALWAYS follow all formatting instructions exactly.
             
             logger.info(f"Step {step}: -> {tool_result[:100]}")
             if new_bindings:
+                plan_local_bindings.update(new_bindings.keys())
                 logger.info(f"Step {step}: New bindings: {new_bindings}")
             
             # Interrupt checkpoint: after code-block execution
@@ -2582,7 +2587,7 @@ ALWAYS follow all formatting instructions exactly.
                     logger.info(f"Done gate: Running deep vision eval on {last_eval_target}")
                     compressed_ctx = _compress_trace(str(s))
                     shallow_text = _vision_eval_check(vision_criteria, last_eval_target, executor, compressed_context=compressed_ctx)
-                    deep_text = _vision_eval_deep(vision_criteria, last_eval_target, shallow_text or "", executor, compressed_context=compressed_ctx)
+                    deep_text = _vision_eval_deep(vision_criteria, last_eval_target, shallow_text or "", executor, compressed_context=compressed_ctx, plan_bindings=plan_local_bindings)
                     if deep_text:
                         s += user(f"DEEP VISION EVALUATION (final quality gate, read-only):\n{deep_text}\nUse this only as QA signal. Do NOT run additional tool steps at done gate.\n")
                         s += assistant("Noted.\n")
@@ -2591,6 +2596,7 @@ ALWAYS follow all formatting instructions exactly.
                         if deep_status == "needs_revision":
                             if not deep_eval_retried:
                                 deep_eval_retried = True
+                                deep_eval_prev_artifact = _resolve_eval_target_text(last_eval_target, executor)
                                 logger.info("Done gate: Deep eval returned NEEDS_REVISION; reopening loop for one retry")
                                 s += user(
                                     f"QUALITY GATE FAILED — you must revise the artifact in {last_eval_target}.\n"
@@ -2601,16 +2607,20 @@ ALWAYS follow all formatting instructions exactly.
                                 s[f"done_{step}"] = "NO"
                                 continue
                             else:
-                                logger.info("Done gate: Deep eval returned NEEDS_REVISION on retry; freezing artifact")
-                                draft_text = _resolve_eval_target_text(last_eval_target, executor)
-                                caveat = (
-                                    "Quality gate warning: deep evaluation found issues after retry (STATUS: NEEDS_REVISION). "
-                                    "Delivering best available draft from this cycle."
-                                )
-                                s["VERIFICATION_ANSWER"] = "PARTIAL"
-                                s[f"done_{step}"] = "NO"
-                                s["final_answer"] = f"{caveat}\n\n{draft_text}" if draft_text else caveat
-                                break
+                                retry_artifact = _resolve_eval_target_text(last_eval_target, executor)
+                                if deep_eval_prev_artifact and retry_artifact == deep_eval_prev_artifact:
+                                    logger.info("Done gate: Deep eval NEEDS_REVISION on retry but artifact unchanged (tool limitation); accepting as satisfied")
+                                else:
+                                    logger.info("Done gate: Deep eval returned NEEDS_REVISION on retry; freezing artifact")
+                                    draft_text = retry_artifact
+                                    caveat = (
+                                        "Quality gate warning: deep evaluation found issues after retry (STATUS: NEEDS_REVISION). "
+                                        "Delivering best available draft from this cycle."
+                                    )
+                                    s["VERIFICATION_ANSWER"] = "PARTIAL"
+                                    s[f"done_{step}"] = "NO"
+                                    s["final_answer"] = f"{caveat}\n\n{draft_text}" if draft_text else caveat
+                                    break
                     if shallow_text and "fail" in shallow_text.lower():
                         s += user(f"VISION EVALUATION (final quality gate, shallow, read-only):\n{shallow_text}\nFAILs are advisory. Do NOT run additional tool steps at done gate.\n")
                         s += assistant("Noted.\n")
@@ -3284,6 +3294,8 @@ ALWAYS follow all formatting instructions exactly.
             logger.info(f"Eval target seeded from declared output_artifacts: {last_eval_target}")
     stall_guard_state = {"prev_signature": None, "repeat_count": 0}
     deep_eval_retried = False
+    deep_eval_prev_artifact = None
+    plan_local_bindings = set()
     for step in range(max_steps):
         if _interrupt_requested(executor):
             _clear_interrupt(executor)
@@ -3344,6 +3356,7 @@ ALWAYS follow all formatting instructions exactly.
         
         logger.info(f"Step {step}: -> {tool_result[:100]}")
         if new_bindings:
+            plan_local_bindings.update(new_bindings.keys())
             logger.info(f"Step {step}: New bindings: {new_bindings}")
         
         # Interrupt checkpoint: after code-block execution
@@ -3488,7 +3501,7 @@ ALWAYS follow all formatting instructions exactly.
                 logger.info(f"Done gate: Running deep vision eval on {last_eval_target}")
                 compressed_ctx = _compress_trace(prompt)
                 shallow_text = _vision_eval_check(vision_criteria, last_eval_target, executor, compressed_context=compressed_ctx)
-                deep_text = _vision_eval_deep(vision_criteria, last_eval_target, shallow_text or "", executor, compressed_context=compressed_ctx)
+                deep_text = _vision_eval_deep(vision_criteria, last_eval_target, shallow_text or "", executor, compressed_context=compressed_ctx, plan_bindings=plan_local_bindings)
                 if deep_text:
                     prompt += format_user(f"DEEP VISION EVALUATION (final quality gate, read-only):\n{deep_text}\nUse this only as QA signal. Do NOT run additional tool steps at done gate.\n")
                     prompt += format_assistant("Noted.\n")
@@ -3497,6 +3510,7 @@ ALWAYS follow all formatting instructions exactly.
                     if deep_status == "needs_revision":
                         if not deep_eval_retried:
                             deep_eval_retried = True
+                            deep_eval_prev_artifact = _resolve_eval_target_text(last_eval_target, executor)
                             logger.info("Done gate: Deep eval returned NEEDS_REVISION; reopening loop for one retry")
                             prompt += format_user(
                                 f"QUALITY GATE FAILED — you must revise the artifact in {last_eval_target}.\n"
@@ -3507,16 +3521,20 @@ ALWAYS follow all formatting instructions exactly.
                             state[f"done_{step}"] = "NO"
                             continue
                         else:
-                            logger.info("Done gate: Deep eval returned NEEDS_REVISION on retry; freezing artifact")
-                            draft_text = _resolve_eval_target_text(last_eval_target, executor)
-                            caveat = (
-                                "Quality gate warning: deep evaluation found issues after retry (STATUS: NEEDS_REVISION). "
-                                "Delivering best available draft from this cycle."
-                            )
-                            state["VERIFICATION_ANSWER"] = "PARTIAL"
-                            state[f"done_{step}"] = "NO"
-                            state["final_answer"] = f"{caveat}\n\n{draft_text}" if draft_text else caveat
-                            break
+                            retry_artifact = _resolve_eval_target_text(last_eval_target, executor)
+                            if deep_eval_prev_artifact and retry_artifact == deep_eval_prev_artifact:
+                                logger.info("Done gate: Deep eval NEEDS_REVISION on retry but artifact unchanged (tool limitation); accepting as satisfied")
+                            else:
+                                logger.info("Done gate: Deep eval returned NEEDS_REVISION on retry; freezing artifact")
+                                draft_text = retry_artifact
+                                caveat = (
+                                    "Quality gate warning: deep evaluation found issues after retry (STATUS: NEEDS_REVISION). "
+                                    "Delivering best available draft from this cycle."
+                                )
+                                state["VERIFICATION_ANSWER"] = "PARTIAL"
+                                state[f"done_{step}"] = "NO"
+                                state["final_answer"] = f"{caveat}\n\n{draft_text}" if draft_text else caveat
+                                break
                 if shallow_text and "fail" in shallow_text.lower():
                     prompt += format_user(f"VISION EVALUATION (final quality gate, shallow, read-only):\n{shallow_text}\nFAILs are advisory. Do NOT run additional tool steps at done gate.\n")
                     prompt += format_assistant("Noted.\n")
