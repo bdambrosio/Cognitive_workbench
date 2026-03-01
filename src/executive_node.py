@@ -1019,6 +1019,14 @@ class ZenohExecutiveNode:
             f"cognitive/{character_name}/control/goal_cache",
             self._handle_goal_cache
         )
+        self.control_goal_interrupt_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/goal_interrupt",
+            self._handle_goal_interrupt
+        )
+        self.control_goal_remove_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/goal_remove",
+            self._handle_goal_remove
+        )
 
         # === ZENOH PUBLICATION ===
         # NAME: execution_state_update
@@ -2121,6 +2129,8 @@ class ZenohExecutiveNode:
             if self.infospace_executor:
                 self.infospace_executor.interrupt_requested = True
             self._update_scheduled_goal(goal_id, status="interrupted", is_running=False)
+            if self._active_scheduled_goal_id == goal_id:
+                self._active_scheduled_goal_id = None
             if goal_id in self._scheduler_started_goals:
                 self._scheduler_started_goals.discard(goal_id)
                 self._record_scheduler_event(
@@ -2136,6 +2146,11 @@ class ZenohExecutiveNode:
             return
         deleted = self._delete_scheduled_goal(goal_id)
         if deleted:
+            if goal_id in self._scheduler_started_goals:
+                self._scheduler_started_goals.discard(goal_id)
+            if hasattr(self, "task_scheduler"):
+                self.task_scheduler.notify_task_terminal(goal_id)
+            self._publish_execution_state()
             self._say_to_user(f"Goal '{goal.get('name') or goal_id}' has been removed.")
         else:
             self._say_to_user(f"Goal '{goal_id}' could not be removed.")
@@ -2396,6 +2411,49 @@ class ZenohExecutiveNode:
             logger.info(f"Cleared cached plan_actions for {goal_id}")
         except Exception as e:
             logger.error(f"Error in goal_cache handler: {e}")
+
+    def _handle_goal_interrupt(self, sample):
+        """Zenoh callback to interrupt a scheduled goal."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            goal_id = data.get("goal_id")
+            if not goal_id:
+                logger.warning(f"Invalid goal_interrupt payload: {data}")
+                return
+            self._handle_goal_terminate(goal_id=goal_id)
+        except Exception as e:
+            logger.error(f"Error in goal_interrupt handler: {e}")
+
+    def _handle_goal_remove(self, sample):
+        """Zenoh callback to force-remove a scheduled goal."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            goal_id = data.get("goal_id")
+            if not goal_id:
+                logger.warning(f"Invalid goal_remove payload: {data}")
+                return
+            goal = self._get_scheduled_goal(goal_id)
+            if not goal:
+                logger.warning(f"Goal {goal_id} not found for remove")
+                return
+            if goal.get("is_running") or self._active_scheduled_goal_id == goal_id:
+                self.interrupt_requested = True
+                if self.infospace_executor:
+                    self.infospace_executor.interrupt_requested = True
+            deleted = self._delete_scheduled_goal(goal_id)
+            if not deleted:
+                logger.warning(f"Goal {goal_id} could not be removed")
+                return
+            if self._active_scheduled_goal_id == goal_id:
+                self._active_scheduled_goal_id = None
+            if goal_id in self._scheduler_started_goals:
+                self._scheduler_started_goals.discard(goal_id)
+            if hasattr(self, "task_scheduler"):
+                self.task_scheduler.notify_task_terminal(goal_id)
+            self._publish_execution_state()
+            logger.info(f"Goal {goal_id} removed via control endpoint")
+        except Exception as e:
+            logger.error(f"Error in goal_remove handler: {e}")
 
     def _handle_task_reuse(self, task_id: str = None):
         """User said 'reuse task_X'. Reset task to step 1, restoring initial plan."""

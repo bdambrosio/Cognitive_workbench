@@ -2,6 +2,16 @@
 name: check-email
 type: python
 description: "Read Gmail via IMAP. Returns Collection of text Notes, one per email (body as content, headers in tool_metadata)."
+schema_hint:
+  folder: "string (IMAP folder, default: INBOX)"
+  limit: "int (max emails, default: 10, max 50)"
+  since: "string (YYYY-MM-DD, optional)"
+  before: "string (YYYY-MM-DD, optional)"
+  from_addr: "string (sender filter, optional)"
+  subject: "string (subject filter, optional)"
+  query: "string (full-text search, optional)"
+  unseen_only: "string (true/false, default: false)"
+  out: "$variable (optional)"
 ---
 
 # check-email
@@ -57,8 +67,7 @@ Failure (`status: "failed"`):
 - Opens folders in read-only mode — no side effects on the mailbox
 - Returns newest emails first
 - Email body capped at 50,000 characters per message
-- Credentials are never logged; only the email address appears in log messages
-- Authentication errors return a generic message without leaking IMAP error details
+- Authentication errors return a generic failure message
 
 ## Common Workflows
 
@@ -77,7 +86,7 @@ Failure (`status: "failed"`):
 **Find unread emails about a topic:**
 ```json
 {"type":"check-email","query":"quarterly report","unseen_only":"true","out":"$unread"}
-{"type":"summarize","target":"$unread","focus":"key points from unread quarterly report emails","out":"$brief"}
+{"type":"synthesize","target":"$unread","focus":"key points from unread quarterly report emails","out":"$brief"}
 ```
 
 **Combine with web search:**

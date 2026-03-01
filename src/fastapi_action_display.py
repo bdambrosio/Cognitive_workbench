@@ -964,6 +964,28 @@ class FastAPIActionDisplayNode:
                 logger.error(f"Error in goal_cache: {e}")
                 return {"success": False, "message": str(e)}
 
+        @self.app.post("/api/goal_interrupt/{character}")
+        async def goal_interrupt(character: str, data: dict = Body(...)):
+            """Interrupt a scheduled goal without removing it."""
+            try:
+                payload = json.dumps(data).encode()
+                self.session.put(f"cognitive/{character}/control/goal_interrupt", payload)
+                return {"success": True}
+            except Exception as e:
+                logger.error(f"Error in goal_interrupt: {e}")
+                return {"success": False, "message": str(e)}
+
+        @self.app.post("/api/goal_remove/{character}")
+        async def goal_remove(character: str, data: dict = Body(...)):
+            """Remove a scheduled goal, interrupting first if needed."""
+            try:
+                payload = json.dumps(data).encode()
+                self.session.put(f"cognitive/{character}/control/goal_remove", payload)
+                return {"success": True}
+            except Exception as e:
+                logger.error(f"Error in goal_remove: {e}")
+                return {"success": False, "message": str(e)}
+
         @self.app.post("/api/control/clear_world_model")
         async def clear_world_model():
             """Clear world model."""
@@ -4555,6 +4577,9 @@ Generated: {generated_at}
                     const taskId = `goal-acc-${i}`;
                     const hasCache = Array.isArray(g.cached_plan_actions) && g.cached_plan_actions.length > 0;
                     const cacheLabel = hasCache ? `${g.cached_plan_actions.length} cached action(s)` : 'no cache';
+                    const isRunning = !!g.is_running;
+                    const actionLabel = isRunning ? 'Interrupt' : 'Remove';
+                    const actionColor = isRunning ? '#ff9f43' : '#ff6b6b';
                     html += `
                         <div class="task-accordion-item" style="border: 1px solid #404040; border-radius: 4px; margin-bottom: 8px; overflow: hidden;">
                             <div class="task-accordion-header" onclick="toggleTaskAccordion('${taskId}')" style="padding: 8px 10px; cursor: pointer; display: flex; align-items: stretch; gap: 8px;">
@@ -4575,7 +4600,7 @@ Generated: {generated_at}
                                     <input type="time" value="${g.run_at || ''}" onchange="event.stopPropagation(); setTaskRunAt('${escapedChar}', '${g.goal_id || ''}', this.value)" style="display:${g.schedule_mode === 'daily' ? 'block' : 'none'}; background: #2a2a2a; color: #ccc; border: 1px solid #555; padding: 3px 4px; border-radius: 3px; font-size: 11px; width: 100%; box-sizing: border-box;" title="Daily run time (24h)" />
                                     <button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', 'proceed ${g.goal_id || ''}')" style="background: #00d4ff; color: #1a1a1a; border: none; padding: 4px 0; border-radius: 3px; font-size: 11px; cursor: pointer; width: 100%;">Proceed</button>
                                     <button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', 'reuse ${g.goal_id || ''}')" style="background: #9b59b6; color: white; border: none; padding: 4px 0; border-radius: 3px; font-size: 11px; cursor: pointer; width: 100%;">Reuse</button>
-                                    <button onclick="event.stopPropagation(); confirmTerminateTask('${escapedChar}', '${g.goal_id || ''}', '${(g.name || '').replace(/'/g, "\\'")}')" style="background: #ff6b6b; color: white; border: none; padding: 4px 0; border-radius: 3px; font-size: 11px; cursor: pointer; width: 100%;">Terminate</button>
+                                    <button onclick="event.stopPropagation(); onGoalPrimaryAction('${escapedChar}', '${g.goal_id || ''}', ${isRunning})" style="background: ${actionColor}; color: white; border: none; padding: 4px 0; border-radius: 3px; font-size: 11px; cursor: pointer; width: 100%;">${actionLabel}</button>
                                 </div>
                             </div>
                             <div id="${taskId}" class="task-accordion-body" style="display: none; padding: 10px; border-top: 1px solid #404040; background: #1e1e1e; font-size: 11px;">
@@ -4604,7 +4629,10 @@ Generated: {generated_at}
                 });
                 const result = await response.json();
                 if (result.success) {
-                    if (activeCharacter === character) loadTasksList(character);
+                    // Delay refresh to allow backend to process the command
+                    if (activeCharacter === character) {
+                        setTimeout(() => loadTasksList(character), 1200);
+                    }
                     return true;
                 }
                 return false;
@@ -4660,10 +4688,54 @@ Generated: {generated_at}
             }
         }
 
-        function confirmTerminateTask(character, taskId, taskName) {
-            const label = taskName || taskId || 'this task';
-            if (!confirm(`Terminate ${label}?`)) return;
-            sendTaskCommand(character, `terminate ${taskId}`);
+        async function interruptGoal(character, goalId) {
+            if (!goalId) return false;
+            try {
+                const response = await fetch(`/api/goal_interrupt/${character}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ goal_id: goalId })
+                });
+                const result = await response.json();
+                return !!result.success;
+            } catch (e) {
+                console.error('interruptGoal:', e);
+                return false;
+            }
+        }
+
+        async function removeGoal(character, goalId) {
+            if (!goalId) return false;
+            try {
+                const response = await fetch(`/api/goal_remove/${character}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ goal_id: goalId })
+                });
+                const result = await response.json();
+                return !!result.success;
+            } catch (e) {
+                console.error('removeGoal:', e);
+                return false;
+            }
+        }
+
+        async function onGoalPrimaryAction(character, goalId, isRunning) {
+            const label = goalId || 'this goal';
+            if (isRunning) {
+                if (!confirm(`Interrupt ${label}?`)) return;
+                const ok = await interruptGoal(character, goalId);
+                if (ok && activeCharacter === character) {
+                    setTimeout(() => loadTasksList(character), 300);
+                }
+                return;
+            }
+            if (!confirm(`Remove ${label}?`)) return;
+            const ok = await removeGoal(character, goalId);
+            if (ok && activeCharacter === character) {
+                loadTasksList(character);
+                setTimeout(() => loadTasksList(character), 500);
+            }
         }
 
         async function setGoalName(character, goalId, name) {

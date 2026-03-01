@@ -1,4 +1,4 @@
-# How to Make an LLM Actually Do Things: Reflective Planning with Quality Gates
+# What's wrong with React as an Agent loop,
 
 ## Building a real-time agentic loop that plans, executes, recovers from errors, and checks its own work
 
