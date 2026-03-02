@@ -1715,7 +1715,10 @@ Only provide the result, followed by the </end> tag.""")
             response_text = str(response_text)
         
         response = response_text.strip()
-        
+
+        # Strip <think>...</think> blocks (Qwen3 thinking mode) before parsing
+        response = re.sub(r'<think>.*?</think>\s*', '', response, flags=re.DOTALL)
+
         # Remove markdown code fences if present
         response = response.replace("```json", "").replace("```", "").strip()
         

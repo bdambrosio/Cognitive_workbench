@@ -28,6 +28,16 @@ CODE_TEMPERATURE = 0.2         # Stage 2 code generation — low for correctness
 SELECT_TEMPERATURE = 0.1       # Tool selection, DONE/EVAL_TARGET classification — low for reliability
 REFLECT_TEMPERATURE = GEN_TEMPERATURE  # Reasoning, thoughts, next-task planning
 
+# Regex to strip <think>...</think> blocks that some models (e.g. Qwen3) prepend to output.
+# The actual answer follows after the closing </think> tag.
+_THINK_TAG_RE = re.compile(r'<think>.*?</think>\s*', re.DOTALL)
+
+def _strip_think_tags(text: str) -> str:
+    """Strip <think>...</think> blocks from model output, returning the actual answer."""
+    if not isinstance(text, str):
+        return text
+    return _THINK_TAG_RE.sub('', text)
+
 # Configure logging with file handler
 # Add file handler directly to this module's logger (doesn't interfere with root logger config)
 logger = logging.getLogger(__name__)
@@ -2235,13 +2245,18 @@ ALWAYS follow all formatting instructions exactly.
             + "</first_task>\n"
         )
         
+        # Strip <think> tags from Stage 1 outputs
+        for _key in ['stage1_reasoning', 'selected_tools_json', 'first_task']:
+            if _key in s:
+                s[_key] = _strip_think_tags(s[_key])
+
         try:
             logger.info(f"Stage 1: Reasoning: {s['stage1_reasoning']}")
             logger.info(f"SELECTED_TOOLS_JSON: {s['selected_tools_json']}")
             logger.info(f"FIRST_TASK: {s['first_task']}")
         except KeyError as e:
             logger.warning(f"Stage 1 values not available: {e}")
-        
+
         # Stage 1.5: Load and inject detailed docs for selected tools (only if not already loaded)
         try:
             selected_tools_json = s['selected_tools_json']
@@ -2383,17 +2398,18 @@ ALWAYS follow all formatting instructions exactly.
                 + "\n```\n"
             )
             
-            code_text = s[f"code_block_{step}"].strip()
+            code_text = _strip_think_tags(s[f"code_block_{step}"].strip())
+            s[f"code_block_{step}"] = code_text
             logger.info(f"Step {step}: Code block ({len(code_text)} chars):\n{code_text}")
             call_count = count_codegen_action_calls(code_text)
             logger.info(f"Step {step}: Code block action calls={call_count} (logged before execution)")
-            
+
             # Interrupt checkpoint: after code-block gen, before execute
             if _interrupt_requested(executor):
                 _clear_interrupt(executor)
                 s["final_answer"] = "Interrupted by user."
                 break
-            
+
             # Snapshot bindings before execution
             bindings_before = dict(executor.plan_bindings_flat)
             result_dict = execute_codegen_block(code_text, executor, "codegen")
@@ -2560,6 +2576,11 @@ ALWAYS follow all formatting instructions exactly.
             elif requested_tools_raw and requested_tools_raw.lower() not in ["", "[]", "none", "null"]:
                 logger.warning(f"Step {step}: Failed to parse REQUEST_TOOLS: {requested_tools_raw[:100]}")
             
+            # Strip <think> tags from model outputs (Qwen3 thinking mode)
+            for _key in [f"thoughts_{step}", f"eval_target_{step}", f"done_{step}", f"next_task_{step}", f"request_tools_{step}"]:
+                if _key in s:
+                    s[_key] = _strip_think_tags(s[_key])
+
             # Check if done
             done_raw = s[f"done_{step}"].strip().upper()
             next_task_raw = s[f"next_task_{step}"].strip()
@@ -2568,7 +2589,7 @@ ALWAYS follow all formatting instructions exactly.
                     _clear_interrupt(executor)
                     s["final_answer"] = "Interrupted by user."
                     break
-                
+
                 # Verification
                 s += user(
                     "STOP. Verify that the GOAL has been achieved:\n"
@@ -2824,7 +2845,8 @@ def vllm_gen(slot_name: str, prompt: str, state: Dict[str, Any], max_tokens: int
             error_msg = "llm_generate returned None text"
             logger.error(error_msg)
             raise RuntimeError(error_msg)
-        
+
+        text = _strip_think_tags(text)
         state[slot_name] = text  # Store in state for later access
         return text
     except Exception as e:
@@ -3419,10 +3441,10 @@ ALWAYS follow all formatting instructions exactly.
         stage3_block = vllm_gen(f"stage3_block_{step}", prompt, state, max_tokens=384, temperature=GEN_TEMPERATURE, executor=executor)
         prompt += stage3_block + "\n"
 
-        thoughts_val = _extract_between_labels(stage3_block, "THOUGHTS:", "DONE:")
-        done_val = _extract_line_value(stage3_block, "DONE:")
-        next_task_val = _extract_between_labels(stage3_block, "NEXT_TASK:", "REQUEST_TOOLS:")
-        request_tools_val = _extract_after_label(stage3_block, "REQUEST_TOOLS:").strip()
+        thoughts_val = _strip_think_tags(_extract_between_labels(stage3_block, "THOUGHTS:", "DONE:"))
+        done_val = _strip_think_tags(_extract_line_value(stage3_block, "DONE:"))
+        next_task_val = _strip_think_tags(_extract_between_labels(stage3_block, "NEXT_TASK:", "REQUEST_TOOLS:"))
+        request_tools_val = _strip_think_tags(_extract_after_label(stage3_block, "REQUEST_TOOLS:").strip())
 
         state[f"thoughts_{step}"] = thoughts_val
         state[f"done_{step}"] = done_val
@@ -3501,11 +3523,12 @@ ALWAYS follow all formatting instructions exactly.
                 logger.info(f"Done gate: Running deep vision eval on {last_eval_target}")
                 compressed_ctx = _compress_trace(prompt)
                 shallow_text = _vision_eval_check(vision_criteria, last_eval_target, executor, compressed_context=compressed_ctx)
+
                 deep_text = _vision_eval_deep(vision_criteria, last_eval_target, shallow_text or "", executor, compressed_context=compressed_ctx, plan_bindings=plan_local_bindings)
                 if deep_text:
                     prompt += format_user(f"DEEP VISION EVALUATION (final quality gate, read-only):\n{deep_text}\nUse this only as QA signal. Do NOT run additional tool steps at done gate.\n")
                     prompt += format_assistant("Noted.\n")
-                    logger.info(f"Done gate: Deep eval result injected")
+                    logger.info(f"Done gate: Deep eval result injected:\n{deep_text}")
                     deep_status = _parse_deep_eval_status(deep_text)
                     if deep_status == "needs_revision":
                         if not deep_eval_retried:
@@ -4401,7 +4424,7 @@ Instructions:
 - Do NOT generate json_parse_error or JSON-related criteria unless the goal explicitly requires JSON output.
 - For run-script, shell scripts, or fire-and-forget tools, output is typically plain text — do NOT assume JSON.
 - For simple execution goals (e.g., "run script X", "execute Y"), prefer "No vision criteria needed."
-- Do NOT check quality, depth, specificity, coverage, credibility, recency, or source verification.
+- Do include minimal criteria to check relevance of content to the goal.
 - Do NOT check content correctness (dates, numbers, facts) — the agent is not a fact-checker.
 - If no obvious failure modes apply (e.g., a simple lookup or report), return "No vision criteria needed."
 - Prefer returning "No vision criteria needed." over generating speculative criteria.
@@ -4727,4 +4750,7 @@ REFLECTION_FRAME_SCHEMA:
         reflection_prompt = reflection_prompt.replace("{trace}", trace)
         reflection = self.executor.llm_generate(reflection_prompt, max_tokens=4096, is_json=True, temperature=0.0)
 
+        if reflection.text is None:
+            logger.warning("Reflection LLM returned None (JSON parse failed or empty response); returning empty frame")
+            return {}
         return reflection.text

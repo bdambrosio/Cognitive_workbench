@@ -269,9 +269,28 @@ class ResourceBrowser:
         .metadata-item {
             margin: 5px 0;
             color: #888;
+            text-align: left;
         }
         .metadata-item span {
             color: #dcdcaa;
+        }
+        .metadata-key {
+            color: #888;
+            margin-bottom: 2px;
+        }
+        .metadata-value {
+            margin: 0;
+            padding: 8px 10px;
+            background: #232326;
+            border: 1px solid #3e3e42;
+            border-radius: 3px;
+            color: #dcdcaa;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.45;
+            text-align: left;
         }
         .copy-btn {
             background: #3e3e42;
@@ -496,7 +515,7 @@ class ResourceBrowser:
                 metadataHtml = '<div class="metadata">';
                 metadataHtml += '<div class="metadata-item"><strong>Properties:</strong></div>';
                 for (const [key, value] of Object.entries(metadata)) {
-                    metadataHtml += `<div class="metadata-item">  ${key}: <span>${JSON.stringify(value)}</span></div>`;
+                    metadataHtml += `<div class="metadata-item"><div class="metadata-key">${escapeHtml(key)}:</div><pre class="metadata-value">${escapeHtml(formatMetadataValue(value))}</pre></div>`;
                 }
                 metadataHtml += '</div>';
             }
@@ -522,6 +541,30 @@ class ResourceBrowser:
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        function formatMetadataValue(value) {
+            if (value === null || value === undefined) return String(value);
+            if (typeof value === 'object') {
+                try {
+                    return JSON.stringify(value, null, 2);
+                } catch (e) {
+                    return String(value);
+                }
+            }
+            if (typeof value === 'string') {
+                const trimmed = value.trim();
+                if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+                    try {
+                        const parsed = JSON.parse(trimmed);
+                        return JSON.stringify(parsed, null, 2);
+                    } catch (e) {
+                        // Fall back to raw string when not valid JSON
+                    }
+                }
+                return value;
+            }
+            return String(value);
         }
         
         // Auto-load on page load

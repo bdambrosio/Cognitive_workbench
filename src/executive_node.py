@@ -589,18 +589,18 @@ class ZenohExecutiveNode:
                     mem_fraction_static=0.82,
                     attention_backend="triton"
                 )
-                elif 'Qwen2.5-72B-Instruct-FP8' in sgl_model_path: # patch for FP8 models as of 1/9/2026
-                    logger.info(f"🚀 Initializing SGLang Runtime with FP8 patch!")
+                elif 'NVFP4' in sgl_model_path: # patch for FP8 models as of 1/9/2026
+                    logger.info(f"🚀 Initializing SGLang Runtime with NVFP4 patch!")
                     self.runtime = sgl.Runtime(
                         model_path=sgl_model_path,
                         tokenizer_path=sgl_model_path,
                         device="cuda",
-                        context_length=32768,
+                        context_length=65536,
                         dtype="auto",
                         tp_size=1,
-                        mem_fraction_static=0.9#,
-                        #fp8_gemm_backend="triton",
-                        #attention_backend="triton"
+                        mem_fraction_static=0.9,
+                        quantization="modelopt_fp4",
+                        attention_backend="triton"
                     )
                 elif 'FP8' in sgl_model_path: # patch for FP8 models as of 1/9/2026
                     logger.info(f"🚀 Initializing SGLang Runtime with FP8 patch!")
