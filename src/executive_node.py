@@ -1973,9 +1973,11 @@ class ZenohExecutiveNode:
         if result.get("status") == "success" and result.get("resource_id"):
             self.resource_manager.update_note_content(result["resource_id"], content)
             return
-        create_result = self.infospace_executor.execute_action({"type": "create-note", "value": content, "name": note_name, "out": "$_scheduled_goal_save_tmp"})
-        note_id = create_result.get("resource_id")
-        self.infospace_executor.execute_action({"type": "persist", "target": "$_scheduled_goal_save_tmp"})
+        # Bypass execute_action to avoid _resolve_value corrupting JSON
+        # when goal text contains $variable references (e.g. "$satsang")
+        note_id = self.infospace_executor._persist_note(content, 'scheduled-goal', note_name=note_name)
+        if note_id:
+            self.resource_manager.mark_persistent(note_id, self.character_name)
         col_id = self.resource_manager.named_collections.get(SCHEDULED_GOALS_COLLECTION) or self.resource_manager._resolve_resource_id(SCHEDULED_GOALS_COLLECTION)
         if col_id and note_id:
             added, _, err = self.resource_manager.add_to_collection(col_id, note_id, self.character_name, operation="add")
