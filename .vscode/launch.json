@@ -46,9 +46,8 @@
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
         },
-
         {
-            "name": "Jill - FS",
+            "name": "Jill - Infospace Anthropic",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/launcher.py",
@@ -57,37 +56,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["jill-fs.yaml", "--ui", "--resource-browser"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Jill - FS OpenRouter",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/launcher.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["jill-fs-openrouter.yaml", "--ui", "--resource-browser"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Jill - FS Anthropic",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/launcher.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["jill-fs-anthropic.yaml", "--ui", "--resource-browser"],
+            "args": ["jill-infospace-anthropic.yaml", "--ui", "--resource-browser"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
