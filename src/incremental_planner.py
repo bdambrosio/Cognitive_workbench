@@ -2802,12 +2802,70 @@ def _parse_prompt_to_messages(prompt: str) -> List[Dict[str, str]]:
     return messages
 
 
-def vllm_gen(slot_name: str, prompt: str, state: Dict[str, Any], max_tokens: int, 
-             temperature: float, stop: Any = None, executor: InfospaceExecutor = None) -> str:
+def _build_compressed_prompt(full_prompt: str, keep_last_n_steps: int = 2) -> str:
+    """
+    Build a token-efficient prompt by compressing earlier conversation turns
+    while keeping the system prefix and recent steps in full.
+
+    Structure: [full system prefix] + [compressed earlier trace] + [full last N steps]
+
+    Args:
+        full_prompt: The full accumulated prompt string with role markers
+        keep_last_n_steps: Number of recent Stage 2/3 step pairs to keep uncompressed
+
+    Returns:
+        Compressed prompt string with same role-marker format
+    """
+    if not full_prompt:
+        return full_prompt
+
+    # Split prompt into system prefix and conversation turns
+    # Find the end of the system block (first <|user|> after <|system|>)
+    first_user_idx = full_prompt.find("<|user|>")
+    if first_user_idx == -1:
+        return full_prompt  # No conversation turns yet
+
+    system_prefix = full_prompt[:first_user_idx]
+    conversation = full_prompt[first_user_idx:]
+
+    # Find Stage 2 boundaries to identify step pairs
+    # Each step consists of: Stage 2 user msg + assistant code + Stage 3 user msg + assistant reflection
+    stage2_pattern = re.compile(r'<\|user\|>\nSTAGE 2 \(step (\d+)/(\d+)\):')
+    step_positions = [(m.start(), int(m.group(1))) for m in stage2_pattern.finditer(conversation)]
+
+    if len(step_positions) <= keep_last_n_steps:
+        return full_prompt  # Not enough steps to compress
+
+    # Split: pre-steps (Stage 1 + format instructions) | compressible steps | recent steps
+    first_step_pos = step_positions[0][0]
+    compress_boundary = step_positions[-keep_last_n_steps][0]
+
+    pre_steps = conversation[:first_step_pos]  # Stage 1 exchanges + format instructions
+    compressible = conversation[first_step_pos:compress_boundary]
+    recent_steps = conversation[compress_boundary:]
+
+    # Compress the earlier steps using existing _compress_trace
+    compressed = _compress_trace(compressible)
+
+    if not compressed.strip():
+        return full_prompt  # Compression produced nothing, use full prompt
+
+    # Rebuild: system + pre-steps + compressed trace as user msg + recent steps
+    result = system_prefix + pre_steps
+    result += format_user(f"[COMPRESSED EXECUTION TRACE — earlier steps]\n{compressed}\n[END COMPRESSED TRACE]")
+    result += format_assistant("Understood. Continuing from the compressed trace.\n")
+    result += recent_steps
+
+    return result
+
+
+def vllm_gen(slot_name: str, prompt: str, state: Dict[str, Any], max_tokens: int,
+             temperature: float, stop: Any = None, executor: InfospaceExecutor = None,
+             llm_prompt: str = None) -> str:
     """
     Replacement for SGLang gen(). Uses executor.llm_generate() for unified LLM interface.
     Appends response to prompt, stores in state.
-    
+
     Args:
         slot_name: Name for state storage
         prompt: Current prompt string (will be converted to messages array)
@@ -2816,7 +2874,10 @@ def vllm_gen(slot_name: str, prompt: str, state: Dict[str, Any], max_tokens: int
         temperature: Temperature setting
         stop: Stop sequence(s) - can be string, list, or None
         executor: InfospaceExecutor instance (required for llm_generate)
-        
+        llm_prompt: Optional override prompt to send to the LLM instead of prompt.
+                    When set, this is what the LLM sees, while prompt remains the
+                    canonical full trace for bookkeeping.
+
     Returns:
         Generated text string
     """
@@ -2831,8 +2892,9 @@ def vllm_gen(slot_name: str, prompt: str, state: Dict[str, Any], max_tokens: int
         else:
             stop_list = [stop]
     
-    messages = _parse_prompt_to_messages(prompt)
-    
+    effective_prompt = llm_prompt if llm_prompt is not None else prompt
+    messages = _parse_prompt_to_messages(effective_prompt)
+
     # Use unified llm_generate interface
     try:
         response = executor.llm_generate(
@@ -3298,12 +3360,13 @@ ALWAYS follow all formatting instructions exactly.
         "#Stage 3 FORMAT:\n"
         "  THOUGHTS: <brief assessment of result and progress>\n"
         "  DONE: <YES or NO — is the entire GOAL satisfied?>\n"
+        "  VERIFICATION: <if DONE=YES: list observable facts proving GOAL is met, and any missing outcomes. Write SUCCESS, PARTIAL, or INCONCLUSIVE. If DONE=NO, leave blank.>\n"
         "  NEXT_TASK: <next task description, or blank if DONE=YES>\n"
         "  REQUEST_TOOLS: <json array of tool names needing docs, or []>\n"
         "\n"
         "#Stage 3 RULES:\n"
         "- DONE=YES only when ALL required actions are complete.\n"
-        "- If DONE=YES, NEXT_TASK must be blank.\n"
+        "- If DONE=YES, NEXT_TASK must be blank and VERIFICATION must be filled.\n"
         "- Do NOT use 'say' inside Stage 2 code blocks; final user delivery happens only after DONE=YES and quality checks.\n"
         "- Efficiency rule: if prior step used only one tool call and GOAL is not done, set NEXT_TASK to combine adjacent subtasks.\n"
         "- SPIRAL DETECTION: If the same tool has failed 2+ times consecutively,\n"
@@ -3347,7 +3410,9 @@ ALWAYS follow all formatting instructions exactly.
         )
 
         prompt += format_assistant("```python\n")
-        code_raw = vllm_gen(f"code_block_{step}", prompt, state, max_tokens=2048, temperature=GEN_TEMPERATURE, stop=["\n```"], executor=executor)
+        # Use compressed prompt for LLM call to reduce token count on later steps
+        compressed_for_llm = _build_compressed_prompt(prompt, keep_last_n_steps=2) if step >= 3 else None
+        code_raw = vllm_gen(f"code_block_{step}", prompt, state, max_tokens=2048, temperature=GEN_TEMPERATURE, stop=["\n```"], executor=executor, llm_prompt=compressed_for_llm)
         prompt += code_raw + "\n```\n"
         code_text = code_raw.strip()
         
@@ -3450,18 +3515,21 @@ ALWAYS follow all formatting instructions exactly.
                 prompt += format_user(f"VISION EVALUATION:\n{vision_eval_text}\nFAILs are advisory — attempt to address if easy, do NOT loop repeatedly. Proceed after at most three retries.\n")
                 prompt += format_assistant("Noted.\n")
 
-        # Stage 3: simplified reflection (4 fields)
+        # Stage 3: simplified reflection (4 fields + inline verification when DONE)
         prompt += format_assistant("")
-        stage3_block = vllm_gen(f"stage3_block_{step}", prompt, state, max_tokens=384, temperature=GEN_TEMPERATURE, executor=executor)
+        compressed_for_llm = _build_compressed_prompt(prompt, keep_last_n_steps=2) if step >= 3 else None
+        stage3_block = vllm_gen(f"stage3_block_{step}", prompt, state, max_tokens=384, temperature=GEN_TEMPERATURE, executor=executor, llm_prompt=compressed_for_llm)
         prompt += stage3_block + "\n"
 
         thoughts_val = _strip_think_tags(_extract_between_labels(stage3_block, "THOUGHTS:", "DONE:"))
         done_val = _strip_think_tags(_extract_line_value(stage3_block, "DONE:"))
+        verification_val = _strip_think_tags(_extract_between_labels(stage3_block, "VERIFICATION:", "NEXT_TASK:"))
         next_task_val = _strip_think_tags(_extract_between_labels(stage3_block, "NEXT_TASK:", "REQUEST_TOOLS:"))
         request_tools_val = _strip_think_tags(_extract_after_label(stage3_block, "REQUEST_TOOLS:").strip())
 
         state[f"thoughts_{step}"] = thoughts_val
         state[f"done_{step}"] = done_val
+        state[f"verification_{step}"] = verification_val
         state[f"next_task_{step}"] = next_task_val
         state[f"request_tools_{step}"] = _strip_code_fences(request_tools_val)
         
@@ -3473,6 +3541,8 @@ ALWAYS follow all formatting instructions exactly.
         
         logger.info(f"THOUGHTS: {safe_get(state, f'thoughts_{step}')}")
         logger.info(f"DONE: {safe_get(state, f'done_{step}')}")
+        if verification_val:
+            logger.info(f"VERIFICATION: {verification_val}")
         logger.info(f"NEXT_TASK: {safe_get(state, f'next_task_{step}')}")
         logger.info(f"REQUEST_TOOLS: {safe_get(state, f'request_tools_{step}')}")
         
@@ -3514,23 +3584,45 @@ ALWAYS follow all formatting instructions exactly.
                 _clear_interrupt(executor)
                 state["final_answer"] = "Interrupted by user."
                 break
-            
-            # Verification
-            prompt += format_user(
-                "STOP. Verify that the GOAL has been achieved:\n"
-                "- What observable facts in the current state satisfy the GOAL?\n"
-                "- What required actions or outcomes are missing?\n"
-                "VERIFICATION_ANSWER: <SUCCESS | PARTIAL | INCONCLUSIVE>\n"
-            )
-            prompt += format_assistant("VERIFICATION_ANSWER: ")
-            verification_raw = vllm_gen("VERIFICATION_ANSWER", prompt, state, max_tokens=96, temperature=GEN_TEMPERATURE, stop="\n", executor=executor)
-            vlines = [ln.strip() for ln in str(verification_raw).splitlines() if ln.strip()]
-            cleaned = vlines[-1] if vlines else str(verification_raw).strip()
-            if cleaned.startswith("VERIFICATION_ANSWER:"):
-                cleaned = cleaned[len("VERIFICATION_ANSWER:"):].strip()
-            state["VERIFICATION_ANSWER"] = cleaned
-            prompt += cleaned + "\n"
-            logger.info(f"VERIFICATION ANSWER: {state.get('VERIFICATION_ANSWER', 'N/A')}")
+
+            # Use inline verification from Stage 3 (no separate LLM call)
+            inline_verification = state.get(f"verification_{step}", "").strip()
+            if inline_verification:
+                # Parse verification status from inline field
+                cleaned = inline_verification.upper()
+                if "SUCCESS" in cleaned:
+                    cleaned = "SUCCESS"
+                elif "PARTIAL" in cleaned:
+                    cleaned = "PARTIAL"
+                elif "INCONCLUSIVE" in cleaned:
+                    cleaned = "INCONCLUSIVE"
+                else:
+                    cleaned = "SUCCESS"  # Default if DONE=YES with verification text
+                state["VERIFICATION_ANSWER"] = cleaned
+                logger.info(f"VERIFICATION (inline): {cleaned} — {inline_verification[:200]}")
+            else:
+                # Fallback: lightweight verification without full system prefix
+                lightweight_verify_prompt = format_system(
+                    f"You are verifying whether a goal has been achieved.\n"
+                    f"#GOAL:\n{goal_for_step}\n#END GOAL\n"
+                )
+                compressed_trace = _compress_trace(prompt)
+                lightweight_verify_prompt += format_user(
+                    f"Execution trace:\n{compressed_trace}\n\n"
+                    f"What observable facts in the current state satisfy the GOAL?\n"
+                    f"What required actions or outcomes are missing?\n"
+                    f"VERIFICATION_ANSWER: <SUCCESS | PARTIAL | INCONCLUSIVE>\n"
+                )
+                lightweight_verify_prompt += format_assistant("VERIFICATION_ANSWER: ")
+                verification_raw = vllm_gen("VERIFICATION_ANSWER", prompt, state, max_tokens=96, temperature=GEN_TEMPERATURE, stop="\n", executor=executor, llm_prompt=lightweight_verify_prompt)
+                vlines = [ln.strip() for ln in str(verification_raw).splitlines() if ln.strip()]
+                cleaned = vlines[-1] if vlines else str(verification_raw).strip()
+                if cleaned.startswith("VERIFICATION_ANSWER:"):
+                    cleaned = cleaned[len("VERIFICATION_ANSWER:"):].strip()
+                state["VERIFICATION_ANSWER"] = cleaned
+                prompt += format_user("VERIFICATION_ANSWER: " + cleaned)
+                prompt += format_assistant("Noted.\n")
+                logger.info(f"VERIFICATION (lightweight fallback): {cleaned}")
             
             # Deep vision evaluation at done gate
             if vision_criteria and last_eval_target:
@@ -3585,7 +3677,9 @@ ALWAYS follow all formatting instructions exactly.
                 final_prompt = "Summarize the results with focus on the original goal"
             
             prompt += format_user(f"FINAL TASK: {final_prompt}\nProvide a concise final answer.")
-            final_answer = vllm_gen("final_answer", prompt, state, max_tokens=256, temperature=GEN_TEMPERATURE, stop=["\n\n", "STAGE"], executor=executor)
+            # Use compressed prompt for final answer generation
+            compressed_final = _build_compressed_prompt(prompt, keep_last_n_steps=2) if step >= 3 else None
+            final_answer = vllm_gen("final_answer", prompt, state, max_tokens=256, temperature=GEN_TEMPERATURE, stop=["\n\n", "STAGE"], executor=executor, llm_prompt=compressed_final)
             prompt += final_answer
             logger.info(f"FINAL_ANSWER: {state.get('final_answer', 'N/A')}")
             break
