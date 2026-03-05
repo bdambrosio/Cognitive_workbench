@@ -1,0 +1,8 @@
+name: "System Health Check"
+description: "Periodic homeostasis check — collect system and cognitive health metrics and report anomalies to the user."
+
+test_goal: >
+  goal: Check system and cognitive health using check-health.
+  If everything is ok, just note it in your thoughts — no need to bother the user.
+  If there are warnings, say to User what is concerning and suggest actions.
+  If anything is critical, ask User for guidance on how to proceed.

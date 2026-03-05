@@ -2195,6 +2195,13 @@ if HAS_SGLANG:
         # Add current date and time
 
         system_parts.append(f"WORLD_MODEL: {json.dumps(world_model, indent=2)}\n")
+
+        # Tool model experience hints (Thompson-sampled, only when sufficient data)
+        if executor and hasattr(executor, 'tool_model') and executor.tool_model:
+            tool_hints = executor.tool_model.sample_tool_hints(goal)
+            if tool_hints:
+                system_parts.append(f"{tool_hints}\n")
+
         system_parts.append(f"CURRENT_TIME: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n")
         system_parts.append(f"\n#GOAL:\n{goal}\n")
         system_parts.append("""Follow this process to achieve the goal:
@@ -2206,7 +2213,7 @@ Then you will work in repeated cycles:
  - Stage 3: Evaluate result — is the goal done? What is the next task?
 ALWAYS follow all formatting instructions exactly.
 
-""")        
+""")
         s += system("".join(system_parts))
         
         s += user(
@@ -3167,6 +3174,13 @@ def tool_planner_infospace_vllm(template, goal: str, world_model: Dict, characte
                 system_parts.append(f"\n# {section_name.upper().replace('_', ' ')}\n{context_text}\n")
     
     system_parts.append(f"WORLD_MODEL: {json.dumps(world_model, indent=2)}\n")
+
+    # Tool model experience hints (Thompson-sampled, only when sufficient data)
+    if executor and hasattr(executor, 'tool_model') and executor.tool_model:
+        tool_hints = executor.tool_model.sample_tool_hints(goal)
+        if tool_hints:
+            system_parts.append(f"{tool_hints}\n")
+
     system_parts.append(f"CURRENT_TIME: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
     system_parts.append("""Follow this process to achieve the goal:
  - Stage 1 (once): Read the ABSTRACT_PLAN, select tools, state first task.
@@ -4313,6 +4327,7 @@ class IncrementalPlanner:
             trace_str = str(state)
             tool_model: ToolModel = self.executor.tool_model
             tool_model.update_from_trace(trace_str=trace_str)
+            tool_model.build_task_tool_index()  # Rebuild so next plan sees fresh experience
             compressed_trace = _compress_trace(trace_str)
             reflection_frame = self._reflect(goal, world_model, max_steps, compressed_trace)
             

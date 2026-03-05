@@ -51,8 +51,8 @@ def tool(input_value=None, runtime=None, **kwargs):
         subprocess.Popen(
             ["bash", str(script_path)],
             cwd=str(_SCRIPTS_DIR),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=f"/var/log/run-script-{script_name}.log",
+            stderr=f"/var/log/run-script-{script_name}.log",
             start_new_session=True,
         )
     except Exception as e:
