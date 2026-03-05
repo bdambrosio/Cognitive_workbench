@@ -12,6 +12,7 @@ import logging
 import re
 import hashlib
 import math
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -482,14 +483,15 @@ class ToolModel:
         step_indices = set()
         stage2_pre_pattern = r'STAGE 2-PRE \(step (\d+)/(\d+)\):'
         stage2_pattern = r'STAGE 2 \(step (\d+)/(\d+)\):'
-        stage3_pattern = r'STAGE 3 - TOOL EXECUTION COMPLETE \(step (\d+)/(\d+)\)'
-        
+        # Match both current format "STAGE 3 (step X/Y)" and legacy "STAGE 3 - TOOL EXECUTION COMPLETE (step X/Y)"
+        stage3_pattern = r'STAGE 3(?:\s*-\s*TOOL EXECUTION COMPLETE)?\s*\(step (\d+)/(\d+)\)'
+
         for match in re.finditer(stage2_pre_pattern, trace_content):
             step_indices.add(int(match.group(1)) - 1)  # Convert to 0-indexed
-        
+
         for match in re.finditer(stage2_pattern, trace_content):
             step_indices.add(int(match.group(1)) - 1)
-        
+
         for match in re.finditer(stage3_pattern, trace_content):
             step_indices.add(int(match.group(1)) - 1)
         
@@ -611,23 +613,29 @@ class ToolModel:
             stop_reason = None
             tool_status_token = None
             
-            # Find STAGE 3 section
+            # Find STAGE 3 section — matches both current and legacy header formats
             stage3_match = re.search(
-                rf'STAGE 3 - TOOL EXECUTION COMPLETE \(step {step_num}/\d+\)(.*?)(?=STAGE 3|STAGE 2|$)',
+                rf'STAGE 3(?:\s*-\s*TOOL EXECUTION COMPLETE)?\s*\(step {step_num}/\d+\)(.*?)(?=STAGE 3|STAGE 2|$)',
                 trace_content,
                 re.DOTALL
             )
             if stage3_match:
                 stage3_section = stage3_match.group(1)
-                
-                # Extract tool status from result
-                status_match = re.search(r'(SUCCESS|FAILED|OK)', stage3_section)
+
+                # Extract tool status from result text
+                # Current format: "SUCCESS | ..." or "ERROR | ..."
+                # Legacy format: "SUCCESS" or "FAILED"
+                status_match = re.search(r'(SUCCESS|ERROR|FAILED|OK)', stage3_section)
                 if status_match:
                     tool_status_token = status_match.group(1)
                     tool_status = 'success' if tool_status_token in ['SUCCESS', 'OK'] else 'failure'
-                
-                # Extract ACTUAL RESULT
-                result_match = re.search(r'>> ACTUAL RESULT.*?<<\n(.*?)\n>> END RESULT', stage3_section, re.DOTALL)
+                else:
+                    tool_status_token = None
+                    tool_status = None
+                    logger.debug(f"tool_model: no status token found in STAGE 3 for step {step_num}")
+
+                # Extract result text — matches both "RESULT (ground truth)" and "ACTUAL RESULT" formats
+                result_match = re.search(r'>> (?:ACTUAL )?RESULT.*?<<\n(.*?)\n>> END RESULT', stage3_section, re.DOTALL)
                 if result_match:
                     result_text = result_match.group(1).strip()
                     result_summary = self._summarize_result(result_text)
@@ -654,6 +662,9 @@ class ToolModel:
                     audit_text = audit_match.group(1).strip()
                     if audit_text and audit_text != '[]':
                         audit_verdicts = self._parse_audit_verdicts(audit_text)
+
+            else:
+                logger.debug(f"tool_model: STAGE 3 section not found for step {step_num}")
 
             # Derived, world-independent arg signature
             tool_args_sig = _tool_args_signature(tool_args)
@@ -961,3 +972,110 @@ class ToolModel:
         
         # Return (tool_name, score) pairs
         return [(tool, stats["weighted_score"]) for tool, stats in ranked[:top_k]]
+
+    # ------------------------------------------------------------------
+    # Thompson-sampled tool hints for planner Stage 1
+    # ------------------------------------------------------------------
+
+    _MIN_TOTAL_RECORDS = 20   # Don't emit any hints until enough data exists
+    _MIN_TOOL_TRIALS = 3      # Don't characterize a tool until tried at least this many times
+    _SIMILARITY_THRESHOLD = 0.25
+    _CAUTIONARY_THRESHOLD = 0.5   # Beta mean below this → cautionary
+    _RELIABLE_THRESHOLD = 0.85    # Beta mean above this → reliable
+    _MAX_HINTS = 3                # Keep context footprint small
+
+    def sample_tool_hints(
+        self,
+        goal_text: str,
+        compiled_index: Optional[Dict[str, Any]] = None,
+    ) -> Optional[str]:
+        """
+        Generate qualitative tool hints for the planner via Thompson sampling.
+
+        Returns a short text block (0-3 lines) only when experience diverges
+        from what the tool catalog already communicates.  Returns None when
+        there is insufficient data or nothing non-obvious to say.
+
+        Uses Beta(1+successes, 1+failures) posteriors per tool, sampled
+        stochastically so under-explored tools still get tried.
+        """
+        if compiled_index is None:
+            compiled_index = self.build_task_tool_index()
+
+        # Gate: enough global data?
+        total_records = len(self.tool_model.get("training_records", []))
+        if total_records < self._MIN_TOTAL_RECORDS:
+            return None
+
+        entries = compiled_index.get("entries", [])
+        if not entries:
+            return None
+
+        # Embed goal and find relevant task clusters
+        try:
+            goal_emb = self.embed_text(goal_text)
+        except Exception:
+            return None
+
+        # Aggregate per-tool stats across similar tasks
+        # tool -> {success: int, failure: int, max_sim: float}
+        tool_evidence: Dict[str, Dict[str, Any]] = {}
+
+        for entry in entries:
+            sim = self.cosine_similarity(goal_emb, entry["embedding"])
+            if sim < self._SIMILARITY_THRESHOLD:
+                continue
+
+            for tool_name, stats in entry["tool_stats"].items():
+                if tool_name not in tool_evidence:
+                    tool_evidence[tool_name] = {"success": 0, "failure": 0, "max_sim": 0.0}
+                tool_evidence[tool_name]["success"] += stats["success"]
+                tool_evidence[tool_name]["failure"] += stats["failure"]
+                tool_evidence[tool_name]["max_sim"] = max(
+                    tool_evidence[tool_name]["max_sim"], sim
+                )
+
+        if not tool_evidence:
+            return None
+
+        # Thompson sample and classify each tool
+        hints = []
+        for tool_name, ev in tool_evidence.items():
+            total = ev["success"] + ev["failure"]
+            if total < self._MIN_TOOL_TRIALS:
+                continue
+
+            # Beta posterior: Beta(1 + success, 1 + failure)
+            alpha = 1.0 + ev["success"]
+            beta_param = 1.0 + ev["failure"]
+            sampled = random.betavariate(alpha, beta_param)
+            mean = alpha / (alpha + beta_param)
+
+            # Only emit a hint when experience is non-obvious
+            if mean < self._CAUTIONARY_THRESHOLD:
+                # Cautionary: tool has struggled on similar tasks
+                hints.append((sampled, tool_name, "cautionary", mean, total))
+            elif mean >= self._RELIABLE_THRESHOLD and total >= 5:
+                # Discovery: tool is proven but might not be the obvious pick
+                hints.append((sampled, tool_name, "reliable", mean, total))
+            # else: tool is in the unremarkable middle — say nothing
+
+        if not hints:
+            return None
+
+        # Sort by sampled value (stochastic ranking)
+        hints.sort(key=lambda h: h[0], reverse=True)
+        hints = hints[:self._MAX_HINTS]
+
+        # Format as qualitative text — no numbers exposed to the LLM
+        lines = []
+        for _, tool_name, category, mean, total in hints:
+            if category == "cautionary":
+                lines.append(f"- {tool_name}: has been unreliable for similar tasks — consider alternatives")
+            elif category == "reliable":
+                lines.append(f"- {tool_name}: has been effective for similar tasks")
+
+        if not lines:
+            return None
+
+        return "TOOL_MODEL_HINTS:\n" + "\n".join(lines)

@@ -7,8 +7,7 @@ llm_config:
   anthropic_model_path: "claude-sonnet-4-6"
   grobid: "http://localhost:8070/"
 
-alt_llm_config:
-  openrouter_model_path: "qwen/qwen3-235b-a22b-2507"
+
   
 setting: |
   Cognitive Workbench, a virtual modern 
