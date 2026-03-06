@@ -2507,12 +2507,13 @@ ALWAYS follow all formatting instructions exactly.
                             eval_target = new_bindings[oa_key]
                             break
                 if not eval_target:
-                    collection_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and rid.startswith("Collection_") and not str(k).startswith("_") and str(k) != "code_block_output"]
-                    note_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and rid.startswith("Note_") and not str(k).startswith("_") and str(k) != "code_block_output"]
-                    if collection_keys:
-                        eval_target = new_bindings[collection_keys[-1]]
-                    elif note_keys:
-                        eval_target = new_bindings[note_keys[-1]]
+                    # Use last resource binding — code blocks execute sequentially so
+                    # the last binding is typically the final product.
+                    resource_keys = [k for k, rid in new_bindings.items()
+                                     if isinstance(rid, str) and (rid.startswith("Note_") or rid.startswith("Collection_"))
+                                     and not str(k).startswith("_") and str(k) != "code_block_output"]
+                    if resource_keys:
+                        eval_target = new_bindings[resource_keys[-1]]
                     else:
                         last_key = list(new_bindings.keys())[-1]
                         eval_target = new_bindings[last_key]
@@ -3529,12 +3530,13 @@ ALWAYS follow all formatting instructions exactly.
                         eval_target = new_bindings[oa_key]
                         break
             if not eval_target:
-                collection_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and rid.startswith("Collection_") and not str(k).startswith("_") and str(k) != "code_block_output"]
-                note_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and rid.startswith("Note_") and not str(k).startswith("_") and str(k) != "code_block_output"]
-                if collection_keys:
-                    eval_target = new_bindings[collection_keys[-1]]
-                elif note_keys:
-                    eval_target = new_bindings[note_keys[-1]]
+                # Use last resource binding — code blocks execute sequentially so
+                # the last binding is typically the final product.
+                resource_keys = [k for k, rid in new_bindings.items()
+                                 if isinstance(rid, str) and (rid.startswith("Note_") or rid.startswith("Collection_"))
+                                 and not str(k).startswith("_") and str(k) != "code_block_output"]
+                if resource_keys:
+                    eval_target = new_bindings[resource_keys[-1]]
                 else:
                     last_key = list(new_bindings.keys())[-1]
                     eval_target = new_bindings[last_key]
