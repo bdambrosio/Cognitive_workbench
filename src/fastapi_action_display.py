@@ -55,29 +55,14 @@ class ActionTracer:
     
     def __init__(self, scenario_name: str = None):
         self.scenario_name = scenario_name or "unknown"
-        self.trace_file = None
         self.start_time = datetime.now()
-        self._init_trace_file()
-    
-    def _init_trace_file(self):
-        """Initialize trace file with header."""
-        trace_dir = Path('logs')
-        trace_dir.mkdir(exist_ok=True)
-        
-        trace_path = trace_dir / f"action_trace_{self.scenario_name}.md"
-        self.trace_file = open(trace_path, 'w')
-        
-        # Write header
-        self.trace_file.write(f"# Action Trace: {self.scenario_name}\n")
-        self.trace_file.write(f"Started: {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-        self.trace_file.flush()
-        
-        logger.info(f"Action trace initialized: {trace_path}")
+        self._trace_lines = [
+            f"# Action Trace: {self.scenario_name}\n",
+            f"Started: {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}\n",
+        ]
     
     def log_action(self, action_data: dict, character_name: str):
-        """Log an action to the trace file."""
-        if not self.trace_file:
-            return
+        """Log an action to the in-memory trace."""
         
         try:
             # Extract timestamp (HH:MM:SS format)
@@ -158,18 +143,19 @@ class ActionTracer:
                 logger.debug(f"Skipping empty action entry: {line}")
                 return
             
-            # Write to file
-            self.trace_file.write(line + '\n')
-            self.trace_file.flush()
+            self._trace_lines.append(line)
             
         except Exception as e:
             logger.error(f"Error logging action to trace: {e}")
     
+    def export_to_file(self, path: Path):
+        """Write the in-memory trace to a file."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('\n'.join(self._trace_lines) + '\n')
+
     def close(self):
-        """Close the trace file."""
-        if self.trace_file:
-            self.trace_file.close()
-            self.trace_file = None
+        """No-op, kept for API compatibility."""
+        pass
 
 
 class FastAPIActionDisplayNode:
@@ -953,6 +939,17 @@ class FastAPIActionDisplayNode:
                 logger.error(f"Error in rename_goal: {e}")
                 return {"success": False, "message": str(e)}
 
+        @self.app.post("/api/goal_text_update/{character}")
+        async def goal_text_update(character: str, data: dict = Body(...)):
+            """Update the goal_text of a scheduled goal."""
+            try:
+                payload = json.dumps(data).encode()
+                self.session.put(f"cognitive/{character}/control/goal_text_update", payload)
+                return {"success": True}
+            except Exception as e:
+                logger.error(f"Error in goal_text_update: {e}")
+                return {"success": False, "message": str(e)}
+
         @self.app.post("/api/goal_cache/{character}")
         async def goal_cache(character: str, data: dict = Body(...)):
             """Manage scheduled goal cache operations."""
@@ -1480,30 +1477,21 @@ Generated: {generated_at}
                 if not vault_path.exists():
                     return {"success": False, "message": f"Obsidian vault path does not exist: {self.obsidian_vault}"}
                 
-                # Check if trace file exists
-                if not self.tracer.trace_file:
-                    return {"success": False, "message": "No trace file is currently open"}
-                
-                # Flush the trace file to ensure all data is written
-                self.tracer.trace_file.flush()
-                
+                # Check if trace has content
+                if not self.tracer._trace_lines:
+                    return {"success": False, "message": "No trace data available"}
+
                 # Create target directory
                 target_dir = vault_path / "Cognitive_Workbench_Traces"
                 target_dir.mkdir(exist_ok=True)
-                
+
                 # Generate timestamped filename
                 timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
                 target_filename = f"action_trace_{self.scenario_name}_{timestamp}.md"
                 target_path = target_dir / target_filename
-                
-                # Get source trace file path
-                source_path = Path('logs') / f"action_trace_{self.scenario_name}.md"
-                
-                if not source_path.exists():
-                    return {"success": False, "message": f"Source trace file not found: {source_path}"}
-                
-                # Copy the file
-                shutil.copy2(source_path, target_path)
+
+                # Write trace to target
+                self.tracer.export_to_file(target_path)
                 
                 logger.info(f"📓 Exported trace to Obsidian: {target_path}")
                 
@@ -4571,8 +4559,10 @@ Generated: {generated_at}
                     return;
                 }
                 const escapedChar = character.replace(/'/g, "\\'");
+                window._goalTextCache = {};
                 let html = '';
                 goals.forEach((g, i) => {
+                    window._goalTextCache[g.goal_id] = g.goal_text || '';
                     const status = g.status || 'ready';
                     const taskId = `goal-acc-${i}`;
                     const hasCache = Array.isArray(g.cached_plan_actions) && g.cached_plan_actions.length > 0;
@@ -4588,7 +4578,7 @@ Generated: {generated_at}
                                     <span style="margin-left: 6px; font-size: 10px; padding: 2px 6px; border-radius: 3px; background: #404040;">${status}</span>
                                     <span style="margin-left: 4px; color: #888; font-size: 11px;">${escapeHtml(g.goal_id || '')}</span>
                                     <div style="margin-top: 3px; color: #a8b3c7; font-size: 10px;">${cacheLabel}</div>
-                                    <div style="margin-top: 3px; color: #8f9bb3; font-size: 10px;">${escapeHtml((g.goal_text || '').slice(0, 140))}${(g.goal_text || '').length > 140 ? '...' : ''}</div>
+                                    <div onclick="event.stopPropagation(); openGoalTextEditor('${escapedChar}', '${g.goal_id}')" style="margin-top: 3px; color: #8f9bb3; font-size: 10px; cursor: pointer;" title="Click to edit goal text">${escapeHtml((g.goal_text || '').slice(0, 140))}${(g.goal_text || '').length > 140 ? '...' : ''}</div>
                                 </div>
                                 <div onclick="event.stopPropagation();" style="display: flex; flex-direction: column; align-items: stretch; gap: 3px; min-width: 90px;">
                                     <select onchange="event.stopPropagation(); onScheduleModeChange('${escapedChar}', '${g.goal_id || ''}', this)" style="background: #2a2a2a; color: #ccc; border: 1px solid #555; padding: 3px 4px; border-radius: 3px; font-size: 11px; cursor: pointer; width: 100%;">
@@ -4748,6 +4738,59 @@ Generated: {generated_at}
                 loadTasksList(character);
             } catch (e) {
                 console.error('setGoalName:', e);
+            }
+        }
+
+        let _goalEditorState = {};
+
+        function openGoalTextEditor(character, goalId) {
+            _goalEditorState = { character, goalId };
+            const goalText = (window._goalTextCache && window._goalTextCache[goalId]) || '';
+
+            let modal = document.getElementById('goalTextModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'goalTextModal';
+                modal.innerHTML = `
+                    <div id="goalTextModalBackdrop" onclick="closeGoalTextEditor()" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9998;"></div>
+                    <div id="goalTextModalDialog" style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:600px; max-width:90vw; max-height:80vh; background:#1e1e1e; border:1px solid #555; border-radius:8px; z-index:9999; display:flex; flex-direction:column; resize:both; overflow:auto; min-width:300px; min-height:200px;">
+                        <div style="padding:10px 14px; border-bottom:1px solid #404040; display:flex; justify-content:space-between; align-items:center;">
+                            <span style="color:#00d4ff; font-size:13px; font-weight:bold;">Edit Goal Text</span>
+                            <button onclick="closeGoalTextEditor()" style="background:none; border:none; color:#888; font-size:18px; cursor:pointer; padding:0 4px;">&times;</button>
+                        </div>
+                        <textarea id="goalTextModalArea" style="flex:1; margin:10px 14px; background:#2a2a2a; color:#ddd; border:1px solid #555; padding:10px; border-radius:4px; font-size:13px; font-family:monospace; line-height:1.5; resize:none; min-height:200px;"></textarea>
+                        <div style="padding:8px 14px; border-top:1px solid #404040; display:flex; justify-content:flex-end; gap:8px;">
+                            <button onclick="closeGoalTextEditor()" style="background:#555; color:#ccc; border:none; padding:6px 16px; border-radius:4px; font-size:12px; cursor:pointer;">Cancel</button>
+                            <button onclick="saveGoalTextFromModal()" style="background:#2ecc71; color:#fff; border:none; padding:6px 16px; border-radius:4px; font-size:12px; cursor:pointer;">Save</button>
+                        </div>
+                    </div>`;
+                document.body.appendChild(modal);
+            }
+            document.getElementById('goalTextModalArea').value = goalText;
+            modal.style.display = 'block';
+            document.getElementById('goalTextModalArea').focus();
+        }
+
+        function closeGoalTextEditor() {
+            const modal = document.getElementById('goalTextModal');
+            if (modal) modal.style.display = 'none';
+            _goalEditorState = {};
+        }
+
+        async function saveGoalTextFromModal() {
+            const { character, goalId } = _goalEditorState;
+            const textarea = document.getElementById('goalTextModalArea');
+            if (!character || !goalId || !textarea) return;
+            try {
+                await fetch(`/api/goal_text_update/${character}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ goal_id: goalId, goal_text: textarea.value })
+                });
+                closeGoalTextEditor();
+                loadTasksList(character);
+            } catch (e) {
+                console.error('saveGoalText:', e);
             }
         }
 

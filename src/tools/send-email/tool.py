@@ -12,13 +12,15 @@ Zero pip dependencies — stdlib only (smtplib, email, ssl).
 """
 
 import email.utils
+import hashlib
 import logging
 import os
 import smtplib
 import ssl
+import time
 from datetime import datetime, timezone
 from email.mime.text import MIMEText
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from infospace_executor import InfospaceExecutor
 
@@ -30,6 +32,35 @@ logger = logging.getLogger(__name__)
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
 MAX_BODY_CHARS = 100_000
+DEDUP_WINDOW_SECS = 600  # 10 minutes
+
+# ---------------------------------------------------------------------------
+# Dedup cache: (content_hash, key_args_hash) → (timestamp, cached_result)
+# ---------------------------------------------------------------------------
+_dedup_cache: Dict[Tuple[str, str], Tuple[float, Dict]] = {}
+
+
+def _dedup_key(body: str, to: str, subject: str) -> Tuple[str, str]:
+    content_hash = hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]
+    args_hash = hashlib.sha256(f"{to}|{subject}".encode("utf-8")).hexdigest()[:16]
+    return (content_hash, args_hash)
+
+
+def _check_dedup(body: str, to: str, subject: str) -> Optional[Dict]:
+    """Return cached result if an identical send happened within the dedup window."""
+    key = _dedup_key(body, to, subject)
+    entry = _dedup_cache.get(key)
+    if entry:
+        ts, cached_result = entry
+        if time.monotonic() - ts < DEDUP_WINDOW_SECS:
+            return cached_result
+        del _dedup_cache[key]
+    return None
+
+
+def _record_dedup(body: str, to: str, subject: str, result: Dict):
+    key = _dedup_key(body, to, subject)
+    _dedup_cache[key] = (time.monotonic(), result)
 
 # ---------------------------------------------------------------------------
 # Uniform return helpers (same interface as check-email)
@@ -167,6 +198,14 @@ def tool(input_value, runtime=None, **kwargs):
 
     logger.info(f"send-email: to={to_addrs} subject={subject!r}")
 
+    # Dedup check — reject identical sends within 10-minute window
+    to_display_dedup = ', '.join(to_addrs)
+    cached = _check_dedup(body, to_display_dedup, subject)
+    if cached:
+        logger.warning(f"send-email: dedup hit — identical email to {to_display_dedup} subject={subject!r} "
+                       f"sent within last {DEDUP_WINDOW_SECS}s, returning cached result")
+        return cached
+
     # Send
     try:
         ctx = ssl.create_default_context()
@@ -206,10 +245,14 @@ def tool(input_value, runtime=None, **kwargs):
                            tool_metadata=metadata)
     if not note_id:
         # Email was sent but we couldn't create the confirmation Note
-        return _success(executor, confirmation_text, None, extra=metadata)
+        result = _success(executor, confirmation_text, None, extra=metadata)
+        _record_dedup(body, to_display, subject, result)
+        return result
 
     logger.info(f"send-email: confirmation Note {note_id}")
-    return _success(executor, confirmation_text, note_id, extra=metadata)
+    result = _success(executor, confirmation_text, note_id, extra=metadata)
+    _record_dedup(body, to_display, subject, result)
+    return result
 
 
 # ---------------------------------------------------------------------------

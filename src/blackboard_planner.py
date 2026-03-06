@@ -503,7 +503,8 @@ class BlackboardPlanner(IncrementalPlanner):
             
             # Attach plan_actions list to executor for tracking
             self.executor._plan_actions = []
-            
+            self.executor._side_effect_cache = {}  # Reset dedup cache per planner session
+
             # Extract context components
             character_context = ""
             recent_context = ""

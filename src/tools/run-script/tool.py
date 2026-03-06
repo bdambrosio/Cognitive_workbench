@@ -47,14 +47,19 @@ def tool(input_value=None, runtime=None, **kwargs):
     if not script_path.exists():
         return _fail(executor, f"script not found: {script_path}")
 
+    log_dir = _SRC_DIR / "logs"
+    log_dir.mkdir(exist_ok=True)
+    log_path = log_dir / f"run-script-{script_name}.log"
     try:
+        log_file = open(log_path, "a")
         subprocess.Popen(
             ["bash", str(script_path)],
             cwd=str(_SCRIPTS_DIR),
-            stdout=f"/var/log/run-script-{script_name}.log",
-            stderr=f"/var/log/run-script-{script_name}.log",
+            stdout=log_file,
+            stderr=log_file,
             start_new_session=True,
         )
+        log_file.close()
     except Exception as e:
         logger.error(f"run-script failed to start: {e}")
         return _fail(executor, str(e), extra={"script": str(script_path)})

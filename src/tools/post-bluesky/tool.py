@@ -12,14 +12,16 @@ Env vars:
 Zero pip dependencies — stdlib only (urllib, json, ssl).
 """
 
+import hashlib
 import json
 import logging
 import os
 import ssl
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from infospace_executor import InfospaceExecutor
 
@@ -30,6 +32,33 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 BSKY_API = "https://bsky.social/xrpc"
 MAX_POST_GRAPHEMES = 300
+DEDUP_WINDOW_SECS = 600  # 10 minutes
+
+# ---------------------------------------------------------------------------
+# Dedup cache: content_hash → (timestamp, cached_result)
+# ---------------------------------------------------------------------------
+_dedup_cache: Dict[str, Tuple[float, Dict]] = {}
+
+
+def _dedup_key(body: str) -> str:
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]
+
+
+def _check_dedup(body: str) -> Optional[Dict]:
+    """Return cached result if an identical post happened within the dedup window."""
+    key = _dedup_key(body)
+    entry = _dedup_cache.get(key)
+    if entry:
+        ts, cached_result = entry
+        if time.monotonic() - ts < DEDUP_WINDOW_SECS:
+            return cached_result
+        del _dedup_cache[key]
+    return None
+
+
+def _record_dedup(body: str, result: Dict):
+    key = _dedup_key(body)
+    _dedup_cache[key] = (time.monotonic(), result)
 
 # ---------------------------------------------------------------------------
 # Uniform return helpers
@@ -136,9 +165,48 @@ def tool(input_value, runtime=None, **kwargs):
     if not body:
         return _fail(executor, 'post body required (use target or value)')
 
-    # Truncate to Bluesky grapheme limit
-    if len(body) > MAX_POST_GRAPHEMES:
-        body = body[:MAX_POST_GRAPHEMES - 1] + '\u2026'
+    # Append tags as hashtags
+    tags = kwargs.get("tags") or []
+    if isinstance(tags, str):
+        tags = [t.strip() for t in tags.split(",") if t.strip()]
+    tag_suffix = ""
+    if tags:
+        tag_suffix = "\n\n" + " ".join(f"#{t.lstrip('#')}" for t in tags)
+
+    # Truncate body to fit within 300 graphemes including tags
+    max_body = 294 - len(tag_suffix)
+    if len(body) > max_body:
+        body = body[:max_body] + '...'
+
+    # Build facets for hashtag rich-text linking
+    facets = []
+    full_text = body + tag_suffix
+    text_bytes = full_text.encode("utf-8")
+    for tag in tags:
+        tag_clean = tag.lstrip("#")
+        hashtag = f"#{tag_clean}"
+        # Find byte position of this hashtag in the full text
+        hashtag_bytes = hashtag.encode("utf-8")
+        byte_start = text_bytes.find(hashtag_bytes)
+        if byte_start >= 0:
+            facets.append({
+                "index": {
+                    "byteStart": byte_start,
+                    "byteEnd": byte_start + len(hashtag_bytes),
+                },
+                "features": [{
+                    "$type": "app.bsky.richtext.facet#tag",
+                    "tag": tag_clean,
+                }],
+            })
+    body = full_text
+
+    # Dedup check — reject identical posts within 10-minute window
+    cached = _check_dedup(body)
+    if cached:
+        logger.warning(f"post-bluesky: dedup hit — identical post sent within last {DEDUP_WINDOW_SECS}s, "
+                       f"returning cached result")
+        return cached
 
     # Authenticate
     try:
@@ -172,6 +240,8 @@ def tool(input_value, runtime=None, **kwargs):
         "text": body,
         "createdAt": now,
     }
+    if facets:
+        post_record["facets"] = facets
 
     logger.info(f"post-bluesky: posting as {handle} ({len(body)} chars)")
 
@@ -209,10 +279,14 @@ def tool(input_value, runtime=None, **kwargs):
     note_id = _create_note(confirmation_text, agent_name, resource_manager,
                            tool_metadata=metadata)
     if not note_id:
-        return _success(executor, confirmation_text, None, extra=metadata)
+        result = _success(executor, confirmation_text, None, extra=metadata)
+        _record_dedup(body, result)
+        return result
 
     logger.info(f"post-bluesky: posted uri={post_uri} cid={post_cid}")
-    return _success(executor, confirmation_text, note_id, extra=metadata)
+    result = _success(executor, confirmation_text, note_id, extra=metadata)
+    _record_dedup(body, result)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -234,8 +308,8 @@ if __name__ == "__main__":
         sys.exit(1)
 
     text = sys.argv[1]
-    if len(text) > MAX_POST_GRAPHEMES:
-        text = text[:MAX_POST_GRAPHEMES - 1] + '\u2026'
+    if len(text) > 294:
+        text = text[:294] + '...'
 
     print(f"Posting as {handle}")
     print(f"Text: {text}")

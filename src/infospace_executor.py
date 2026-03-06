@@ -818,7 +818,39 @@ class InfospaceExecutor:
         # Track action in plan_actions
         if hasattr(self, '_plan_actions'):
             self._plan_actions.append(action.copy())
-        
+
+        # Dedup guard for side-effectful tools within a single planner session.
+        # If an identical send-email or post-bluesky was already executed successfully
+        # in this session, return the cached result instead of re-executing.
+        _SIDE_EFFECT_TOOLS = {'send-email', 'post-bluesky'}
+        action_type = action.get('type', '')
+        if action_type in _SIDE_EFFECT_TOOLS:
+            if not hasattr(self, '_side_effect_cache'):
+                self._side_effect_cache = {}
+            # Build dedup key from action content (resolved target text + key params)
+            _dedup_parts = [action_type]
+            # Resolve target/value to actual text for content-based dedup
+            for field in ('target', 'value', 'to', 'subject'):
+                val = action.get(field, '')
+                if isinstance(val, str) and val.startswith('$'):
+                    # Resolve $var → resource ID → Note content
+                    rid = self.plan_bindings_flat.get(val.lstrip('$'))
+                    if rid and self.resource_manager and isinstance(rid, str) and rid.startswith('Note_'):
+                        try:
+                            note = self.resource_manager.get_resource(rid)
+                            if note and note.get('content'):
+                                val = str(note['content'])[:500]
+                        except Exception:
+                            pass
+                if val:
+                    _dedup_parts.append(str(val))
+            import hashlib as _hl
+            _dedup_key = _hl.sha256('|'.join(_dedup_parts).encode('utf-8')).hexdigest()[:24]
+            cached = self._side_effect_cache.get(_dedup_key)
+            if cached:
+                logger.warning(f"Dedup: skipping duplicate {action_type} within planner session (returning cached result)")
+                return cached
+
         # Execute the action
         result = self.execute_action(action)
         
@@ -830,7 +862,11 @@ class InfospaceExecutor:
                 reason=result.get('reason'),
                 extra=result.get('extra')
             )
-        
+
+        # Cache successful side-effect results for dedup
+        if action_type in _SIDE_EFFECT_TOOLS and result.get('status') == 'success' and hasattr(self, '_side_effect_cache'):
+            self._side_effect_cache[_dedup_key] = result
+
         # Create ActionRecord + publish to UI
         if self.executive_node:
             action_type = action.get('type', 'unknown')
