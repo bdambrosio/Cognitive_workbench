@@ -1015,6 +1015,10 @@ class ZenohExecutiveNode:
             f"cognitive/{character_name}/control/goal_rename",
             self._handle_goal_rename
         )
+        self.control_goal_text_update_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/goal_text_update",
+            self._handle_goal_text_update
+        )
         self.control_goal_cache_subscriber = self.session.declare_subscriber(
             f"cognitive/{character_name}/control/goal_cache",
             self._handle_goal_cache
@@ -1521,23 +1525,27 @@ class ZenohExecutiveNode:
 
     def _publish_current_plan(self):
         """Publish current plan to the current_plan topic for UI display."""
-        if not isinstance(self.current_plan, dict):
-            self.current_plan = {}
+        # current_plan may be a list (plan_actions from generate_plan) or a dict; normalize for publishing
+        plan_for_publish = self.current_plan
+        if isinstance(plan_for_publish, list):
+            plan_for_publish = {'plan': plan_for_publish}
+        elif not isinstance(plan_for_publish, dict):
+            plan_for_publish = {}
         try:
             current_plan_data = {
-                'current_plan': json.dumps(self.current_plan, indent=2) if self.current_plan else '',
-                'plan_data': self.current_plan,
+                'current_plan': json.dumps(plan_for_publish, indent=2) if plan_for_publish else '',
+                'plan_data': plan_for_publish,
                 'timestamp': datetime.now().isoformat(),
                 'character': self.character_name
             }
-            
+
             self.current_plan_publisher.put(json.dumps(current_plan_data))
             logger.info(f'📋 Published current plan for {self.character_name}')
-            
+
             # Log plan_bindings if they exist
             if self.infospace_executor and self.infospace_executor.plan_bindings:
                 logger.info(f'🔗 {self.character_name} current plan_bindings: {self.infospace_executor.plan_bindings}')
-            
+
             # Publish plan_result for external consumers
             self._publish_plan_result()
             
@@ -1624,7 +1632,9 @@ class ZenohExecutiveNode:
         interrupted_final = final_thoughts_clean == "Interrupted by user."
 
         # Save fallback response to conversation only when no explicit say action occurred.
-        if (not last_say) and (not interrupted_final) and final_thoughts_clean and len(final_thoughts_clean) >= 20 and final_thoughts_clean.replace(' ', '').replace('.', '').replace(',', '').replace('!', '').replace('?', '').strip():
+        # Skip for scheduled goal executions — they are not user conversations.
+        is_scheduled_goal = bool(self._active_scheduled_goal_id)
+        if (not is_scheduled_goal) and (not last_say) and (not interrupted_final) and final_thoughts_clean and len(final_thoughts_clean) >= 20 and final_thoughts_clean.replace(' ', '').replace('.', '').replace(',', '').replace('!', '').replace('?', '').strip():
             # Fall back to FINAL_ANSWER if no actual say action
             logger.debug(f'Using FINAL_ANSWER for conversation (no say action found): {final_thoughts_clean[:50]}...')
             self.conversation_store.record_outgoing("User", final_thoughts_clean, act_type="response")
@@ -1778,41 +1788,109 @@ class ZenohExecutiveNode:
         return "\n\n".join(parts)
 
     def _update_situation_note(self, goal_text: str, plan_result: dict):
-        """Update the living context (_situation) note after goal completion."""
+        """Update the living context (_situation) note after goal completion.
+
+        The note is primarily data-driven (resource inventory, goal outcomes).
+        A light LLM pass extracts any cross-goal learnings from the completed goal
+        and prunes stale entries from the learnings section.
+        """
         if self.benchmark_mode or not self.infospace_executor:
             return
         try:
-            current = self.situation_context or "(No prior situation note — this is the first entry.)"
             status = plan_result.get('status', 'unknown')
-            summary = (plan_result.get('final_thoughts') or '')[:500]
+            summary = (plan_result.get('final_thoughts') or '')[:400]
 
-            char_desc = (self.character_config.get('character') or self.character_name)[:200]
-            prompt_system = (
-                f"You maintain a concise living-context note for {self.character_name}. "
-                f"Character: {char_desc}\n"
-                "The note tracks: active projects and their states, what is blocked, recent decisions, "
-                "and what to do next. Keep it under 600 words. Drop anything no longer relevant. "
-                "Output ONLY the updated note text, no preamble."
-            )
-            prompt_user = (
-                f"## CURRENT SITUATION NOTE\n{current}\n\n"
-                f"## JUST COMPLETED\nGoal: {goal_text}\nOutcome: {status}\nSummary: {summary}\n\n"
-                "Write the updated situation note."
-            )
+            # --- Section 1: Persistent resource inventory ---
+            resource_lines = []
+            rm = self.resource_manager
+            if rm:
+                for name, rid in sorted(rm.named_notes.items()):
+                    if name.startswith('_'):
+                        continue  # skip system internals
+                    res = rm.get_resource(rid)
+                    if not res:
+                        continue
+                    props = res.get('properties', {})
+                    if not props.get('persistent', False):
+                        continue
+                    updated = props.get('updated', '')[:10]
+                    label = f"  {rid} \"{name}\""
+                    if updated:
+                        label += f" (updated {updated})"
+                    resource_lines.append(label)
+                for name, cid in sorted(rm.named_collections.items()):
+                    if name.startswith('_'):
+                        continue
+                    res = rm.get_resource(cid)
+                    if not res:
+                        continue
+                    props = res.get('properties', {})
+                    if not props.get('persistent', False):
+                        continue
+                    count = props.get('item_count', 0)
+                    resource_lines.append(f"  {cid} \"{name}\" ({count} items)")
 
-            response = self.infospace_executor.llm_generate(
-                [prompt_system, prompt_user], max_tokens=1200, temperature=0.3
-            )
-            if not response.success or not response.text or not response.text.strip():
-                logger.warning(f'Situation note update LLM call failed: {getattr(response, "error", "empty")}')
-                return
+            # --- Section 2: Recent goal outcomes ---
+            goal_lines = []
+            try:
+                scheduled = self._all_scheduled_goals()
+                recent = [g for g in scheduled if g.get('status') in ('completed', 'failed')]
+                recent.sort(key=lambda g: g.get('updated', ''), reverse=True)
+                for g in recent[:5]:
+                    name = g.get('name') or g.get('goal_text', '?')[:60]
+                    product = g.get('primary_product', '')
+                    g_status = g.get('status', '?')
+                    line = f"  {name} [{g_status}]"
+                    if product:
+                        line += f" → {product}"
+                    goal_lines.append(line)
+            except Exception:
+                pass
 
-            new_content = response.text.strip()
+            # --- Section 3: Learnings (LLM-maintained) ---
+            # Extract existing learnings from current note
+            current = self.situation_context or ""
+            existing_learnings = ""
+            marker = "## Learnings"
+            if marker in current:
+                existing_learnings = current[current.index(marker) + len(marker):].strip()
 
-            # Backup current note to _situation_prev before overwriting
+            # LLM pass: extract new learnings from the just-completed goal, prune stale ones
+            new_learnings = existing_learnings
+            if summary and len(summary) > 20:
+                prompt = (
+                    "You maintain a short list of cross-goal learnings for a planning agent. "
+                    "Each entry is a one-line fact useful across future goals "
+                    "(e.g., user preferences, working data sources, useful resource names, "
+                    "things that failed and shouldn't be retried the same way).\n\n"
+                    "Do NOT include: goal status, project narratives, what to do next, "
+                    "or anything already tracked by world_model/tool_model.\n"
+                    "Keep max 10 entries. Drop stale or redundant ones.\n"
+                    "Output ONLY the bullet list (- item), or 'none' if nothing to retain.\n\n"
+                    f"## EXISTING LEARNINGS\n{existing_learnings or '(none yet)'}\n\n"
+                    f"## JUST COMPLETED\nGoal: {goal_text}\nOutcome: {status}\n"
+                    f"Summary: {summary}\n\n"
+                    "Write the updated learnings list."
+                )
+                response = self.infospace_executor.llm_generate(
+                    prompt, max_tokens=400, temperature=0.2
+                )
+                if response.success and response.text and response.text.strip().lower() != 'none':
+                    new_learnings = response.text.strip()
+
+            # --- Assemble note ---
+            parts = []
+            if resource_lines:
+                parts.append("## Persistent Resources\n" + "\n".join(resource_lines))
+            if goal_lines:
+                parts.append("## Recent Goal Outcomes\n" + "\n".join(goal_lines))
+            if new_learnings:
+                parts.append(f"## Learnings\n{new_learnings}")
+
+            new_content = "\n\n".join(parts) if parts else "(no situation data)"
+
+            # Backup and write
             self._write_named_note('_situation_prev', self.situation_context or '')
-
-            # Write updated note
             self._write_named_note('_situation', new_content)
             self.situation_context = new_content
             logger.info(f'✓ Updated situation note ({len(new_content)} chars)')
@@ -1820,37 +1898,53 @@ class ZenohExecutiveNode:
             logger.warning(f'Error updating situation note: {e}')
 
     def _consolidate_situation_note(self):
-        """Final situation note consolidation at shutdown."""
+        """Final situation note consolidation at shutdown.
+
+        Data sections (resources, goal outcomes) are rebuilt on next goal,
+        so consolidation only needs to prune the learnings section.
+        """
         if self.benchmark_mode or not self.infospace_executor:
             return
         if self.plan_counter == 0 and not self.situation_context:
             logger.info('No goals executed and no situation note — skipping consolidation')
             return
         try:
-            current = self._build_situation_context() or "(empty)"
-            char_desc = (self.character_config.get('character') or self.character_name)[:200]
-            prompt_system = (
-                f"You maintain a concise living-context note for {self.character_name}. "
-                f"Character: {char_desc}\n"
-                "A session is ending. Consolidate the note for next startup. "
-                "Keep it under 600 words. Drop stale items. Output ONLY the note text."
-            )
-            prompt_user = (
-                f"## CURRENT SITUATION NOTE\n{current}\n\n"
-                f"Session summary: {self.plan_counter} goal(s) attempted this session.\n"
-                "Write the consolidated situation note for next session."
+            current = self.situation_context or ""
+            marker = "## Learnings"
+            if marker not in current:
+                logger.info('No learnings section to consolidate')
+                return
+
+            learnings = current[current.index(marker) + len(marker):].strip()
+            if not learnings:
+                return
+
+            prompt = (
+                "You maintain a short list of cross-goal learnings for a planning agent. "
+                "A session is ending. Prune entries that are stale, redundant, or too specific "
+                "to a single past goal. Keep only durable, reusable facts.\n"
+                "Output ONLY the bullet list (- item), or 'none' if nothing worth keeping.\n\n"
+                f"## CURRENT LEARNINGS\n{learnings}\n\n"
+                f"Session: {self.plan_counter} goal(s) attempted.\n"
+                "Write the pruned learnings list."
             )
             response = self.infospace_executor.llm_generate(
-                [prompt_system, prompt_user], max_tokens=1200, temperature=0.3
+                prompt, max_tokens=400, temperature=0.2
             )
-            if response.success and response.text and response.text.strip():
-                new_content = response.text.strip()
+            if response.success and response.text:
+                pruned = response.text.strip()
+                if pruned.lower() == 'none':
+                    pruned = ""
+                # Rebuild note with pruned learnings — data sections will refresh on next goal
+                new_content = current[:current.index(marker)].rstrip()
+                if pruned:
+                    new_content += f"\n\n## Learnings\n{pruned}"
                 self._write_named_note('_situation_prev', self.situation_context or '')
                 self._write_named_note('_situation', new_content)
                 self.situation_context = new_content
                 logger.info(f'✓ Consolidated situation note at shutdown ({len(new_content)} chars)')
             else:
-                logger.warning(f'Situation consolidation LLM call failed, keeping existing note')
+                logger.warning('Situation consolidation LLM call failed, keeping existing note')
         except Exception as e:
             logger.warning(f'Error consolidating situation note at shutdown: {e}')
 
@@ -1932,6 +2026,7 @@ class ZenohExecutiveNode:
             "cached_plan_actions": [],
             "is_running": False,
             "last_result": "",
+            "primary_product": "",
             "name_customized": False,
         }
 
@@ -1952,6 +2047,7 @@ class ZenohExecutiveNode:
             "cached_plan_actions": [],
             "is_running": False,
             "last_result": "",
+            "primary_product": "",
             "name_customized": False,
         }.items():
             if key not in goal:
@@ -2052,15 +2148,17 @@ class ZenohExecutiveNode:
         self._save_scheduled_goal(goal)
         return goal
 
-    def _set_scheduled_goal_result(self, goal_id: str, result: Dict[str, Any], used_cache: bool = False):
+    def _set_scheduled_goal_result(self, goal_id: str, result: Dict[str, Any], used_cache: bool = False, pre_resource_ids: set = None):
         goal = self._get_scheduled_goal(goal_id)
         if not goal:
             return
         success = bool(result and result.get("success"))
+        primary_product = (result.get("primary_product") if isinstance(result, dict) else "") or ""
         updates: Dict[str, Any] = {
             "is_running": False,
             "status": "completed" if success else "failed",
             "last_result": (result.get("response") if isinstance(result, dict) else "") or (result.get("error") if isinstance(result, dict) else "") or "",
+            "primary_product": primary_product,
         }
         if not used_cache:
             plan_actions = result.get("plan") if isinstance(result, dict) else None
@@ -2080,6 +2178,12 @@ class ZenohExecutiveNode:
             self._active_scheduled_goal_id = None
         if hasattr(self, "task_scheduler"):
             self.task_scheduler.notify_step_completed(goal_id)
+        # Clean up transient resources created during the goal
+        if pre_resource_ids is not None and self.resource_manager:
+            now_ids = set(self.resource_manager.resource_registry.keys())
+            created_ids = now_ids - pre_resource_ids
+            keep_ids = {primary_product} if primary_product else set()
+            self._cleanup_transient_resources(created_ids, keep_ids, label=goal_id)
         self._publish_execution_state()
 
     def _handle_goal_proceed(self, goal_id: str = None, source: str = "user"):
@@ -2097,13 +2201,14 @@ class ZenohExecutiveNode:
             goal_id=goal_id,
             goal_name=goal.get("name", "") or goal.get("goal_text", "")[:80],
         )
+        pre_resource_ids = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
         result: Dict[str, Any] = {}
         try:
             # Always replan on proceed - cached plans have stale Note IDs from the prior run
             result = self.parse_and_set_goal("", goal.get("goal_text", "")) or {}
         except Exception as e:
             result = {"success": False, "error": str(e)}
-        self._set_scheduled_goal_result(goal_id, result, used_cache=False)
+        self._set_scheduled_goal_result(goal_id, result, used_cache=False, pre_resource_ids=pre_resource_ids)
         if source != "scheduler":
             status = "completed" if result.get("success") else "failed"
             self._say_to_user(f"Goal '{goal.get('name') or goal_id}' {status}.")
@@ -2400,6 +2505,21 @@ class ZenohExecutiveNode:
         except Exception as e:
             logger.error(f"Error in goal_rename handler: {e}")
 
+    def _handle_goal_text_update(self, sample):
+        """Zenoh callback for updating a scheduled goal's goal_text."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            goal_id = data.get("goal_id")
+            goal_text = (data.get("goal_text") or "").strip()
+            if not goal_id or not goal_text:
+                logger.warning(f"Invalid goal_text_update payload: {data}")
+                return
+            # Update goal_text and clear cached plan (text changed, cache is stale)
+            self._update_scheduled_goal(goal_id, goal_text=goal_text, cached_plan_actions=[], status="ready")
+            logger.info(f"Goal {goal_id} text updated ({len(goal_text)} chars)")
+        except Exception as e:
+            logger.error(f"Error in goal_text_update handler: {e}")
+
     def _handle_goal_cache(self, sample):
         """Zenoh callback for scheduled goal cache operations."""
         try:
@@ -2653,7 +2773,7 @@ class ZenohExecutiveNode:
         if not task:
             return
         if task.get("status") == TASK_COMPLETED:
-            self._cleanup_completed_task_resources(task_id)
+            self._cleanup_completed_task(task_id)
             self._say_to_user(
                 f"Task \"{task['name']}\" is complete!\n"
                 f"Last step outcome: {outcome or 'done'}"
@@ -2700,35 +2820,39 @@ class ZenohExecutiveNode:
             summaries.append({"id": rid, "type": type_name, "name": name, "snippet": snippet})
         return summaries
 
-    def _cleanup_completed_task_resources(self, task_id: str):
-        """
-        Conservative cleanup for completed tasks.
-        Deletes only task-created, non-persistent resources that are not explicitly kept.
-        """
+    def _cleanup_completed_task(self, task_id: str):
+        """Clean up transient resources after task completion."""
         task = self.task_manager.get_task(task_id)
         if not task or not self.resource_manager:
             return
-
         created_ids = set(task.get("task_created_resources", []))
         if not created_ids:
             return
-
         keep_ids = set(task.get("artifacts", []))
         for step in task.get("abstract_plan", []):
-            step_outputs = step.get("output_artifacts", [])
-            for art in step_outputs or []:
+            for art in step.get("output_artifacts", []) or []:
                 if isinstance(art, str):
-                    keep_ids.add(art)
                     keep_ids.add(art.strip())
                     if hasattr(self.resource_manager, "_resolve_resource_id"):
                         resolved = self.resource_manager._resolve_resource_id(art)
                         if resolved:
                             keep_ids.add(resolved)
-        preserved_collections = {"conversation", "conversation_history", "_tasks"}
-        preserved_notes = {"_situation", "_situation_prev"}
+        self._cleanup_transient_resources(created_ids, keep_ids, label=task_id)
+
+    def _cleanup_transient_resources(self, created_ids: set, keep_ids: set = None, label: str = ""):
+        """
+        Delete transient resources created during a goal or task, preserving
+        persistent resources, system resources, and any explicitly kept IDs.
+        """
+        if not self.resource_manager or not created_ids:
+            return
+        keep_ids = set(keep_ids or ())
+        _PRESERVED_COLLECTIONS = {"conversation", "conversation_history", "_tasks", "_scheduled_goals"}
+        _PRESERVED_NOTES = {"_situation", "_situation_prev"}
+        _PRESERVED_NOTE_PREFIXES = ("_task_", "_scheduled_goal_")
         deleted = 0
         for resource_id in created_ids:
-            if resource_id in keep_ids:
+            if resource_id in keep_ids or resource_id == "Note_null":
                 continue
             resource = self.resource_manager.get_resource(resource_id)
             if not resource:
@@ -2738,21 +2862,15 @@ class ZenohExecutiveNode:
                 continue
             note_name = props.get("note_name", "")
             collection_name = props.get("collection_name", "")
-            if note_name in preserved_notes:
+            if note_name in _PRESERVED_NOTES or note_name.startswith(_PRESERVED_NOTE_PREFIXES):
                 continue
-            if collection_name in preserved_collections:
-                continue
-            if note_name.startswith("_task_"):
-                continue
-            if note_name in {"_task_plan_draft", "_task_review"}:
-                continue
-            if resource_id == "Note_null":
+            if collection_name in _PRESERVED_COLLECTIONS:
                 continue
             success, _ = self._delete_resource_and_unbind(resource_id)
             if success:
                 deleted += 1
         if deleted:
-            logger.info(f"🧹 Cleaned {deleted} non-kept task resources for {task_id}")
+            logger.info(f"🧹 Cleaned {deleted} transient resources{' for ' + label if label else ''}")
 
     def _read_and_delete_draft_note(self, note_name: str) -> Any:
         """Load a named Note, parse its JSON content, delete it, return parsed data."""
@@ -2989,7 +3107,6 @@ class ZenohExecutiveNode:
                 parts = clean_input.strip().split()
                 target_id = parts[1] if len(parts) > 1 else None
                 if target_id and target_id.startswith('goal_'):
-                    self.conversation_store.close_dialog("User")
                     self._handle_goal_proceed(goal_id=target_id, source='scheduler')
                 else:
                     task_id = target_id if target_id and target_id.startswith('task_') else None
@@ -3004,8 +3121,9 @@ class ZenohExecutiveNode:
                     self.conversation_store.close_dialog("User")
                     goal_text = clean_input[5:].strip()
                     scheduled_goal = self._upsert_scheduled_goal(goal_text)
+                    pre_resource_ids = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
                     result = self.parse_and_set_goal("", goal_text) or {}
-                    self._set_scheduled_goal_result(scheduled_goal["goal_id"], result, used_cache=False)
+                    self._set_scheduled_goal_result(scheduled_goal["goal_id"], result, used_cache=False, pre_resource_ids=pre_resource_ids)
                     return  # Don't process as speech
                 elif clean_input.startswith('task:'):
                     self._handle_task_create(clean_input[5:].strip())
@@ -3265,6 +3383,72 @@ class ZenohExecutiveNode:
             return result_str
         return result_str[:max_len] + '...'
     
+    def _build_agent_state_block(self) -> str:
+        """Build the authoritative agent state block.
+
+        This block is the single source of truth about what the agent is
+        currently doing.  The character layer MUST defer to it rather than
+        inferring task state from conversation history.
+        """
+        parts = ["## AGENT STATE (authoritative — your claims about what you are working on must be consistent with this)"]
+
+        # Active goal
+        if self.current_goal and self.current_goal.name != 'sleep':
+            parts.append(f"Active goal: {self.current_goal.to_string()}")
+        else:
+            parts.append("Active goal: none")
+
+        # Current plan (summary only — full plan is too large)
+        if self.current_plan:
+            plan_status = self.current_plan.get('quality_status', 'in_progress') if isinstance(self.current_plan, dict) else 'active'
+            parts.append(f"Current plan: {plan_status}")
+        else:
+            parts.append("Current plan: none")
+
+        # Last completed action
+        if self.action_history:
+            last_action = self.action_history[-1]
+            result_str = self._truncate_result(last_action.result)
+            parts.append(f"Last action: {last_action.action.get('type')}: {last_action.action.get('target')} — {result_str}")
+        else:
+            parts.append("Last action: none")
+
+        # Scheduled goals — full view for conversational grounding
+        try:
+            scheduled = self._all_scheduled_goals()
+            if scheduled:
+                def _goal_line(g):
+                    name = g.get('name') or g.get('goal_text', '?')[:80]
+                    status = g.get('status', '?')
+                    result = g.get('last_result', '')
+                    line = f"  - {name} [{status}]"
+                    if result:
+                        line += f" — {result[:100]}"
+                    return line
+
+                pending = [g for g in scheduled if g.get('status') in ('ready', 'pending', 'scheduled')]
+                recent = [g for g in scheduled if g.get('status') in ('completed', 'failed', 'interrupted')]
+                # Show most recently updated first for completed/failed
+                recent.sort(key=lambda g: g.get('updated', ''), reverse=True)
+
+                lines = []
+                if pending:
+                    lines.append("Upcoming/ready:")
+                    lines.extend(_goal_line(g) for g in pending[:5])
+                if recent:
+                    lines.append("Recently completed/failed:")
+                    lines.extend(_goal_line(g) for g in recent[:5])
+                if lines:
+                    parts.append("Scheduled goals:\n" + "\n".join(lines))
+                else:
+                    parts.append("Scheduled goals: none active or recent")
+            else:
+                parts.append("Scheduled goals: none")
+        except Exception:
+            parts.append("Scheduled goals: unavailable")
+
+        return "\n".join(parts)
+
     def _update_system_prompt(self):
         """Update the system prompt with the current situation."""
         # Build system prompt fresh from character_config (not cached observations)
@@ -3278,16 +3462,10 @@ class ZenohExecutiveNode:
             system_prompt += f"\n#Your drives are:\n\t{'\n\t'.join(self.character_config['drives'])}\n"
         if self.character_config.get('setting', None):
             system_prompt += f"\n#The world you are operating in is:\n{self.character_config['setting']}\n"
-        
-        # Add dynamic updates
-        if self.current_goal:
-            system_prompt += f"\n#Your current goal is:\n\t{self.current_goal.to_string()}\n"
-        if self.current_plan:
-            system_prompt += f"\n#Your current plan is:\n\t{json.dumps(self.current_plan, indent=2)}\n"
-        if self.action_history:
-            last_action = self.action_history[-1]
-            result_str = self._truncate_result(last_action.result)
-            system_prompt += f"\n#Your last action was:\n\t{last_action.action.get('type')}: {last_action.action.get('target')} - {result_str}\n"
+
+        # Authoritative agent state — overrides conversation history
+        system_prompt += f"\n{self._build_agent_state_block()}\n"
+
         return system_prompt
 
     def _observe(self):
@@ -3301,16 +3479,10 @@ class ZenohExecutiveNode:
             
             entity_context = self.get_entity_context(self.character_name, 10)
             if entity_context:
-                user_prompt += f'\n#Your most recent thoughts include:'
-                for i, memory in enumerate(entity_context['conversation_history']):  # Use last 2 memories
+                user_prompt += '\n## CONVERSATION HISTORY (for tone and continuity only — do NOT infer task state from this)'
+                for i, memory in enumerate(entity_context['conversation_history']):
                     user_prompt += f"\n\t{memory['source']}: {memory['text'][:600]}..."
                 user_prompt += '\n'
-            
-            if self.action_history:
-                last_action = self.action_history[-1]
-                result_str = self._truncate_result(last_action.result)
-                user_prompt += f'\n#Your last action was:'
-                user_prompt += f"\n\t{last_action.action.get('type')}: {last_action.action.get('target')} - {result_str}\n"
 
             self.observations = {'static': system_prompt, 'dynamic': user_prompt}
             return self.observations
@@ -3444,10 +3616,10 @@ class ZenohExecutiveNode:
                 context=context, 
                 max_steps=16
             )
-            self.current_plan = result.get('plan', {})
+            self.current_plan = result
 
         return result
-    
+
 
     def sense_data_callback(self, sample):
         """Handle incoming sense data."""
@@ -3479,7 +3651,9 @@ class ZenohExecutiveNode:
                     self.text_input_queue.pop(0)
                 
                 # Add conversation entry to note/collection conversation store
-                self.conversation_store.record_incoming(source, text_input, close=bool(content_data.get('close', False)) if 'content_data' in locals() else False)
+                # Skip recording for scheduler-issued commands (goal proceeds, etc.)
+                if source != 'scheduler':
+                    self.conversation_store.record_incoming(source, text_input, close=bool(content_data.get('close', False)) if 'content_data' in locals() else False)
                 
                 # Auto-unpause for goal commands so they execute immediately
                 if _is_goal_cmd(text_input) and self.execution_paused:
@@ -3708,9 +3882,9 @@ class ZenohExecutiveNode:
                 logger.error("Resource manager not available, cannot clear transients")
                 return
             
-            PRESERVED_COLLECTIONS = {'conversation', 'conversation_history', '_tasks'}
+            PRESERVED_COLLECTIONS = {'conversation', 'conversation_history', '_tasks', '_scheduled_goals'}
             PRESERVED_NOTES = {'_situation', '_situation_prev'}
-            PRESERVED_NOTE_PREFIXES = ('_task_',)
+            PRESERVED_NOTE_PREFIXES = ('_task_', '_scheduled_goal_')
             
             deleted_notes = 0
             deleted_collections = 0
@@ -3768,9 +3942,9 @@ class ZenohExecutiveNode:
                 logger.error("Resource manager not available, cannot clear persistents")
                 return
             
-            PRESERVED_COLLECTIONS = {'conversation', 'conversation_history', '_tasks'}
+            PRESERVED_COLLECTIONS = {'conversation', 'conversation_history', '_tasks', '_scheduled_goals'}
             PRESERVED_NOTES = {'_situation', '_situation_prev'}
-            PRESERVED_NOTE_PREFIXES = ('_task_',)
+            PRESERVED_NOTE_PREFIXES = ('_task_', '_scheduled_goal_')
             
             deleted_notes = 0
             deleted_collections = 0
@@ -4116,9 +4290,9 @@ class ZenohExecutiveNode:
                 pass  # Default to False if payload parsing fails
         
         # Collections and Notes to preserve (by name) - should persist across benchmark runs
-        PRESERVED_COLLECTIONS = {'conversation', 'conversation_history', '_tasks'}
+        PRESERVED_COLLECTIONS = {'conversation', 'conversation_history', '_tasks', '_scheduled_goals'}
         PRESERVED_NOTES = {'_situation', '_situation_prev'}
-        PRESERVED_NOTE_PREFIXES = ('_task_',)
+        PRESERVED_NOTE_PREFIXES = ('_task_', '_scheduled_goal_')
         
         deleted_notes = 0
         deleted_collections = 0
@@ -4686,7 +4860,7 @@ class ZenohExecutiveNode:
                 return result
 
             if result.get('success', False):
-                self.current_plan = result.get('plan', {})
+                self.current_plan = result
                 self._publish_current_plan()
                 self.plan_just_generated = True
                 if result.get('response', None):

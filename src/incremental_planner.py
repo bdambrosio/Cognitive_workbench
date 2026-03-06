@@ -1247,7 +1247,9 @@ def execute_infospace_action(action: Dict, executor: InfospaceExecutor, agent_na
 
 _CODEGEN_FORBIDDEN_PATTERNS = [
     r'\bexec\b\s*\(', r'\beval\b\s*\(', r'\bcompile\b\s*\(',
-    r'\b__\w+__\b',
+    r'\b__import__\b', r'\b__builtins__\b', r'\b__subclasses__\b',
+    r'\b__code__\b', r'\b__globals__\b', r'\b__loader__\b',
+    r'\b__spec__\b', r'\b__bases__\b', r'\b__mro__\b',
     r'\bsys\b\.', r'\bsubprocess\b',
     r'\bglobals\b\s*\(', r'\blocals\b\s*\(',
     r'\bsetattr\b\s*\(', r'\bdelattr\b\s*\(',
@@ -2427,11 +2429,14 @@ ALWAYS follow all formatting instructions exactly.
             # Track new bindings
             new_bindings = {k: v for k, v in executor.plan_bindings_flat.items() if bindings_before.get(k) != v}
             
-            # Persist code block return value as Note when substantial.
-            # Use 'data' (full structured content) in preference to 'value' (truncated display string)
-            # so that the Note — and therefore the eval target — contains real content.
+            # Persist code block return value as Note when substantial, but only if the
+            # code block didn't already create Note bindings (avoids duplicate content).
             code_block_output_created = False
-            if result_dict.get('status') == 'success':
+            note_bindings_created = any(
+                isinstance(v, str) and v.startswith("Note_")
+                for v in new_bindings.values()
+            )
+            if result_dict.get('status') == 'success' and not note_bindings_created:
                 raw = result_dict.get('data')
                 if raw is None:
                     raw = result_dict.get('value', '')
@@ -2485,20 +2490,32 @@ ALWAYS follow all formatting instructions exactly.
                 rid = executor.plan_bindings_flat.get(lookup_key) or executor.plan_bindings_flat.get("$" + lookup_key)
                 if rid:
                     eval_target = rid
-            if not eval_target and new_bindings:
-                collection_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and rid.startswith("Collection_") and not str(k).startswith("_") and str(k) != "code_block_output"]
-                note_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and rid.startswith("Note_") and not str(k).startswith("_") and str(k) != "code_block_output"]
-                if collection_keys:
-                    eval_target = new_bindings[collection_keys[-1]]
-                elif note_keys:
-                    eval_target = new_bindings[note_keys[-1]]
-                else:
-                    last_key = list(new_bindings.keys())[-1]
-                    eval_target = new_bindings[last_key]
+            # Prefer code_block_output (planner's explicit return value) over raw new_bindings —
+            # the return value is the planner's summary of what happened and is most likely to
+            # satisfy multi-faceted vision criteria. Without this, the heuristic picks the last
+            # Note binding (e.g. email confirmation) which causes false NEEDS_REVISION loops.
             if not eval_target and code_block_output_created:
                 rid = executor.plan_bindings_flat.get("code_block_output")
                 if rid:
                     eval_target = rid
+            if not eval_target and new_bindings:
+                # Prefer declared output artifacts that appear in new_bindings
+                if _declared_output_artifacts:
+                    for oa in _declared_output_artifacts:
+                        oa_key = oa.strip().lstrip("$")
+                        if oa_key in new_bindings and isinstance(new_bindings[oa_key], str) and (new_bindings[oa_key].startswith("Note_") or new_bindings[oa_key].startswith("Collection_")):
+                            eval_target = new_bindings[oa_key]
+                            break
+                if not eval_target:
+                    collection_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and rid.startswith("Collection_") and not str(k).startswith("_") and str(k) != "code_block_output"]
+                    note_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and rid.startswith("Note_") and not str(k).startswith("_") and str(k) != "code_block_output"]
+                    if collection_keys:
+                        eval_target = new_bindings[collection_keys[-1]]
+                    elif note_keys:
+                        eval_target = new_bindings[note_keys[-1]]
+                    else:
+                        last_key = list(new_bindings.keys())[-1]
+                        eval_target = new_bindings[last_key]
             if eval_target:
                 last_eval_target = eval_target
             # Mid-loop vision eval: only run on declared output artifacts (not every intermediate binding)
@@ -2734,6 +2751,7 @@ ALWAYS follow all formatting instructions exactly.
             trace_file.write(str(s)+"\n")
             trace_file.write(f"\n{'='*80}\n\n")
             trace_file.flush()
+        s["last_eval_target"] = last_eval_target
         return s
 
 
@@ -3436,11 +3454,14 @@ ALWAYS follow all formatting instructions exactly.
         # Track new bindings
         new_bindings = {k: v for k, v in executor.plan_bindings_flat.items() if bindings_before.get(k) != v}
         
-        # Persist code block return value as Note when substantial.
-        # Use 'data' (full structured content) in preference to 'value' (truncated display string)
-        # so that the Note — and therefore the eval target — contains real content.
+        # Persist code block return value as Note when substantial, but only if the
+        # code block didn't already create Note bindings (avoids duplicate content).
         code_block_output_created = False
-        if result_dict.get('status') == 'success':
+        note_bindings_created = any(
+            isinstance(v, str) and v.startswith("Note_")
+            for v in new_bindings.values()
+        )
+        if result_dict.get('status') == 'success' and not note_bindings_created:
             raw = result_dict.get('data')
             if raw is None:
                 raw = result_dict.get('value', '')
@@ -3491,20 +3512,32 @@ ALWAYS follow all formatting instructions exactly.
             rid = executor.plan_bindings_flat.get(lookup_key) or executor.plan_bindings_flat.get("$" + lookup_key)
             if rid:
                 eval_target = rid
-        if not eval_target and new_bindings:
-            collection_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and rid.startswith("Collection_") and not str(k).startswith("_") and str(k) != "code_block_output"]
-            note_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and rid.startswith("Note_") and not str(k).startswith("_") and str(k) != "code_block_output"]
-            if collection_keys:
-                eval_target = new_bindings[collection_keys[-1]]
-            elif note_keys:
-                eval_target = new_bindings[note_keys[-1]]
-            else:
-                last_key = list(new_bindings.keys())[-1]
-                eval_target = new_bindings[last_key]
+        # Prefer code_block_output (planner's explicit return value) over raw new_bindings —
+        # the return value is the planner's summary of what happened and is most likely to
+        # satisfy multi-faceted vision criteria. Without this, the heuristic picks the last
+        # Note binding (e.g. email confirmation) which causes false NEEDS_REVISION loops.
         if not eval_target and code_block_output_created:
             rid = executor.plan_bindings_flat.get("code_block_output")
             if rid:
                 eval_target = rid
+        if not eval_target and new_bindings:
+            # Prefer declared output artifacts that appear in new_bindings
+            if _declared_output_artifacts:
+                for oa in _declared_output_artifacts:
+                    oa_key = oa.strip().lstrip("$")
+                    if oa_key in new_bindings and isinstance(new_bindings[oa_key], str) and (new_bindings[oa_key].startswith("Note_") or new_bindings[oa_key].startswith("Collection_")):
+                        eval_target = new_bindings[oa_key]
+                        break
+            if not eval_target:
+                collection_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and rid.startswith("Collection_") and not str(k).startswith("_") and str(k) != "code_block_output"]
+                note_keys = [k for k, rid in new_bindings.items() if isinstance(rid, str) and rid.startswith("Note_") and not str(k).startswith("_") and str(k) != "code_block_output"]
+                if collection_keys:
+                    eval_target = new_bindings[collection_keys[-1]]
+                elif note_keys:
+                    eval_target = new_bindings[note_keys[-1]]
+                else:
+                    last_key = list(new_bindings.keys())[-1]
+                    eval_target = new_bindings[last_key]
         if eval_target:
             last_eval_target = eval_target
         if eval_target and vision_criteria:
@@ -3754,7 +3787,8 @@ ALWAYS follow all formatting instructions exactly.
         trace_file.write(prompt + "\n")
         trace_file.write(f"\n{'='*80}\n\n")
         trace_file.flush()
-    
+
+    state["last_eval_target"] = last_eval_target
     return state
 
 
@@ -4234,6 +4268,7 @@ class IncrementalPlanner:
             # Attach plan_actions list to executor for tracking
             self.executor._plan_actions = []
             self.executor._plan_error_count = 0  # Initialize error counter for this plan
+            self.executor._side_effect_cache = {}  # Reset dedup cache per planner session
             self.goal = goal
 
             preplan = goal
@@ -4353,6 +4388,7 @@ class IncrementalPlanner:
             # Attach plan_actions list to executor for tracking
             self.executor._plan_actions = []
             self.executor._plan_error_count = 0  # Initialize error counter for this plan
+            self.executor._side_effect_cache = {}  # Reset dedup cache per planner session
             self.goal = goal
 
             preplan = self._preplan(goal)
@@ -4505,6 +4541,15 @@ class IncrementalPlanner:
             else:
                 quality_status = "failed"
             
+            # Extract primary product: the last eval target identified by the planner
+            primary_product = ""
+            try:
+                raw_target = state.get('last_eval_target', '') if isinstance(state, dict) else (state['last_eval_target'] if 'last_eval_target' in state else '')
+                if raw_target:
+                    primary_product = _resolve_eval_target_id(raw_target, self.executor) or raw_target
+            except (KeyError, TypeError):
+                pass
+
             return {
                 'plan': plan_actions,
                 'response': final_answer,
@@ -4513,6 +4558,7 @@ class IncrementalPlanner:
                 'quality_status': quality_status,
                 'verification_answer': verification_answer,
                 'error_count': error_count,
+                'primary_product': primary_product,
                 'skip_validation': True  # Plan already executed, no need to validate
             }
         except Exception as e:
