@@ -12,38 +12,33 @@ websockets>=15.0.0
 # Data processing and scientific computing
 numpy>=2.3.0
 scipy>=1.16.0
-networkx>=3.5
 
 # AI/ML and LLM clients
-openai>=1.98.0
 anthropic>=0.39.0
+openai>=1.98.0
 sglang>=0.3.0  # SGLang for incremental planner
 opentelemetry-api>=1.38.0
 opentelemetry-sdk>=1.38.0
-tqdm>=4.67.0
 sentence-transformers>=2.7.0
 transformers>=4.30.0  # Used by executive_node for AutoTokenizer
-txtai>=6.1.0
 faiss-cpu>=1.7.0  # Vector search for infospace memory
 torch>=2.9.1  # VoxelAffordanceModel inference
 zstandard>=0.22.0  # Training data compression
 
-# GUI and visualization
+# GUI
 PyQt6>=6.0.0
-pygame>=2.6.0
-colorama>=0.4.6
 
 # Utilities and tools
-noise>=1.2.2
 python-dotenv>=1.1.0
-watchfiles>=1.1.0
 unstructured>=0.10.0
 wordfreq>=3.0.0
 pymupdf>=1.24.0
 playwright>=1.40.0
 python-docx>=1.1.0
 lxml>=4.9.0  # Used by utils/grobid.py for PDF parsing
+spacy>=3.7.0  # Used by test_space.py
+imageio>=2.30.0  # Used by utils/create-log-gif
 
 # Development and testing (optional)
 pytest>=7.4.0
-pytest-asyncio>=0.21.0 
+pytest-asyncio>=0.21.0
