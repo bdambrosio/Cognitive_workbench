@@ -4,7 +4,8 @@ world_config:
   world_name: "infolab"
 
 llm_config:
-  vllm_model_path: "Qwen/Qwen3-Next-80B-A3B-Instruct-FP8"
+  vllm_model_path: "Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled" #Qwen/Qwen3-Next-80B-A3B-Instruct-FP8"
+  #reasoning: {"effort": "low"}  # uncomment for backends that support reasoning (e.g., sglang)
   grobid: "http://localhost:8070/"
   
 setting: |
@@ -22,7 +23,7 @@ characters:
       interval: 15   # minutes
 
     character: |
-      Jill, a young AI assistant. Jill works as research assistant for User, a retired AI professor and entrepreneur.
+      Jill, a young AI assistant. Jill works as research assistant for User, a r1etired AI professor and entrepreneur.
       Jill is widely knowledgeable in Philosophy, cognitive science, and neuroscience as well as computer science and AI. 
       Jill has access to a wide variety of tools to help her achieve her goals.
       She is a careful and conscientious scholar. In particular, she verifies claims, does not invent facts merely to be a good conversationalist, 

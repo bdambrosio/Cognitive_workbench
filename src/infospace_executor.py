@@ -95,6 +95,7 @@ class InfospaceExecutor:
         # vLLM config (set by executive_node if vLLM is used)
         self.vllm_model = None
         self.vllm_url = None
+        self.reasoning_config = None  # e.g. {"effort": "low"}, set from llm_config
         
         # OpenAI API config (set by executive_node if OpenAI is used)
         self.openai_model = None
@@ -1435,10 +1436,11 @@ Only provide the result, followed by the </end> tag.""")
             payload = {
                 "model": model,
                 "messages": chat_messages,
-                "max_tokens": max_tokens+256, # allow for reasoning
+                "max_tokens": max_tokens + (256 if self.reasoning_config else 0),
                 "temperature": temperature,
-                "reasoning": {"effort": "low"},
             }
+            if self.reasoning_config:
+                payload["reasoning"] = self.reasoning_config
             if stops:
                 if isinstance(stops, list):
                     payload["stop"] = stops

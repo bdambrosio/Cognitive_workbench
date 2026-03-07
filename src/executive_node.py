@@ -477,7 +477,8 @@ class ZenohExecutiveNode:
         openrouter_model_path = llm_config.get('openrouter_model_path')
         openrouter_provider = llm_config.get('openrouter_provider')
         anthropic_model_path = llm_config.get('anthropic_model_path')
-        
+        self.reasoning_config = llm_config.get('reasoning')  # e.g. {"effort": "low"}
+
         self.runtime = None
         self.llm_client = None
         self.vllm_model = None
@@ -815,6 +816,7 @@ class ZenohExecutiveNode:
         if self.vllm_model and self.vllm_url:
             self.infospace_executor.vllm_model = self.vllm_model
             self.infospace_executor.vllm_url = self.vllm_url
+            self.infospace_executor.reasoning_config = self.reasoning_config
         if self.openai_model and self.openai_api_key:
             self.infospace_executor.openai_model = self.openai_model
             self.infospace_executor.openai_api_key = self.openai_api_key

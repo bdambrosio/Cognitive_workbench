@@ -1903,6 +1903,47 @@ def _is_explicit_artifact_reference(
     return bool(mapped and mapped == resource_id)
 
 
+def _find_side_effect_content_source(executor) -> str:
+    """
+    Scan executed plan actions for the last side-effect tool (send-email, post-bluesky)
+    and return the resource ID of its input content — the artifact that was consumed
+    by the delivery action.
+
+    The primary product of a goal like "write report and email it" is the report,
+    not the email confirmation.  The report is whatever the side-effect tool received
+    as its ``target`` or ``value``.
+
+    Returns resource ID string, or "" if no side-effect tool was used or input
+    cannot be resolved.
+    """
+    plan_actions = getattr(executor, '_plan_actions', [])
+    if not plan_actions:
+        return ""
+
+    bindings = getattr(executor, 'plan_bindings_flat', {})
+
+    # Walk backwards to find the last side-effect action
+    for action in reversed(plan_actions):
+        action_type = action.get('type', '')
+        if action_type not in _SIDE_EFFECT_TOOLS:
+            continue
+        # The content fed to the tool lives in target or value
+        for field in ('target', 'value'):
+            ref = action.get(field, '')
+            if not ref or not isinstance(ref, str):
+                continue
+            if ref.startswith('$'):
+                rid = bindings.get(ref.lstrip('$'))
+                if rid and isinstance(rid, str) and (rid.startswith('Note_') or rid.startswith('Collection_')):
+                    return rid
+            elif ref.startswith('Note_') or ref.startswith('Collection_'):
+                return ref
+        # Side-effect found but input unresolvable — stop searching
+        break
+
+    return ""
+
+
 def _select_primary_artifact_id(
     executor,
     declared_output_artifacts: List[str],
@@ -2652,6 +2693,12 @@ ALWAYS follow all formatting instructions exactly.
             )
             if eval_target:
                 last_eval_target = eval_target
+            # If a side-effect tool ran, prefer its input content as eval target
+            # (e.g. the report that was emailed, not the email confirmation)
+            side_effect_content = _find_side_effect_content_source(executor)
+            if side_effect_content:
+                last_eval_target = side_effect_content
+                logger.info(f"Step {step}: Eval target updated to side-effect content source: {side_effect_content}")
             # Mid-loop vision eval: only run on declared output artifacts (not every intermediate binding)
             run_mid_vision = False
             if eval_target and vision_criteria and _declared_output_artifacts and executor:
@@ -3668,6 +3715,11 @@ ALWAYS follow all formatting instructions exactly.
         )
         if eval_target:
             last_eval_target = eval_target
+        # If a side-effect tool ran, prefer its input content as eval target
+        side_effect_content = _find_side_effect_content_source(executor)
+        if side_effect_content:
+            last_eval_target = side_effect_content
+            logger.info(f"Step {step}: Eval target updated to side-effect content source: {side_effect_content}")
         if eval_target and vision_criteria:
             logger.info(f"Step {step}: Vision eval target: {last_eval_target}")
             compressed_ctx = _compress_trace(prompt)
@@ -4512,6 +4564,15 @@ class IncrementalPlanner:
             else:
                 quality_status = "failed"
             
+            primary_product = _find_side_effect_content_source(self.executor)
+            if not primary_product:
+                try:
+                    raw_target = state.get('last_eval_target', '') if isinstance(state, dict) else (state['last_eval_target'] if 'last_eval_target' in state else '')
+                    if raw_target:
+                        primary_product = _resolve_eval_target_id(raw_target, self.executor) or raw_target
+                except (KeyError, TypeError):
+                    pass
+
             return {
                 'plan': None,
                 'response': final_answer,
@@ -4520,6 +4581,7 @@ class IncrementalPlanner:
                 'quality_status': quality_status,
                 'verification_answer': verification_answer,
                 'error_count': error_count,
+                'primary_product': primary_product,
                 'skip_validation': True  # Plan already executed, no need to validate
             }
         except Exception as e:
@@ -4717,14 +4779,18 @@ class IncrementalPlanner:
             else:
                 quality_status = "failed"
             
-            # Extract primary product: the last eval target identified by the planner
-            primary_product = ""
-            try:
-                raw_target = state.get('last_eval_target', '') if isinstance(state, dict) else (state['last_eval_target'] if 'last_eval_target' in state else '')
-                if raw_target:
-                    primary_product = _resolve_eval_target_id(raw_target, self.executor) or raw_target
-            except (KeyError, TypeError):
-                pass
+            # Extract primary product.
+            # Strategy: if a side-effect tool (email, post) ran, the primary product
+            # is the content it consumed (e.g. the report that was emailed), not the
+            # delivery confirmation.  Otherwise fall back to last_eval_target.
+            primary_product = _find_side_effect_content_source(self.executor)
+            if not primary_product:
+                try:
+                    raw_target = state.get('last_eval_target', '') if isinstance(state, dict) else (state['last_eval_target'] if 'last_eval_target' in state else '')
+                    if raw_target:
+                        primary_product = _resolve_eval_target_id(raw_target, self.executor) or raw_target
+                except (KeyError, TypeError):
+                    pass
 
             return {
                 'plan': plan_actions,
