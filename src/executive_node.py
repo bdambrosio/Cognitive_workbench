@@ -3747,6 +3747,11 @@ class ZenohExecutiveNode:
                 # Fallback to plain text (console input format)
                 text_input = content
                 source = 'console'
+            # Sensor reports: log only, don't queue for agent processing
+            if source.startswith('sensor:') or (text_input and text_input.startswith('sensor ') and ' report\n' in text_input):
+                logger.info(f'📡 {self.character_name} sensor report from {source}: {text_input[:120]}')
+                return
+
             # Process if we have text input
             if text_input and text_input.strip():
                 self.text_input_queue.append(sense_data)

@@ -375,6 +375,63 @@ def main():
 
     logger.info(f"All {len(threads)} agent threads started")
 
+    # ---- Launch sensor threads ----
+    sensor_threads: List[threading.Thread] = []
+    try:
+        from utils.sensor_loader import load_sensors
+        from sensor_runner import SensorRunner
+
+        src_dir = Path(__file__).parent
+        all_sensors = load_sensors(str(src_dir / 'sensors'))
+
+        if all_sensors:
+            for char_name, config in characters:
+                char_sensors = config.get('sensors', [])
+                if not char_sensors:
+                    continue
+                for sensor_cfg in char_sensors:
+                    s_name = sensor_cfg.get('name', '')
+                    if s_name not in all_sensors:
+                        logger.warning(f"Sensor '{s_name}' declared for {char_name} but not found in src/sensors/")
+                        continue
+
+                    sensor_meta = all_sensors[s_name]
+
+                    # Build scenario overrides: parse schedule override if present
+                    overrides = {}
+                    if 'schedule' in sensor_cfg:
+                        from utils.sensor_loader import parse_schedule
+                        secs = parse_schedule(sensor_cfg['schedule'])
+                        if secs is not None:
+                            overrides['schedule_seconds'] = secs
+                    if 'parameters' in sensor_cfg:
+                        overrides['parameters'] = sensor_cfg['parameters']
+                    if 'gate' in sensor_cfg:
+                        overrides['gate'] = sensor_cfg['gate']
+
+                    runner = SensorRunner(
+                        sensor_name=s_name,
+                        sensor_meta=sensor_meta,
+                        character_name=char_name,
+                        scenario_overrides=overrides,
+                        resource_manager=None,  # Set after agent init if needed
+                        zenoh_session=zenoh_session,
+                        available_tools={},
+                        shutdown_event=shutdown_event,
+                    )
+
+                    t = threading.Thread(target=runner.run, name=f"sensor-{char_name}-{s_name}", daemon=True)
+                    t.start()
+                    sensor_threads.append(t)
+                    logger.info(f"Started sensor {s_name} for {char_name}")
+    except Exception as e:
+        logger.warning(f"Sensor loading failed (non-fatal): {e}")
+        import traceback
+        traceback.print_exc()
+
+    if sensor_threads:
+        logger.info(f"Started {len(sensor_threads)} sensor threads")
+
     # ---- Wait for shutdown ----
     def _signal_handler(signum, frame):
         logger.info(f"Received signal {signum}, shutting down...")

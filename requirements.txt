@@ -28,6 +28,9 @@ zstandard>=0.22.0  # Training data compression
 # GUI
 PyQt6>=6.0.0
 
+# Sensors
+feedparser>=6.0.0  # Used by rss-watcher sensor
+
 # Utilities and tools
 python-dotenv>=1.1.0
 unstructured>=0.10.0

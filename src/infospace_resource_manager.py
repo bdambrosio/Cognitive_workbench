@@ -871,13 +871,13 @@ class InfospaceResourceManager:
         if self.embedder is None:
             from sentence_transformers import SentenceTransformer
             try:
-                # Try offline first
-                self.embedder = SentenceTransformer(model_name, local_files_only=True)
+                # Try offline first; force CPU to avoid CUDA arch mismatches
+                self.embedder = SentenceTransformer(model_name, local_files_only=True, device='cpu')
                 logger.info(f"Initialized embedding model: {model_name} (from cache)")
             except Exception:
                 # Fallback to download
                 logger.info(f"Cache miss, downloading embedding model: {model_name}")
-                self.embedder = SentenceTransformer(model_name)
+                self.embedder = SentenceTransformer(model_name, device='cpu')
                 logger.info(f"Initialized embedding model: {model_name} (downloaded)")
     
     # ==================== Note Creation ====================
