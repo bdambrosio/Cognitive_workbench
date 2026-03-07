@@ -153,6 +153,22 @@ def _syntax_ok(code: str) -> tuple[bool, str]:
 
 
 # ── Main tool function ─────────────────────────────────────────────────────
+def _generate_instruction_skill_md(name: str, description: str, requirements: str) -> str:
+    """Build a Skill.md for an instruction-type tool (no LLM needed)."""
+    return (
+        f"---\n"
+        f"name: {name}\n"
+        f"type: instruction\n"
+        f'description: "{description}"\n'
+        f"schema_hint:\n"
+        f'  target: "$variable (optional context)"\n'
+        f'  out: "$variable (optional)"\n'
+        f"---\n\n"
+        f"# {name}\n\n"
+        f"{requirements}\n"
+    )
+
+
 def tool(input_value=None, runtime=None, **kwargs):
     """
     Generate a new tool (tool.py + Skill.md) using the LLM.
@@ -163,14 +179,23 @@ def tool(input_value=None, runtime=None, **kwargs):
         requirements: What the tool should do, what APIs/libs it uses,
                       what env vars it needs, what parameters it accepts,
                       what it returns (required)
+        tool_type: "python" (default) or "instruction" (no code, Skill.md body is the tool output)
     """
     executor: InfospaceExecutor = kwargs.get("executor")
     if not executor:
         return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
 
-    llm_generate = kwargs.get("llm_generate")
-    if not llm_generate:
-        return _fail(executor, "llm_generate callback is required")
+    # Per-goal guard: only one create-tool per planner session
+    plan_id = getattr(getattr(executor, 'executive_node', None), 'current_plan_id', None)
+    if plan_id:
+        used = getattr(executor, '_side_effect_used_goals', None)
+        if used is None:
+            used = {}
+            executor._side_effect_used_goals = used
+        goal_key = f"create-tool:{plan_id}"
+        if goal_key in used:
+            logger.warning(f"create-tool: blocked — already created a tool in plan {plan_id}")
+            return used[goal_key]
 
     name = (kwargs.get("name") or input_value or "").strip().lower().replace(" ", "-")
     if not name:
@@ -181,18 +206,45 @@ def tool(input_value=None, runtime=None, **kwargs):
     if not description or not requirements:
         return _fail(executor, "description and requirements parameters are required")
 
-    success, msg, staging_dir_str = generate_and_stage_tool(llm_generate, name, description, requirements)
-    if not success:
-        return _fail(executor, msg)
-    staging_dir = Path(staging_dir_str)
-    promote_cmd = f"mv {staging_dir} {_TOOLS_DIR / name}"
-    summary = (
-        f"Tool '{name}' generated and saved to staging.\n\n"
-        f"Files:\n  {staging_dir / 'tool.py'}\n  {staging_dir / 'Skill.md'}\n\n"
-        f"To activate: review the files, then run:\n  {promote_cmd}\n"
-        f"Then restart the character process."
-    )
+    tool_type = (kwargs.get("tool_type") or "python").strip().lower()
 
-    logger.info(f"create-tool: '{name}' written to {staging_dir}")
-    return _success(executor, f"Tool '{name}' staged at {staging_dir}", data=summary,
-                    extra={"name": name, "staging_dir": str(staging_dir), "promote_cmd": promote_cmd})
+    if tool_type == "instruction":
+        # Instruction tools: no code generation, write Skill.md directly to tools dir
+        target_dir = _TOOLS_DIR / name
+        if target_dir.exists():
+            return _fail(executor, f"Tool '{name}' already exists at {target_dir}")
+        skill_text = _generate_instruction_skill_md(name, description, requirements)
+        target_dir.mkdir(parents=True, exist_ok=True)
+        (target_dir / "Skill.md").write_text(skill_text)
+        # Hot-register into running system
+        executive_node = getattr(executor, 'executive_node', None)
+        if executive_node and hasattr(executive_node, '_register_tool'):
+            executive_node._register_tool(str(target_dir))
+        summary = f"Instruction tool '{name}' created and registered at {target_dir}"
+        logger.info(f"create-tool: instruction tool '{name}' written to {target_dir}")
+        result = _success(executor, summary, data=summary,
+                          extra={"name": name, "tool_type": "instruction", "path": str(target_dir)})
+    else:
+        # Python tools: generate code via LLM, stage for review
+        llm_generate = kwargs.get("llm_generate")
+        if not llm_generate:
+            return _fail(executor, "llm_generate callback is required")
+        success, msg, staging_dir_str = generate_and_stage_tool(llm_generate, name, description, requirements)
+        if not success:
+            return _fail(executor, msg)
+        staging_dir = Path(staging_dir_str)
+        promote_cmd = f"mv {staging_dir} {_TOOLS_DIR / name}"
+        summary = (
+            f"Tool '{name}' generated and saved to staging.\n\n"
+            f"Files:\n  {staging_dir / 'tool.py'}\n  {staging_dir / 'Skill.md'}\n\n"
+            f"To activate: review the files, then run:\n  {promote_cmd}\n"
+            f"Then restart the character process."
+        )
+        logger.info(f"create-tool: '{name}' written to {staging_dir}")
+        result = _success(executor, f"Tool '{name}' staged at {staging_dir}", data=summary,
+                          extra={"name": name, "staging_dir": str(staging_dir), "promote_cmd": promote_cmd})
+
+    # Record for per-goal guard
+    if plan_id and hasattr(executor, '_side_effect_used_goals'):
+        executor._side_effect_used_goals[f"create-tool:{plan_id}"] = result
+    return result

@@ -96,6 +96,10 @@ class InfospaceExecutor:
         self.vllm_model = None
         self.vllm_url = None
         
+        # OpenAI API config (set by executive_node if OpenAI is used)
+        self.openai_model = None
+        self.openai_api_key = None
+
         # OpenRouter config (set by executive_node if OpenRouter is used)
         self.openrouter_model = None
         self.openrouter_api_key = None
@@ -106,6 +110,8 @@ class InfospaceExecutor:
         self.anthropic_api_key = None
 
         # Alt LLM config (for synthesize, extract, extract-struct, extract-references, refine)
+        self.alt_openai_model = None
+        self.alt_openai_api_key = None
         self.alt_openrouter_model = None
         self.alt_openrouter_api_key = None
         self.alt_openrouter_provider = None
@@ -819,12 +825,29 @@ class InfospaceExecutor:
         if hasattr(self, '_plan_actions'):
             self._plan_actions.append(action.copy())
 
+        def _bind_cached_result(cached_result: Dict):
+            out_var = action.get('out')
+            resource_id = cached_result.get('resource_id') if isinstance(cached_result, dict) else None
+            if out_var and isinstance(out_var, str) and out_var.startswith('$') and resource_id:
+                self._bind_variable(out_var.lstrip('$'), resource_id)
+            return cached_result
+
         # Dedup guard for side-effectful tools within a single planner session.
         # If an identical send-email or post-bluesky was already executed successfully
         # in this session, return the cached result instead of re-executing.
         _SIDE_EFFECT_TOOLS = {'send-email', 'post-bluesky'}
         action_type = action.get('type', '')
         if action_type in _SIDE_EFFECT_TOOLS:
+            if not hasattr(self, '_successful_side_effect_results'):
+                self._successful_side_effect_results = {}
+            if getattr(self, '_done_gate_retry_active', False) and not action.get('allow_repeat_side_effect'):
+                prior_success = self._successful_side_effect_results.get(action_type)
+                if prior_success:
+                    logger.warning(
+                        f"Dedup: blocking repeated {action_type} during done-gate retry "
+                        f"(returning prior successful result)"
+                    )
+                    return _bind_cached_result(prior_success)
             if not hasattr(self, '_side_effect_cache'):
                 self._side_effect_cache = {}
             # Build dedup key from action content (resolved target text + key params)
@@ -849,7 +872,7 @@ class InfospaceExecutor:
             cached = self._side_effect_cache.get(_dedup_key)
             if cached:
                 logger.warning(f"Dedup: skipping duplicate {action_type} within planner session (returning cached result)")
-                return cached
+                return _bind_cached_result(cached)
 
         # Execute the action
         result = self.execute_action(action)
@@ -866,6 +889,8 @@ class InfospaceExecutor:
         # Cache successful side-effect results for dedup
         if action_type in _SIDE_EFFECT_TOOLS and result.get('status') == 'success' and hasattr(self, '_side_effect_cache'):
             self._side_effect_cache[_dedup_key] = result
+            if hasattr(self, '_successful_side_effect_results'):
+                self._successful_side_effect_results[action_type] = result
 
         # Create ActionRecord + publish to UI
         if self.executive_node:
@@ -1553,6 +1578,116 @@ Only provide the result, followed by the </end> tag.""")
             logger.exception(f"Anthropic API error: {e}")
             return Response(success=False, error=str(e))
 
+    def _openai_generate(self, messages, max_tokens=2000, temperature=0.7, stops=None, is_json=False, use_alt=False, reasoning_effort=None):
+        """
+        Generate text using the OpenAI Responses API.
+
+        Args:
+            messages: List of message strings or dicts with role/content
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature
+            stops: Optional stop sequences (applied client-side to returned text)
+            is_json: If True, request JSON mode and parse the result
+            use_alt: If True, use alt_openai_* config
+
+        Returns:
+            Object with .success, .text, and .error attributes
+        """
+        model = self.alt_openai_model if use_alt else self.openai_model
+        api_key = self.alt_openai_api_key if use_alt else self.openai_api_key
+
+        class Response:
+            def __init__(self, success, text='', error=None):
+                self.success = success
+                self.text = text
+                self.error = error
+
+        try:
+            from openai import OpenAI
+
+            client = OpenAI(api_key=api_key, timeout=180.0, max_retries=2)
+
+            def _norm_text(value):
+                return value.rstrip() if isinstance(value, str) else value
+
+            instructions_parts = []
+            input_items = []
+
+            if isinstance(messages, list):
+                for msg in messages:
+                    if isinstance(msg, str):
+                        raw = msg.strip()
+                        if raw.startswith('<|system|>'):
+                            instructions_parts.append(_norm_text(raw.replace('<|system|>', '', 1).strip()))
+                            continue
+                        if raw.startswith('<|user|>'):
+                            role = "user"
+                            content = _norm_text(raw.replace('<|user|>', '', 1).strip())
+                        elif raw.startswith('<|assistant|>'):
+                            role = "assistant"
+                            content = _norm_text(raw.replace('<|assistant|>', '', 1).strip())
+                        else:
+                            role = "user"
+                            content = _norm_text(msg)
+                    elif isinstance(msg, dict):
+                        role = msg.get("role", "user")
+                        content = _norm_text(msg.get("content", ""))
+                        if role == "system":
+                            instructions_parts.append(content)
+                            continue
+                    else:
+                        role = "user"
+                        content = _norm_text(str(msg))
+
+                    if content and str(content).strip():
+                        input_items.append({
+                            "role": role,
+                            "content": str(content),
+                        })
+            else:
+                content = _norm_text(str(messages))
+                if content and str(content).strip():
+                    input_items.append({
+                        "role": "user",
+                        "content": str(content),
+                    })
+
+            if not input_items:
+                return Response(success=False, error="No user messages to send")
+
+            effort = reasoning_effort or "low"
+            payload = {
+                "model": model,
+                "input": input_items,
+                "max_output_tokens": max_tokens,
+                "reasoning": {"effort": effort},
+            }
+            if instructions_parts:
+                payload["instructions"] = "\n\n".join(part for part in instructions_parts if part and str(part).strip())
+            if is_json:
+                payload["text"] = {"format": {"type": "json_object"}}
+
+            response = client.responses.create(**payload)
+            result_text = getattr(response, "output_text", None)
+
+            if result_text is None:
+                return Response(success=False, error="OpenAI Responses API returned no text")
+
+            if stops and isinstance(result_text, str):
+                stop_list = stops if isinstance(stops, list) else [stops]
+                cutoffs = [result_text.find(stop) for stop in stop_list if stop]
+                cutoffs = [idx for idx in cutoffs if idx >= 0]
+                if cutoffs:
+                    result_text = result_text[:min(cutoffs)]
+
+            if is_json:
+                result_text = self._parse_json_response(result_text, str(messages))
+
+            return Response(success=True, text=result_text)
+        except Exception as e:
+            logger.exception(f"OpenAI API error: {e}")
+            return Response(success=False, error=str(e))
+
     def _openrouter_generate(self, messages, max_tokens=2000, temperature=0.7, stops=None, is_json=False, use_alt=False):
         """
         Generate text using OpenRouter API via HTTP.
@@ -1678,8 +1813,8 @@ Only provide the result, followed by the </end> tag.""")
             logger.exception(f"OpenRouter generation error: {e}")
             return Response(success=False, error=str(e))
     
-    def llm_generate(self, messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
-        """Unified LLM generation interface using SGLang runtime, vLLM, or OpenRouter."""
+    def llm_generate(self, messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None, reasoning_effort=None):
+        """Unified LLM generation interface using SGLang runtime or configured remote backends."""
         # Apply bindings to messages if provided
         if bindings and isinstance(messages, list):
             processed_messages = []
@@ -1693,9 +1828,11 @@ Only provide the result, followed by the </end> tag.""")
                     processed_messages.append(msg)
             messages = processed_messages
         
-        # Use Anthropic if configured, then OpenRouter, then vLLM, then SGLang
+        # Use Anthropic if configured, then OpenAI, then OpenRouter, then vLLM, then SGLang
         if self.anthropic_model and self.anthropic_api_key:
             return self._anthropic_generate(messages, max_tokens, temperature, stops, is_json=is_json)
+        elif self.openai_model and self.openai_api_key:
+            return self._openai_generate(messages, max_tokens, temperature, stops, is_json=is_json, reasoning_effort=reasoning_effort)
         elif self.openrouter_model and self.openrouter_api_key:
             return self._openrouter_generate(messages, max_tokens, temperature, stops, is_json=is_json)
         elif self.vllm_model and self.vllm_url:
@@ -1703,7 +1840,7 @@ Only provide the result, followed by the </end> tag.""")
         elif self.runtime:
             return self._sglang_generate(messages, max_tokens, temperature, stops, is_json=is_json)
         else:
-            raise RuntimeError("No LLM backend available - ensure executive_node is started with sgl_model_path, vllm_model_path, anthropic_model_path, or openrouter_model_path")
+            raise RuntimeError("No LLM backend available - ensure executive_node is started with sgl_model_path, vllm_model_path, anthropic_model_path, openai_model_path, or openrouter_model_path")
     
     def _alt_llm_generate(self, messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
         """Unified LLM generation using alt backend when configured; falls back to main llm_generate otherwise."""
@@ -1720,12 +1857,15 @@ Only provide the result, followed by the </end> tag.""")
             messages = processed_messages
         has_alt = (
             (self.alt_anthropic_model and self.alt_anthropic_api_key) or
+            (self.alt_openai_model and self.alt_openai_api_key) or
             (self.alt_openrouter_model and self.alt_openrouter_api_key) or
             (self.alt_vllm_model and self.alt_vllm_url)
         )
         if has_alt:
             if self.alt_anthropic_model and self.alt_anthropic_api_key:
                 return self._anthropic_generate(messages, max_tokens, temperature, stops, is_json=is_json, use_alt=True)
+            elif self.alt_openai_model and self.alt_openai_api_key:
+                return self._openai_generate(messages, max_tokens, temperature, stops, is_json=is_json, use_alt=True)
             elif self.alt_openrouter_model and self.alt_openrouter_api_key:
                 return self._openrouter_generate(messages, max_tokens, temperature, stops, is_json=is_json, use_alt=True)
             elif self.alt_vllm_model and self.alt_vllm_url:

@@ -1,47 +1,57 @@
 ---
 name: create-tool
 type: python
-description: "Generate a new tool (tool.py + Skill.md) using the LLM and save it to src/tools-staging/ for review. After review, promote with mv and restart."
+description: "Generate a new tool. Python tools go to staging for review. Instruction tools (no code) are created and registered immediately."
 schema_hint:
-  name: "string (tool name, e.g. post-bluesky)"
+  name: "string (tool name, e.g. bluesky-metrics)"
   description: "string (one-line description)"
   requirements: "string (what it does, what APIs/libs/env vars/params/output)"
+  tool_type: "string (optional): 'python' (default, staged) or 'instruction' (no code, immediate)"
 ---
 
 # create-tool
 
-Generate a new Cognitive Workbench tool using the LLM. The tool is written to `src/tools-staging/{name}/` for review before activation.
+Generate a new Cognitive Workbench tool. Supports two modes:
+
+- **python** (default): LLM generates `tool.py` + `Skill.md`, written to `src/tools-staging/{name}/` for review.
+- **instruction**: No code generation. The `requirements` text becomes the Skill.md body. Written directly to `src/tools/{name}/` and hot-registered immediately.
 
 ## Input
 
-- `name`: Tool name (used as directory and action type, e.g. `post-bluesky`)
-- `description`: One-line description for the Skill.md and tool catalog
-- `requirements`: Full specification — what the tool does, what library or API it calls, what env vars it reads, what parameters it accepts, and what it returns
+- `name`: Tool name (used as directory and action type, e.g. `bluesky-metrics`)
+- `description`: One-line description for the tool catalog
+- `requirements`: For python tools: full specification. For instruction tools: the instructional content that becomes the tool output.
+- `tool_type`: `"python"` (default) or `"instruction"`
 
 ## Output
 
-Success: summary Note with file paths and the promotion command to run.
+Success: summary with file paths. For python tools, includes promotion command.
 
-Failure: reason (syntax error in generated code, LLM failure, name already staged).
+Failure: reason (syntax error, LLM failure, name conflict).
 
 ## Behavior
 
-- Loads 3 reference tools (`stock-price`, `run-script`, `calculate`) as examples for the LLM
-- Generates `tool.py` and runs `py_compile` to catch syntax errors before saving
-- Generates `Skill.md` with correct frontmatter
-- Writes to `src/tools-staging/{name}/` — NOT directly to `src/tools/`
-- To activate: review the files, `mv src/tools-staging/{name} src/tools/{name}`, restart the character
+**Python tools:**
+- Loads reference tools as examples for the LLM
+- Generates `tool.py` and runs `py_compile` to catch syntax errors
+- Writes to `src/tools-staging/{name}/` for review
+- To activate: review, `mv` to `src/tools/`, restart
+
+**Instruction tools:**
+- Writes Skill.md directly to `src/tools/{name}/`
+- Hot-registers into running system (available immediately for next goal)
+- No restart needed
+
+**Limits:** Only one create-tool call allowed per planner session.
 
 ## Common Workflows
 
-**Generate a new API wrapper tool:**
+**Create an instruction tool from research results:**
+```json
+{"type":"create-tool","name":"bluesky-metrics","description":"Instructions for retrieving Bluesky engagement metrics via public API","requirements":"Use fetch-text to call https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor={HANDLE} for profile metrics and app.bsky.feed.getAuthorFeed for post engagement. No auth required.","tool_type":"instruction","out":"$result"}
+```
+
+**Generate a new Python tool:**
 ```json
 {"type":"create-tool","name":"post-bluesky","description":"Post text to Bluesky social network","requirements":"Use atproto library. Read BLUESKY_HANDLE and BLUESKY_PASSWORD from env. Accept 'text' parameter with post content (max 300 chars). Return success/failure with post URI if successful.","out":"$result"}
-{"type":"say","target":"User","value":"$result"}
 ```
-
-**Generate a data-fetching tool:**
-```json
-{"type":"create-tool","name":"fetch-rss","description":"Fetch and parse an RSS feed, returning recent items as a Note","requirements":"Use feedparser library. Accept 'url' parameter. Return a Note with the 10 most recent items as JSON (title, link, published, summary).","out":"$result"}
-```
-

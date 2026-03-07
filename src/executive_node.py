@@ -307,7 +307,29 @@ class ZenohExecutiveNode:
                 logger.debug(f"World tools directory not found: {world_tools_dir}")
         
         return tools
-    
+
+    def _register_tool(self, tool_dir_path: str) -> bool:
+        """Hot-register a single tool from its directory into all subsystems."""
+        from utils.tool_loader import load_tools
+        from pathlib import Path
+        parent = str(Path(tool_dir_path).parent)
+        new_tools = load_tools(parent)
+        tool_name = Path(tool_dir_path).name
+        if tool_name not in new_tools:
+            logger.warning(f"_register_tool: '{tool_name}' not found in {parent}")
+            return False
+        meta = new_tools[tool_name]
+        self.available_tools[tool_name] = meta
+        if self.infospace_executor:
+            self.infospace_executor.available_tools[tool_name] = meta
+        if self.incremental_planner:
+            from incremental_planner import build_tool_catalog, tool_catalog_text
+            self.incremental_planner.available_tools[tool_name] = meta
+            self.incremental_planner.tools = build_tool_catalog(self.incremental_planner.available_tools)
+            self.incremental_planner.tools_catalog_text = tool_catalog_text(self.incremental_planner.tools)
+        logger.info(f"_register_tool: '{tool_name}' registered (type={meta.get('type')})")
+        return True
+
     def __init__(self, character_name="default", character_config=None, runtime=None, tokenizer=None):
         # Store character info (canonicalized)
         self.character_name = character_name.capitalize()
@@ -443,13 +465,15 @@ class ZenohExecutiveNode:
                 }
             return None
         
-        # LLM backend - Use SGLang.Runtime for infospace, vLLM or OpenRouter as alternatives, ZenohLLMClient as fallback
+        # LLM backend - Use shared/local SGLang when available, direct provider APIs otherwise,
+        # and fall back to ZenohLLMClient only when no direct backend is configured.
         llm_config = self.character_config.get('llm_config', {})
         server_name = llm_config.get('server_name', 'openai')
         model_name = llm_config.get('model_name', 'gpt-4.1')
         sgl_model_path = llm_config.get('sgl_model_path')
         vllm_model_path = llm_config.get('vllm_model_path')
         vllm_url = llm_config.get('vllm_url', 'http://localhost:5000/v1/chat/completions')
+        openai_model_path = llm_config.get('openai_model_path')
         openrouter_model_path = llm_config.get('openrouter_model_path')
         openrouter_provider = llm_config.get('openrouter_provider')
         anthropic_model_path = llm_config.get('anthropic_model_path')
@@ -458,11 +482,15 @@ class ZenohExecutiveNode:
         self.llm_client = None
         self.vllm_model = None
         self.vllm_url = None
+        self.openai_model = None
+        self.openai_api_key = None
         self.openrouter_model = None
         self.openrouter_api_key = None
         self.openrouter_provider = None
         self.anthropic_model = None
         self.anthropic_api_key = None
+        self.alt_openai_model = None
+        self.alt_openai_api_key = None
         self.alt_openrouter_model = None
         self.alt_openrouter_api_key = None
         self.alt_openrouter_provider = None
@@ -488,6 +516,15 @@ class ZenohExecutiveNode:
             self.anthropic_model = anthropic_model_path
             self.anthropic_api_key = api_key
             logger.info(f"✅ Anthropic API configured with model: {anthropic_model_path}")
+        # Initialize OpenAI API if configured
+        elif openai_model_path:
+            api_key = os.getenv('OPENAI_API_KEY')
+            if not api_key:
+                logger.error("❌ OpenAI model configured but OPENAI_API_KEY environment variable not set")
+                raise ValueError("OPENAI_API_KEY environment variable required for OpenAI API")
+            self.openai_model = openai_model_path
+            self.openai_api_key = api_key
+            logger.info(f"✅ OpenAI API configured with model: {openai_model_path}")
         # Initialize OpenRouter if configured
         elif openrouter_model_path:
             api_key = os.getenv('OPENROUTER_API_KEY')
@@ -531,6 +568,7 @@ class ZenohExecutiveNode:
         alt_llm_config = self.character_config.get('alt_llm_config', {})
         if alt_llm_config:
             alt_anthropic = alt_llm_config.get('anthropic_model_path')
+            alt_openai = alt_llm_config.get('openai_model_path')
             alt_openrouter = alt_llm_config.get('openrouter_model_path')
             alt_openrouter_prov = alt_llm_config.get('openrouter_provider')
             alt_vllm = alt_llm_config.get('vllm_model_path')
@@ -543,6 +581,14 @@ class ZenohExecutiveNode:
                     logger.info(f"✅ Alt LLM (Anthropic) configured: {alt_anthropic}")
                 else:
                     logger.warning("⚠️ alt_llm_config has anthropic_model_path but CLAUDE_API_KEY not set - alt LLM disabled")
+            elif alt_openai:
+                api_key = os.getenv('OPENAI_API_KEY')
+                if api_key:
+                    self.alt_openai_model = alt_openai
+                    self.alt_openai_api_key = api_key
+                    logger.info(f"✅ Alt LLM (OpenAI) configured: {alt_openai}")
+                else:
+                    logger.warning("⚠️ alt_llm_config has openai_model_path but OPENAI_API_KEY not set - alt LLM disabled")
             elif alt_openrouter:
                 api_key = os.getenv('OPENROUTER_API_KEY')
                 if api_key:
@@ -649,13 +695,19 @@ class ZenohExecutiveNode:
                 self.api_server = None
         
         # Fallback to ZenohLLMClient if SGLang not available
-        if not self.runtime:
+        has_direct_llm_backend = any((
+            self.anthropic_model and self.anthropic_api_key,
+            self.openai_model and self.openai_api_key,
+            self.openrouter_model and self.openrouter_api_key,
+            self.vllm_model and self.vllm_url,
+        ))
+        if not self.runtime and not has_direct_llm_backend:
             self.llm_client = ZenohLLMClient(server_name=server_name, model_name=model_name, service_timeout=200.0 if not self.debug else 300.0)
             logger.info(f'🤖 LLM client initialized (server={server_name}, model={model_name})')
         
         # Create llm_generate wrapper function (unified interface for LLM calls)
         def llm_generate(messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
-            """Unified LLM generation interface - uses SGLang Runtime if available, else ZenohLLMClient."""
+            """Unified LLM generation interface - uses executor-backed providers when available, else ZenohLLMClient."""
             if self.runtime:
                 # Use SGLang Runtime - apply bindings if provided
                 if bindings and isinstance(messages, list):
@@ -677,6 +729,20 @@ class ZenohExecutiveNode:
                 else:
                     logger.error("SGLang Runtime available but no infospace_executor to use it")
                     return type('Response', (), {'success': False, 'error': 'No executor', 'text': ''})()
+            elif self.infospace_executor and any((
+                self.infospace_executor.anthropic_model and self.infospace_executor.anthropic_api_key,
+                self.infospace_executor.openai_model and self.infospace_executor.openai_api_key,
+                self.infospace_executor.openrouter_model and self.infospace_executor.openrouter_api_key,
+                self.infospace_executor.vllm_model and self.infospace_executor.vllm_url,
+            )):
+                return self.infospace_executor.llm_generate(
+                    messages=messages,
+                    bindings=bindings,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    is_json=is_json,
+                    stops=stops,
+                )
             else:
                 # Fallback to ZenohLLMClient
                 return self.llm_client.generate(
@@ -749,6 +815,9 @@ class ZenohExecutiveNode:
         if self.vllm_model and self.vllm_url:
             self.infospace_executor.vllm_model = self.vllm_model
             self.infospace_executor.vllm_url = self.vllm_url
+        if self.openai_model and self.openai_api_key:
+            self.infospace_executor.openai_model = self.openai_model
+            self.infospace_executor.openai_api_key = self.openai_api_key
         if self.openrouter_model and self.openrouter_api_key:
             self.infospace_executor.openrouter_model = self.openrouter_model
             self.infospace_executor.openrouter_api_key = self.openrouter_api_key
@@ -756,6 +825,9 @@ class ZenohExecutiveNode:
         if self.anthropic_model and self.anthropic_api_key:
             self.infospace_executor.anthropic_model = self.anthropic_model
             self.infospace_executor.anthropic_api_key = self.anthropic_api_key
+        if self.alt_openai_model and self.alt_openai_api_key:
+            self.infospace_executor.alt_openai_model = self.alt_openai_model
+            self.infospace_executor.alt_openai_api_key = self.alt_openai_api_key
         if self.alt_openrouter_model and self.alt_openrouter_api_key:
             self.infospace_executor.alt_openrouter_model = self.alt_openrouter_model
             self.infospace_executor.alt_openrouter_api_key = self.alt_openrouter_api_key
@@ -861,6 +933,7 @@ class ZenohExecutiveNode:
             sgl_model_path = llm_config.get('sgl_model_path')
             vllm_model_path = llm_config.get('vllm_model_path')
             vllm_url = llm_config.get('vllm_url', 'http://localhost:5000/v1/chat/completions')
+            openai_model_path = llm_config.get('openai_model_path')
             openrouter_model_path = llm_config.get('openrouter_model_path')
             anthropic_model_path = llm_config.get('anthropic_model_path')
             
@@ -893,6 +966,15 @@ class ZenohExecutiveNode:
                     anthropic_model_path=anthropic_model_path
                 )
                 logger.info(f'🚀 IncrementalPlanner initialized (Anthropic API) for {character_name}')
+            elif openai_model_path and self.openai_model:
+                # Use OpenAI API
+                self.incremental_planner = IncrementalPlanner(
+                    executor=self.infospace_executor,
+                    available_tools=self.available_tools,
+                    logger_instance=logger,
+                    openai_model_path=openai_model_path
+                )
+                logger.info(f'🚀 IncrementalPlanner initialized (OpenAI API) for {character_name}')
             elif openrouter_model_path and self.openrouter_model:
                 # Use OpenRouter
                 self.incremental_planner = IncrementalPlanner(
@@ -903,7 +985,7 @@ class ZenohExecutiveNode:
                 )
                 logger.info(f'🚀 IncrementalPlanner initialized (OpenRouter) for {character_name}')
             else:
-                logger.warning(f'⚠️  Neither SGLang, vLLM, Anthropic, nor OpenRouter configured - incremental planning disabled')
+                logger.warning(f'⚠️  Neither SGLang, vLLM, Anthropic, OpenAI, nor OpenRouter configured - incremental planning disabled')
         except Exception as e:
             logger.warning(f'⚠️  Failed to initialize IncrementalPlanner: {e}')
             import traceback
@@ -1615,6 +1697,7 @@ class ZenohExecutiveNode:
             'final_content': final_content,
             'quality_status': self.current_plan.get('quality_status', 'unknown'),
             'verification_answer': self.current_plan.get('verification_answer', ''),
+            'primary_product': self.current_plan.get('primary_product', ''),
             'bindings': bindings,
             'timestamp': datetime.now().isoformat(),
             'character': self.character_name,
@@ -1639,38 +1722,47 @@ class ZenohExecutiveNode:
             logger.debug(f'Using FINAL_ANSWER for conversation (no say action found): {final_thoughts_clean[:50]}...')
             self.conversation_store.record_outgoing("User", final_thoughts_clean, act_type="response")
         
-        # Publish final_answer as a "say" action to User so it appears in action log
-        # Only publish if final_thoughts is non-empty, meaningful, and different from last_say_text
-        # (to avoid duplicating the actual say action that was already published)
-        # Require meaningful content: at least 20 chars and not just whitespace/punctuation
-        if (not interrupted_final) and final_thoughts_clean and len(final_thoughts_clean) >= 20 and final_thoughts_clean.replace(' ', '').replace('.', '').replace(',', '').replace('!', '').replace('?', '').strip():
-            # Only publish if final_thoughts is different from the last say action
-            # This prevents duplicating the actual say action content
-            if final_thoughts_clean != last_say:
-                # Check if we've already published this final_answer for this plan
-                plan_id = getattr(self, 'current_plan_id', None)
-                last_published_final = getattr(self, '_last_published_final_answer', None)
-                if last_published_final != final_thoughts_clean:
-                    final_answer_action = {
-                        'type': 'say',
-                        'action_type': 'say',
-                        'action_id': f'final_answer_{int(time.time() * 1000)}',
-                        'timestamp': datetime.now().isoformat(),
-                        'text': final_thoughts_clean,
-                        'source': self.character_name,
-                        'target': 'User',
-                        'is_text_only': True
-                    }
-                    self.action_publisher.put(json.dumps(final_answer_action))
-                    self._last_published_final_answer = final_thoughts_clean
-                    logger.info(f'📤 Published FINAL_ANSWER to action log: {final_thoughts_clean[:100]}...')
-                else:
-                    logger.debug(f'Skipping final_answer publication - already published for this plan')
-            else:
-                logger.debug(f'Skipping final_answer publication - same as last_say_text')
-        elif final_thoughts_clean:
-            # Log when we skip due to insufficient content (for debugging)
-            logger.debug(f'Skipping final_answer publication - content too short or only punctuation: "{final_thoughts_clean[:50]}..."')
+        # Publish result to action log for UI display.
+        # Three cases:
+        #   A) In-plan say already addressed user → skip (already visible)
+        #   B) No in-plan say, but primary_product exists → show product reference
+        #   C) No in-plan say, no product → show FINAL_ANSWER text
+        primary_product = plan_result.get('primary_product', '')
+        if last_say:
+            # Case A: user was already addressed during plan execution
+            if primary_product and primary_product != last_say:
+                logger.debug(f'In-plan say covered response; primary product: {primary_product}')
+        elif not interrupted_final and not is_scheduled_goal:
+            if primary_product:
+                # Case B: show the primary product as a clickable reference
+                display_text = final_thoughts_clean or "Done."
+                display_text = f"{display_text}\n→ {primary_product}"
+                result_action = {
+                    'type': 'say',
+                    'action_type': 'say',
+                    'action_id': f'final_answer_{int(time.time() * 1000)}',
+                    'timestamp': datetime.now().isoformat(),
+                    'text': display_text,
+                    'source': self.character_name,
+                    'target': 'User',
+                    'is_text_only': True
+                }
+                self.action_publisher.put(json.dumps(result_action))
+                logger.info(f'📤 Published result with primary product: {primary_product}')
+            elif final_thoughts_clean and len(final_thoughts_clean) >= 20 and final_thoughts_clean.replace(' ', '').replace('.', '').replace(',', '').replace('!', '').replace('?', '').strip():
+                # Case C: no product, show FINAL_ANSWER text
+                final_answer_action = {
+                    'type': 'say',
+                    'action_type': 'say',
+                    'action_id': f'final_answer_{int(time.time() * 1000)}',
+                    'timestamp': datetime.now().isoformat(),
+                    'text': final_thoughts_clean,
+                    'source': self.character_name,
+                    'target': 'User',
+                    'is_text_only': True
+                }
+                self.action_publisher.put(json.dumps(final_answer_action))
+                logger.info(f'📤 Published FINAL_ANSWER to action log: {final_thoughts_clean[:100]}...')
 
         # Update living context (situation note) after non-trivial goal completion
         if not interrupted_final and self.current_goal and plan_result.get('status') in ('complete', 'failed'):
@@ -2738,12 +2830,14 @@ class ZenohExecutiveNode:
         review = self._read_and_delete_draft_note("_task_review")
         outcome = ""
         output_artifacts = []
+        output_artifact_names = {}
         if review and isinstance(review, dict):
             outcome = review.get("step_outcome", "")
-            output_artifacts = review.get("output_artifacts", [])
+            output_artifacts = review.get("resolved_output_artifacts", review.get("output_artifacts", []))
             # Register declared-name → resource-ID mappings so downstream phases can resolve by name
             name_map = review.get("output_artifact_names")
             if name_map and isinstance(name_map, dict) and self.resource_manager:
+                output_artifact_names = name_map
                 for art_name, rid in name_map.items():
                     if isinstance(art_name, str) and isinstance(rid, str) and rid:
                         self.resource_manager.named_notes[art_name] = rid
@@ -2759,12 +2853,12 @@ class ZenohExecutiveNode:
                 return
             revised = review.get("revised_remaining_steps")
             if revised and isinstance(revised, list):
-                self.task_manager.complete_current_step(task_id, outcome, output_artifacts)
+                self.task_manager.complete_current_step(task_id, outcome, output_artifacts, output_artifact_names)
                 task = self.task_manager.get_task(task_id)
                 if task and task.get("status") != TASK_COMPLETED:
                     self.task_manager.update_remaining_plan(task_id, revised)
             else:
-                self.task_manager.complete_current_step(task_id, outcome, output_artifacts)
+                self.task_manager.complete_current_step(task_id, outcome, output_artifacts, output_artifact_names)
         else:
             response = (result.get("response") or "phase completed")[:300]
             self.task_manager.complete_current_step(task_id, response, [])
@@ -2830,7 +2924,8 @@ class ZenohExecutiveNode:
             return
         keep_ids = set(task.get("artifacts", []))
         for step in task.get("abstract_plan", []):
-            for art in step.get("output_artifacts", []) or []:
+            resolved_outputs = step.get("resolved_output_artifacts", step.get("output_artifacts", [])) or []
+            for art in resolved_outputs:
                 if isinstance(art, str):
                     keep_ids.add(art.strip())
                     if hasattr(self.resource_manager, "_resolve_resource_id"):
@@ -3572,8 +3667,10 @@ class ZenohExecutiveNode:
                 result_str = self._truncate_result(last_action.result)
                 recent_context += f"\n# Last action:\n  {last_action.action.get('type')}: {last_action.action.get('target')} - {result_str}\n"
             
-            # Resolve declared output_artifacts for the current task step (used as eval target hint)
+            # Resolve declared/resolved output artifacts for the current task step
             step_output_artifacts = []
+            step_resolved_output_artifacts = []
+            step_output_artifact_names = {}
             active_goal = self.task_manager.active_task_goal if self.task_manager else None
             if active_goal and active_goal.get("goal_type") == "execute":
                 task_for_context = self.task_manager.get_task(active_goal["task_id"])
@@ -3581,8 +3678,13 @@ class ZenohExecutiveNode:
                     plan_steps = task_for_context.get("abstract_plan", [])
                     step_idx = task_for_context.get("current_step", 1) - 1
                     if 0 <= step_idx < len(plan_steps):
-                        oa = plan_steps[step_idx].get("output_artifacts", [])
+                        step_data = plan_steps[step_idx]
+                        oa = step_data.get("declared_output_artifacts", step_data.get("output_artifacts", []))
                         step_output_artifacts = oa if isinstance(oa, list) else ([oa] if oa else [])
+                        roa = step_data.get("resolved_output_artifacts", [])
+                        step_resolved_output_artifacts = roa if isinstance(roa, list) else ([roa] if roa else [])
+                        name_map = step_data.get("output_artifact_names", {})
+                        step_output_artifact_names = name_map if isinstance(name_map, dict) else {}
 
             # Build scoped vision goal for step execution (avoids _generate_vision using the full task description)
             vision_goal = goal_text
@@ -3602,6 +3704,8 @@ class ZenohExecutiveNode:
                 'recent_context': recent_context,
                 'executor': self.infospace_executor,  # Pass executor for incremental planner
                 'output_artifacts': step_output_artifacts,
+                'resolved_output_artifacts': step_resolved_output_artifacts,
+                'output_artifact_names': step_output_artifact_names,
                 'vision_goal': vision_goal,
             }
             
@@ -4859,27 +4963,24 @@ class ZenohExecutiveNode:
                 self._handle_task_goal_completed(result)
                 return result
 
+            self.current_plan = result
             if result.get('success', False):
-                self.current_plan = result
                 self._publish_current_plan()
                 self.plan_just_generated = True
-                if result.get('response', None):
-                    self.infospace_executor.execute_action({"type": "say", "target": "user", "value": result.get('response')})
             else:
                 if result.get('response') == "Interrupted by user.":
                     logger.info(f"Planning interrupted for {self.character_name}; clearing current plan for clean terminal ask turn.")
                     self.current_plan = None
                 elif result.get('response'):
+                    # Non-success with response (partial, quality gate fail, etc.)
+                    # Still publish so _publish_plan_result can show the result
+                    self._publish_current_plan()
                     logger.warning(
                         f"Plan returned non-success with response (quality_status={result.get('quality_status', 'unknown')}, "
                         f"verification_answer={result.get('verification_answer', '')}); not treating as internal error."
                     )
                 else:
                     logger.error(f"Error in _plan: {result.get('error', 'Unknown error')}")
-                return result
-            if self.current_plan:
-                self._publish_current_plan()
-                self.plan_just_generated = True
             return result
             
         except Exception as e:

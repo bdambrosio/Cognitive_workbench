@@ -46,20 +46,36 @@ def _dedup_key(body: str, to: str, subject: str) -> Tuple[str, str]:
     return (content_hash, args_hash)
 
 
-def _check_dedup(body: str, to: str, subject: str) -> Optional[Dict]:
+def _get_executor_dedup_cache(executor: Optional[InfospaceExecutor]) -> Dict[Tuple[str, str], Tuple[float, Dict]]:
+    if not executor:
+        return {}
+    cache = getattr(executor, "_tool_dedup_cache", None)
+    if not isinstance(cache, dict):
+        cache = {}
+        executor._tool_dedup_cache = cache
+    tool_cache = cache.get("send-email")
+    if not isinstance(tool_cache, dict):
+        tool_cache = {}
+        cache["send-email"] = tool_cache
+    return tool_cache
+
+
+def _check_dedup(body: str, to: str, subject: str, executor: Optional[InfospaceExecutor] = None) -> Optional[Dict]:
     """Return cached result if an identical send happened within the dedup window."""
     key = _dedup_key(body, to, subject)
-    entry = _dedup_cache.get(key)
-    if entry:
-        ts, cached_result = entry
-        if time.monotonic() - ts < DEDUP_WINDOW_SECS:
-            return cached_result
-        del _dedup_cache[key]
+    for cache in (_get_executor_dedup_cache(executor), _dedup_cache):
+        entry = cache.get(key)
+        if entry:
+            ts, cached_result = entry
+            if time.monotonic() - ts < DEDUP_WINDOW_SECS:
+                return cached_result
+            del cache[key]
     return None
 
 
-def _record_dedup(body: str, to: str, subject: str, result: Dict):
+def _record_dedup(body: str, to: str, subject: str, result: Dict, executor: Optional[InfospaceExecutor] = None):
     key = _dedup_key(body, to, subject)
+    _get_executor_dedup_cache(executor)[key] = (time.monotonic(), result)
     _dedup_cache[key] = (time.monotonic(), result)
 
 # ---------------------------------------------------------------------------
@@ -198,9 +214,21 @@ def tool(input_value, runtime=None, **kwargs):
 
     logger.info(f"send-email: to={to_addrs} subject={subject!r}")
 
+    # Per-goal guard: only one send-email per planner session
+    plan_id = getattr(getattr(executor, 'executive_node', None), 'current_plan_id', None)
+    if plan_id:
+        used = getattr(executor, '_side_effect_used_goals', None)
+        if used is None:
+            used = {}
+            executor._side_effect_used_goals = used
+        goal_key = f"send-email:{plan_id}"
+        if goal_key in used:
+            logger.warning(f"send-email: blocked — already sent in plan {plan_id}, returning cached result")
+            return used[goal_key]
+
     # Dedup check — reject identical sends within 10-minute window
     to_display_dedup = ', '.join(to_addrs)
-    cached = _check_dedup(body, to_display_dedup, subject)
+    cached = _check_dedup(body, to_display_dedup, subject, executor=executor)
     if cached:
         logger.warning(f"send-email: dedup hit — identical email to {to_display_dedup} subject={subject!r} "
                        f"sent within last {DEDUP_WINDOW_SECS}s, returning cached result")
@@ -246,12 +274,17 @@ def tool(input_value, runtime=None, **kwargs):
     if not note_id:
         # Email was sent but we couldn't create the confirmation Note
         result = _success(executor, confirmation_text, None, extra=metadata)
-        _record_dedup(body, to_display, subject, result)
+        _record_dedup(body, to_display, subject, result, executor=executor)
+        if plan_id and hasattr(executor, '_side_effect_used_goals'):
+            executor._side_effect_used_goals[f"send-email:{plan_id}"] = result
         return result
 
     logger.info(f"send-email: confirmation Note {note_id}")
     result = _success(executor, confirmation_text, note_id, extra=metadata)
-    _record_dedup(body, to_display, subject, result)
+    _record_dedup(body, to_display, subject, result, executor=executor)
+    # Record for per-goal guard
+    if plan_id and hasattr(executor, '_side_effect_used_goals'):
+        executor._side_effect_used_goals[f"send-email:{plan_id}"] = result
     return result
 
 

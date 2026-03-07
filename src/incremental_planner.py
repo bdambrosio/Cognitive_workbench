@@ -1773,6 +1773,179 @@ _ARTIFACT_PRODUCING_TOOLS = frozenset({"synthesize", "extract", "generate-note"}
 # Subset of artifact-producing tools that typically produce goal-level output.
 # A FAIL from the lightweight classifier on these triggers deep (subplanner) evaluation.
 _GOAL_LEVEL_TOOLS = frozenset({"synthesize", "_code_block_"})
+_SIDE_EFFECT_TOOLS = frozenset({"send-email", "post-bluesky"})
+
+
+def _normalize_artifact_refs(values: Any) -> List[str]:
+    if values is None:
+        return []
+    if isinstance(values, str):
+        values = [values]
+    if not isinstance(values, list):
+        return []
+    refs = []
+    for value in values:
+        if value is None:
+            continue
+        if not isinstance(value, str):
+            value = str(value)
+        value = value.strip()
+        if value:
+            refs.append(value)
+    return list(dict.fromkeys(refs))
+
+
+def _normalize_artifact_name_map(values: Any) -> Dict[str, str]:
+    if not isinstance(values, dict):
+        return {}
+    normalized = {}
+    for key, value in values.items():
+        if key is None or value is None:
+            continue
+        if not isinstance(key, str):
+            key = str(key)
+        if not isinstance(value, str):
+            value = str(value)
+        key = key.strip()
+        value = value.strip()
+        if key and value:
+            normalized[key] = value
+    return normalized
+
+
+def _resolve_artifact_reference_id(reference: str, executor, output_artifact_names: Optional[Dict[str, str]] = None) -> str:
+    """Resolve resource IDs, $bindings, stable names, and declared output name mappings."""
+    if not reference or not executor:
+        return ""
+    ref = str(reference).strip()
+    if not ref:
+        return ""
+    if ref.startswith(("Note_", "Collection_")):
+        return ref
+
+    if ref.startswith("$"):
+        binding_key = ref.lstrip("$")
+        rid = executor.plan_bindings_flat.get(binding_key) or executor.plan_bindings_flat.get("$" + binding_key)
+        if isinstance(rid, str) and rid.startswith(("Note_", "Collection_")):
+            return rid
+        ref = binding_key
+
+    output_artifact_names = _normalize_artifact_name_map(output_artifact_names)
+    mapped = output_artifact_names.get(ref)
+    if mapped:
+        return _resolve_artifact_reference_id(mapped, executor)
+
+    rid = executor.plan_bindings_flat.get(ref) or executor.plan_bindings_flat.get("$" + ref)
+    if isinstance(rid, str) and rid.startswith(("Note_", "Collection_")):
+        return rid
+
+    if getattr(executor, "resource_manager", None) and hasattr(executor.resource_manager, "_resolve_resource_id"):
+        rid = executor.resource_manager._resolve_resource_id(ref)
+        if isinstance(rid, str) and rid.startswith(("Note_", "Collection_")):
+            return rid
+    return ""
+
+
+def _get_resource_content_text(resource_id: str, executor) -> str:
+    if not resource_id or not executor or not getattr(executor, "resource_manager", None):
+        return ""
+    try:
+        resource = executor.resource_manager.get_resource(resource_id)
+        if not resource:
+            return ""
+        content = resource.get("properties", {}).get("content", "")
+        if content is None:
+            return ""
+        return content if isinstance(content, str) else str(content)
+    except Exception:
+        return ""
+
+
+def _is_side_effect_artifact(resource_id: str, executor) -> bool:
+    if not resource_id or not executor or not getattr(executor, "resource_manager", None):
+        return False
+    try:
+        resource = executor.resource_manager.get_resource(resource_id)
+        if not resource:
+            return False
+        source_skill = str(resource.get("properties", {}).get("source_skill", "")).strip().lower()
+        return source_skill in _SIDE_EFFECT_TOOLS
+    except Exception:
+        return False
+
+
+def _resolve_artifact_candidates(references: List[str], executor, output_artifact_names: Optional[Dict[str, str]] = None) -> List[str]:
+    candidates: List[str] = []
+    for reference in _normalize_artifact_refs(references):
+        rid = _resolve_artifact_reference_id(reference, executor, output_artifact_names=output_artifact_names)
+        if rid and rid not in candidates:
+            candidates.append(rid)
+    return candidates
+
+
+def _is_explicit_artifact_reference(
+    raw_reference: str,
+    resource_id: str,
+    declared_output_artifacts: List[str],
+    resolved_output_artifacts: List[str],
+    output_artifact_names: Optional[Dict[str, str]] = None,
+) -> bool:
+    reference = str(raw_reference or "").strip()
+    explicit_refs = set(_normalize_artifact_refs(declared_output_artifacts))
+    explicit_refs.update(_normalize_artifact_refs(resolved_output_artifacts))
+    explicit_refs.update(_normalize_artifact_name_map(output_artifact_names).keys())
+    if reference in explicit_refs or reference.lstrip("$") in explicit_refs:
+        return True
+    explicit_ids = set(_normalize_artifact_refs(resolved_output_artifacts))
+    if resource_id in explicit_ids:
+        return True
+    mapped = _normalize_artifact_name_map(output_artifact_names).get(reference) or _normalize_artifact_name_map(output_artifact_names).get(reference.lstrip("$"))
+    return bool(mapped and mapped == resource_id)
+
+
+def _select_primary_artifact_id(
+    executor,
+    declared_output_artifacts: List[str],
+    resolved_output_artifacts: List[str],
+    output_artifact_names: Optional[Dict[str, str]] = None,
+    code_block_output_created: bool = False,
+) -> str:
+    output_artifact_names = _normalize_artifact_name_map(output_artifact_names)
+
+    for rid in _resolve_artifact_candidates(resolved_output_artifacts, executor, output_artifact_names=output_artifact_names):
+        return rid
+
+    for rid in _resolve_artifact_candidates(declared_output_artifacts, executor, output_artifact_names=output_artifact_names):
+        if not _is_side_effect_artifact(rid, executor):
+            return rid
+
+    if code_block_output_created:
+        rid = _resolve_artifact_reference_id("$code_block_output", executor)
+        if rid:
+            return rid
+
+    return ""
+
+
+def _allow_llm_eval_target_override(
+    raw_reference: str,
+    resource_id: str,
+    executor,
+    declared_output_artifacts: List[str],
+    resolved_output_artifacts: List[str],
+    output_artifact_names: Optional[Dict[str, str]] = None,
+) -> bool:
+    if not resource_id:
+        return False
+    if not _is_side_effect_artifact(resource_id, executor):
+        return True
+    return _is_explicit_artifact_reference(
+        raw_reference,
+        resource_id,
+        declared_output_artifacts=declared_output_artifacts,
+        resolved_output_artifacts=resolved_output_artifacts,
+        output_artifact_names=output_artifact_names,
+    )
 
 
 def _vision_eval_check(vision_criteria: str, eval_target: str, executor, compressed_context: str = "") -> str:
@@ -1945,15 +2118,7 @@ END_EVAL"""
 
 def _resolve_eval_target_id(eval_target: str, executor) -> str:
     """Resolve $var or Note_ID/Collection_ID to a concrete resource ID, or return ''."""
-    if not eval_target or not executor:
-        return ""
-    if isinstance(eval_target, str) and (eval_target.startswith("Note_") or eval_target.startswith("Collection_")):
-        return eval_target
-    if isinstance(eval_target, str) and eval_target.startswith("$"):
-        rid = executor.plan_bindings_flat.get(eval_target.lstrip("$"))
-        if isinstance(rid, str) and (rid.startswith("Note_") or rid.startswith("Collection_")):
-            return rid
-    return ""
+    return _resolve_artifact_reference_id(eval_target, executor)
 
 
 def _resolve_eval_target_text(eval_target: str, executor) -> str:
@@ -1964,20 +2129,10 @@ def _resolve_eval_target_text(eval_target: str, executor) -> str:
     if not eval_target or not executor or not getattr(executor, "resource_manager", None):
         return ""
     try:
-        resource_id = None
-        if isinstance(eval_target, str) and eval_target.startswith("$"):
-            resource_id = executor.plan_bindings_flat.get(eval_target.lstrip("$"))
-        elif isinstance(eval_target, str) and eval_target.startswith("Note_"):
-            resource_id = eval_target
+        resource_id = _resolve_eval_target_id(eval_target, executor)
         if not resource_id:
             return ""
-        resource = executor.resource_manager.get_resource(resource_id)
-        if not resource:
-            return ""
-        content = resource.get("properties", {}).get("content", "")
-        if content is None:
-            return ""
-        return content if isinstance(content, str) else str(content)
+        return _get_resource_content_text(resource_id, executor)
     except Exception:
         return ""
 
@@ -2129,7 +2284,7 @@ if HAS_SGLANG:
     
     @function
     def tool_planner_infospace(s, template, goal: str, world_model: Dict, character_context: str, recent_context: str, 
-                              tools_catalog_text: str, executor, trace_file=None, max_steps: int = 16, similar_plan: Dict = None, preplan: str = None, vision_criteria: str = "", output_artifacts: List[str] = None):
+                              tools_catalog_text: str, executor, trace_file=None, max_steps: int = 16, similar_plan: Dict = None, preplan: str = None, vision_criteria: str = "", output_artifacts: List[str] = None, resolved_output_artifacts: List[str] = None, output_artifact_names: Dict[str, str] = None):
         """
         SGLang incremental planner for infospace goals.
         
@@ -2374,14 +2529,17 @@ ALWAYS follow all formatting instructions exactly.
 
         # Main loop
         current_task = s["first_task"].strip()
-        _declared_output_artifacts = output_artifacts or []
-        last_eval_target = ""
-        if _declared_output_artifacts and executor:
-            first_oa = _declared_output_artifacts[0].strip().lstrip("$")
-            rid = _resolve_eval_target_id("$" + first_oa, executor)
-            if rid:
-                last_eval_target = rid
-                logger.info(f"Eval target seeded from declared output_artifacts: {last_eval_target}")
+        _declared_output_artifacts = _normalize_artifact_refs(output_artifacts)
+        _resolved_output_artifacts = _normalize_artifact_refs(resolved_output_artifacts)
+        _output_artifact_names = _normalize_artifact_name_map(output_artifact_names)
+        last_eval_target = _select_primary_artifact_id(
+            executor,
+            declared_output_artifacts=_declared_output_artifacts,
+            resolved_output_artifacts=_resolved_output_artifacts,
+            output_artifact_names=_output_artifact_names,
+        )
+        if last_eval_target:
+            logger.info(f"Eval target seeded from explicit artifact context: {last_eval_target}")
         stall_guard_state = {"prev_signature": None, "repeat_count": 0}
         deep_eval_retried = False
         deep_eval_prev_artifact = None
@@ -2422,6 +2580,8 @@ ALWAYS follow all formatting instructions exactly.
             # Snapshot bindings before execution
             bindings_before = dict(executor.plan_bindings_flat)
             result_dict = execute_codegen_block(code_text, executor, "codegen")
+            if hasattr(executor, "_done_gate_retry_active"):
+                executor._done_gate_retry_active = False
             logger.info(f"Step {step}: plan_actions count: {len(getattr(executor, '_plan_actions', []))}")
             action = {"type": "_code_block_"}
             tool_result = format_result_text(result_dict, action)
@@ -2483,40 +2643,13 @@ ALWAYS follow all formatting instructions exactly.
             )
             
             # Vision evaluation before planner reflects — resolve to concrete resource ID
-            eval_target = ""
-            if _declared_output_artifacts and executor:
-                first_oa = _declared_output_artifacts[0].strip()
-                lookup_key = first_oa.lstrip("$")
-                rid = executor.plan_bindings_flat.get(lookup_key) or executor.plan_bindings_flat.get("$" + lookup_key)
-                if rid:
-                    eval_target = rid
-            # Prefer code_block_output (planner's explicit return value) over raw new_bindings —
-            # the return value is the planner's summary of what happened and is most likely to
-            # satisfy multi-faceted vision criteria. Without this, the heuristic picks the last
-            # Note binding (e.g. email confirmation) which causes false NEEDS_REVISION loops.
-            if not eval_target and code_block_output_created:
-                rid = executor.plan_bindings_flat.get("code_block_output")
-                if rid:
-                    eval_target = rid
-            if not eval_target and new_bindings:
-                # Prefer declared output artifacts that appear in new_bindings
-                if _declared_output_artifacts:
-                    for oa in _declared_output_artifacts:
-                        oa_key = oa.strip().lstrip("$")
-                        if oa_key in new_bindings and isinstance(new_bindings[oa_key], str) and (new_bindings[oa_key].startswith("Note_") or new_bindings[oa_key].startswith("Collection_")):
-                            eval_target = new_bindings[oa_key]
-                            break
-                if not eval_target:
-                    # Use last resource binding — code blocks execute sequentially so
-                    # the last binding is typically the final product.
-                    resource_keys = [k for k, rid in new_bindings.items()
-                                     if isinstance(rid, str) and (rid.startswith("Note_") or rid.startswith("Collection_"))
-                                     and not str(k).startswith("_") and str(k) != "code_block_output"]
-                    if resource_keys:
-                        eval_target = new_bindings[resource_keys[-1]]
-                    else:
-                        last_key = list(new_bindings.keys())[-1]
-                        eval_target = new_bindings[last_key]
+            eval_target = _select_primary_artifact_id(
+                executor,
+                declared_output_artifacts=_declared_output_artifacts,
+                resolved_output_artifacts=_resolved_output_artifacts,
+                output_artifact_names=_output_artifact_names,
+                code_block_output_created=code_block_output_created,
+            )
             if eval_target:
                 last_eval_target = eval_target
             # Mid-loop vision eval: only run on declared output artifacts (not every intermediate binding)
@@ -2566,8 +2699,19 @@ ALWAYS follow all formatting instructions exactly.
             # Update last_eval_target from LLM-declared EVAL_TARGET (overrides heuristic)
             llm_eval_target_raw = safe_get(s, f"eval_target_{step}", "").strip()
             if llm_eval_target_raw and llm_eval_target_raw.upper() != "NONE":
-                llm_rid = _resolve_eval_target_id(llm_eval_target_raw, executor)
-                if llm_rid:
+                llm_rid = _resolve_artifact_reference_id(
+                    llm_eval_target_raw,
+                    executor,
+                    output_artifact_names=_output_artifact_names,
+                )
+                if llm_rid and _allow_llm_eval_target_override(
+                    llm_eval_target_raw,
+                    llm_rid,
+                    executor,
+                    declared_output_artifacts=_declared_output_artifacts,
+                    resolved_output_artifacts=_resolved_output_artifacts,
+                    output_artifact_names=_output_artifact_names,
+                ):
                     last_eval_target = llm_rid
                     logger.info(f"Step {step}: LLM-declared eval target resolved: {last_eval_target}")
             
@@ -2644,6 +2788,8 @@ ALWAYS follow all formatting instructions exactly.
                                 deep_eval_retried = True
                                 deep_eval_prev_artifact = _resolve_eval_target_text(last_eval_target, executor)
                                 logger.info("Done gate: Deep eval returned NEEDS_REVISION; reopening loop for one retry")
+                                if hasattr(executor, "_done_gate_retry_active"):
+                                    executor._done_gate_retry_active = True
                                 s += user(
                                     f"QUALITY GATE FAILED — you must revise the artifact in {last_eval_target}.\n"
                                     f"Issues found:\n{deep_text}\n\n"
@@ -2880,7 +3026,7 @@ def _build_compressed_prompt(full_prompt: str, keep_last_n_steps: int = 2) -> st
 
 def vllm_gen(slot_name: str, prompt: str, state: Dict[str, Any], max_tokens: int,
              temperature: float, stop: Any = None, executor: InfospaceExecutor = None,
-             llm_prompt: str = None) -> str:
+             llm_prompt: str = None, reasoning_effort: str = None) -> str:
     """
     Replacement for SGLang gen(). Uses executor.llm_generate() for unified LLM interface.
     Appends response to prompt, stores in state.
@@ -2920,7 +3066,8 @@ def vllm_gen(slot_name: str, prompt: str, state: Dict[str, Any], max_tokens: int
             messages=messages,
             max_tokens=max_tokens+256,  # allow for reasoning
             temperature=temperature,
-            stops=stop_list if stop_list else None
+            stops=stop_list if stop_list else None,
+            reasoning_effort=reasoning_effort
         )
         
         if not response.success:
@@ -3092,7 +3239,7 @@ def vllm_gen_multi(prompt: str, state: Dict[str, Any], specs: List[Dict],
 def tool_planner_infospace_vllm(template, goal: str, world_model: Dict, character_context: str, recent_context: str, 
                                  tools_catalog_text: str, executor, trace_file=None, max_steps: int = 16, 
                                  similar_plan: Dict = None, preplan: str = None, vllm_url: str = None,
-                                 model: str = None, vision_criteria: str = "", output_artifacts: List[str] = None):
+                                 model: str = None, vision_criteria: str = "", output_artifacts: List[str] = None, resolved_output_artifacts: List[str] = None, output_artifact_names: Dict[str, str] = None):
     """
     vLLM-based incremental planner for infospace goals (alternative to SGLang version).
     
@@ -3378,6 +3525,7 @@ ALWAYS follow all formatting instructions exactly.
         "\n"
         "#Stage 3 FORMAT:\n"
         "  THOUGHTS: <brief assessment of result and progress>\n"
+        "  EVAL_TARGET: <single $variable (e.g. $report) of the key output artifact from this step, or NONE if no significant artifact>\n"
         "  DONE: <YES or NO — is the entire GOAL satisfied?>\n"
         "  VERIFICATION: <if DONE=YES: list observable facts proving GOAL is met, and any missing outcomes. Write SUCCESS, PARTIAL, or INCONCLUSIVE. If DONE=NO, leave blank.>\n"
         "  NEXT_TASK: <next task description, or blank if DONE=YES>\n"
@@ -3402,14 +3550,17 @@ ALWAYS follow all formatting instructions exactly.
     if not current_task:
         logger.warning("No first_task found, using goal as initial task")
         current_task = goal_for_step
-    _declared_output_artifacts = output_artifacts or []
-    last_eval_target = ""
-    if _declared_output_artifacts and executor:
-        first_oa = _declared_output_artifacts[0].strip().lstrip("$")
-        rid = _resolve_eval_target_id("$" + first_oa, executor)
-        if rid:
-            last_eval_target = rid
-            logger.info(f"Eval target seeded from declared output_artifacts: {last_eval_target}")
+    _declared_output_artifacts = _normalize_artifact_refs(output_artifacts)
+    _resolved_output_artifacts = _normalize_artifact_refs(resolved_output_artifacts)
+    _output_artifact_names = _normalize_artifact_name_map(output_artifact_names)
+    last_eval_target = _select_primary_artifact_id(
+        executor,
+        declared_output_artifacts=_declared_output_artifacts,
+        resolved_output_artifacts=_resolved_output_artifacts,
+        output_artifact_names=_output_artifact_names,
+    )
+    if last_eval_target:
+        logger.info(f"Eval target seeded from explicit artifact context: {last_eval_target}")
     stall_guard_state = {"prev_signature": None, "repeat_count": 0}
     deep_eval_retried = False
     deep_eval_prev_artifact = None
@@ -3431,7 +3582,7 @@ ALWAYS follow all formatting instructions exactly.
         prompt += format_assistant("```python\n")
         # Use compressed prompt for LLM call to reduce token count on later steps
         compressed_for_llm = _build_compressed_prompt(prompt, keep_last_n_steps=2) if step >= 3 else None
-        code_raw = vllm_gen(f"code_block_{step}", prompt, state, max_tokens=2048, temperature=GEN_TEMPERATURE, stop=["\n```"], executor=executor, llm_prompt=compressed_for_llm)
+        code_raw = vllm_gen(f"code_block_{step}", prompt, state, max_tokens=2048, temperature=GEN_TEMPERATURE, stop=["\n```"], executor=executor, llm_prompt=compressed_for_llm, reasoning_effort="medium")
         prompt += code_raw + "\n```\n"
         code_text = code_raw.strip()
         
@@ -3448,6 +3599,8 @@ ALWAYS follow all formatting instructions exactly.
         # Snapshot bindings before execution
         bindings_before = dict(executor.plan_bindings_flat)
         result_dict = execute_codegen_block(code_text, executor, "codegen")
+        if hasattr(executor, "_done_gate_retry_active"):
+            executor._done_gate_retry_active = False
         logger.info(f"Step {step}: plan_actions count: {len(getattr(executor, '_plan_actions', []))}")
         action = {"type": "_code_block_"}
         tool_result = format_result_text(result_dict, action)
@@ -3506,40 +3659,13 @@ ALWAYS follow all formatting instructions exactly.
         )
         
         # Vision evaluation before planner reflects — resolve to concrete resource ID
-        eval_target = ""
-        if _declared_output_artifacts and executor:
-            first_oa = _declared_output_artifacts[0].strip()
-            lookup_key = first_oa.lstrip("$")
-            rid = executor.plan_bindings_flat.get(lookup_key) or executor.plan_bindings_flat.get("$" + lookup_key)
-            if rid:
-                eval_target = rid
-        # Prefer code_block_output (planner's explicit return value) over raw new_bindings —
-        # the return value is the planner's summary of what happened and is most likely to
-        # satisfy multi-faceted vision criteria. Without this, the heuristic picks the last
-        # Note binding (e.g. email confirmation) which causes false NEEDS_REVISION loops.
-        if not eval_target and code_block_output_created:
-            rid = executor.plan_bindings_flat.get("code_block_output")
-            if rid:
-                eval_target = rid
-        if not eval_target and new_bindings:
-            # Prefer declared output artifacts that appear in new_bindings
-            if _declared_output_artifacts:
-                for oa in _declared_output_artifacts:
-                    oa_key = oa.strip().lstrip("$")
-                    if oa_key in new_bindings and isinstance(new_bindings[oa_key], str) and (new_bindings[oa_key].startswith("Note_") or new_bindings[oa_key].startswith("Collection_")):
-                        eval_target = new_bindings[oa_key]
-                        break
-            if not eval_target:
-                # Use last resource binding — code blocks execute sequentially so
-                # the last binding is typically the final product.
-                resource_keys = [k for k, rid in new_bindings.items()
-                                 if isinstance(rid, str) and (rid.startswith("Note_") or rid.startswith("Collection_"))
-                                 and not str(k).startswith("_") and str(k) != "code_block_output"]
-                if resource_keys:
-                    eval_target = new_bindings[resource_keys[-1]]
-                else:
-                    last_key = list(new_bindings.keys())[-1]
-                    eval_target = new_bindings[last_key]
+        eval_target = _select_primary_artifact_id(
+            executor,
+            declared_output_artifacts=_declared_output_artifacts,
+            resolved_output_artifacts=_resolved_output_artifacts,
+            output_artifact_names=_output_artifact_names,
+            code_block_output_created=code_block_output_created,
+        )
         if eval_target:
             last_eval_target = eval_target
         if eval_target and vision_criteria:
@@ -3550,19 +3676,21 @@ ALWAYS follow all formatting instructions exactly.
                 prompt += format_user(f"VISION EVALUATION:\n{vision_eval_text}\nFAILs are advisory — attempt to address if easy, do NOT loop repeatedly. Proceed after at most three retries.\n")
                 prompt += format_assistant("Noted.\n")
 
-        # Stage 3: simplified reflection (4 fields + inline verification when DONE)
+        # Stage 3: simplified reflection (5 fields + inline verification when DONE)
         prompt += format_assistant("")
         compressed_for_llm = _build_compressed_prompt(prompt, keep_last_n_steps=2) if step >= 3 else None
         stage3_block = vllm_gen(f"stage3_block_{step}", prompt, state, max_tokens=384, temperature=GEN_TEMPERATURE, executor=executor, llm_prompt=compressed_for_llm)
         prompt += stage3_block + "\n"
 
-        thoughts_val = _strip_think_tags(_extract_between_labels(stage3_block, "THOUGHTS:", "DONE:"))
+        thoughts_val = _strip_think_tags(_extract_between_labels(stage3_block, "THOUGHTS:", "EVAL_TARGET:"))
+        eval_target_val = _strip_think_tags(_extract_line_value(stage3_block, "EVAL_TARGET:"))
         done_val = _strip_think_tags(_extract_line_value(stage3_block, "DONE:"))
         verification_val = _strip_think_tags(_extract_between_labels(stage3_block, "VERIFICATION:", "NEXT_TASK:"))
         next_task_val = _strip_think_tags(_extract_between_labels(stage3_block, "NEXT_TASK:", "REQUEST_TOOLS:"))
         request_tools_val = _strip_think_tags(_extract_after_label(stage3_block, "REQUEST_TOOLS:").strip())
 
         state[f"thoughts_{step}"] = thoughts_val
+        state[f"eval_target_{step}"] = eval_target_val
         state[f"done_{step}"] = done_val
         state[f"verification_{step}"] = verification_val
         state[f"next_task_{step}"] = next_task_val
@@ -3575,11 +3703,30 @@ ALWAYS follow all formatting instructions exactly.
                 return default
         
         logger.info(f"THOUGHTS: {safe_get(state, f'thoughts_{step}')}")
+        logger.info(f"EVAL_TARGET: {safe_get(state, f'eval_target_{step}')}")
         logger.info(f"DONE: {safe_get(state, f'done_{step}')}")
         if verification_val:
             logger.info(f"VERIFICATION: {verification_val}")
         logger.info(f"NEXT_TASK: {safe_get(state, f'next_task_{step}')}")
         logger.info(f"REQUEST_TOOLS: {safe_get(state, f'request_tools_{step}')}")
+
+        llm_eval_target_raw = state.get(f"eval_target_{step}", "").strip()
+        if llm_eval_target_raw and llm_eval_target_raw.upper() != "NONE":
+            llm_rid = _resolve_artifact_reference_id(
+                llm_eval_target_raw,
+                executor,
+                output_artifact_names=_output_artifact_names,
+            )
+            if llm_rid and _allow_llm_eval_target_override(
+                llm_eval_target_raw,
+                llm_rid,
+                executor,
+                declared_output_artifacts=_declared_output_artifacts,
+                resolved_output_artifacts=_resolved_output_artifacts,
+                output_artifact_names=_output_artifact_names,
+            ):
+                last_eval_target = llm_rid
+                logger.info(f"Step {step}: LLM-declared eval target resolved: {last_eval_target}")
         
         # Stage 3.1: Update resource indexes with commentary
         thoughts_text = state.get(f'thoughts_{step}', '').strip()
@@ -3676,6 +3823,8 @@ ALWAYS follow all formatting instructions exactly.
                             deep_eval_retried = True
                             deep_eval_prev_artifact = _resolve_eval_target_text(last_eval_target, executor)
                             logger.info("Done gate: Deep eval returned NEEDS_REVISION; reopening loop for one retry")
+                            if hasattr(executor, "_done_gate_retry_active"):
+                                executor._done_gate_retry_active = True
                             prompt += format_user(
                                 f"QUALITY GATE FAILED — you must revise the artifact in {last_eval_target}.\n"
                                 f"Issues found:\n{deep_text}\n\n"
@@ -3929,7 +4078,8 @@ class IncrementalPlanner:
     def __init__(self, executor: InfospaceExecutor, available_tools: Dict[str, Dict], 
                 logger_instance=None, sgl_model_path: str = None, vllm_model_path: str = None,
                 vllm_url: str = "http://localhost:5000/v1/chat/completions", vllm_model: str = None,
-                openrouter_model_path: str = None, anthropic_model_path: str = None):
+                openrouter_model_path: str = None, anthropic_model_path: str = None,
+                openai_model_path: str = None):
         """
         Initialize incremental planner.
         
@@ -3938,16 +4088,17 @@ class IncrementalPlanner:
             available_tools: Dict of tool_name -> metadata
             primitives_reference: Primitives reference text
             logger_instance: Optional logger
-            sgl_model_path: Path to local model for SGLang (optional if vLLM/OpenRouter/Anthropic is used)
-            vllm_model_path: Path to model for vLLM (optional if SGLang/OpenRouter/Anthropic is used)
+            sgl_model_path: Path to local model for SGLang (optional if vLLM/OpenRouter/OpenAI/Anthropic is used)
+            vllm_model_path: Path to model for vLLM (optional if SGLang/OpenRouter/OpenAI/Anthropic is used)
             vllm_url: vLLM API endpoint (default: http://localhost:5000/v1/chat/completions)
             vllm_model: vLLM model name (resolved from vLLM server if not provided)
-            openrouter_model_path: Model name for OpenRouter (optional if SGLang/vLLM/Anthropic is used)
-            anthropic_model_path: Model name for Anthropic API (optional if SGLang/vLLM/OpenRouter is used)
+            openrouter_model_path: Model name for OpenRouter (optional if SGLang/vLLM/OpenAI/Anthropic is used)
+            anthropic_model_path: Model name for Anthropic API (optional if SGLang/vLLM/OpenAI/OpenRouter is used)
+            openai_model_path: Model name for OpenAI API (optional if SGLang/vLLM/OpenRouter/Anthropic is used)
         """
-        # Require either SGLang, vLLM, OpenRouter, or Anthropic
-        if not HAS_SGLANG and not vllm_model_path and not openrouter_model_path and not anthropic_model_path:
-            raise ImportError("Neither SGLang, vLLM, OpenRouter, nor Anthropic available - at least one backend required")
+        # Require either SGLang, vLLM, OpenRouter, OpenAI, or Anthropic
+        if not HAS_SGLANG and not vllm_model_path and not openrouter_model_path and not anthropic_model_path and not openai_model_path:
+            raise ImportError("Neither SGLang, vLLM, OpenRouter, OpenAI, nor Anthropic available - at least one backend required")
         
         self.executor: InfospaceExecutor = executor
         self.available_tools = available_tools
@@ -3964,12 +4115,15 @@ class IncrementalPlanner:
         # Store Anthropic config
         self.anthropic_model_path = anthropic_model_path
         
+        # Store OpenAI config
+        self.openai_model_path = openai_model_path
+        
         # SGLang runtime is now initialized in executive_node (optional)
         # Verify availability if SGLang is expected
         if sgl_model_path and not executor.runtime:
             self.logger.warning("SGLang runtime not available in executor - will use vLLM/OpenRouter if configured")
-        elif not vllm_model_path and not openrouter_model_path and not anthropic_model_path and not executor.runtime:
-            self.logger.warning("Neither SGLang runtime nor vLLM/OpenRouter config available - incremental planner may have reduced functionality")
+        elif not vllm_model_path and not openrouter_model_path and not anthropic_model_path and not openai_model_path and not executor.runtime:
+            self.logger.warning("Neither SGLang runtime nor vLLM/OpenRouter/OpenAI config available - incremental planner may have reduced functionality")
         
         # Build tool catalog
         self.tools = build_tool_catalog(available_tools)
@@ -4180,9 +4334,16 @@ class IncrementalPlanner:
         similar_plan: Optional[Dict] = None,
         vision_criteria: str = "",
         output_artifacts: Optional[List[str]] = None,
+        resolved_output_artifacts: Optional[List[str]] = None,
+        output_artifact_names: Optional[Dict[str, str]] = None,
     ):
         """Run the core tool planner using any configured backend."""
-        if (self.vllm_model_path and self.vllm_model) or (self.openrouter_model_path and self.executor.openrouter_model) or (self.anthropic_model_path and self.executor.anthropic_model):
+        if (
+            (self.vllm_model_path and self.vllm_model) or
+            (self.openrouter_model_path and self.executor.openrouter_model) or
+            (self.anthropic_model_path and self.executor.anthropic_model) or
+            (self.openai_model_path and self.executor.openai_model)
+        ):
             return tool_planner_infospace_vllm(
                 template=template,
                 goal=goal,
@@ -4199,6 +4360,8 @@ class IncrementalPlanner:
                 model=self.vllm_model,
                 vision_criteria=vision_criteria,
                 output_artifacts=output_artifacts or [],
+                resolved_output_artifacts=resolved_output_artifacts or [],
+                output_artifact_names=output_artifact_names or {},
             )
         if HAS_SGLANG and self.executor.runtime:
             return tool_planner_infospace.run(
@@ -4215,8 +4378,10 @@ class IncrementalPlanner:
                 similar_plan=similar_plan,
                 vision_criteria=vision_criteria,
                 output_artifacts=output_artifacts or [],
+                resolved_output_artifacts=resolved_output_artifacts or [],
+                output_artifact_names=output_artifact_names or {},
             )
-        raise RuntimeError("No planner backend available (SGLang, vLLM, Anthropic, or OpenRouter required)")
+        raise RuntimeError("No planner backend available (SGLang, vLLM, Anthropic, OpenAI, or OpenRouter required)")
 
     def __del__(self):
         """Cleanup: close trace file on instance destruction."""
@@ -4252,8 +4417,8 @@ class IncrementalPlanner:
         Returns:
             Plan dict with 'plan' key containing actions
         """
-        if not HAS_SGLANG and not self.vllm_model_path and not self.openrouter_model_path and not self.anthropic_model_path:
-            return {'error': 'Neither SGLang, vLLM, OpenRouter, nor Anthropic available'}
+        if not HAS_SGLANG and not self.vllm_model_path and not self.openrouter_model_path and not self.anthropic_model_path and not self.openai_model_path:
+            return {'error': 'Neither SGLang, vLLM, OpenRouter, OpenAI, nor Anthropic available'}
         
         # Get world_model from executor
         if not hasattr(self.executor, 'world_model') or not self.executor.world_model:
@@ -4271,6 +4436,9 @@ class IncrementalPlanner:
             self.executor._plan_actions = []
             self.executor._plan_error_count = 0  # Initialize error counter for this plan
             self.executor._side_effect_cache = {}  # Reset dedup cache per planner session
+            self.executor._successful_side_effect_results = {}
+            self.executor._done_gate_retry_active = False
+            self.executor._tool_dedup_cache = {}
             self.goal = goal
 
             preplan = goal
@@ -4372,8 +4540,8 @@ class IncrementalPlanner:
         Returns:
             Plan dict with 'plan' key containing actions
         """
-        if not HAS_SGLANG and not self.vllm_model_path and not self.openrouter_model_path and not self.anthropic_model_path:
-            return {'error': 'Neither SGLang, vLLM, OpenRouter, nor Anthropic available'}
+        if not HAS_SGLANG and not self.vllm_model_path and not self.openrouter_model_path and not self.anthropic_model_path and not self.openai_model_path:
+            return {'error': 'Neither SGLang, vLLM, OpenRouter, OpenAI, nor Anthropic available'}
         
         # Get world_model from executor
         if not hasattr(self.executor, 'world_model') or not self.executor.world_model:
@@ -4400,11 +4568,15 @@ class IncrementalPlanner:
             recent_context = ""
             situation_context = ""
             output_artifacts = []
+            resolved_output_artifacts = []
+            output_artifact_names = {}
             if context:
                 character_context = context.get('character_context', '')
                 recent_context = context.get('recent_context', '')
                 situation_context = context.get('situation_context', '')
                 output_artifacts = context.get('output_artifacts', []) or []
+                resolved_output_artifacts = context.get('resolved_output_artifacts', []) or []
+                output_artifact_names = context.get('output_artifact_names', {}) or {}
             if situation_context:
                 recent_context = f"\n# SITUATION AWARENESS\n{situation_context}\n" + recent_context
             recent_context += self.build_context(goal=goal)
@@ -4443,6 +4615,8 @@ class IncrementalPlanner:
                 similar_plan=similar_plans[0] if similar_plans else None,
                 vision_criteria=vision_criteria,
                 output_artifacts=output_artifacts,
+                resolved_output_artifacts=resolved_output_artifacts,
+                output_artifact_names=output_artifact_names,
             )
 
             step = self._find_last_step(state, max_steps)

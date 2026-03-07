@@ -247,7 +247,13 @@ class TaskManager:
             updates["initial_abstract_plan"] = copy.deepcopy(plan)
         return self.update_task(task_id, **updates)
 
-    def complete_current_step(self, task_id: str, outcome: str = "", output_artifacts: List[str] = None) -> Optional[Dict]:
+    def complete_current_step(
+        self,
+        task_id: str,
+        outcome: str = "",
+        output_artifacts: List[str] = None,
+        output_artifact_names: Optional[Dict[str, str]] = None,
+    ) -> Optional[Dict]:
         """Mark current step completed and advance to next."""
         task = self.get_task(task_id)
         if not task:
@@ -255,11 +261,14 @@ class TaskManager:
         plan = task.get("abstract_plan", [])
         idx = task.get("current_step", 1) - 1
         output_artifacts = self._normalize_artifact_list(output_artifacts)
+        output_artifact_names = self._normalize_artifact_name_map(output_artifact_names)
         if 0 <= idx < len(plan):
             plan[idx]["status"] = STEP_COMPLETED
             plan[idx]["outcome"] = outcome
             if output_artifacts:
-                plan[idx]["output_artifacts"] = output_artifacts
+                plan[idx]["resolved_output_artifacts"] = output_artifacts
+            if output_artifact_names:
+                plan[idx]["output_artifact_names"] = output_artifact_names
 
         next_idx = idx + 1
         merged_artifacts = self._normalize_artifact_list(task.get("artifacts", []))
@@ -285,7 +294,7 @@ class TaskManager:
         completed = [s for s in plan if s.get("status") == STEP_COMPLETED]
         base_inputs = self._normalize_artifact_list(task.get("artifacts", []))
         for step in completed:
-            base_inputs.extend(self._normalize_artifact_list(step.get("output_artifacts", [])))
+            base_inputs.extend(self._get_step_resolved_output_artifacts(step))
         remaining_steps, _ = self._normalize_plan_steps(
             remaining_steps,
             base_inputs=list(dict.fromkeys(base_inputs)),
@@ -308,7 +317,8 @@ class TaskManager:
             step.setdefault("step", i + 1)
             step["status"] = STEP_PENDING
             step["outcome"] = ""
-            step["output_artifacts"] = []
+            step["resolved_output_artifacts"] = []
+            step["output_artifact_names"] = {}
         if plan:
             plan[0]["status"] = STEP_READY
         return self.update_task(
@@ -375,12 +385,12 @@ class TaskManager:
         completed_summary = ""
         for s in plan[:idx]:
             if s.get("status") == STEP_COMPLETED:
-                outputs = ", ".join(s.get("output_artifacts", [])) or "none"
+                outputs = ", ".join(self._get_step_resolved_output_artifacts(s)) or "none"
                 completed_summary += f"  Phase {s['step']}: {s['description']} → {s.get('outcome', 'done')} [outputs: {outputs}]\n"
 
         next_phases = plan[idx + 1:]
         step_inputs = ", ".join(step.get("input_artifacts", [])) or "none"
-        step_outputs = ", ".join(step.get("output_artifacts", [])) or "none declared"
+        step_outputs = ", ".join(self._get_step_declared_output_artifacts(step)) or "none declared"
 
         scope_fence = ""
         if next_phases:
@@ -409,7 +419,7 @@ class TaskManager:
         idx = task.get("current_step", 1) - 1
         step = plan[idx] if 0 <= idx < len(plan) else {}
         step_desc = step.get("description", "unknown")
-        declared_outputs = step.get("output_artifacts", [])
+        declared_outputs = self._get_step_declared_output_artifacts(step)
         success = goal_result.get("success", False)
         final_thoughts = (goal_result.get("response") or "")[:500]
 
@@ -443,7 +453,7 @@ class TaskManager:
             f"3. Assess whether the remaining plan phases are still appropriate given the actual results.\n"
             f"4. Create a Note named '_task_review' with a JSON object containing:\n"
             f"   - \"step_outcome\": brief description of what was accomplished\n"
-            f"   - \"output_artifacts\": list of resource IDs (e.g. [\"Note_123\", \"Note_456\"]) "
+            f"   - \"resolved_output_artifacts\": list of resource IDs (e.g. [\"Note_123\", \"Note_456\"]) "
             f"that are the deliverables for this phase\n"
             f"   - \"output_artifact_names\": mapping of declared output name to resource ID "
             f"(e.g. {{\"forecast_data\": \"Note_123\"}}), for any you can confidently match\n"
@@ -522,6 +532,41 @@ class TaskManager:
                 normalized.append(value)
         return list(dict.fromkeys(normalized))
 
+    @staticmethod
+    def _normalize_artifact_name_map(values: Any) -> Dict[str, str]:
+        """Normalize declared artifact name -> resource ID mappings."""
+        if not isinstance(values, dict):
+            return {}
+        normalized: Dict[str, str] = {}
+        for key, value in values.items():
+            if key is None or value is None:
+                continue
+            if not isinstance(key, str):
+                key = str(key)
+            if not isinstance(value, str):
+                value = str(value)
+            key = key.strip()
+            value = value.strip()
+            if key and value:
+                normalized[key] = value
+        return normalized
+
+    @staticmethod
+    def _get_step_declared_output_artifacts(step: Dict[str, Any]) -> List[str]:
+        return TaskManager._normalize_artifact_list(
+            step.get("declared_output_artifacts", step.get("output_artifacts", []))
+        )
+
+    @staticmethod
+    def _get_step_resolved_output_artifacts(step: Dict[str, Any]) -> List[str]:
+        resolved = TaskManager._normalize_artifact_list(step.get("resolved_output_artifacts", []))
+        if resolved:
+            return resolved
+        legacy_outputs = TaskManager._normalize_artifact_list(step.get("output_artifacts", []))
+        if legacy_outputs and all(item.startswith(("Note_", "Collection_")) for item in legacy_outputs):
+            return legacy_outputs
+        return []
+
     def _normalize_plan_steps(
         self,
         plan: Any,
@@ -561,6 +606,26 @@ class TaskManager:
             if step.get("output_artifacts") != output_artifacts:
                 changed = True
             step["output_artifacts"] = output_artifacts
+
+            declared_output_artifacts = self._normalize_artifact_list(
+                step.get("declared_output_artifacts", output_artifacts)
+            )
+            if step.get("declared_output_artifacts") != declared_output_artifacts:
+                step["declared_output_artifacts"] = declared_output_artifacts
+                changed = True
+
+            resolved_output_artifacts = self._normalize_artifact_list(step.get("resolved_output_artifacts"))
+            if not resolved_output_artifacts and step.get("status") == STEP_COMPLETED:
+                if output_artifacts and all(item.startswith(("Note_", "Collection_")) for item in output_artifacts):
+                    resolved_output_artifacts = output_artifacts
+            if step.get("resolved_output_artifacts") != resolved_output_artifacts:
+                step["resolved_output_artifacts"] = resolved_output_artifacts
+                changed = True
+
+            output_artifact_names = self._normalize_artifact_name_map(step.get("output_artifact_names"))
+            if step.get("output_artifact_names") != output_artifact_names:
+                step["output_artifact_names"] = output_artifact_names
+                changed = True
 
             if "artifacts" in step:
                 step.pop("artifacts", None)
@@ -606,4 +671,15 @@ class TaskManager:
         if plan_changed:
             task["abstract_plan"] = normalized_plan
             changed = True
+        initial_plan = task.get("initial_abstract_plan", [])
+        if isinstance(initial_plan, list):
+            normalized_initial_plan, initial_changed = self._normalize_plan_steps(
+                initial_plan,
+                base_inputs=task_artifacts,
+                start_step=1,
+                preserve_runtime_fields=False,
+            )
+            if initial_changed:
+                task["initial_abstract_plan"] = normalized_initial_plan
+                changed = True
         return task, changed

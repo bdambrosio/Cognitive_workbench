@@ -201,6 +201,18 @@ def tool(input_value, runtime=None, **kwargs):
             })
     body = full_text
 
+    # Per-goal guard: only one post-bluesky per planner session
+    plan_id = getattr(getattr(executor, 'executive_node', None), 'current_plan_id', None)
+    if plan_id:
+        used = getattr(executor, '_side_effect_used_goals', None)
+        if used is None:
+            used = {}
+            executor._side_effect_used_goals = used
+        goal_key = f"post-bluesky:{plan_id}"
+        if goal_key in used:
+            logger.warning(f"post-bluesky: blocked — already posted in plan {plan_id}, returning cached result")
+            return used[goal_key]
+
     # Dedup check — reject identical posts within 10-minute window
     cached = _check_dedup(body)
     if cached:
@@ -281,11 +293,15 @@ def tool(input_value, runtime=None, **kwargs):
     if not note_id:
         result = _success(executor, confirmation_text, None, extra=metadata)
         _record_dedup(body, result)
+        if plan_id and hasattr(executor, '_side_effect_used_goals'):
+            executor._side_effect_used_goals[f"post-bluesky:{plan_id}"] = result
         return result
 
     logger.info(f"post-bluesky: posted uri={post_uri} cid={post_cid}")
     result = _success(executor, confirmation_text, note_id, extra=metadata)
     _record_dedup(body, result)
+    if plan_id and hasattr(executor, '_side_effect_used_goals'):
+        executor._side_effect_used_goals[f"post-bluesky:{plan_id}"] = result
     return result
 
 
