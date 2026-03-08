@@ -2641,7 +2641,7 @@ Generated: {generated_at}
         
         function connectWebSocket() {
             const port = window.location.port;
-            ws = new WebSocket(`ws://localhost:${port}/ws`);
+            ws = new WebSocket(`ws://${window.location.hostname}:${port}/ws`);
             const actionLog = document.getElementById('actionLog');
             
             ws.onopen = function() {
@@ -6407,9 +6407,12 @@ def main():
     parser = argparse.ArgumentParser(description='FastAPI Action Display Node')
     parser.add_argument('--port', type=int, default=3000, help='Port for FastAPI server (default: 3000)')
     parser.add_argument('--scenario', type=str, default=None, help='Scenario name for trace file')
-    parser.add_argument('--obsidian-vault', type=str, 
-                       default=os.getenv('OBSIDIAN_VAULT_PATH', '/home/bruce/Documents/Obsidian Vault'),
-                       help='Path to Obsidian vault for trace exports (default: /home/bruce/Documents/Obsidian Vault)')
+    _default_vault = os.getenv('OBSIDIAN_VAULT_PATH', '/home/bruce/Documents/Obsidian Vault')
+    if not Path(_default_vault).exists():
+        _default_vault = None
+    parser.add_argument('--obsidian-vault', type=str,
+                       default=_default_vault,
+                       help='Path to Obsidian vault for trace exports')
     args = parser.parse_args()
     
     node = FastAPIActionDisplayNode(port=args.port, scenario_name=args.scenario, obsidian_vault=args.obsidian_vault)
