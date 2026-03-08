@@ -939,6 +939,17 @@ class FastAPIActionDisplayNode:
                 logger.error(f"Error in rename_goal: {e}")
                 return {"success": False, "message": str(e)}
 
+        @self.app.post("/api/goal_execution_mode/{character}")
+        async def set_goal_execution_mode(character: str, data: dict = Body(...)):
+            """Set per-goal execution mode (replan/replay)."""
+            try:
+                payload = json.dumps(data).encode()
+                self.session.put(f"cognitive/{character}/control/goal_execution_mode", payload)
+                return {"success": True}
+            except Exception as e:
+                logger.error(f"Error in set_goal_execution_mode: {e}")
+                return {"success": False, "message": str(e)}
+
         @self.app.post("/api/goal_text_update/{character}")
         async def goal_text_update(character: str, data: dict = Body(...)):
             """Update the goal_text of a scheduled goal."""
@@ -4566,10 +4577,18 @@ Generated: {generated_at}
                     const status = g.status || 'ready';
                     const taskId = `goal-acc-${i}`;
                     const hasCache = Array.isArray(g.cached_plan_actions) && g.cached_plan_actions.length > 0;
-                    const cacheLabel = hasCache ? `${g.cached_plan_actions.length} cached action(s)` : 'no cache';
+                    const execMode = g.execution_mode || 'replan';
+                    const isReplay = execMode === 'replay';
+                    const cacheColor = isReplay && hasCache ? '#2ecc71' : isReplay && !hasCache ? '#ff9f43' : '#a8b3c7';
+                    const cacheLabel = hasCache
+                        ? `${g.cached_plan_actions.length} cached action(s)${isReplay && !hasCache ? '' : ''}`
+                        : (isReplay ? 'no cache (will replan)' : 'no cache');
                     const isRunning = !!g.is_running;
                     const actionLabel = isRunning ? 'Interrupt' : 'Remove';
                     const actionColor = isRunning ? '#ff9f43' : '#ff6b6b';
+                    const proceedColor = isReplay && hasCache ? '#9b59b6' : '#00d4ff';
+                    const proceedTextColor = isReplay && hasCache ? 'white' : '#1a1a1a';
+                    const proceedLabel = isReplay && hasCache ? 'Replay' : 'Proceed';
                     html += `
                         <div class="task-accordion-item" style="border: 1px solid #404040; border-radius: 4px; margin-bottom: 8px; overflow: hidden;">
                             <div class="task-accordion-header" onclick="toggleTaskAccordion('${taskId}')" style="padding: 8px 10px; cursor: pointer; display: flex; align-items: stretch; gap: 8px;">
@@ -4577,7 +4596,7 @@ Generated: {generated_at}
                                     <input type="text" value="${escapeHtml(g.name || g.goal_id || 'Goal')}" onchange="event.stopPropagation(); setGoalName('${escapedChar}', '${g.goal_id || ''}', this.value)" style="width: 100%; background: #2a2a2a; color: #00d4ff; border: 1px solid #555; padding: 3px 4px; border-radius: 3px; font-size: 11px; font-weight: bold;" />
                                     <span style="margin-left: 6px; font-size: 10px; padding: 2px 6px; border-radius: 3px; background: #404040;">${status}</span>
                                     <span style="margin-left: 4px; color: #888; font-size: 11px;">${escapeHtml(g.goal_id || '')}</span>
-                                    <div style="margin-top: 3px; color: #a8b3c7; font-size: 10px;">${cacheLabel}</div>
+                                    <div style="margin-top: 3px; color: ${cacheColor}; font-size: 10px;">${cacheLabel}</div>
                                     <div onclick="event.stopPropagation(); openGoalTextEditor('${escapedChar}', '${g.goal_id}')" style="margin-top: 3px; color: #8f9bb3; font-size: 10px; cursor: pointer;" title="Click to edit goal text">${escapeHtml((g.goal_text || '').slice(0, 140))}${(g.goal_text || '').length > 140 ? '...' : ''}</div>
                                 </div>
                                 <div onclick="event.stopPropagation();" style="display: flex; flex-direction: column; align-items: stretch; gap: 3px; min-width: 90px;">
@@ -4588,8 +4607,11 @@ Generated: {generated_at}
                                         <option value="daily" ${g.schedule_mode === 'daily' ? 'selected' : ''}>Daily</option>
                                     </select>
                                     <input type="time" value="${g.run_at || ''}" onchange="event.stopPropagation(); setTaskRunAt('${escapedChar}', '${g.goal_id || ''}', this.value)" style="display:${g.schedule_mode === 'daily' ? 'block' : 'none'}; background: #2a2a2a; color: #ccc; border: 1px solid #555; padding: 3px 4px; border-radius: 3px; font-size: 11px; width: 100%; box-sizing: border-box;" title="Daily run time (24h)" />
-                                    <button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', 'proceed ${g.goal_id || ''}')" style="background: #00d4ff; color: #1a1a1a; border: none; padding: 4px 0; border-radius: 3px; font-size: 11px; cursor: pointer; width: 100%;">Proceed</button>
-                                    <button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', 'reuse ${g.goal_id || ''}')" style="background: #9b59b6; color: white; border: none; padding: 4px 0; border-radius: 3px; font-size: 11px; cursor: pointer; width: 100%;">Reuse</button>
+                                    <div style="display: flex; border-radius: 3px; overflow: hidden; border: 1px solid #555; font-size: 10px; cursor: pointer;" title="Execution mode: replan generates a fresh plan each time; replay re-executes the cached plan">
+                                        <div onclick="event.stopPropagation(); setGoalExecutionMode('${escapedChar}', '${g.goal_id || ''}', 'replan')" style="flex: 1; text-align: center; padding: 3px 0; background: ${!isReplay ? '#00d4ff' : '#2a2a2a'}; color: ${!isReplay ? '#1a1a1a' : '#888'}; font-weight: ${!isReplay ? 'bold' : 'normal'};">Replan</div>
+                                        <div onclick="event.stopPropagation(); setGoalExecutionMode('${escapedChar}', '${g.goal_id || ''}', 'replay')" style="flex: 1; text-align: center; padding: 3px 0; background: ${isReplay ? '#9b59b6' : '#2a2a2a'}; color: ${isReplay ? 'white' : '#888'}; font-weight: ${isReplay ? 'bold' : 'normal'};">Replay</div>
+                                    </div>
+                                    <button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', '${isReplay && hasCache ? 'reuse' : 'proceed'} ${g.goal_id || ''}')" style="background: ${proceedColor}; color: ${proceedTextColor}; border: none; padding: 4px 0; border-radius: 3px; font-size: 11px; cursor: pointer; width: 100%;">${proceedLabel}</button>
                                     <button onclick="event.stopPropagation(); onGoalPrimaryAction('${escapedChar}', '${g.goal_id || ''}', ${isRunning})" style="background: ${actionColor}; color: white; border: none; padding: 4px 0; border-radius: 3px; font-size: 11px; cursor: pointer; width: 100%;">${actionLabel}</button>
                                 </div>
                             </div>
@@ -4652,6 +4674,19 @@ Generated: {generated_at}
                 loadTasksList(character);
             } catch (e) {
                 console.error('setTaskScheduleMode:', e);
+            }
+        }
+
+        async function setGoalExecutionMode(character, goalId, mode) {
+            try {
+                await fetch(`/api/goal_execution_mode/${character}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ goal_id: goalId, execution_mode: mode })
+                });
+                loadTasksList(character);
+            } catch (e) {
+                console.error('setGoalExecutionMode:', e);
             }
         }
 

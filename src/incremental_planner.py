@@ -1460,6 +1460,62 @@ def execute_codegen_block(code: str, executor, method_name: str = "codegen") -> 
     return result
 
 
+def _execute_and_record_code_block(code_text: str, executor, step: int) -> tuple:
+    """Execute a code block, record it as a single _code_block_ plan action, and
+    persist the output as a Note when substantial.
+
+    Returns:
+        (result_dict, new_bindings, tool_result_text, code_block_output_created)
+    """
+    bindings_before = dict(executor.plan_bindings_flat)
+    # Snapshot plan_actions so we can replace individual tool calls with one _code_block_
+    _pa = getattr(executor, '_plan_actions', [])
+    _pa_start = len(_pa)
+
+    result_dict = execute_codegen_block(code_text, executor, "codegen")
+
+    if hasattr(executor, "_done_gate_retry_active"):
+        executor._done_gate_retry_active = False
+
+    # Replace individual actions recorded during the code block with a single
+    # _code_block_ action containing the source, making cached plans replayable.
+    if hasattr(executor, '_plan_actions'):
+        replaced_count = len(executor._plan_actions) - _pa_start
+        del executor._plan_actions[_pa_start:]
+        executor._plan_actions.append({"type": "_code_block_", "source": code_text})
+        logger.info(f"Step {step}: Replaced {replaced_count} tracked actions with 1 _code_block_ (source={len(code_text)} chars)")
+
+    logger.info(f"Step {step}: plan_actions count: {len(getattr(executor, '_plan_actions', []))}")
+
+    action = {"type": "_code_block_", "source": code_text}
+    tool_result = format_result_text(result_dict, action)
+
+    new_bindings = {k: v for k, v in executor.plan_bindings_flat.items() if bindings_before.get(k) != v}
+
+    # Persist code block return value as Note when substantial, but only if the
+    # code block didn't already create Note bindings (avoids duplicate content).
+    code_block_output_created = False
+    note_bindings_created = any(
+        isinstance(v, str) and v.startswith("Note_")
+        for v in new_bindings.values()
+    )
+    if result_dict.get('status') == 'success' and not note_bindings_created:
+        raw = result_dict.get('data')
+        if raw is None:
+            raw = result_dict.get('value', '')
+        if isinstance(raw, list):
+            raw = '\n'.join(str(x) for x in raw)
+        elif isinstance(raw, dict):
+            raw = json.dumps(raw, ensure_ascii=False)
+        else:
+            raw = str(raw) if raw is not None else ''
+        if isinstance(raw, str) and len(raw) > 80:
+            executor.execute_action_tracked({"type": "create-note", "value": raw, "out": "$code_block_output"}, "codegen")
+            code_block_output_created = True
+
+    return result_dict, new_bindings, tool_result, code_block_output_created
+
+
 def _compress_trace(trace_str: str) -> str:
     """
     Compress execution trace while preserving order and event identity.
@@ -2618,39 +2674,7 @@ ALWAYS follow all formatting instructions exactly.
                 s["final_answer"] = "Interrupted by user."
                 break
 
-            # Snapshot bindings before execution
-            bindings_before = dict(executor.plan_bindings_flat)
-            result_dict = execute_codegen_block(code_text, executor, "codegen")
-            if hasattr(executor, "_done_gate_retry_active"):
-                executor._done_gate_retry_active = False
-            logger.info(f"Step {step}: plan_actions count: {len(getattr(executor, '_plan_actions', []))}")
-            action = {"type": "_code_block_"}
-            tool_result = format_result_text(result_dict, action)
-            
-            # Track new bindings
-            new_bindings = {k: v for k, v in executor.plan_bindings_flat.items() if bindings_before.get(k) != v}
-            
-            # Persist code block return value as Note when substantial, but only if the
-            # code block didn't already create Note bindings (avoids duplicate content).
-            code_block_output_created = False
-            note_bindings_created = any(
-                isinstance(v, str) and v.startswith("Note_")
-                for v in new_bindings.values()
-            )
-            if result_dict.get('status') == 'success' and not note_bindings_created:
-                raw = result_dict.get('data')
-                if raw is None:
-                    raw = result_dict.get('value', '')
-                if isinstance(raw, list):
-                    raw = '\n'.join(str(x) for x in raw)
-                elif isinstance(raw, dict):
-                    import json as _json
-                    raw = _json.dumps(raw, ensure_ascii=False)
-                else:
-                    raw = str(raw) if raw is not None else ''
-                if isinstance(raw, str) and len(raw) > 80:
-                    executor.execute_action({"type": "create-note", "value": raw, "out": "$code_block_output"})
-                    code_block_output_created = True
+            result_dict, new_bindings, tool_result, code_block_output_created = _execute_and_record_code_block(code_text, executor, step)
             
             logger.info(f"Step {step}: -> {tool_result[:100]}")
             if new_bindings:
@@ -3643,39 +3667,7 @@ ALWAYS follow all formatting instructions exactly.
             state["final_answer"] = "Interrupted by user."
             break
         
-        # Snapshot bindings before execution
-        bindings_before = dict(executor.plan_bindings_flat)
-        result_dict = execute_codegen_block(code_text, executor, "codegen")
-        if hasattr(executor, "_done_gate_retry_active"):
-            executor._done_gate_retry_active = False
-        logger.info(f"Step {step}: plan_actions count: {len(getattr(executor, '_plan_actions', []))}")
-        action = {"type": "_code_block_"}
-        tool_result = format_result_text(result_dict, action)
-        
-        # Track new bindings
-        new_bindings = {k: v for k, v in executor.plan_bindings_flat.items() if bindings_before.get(k) != v}
-        
-        # Persist code block return value as Note when substantial, but only if the
-        # code block didn't already create Note bindings (avoids duplicate content).
-        code_block_output_created = False
-        note_bindings_created = any(
-            isinstance(v, str) and v.startswith("Note_")
-            for v in new_bindings.values()
-        )
-        if result_dict.get('status') == 'success' and not note_bindings_created:
-            raw = result_dict.get('data')
-            if raw is None:
-                raw = result_dict.get('value', '')
-            if isinstance(raw, list):
-                raw = '\n'.join(str(x) for x in raw)
-            elif isinstance(raw, dict):
-                import json as _json
-                raw = _json.dumps(raw, ensure_ascii=False)
-            else:
-                raw = str(raw) if raw is not None else ''
-            if isinstance(raw, str) and len(raw) > 80:
-                executor.execute_action({"type": "create-note", "value": raw, "out": "$code_block_output"})
-                code_block_output_created = True
+        result_dict, new_bindings, tool_result, code_block_output_created = _execute_and_record_code_block(code_text, executor, step)
         
         logger.info(f"Step {step}: -> {tool_result[:100]}")
         if new_bindings:

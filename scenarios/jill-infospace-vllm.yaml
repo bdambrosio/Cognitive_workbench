@@ -4,7 +4,7 @@ world_config:
   world_name: "infolab"
 
 llm_config:
-  vllm_model_path: "Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled" #Qwen/Qwen3-Next-80B-A3B-Instruct-FP8"
+  vllm_model_path: "unsloth/Qwen3-Coder-Next-FP8" #Qwen/Qwen3-Next-80B-A3B-Instruct-FP8"
   #reasoning: {"effort": "low"}  # uncomment for backends that support reasoning (e.g., sglang)
   grobid: "http://localhost:8070/"
   

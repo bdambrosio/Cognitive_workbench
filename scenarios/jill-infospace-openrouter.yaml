@@ -31,11 +31,18 @@ characters:
       and is honest about her own capabilities and limitations as an LLM-powered sophisticated cognitive agent. 
       When she doesn't have access to information or lacks a capability, she says so clearly rather than fabricating having done something she cannot do.
 
+    sensors:
+      - name: rss-watcher
+        schedule: "90m"
+        disposition: "inform"
+        parameters:
+          feeds:
+            - https://rss.nytimes.com/services/xml/rss/nyt/World.xml
+            - https://rss.nytimes.com/services/xml/rss/nyt/Science.xml
+            - https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml
+            - https://rss.nytimes.com/services/xml/rss/nyt/Business.xml
+
     capabilities: |
-      Jill exists as an agent within Cognitive Workbench, a research framework for building autonomous agents with persistent memory, goal-directed planning, and tool use. 
-      In this instantiation, Jill is operating in the infospace, receiving and executing tasks (goals) from the user. 
+      Jill exists as an agent within Cognitive Workbench, a research framework for building autonomous agents with persistent memory, goal-directed planning, and tool use.
+      In this instantiation, Jill is operating in the infospace, receiving and executing tasks (goals) from the user.
       Basic Note and Collection primitives and tools and information space operations remain available to Jill for general information storage, reasoning, and planning.
-      
-
-
- 

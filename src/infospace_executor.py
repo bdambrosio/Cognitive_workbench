@@ -6110,22 +6110,52 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                         'continue': continue_wait,
                         'last_action_result': last_action_result if 'last_action_result' in locals() else None
                     }
-            
+
+            # Handle code blocks (replayed from cached plans)
+            if stype == '_code_block_':
+                source = step.get('source')
+                if not source:
+                    logger.error("_code_block_ action missing 'source'; skipping")
+                    current['idx'] = idx + 1
+                    continue
+                from incremental_planner import execute_codegen_block
+                try:
+                    result = execute_codegen_block(source, self, "codegen")
+                except Exception as e:
+                    logger.error(f"Code block replay error: {e}")
+                    logger.error(traceback.format_exc())
+                    result = self._create_uniform_return("failed", reason=f"Code block replay error: {e}")
+                executed_steps += 1
+                last_action_result = result.copy()
+                if self.executive_node:
+                    self.executive_node._publish_action_result(step, result, stype, datetime.now())
+                if result.get('status') == 'failed':
+                    logger.warning(f"Code block at step {executed_steps} failed: {result.get('reason')}")
+                current['idx'] = idx + 1
+                if self.interrupt_requested:
+                    return {
+                        'status': 'suspended',
+                        'reason': 'interrupted',
+                        'executed_steps': executed_steps,
+                        'last_action_result': last_action_result
+                    }
+                continue
+
             # Execute action
             try:
                 result = self.execute_action(step)
                 executed_steps += 1
-                
+
                 # Track last action result in uniform format
                 last_action_result = result.copy()
-                
+
                 # Publish action result for UI display (if executive_node available)
                 # Skip say/ask - they self-publish
                 if self.executive_node and stype not in ('say', 'ask'):
                     self.executive_node._publish_action_result(step, result, stype, datetime.now())
-                
+
                 # Handle while loop completion (checked in frame completion logic above)
-                
+
                 # Advance step index
                 if result.get('status') == 'failed':
                     # Action failed - log but continue
@@ -6141,7 +6171,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                         'executed_steps': executed_steps,
                         'last_action_result': last_action_result
                     }
-                
+
             except Exception as e:
                 logger.error(f"Error executing step {executed_steps}: {e}")
                 logger.error(traceback.format_exc())
@@ -6151,7 +6181,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                     'executed_steps': executed_steps,
                     'last_action_result': last_action_result if 'last_action_result' in locals() else None
                 }
-        
+
         # Execution complete
         if executed_steps >= max_steps:
             return {
@@ -6313,22 +6343,51 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                         'continue': continue_wait,
                         'last_action_result': last_action_result if 'last_action_result' in locals() else None
                     }
-            
+
+            # Handle code blocks (replayed from cached plans)
+            if stype == '_code_block_':
+                source = step.get('source')
+                if not source:
+                    logger.error("_code_block_ action missing 'source'; skipping")
+                    current['idx'] = idx + 1
+                    continue
+                from incremental_planner import execute_codegen_block
+                try:
+                    result = execute_codegen_block(source, self, "codegen")
+                except Exception as e:
+                    logger.error(f"Code block replay error: {e}")
+                    result = self._create_uniform_return("failed", reason=f"Code block replay error: {e}")
+                executed_steps += 1
+                last_action_result = result.copy()
+                if self.executive_node:
+                    self.executive_node._publish_action_result(step, result, stype, datetime.now())
+                if result.get('status') == 'failed':
+                    logger.warning(f"Code block at step {executed_steps} failed: {result.get('reason')}")
+                current['idx'] = idx + 1
+                if self.interrupt_requested:
+                    return {
+                        'status': 'suspended',
+                        'reason': 'interrupted',
+                        'executed_steps': executed_steps,
+                        'last_action_result': last_action_result
+                    }
+                continue
+
             # Execute action
             try:
                 result = self.execute_action(step)
                 executed_steps += 1
-                
+
                 # Track last action result in uniform format
                 last_action_result = result.copy()
-                
+
                 # Publish action result for UI display (if executive_node available)
                 # Skip say/ask - they self-publish
                 if self.executive_node and stype not in ('say', 'ask'):
                     self.executive_node._publish_action_result(step, result, stype, datetime.now())
-                
+
                 # While loop completion handled in frame completion logic above
-                
+
                 if result.get('status') == 'failed':
                     logger.warning(f"Step {executed_steps} failed: {result.get('reason')}")
                 

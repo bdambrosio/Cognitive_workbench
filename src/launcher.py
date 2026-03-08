@@ -167,14 +167,12 @@ def create_sglang_runtime(llm_config: dict):
         logger.info(f"Initializing SGLang Runtime with model: {sgl_model_path}")
         tokenizer = AutoTokenizer.from_pretrained(sgl_model_path)
 
-        if sgl_model_path.startswith("allenai/Olmo-3"):
-            runtime = sgl.Runtime(model_path=sgl_model_path, context_length=32768, cuda_graph_max_bs=4, tp_size=1, mem_fraction_static=0.82, attention_backend="triton")
-        elif 'NVFP4' in sgl_model_path: # patch for Qwen3.5-122B-A10B-NVFP4 models as of 3/1/2026
+        if 'NVFP4' in sgl_model_path: # patch for Qwen3.5-122B-A10B-NVFP4 models as of 3/1/2026
             logger.info(f"🚀 Initializing SGLang Runtime with NVFP4 patch!")
             runtime = sgl.Runtime(model_path=sgl_model_path,device="cuda",context_length=65536,tp_size=1,mem_fraction_static=0.9,quantization="modelopt_fp4",attention_backend="triton")
         elif 'FP8' in sgl_model_path:
             logger.info("Initializing SGLang Runtime with FP8 patch")
-            runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, dtype="auto", tp_size=1, mem_fraction_static=0.9, fp8_gemm_runner_backend="triton", attention_backend="flashinfer")
+            runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, dtype="auto", tp_size=1, mem_fraction_static=0.85, attention_backend="triton", fp8_gemm_runner_backend="cutlass")
         else:
             runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, dtype="auto", tp_size=1, mem_fraction_static=0.9, attention_backend="flashinfer")
 

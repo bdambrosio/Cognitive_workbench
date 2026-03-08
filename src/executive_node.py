@@ -1099,6 +1099,10 @@ class ZenohExecutiveNode:
             f"cognitive/{character_name}/control/goal_rename",
             self._handle_goal_rename
         )
+        self.control_goal_execution_mode_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/goal_execution_mode",
+            self._handle_goal_execution_mode
+        )
         self.control_goal_text_update_subscriber = self.session.declare_subscriber(
             f"cognitive/{character_name}/control/goal_text_update",
             self._handle_goal_text_update
@@ -2118,6 +2122,7 @@ class ZenohExecutiveNode:
             "run_at": "",
             "last_run_date": "",
             "cached_plan_actions": [],
+            "execution_mode": "replan",
             "is_running": False,
             "last_result": "",
             "primary_product": "",
@@ -2139,6 +2144,7 @@ class ZenohExecutiveNode:
             "run_at": "",
             "last_run_date": "",
             "cached_plan_actions": [],
+            "execution_mode": "replan",
             "is_running": False,
             "last_result": "",
             "primary_product": "",
@@ -2152,6 +2158,9 @@ class ZenohExecutiveNode:
             changed = True
         if goal.get("schedule_mode") not in ("manual", "auto", "recurring", "daily"):
             goal["schedule_mode"] = "manual"
+            changed = True
+        if goal.get("execution_mode") not in ("replan", "replay"):
+            goal["execution_mode"] = "replan"
             changed = True
         return goal, changed
 
@@ -2254,7 +2263,7 @@ class ZenohExecutiveNode:
             "last_result": (result.get("response") if isinstance(result, dict) else "") or (result.get("error") if isinstance(result, dict) else "") or "",
             "primary_product": primary_product,
         }
-        if not used_cache:
+        if not used_cache and success:
             plan_actions = result.get("plan") if isinstance(result, dict) else None
             if isinstance(plan_actions, list):
                 updates["cached_plan_actions"] = plan_actions
@@ -2298,7 +2307,7 @@ class ZenohExecutiveNode:
         pre_resource_ids = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
         result: Dict[str, Any] = {}
         try:
-            # Always replan on proceed - cached plans have stale Note IDs from the prior run
+            # Proceed always replans from scratch; use 'reuse' to replay cached plans
             result = self.parse_and_set_goal("", goal.get("goal_text", "")) or {}
         except Exception as e:
             result = {"success": False, "error": str(e)}
@@ -2311,11 +2320,41 @@ class ZenohExecutiveNode:
         if not goal_id:
             self._say_to_user("Please specify which goal to reuse, e.g. 'reuse goal_1'.")
             return
-        goal = self._update_scheduled_goal(goal_id, status="ready", is_running=False, last_result="", last_run_date="")
+        goal = self._get_scheduled_goal(goal_id)
         if not goal:
             self._say_to_user(f"Goal '{goal_id}' not found.")
             return
-        self._say_to_user(f"Goal \"{goal.get('name') or goal_id}\" reset and ready.")
+        cached = goal.get("cached_plan_actions")
+        if not cached or not isinstance(cached, list):
+            self._say_to_user(f"Goal '{goal_id}' has no cached plan. Use 'proceed {goal_id}' to replan.")
+            return
+        # Execute the cached plan via execute_plan_sync
+        self._active_scheduled_goal_id = goal_id
+        self._update_scheduled_goal(goal_id, is_running=True, status="running")
+        self._record_scheduler_event(
+            "start",
+            goal_id=goal_id,
+            goal_name=goal.get("name", "") or goal.get("goal_text", "")[:80],
+        )
+        pre_resource_ids = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
+        # Clear side-effect dedup caches so replay re-executes send-email, post-bluesky, etc.
+        self.infospace_executor._side_effect_cache = {}
+        self.infospace_executor._successful_side_effect_results = {}
+        result = {}
+        try:
+            sync_result = self.infospace_executor.execute_plan_sync({"plan": cached})
+            success = sync_result.get("status") == "success"
+            result = {
+                "success": success,
+                "plan": cached,
+                "response": f"Cached plan replay {'succeeded' if success else 'failed'}: {sync_result.get('reason', '')}".strip(),
+                "quality_status": "passed" if success else "failed",
+            }
+        except Exception as e:
+            result = {"success": False, "error": str(e)}
+        self._set_scheduled_goal_result(goal_id, result, used_cache=True, pre_resource_ids=pre_resource_ids)
+        status = "completed" if result.get("success") else "failed"
+        self._say_to_user(f"Goal '{goal.get('name') or goal_id}' reuse {status}.")
 
     def _handle_goal_terminate(self, goal_id: str = None):
         if not goal_id:
@@ -2357,7 +2396,7 @@ class ZenohExecutiveNode:
             self._say_to_user(f"Goal '{goal_id}' could not be removed.")
 
     def _handle_goal_cache_clear(self, goal_id: str):
-        goal = self._update_scheduled_goal(goal_id, cached_plan_actions=[], status="ready")
+        goal = self._update_scheduled_goal(goal_id, cached_plan_actions=[], execution_mode="replan", status="ready")
         if not goal:
             self._say_to_user(f"Goal '{goal_id}' not found.")
             return
@@ -2522,7 +2561,7 @@ class ZenohExecutiveNode:
         return eligible
 
     def _scheduler_proceed_goal(self, goal_id):
-        """Enqueue a synthetic goal proceed command (called from scheduler thread)."""
+        """Enqueue a synthetic goal proceed/reuse command (called from scheduler thread)."""
         from datetime import date
         goal = self._get_scheduled_goal(goal_id)
         self._scheduler_started_goals.add(goal_id)
@@ -2533,7 +2572,11 @@ class ZenohExecutiveNode:
         )
         if goal and goal.get("schedule_mode") == "daily":
             self._update_scheduled_goal(goal_id, last_run_date=date.today().isoformat())
-        command = json.dumps({"text": f"proceed {goal_id}", "source": "scheduler"})
+        # Respect execution_mode: replay uses cached plan, replan (default) replans from scratch
+        exec_mode = goal.get("execution_mode", "replan") if goal else "replan"
+        has_cache = bool(goal and isinstance(goal.get("cached_plan_actions"), list) and goal["cached_plan_actions"])
+        verb = "reuse" if exec_mode == "replay" and has_cache else "proceed"
+        command = json.dumps({"text": f"{verb} {goal_id}", "source": "scheduler"})
         self.text_input_queue.append({"content": command})
         self.execution_paused = False
         self._publish_execution_state()
@@ -2599,6 +2642,20 @@ class ZenohExecutiveNode:
         except Exception as e:
             logger.error(f"Error in goal_rename handler: {e}")
 
+    def _handle_goal_execution_mode(self, sample):
+        """Zenoh callback for per-goal execution mode changes (replan/replay)."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            goal_id = data.get("goal_id")
+            mode = data.get("execution_mode")
+            if not goal_id or mode not in ("replan", "replay"):
+                logger.warning(f"Invalid goal_execution_mode payload: {data}")
+                return
+            self._update_scheduled_goal(goal_id, execution_mode=mode)
+            logger.info(f"Goal {goal_id} execution_mode set to '{mode}'")
+        except Exception as e:
+            logger.error(f"Error in goal_execution_mode handler: {e}")
+
     def _handle_goal_text_update(self, sample):
         """Zenoh callback for updating a scheduled goal's goal_text."""
         try:
@@ -2608,8 +2665,16 @@ class ZenohExecutiveNode:
             if not goal_id or not goal_text:
                 logger.warning(f"Invalid goal_text_update payload: {data}")
                 return
-            # Update goal_text and clear cached plan (text changed, cache is stale)
-            self._update_scheduled_goal(goal_id, goal_text=goal_text, cached_plan_actions=[], status="ready")
+            # Only clear cache if text actually changed
+            goal = self._get_scheduled_goal(goal_id)
+            old_text = (goal.get("goal_text", "") if goal else "").strip()
+            updates = {"goal_text": goal_text}
+            if goal_text != old_text:
+                updates["cached_plan_actions"] = []
+                updates["execution_mode"] = "replan"
+                updates["status"] = "ready"
+                logger.info(f"Goal {goal_id} text changed, cache cleared")
+            self._update_scheduled_goal(goal_id, **updates)
             logger.info(f"Goal {goal_id} text updated ({len(goal_text)} chars)")
         except Exception as e:
             logger.error(f"Error in goal_text_update handler: {e}")
@@ -2623,7 +2688,7 @@ class ZenohExecutiveNode:
             if action != "clear" or not goal_id:
                 logger.warning(f"Invalid goal_cache payload: {data}")
                 return
-            self._update_scheduled_goal(goal_id, cached_plan_actions=[], status="ready")
+            self._update_scheduled_goal(goal_id, cached_plan_actions=[], execution_mode="replan", status="ready")
             logger.info(f"Cleared cached plan_actions for {goal_id}")
         except Exception as e:
             logger.error(f"Error in goal_cache handler: {e}")
