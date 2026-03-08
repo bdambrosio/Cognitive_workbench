@@ -46,9 +46,9 @@ class ZenohLLMClient:
     """
     
     def __init__(self, server_name='openai', model_name='gpt-4.1', service_timeout: float = 600.0):
-        # Initialize Zenoh session
-        config = zenoh.Config()
-        self.session = zenoh.open(config)
+        # Initialize Zenoh session (localhost only)
+        from utils.zenoh_utils import make_localhost_config
+        self.session = zenoh.open(make_localhost_config())
         self.llm = LLM(server_name=server_name, model_name=model_name)
         
         # Publisher for LLM requests

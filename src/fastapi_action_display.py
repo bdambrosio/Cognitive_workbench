@@ -191,9 +191,9 @@ class FastAPIActionDisplayNode:
         # Store scenario name for export
         self.scenario_name = scenario_name or "unknown"
         
-        # Initialize Zenoh session
-        config = zenoh.Config()
-        self.session = zenoh.open(config)
+        # Initialize Zenoh session (localhost only)
+        from utils.zenoh_utils import make_localhost_config
+        self.session = zenoh.open(make_localhost_config())
         
         # Publisher for User actions (so User text appears in UI/trace)
         self.user_action_publisher = self.session.declare_publisher("cognitive/User/action")

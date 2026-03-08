@@ -357,7 +357,8 @@ def main():
     zenoh_session = None
     try:
         import zenoh
-        zenoh_session = zenoh.open(zenoh.Config())
+        from utils.zenoh_utils import make_localhost_config
+        zenoh_session = zenoh.open(make_localhost_config())
         ready_pub = zenoh_session.declare_publisher("cognitive/launcher/ready")
         ready_pub.put(json.dumps({'status': 'ready', 'character_count': len(characters), 'timestamp': time.time()}))
         logger.info(f"Published ready signal: {len(characters)} characters")

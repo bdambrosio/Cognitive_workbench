@@ -37,9 +37,9 @@ class ResourceBrowser:
         self.app = FastAPI(title="Resource Browser")
         self.shutdown_requested = False
         
-        # Zenoh session
-        config = zenoh.Config()
-        self.session = zenoh.open(config)
+        # Zenoh session (localhost only)
+        from utils.zenoh_utils import make_localhost_config
+        self.session = zenoh.open(make_localhost_config())
         logger.info(f"Connected to Zenoh for map: {map_name}")
         
         # Register signal handlers for graceful shutdown

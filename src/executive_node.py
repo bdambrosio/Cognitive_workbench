@@ -352,9 +352,9 @@ class ZenohExecutiveNode:
         if self.benchmark_mode:
             logger.info(f'📊 Benchmark mode enabled for {self.character_name} - conversation collections disabled')
         
-        # Initialize Zenoh session
-        config = zenoh.Config()
-        self.session = zenoh.open(config)
+        # Initialize Zenoh session (localhost only)
+        from utils.zenoh_utils import make_localhost_config
+        self.session = zenoh.open(make_localhost_config())
         
         # Autonomous mode state
         self.previous_autonomous_goal_text = ''

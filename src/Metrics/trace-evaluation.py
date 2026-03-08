@@ -200,8 +200,9 @@ def main():
     logger.info(f"Characters: {', '.join(characters.keys())}")
     character_names = list(characters.keys())
 
-    # Initialize Zenoh session (reused for map/types)
-    session = zenoh.open(zenoh.Config())
+    # Initialize Zenoh session (localhost only)
+    from utils.zenoh_utils import make_localhost_config
+    session = zenoh.open(make_localhost_config())
 
     # Initialize LL
     llm_client = ZenohLLMClient(server_name=args.server, model_name=args.model, service_timeout=240.0)

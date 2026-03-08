@@ -12,6 +12,20 @@ import random
 logger = logging.getLogger('zenoh_utils')
 
 
+def make_localhost_config():
+    """Create a Zenoh config scoped to localhost only.
+
+    Disables multicast scouting and restricts listeners/connect
+    endpoints to loopback, preventing cross-machine discovery on LANs.
+    """
+    import zenoh
+    config = zenoh.Config()
+    config.insert_json5("scouting/multicast/enabled", "false")
+    config.insert_json5("listen/endpoints", '["tcp/127.0.0.1:0"]')
+    config.insert_json5("connect/endpoints", '["tcp/127.0.0.1:7447"]')
+    return config
+
+
 def datetime_handler(obj):
     if isinstance(obj, datetime):
         return obj.isoformat()  # More standard format
