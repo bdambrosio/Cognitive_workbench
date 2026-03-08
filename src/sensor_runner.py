@@ -53,6 +53,7 @@ class SensorRunner:
         self.sensor_type = sensor_meta['type']
         self.schedule_seconds = scenario_overrides.get('schedule_seconds', sensor_meta['schedule_seconds'])
         self.gate = scenario_overrides.get('gate', sensor_meta.get('gate'))
+        self.disposition = scenario_overrides.get('disposition', sensor_meta.get('disposition', 'inform'))
         self.parameters = {**sensor_meta.get('parameters', {}), **scenario_overrides.get('parameters', {})}
 
         # Plan-type state
@@ -188,10 +189,11 @@ class SensorRunner:
 
     def _push_to_agent(self, text: str):
         """Publish sensor result to agent's sense_data channel."""
-        prefixed_text = f"sensor {self.sensor_name} report\n{text}"
+        prefixed_text = f"sensor {self.sensor_name} report [{self.disposition}]\n{text}"
         content_payload = {
             'source': f'sensor:{self.sensor_name}',
             'text': prefixed_text,
+            'disposition': self.disposition,
         }
         sense_data = {
             'timestamp': datetime.now().isoformat(),

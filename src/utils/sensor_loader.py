@@ -86,6 +86,7 @@ def load_sensors(sensors_dir_path: str) -> Dict[str, Dict]:
         description = metadata.get('description', '')
         schedule_str = metadata.get('schedule', '5m')
         gate = metadata.get('gate', None)
+        disposition = metadata.get('disposition', 'inform')
         tools = metadata.get('tools', None)
         parameters = metadata.get('parameters', {})
 
@@ -135,6 +136,7 @@ def load_sensors(sensors_dir_path: str) -> Dict[str, Dict]:
             'schedule': schedule_str,
             'schedule_seconds': schedule_seconds,
             'gate': gate,
+            'disposition': disposition,
             'tools': tools,
             'parameters': parameters,
             'path': str(sensor_dir.absolute()),

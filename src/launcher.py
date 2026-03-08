@@ -408,6 +408,16 @@ def main():
                         overrides['parameters'] = sensor_cfg['parameters']
                     if 'gate' in sensor_cfg:
                         overrides['gate'] = sensor_cfg['gate']
+                    if 'disposition' in sensor_cfg:
+                        overrides['disposition'] = sensor_cfg['disposition']
+
+                    # Validate trigger dispositions against scheduled goals
+                    effective_disposition = sensor_cfg.get('disposition', sensor_meta.get('disposition', 'inform'))
+                    if effective_disposition.startswith('trigger:'):
+                        goal_name = effective_disposition[len('trigger:'):]
+                        scheduled_goals = [g.get('name', '') for g in config.get('scheduled_goals', [])]
+                        if goal_name not in scheduled_goals:
+                            logger.warning(f"Sensor '{s_name}' has disposition 'trigger:{goal_name}' but goal '{goal_name}' not found in {char_name}'s scheduled goals")
 
                     runner = SensorRunner(
                         sensor_name=s_name,

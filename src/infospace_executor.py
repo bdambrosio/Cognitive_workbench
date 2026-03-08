@@ -1772,14 +1772,29 @@ Only provide the result, followed by the </end> tag.""")
             }
             
             logger.debug(f"Calling OpenRouter API with model {model}")
-            response = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                json=payload,
-                headers=headers,
-                timeout=120
-            )
-            response.raise_for_status()  # Fail fast
-            
+            last_err = None
+            for attempt in range(2):
+                try:
+                    response = requests.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        json=payload,
+                        headers=headers,
+                        timeout=60
+                    )
+                    if response.status_code in (429, 502, 503, 504):
+                        last_err = f"HTTP {response.status_code}"
+                        logger.warning(f"OpenRouter API {last_err} (attempt {attempt+1}/2), retrying...")
+                        import time; time.sleep(2 ** attempt)
+                        continue
+                    response.raise_for_status()
+                    break
+                except requests.exceptions.Timeout as e:
+                    last_err = str(e)
+                    logger.warning(f"OpenRouter API timeout (attempt {attempt+1}/2), retrying...")
+                    continue
+            else:
+                return Response(success=False, error=f"OpenRouter API failed after 2 attempts: {last_err}")
+
             result = response.json()
             logger.debug(f"OpenRouter API response structure: {list(result.keys())}")
             
