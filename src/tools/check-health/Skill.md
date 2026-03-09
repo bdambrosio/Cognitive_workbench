@@ -17,9 +17,23 @@ No required input. Runs all checks automatically.
 ## Output
 
 Success (`status: "success"`):
-- `value`: Human-readable summary of health status — lists only concerns if any exist, otherwise "All systems nominal."
-- `data`: Full structured report dict with per-signal status classifications.
-- `extra`: Contains `overall_status` ("ok", "warning", or "critical") and `concerns` list.
+- `value`: Human-readable summary string — lists concerns if any, otherwise "All systems nominal."
+- The bound Note (`$health`) contains a **JSON object** with these top-level keys:
+  - `overall_status`: `"ok"` | `"warning"` | `"critical"`
+  - `concerns`: list of human-readable concern strings (empty if all ok)
+  - `system`: hardware/OS metrics (cpu, gpu, ram, disk, network, processes)
+  - `cognitive`: cognitive metrics (memory, planning, tool_model, world_model, user_interaction)
+
+## Reading the health report in code blocks
+
+```python
+health = executor.get_json("$health")
+overall = health["overall_status"]       # "ok", "warning", or "critical"
+concerns = health["concerns"]            # e.g. ["Plan completion rate low: 45% (last 20 plans)"]
+```
+
+**Do NOT** use `health.get("extra", {}).get("overall_status")` — `overall_status` and `concerns`
+are at the **top level** of the Note content, not nested under `extra`.
 
 ## Behavior
 
@@ -35,4 +49,5 @@ Success (`status: "success"`):
 {"type":"check-health","out":"$health"}
 ```
 
-The planner reads `$health` and decides whether to `say` or `ask` the user based on the report contents.
+The planner reads `$health` via `executor.get_json("$health")` and decides whether to
+`say` or `ask` the user based on `overall_status` and `concerns`.
