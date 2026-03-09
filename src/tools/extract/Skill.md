@@ -45,8 +45,15 @@ Failure (`status: "failed"`):
   ("convert this abstract to bullet points", "rewrite as JSON with fields: method, result")
 - Compressing a single document
   ("summarize this paper in 3 sentences", "extract only the methodology section")
+- Formatting and reporting from a single source document
+  ("format this weather data as a concise report", "summarize these findings and present as a briefing")
 - Normalizing or cleaning text
   ("remove citation markers", "standardize author name format")
+
+**Prefer `extract` over `synthesize` when:**
+- There is only ONE source document — even if the goal says "summarize" or "report"
+- Grounding is critical — extract never introduces new information
+- The task is reformatting, not integrating across multiple documents
 
 **Do NOT use `extract` when:**
 - Integrating across multiple documents → use `synthesize`

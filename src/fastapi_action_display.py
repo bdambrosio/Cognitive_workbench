@@ -3537,6 +3537,15 @@ Generated: {generated_at}
                     updateSchedulerUI(stateData.task_scheduler);
                 }
             }
+
+            // Refresh goals list on transition to idle (was_active → not active)
+            if (!stateData.turn.is_active && window._lastExecutionActive && stateData.character === activeCharacter) {
+                const tasksPanel = document.getElementById('tasksPanel');
+                if (tasksPanel && tasksPanel.classList.contains('active')) {
+                    setTimeout(() => loadTasksList(stateData.character), 300);
+                }
+            }
+            window._lastExecutionActive = stateData.turn.is_active;
         }
         
         function handleTurnStart(turnData) {

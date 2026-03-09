@@ -1305,11 +1305,9 @@ def validate_codegen_block(code: str) -> tuple:
     if 'executor._create_uniform_return' not in code:
         return False, "Missing return executor._create_uniform_return(...)"
 
-    # Reject silent-failure patterns: bare except or except followed immediately by continue/pass
-    # execute_action_tracked never raises, so these swallow nothing and hide all errors
-    if re.search(r'^\s*except\s*:\s*$', code, re.MULTILINE):
-        return False, "Bare 'except:' not allowed — execute_action_tracked never raises. Check r['status'] instead."
-    if re.search(r'^\s*except\b[^:]*:\s*(continue|pass)\s*$', code, re.MULTILINE):
+    # Reject silent-failure patterns: except blocks whose body is only continue or pass.
+    # Allow except blocks that handle errors visibly (e.g. errors.append, return failure).
+    if re.search(r'^\s*except\b[^:]*:\s*\n\s*(continue|pass)\s*$', code, re.MULTILINE):
         return False, "Silent 'except: continue/pass' not allowed. Track errors explicitly and check r['status']."
 
     return True, ""
@@ -1514,6 +1512,15 @@ def _execute_and_record_code_block(code_text: str, executor, step: int) -> tuple
             code_block_output_created = True
 
     return result_dict, new_bindings, tool_result, code_block_output_created
+
+
+def _strip_numbered_prefix(text: str) -> str:
+    """Strip leading numbered list prefix like '1. ' or '2. ' from LLM output."""
+    stripped = text.lstrip()
+    m = re.match(r'^\d+\.\s+', stripped)
+    if m:
+        return stripped[m.end():]
+    return stripped
 
 
 def _compress_trace(trace_str: str) -> str:
@@ -2799,7 +2806,7 @@ ALWAYS follow all formatting instructions exactly.
                             logger.debug(f"Stage 3.1: Failed to update commentary for {rid}: {e}")
             
             # Stage 3.5: Dynamic tool loading (if requested)
-            requested_tools_raw = s[f"request_tools_{step}"].strip()
+            requested_tools_raw = _strip_numbered_prefix(s[f"request_tools_{step}"].strip())
             requested_tools = parse_request_tools(requested_tools_raw)
             if requested_tools:
                 logger.info(f"Step {step}: LLM requested additional tools: {requested_tools}")
@@ -2822,8 +2829,8 @@ ALWAYS follow all formatting instructions exactly.
                     s[_key] = _strip_think_tags(s[_key])
 
             # Check if done
-            done_raw = s[f"done_{step}"].strip().upper()
-            next_task_raw = s[f"next_task_{step}"].strip()
+            done_raw = _strip_numbered_prefix(s[f"done_{step}"].strip()).upper()
+            next_task_raw = _strip_numbered_prefix(s[f"next_task_{step}"].strip())
             if done_raw.startswith("YES"):
                 if _interrupt_requested(executor):
                     _clear_interrupt(executor)
@@ -3367,7 +3374,7 @@ def tool_planner_infospace_vllm(template, goal: str, world_model: Dict, characte
         # Strip leading whitespace and take first line
         remainder = remainder.lstrip()
         line = remainder.splitlines()[0] if remainder.splitlines() else remainder
-        return line.strip()
+        return _strip_numbered_prefix(line.strip())
 
     def _strip_code_fences(text: str) -> str:
         t = text.strip()
@@ -3730,8 +3737,8 @@ ALWAYS follow all formatting instructions exactly.
         eval_target_val = _strip_think_tags(_extract_line_value(stage3_block, "EVAL_TARGET:"))
         done_val = _strip_think_tags(_extract_line_value(stage3_block, "DONE:"))
         verification_val = _strip_think_tags(_extract_between_labels(stage3_block, "VERIFICATION:", "NEXT_TASK:"))
-        next_task_val = _strip_think_tags(_extract_between_labels(stage3_block, "NEXT_TASK:", "REQUEST_TOOLS:"))
-        request_tools_val = _strip_think_tags(_extract_after_label(stage3_block, "REQUEST_TOOLS:").strip())
+        next_task_val = _strip_numbered_prefix(_strip_think_tags(_extract_between_labels(stage3_block, "NEXT_TASK:", "REQUEST_TOOLS:")))
+        request_tools_val = _strip_numbered_prefix(_strip_think_tags(_extract_after_label(stage3_block, "REQUEST_TOOLS:").strip()))
 
         state[f"thoughts_{step}"] = thoughts_val
         state[f"eval_target_{step}"] = eval_target_val
@@ -3803,8 +3810,8 @@ ALWAYS follow all formatting instructions exactly.
             logger.warning(f"Step {step}: Failed to parse REQUEST_TOOLS: {requested_tools_raw[:100]}")
         
         # Check if done
-        done_raw = state.get(f"done_{step}", "").strip().upper()
-        next_task_raw = state.get(f"next_task_{step}", "").strip()
+        done_raw = _strip_numbered_prefix(state.get(f"done_{step}", "").strip()).upper()
+        next_task_raw = _strip_numbered_prefix(state.get(f"next_task_{step}", "").strip())
         if done_raw.startswith("YES"):
             if _interrupt_requested(executor):
                 _clear_interrupt(executor)
@@ -4008,11 +4015,16 @@ def parse_request_tools(raw_text: str) -> Optional[List[str]]:
         return None
     
     text = raw_text.strip()
-    
+
     # Remove "REQUEST_TOOLS: " prefix if present
     if text.startswith("REQUEST_TOOLS:"):
         text = text[len("REQUEST_TOOLS:"):].strip()
-    
+
+    # Strip numbered list prefix (e.g. "1. []" → "[]")
+    m = re.match(r'^\d+\.\s+', text)
+    if m:
+        text = text[m.end():]
+
     # Handle empty/placeholder values
     if not text or text.lower() in ["", "[]", "none", "null", "n/a"]:
         return None
@@ -4533,20 +4545,27 @@ class IncrementalPlanner:
                 final_answer = 'Planning completed'
             
             error_count = getattr(self.executor, '_plan_error_count', 0)
-            verification_answer = str(state.get('VERIFICATION_ANSWER', '')).strip().upper() if isinstance(state, dict) else ""
+            # Extract verification_answer from state (works for both dict and ProgramState)
+            try:
+                verification_answer = _strip_numbered_prefix(str(state['VERIFICATION_ANSWER']).strip()).upper() if 'VERIFICATION_ANSWER' in state else ""
+            except (KeyError, TypeError):
+                verification_answer = ""
             # Safely determine success status (handle interrupt case)
             success = False
             if f'done_{step}' in state:
                 try:
                     done_str = state[f'done_{step}']
                     if done_str and isinstance(done_str, str):
-                        success = done_str.strip().upper().startswith("YES")
+                        success = _strip_numbered_prefix(done_str.strip()).upper().startswith("YES")
                 except (KeyError, TypeError, AttributeError):
                     pass
             # If interrupted, final_answer will be "Interrupted by user."
             # Exception: ask to User completed successfully (intentional pause, not failure)
             elif final_answer == "Interrupted by user.":
-                success = bool(state.get("ask_completed_successfully", False))
+                try:
+                    success = bool(state['ask_completed_successfully']) if 'ask_completed_successfully' in state else False
+                except (KeyError, TypeError):
+                    success = False
             if final_answer == "Interrupted by user.":
                 quality_status = "interrupted" if not success else "passed"
             elif success:
@@ -4555,11 +4574,11 @@ class IncrementalPlanner:
                 quality_status = "needs_revision"
             else:
                 quality_status = "failed"
-            
+
             primary_product = _find_side_effect_content_source(self.executor)
             if not primary_product:
                 try:
-                    raw_target = state.get('last_eval_target', '') if isinstance(state, dict) else (state['last_eval_target'] if 'last_eval_target' in state else '')
+                    raw_target = state['last_eval_target'] if 'last_eval_target' in state else ''
                     if raw_target:
                         primary_product = _resolve_eval_target_id(raw_target, self.executor) or raw_target
                 except (KeyError, TypeError):
@@ -4748,20 +4767,27 @@ class IncrementalPlanner:
                 final_answer = 'Planning completed'
             
             error_count = getattr(self.executor, '_plan_error_count', 0)
-            verification_answer = str(state.get('VERIFICATION_ANSWER', '')).strip().upper() if isinstance(state, dict) else ""
+            # Extract verification_answer from state (works for both dict and ProgramState)
+            try:
+                verification_answer = _strip_numbered_prefix(str(state['VERIFICATION_ANSWER']).strip()).upper() if 'VERIFICATION_ANSWER' in state else ""
+            except (KeyError, TypeError):
+                verification_answer = ""
             # Safely determine success status (handle interrupt case)
             success = False
             if f'done_{step}' in state:
                 try:
                     done_str = state[f'done_{step}']
                     if done_str and isinstance(done_str, str):
-                        success = done_str.strip().upper().startswith("YES")
+                        success = _strip_numbered_prefix(done_str.strip()).upper().startswith("YES")
                 except (KeyError, TypeError, AttributeError):
                     pass
             # If interrupted, final_answer will be "Interrupted by user."
             # Exception: ask to User completed successfully (intentional pause, not failure)
             elif final_answer == "Interrupted by user.":
-                success = bool(state.get("ask_completed_successfully", False))
+                try:
+                    success = bool(state['ask_completed_successfully']) if 'ask_completed_successfully' in state else False
+                except (KeyError, TypeError):
+                    success = False
             if final_answer == "Interrupted by user.":
                 quality_status = "interrupted" if not success else "passed"
             elif success:
@@ -4778,7 +4804,7 @@ class IncrementalPlanner:
             primary_product = _find_side_effect_content_source(self.executor)
             if not primary_product:
                 try:
-                    raw_target = state.get('last_eval_target', '') if isinstance(state, dict) else (state['last_eval_target'] if 'last_eval_target' in state else '')
+                    raw_target = state['last_eval_target'] if 'last_eval_target' in state else ''
                     if raw_target:
                         primary_product = _resolve_eval_target_id(raw_target, self.executor) or raw_target
                 except (KeyError, TypeError):

@@ -70,7 +70,8 @@ Failure (`status: "failed"`):
 - Aggregating per-item extractions into a coherent narrative
 
 **Do NOT use `synthesize` when:**
-- Extracting content from a single document → use `extract`
+- Extracting, formatting, or reporting from a single document → use `extract`
+  (even if the goal says "summarize", "report", or "present" — if there is only ONE source, use `extract`)
 - Creating content with no source material → use `generate-note`
 - Filtering or selecting items → use `filter-structured` or `filter-semantic`
 - Structural operations on Collections → use `project`, `sort`, `head`, etc.

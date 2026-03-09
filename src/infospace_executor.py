@@ -3398,7 +3398,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             self._bind_variable(out_var, "Note_null")
         else:
             logger.info(f"❓ Ask: '{question_text}' → terminating turn")
-        self.executive_node.awaiting_ask_response = False
+        self.executive_node.awaiting_ask_response = True
         # Terminal dialog action model: end this turn after ask.
         self.interrupt_requested = True
         if self.executive_node:

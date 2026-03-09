@@ -13,6 +13,7 @@ import traceback
 import json
 import time
 import threading
+import queue
 import logging
 import sys
 import signal
@@ -1016,6 +1017,16 @@ class ZenohExecutiveNode:
         
         # Ask primitive state
         self.awaiting_ask_response = False
+
+        # Goal worker thread state
+        self._goal_thread: Optional[threading.Thread] = None
+        self._goal_thread_result: Optional[Dict[str, Any]] = None
+        self._goal_done_event = threading.Event()
+
+        # Sensor priority queues (observed while goal runs, drained on completion)
+        self._sensor_alert_queue: list = []    # disposition='alert' — high priority
+        self._sensor_trigger_queue: list = []  # disposition='trigger:X' — goal dispatch
+        self._sensor_inform_queue: list = []   # disposition='inform' — rolling context (last 10)
         
         # Track last action outputs for plan_result
         self.last_say_text = ''
@@ -1336,52 +1347,13 @@ class ZenohExecutiveNode:
             time.sleep(0.1)
             time.sleep(1.0)
             
-            # Start OODA loop
+            # Start main loop
             while not self.shutdown_requested:
-                # Check if there's a goal in queue that should unpause execution
-                # (either explicit 'goal:' prefix or User text that will be converted to goal)
-                if self.execution_paused and self.text_input_queue:
-                    for queued in self.text_input_queue:
-                        content = queued.get('content', '')
-                        try:
-                            content_data = json.loads(content)
-                            text = content_data.get('text', '')
-                            source = content_data.get('source', 'unknown')
-                        except (json.JSONDecodeError, TypeError):
-                            text = content
-                            source = 'console'
-                        # Unpause for explicit goals, User text, or messages from other agents
-                        if _is_goal_cmd(text) or source == 'User' or source not in ('unknown', 'console'):
-                            logger.info(f'🚀 Goal/User input in queue, unpausing execution')
-                            self.execution_paused = False
-                            self._publish_execution_state()
-                            break
-                
-                if self.execution_paused:
-                    time.sleep(0.2)
-                else:
-                    try:
-                        # Priority order: Text input → Normal OODA
-                        # Skip if ask primitive is polling text_input_queue directly
-                        if self.text_input_queue and not self.awaiting_ask_response:
-                            self._process_text_input()
-                        self._run_ooda_loop()
-                        
-                        # Check autonomous mode completion conditions
-                        if self.execution_mode == 'autonomous':
-                            self.run_autonomous_mode()
-                            if not self.autonomous_mode:
-                                # Autonomous mode completed or stopped, pause and enable button
-                                self.execution_mode = 'step'
-                                self.execution_paused = True
-                                self._publish_execution_state()
-                        # In step mode, pause after one OODA cycle
-                        elif self.execution_mode == 'step':
-                            self.execution_paused = True
-                            self._publish_execution_state()
-                    except Exception as e:
-                        traceback.print_exc()
-                        logger.error(f'Error in OODA loop: {e}')
+                try:
+                    self._main_loop_tick()
+                except Exception as e:
+                    traceback.print_exc()
+                    logger.error(f'Error in main loop: {e}')
                 time.sleep(0.2)
                 
         except KeyboardInterrupt:
@@ -1389,6 +1361,98 @@ class ZenohExecutiveNode:
         finally:
             self.shutdown()
     
+    def _main_loop_tick(self):
+        """One iteration of the main loop.
+
+        Responsibilities:
+        - Route user text: ask-reply → goal thread, goal: prefix → goal thread, else → chat-mode
+        - Route goal commands (proceed/reuse/terminate) → goal dispatch
+        - Handle goal thread completion → drain sensor queues
+        - Chat-mode: lightweight LLM response while goal thread is busy or idle
+        """
+        # ── 1. Check goal thread completion ──────────────────────────────
+        if self._goal_done_event.is_set() and not self._is_goal_running():
+            self._goal_done_event.clear()
+            logger.info(f'✅ {self.character_name} goal thread completed')
+            # Return to idle state so UI shows step/run buttons, not interrupt
+            self.execution_paused = True
+            self.execution_mode = 'step'
+            # Scheduler notification handled by _set_scheduled_goal_result in worker
+            self._publish_execution_state()
+            # Drain sensor queues in priority order
+            self._drain_sensor_queues()
+
+        # ── 2. Process text_input_queue ──────────────────────────────────
+        if self.text_input_queue:
+            # Peek at first item to classify it
+            sense_data = self.text_input_queue[0]
+            content = sense_data.get('content', '')
+            try:
+                content_data = json.loads(content)
+                text = content_data.get('text', '')
+                source = content_data.get('source', 'unknown')
+            except (json.JSONDecodeError, TypeError):
+                text = content
+                source = 'console'
+
+            # 2a. Ask-reply: route to goal thread (which is paused waiting)
+            if self.awaiting_ask_response:
+                if source == 'User':
+                    self.text_input_queue.pop(0)
+                    logger.info(f'🚀 User reply to ask received, resuming goal')
+                    self.awaiting_ask_response = False
+                    self.execution_paused = False
+                    self._publish_execution_state()
+                    # Feed reply through _process_text_input (handles goal resume)
+                    self._process_text_input_item(sense_data)
+                return  # While awaiting ask, ignore non-User input
+
+            # 2b. Goal commands and explicit goals — dispatch to goal thread
+            clean = text.strip().strip('"').strip("'")
+            is_goal = _is_goal_cmd(text)
+            is_proceed = clean.lower().startswith('proceed') or clean.lower() == 'next step'
+            is_reuse = clean.lower().startswith('reuse')
+            is_terminate = clean.lower().startswith('terminate')
+            is_clear_cache = clean.lower().startswith('clear-cache')
+            is_unblock = clean.lower().startswith('unblock')
+            is_task_cmd = clean.startswith('task:') or clean.lower() in ('tasks', 'task list', 'list tasks')
+            is_command = is_goal or is_proceed or is_reuse or is_terminate or is_clear_cache or is_unblock or is_task_cmd
+            is_scheduler = source == 'scheduler'
+
+            if is_command or is_scheduler:
+                self.text_input_queue.pop(0)
+                self._process_text_input_item(sense_data)
+                return
+
+            # 2c. Regular user text or agent message → chat-mode response
+            if source == 'User':
+                self.text_input_queue.pop(0)
+                self._handle_chat_response(text, source)
+                return
+
+            # 2d. Agent-to-agent messages — process through existing pipeline
+            if source not in ('unknown', 'console'):
+                self.text_input_queue.pop(0)
+                self._process_text_input_item(sense_data)
+                return
+
+            # 2e. Unknown source — drop
+            self.text_input_queue.pop(0)
+
+        # ── 3. Run OODA observe (keeps observations fresh) ───────────────
+        if not self._is_goal_running():
+            self._run_ooda_loop()
+
+    def _process_text_input_item(self, sense_data: dict):
+        """Process a single text input item through the existing dispatch pipeline.
+
+        Wraps the original _process_text_input logic but accepts the item directly
+        instead of popping from queue (caller already popped it).
+        """
+        # Re-inject into queue head so _process_text_input can pop it
+        self.text_input_queue.insert(0, sense_data)
+        self._process_text_input()
+
     def _announce_character(self):
         """Announce character presence to the action display node."""
         try:
@@ -2297,6 +2361,9 @@ class ZenohExecutiveNode:
         if not goal:
             self._say_to_user(f"Goal '{goal_id}' not found.")
             return
+        if self._is_goal_running():
+            self._say_to_user(f"A goal is already running. Please wait for it to complete.")
+            return
         self._active_scheduled_goal_id = goal_id
         self._update_scheduled_goal(goal_id, is_running=True, status="running")
         self._record_scheduler_event(
@@ -2305,16 +2372,22 @@ class ZenohExecutiveNode:
             goal_name=goal.get("name", "") or goal.get("goal_text", "")[:80],
         )
         pre_resource_ids = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
-        result: Dict[str, Any] = {}
-        try:
-            # Proceed always replans from scratch; use 'reuse' to replay cached plans
-            result = self.parse_and_set_goal("", goal.get("goal_text", "")) or {}
-        except Exception as e:
-            result = {"success": False, "error": str(e)}
-        self._set_scheduled_goal_result(goal_id, result, used_cache=False, pre_resource_ids=pre_resource_ids)
-        if source != "scheduler":
-            status = "completed" if result.get("success") else "failed"
-            self._say_to_user(f"Goal '{goal.get('name') or goal_id}' {status}.")
+        notify_user = source != "scheduler"
+        goal_name = goal.get('name') or goal_id
+
+        def _run():
+            result: Dict[str, Any] = {}
+            try:
+                result = self.parse_and_set_goal("", goal.get("goal_text", "")) or {}
+            except Exception as e:
+                result = {"success": False, "error": str(e)}
+            self._set_scheduled_goal_result(goal_id, result, used_cache=False, pre_resource_ids=pre_resource_ids)
+            if notify_user:
+                status = "completed" if result.get("success") else "failed"
+                self._say_to_user(f"Goal '{goal_name}' {status}.")
+            return result
+
+        self._run_goal_on_thread(_run)
 
     def _handle_goal_reuse(self, goal_id: str = None):
         if not goal_id:
@@ -2328,6 +2401,9 @@ class ZenohExecutiveNode:
         if not cached or not isinstance(cached, list):
             self._say_to_user(f"Goal '{goal_id}' has no cached plan. Use 'proceed {goal_id}' to replan.")
             return
+        if self._is_goal_running():
+            self._say_to_user(f"A goal is already running. Please wait for it to complete.")
+            return
         # Execute the cached plan via execute_plan_sync
         self._active_scheduled_goal_id = goal_id
         self._update_scheduled_goal(goal_id, is_running=True, status="running")
@@ -2337,24 +2413,30 @@ class ZenohExecutiveNode:
             goal_name=goal.get("name", "") or goal.get("goal_text", "")[:80],
         )
         pre_resource_ids = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
-        # Clear side-effect dedup caches so replay re-executes send-email, post-bluesky, etc.
-        self.infospace_executor._side_effect_cache = {}
-        self.infospace_executor._successful_side_effect_results = {}
-        result = {}
-        try:
-            sync_result = self.infospace_executor.execute_plan_sync({"plan": cached})
-            success = sync_result.get("status") == "success"
-            result = {
-                "success": success,
-                "plan": cached,
-                "response": f"Cached plan replay {'succeeded' if success else 'failed'}: {sync_result.get('reason', '')}".strip(),
-                "quality_status": "passed" if success else "failed",
-            }
-        except Exception as e:
-            result = {"success": False, "error": str(e)}
-        self._set_scheduled_goal_result(goal_id, result, used_cache=True, pre_resource_ids=pre_resource_ids)
-        status = "completed" if result.get("success") else "failed"
-        self._say_to_user(f"Goal '{goal.get('name') or goal_id}' reuse {status}.")
+        goal_name = goal.get('name') or goal_id
+
+        def _run():
+            # Clear side-effect dedup caches so replay re-executes send-email, post-bluesky, etc.
+            self.infospace_executor._side_effect_cache = {}
+            self.infospace_executor._successful_side_effect_results = {}
+            result = {}
+            try:
+                sync_result = self.infospace_executor.execute_plan_sync({"plan": cached})
+                success = sync_result.get("status") == "success"
+                result = {
+                    "success": success,
+                    "plan": cached,
+                    "response": f"Cached plan replay {'succeeded' if success else 'failed'}: {sync_result.get('reason', '')}".strip(),
+                    "quality_status": "passed" if success else "failed",
+                }
+            except Exception as e:
+                result = {"success": False, "error": str(e)}
+            self._set_scheduled_goal_result(goal_id, result, used_cache=True, pre_resource_ids=pre_resource_ids)
+            status = "completed" if result.get("success") else "failed"
+            self._say_to_user(f"Goal '{goal_name}' reuse {status}.")
+            return result
+
+        self._run_goal_on_thread(_run)
 
     def _handle_goal_terminate(self, goal_id: str = None):
         if not goal_id:
@@ -3024,7 +3106,8 @@ class ZenohExecutiveNode:
                 continue
             note_name = props.get("note_name", "")
             collection_name = props.get("collection_name", "")
-            if note_name in _PRESERVED_NOTES or note_name.startswith(_PRESERVED_NOTE_PREFIXES):
+            # Preserve named Notes — if the planner named it, it's intentional output
+            if note_name:
                 continue
             if collection_name in _PRESERVED_COLLECTIONS:
                 continue
@@ -3057,6 +3140,124 @@ class ZenohExecutiveNode:
         """Send a message to user via the say action."""
         if self.infospace_executor:
             self.infospace_executor.execute_action({"type": "say", "target": "user", "value": text})
+
+    # ── Chat-mode response (lightweight, no planning pipeline) ────────────
+
+    def _handle_chat_response(self, text: str, source: str = 'User'):
+        """Respond to user via direct LLM call, bypassing the planning pipeline.
+
+        Used when no goal: prefix is present.  Read-only — no resource mutations.
+        """
+        # Record the incoming turn so envision sees full history
+        self.conversation_store.record_incoming(source, text)
+
+        # Characterise the conversational moment (cheap LLM call)
+        envision = self._envision_conversation_turn(source, text, "")
+
+        # Build system prompt (character + setting + capabilities + drives + agent state)
+        system_prompt = self._update_system_prompt()
+
+        # Build user prompt with dialog history + envision guidance + user message
+        recent_turns = ""
+        entity_data = self.conversation_store.get_entity_context(source, limit=6, scope='current')
+        if entity_data and 'conversation_history' in entity_data:
+            for entry in entity_data['conversation_history'][-6:]:
+                if isinstance(entry, dict) and 'source' in entry and 'text' in entry:
+                    text_preview = str(entry['text'])[:200]
+                    recent_turns += f"{entry['source']}: {text_preview}\n"
+
+        user_prompt = (
+            f"RECENT DIALOG:\n{recent_turns}\n"
+            f"Their move: {envision['turn_intent']}\n"
+            f"Your move: {envision['my_move']}\n\n"
+            f"Message from {source}: {text}\n\n"
+            f"Respond in character. Be concise."
+        )
+
+        try:
+            result = self.llm_generate(
+                messages=[system_prompt, user_prompt],
+                max_tokens=400,
+                temperature=0.7,
+            )
+            if result.success and result.text:
+                response = result.text.strip()
+                self._say_to_user(response)
+                self.conversation_store.record_outgoing(source, response, act_type="chat")
+                logger.info(f'💬 {self.character_name} chat response to {source}: {response[:80]}...')
+            else:
+                logger.warning(f'Chat LLM call failed: {getattr(result, "error", "unknown")}')
+        except Exception as e:
+            logger.error(f'Error in chat response: {e}')
+            traceback.print_exc()
+
+    # ── Goal worker thread ────────────────────────────────────────────────
+
+    def _run_goal_on_thread(self, fn, *args, **kwargs):
+        """Execute a goal function on the worker thread.
+
+        fn is called with *args/**kwargs.  Result stored in _goal_thread_result.
+        _goal_done_event is set on completion (success or failure).
+        """
+        self._goal_done_event.clear()
+        self._goal_thread_result = None
+        # Mark as running so UI shows interrupt button
+        self.execution_paused = False
+        self.execution_mode = 'run'
+        self._publish_execution_state()
+
+        def _worker():
+            try:
+                result = fn(*args, **kwargs)
+                self._goal_thread_result = result if result is not None else {}
+            except Exception as e:
+                logger.error(f'Goal thread error: {e}')
+                traceback.print_exc()
+                self._goal_thread_result = {'success': False, 'error': str(e)}
+            finally:
+                self._goal_done_event.set()
+
+        self._goal_thread = threading.Thread(target=_worker, daemon=True, name='goal-worker')
+        self._goal_thread.start()
+
+    def _is_goal_running(self) -> bool:
+        """True if a goal is currently executing on the worker thread."""
+        return self._goal_thread is not None and self._goal_thread.is_alive()
+
+    def _drain_sensor_queues(self):
+        """Drain sensor priority queues after a goal completes.
+
+        Order: alerts → triggers → informs.
+        """
+        # Alerts: generate chat-style acknowledgement
+        while self._sensor_alert_queue:
+            alert = self._sensor_alert_queue.pop(0)
+            sensor_name = alert.get('sensor_name', 'unknown')
+            content = alert.get('content', '')
+            logger.info(f'🚨 {self.character_name} processing alert from {sensor_name}: {content[:80]}')
+            # Respond to alert via chat-mode (read-only, in character)
+            self._handle_chat_response(
+                f"[ALERT from sensor {sensor_name}]: {content}",
+                source=f'sensor:{sensor_name}'
+            )
+
+        # Triggers: dispatch the first eligible as next goal
+        if self._sensor_trigger_queue:
+            trigger = self._sensor_trigger_queue.pop(0)
+            goal_name = trigger.get('goal_name', '')
+            logger.info(f'⚡ {self.character_name} dispatching triggered goal: {goal_name}')
+            # Find the scheduled goal matching trigger target
+            for goal in self._all_scheduled_goals():
+                if goal.get('name') == goal_name or goal.get('goal_text', '').strip() == goal_name:
+                    goal_id = goal.get('goal_id')
+                    if goal_id:
+                        self._handle_goal_proceed(goal_id=goal_id, source='sensor_trigger')
+                        break
+            else:
+                logger.warning(f'Triggered goal "{goal_name}" not found in scheduled goals')
+            # Remaining triggers stay queued for next drain cycle
+
+        # Informs: retained as rolling context in _build_agent_state_block (not drained)
 
     def _delete_resource_and_unbind(self, resource_id: str):
         """Delete a resource and clear any binding variables targeting it."""
@@ -3264,15 +3465,23 @@ class ZenohExecutiveNode:
                     self._publish_action_result(action_dict if 'action_dict' in locals() else {}, error_result, action_type, timestamp)
                     return
             
-            # Handle scheduler-issued proceed commands
-            if source == 'scheduler' and clean_input.strip().lower().startswith('proceed'):
+            # Handle scheduler-issued proceed/reuse commands
+            if source == 'scheduler':
+                cmd = clean_input.strip().lower()
                 parts = clean_input.strip().split()
                 target_id = parts[1] if len(parts) > 1 else None
-                if target_id and target_id.startswith('goal_'):
-                    self._handle_goal_proceed(goal_id=target_id, source='scheduler')
-                else:
-                    task_id = target_id if target_id and target_id.startswith('task_') else None
-                    self._handle_task_proceed(task_id=task_id)
+                if cmd.startswith('proceed'):
+                    if target_id and target_id.startswith('goal_'):
+                        self._handle_goal_proceed(goal_id=target_id, source='scheduler')
+                    else:
+                        task_id = target_id if target_id and target_id.startswith('task_') else None
+                        self._handle_task_proceed(task_id=task_id)
+                elif cmd.startswith('reuse'):
+                    if target_id and target_id.startswith('goal_'):
+                        self._handle_goal_reuse(goal_id=target_id)
+                    else:
+                        task_id = target_id if target_id and target_id.startswith('task_') else None
+                        self._handle_task_reuse(task_id=task_id)
                 return
 
             # Handle special commands from User BEFORE processing as dialog
@@ -3283,9 +3492,20 @@ class ZenohExecutiveNode:
                     self.conversation_store.close_dialog("User")
                     goal_text = clean_input[5:].strip()
                     scheduled_goal = self._upsert_scheduled_goal(goal_text)
+                    goal_id = scheduled_goal["goal_id"]
+                    if self._is_goal_running():
+                        self._say_to_user("A goal is already running. Please wait for it to complete.")
+                        return
+                    self._active_scheduled_goal_id = goal_id
+                    self._update_scheduled_goal(goal_id, is_running=True, status="running")
                     pre_resource_ids = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
-                    result = self.parse_and_set_goal("", goal_text) or {}
-                    self._set_scheduled_goal_result(scheduled_goal["goal_id"], result, used_cache=False, pre_resource_ids=pre_resource_ids)
+
+                    def _run_user_goal():
+                        result = self.parse_and_set_goal("", goal_text) or {}
+                        self._set_scheduled_goal_result(goal_id, result, used_cache=False, pre_resource_ids=pre_resource_ids)
+                        return result
+
+                    self._run_goal_on_thread(_run_user_goal)
                     return  # Don't process as speech
                 elif clean_input.startswith('task:'):
                     self._handle_task_create(clean_input[5:].strip())
@@ -3375,6 +3595,8 @@ class ZenohExecutiveNode:
             
             # Agent-to-agent message processing — treat like User input (create goal)
             if source and source not in ('unknown', 'console'):
+                # Record incoming message for conversation history
+                self.conversation_store.record_incoming(source, clean_input, close=close_flag)
                 # Dedup: skip if identical to last message from this source
                 if self._last_agent_message.get(source) == clean_input:
                     logger.info(f'📥 {self.character_name} Skipping duplicate message from {source}')
@@ -3511,8 +3733,8 @@ class ZenohExecutiveNode:
             logger.error(f'Error in OODA loop: {e}')
             logger.error(traceback.format_exc())
         finally:
-            # In step mode, pause after plan execution
-            if self.execution_mode == 'step':
+            # In step mode, pause after plan execution (skip if already paused)
+            if self.execution_mode == 'step' and not self.execution_paused:
                 self.execution_paused = True
                 self._publish_execution_state()
 
@@ -3608,6 +3830,15 @@ class ZenohExecutiveNode:
                 parts.append("Scheduled goals: none")
         except Exception:
             parts.append("Scheduled goals: unavailable")
+
+        # Recent sensor observations (inform disposition — rolling context)
+        if self._sensor_inform_queue:
+            lines = []
+            for entry in self._sensor_inform_queue:
+                sensor_name = entry.get('sensor_name', 'unknown')
+                content = entry.get('content', '')[:200]
+                lines.append(f"  - [{sensor_name}] {content}")
+            parts.append("Recent sensor observations:\n" + "\n".join(lines))
 
         return "\n".join(parts)
 
@@ -3812,9 +4043,30 @@ class ZenohExecutiveNode:
                 # Fallback to plain text (console input format)
                 text_input = content
                 source = 'console'
-            # Sensor reports: log only, don't queue for agent processing
+            # Sensor reports: route by disposition into priority queues
             if source.startswith('sensor:') or (text_input and text_input.startswith('sensor ') and ' report\n' in text_input):
-                logger.info(f'📡 {self.character_name} sensor report from {source}: {text_input[:120]}')
+                disposition = content_data.get('disposition', 'inform') if isinstance(content_data, dict) else 'inform'
+                sensor_name = source.replace('sensor:', '') if source.startswith('sensor:') else 'unknown'
+                # Extract the actual content (strip the "sensor X report [disp]\n" prefix)
+                sensor_content = text_input
+                if '\n' in text_input:
+                    sensor_content = text_input.split('\n', 1)[1] if '\n' in text_input else text_input
+                sensor_entry = {'sensor_name': sensor_name, 'content': sensor_content, 'disposition': disposition}
+
+                if disposition == 'alert':
+                    self._sensor_alert_queue.append(sensor_entry)
+                    logger.info(f'🚨 {self.character_name} sensor ALERT queued from {sensor_name}: {sensor_content[:80]}')
+                elif disposition.startswith('trigger:'):
+                    goal_name = disposition.split(':', 1)[1]
+                    sensor_entry['goal_name'] = goal_name
+                    self._sensor_trigger_queue.append(sensor_entry)
+                    logger.info(f'⚡ {self.character_name} sensor TRIGGER queued: {goal_name} (from {sensor_name})')
+                else:
+                    # 'inform' or unrecognized — rolling context (last 10)
+                    self._sensor_inform_queue.append(sensor_entry)
+                    if len(self._sensor_inform_queue) > 10:
+                        self._sensor_inform_queue.pop(0)
+                    logger.info(f'📡 {self.character_name} sensor inform from {sensor_name}: {sensor_content[:120]}')
                 return
 
             # Process if we have text input
@@ -3825,17 +4077,6 @@ class ZenohExecutiveNode:
                 if len(self.text_input_queue) > 3:
                     logger.warning(f'⚠️ Text input queue size {len(self.text_input_queue)} > 3, dropping oldest')
                     self.text_input_queue.pop(0)
-                
-                # Add conversation entry to note/collection conversation store
-                # Skip recording for scheduler-issued commands (goal proceeds, etc.)
-                if source != 'scheduler':
-                    self.conversation_store.record_incoming(source, text_input, close=bool(content_data.get('close', False)) if 'content_data' in locals() else False)
-                
-                # Auto-unpause for goal commands so they execute immediately
-                if _is_goal_cmd(text_input) and self.execution_paused:
-                    logger.info(f'🚀 Goal received, unpausing execution')
-                    self.execution_paused = False
-                    self._publish_execution_state()
                 
         except Exception as e:
             traceback.print_exc()
@@ -5168,7 +5409,7 @@ class ZenohExecutiveNode:
         try:
             entity_data = self.conversation_store.get_entity_context(entity_name, limit=limit, scope=scope)
             if entity_data:
-                logger.info(f'👥 Retrieved entity context for {entity_name}')
+                # logger.info(f'👥 Retrieved entity context for {entity_name}')
                 return entity_data
             return None
         except Exception as e:
