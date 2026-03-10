@@ -895,26 +895,15 @@ class FastAPIActionDisplayNode:
                 logger.error(f"Error in toggle_continuous: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
         
-        @self.app.post("/api/task_scheduler/{character}")
-        async def toggle_task_scheduler(character: str, data: dict = Body(...)):
+        @self.app.post("/api/goal_scheduler/{character}")
+        async def toggle_goal_scheduler(character: str, data: dict = Body(...)):
             """Control task scheduler (enable/disable, interval)."""
             try:
                 payload = json.dumps(data).encode()
-                self.session.put(f"cognitive/{character}/control/task_scheduler", payload)
+                self.session.put(f"cognitive/{character}/control/goal_scheduler", payload)
                 return {"success": True}
             except Exception as e:
-                logger.error(f"Error in toggle_task_scheduler: {e}")
-                return {"success": False, "message": str(e)}
-
-        @self.app.post("/api/task_schedule_mode/{character}")
-        async def set_task_schedule_mode(character: str, data: dict = Body(...)):
-            """Set per-task schedule mode (manual/auto/recurring)."""
-            try:
-                payload = json.dumps(data).encode()
-                self.session.put(f"cognitive/{character}/control/task_schedule_mode", payload)
-                return {"success": True}
-            except Exception as e:
-                logger.error(f"Error in set_task_schedule_mode: {e}")
+                logger.error(f"Error in toggle_goal_scheduler: {e}")
                 return {"success": False, "message": str(e)}
 
         @self.app.post("/api/goal_schedule_mode/{character}")
@@ -1414,23 +1403,6 @@ Generated: {generated_at}
                 logger.error(f"Error getting plan bindings: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
         
-        @self.app.get("/api/tasks/{character}")
-        async def get_tasks(character: str):
-            """Get active tasks for a character."""
-            try:
-                selector = f"cognitive/{character}/tasks"
-                replies = self.session.get(selector, timeout=2.0)
-                for reply in replies:
-                    if hasattr(reply, 'ok') and reply.ok is not None:
-                        payload_bytes = reply.ok.payload.to_bytes()
-                        response = json.loads(payload_bytes.decode('utf-8'))
-                        if response.get('success'):
-                            return {"success": True, "tasks": response.get('tasks', [])}
-                return {"success": True, "tasks": []}
-            except Exception as e:
-                logger.error(f"Error getting tasks: {e}")
-                return {"success": False, "message": str(e)}
-
         @self.app.get("/api/scheduled_goals/{character}")
         async def get_scheduled_goals(character: str):
             """Get scheduled goals for a character."""
@@ -2452,8 +2424,8 @@ Generated: {generated_at}
                     </div>
                     
                     <!-- Tasks tab content -->
-                    <div class="character-data-panel" id="tasksPanel">
-                        <div id="taskSchedulerBar" style="padding: 6px 10px; border-bottom: 1px solid #404040; display: flex; align-items: center; gap: 8px; font-size: 11px;">
+                    <div class="character-data-panel" id="schedulerPanel">
+                        <div id="goalSchedulerBar" style="padding: 6px 10px; border-bottom: 1px solid #404040; display: flex; align-items: center; gap: 8px; font-size: 11px;">
                             <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
                                 <input type="checkbox" id="schedulerToggle" onchange="toggleScheduler(this.checked)">
                                 Auto-proceed
@@ -2469,7 +2441,7 @@ Generated: {generated_at}
                         <div id="schedulerEvents" style="max-height: 130px; overflow-y: auto; border-bottom: 1px solid #404040; padding: 6px 10px; font-size: 11px; color: #bbb;">
                             <div style="color: #777; font-style: italic;">No scheduler events yet.</div>
                         </div>
-                        <div id="tasksList">
+                        <div id="scheduleList">
                             <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
                                 Select a character to view tasks
                             </div>
@@ -2723,7 +2695,7 @@ Generated: {generated_at}
                     if (data.action_type === 'announcement') {
                         createCharacterTab(data.character);
                         try {
-                            const cfg = (data.raw_data && data.raw_data.character_config && data.raw_data.character_config.task_scheduler) || null;
+                            const cfg = (data.raw_data && data.raw_data.character_config && data.raw_data.character_config.goal_scheduler) || null;
                             if (cfg) {
                                 const tabData = characterTabs.get(data.character);
                                 if (tabData) {
@@ -2945,9 +2917,9 @@ Generated: {generated_at}
                 const character = activeCharacter || 'Jill';
                 loadWorldState(character);
             } else if (tabName === 'tasks') {
-                document.getElementById('tasksPanel').classList.add('active');
+                document.getElementById('schedulerPanel').classList.add('active');
                 const character = activeCharacter || 'Jill';
-                loadTasksList(character);
+                loadScheduleList(character);
             }
         }
         
@@ -3530,19 +3502,19 @@ Generated: {generated_at}
                        `stop=${stateData.buttons.stop.enabled}, active_dialog=${stateData.active_dialog}`);
 
             // Cache scheduler state per character and update UI if it's the active character
-            if (stateData.task_scheduler && stateData.character) {
+            if (stateData.goal_scheduler && stateData.character) {
                 const tabData = characterTabs.get(stateData.character);
-                if (tabData) tabData.schedulerState = stateData.task_scheduler;
+                if (tabData) tabData.schedulerState = stateData.goal_scheduler;
                 if (stateData.character === activeCharacter) {
-                    updateSchedulerUI(stateData.task_scheduler);
+                    updateSchedulerUI(stateData.goal_scheduler);
                 }
             }
 
             // Refresh goals list on transition to idle (was_active → not active)
             if (!stateData.turn.is_active && window._lastExecutionActive && stateData.character === activeCharacter) {
-                const tasksPanel = document.getElementById('tasksPanel');
-                if (tasksPanel && tasksPanel.classList.contains('active')) {
-                    setTimeout(() => loadTasksList(stateData.character), 300);
+                const schedulerPanel = document.getElementById('schedulerPanel');
+                if (schedulerPanel && schedulerPanel.classList.contains('active')) {
+                    setTimeout(() => loadScheduleList(stateData.character), 300);
                 }
             }
             window._lastExecutionActive = stateData.turn.is_active;
@@ -4562,8 +4534,8 @@ Generated: {generated_at}
             }
         }
         
-        async function loadTasksList(character) {
-            const listDiv = document.getElementById('tasksList');
+        async function loadScheduleList(character) {
+            const listDiv = document.getElementById('scheduleList');
             if (!listDiv) return;
             listDiv.innerHTML = '<div style="color: #f39c12; text-align: center; padding: 20px;">⏳ Loading...</div>';
             try {
@@ -4584,7 +4556,7 @@ Generated: {generated_at}
                 goals.forEach((g, i) => {
                     window._goalTextCache[g.goal_id] = g.goal_text || '';
                     const status = g.status || 'ready';
-                    const taskId = `goal-acc-${i}`;
+                    const goalId = `goal-acc-${i}`;
                     const hasCache = Array.isArray(g.cached_plan_actions) && g.cached_plan_actions.length > 0;
                     const execMode = g.execution_mode || 'replan';
                     const isReplay = execMode === 'replay';
@@ -4599,8 +4571,8 @@ Generated: {generated_at}
                     const proceedTextColor = isReplay && hasCache ? 'white' : '#1a1a1a';
                     const proceedLabel = isReplay && hasCache ? 'Replay' : 'Proceed';
                     html += `
-                        <div class="task-accordion-item" style="border: 1px solid #404040; border-radius: 4px; margin-bottom: 8px; overflow: hidden;">
-                            <div class="task-accordion-header" onclick="toggleTaskAccordion('${taskId}')" style="padding: 8px 10px; cursor: pointer; display: flex; align-items: stretch; gap: 8px;">
+                        <div class="goal-accordion-item" style="border: 1px solid #404040; border-radius: 4px; margin-bottom: 8px; overflow: hidden;">
+                            <div class="goal-accordion-header" onclick="toggleGoalAccordion('${goalId}')" style="padding: 8px 10px; cursor: pointer; display: flex; align-items: stretch; gap: 8px;">
                                 <div style="flex: 1; min-width: 0; padding-right: 4px;">
                                     <input type="text" value="${escapeHtml(g.name || g.goal_id || 'Goal')}" onchange="event.stopPropagation(); setGoalName('${escapedChar}', '${g.goal_id || ''}', this.value)" style="width: 100%; background: #2a2a2a; color: #00d4ff; border: 1px solid #555; padding: 3px 4px; border-radius: 3px; font-size: 11px; font-weight: bold;" />
                                     <span style="margin-left: 6px; font-size: 10px; padding: 2px 6px; border-radius: 3px; background: #404040;">${status}</span>
@@ -4615,16 +4587,16 @@ Generated: {generated_at}
                                         <option value="recurring" ${g.schedule_mode === 'recurring' ? 'selected' : ''}>Recurring</option>
                                         <option value="daily" ${g.schedule_mode === 'daily' ? 'selected' : ''}>Daily</option>
                                     </select>
-                                    <input type="time" value="${g.run_at || ''}" onchange="event.stopPropagation(); setTaskRunAt('${escapedChar}', '${g.goal_id || ''}', this.value)" style="display:${g.schedule_mode === 'daily' ? 'block' : 'none'}; background: #2a2a2a; color: #ccc; border: 1px solid #555; padding: 3px 4px; border-radius: 3px; font-size: 11px; width: 100%; box-sizing: border-box;" title="Daily run time (24h)" />
+                                    <input type="time" value="${g.run_at || ''}" onchange="event.stopPropagation(); setGoalRunAt('${escapedChar}', '${g.goal_id || ''}', this.value)" style="display:${g.schedule_mode === 'daily' ? 'block' : 'none'}; background: #2a2a2a; color: #ccc; border: 1px solid #555; padding: 3px 4px; border-radius: 3px; font-size: 11px; width: 100%; box-sizing: border-box;" title="Daily run time (24h)" />
                                     <div style="display: flex; border-radius: 3px; overflow: hidden; border: 1px solid #555; font-size: 10px; cursor: pointer;" title="Execution mode: replan generates a fresh plan each time; replay re-executes the cached plan">
                                         <div onclick="event.stopPropagation(); setGoalExecutionMode('${escapedChar}', '${g.goal_id || ''}', 'replan')" style="flex: 1; text-align: center; padding: 3px 0; background: ${!isReplay ? '#00d4ff' : '#2a2a2a'}; color: ${!isReplay ? '#1a1a1a' : '#888'}; font-weight: ${!isReplay ? 'bold' : 'normal'};">Replan</div>
                                         <div onclick="event.stopPropagation(); setGoalExecutionMode('${escapedChar}', '${g.goal_id || ''}', 'replay')" style="flex: 1; text-align: center; padding: 3px 0; background: ${isReplay ? '#9b59b6' : '#2a2a2a'}; color: ${isReplay ? 'white' : '#888'}; font-weight: ${isReplay ? 'bold' : 'normal'};">Replay</div>
                                     </div>
-                                    <button onclick="event.stopPropagation(); sendTaskCommand('${escapedChar}', '${isReplay && hasCache ? 'reuse' : 'proceed'} ${g.goal_id || ''}')" style="background: ${proceedColor}; color: ${proceedTextColor}; border: none; padding: 4px 0; border-radius: 3px; font-size: 11px; cursor: pointer; width: 100%;">${proceedLabel}</button>
+                                    <button onclick="event.stopPropagation(); sendGoalCommand('${escapedChar}', '${isReplay && hasCache ? 'reuse' : 'proceed'} ${g.goal_id || ''}')" style="background: ${proceedColor}; color: ${proceedTextColor}; border: none; padding: 4px 0; border-radius: 3px; font-size: 11px; cursor: pointer; width: 100%;">${proceedLabel}</button>
                                     <button onclick="event.stopPropagation(); onGoalPrimaryAction('${escapedChar}', '${g.goal_id || ''}', ${isRunning})" style="background: ${actionColor}; color: white; border: none; padding: 4px 0; border-radius: 3px; font-size: 11px; cursor: pointer; width: 100%;">${actionLabel}</button>
                                 </div>
                             </div>
-                            <div id="${taskId}" class="task-accordion-body" style="display: none; padding: 10px; border-top: 1px solid #404040; background: #1e1e1e; font-size: 11px;">
+                            <div id="${goalId}" class="goal-accordion-body" style="display: none; padding: 10px; border-top: 1px solid #404040; background: #1e1e1e; font-size: 11px;">
                                 <pre style="white-space: pre-wrap; margin: 0; font-size: 10px; overflow-x: auto;">${escapeHtml(JSON.stringify(g, null, 2))}</pre>
                             </div>
                         </div>
@@ -4636,12 +4608,12 @@ Generated: {generated_at}
             }
         }
         
-        function toggleTaskAccordion(id) {
+        function toggleGoalAccordion(id) {
             const el = document.getElementById(id);
             if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
         }
         
-        async function sendTaskCommand(character, cmd) {
+        async function sendGoalCommand(character, cmd) {
             try {
                 const response = await fetch('/api/text_input', {
                     method: 'POST',
@@ -4652,37 +4624,37 @@ Generated: {generated_at}
                 if (result.success) {
                     // Delay refresh to allow backend to process the command
                     if (activeCharacter === character) {
-                        setTimeout(() => loadTasksList(character), 1200);
+                        setTimeout(() => loadScheduleList(character), 1200);
                     }
                     return true;
                 }
                 return false;
             } catch (e) {
-                console.error('sendTaskCommand:', e);
+                console.error('sendGoalCommand:', e);
                 return false;
             }
         }
 
-        async function sendTaskCommandSequence(character, commands) {
+        async function sendGoalCommandSequence(character, commands) {
             for (const cmd of commands) {
-                const ok = await sendTaskCommand(character, cmd);
+                const ok = await sendGoalCommand(character, cmd);
                 if (!ok) return false;
             }
             return true;
         }
 
-        async function setTaskScheduleMode(character, taskId, mode, runAt) {
+        async function setGoalScheduleMode(character, goalId, mode, runAt) {
             try {
-                const body = { goal_id: taskId, schedule_mode: mode };
+                const body = { goal_id: goalId, schedule_mode: mode };
                 if (runAt) body.run_at = runAt;
                 await fetch(`/api/goal_schedule_mode/${character}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
                 });
-                loadTasksList(character);
+                loadScheduleList(character);
             } catch (e) {
-                console.error('setTaskScheduleMode:', e);
+                console.error('setGoalScheduleMode:', e);
             }
         }
 
@@ -4693,13 +4665,13 @@ Generated: {generated_at}
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ goal_id: goalId, execution_mode: mode })
                 });
-                loadTasksList(character);
+                loadScheduleList(character);
             } catch (e) {
                 console.error('setGoalExecutionMode:', e);
             }
         }
 
-        function onScheduleModeChange(character, taskId, selectEl) {
+        function onScheduleModeChange(character, goalId, selectEl) {
             const mode = selectEl.value;
             // Show/hide the time picker sibling
             const timeInput = selectEl.nextElementSibling;
@@ -4707,18 +4679,18 @@ Generated: {generated_at}
                 timeInput.style.display = mode === 'daily' ? 'inline' : 'none';
             }
             const runAt = (mode === 'daily' && timeInput) ? timeInput.value : undefined;
-            setTaskScheduleMode(character, taskId, mode, runAt);
+            setGoalScheduleMode(character, goalId, mode, runAt);
         }
 
-        async function setTaskRunAt(character, taskId, runAt) {
+        async function setGoalRunAt(character, goalId, runAt) {
             try {
                 await fetch(`/api/goal_schedule_mode/${character}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ goal_id: taskId, schedule_mode: 'daily', run_at: runAt })
+                    body: JSON.stringify({ goal_id: goalId, schedule_mode: 'daily', run_at: runAt })
                 });
             } catch (e) {
-                console.error('setTaskRunAt:', e);
+                console.error('setGoalRunAt:', e);
             }
         }
 
@@ -4760,15 +4732,15 @@ Generated: {generated_at}
                 if (!confirm(`Interrupt ${label}?`)) return;
                 const ok = await interruptGoal(character, goalId);
                 if (ok && activeCharacter === character) {
-                    setTimeout(() => loadTasksList(character), 300);
+                    setTimeout(() => loadScheduleList(character), 300);
                 }
                 return;
             }
             if (!confirm(`Remove ${label}?`)) return;
             const ok = await removeGoal(character, goalId);
             if (ok && activeCharacter === character) {
-                loadTasksList(character);
-                setTimeout(() => loadTasksList(character), 500);
+                loadScheduleList(character);
+                setTimeout(() => loadScheduleList(character), 500);
             }
         }
 
@@ -4779,7 +4751,7 @@ Generated: {generated_at}
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ goal_id: goalId, name: name })
                 });
-                loadTasksList(character);
+                loadScheduleList(character);
             } catch (e) {
                 console.error('setGoalName:', e);
             }
@@ -4832,7 +4804,7 @@ Generated: {generated_at}
                     body: JSON.stringify({ goal_id: goalId, goal_text: textarea.value })
                 });
                 closeGoalTextEditor();
-                loadTasksList(character);
+                loadScheduleList(character);
             } catch (e) {
                 console.error('saveGoalText:', e);
             }
@@ -4845,8 +4817,8 @@ Generated: {generated_at}
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ goal_id: goalId, action: 'clear' })
                 });
-                sendTaskCommand(character, `clear-cache ${goalId}`);
-                loadTasksList(character);
+                sendGoalCommand(character, `clear-cache ${goalId}`);
+                loadScheduleList(character);
             } catch (e) {
                 console.error('clearGoalCache:', e);
             }
@@ -4855,7 +4827,7 @@ Generated: {generated_at}
         async function toggleScheduler(enabled) {
             if (!activeCharacter) return;
             try {
-                await fetch(`/api/task_scheduler/${activeCharacter}`, {
+                await fetch(`/api/goal_scheduler/${activeCharacter}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ enable: enabled })
@@ -4867,7 +4839,7 @@ Generated: {generated_at}
             if (!activeCharacter) return;
             const mins = Math.max(1, Math.min(1440, parseInt(minutes) || 1));
             try {
-                await fetch(`/api/task_scheduler/${activeCharacter}`, {
+                await fetch(`/api/goal_scheduler/${activeCharacter}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ interval: mins * 60 })
@@ -4887,8 +4859,8 @@ Generated: {generated_at}
                 if (!schedulerState.enabled) {
                     status.textContent = 'disabled';
                     status.style.color = '#888';
-                } else if (schedulerState.executing_task_id) {
-                    status.textContent = 'running: ' + schedulerState.executing_task_id;
+                } else if (schedulerState.executing_goal_id) {
+                    status.textContent = 'running: ' + schedulerState.executing_goal_id;
                     status.style.color = '#4ecdc4';
                 } else {
                     status.textContent = 'waiting';
@@ -5704,7 +5676,7 @@ Generated: {generated_at}
                         'tooltip': 'Click to pause execution' if stop_enabled else 'Not running'
                     }
                 },
-                'task_scheduler': state_data.get('task_scheduler'),
+                'goal_scheduler': state_data.get('goal_scheduler'),
                 'character': state_data.get('character', ''),
                 'timestamp': state_data.get('timestamp', time.time())
             }
@@ -6338,7 +6310,7 @@ Generated: {generated_at}
         """Handle character announcement actions."""
         self.active_characters.add(character_name)
         try:
-            sched_cfg = (action_data.get('character_config') or {}).get('task_scheduler', {})
+            sched_cfg = (action_data.get('character_config') or {}).get('goal_scheduler', {})
             interval_min = float(sched_cfg.get('interval', 15))
             self.character_scheduler_defaults[character_name] = {
                 "enabled": bool(sched_cfg.get('enabled', False)),

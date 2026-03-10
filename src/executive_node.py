@@ -359,7 +359,7 @@ class ZenohExecutiveNode:
         
         # Autonomous mode state
         self.previous_autonomous_goal_text = ''
-        self.autonomous_task_state = ''
+        self.autonomous_goal_state = ''
         
         # Subscriber for sense data (character-specific)
         self.sense_subscriber = self.session.declare_subscriber(
@@ -892,29 +892,20 @@ class ZenohExecutiveNode:
         )
         self.conversation_store.initialize()
         
-        # Initialize task manager
-        from task_manager import TaskManager
-        self.task_manager = TaskManager(
-            resource_manager=self.resource_manager,
-            executor=self.infospace_executor,
-            character_name=self.character_name
-        )
-        if not self.benchmark_mode:
-            self.task_manager.initialize()
         self._scheduled_goal_counter = 0
         self._active_scheduled_goal_id = None
         self._initialize_scheduled_goals()
 
         # Initialize task scheduler (auto-proceed timer)
-        from task_scheduler import TaskScheduler
-        sched_cfg = self.character_config.get('task_scheduler', {})
+        from goal_scheduler import GoalScheduler
+        sched_cfg = self.character_config.get('goal_scheduler', self.character_config.get('task_scheduler', {}))
         interval_min = sched_cfg.get('interval', 15)  # minutes (consistent with UI)
-        self.task_scheduler = TaskScheduler(
+        self.goal_scheduler = GoalScheduler(
             character_name=self.character_name,
             interval=float(interval_min) * 60.0,  # convert to seconds
             enabled=sched_cfg.get('enabled', False),
         )
-        self.task_scheduler.start(
+        self.goal_scheduler.start(
             check_fn=self._scheduler_eligible_goals,
             proceed_fn=self._scheduler_proceed_goal,
         )
@@ -1095,12 +1086,8 @@ class ZenohExecutiveNode:
             self.handle_clear_persistents
         )
         self.control_scheduler_subscriber = self.session.declare_subscriber(
-            f"cognitive/{character_name}/control/task_scheduler",
+            f"cognitive/{character_name}/control/goal_scheduler",
             self._handle_scheduler_control
-        )
-        self.control_task_schedule_mode_subscriber = self.session.declare_subscriber(
-            f"cognitive/{character_name}/control/task_schedule_mode",
-            self._handle_task_schedule_mode
         )
         self.control_goal_schedule_mode_subscriber = self.session.declare_subscriber(
             f"cognitive/{character_name}/control/goal_schedule_mode",
@@ -1207,10 +1194,6 @@ class ZenohExecutiveNode:
             self._plan_bindings_query_handler
         )
         
-        self.tasks_queryable = self.session.declare_queryable(
-            f"cognitive/{character_name}/tasks",
-            self._tasks_query_handler
-        )
         self.scheduled_goals_queryable = self.session.declare_queryable(
             f"cognitive/{character_name}/scheduled_goals",
             self._scheduled_goals_query_handler
@@ -1939,15 +1922,10 @@ class ZenohExecutiveNode:
             logger.warning(f'Error loading situation note: {e}')
 
     def _build_situation_context(self) -> str:
-        """Build situation context from task state + persisted situation note."""
-        parts = []
-        if hasattr(self, 'task_manager'):
-            task_summary = self.task_manager.situation_summary()
-            if task_summary:
-                parts.append(task_summary)
+        """Build situation context from persisted situation note."""
         if self.situation_context:
-            parts.append(self.situation_context)
-        return "\n\n".join(parts)
+            return self.situation_context
+        return ""
 
     def _update_situation_note(self, goal_text: str, plan_result: dict):
         """Update the living context (_situation) note after goal completion.
@@ -2343,8 +2321,8 @@ class ZenohExecutiveNode:
         )
         if self._active_scheduled_goal_id == goal_id:
             self._active_scheduled_goal_id = None
-        if hasattr(self, "task_scheduler"):
-            self.task_scheduler.notify_step_completed(goal_id)
+        if hasattr(self, "goal_scheduler"):
+            self.goal_scheduler.notify_step_completed(goal_id)
         # Clean up transient resources created during the goal
         if pre_resource_ids is not None and self.resource_manager:
             now_ids = set(self.resource_manager.resource_registry.keys())
@@ -2461,8 +2439,8 @@ class ZenohExecutiveNode:
                     goal_name=goal.get("name", "") or goal.get("goal_text", "")[:80],
                     status="interrupted",
                 )
-            if hasattr(self, "task_scheduler"):
-                self.task_scheduler.notify_task_terminal(goal_id)
+            if hasattr(self, "goal_scheduler"):
+                self.goal_scheduler.notify_goal_terminal(goal_id)
             self._publish_execution_state()
             self._say_to_user(f"Goal '{goal.get('name') or goal_id}' interrupted.")
             return
@@ -2470,8 +2448,8 @@ class ZenohExecutiveNode:
         if deleted:
             if goal_id in self._scheduler_started_goals:
                 self._scheduler_started_goals.discard(goal_id)
-            if hasattr(self, "task_scheduler"):
-                self.task_scheduler.notify_task_terminal(goal_id)
+            if hasattr(self, "goal_scheduler"):
+                self.goal_scheduler.notify_goal_terminal(goal_id)
             self._publish_execution_state()
             self._say_to_user(f"Goal '{goal.get('name') or goal_id}' has been removed.")
         else:
@@ -2484,103 +2462,6 @@ class ZenohExecutiveNode:
             return
         self._say_to_user(f"Goal '{goal.get('name') or goal_id}' cache cleared.")
 
-    def _handle_task_create(self, description: str):
-        """User entered 'task: <description>'. Create task and submit planning goal."""
-        from task_manager import TASK_PLANNING
-        if not description:
-            self._say_to_user("Please provide a task description after 'task:'.")
-            return
-        task_id, task = self.task_manager.create_task(description)
-        self.task_manager.set_status(task_id, TASK_PLANNING)
-        self.task_manager.set_active_task_goal(task_id, "plan")
-        goal_text = self.task_manager.planning_goal_text(task, self._character_desc_short())
-        logger.info(f'📋 {self.character_name} Planning task {task_id}: {description[:80]}')
-        self.parse_and_set_goal("", goal_text)
-
-    def _handle_task_proceed(self, task_id: str = None):
-        """User said 'proceed' (or 'proceed task_X'). Execute the requested ready task."""
-        from task_manager import TASK_BLOCKED, TASK_STEP_READY, TASK_EXECUTING
-        active = self.task_manager.get_active_tasks()
-        ready = [t for t in active if t.get("status") == TASK_STEP_READY]
-        if not ready:
-            self._say_to_user("No tasks are ready for the next step. Use 'tasks' to see current task states.")
-            return
-        if task_id:
-            task = next((t for t in ready if t.get("task_id") == task_id), None)
-            if not task:
-                self._say_to_user(f"Task '{task_id}' is not ready. Use 'tasks' to inspect status.")
-                return
-        else:
-            task = ready[0]
-        task_id = task["task_id"]
-        step_num = task.get("current_step", 1)
-        # Skip input validation for phase 1 — bootstrap inputs may not exist yet
-        if step_num > 1:
-            missing_inputs = self._missing_step_inputs(task)
-            if missing_inputs:
-                reason = f"Missing required input artifacts for phase {step_num}: {', '.join(missing_inputs)}"
-                self.task_manager.update_task(task_id, blockers=[reason])
-                self.task_manager.set_status(task_id, TASK_BLOCKED)
-                self._say_to_user(
-                    f"Task \"{task['name']}\" is blocked.\n"
-                    f"{reason}\n"
-                    f"Provide or create these artifacts, then say 'unblock {task_id}'."
-                )
-                logger.info(f'⛔ {self.character_name} Blocked task {task_id}: {reason}')
-                return
-        if self.infospace_executor:
-            self.infospace_executor.clear_plan_state()
-            plan = task.get("abstract_plan", [])
-            step = plan[step_num - 1] if 0 < step_num <= len(plan) else {}
-            for art_name in step.get("input_artifacts", []):
-                if not isinstance(art_name, str) or not art_name.strip():
-                    continue
-                name = art_name.strip()
-                resolved = None
-                if hasattr(self.resource_manager, "_resolve_resource_id"):
-                    resolved = self.resource_manager._resolve_resource_id(name)
-                if resolved:
-                    self.infospace_executor._bind_variable(name, resolved)
-                    logger.debug(f"Phase {step_num} pre-seeded ${name} → {resolved}")
-        pre_resource_ids = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
-        self.task_manager.set_status(task_id, TASK_EXECUTING)
-        self.task_manager.set_active_task_goal(task_id, "execute", step_num, pre_resource_ids=list(pre_resource_ids))
-        goal_text = self.task_manager.step_execution_goal_text(task, self._character_desc_short())
-        logger.info(f'▶️ {self.character_name} Executing phase {step_num} of task {task_id}')
-        self.parse_and_set_goal("", goal_text)
-
-    def _missing_step_inputs(self, task: Dict) -> List[str]:
-        """Return unresolved declared inputs for the task's current step."""
-        if not self.resource_manager:
-            return []
-        plan = task.get("abstract_plan", [])
-        idx = task.get("current_step", 1) - 1
-        if idx < 0 or idx >= len(plan):
-            return []
-        step = plan[idx] if isinstance(plan[idx], dict) else {}
-        inputs = step.get("input_artifacts", [])
-        if not isinstance(inputs, list):
-            inputs = [inputs] if inputs else []
-        outputs = step.get("output_artifacts", [])
-        if not isinstance(outputs, list):
-            outputs = [outputs] if outputs else []
-        output_set = {str(o).strip().lstrip("$") for o in outputs if o}
-        missing = []
-        for item in inputs:
-            if not isinstance(item, str):
-                item = str(item)
-            name = item.strip()
-            if not name:
-                continue
-            if name.lstrip("$") in output_set:
-                continue
-            resolved_id = None
-            if hasattr(self.resource_manager, "_resolve_resource_id"):
-                resolved_id = self.resource_manager._resolve_resource_id(name)
-            if resolved_id or self.resource_manager.get_resource(name):
-                continue
-            missing.append(name)
-        return missing
 
     # ── Goal scheduler callbacks ────────────────────────────────────
 
@@ -2626,7 +2507,7 @@ class ZenohExecutiveNode:
                 # Skip if we're past run_at + interval (missed window)
                 try:
                     h, m = map(int, run_at.split(":"))
-                    deadline_min = h * 60 + m + int(self.task_scheduler.interval // 60)
+                    deadline_min = h * 60 + m + int(self.goal_scheduler.interval // 60)
                     now_min = _dt.now().hour * 60 + _dt.now().minute
                     if now_min > deadline_min:
                         self._record_scheduler_event(
@@ -2668,30 +2549,12 @@ class ZenohExecutiveNode:
         try:
             data = json.loads(sample.payload.to_bytes().decode('utf-8'))
             if 'enable' in data:
-                self.task_scheduler.set_enabled(bool(data['enable']))
+                self.goal_scheduler.set_enabled(bool(data['enable']))
             if 'interval' in data:
-                self.task_scheduler.set_interval(float(data['interval']))
+                self.goal_scheduler.set_interval(float(data['interval']))
             self._publish_execution_state()
         except Exception as e:
             logger.error(f'Error in scheduler control handler: {e}')
-
-    def _handle_task_schedule_mode(self, sample):
-        """Zenoh callback for per-task schedule mode changes."""
-        try:
-            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            task_id = data.get("task_id")
-            mode = data.get("schedule_mode")
-            if not task_id or mode not in ("manual", "auto", "recurring", "daily"):
-                logger.warning(f"Invalid task_schedule_mode payload: {data}")
-                return
-            updates = {"schedule_mode": mode}
-            if mode == "daily" and data.get("run_at"):
-                updates["run_at"] = data["run_at"]
-            self.task_manager.update_task(task_id, **updates)
-            logger.info(f"Task {task_id} schedule_mode set to '{mode}'" +
-                        (f" run_at={updates.get('run_at')}" if "run_at" in updates else ""))
-        except Exception as e:
-            logger.error(f"Error in task_schedule_mode handler: {e}")
 
     def _handle_goal_schedule_mode(self, sample):
         """Zenoh callback for per-goal schedule mode changes."""
@@ -2811,281 +2674,16 @@ class ZenohExecutiveNode:
                 self._active_scheduled_goal_id = None
             if goal_id in self._scheduler_started_goals:
                 self._scheduler_started_goals.discard(goal_id)
-            if hasattr(self, "task_scheduler"):
-                self.task_scheduler.notify_task_terminal(goal_id)
+            if hasattr(self, "goal_scheduler"):
+                self.goal_scheduler.notify_goal_terminal(goal_id)
             self._publish_execution_state()
             logger.info(f"Goal {goal_id} removed via control endpoint")
         except Exception as e:
             logger.error(f"Error in goal_remove handler: {e}")
 
-    def _handle_task_reuse(self, task_id: str = None):
-        """User said 'reuse task_X'. Reset task to step 1, restoring initial plan."""
-        if not task_id:
-            self._say_to_user("Please specify which task to reuse, e.g. 'reuse task_3'.")
-            return
-        task = self.task_manager.get_task(task_id)
-        if not task:
-            self._say_to_user(f"Task '{task_id}' not found.")
-            return
-        reset = self.task_manager.reset_for_reuse(task_id)
-        if not reset:
-            self._say_to_user(f"Failed to reset task '{task_id}' for reuse.")
-            return
-        self._say_to_user(f"Task \"{task['name']}\" reset to phase 1. Say 'proceed {task_id}' to start.")
-        logger.info(f'🔁 {self.character_name} Reused task {task_id}')
-
-    def _handle_task_terminate(self, task_id: str = None):
-        """User said 'terminate' or 'terminate task_X'. Abandon the specified or most recent task."""
-        from task_manager import TASK_ABANDONED, TERMINAL_STATUSES
-        if task_id:
-            task = self.task_manager.get_task(task_id)
-            if not task:
-                self._say_to_user(f"Task '{task_id}' not found.")
-                return
-            if task.get("status") in TERMINAL_STATUSES:
-                deleted = self.task_manager.delete_task(task_id)
-                if not deleted:
-                    self._say_to_user(f"Task '{task_id}' could not be removed.")
-                    return
-                if self.task_manager.active_task_goal and self.task_manager.active_task_goal.get("task_id") == task_id:
-                    self.task_manager.clear_active_task_goal()
-                self._say_to_user(f"Task '{task['name']}' has been removed.")
-                logger.info(f'🗑️ {self.character_name} Removed task {task_id}')
-                return
-            self.task_manager.set_status(task_id, TASK_ABANDONED)
-            self.task_manager.clear_active_task_goal()
-            self._say_to_user(f"Task '{task['name']}' has been abandoned.")
-            logger.info(f'🛑 {self.character_name} Abandoned task {task_id}')
-            return
-
-        active = self.task_manager.get_active_tasks()
-        if not active:
-            self._say_to_user("No active tasks to terminate.")
-            return
-        else:
-            task = active[-1]
-            task_id = task["task_id"]
-        self.task_manager.set_status(task_id, TASK_ABANDONED)
-        self.task_manager.clear_active_task_goal()
-        self._say_to_user(f"Task '{task['name']}' has been abandoned.")
-        logger.info(f'🛑 {self.character_name} Abandoned task {task_id}')
-
-    def _handle_task_unblock(self, task_id: str = None):
-        """User said 'unblock' or 'unblock task_X'. Clear blockers and set back to step_ready."""
-        from task_manager import TASK_BLOCKED, TASK_STEP_READY
-        active = self.task_manager.get_active_tasks()
-        blocked = [t for t in active if t.get("status") == TASK_BLOCKED]
-        if not blocked:
-            self._say_to_user("No blocked tasks to unblock.")
-            return
-        if task_id:
-            task = next((t for t in blocked if t.get("task_id") == task_id), None)
-            if not task:
-                self._say_to_user(f"Task '{task_id}' is not blocked.")
-                return
-        else:
-            task = blocked[0]
-            task_id = task["task_id"]
-        self.task_manager.update_task(task_id, blockers=[])
-        self.task_manager.set_status(task_id, TASK_STEP_READY)
-        step = task.get("current_step", 1)
-        self._say_to_user(f"Task \"{task['name']}\" unblocked. Step {step} is ready. Say 'proceed' to retry.")
-        logger.info(f'🔓 {self.character_name} Unblocked task {task_id} at step {step}')
-
-    def _handle_task_list(self):
-        """User said 'tasks'. Report all active task states."""
-        tasks = self.task_manager.get_active_tasks()
-        if not tasks:
-            self._say_to_user("No active tasks.")
-            return
-        lines = []
-        for t in tasks:
-            plan = t.get("abstract_plan", [])
-            total = len(plan)
-            completed = sum(1 for s in plan if s.get("status") == "completed")
-            lines.append(f"• [{t['status']}] {t['name']} — phase {t.get('current_step', '?')}/{total} ({completed} done)")
-            if t.get("blockers"):
-                lines.append(f"  Blocked: {'; '.join(t['blockers'])}")
-        self._say_to_user("Active tasks:\n" + "\n".join(lines))
-
-    def _handle_task_goal_completed(self, result: Dict[str, Any]):
-        """Called after a task-related goal completes. Drives the task state machine."""
-        from task_manager import (TASK_STEP_READY, TASK_REVIEWING, TASK_BLOCKED,
-                                  TASK_COMPLETED, TASK_EXECUTING)
-        atg = self.task_manager.active_task_goal
-        if not atg:
-            return
-        task_id = atg["task_id"]
-        goal_type = atg["goal_type"]
-        self.task_manager.clear_active_task_goal()
-
-        task = self.task_manager.get_task(task_id)
-        if not task:
-            logger.warning(f"Task {task_id} not found after goal completion")
-            return
-
-        phase_new_ids: list = []
-        if goal_type == "execute" and self.resource_manager:
-            pre_ids = set(atg.get("pre_resource_ids", []) or [])
-            now_ids = set(self.resource_manager.resource_registry.keys())
-            phase_new_ids = [rid for rid in (now_ids - pre_ids) if rid != "Note_null"]
-            if phase_new_ids:
-                existing = task.get("task_created_resources", [])
-                merged = list(dict.fromkeys(existing + phase_new_ids))
-                self.task_manager.update_task(task_id, task_created_resources=merged)
-                task = self.task_manager.get_task(task_id) or task
-
-        if goal_type == "plan":
-            self._handle_plan_goal_completed(task_id, task, result)
-        elif goal_type == "execute":
-            self._handle_execute_goal_completed(task_id, task, result, phase_new_ids)
-        elif goal_type == "review":
-            self._handle_review_goal_completed(task_id, task, result)
-
-    def _handle_plan_goal_completed(self, task_id: str, task: Dict, result: Dict):
-        """Planning goal finished — parse the draft plan and present to user."""
-        from task_manager import TASK_STEP_READY, TASK_ABANDONED
-        plan_steps = self._read_and_delete_draft_note("_task_plan_draft")
-        if plan_steps and isinstance(plan_steps, list):
-            self.task_manager.set_abstract_plan(task_id, plan_steps)
-            task = self.task_manager.get_task(task_id)
-            plan = task.get("abstract_plan", [])
-            plan_summary = "\n".join(f"  {s['step']}. {s['description']}" for s in plan)
-            self._say_to_user(
-                f"Task accepted: \"{task['name']}\"\n"
-                f"Plan ({len(plan)} steps):\n{plan_summary}\n\n"
-                f"Say 'proceed' to start phase 1, or 'terminate' to abandon."
-            )
-        else:
-            response = (result.get("response") or "")[:500]
-            self.task_manager.set_status(task_id, TASK_ABANDONED)
-            self._say_to_user(f"Task could not be planned: {response}")
-
-    def _handle_execute_goal_completed(self, task_id: str, task: Dict, result: Dict, phase_new_ids: list = None):
-        """Step execution finished — auto-submit review goal (via subplanner, no vision eval)."""
-        from task_manager import TASK_REVIEWING
-        self.task_manager.set_status(task_id, TASK_REVIEWING)
-        step_num = task.get("current_step", 1)
-        self.task_manager.set_active_task_goal(task_id, "review", step_num)
-        phase_resources = self._summarize_phase_resources(phase_new_ids or [])
-        goal_text = self.task_manager.review_goal_text(task, result, self._character_desc_short(), phase_resources)
-        logger.info(f'🔍 {self.character_name} Reviewing step {step_num} of task {task_id}')
-        review_result = self.infospace_executor.call_subplanner(goal=goal_text, max_steps=8)
-        self._handle_task_goal_completed(review_result if isinstance(review_result, dict) else {"success": False, "response": str(review_result)})
-
-    def _handle_review_goal_completed(self, task_id: str, task: Dict, result: Dict):
-        """Review goal finished — parse review note, update task, report to user."""
-        from task_manager import TASK_STEP_READY, TASK_BLOCKED, TASK_COMPLETED
-        review = self._read_and_delete_draft_note("_task_review")
-        outcome = ""
-        output_artifacts = []
-        output_artifact_names = {}
-        if review and isinstance(review, dict):
-            outcome = review.get("step_outcome", "")
-            output_artifacts = review.get("resolved_output_artifacts", review.get("output_artifacts", []))
-            # Register declared-name → resource-ID mappings so downstream phases can resolve by name
-            name_map = review.get("output_artifact_names")
-            if name_map and isinstance(name_map, dict) and self.resource_manager:
-                output_artifact_names = name_map
-                for art_name, rid in name_map.items():
-                    if isinstance(art_name, str) and isinstance(rid, str) and rid:
-                        self.resource_manager.named_notes[art_name] = rid
-                        logger.debug(f"Registered output artifact name '{art_name}' → {rid}")
-            if review.get("blocked"):
-                self.task_manager.update_task(task_id, blockers=[review.get("block_reason", "unknown")])
-                self.task_manager.set_status(task_id, TASK_BLOCKED)
-                self._say_to_user(
-                    f"Task \"{task['name']}\" is blocked: {review.get('block_reason', 'unknown')}\n"
-                    f"Step outcome: {outcome}"
-                )
-                self.task_scheduler.notify_task_terminal(task_id)
-                return
-            revised = review.get("revised_remaining_steps")
-            if revised and isinstance(revised, list):
-                self.task_manager.complete_current_step(task_id, outcome, output_artifacts, output_artifact_names)
-                task = self.task_manager.get_task(task_id)
-                if task and task.get("status") != TASK_COMPLETED:
-                    self.task_manager.update_remaining_plan(task_id, revised)
-            else:
-                self.task_manager.complete_current_step(task_id, outcome, output_artifacts, output_artifact_names)
-        else:
-            response = (result.get("response") or "phase completed")[:300]
-            self.task_manager.complete_current_step(task_id, response, [])
-
-        task = self.task_manager.get_task(task_id)
-        if not task:
-            return
-        if task.get("status") == TASK_COMPLETED:
-            self._cleanup_completed_task(task_id)
-            self._say_to_user(
-                f"Task \"{task['name']}\" is complete!\n"
-                f"Last step outcome: {outcome or 'done'}"
-            )
-            if task.get("schedule_mode") in ("recurring", "daily"):
-                self.task_manager.reset_for_reuse(task_id)
-                mode_label = "Recurring" if task.get("schedule_mode") == "recurring" else "Daily"
-                self._say_to_user(f"{mode_label} task \"{task['name']}\" reset to phase 1.")
-                self.task_scheduler.notify_step_completed(task_id)
-            else:
-                self.task_scheduler.notify_task_terminal(task_id)
-        else:
-            plan = task.get("abstract_plan", [])
-            idx = task.get("current_step", 1) - 1
-            next_desc = plan[idx]["description"] if 0 <= idx < len(plan) else "unknown"
-            arts_str = ", ".join(output_artifacts) if output_artifacts else "none recorded"
-            self._say_to_user(
-                f"Phase {task.get('current_step', 1) - 1} complete: {outcome or 'done'}\n"
-                f"Output artifacts: {arts_str}\n"
-                f"Next step ({task.get('current_step', '?')} of {len(plan)}): {next_desc}\n\n"
-                f"Say 'proceed' for next step, or 'terminate' to abandon."
-            )
-            self.task_scheduler.notify_step_completed(task_id)
-
-    def _summarize_phase_resources(self, resource_ids: list) -> list:
-        """Build a compact summary of resources created during a phase for the review prompt."""
-        summaries = []
-        for rid in resource_ids:
-            if not self.resource_manager:
-                break
-            resource = self.resource_manager.get_resource(rid)
-            if not resource:
-                continue
-            props = resource.get("properties", {})
-            rtype = resource.get("type")
-            type_name = rtype.name if hasattr(rtype, "name") else str(rtype)
-            name = props.get("note_name", "") or props.get("collection_name", "") or ""
-            content = props.get("content", "")
-            if isinstance(content, list):
-                snippet = f"[Collection with {len(content)} items]"
-            else:
-                raw = str(content) if content else ""
-                snippet = (raw[:120] + "…") if len(raw) > 120 else raw
-            summaries.append({"id": rid, "type": type_name, "name": name, "snippet": snippet})
-        return summaries
-
-    def _cleanup_completed_task(self, task_id: str):
-        """Clean up transient resources after task completion."""
-        task = self.task_manager.get_task(task_id)
-        if not task or not self.resource_manager:
-            return
-        created_ids = set(task.get("task_created_resources", []))
-        if not created_ids:
-            return
-        keep_ids = set(task.get("artifacts", []))
-        for step in task.get("abstract_plan", []):
-            resolved_outputs = step.get("resolved_output_artifacts", step.get("output_artifacts", [])) or []
-            for art in resolved_outputs:
-                if isinstance(art, str):
-                    keep_ids.add(art.strip())
-                    if hasattr(self.resource_manager, "_resolve_resource_id"):
-                        resolved = self.resource_manager._resolve_resource_id(art)
-                        if resolved:
-                            keep_ids.add(resolved)
-        self._cleanup_transient_resources(created_ids, keep_ids, label=task_id)
-
     def _cleanup_transient_resources(self, created_ids: set, keep_ids: set = None, label: str = ""):
         """
-        Delete transient resources created during a goal or task, preserving
+        Delete transient resources created during a goal, preserving
         persistent resources, system resources, and any explicitly kept IDs.
         """
         if not self.resource_manager or not created_ids:
@@ -3116,25 +2714,6 @@ class ZenohExecutiveNode:
                 deleted += 1
         if deleted:
             logger.info(f"🧹 Cleaned {deleted} transient resources{' for ' + label if label else ''}")
-
-    def _read_and_delete_draft_note(self, note_name: str) -> Any:
-        """Load a named Note, parse its JSON content, delete it, return parsed data."""
-        result = self.infospace_executor.execute_action({"type": "load", "target": note_name, "out": "$_draft_tmp"})
-        if result.get("status") != "success" or not result.get("resource_id"):
-            return None
-        note_id = result["resource_id"]
-        content = self.infospace_executor._get_content(note_id)
-        # Clean up the draft note
-        try:
-            self._delete_resource_and_unbind(note_id)
-        except Exception:
-            pass
-        if not content:
-            return None
-        try:
-            return json.loads(content) if isinstance(content, str) else content
-        except (json.JSONDecodeError, TypeError):
-            return content
 
     def _say_to_user(self, text: str):
         """Send a message to user via the say action."""
@@ -3473,15 +3052,9 @@ class ZenohExecutiveNode:
                 if cmd.startswith('proceed'):
                     if target_id and target_id.startswith('goal_'):
                         self._handle_goal_proceed(goal_id=target_id, source='scheduler')
-                    else:
-                        task_id = target_id if target_id and target_id.startswith('task_') else None
-                        self._handle_task_proceed(task_id=task_id)
                 elif cmd.startswith('reuse'):
                     if target_id and target_id.startswith('goal_'):
                         self._handle_goal_reuse(goal_id=target_id)
-                    else:
-                        task_id = target_id if target_id and target_id.startswith('task_') else None
-                        self._handle_task_reuse(task_id=task_id)
                 return
 
             # Handle special commands from User BEFORE processing as dialog
@@ -3507,36 +3080,24 @@ class ZenohExecutiveNode:
 
                     self._run_goal_on_thread(_run_user_goal)
                     return  # Don't process as speech
-                elif clean_input.startswith('task:'):
-                    self._handle_task_create(clean_input[5:].strip())
-                    return
                 elif clean_input.strip().lower().startswith('proceed') or clean_input.strip().lower() == 'next step':
                     parts = clean_input.strip().split()
                     target_id = parts[1] if len(parts) > 1 else None
                     if target_id and target_id.startswith('goal_'):
                         self.conversation_store.close_dialog("User")
                         self._handle_goal_proceed(goal_id=target_id)
-                    else:
-                        task_id = target_id if target_id and target_id.startswith('task_') else None
-                        self._handle_task_proceed(task_id=task_id)
                     return
                 elif clean_input.strip().lower().startswith('terminate'):
                     parts = clean_input.strip().split()
                     target_id = parts[1] if len(parts) > 1 else None
                     if target_id and target_id.startswith('goal_'):
                         self._handle_goal_terminate(goal_id=target_id)
-                    else:
-                        task_id = target_id if target_id and target_id.startswith('task_') else None
-                        self._handle_task_terminate(task_id=task_id)
                     return
                 elif clean_input.strip().lower().startswith('reuse'):
                     parts = clean_input.strip().split()
                     target_id = parts[1] if len(parts) > 1 else None
                     if target_id and target_id.startswith('goal_'):
                         self._handle_goal_reuse(goal_id=target_id)
-                    else:
-                        task_id = target_id if target_id and target_id.startswith('task_') else None
-                        self._handle_task_reuse(task_id=task_id)
                     return
                 elif clean_input.strip().lower().startswith('clear-cache'):
                     parts = clean_input.strip().split()
@@ -3545,14 +3106,6 @@ class ZenohExecutiveNode:
                         self._handle_goal_cache_clear(goal_id=goal_id)
                     else:
                         self._say_to_user("Please specify which goal cache to clear, e.g. 'clear-cache goal_1'.")
-                    return
-                elif clean_input.strip().lower().startswith('unblock'):
-                    parts = clean_input.strip().split()
-                    task_id = parts[1] if len(parts) > 1 and parts[1].startswith('task_') else None
-                    self._handle_task_unblock(task_id=task_id)
-                    return
-                elif clean_input.strip().lower() in ('tasks', 'task list', 'list tasks'):
-                    self._handle_task_list()
                     return
                 else:
                     # Regular user input
@@ -3965,35 +3518,6 @@ class ZenohExecutiveNode:
                 result_str = self._truncate_result(last_action.result)
                 recent_context += f"\n# Last action:\n  {last_action.action.get('type')}: {last_action.action.get('target')} - {result_str}\n"
             
-            # Resolve declared/resolved output artifacts for the current task step
-            step_output_artifacts = []
-            step_resolved_output_artifacts = []
-            step_output_artifact_names = {}
-            active_goal = self.task_manager.active_task_goal if self.task_manager else None
-            if active_goal and active_goal.get("goal_type") == "execute":
-                task_for_context = self.task_manager.get_task(active_goal["task_id"])
-                if task_for_context:
-                    plan_steps = task_for_context.get("abstract_plan", [])
-                    step_idx = task_for_context.get("current_step", 1) - 1
-                    if 0 <= step_idx < len(plan_steps):
-                        step_data = plan_steps[step_idx]
-                        oa = step_data.get("declared_output_artifacts", step_data.get("output_artifacts", []))
-                        step_output_artifacts = oa if isinstance(oa, list) else ([oa] if oa else [])
-                        roa = step_data.get("resolved_output_artifacts", [])
-                        step_resolved_output_artifacts = roa if isinstance(roa, list) else ([roa] if roa else [])
-                        name_map = step_data.get("output_artifact_names", {})
-                        step_output_artifact_names = name_map if isinstance(name_map, dict) else {}
-
-            # Build scoped vision goal for step execution (avoids _generate_vision using the full task description)
-            vision_goal = goal_text
-            if active_goal and active_goal.get("goal_type") == "execute" and task_for_context:
-                step_idx = task_for_context.get("current_step", 1) - 1
-                plan_steps = task_for_context.get("abstract_plan", [])
-                if 0 <= step_idx < len(plan_steps):
-                    step_desc = plan_steps[step_idx].get("description", "")
-                    step_outs = ", ".join(step_output_artifacts) or "none declared"
-                    vision_goal = f"Step: {step_desc}\nDeclared outputs: {step_outs}"
-
             # Build context for planner (always needed for infospace)
             context = {
                 'variables': self.infospace_executor.plan_bindings_flat if self.infospace_executor else {},
@@ -4001,10 +3525,7 @@ class ZenohExecutiveNode:
                 'situation_context': self._build_situation_context(),
                 'recent_context': recent_context,
                 'executor': self.infospace_executor,  # Pass executor for incremental planner
-                'output_artifacts': step_output_artifacts,
-                'resolved_output_artifacts': step_resolved_output_artifacts,
-                'output_artifact_names': step_output_artifact_names,
-                'vision_goal': vision_goal,
+                'vision_goal': goal_text,
             }
             
             # Initialize plan identifiers before plan generation (needed for incremental planner action tracking)
@@ -4114,7 +3635,7 @@ class ZenohExecutiveNode:
         You are a strict goal generator.
         You are generating a goal for autonomous mode operation.
         Your previous goal, if any, was: \n{self.previous_autonomous_goal_text}\n
-        The resulting autonomous task state, if any, was: \n{self.autonomous_task_state}\n
+        The resulting autonomous task state, if any, was: \n{self.autonomous_goal_state}\n
         Given what you know about the world, your situation and your character, assess your current needs and pressing priorities.
         Given these, generate 2-3 goal statements that you might work on next.
         Finally, prioritize the goals by their importance, urgency, and feasibility, and return the highest priority goal.
@@ -4133,7 +3654,7 @@ class ZenohExecutiveNode:
         planner_response = self.incremental_planner.generate_plan(template='',goal=goal_text, context=None, max_steps=16)
         if not planner_response or not planner_response.get('success', False):
             return False
-        self.autonomous_task_state = planner_response.get('task_state', '')
+        self.autonomous_goal_state = planner_response.get('task_state', '')
         self.execution_paused = False
         self._publish_execution_state()
         return True
@@ -4460,7 +3981,7 @@ class ZenohExecutiveNode:
                 active_dialog = self.conversation_store.has_active_dialogs()
             except Exception:
                 pass
-            scheduler_state = self.task_scheduler.get_status() if hasattr(self, 'task_scheduler') else None
+            scheduler_state = self.goal_scheduler.get_status() if hasattr(self, 'goal_scheduler') else None
             if scheduler_state is not None:
                 with self._scheduler_event_lock:
                     scheduler_state['events'] = list(self._scheduler_events[-20:])
@@ -4470,7 +3991,7 @@ class ZenohExecutiveNode:
                 'character': self.character_name,
                 'continuous_mode': self.continuous_mode,
                 'active_dialog': active_dialog,
-                'task_scheduler': scheduler_state,
+                'goal_scheduler': scheduler_state,
                 'timestamp': time.time()
             }
             self.execution_state_publisher.put(json.dumps(state_data).encode('utf-8'))
@@ -4942,19 +4463,6 @@ class ZenohExecutiveNode:
             response = {'success': False, 'error': str(e)}
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
     
-    def _tasks_query_handler(self, query):
-        """Handle query for tasks (active + terminal)."""
-        try:
-            tasks = []
-            if hasattr(self, 'task_manager') and self.task_manager:
-                tasks = self.task_manager.get_all_tasks()
-            response = {'success': True, 'tasks': tasks}
-            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-        except Exception as e:
-            logger.error(f'Error in tasks query handler: {e}')
-            response = {'success': False, 'error': str(e)}
-            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-
     def _scheduled_goals_query_handler(self, query):
         """Handle query for scheduled goals."""
         try:
@@ -5271,11 +4779,6 @@ class ZenohExecutiveNode:
             # Publish complete goal result for external consumers (e.g., eval scripts)
             self._publish_goal_result(result)
 
-            # Drive task state machine if this goal was task-related
-            if self.task_manager.active_task_goal:
-                self._handle_task_goal_completed(result)
-                return result
-
             self.current_plan = result
             if result.get('success', False):
                 self._publish_current_plan()
@@ -5426,8 +4929,8 @@ class ZenohExecutiveNode:
             logger.info(f'Executive Node shutdown initiated for {self.character_name}...')
 
             # Stop task scheduler
-            if hasattr(self, 'task_scheduler'):
-                self.task_scheduler.stop()
+            if hasattr(self, 'goal_scheduler'):
+                self.goal_scheduler.stop()
 
             # Consolidate situation note while LLM is still available
             try:
