@@ -10,6 +10,7 @@ Returns a structured report with per-signal status classifications.
 
 import json
 import logging
+import re
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -157,8 +158,8 @@ def _collect_cognitive_health(executor: InfospaceExecutor,
                     try:
                         record = json.loads(line)
                         trace_text = record.get("compressed_trace", "")
-                        # Completion is marked as "DONE: YES" inside the trace text
-                        if "DONE: YES" in trace_text or "DONE:YES" in trace_text:
+                        # Completion is marked as "DONE: YES" (with varying whitespace) inside the trace text
+                        if re.search(r'DONE:\s*YES', trace_text):
                             completed += 1
                     except json.JSONDecodeError:
                         continue

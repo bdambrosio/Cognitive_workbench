@@ -1,8 +1,8 @@
 """
-Run a shell script from src/scripts/.
+Submit a shell script from src/scripts/ for execution.
 
 Accepts script name (without .sh), looks for src/scripts/{name}.sh,
-submits to bash. Does not wait for completion. Fails if script not found.
+submits to bash. Successful submission = success. Fails if script not found.
 """
 
 import logging
@@ -29,8 +29,8 @@ def _success(executor: InfospaceExecutor, value: str, data: Optional[str] = None
 
 def tool(input_value=None, runtime=None, **kwargs):
     """
-    Run a shell script from src/scripts/. Looks up {script_name}.sh and runs it under bash.
-    Does not wait for completion.
+    Submit a shell script from src/scripts/. Looks up {script_name}.sh and submits to bash.
+    Successful submission = success.
     """
     executor: InfospaceExecutor = kwargs.get("executor")
     if not executor:

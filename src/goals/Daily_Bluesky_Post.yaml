@@ -2,4 +2,4 @@ name: "Daily Bluesky Post"
 description: "Run the daily Bluesky post script (src/scripts/daily_post.sh)."
 
 test_goal: >
-  goal: Run the daily Bluesky post script. Use run-script with script_name daily_post. Report success or failure to the user.
+  goal: Submit the daily Bluesky post script using run-script with script_name daily_post. Successful submission completes the goal.

@@ -3,10 +3,10 @@
 Offline ToolModel consolidation (KISS).
 
 Reads authoritative JSONL logs:
-  - scenarios/<world>/resources/planner_history/compressed_trace.jsonl
-  - scenarios/<world>/resources/planner_history/reflection_frame.jsonl
+  - scenarios/<world>/resources/[<agent>/]planner_history/compressed_trace.jsonl
+  - scenarios/<world>/resources/[<agent>/]planner_history/reflection_frame.jsonl
 
-Maintains a single watermark in scenarios/<world>/resources/tool_model.json:
+Maintains a single watermark in scenarios/<world>/resources/[<agent>/]tool_model.json:
   - consolidation_last_seq: int
 
 For seq > watermark:
@@ -38,8 +38,11 @@ def _project_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def _base_dir(world: str) -> Path:
-    return _project_root() / "scenarios" / world / "resources"
+def _base_dir(world: str, agent: Optional[str] = None) -> Path:
+    base = _project_root() / "scenarios" / world / "resources"
+    if agent:
+        base = base / agent
+    return base
 
 
 def _read_jsonl(path: Path) -> Iterable[Dict[str, Any]]:
@@ -200,9 +203,9 @@ def _save_tool_model(path: Path, tool_model: Dict[str, Any]) -> None:
     path.write_text(json.dumps(tool_model, indent=2), encoding="utf-8")
 
 
-def consolidate(world: str, server_name: str, model_name: str) -> int:
-    print(f"[consolidate] Starting consolidation for world={world}, server={server_name}, model={model_name}")
-    base = _base_dir(world)
+def consolidate(world: str, server_name: str, model_name: str, agent: Optional[str] = None) -> int:
+    print(f"[consolidate] Starting consolidation for world={world}, agent={agent}, server={server_name}, model={model_name}")
+    base = _base_dir(world, agent=agent)
     base.mkdir(parents=True, exist_ok=True)
 
     tool_model_path = base / "tool_model.json"
@@ -329,8 +332,8 @@ def consolidate(world: str, server_name: str, model_name: str) -> int:
     return 0
 
 
-def clear(world: str) -> int:
-    base = _base_dir(world)
+def clear(world: str, agent: Optional[str] = None) -> int:
+    base = _base_dir(world, agent=agent)
     base.mkdir(parents=True, exist_ok=True)
     tool_model_path = base / "tool_model.json"
     tm = empty_tool_model()
@@ -346,7 +349,8 @@ def clear(world: str) -> int:
 
 def main(argv: Optional[List[str]] = None) -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("--world", required=True, help="World name (e.g., minecraft)")
+    p.add_argument("--world", required=True, help="World name (e.g., infolab)")
+    p.add_argument("--agent", default=None, help="Agent name (e.g., Jill). If set, reads from scenarios/<world>/resources/<agent>/")
     p.add_argument("--server_name", default="openai")
     p.add_argument("--model_name", default="gpt-4.1")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -355,8 +359,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = p.parse_args(argv)
 
     if args.cmd == "clear":
-        return clear(args.world)
-    return consolidate(args.world, args.server_name, args.model_name)
+        return clear(args.world, agent=args.agent)
+    return consolidate(args.world, args.server_name, args.model_name, agent=args.agent)
 
 
 if __name__ == "__main__":

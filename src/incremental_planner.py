@@ -1550,12 +1550,26 @@ def _compress_trace(trace_str: str) -> str:
         return ""
     
     # Split into sections by user/assistant markers for easier parsing
-    # Handles both SGLang format (<|im_start|>user / <|im_end|>) and vLLM format (<|user|> / <|assistant|>)
-    sections = re.split(r'(<\|im_start\|>(?:user|assistant)|<\|im_end\|>|<\|(?:user|assistant)\|>)', trace_str)
+    # Handles:
+    #   - SGLang ProgramState format: USER: / ASSISTANT: at start of line
+    #   - SGLang chat template: <|im_start|>user / <|im_end|>
+    #   - vLLM format: <|user|> / <|assistant|>
+    # Note: ProgramState(SYSTEM:...) is the initial system section, split only on
+    # USER:/ASSISTANT: at line boundaries to avoid matching examples in prompt text.
+    sections = re.split(
+        r'(<\|im_start\|>(?:user|assistant)|<\|im_end\|>|<\|(?:user|assistant)\|>'
+        r'|^(?:USER|ASSISTANT):|\n(?:USER|ASSISTANT):)',
+        trace_str,
+        flags=re.MULTILINE,
+    )
     compressed_events = []
-    
-    # Markers to skip (both formats)
-    _SKIP_MARKERS = {'<|im_start|>user', '<|im_start|>assistant', '<|im_end|>', '<|user|>', '<|assistant|>'}
+
+    # Markers to skip (all formats)
+    _SKIP_MARKERS = {
+        '<|im_start|>user', '<|im_start|>assistant', '<|im_end|>',
+        '<|user|>', '<|assistant|>',
+        'USER:', 'ASSISTANT:', '\nUSER:', '\nASSISTANT:',
+    }
     
     # State tracking
     first_goal = None
