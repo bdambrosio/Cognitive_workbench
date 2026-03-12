@@ -427,7 +427,7 @@ class ZenohExecutiveNode:
         # NAME: goal_result
         # TOPIC: cognitive/{character}/goal_result
         # DESCRIPTION: Published when goal planning completes - contains complete result from _plan()
-        # PAYLOAD: Complete result dict from incremental_planner.generate_plan() with plan, response, task_state, success, error_count
+        # PAYLOAD: Complete result dict from incremental_planner.generate_plan() with plan, response, success, error_count
         # ========================
         self.goal_result_publisher = self.session.declare_publisher(f"cognitive/{character_name}/goal_result")
         
@@ -473,7 +473,9 @@ class ZenohExecutiveNode:
         model_name = llm_config.get('model_name', 'gpt-4.1')
         sgl_model_path = llm_config.get('sgl_model_path')
         vllm_model_path = llm_config.get('vllm_model_path')
-        vllm_url = llm_config.get('vllm_url', 'http://localhost:5000/v1/chat/completions')
+        vllm_url = llm_config.get('vllm_url', 'http://localhost:5000')
+        # Normalize: strip trailing path so we have a clean base for /v1/models etc.
+        vllm_base = vllm_url.split('/v1')[0] if '/v1' in vllm_url else vllm_url.rstrip('/')
         openai_model_path = llm_config.get('openai_model_path')
         openrouter_model_path = llm_config.get('openrouter_model_path')
         openrouter_provider = llm_config.get('openrouter_provider')
@@ -542,8 +544,8 @@ class ZenohExecutiveNode:
         elif vllm_model_path:
             try:
                 import requests
-                logger.info(f"🔍 Querying vLLM server for available models...")
-                response = requests.get('http://localhost:5000/v1/models', timeout=10)
+                logger.info(f"🔍 Querying vLLM server at {vllm_base} for available models...")
+                response = requests.get(f'{vllm_base}/v1/models', timeout=10)
                 response.raise_for_status()  # Fail fast
                 data = response.json()
                 available_models = []
@@ -561,7 +563,7 @@ class ZenohExecutiveNode:
                         logger.warning(f"⚠️  Configured vLLM model '{vllm_model_path}' not found in available models. Using first available: {self.vllm_model}")
                 else:
                     raise ValueError("No models found in vLLM response")
-                self.vllm_url = vllm_url
+                self.vllm_url = f'{vllm_base}/v1/chat/completions'
             except Exception as e:
                 logger.error(f"❌ Failed to query vLLM server: {e}")
                 raise  # Fail fast
@@ -574,7 +576,8 @@ class ZenohExecutiveNode:
             alt_openrouter = alt_llm_config.get('openrouter_model_path')
             alt_openrouter_prov = alt_llm_config.get('openrouter_provider')
             alt_vllm = alt_llm_config.get('vllm_model_path')
-            alt_vllm_url = alt_llm_config.get('vllm_url', 'http://localhost:5000/v1/chat/completions')
+            alt_vllm_url_raw = alt_llm_config.get('vllm_url', 'http://localhost:5000')
+            alt_vllm_base = alt_vllm_url_raw.split('/v1')[0] if '/v1' in alt_vllm_url_raw else alt_vllm_url_raw.rstrip('/')
             if alt_anthropic:
                 api_key = os.getenv('CLAUDE_API_KEY')
                 if api_key:
@@ -603,13 +606,13 @@ class ZenohExecutiveNode:
             elif alt_vllm:
                 try:
                     import requests
-                    response = requests.get('http://localhost:5000/v1/models', timeout=10)
+                    response = requests.get(f'{alt_vllm_base}/v1/models', timeout=10)
                     response.raise_for_status()
                     data = response.json()
                     if data.get('data') and len(data['data']) > 0:
                         available = [m['id'] for m in data['data']]
                         self.alt_vllm_model = alt_vllm if alt_vllm in available else available[0]
-                        self.alt_vllm_url = alt_vllm_url
+                        self.alt_vllm_url = f'{alt_vllm_base}/v1/chat/completions'
                         logger.info(f"✅ Alt LLM (vLLM) configured: {self.alt_vllm_model}")
                     else:
                         logger.warning("⚠️ alt_llm_config vLLM: no models found - alt LLM disabled")
@@ -926,11 +929,10 @@ class ZenohExecutiveNode:
             llm_config = self.character_config.get('llm_config', {})
             sgl_model_path = llm_config.get('sgl_model_path')
             vllm_model_path = llm_config.get('vllm_model_path')
-            vllm_url = llm_config.get('vllm_url', 'http://localhost:5000/v1/chat/completions')
             openai_model_path = llm_config.get('openai_model_path')
             openrouter_model_path = llm_config.get('openrouter_model_path')
             anthropic_model_path = llm_config.get('anthropic_model_path')
-            
+
             if HAS_SGLANG and sgl_model_path:
                 # Use SGLang
                 self.incremental_planner = IncrementalPlanner(
@@ -941,13 +943,13 @@ class ZenohExecutiveNode:
                 )
                 logger.info(f'🚀 IncrementalPlanner initialized (SGLang) for {character_name}')
             elif vllm_model_path and self.vllm_model:
-                # Use vLLM
+                # Use vLLM — self.vllm_url already normalized to full endpoint
                 self.incremental_planner = IncrementalPlanner(
                     executor=self.infospace_executor,
                     available_tools=self.available_tools,
                     logger_instance=logger,
                     vllm_model_path=vllm_model_path,
-                    vllm_url=vllm_url,
+                    vllm_url=self.vllm_url,
                     vllm_model=self.vllm_model
                 )
                 logger.info(f'🚀 IncrementalPlanner initialized (vLLM) for {character_name}')
@@ -2367,17 +2369,21 @@ class ZenohExecutiveNode:
                     self._update_task_wip(wip)
                 self.active_task_wip = None
                 self.active_task_wip_waiting = False
+                self._task_wip_pre_resource_ids = None
                 self._say_to_user("Task establishment interrupted.")
             else:
                 try:
-                    result_summary = last_result[:500] if last_result else ("success" if success else "failed")
+                    wip = self._read_task_wip()
+                    # Specification milestones carry user answers — allow more room
+                    phase = (wip or {}).get("phase", "")
+                    summary_limit = 1500 if phase == "specification" else 500
+                    result_summary = last_result[:summary_limit] if last_result else ("success" if success else "failed")
                     milestone_record = {
                         "goal_text": goal.get("goal_text", ""),
                         "result_summary": result_summary,
                         "status": "completed" if success else "failed",
                         "timestamp": datetime.now().isoformat(),
                     }
-                    wip = self._read_task_wip()
                     if wip:
                         wip.setdefault("milestones_completed", []).append(milestone_record)
                         wip["current_milestone"] = None
@@ -2386,6 +2392,12 @@ class ZenohExecutiveNode:
                         if primary_product:
                             wip.setdefault("accumulated_findings", []).append(
                                 f"Milestone produced artifact: {primary_product}"
+                            )
+                        # For specification phase, also capture the result as a finding
+                        # so subsequent phases see user answers in ACCUMULATED FINDINGS
+                        if phase == "specification" and result_summary:
+                            wip.setdefault("accumulated_findings", []).append(
+                                f"User clarification: {result_summary}"
                             )
                         self._update_task_wip(wip)
                     logger.info(f'📋 Task WIP {task_wip_id}: milestone completed ({updates["status"]})')
@@ -2532,6 +2544,7 @@ class ZenohExecutiveNode:
                     self._update_task_wip(wip)
                 self.active_task_wip = None
                 self.active_task_wip_waiting = False
+                self._task_wip_pre_resource_ids = None
                 self._say_to_user("Task establishment interrupted.")
             if goal_id in self._scheduler_started_goals:
                 self._scheduler_started_goals.discard(goal_id)
@@ -2782,6 +2795,7 @@ class ZenohExecutiveNode:
                     self._update_task_wip(wip)
                 self.active_task_wip = None
                 self.active_task_wip_waiting = False
+                self._task_wip_pre_resource_ids = None
                 self._say_to_user("Task establishment interrupted.")
             deleted = self._delete_scheduled_goal(goal_id)
             if not deleted:
@@ -2841,6 +2855,7 @@ class ZenohExecutiveNode:
                     self.infospace_executor.interrupt_requested = True
                 self.active_task_wip = None
                 self.active_task_wip_waiting = False
+                self._task_wip_pre_resource_ids = None
 
             self._publish_execution_state()
             logger.info(f"Task WIP {note_name} deleted (removed {len(deleted_goals)} goals: {deleted_goals})")
@@ -2867,6 +2882,7 @@ class ZenohExecutiveNode:
                 self._update_task_wip(wip)
             self.active_task_wip = None
             self.active_task_wip_waiting = False
+            self._task_wip_pre_resource_ids = None
             self._say_to_user("Task establishment interrupted.")
             self._publish_execution_state()
             logger.info(f"Task WIP {note_name} interrupted via UI")
@@ -2945,6 +2961,10 @@ class ZenohExecutiveNode:
         })
         self.active_task_wip = note_name
         self.active_task_wip_waiting = False
+        # Snapshot resource IDs so we can clean up establishment artifacts later
+        self._task_wip_pre_resource_ids = set(
+            self.resource_manager.resource_registry.keys()
+        ) if self.resource_manager else set()
         logger.info(f'📋 Task WIP created: {note_name} — "{user_text[:80]}"')
         self._say_to_user(f"Task received. Beginning establishment for: {user_text[:200]}")
 
@@ -3007,8 +3027,9 @@ class ZenohExecutiveNode:
         "PHASES (in typical order):\n"
         "  specification — Clarify requirements with the user via `ask`. What exactly should\n"
         "    the task do? What parameters, thresholds, or preferences matter? The goal you\n"
-        "    submit should use `ask` to have a conversation with the user, then store the\n"
-        "    collected answers in the task WIP note.\n"
+        "    submit should use `ask` to have a conversation with the user and return the\n"
+        "    collected answers as its final result. The answers will be recorded\n"
+        "    automatically in the milestone history.\n"
         "  capability_evaluation — Test whether the needed tools/data sources actually work.\n"
         "    E.g., can we fetch the right emails? Can we access the web page? Submit a small\n"
         "    probe goal that tries the key operation and reports what it found.\n"
@@ -3033,6 +3054,7 @@ class ZenohExecutiveNode:
         if not wip:
             logger.warning('Task WIP read failed; clearing active_task_wip')
             self.active_task_wip = None
+            self._task_wip_pre_resource_ids = None
             return
 
         # Format milestones and findings for prompt
@@ -3087,6 +3109,7 @@ class ZenohExecutiveNode:
             logger.error(f'Task WIP llm_generate failed: {e}')
             self._say_to_user(f"Task milestone planning failed: {e}")
             self.active_task_wip = None
+            self._task_wip_pre_resource_ids = None
             return
 
         # Parse response
@@ -3142,6 +3165,7 @@ class ZenohExecutiveNode:
             logger.warning(f'Response was: {resp_text[:500]}')
             self._say_to_user("Task establishment failed: could not determine next step.")
             self.active_task_wip = None
+            self._task_wip_pre_resource_ids = None
 
     def _complete_task_wip(self, wip: Dict[str, Any], summary: str):
         """Finalize task: create scheduled goal and update WIP Note."""
@@ -3191,6 +3215,9 @@ class ZenohExecutiveNode:
         wip["completion_summary"] = summary
         self._update_task_wip(wip)
 
+        # Clean up establishment artifacts
+        self._cleanup_task_establishment(wip, goal_id)
+
         self.active_task_wip = None
         self.active_task_wip_waiting = False
         logger.info(f'📋 Task established: {op_name} (goal_id={goal_id}, schedule={schedule_mode})')
@@ -3199,6 +3226,62 @@ class ZenohExecutiveNode:
             f"Schedule: {schedule_mode}\n"
             f"Goal: {op_goal_text[:200]}"
         )
+
+    def _cleanup_task_establishment(self, wip: Dict[str, Any], operational_goal_id: str):
+        """Remove milestone goals and transient resources from task establishment.
+
+        Keeps:
+        - The final operational scheduled goal (operational_goal_id)
+        - The WIP note itself (referenced by task_context_note)
+        - Any persistent resources created during infrastructure_setup
+        - System collections (conversation, _tasks, _scheduled_goals, etc.)
+        """
+        task_wip_id = wip.get("task_wip_id", "")
+
+        # 1. Delete milestone scheduled goals (not the final operational one)
+        deleted_goals = 0
+        for goal in self._all_scheduled_goals():
+            if goal.get("task_wip_id") == task_wip_id and goal["goal_id"] != operational_goal_id:
+                self._delete_scheduled_goal(goal["goal_id"])
+                deleted_goals += 1
+
+        # 2. Delete transient resources created during establishment
+        pre_ids = getattr(self, "_task_wip_pre_resource_ids", None)
+        if pre_ids is not None and self.resource_manager:
+            now_ids = set(self.resource_manager.resource_registry.keys())
+            created_ids = now_ids - pre_ids
+
+            # Identify resources to keep
+            wip_note_name = self.active_task_wip or ""
+            wip_note_id = self.resource_manager.named_notes.get(wip_note_name, "")
+            keep_ids = {wip_note_id} if wip_note_id else set()
+
+            deleted_resources = 0
+            for resource_id in created_ids:
+                if resource_id in keep_ids:
+                    continue
+                resource = self.resource_manager.get_resource(resource_id)
+                if not resource:
+                    continue
+                props = resource.get("properties", {})
+                # Keep persistent resources (created during infrastructure_setup)
+                if props.get("persistent", False):
+                    continue
+                # Keep scheduled goal notes (managed separately above)
+                note_name = props.get("note_name", "")
+                if note_name and note_name.startswith("_scheduled_goal_"):
+                    continue
+                success, _ = self._delete_resource_and_unbind(resource_id)
+                if success:
+                    deleted_resources += 1
+
+            self._task_wip_pre_resource_ids = None
+            logger.info(
+                f"🧹 Task establishment cleanup: {deleted_goals} milestone goals, "
+                f"{deleted_resources} transient resources removed"
+            )
+        elif deleted_goals:
+            logger.info(f"🧹 Task establishment cleanup: {deleted_goals} milestone goals removed")
 
     # ── Chat-mode response (lightweight, no planning pipeline) ────────────
 

@@ -56,11 +56,16 @@ pattern = r'\{\$[^}]*\}'
 # options include 'local', 'Claude', 'OpenAI', 'deepseek-chat',
 class LLM():
 
-    def __init__(self, server_name='local', model_name=None):
+    def __init__(self, server_name='local', model_name=None, vllm_url=None):
         global vllm_model
         self.server_name = server_name
         #print(f'will use {self.server_name} as llm')
         self.context_size = 16384  # conservative local mis/mixtral default
+        # Normalize vllm_url to a base (scheme + host + port)
+        if vllm_url:
+            self.vllm_base = vllm_url.split('/v1')[0] if '/v1' in vllm_url else vllm_url.rstrip('/')
+        else:
+            self.vllm_base = 'http://localhost:5000'
         if model_name is not None:
             self.model = model_name
         else:
@@ -69,7 +74,7 @@ class LLM():
             self.openai_client = OpenAIClient(model_name=self.model)
         if self.server_name == 'vllm':
             try:
-                response = requests.get('http://localhost:5000/v1/models', headers=headers)
+                response = requests.get(f'{self.vllm_base}/v1/models', headers=headers)
                 response.raise_for_status()  # Raises an HTTPError for bad responses (4xx, 5xx)
                 data = response.json()
                 if data.get('data') and len(data['data']) > 0:
@@ -124,7 +129,7 @@ class LLM():
             response= openrouter_client.executeRequest(prompt=substituted_prompt, temperature=temperature, top_p=top_p, max_tokens=max_tokens, stops=stops, model=self.model)
         elif 'vllm' in self.server_name:
             headers = {"Content-Type": "application/json"}
-            url = 'http://localhost:5000/v1/completions'
+            url = f'{self.vllm_base}/v1/completions'
             content = '\n'.join([msg['content'] for msg in substituted_prompt])
             if self.model.startswith('models/Qwen3-Next'):
                 temperature = temperature / 2.0
@@ -132,7 +137,7 @@ class LLM():
                                           json={"model":self.model, "prompt":content, "temperature":temperature,
                                                "top_p":top_p, "max_tokens":max_tokens, "stop":stops})
         elif 'llama.cpp' in self.server_name:
-            url = 'http://localhost:5000/v1/chat/completions'
+            url = f'{self.vllm_base}/v1/chat/completions'
             response =  requests.post(url, headers={"Content-Type":"application/json"},
                             json={"messages":substituted_prompt, "temperature":temperature,
                                     "top_p":top_p, "max_tokens":max_tokens, "stop":stops, "reasoning_effort": "low"})

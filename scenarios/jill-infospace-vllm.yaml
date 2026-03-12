@@ -5,6 +5,7 @@ world_config:
 
 llm_config:
   vllm_model_path: "unsloth/Qwen3-Coder-Next-FP8" #Qwen/Qwen3-Next-80B-A3B-Instruct-FP8"
+  #vllm_url: "http://192.168.1.100:5000"  # remote vLLM server (default: http://localhost:5000)
   #reasoning: {"effort": "low"}  # uncomment for backends that support reasoning (e.g., sglang)
   grobid: "http://localhost:8070/"
   
