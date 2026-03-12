@@ -47,7 +47,7 @@ load(target=$doc, slice="1500:2000", out=$chunk3)  → process $chunk3
 
 ## OUTPUT
 
-**Notes:** Returns `"Note Content: <sliced text>"` with character count metadata.
+**Notes:** Returns the sliced text content with character count metadata. To read content in code blocks, use `get_text("$var")` on the bound variable rather than parsing the return value.
 
 **Collections:** The `out` binding is a **new Collection** containing the sliced items. The planner-visible value is a content preview showing each item's Note ID and first 200 chars.
 

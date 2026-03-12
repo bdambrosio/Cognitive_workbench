@@ -1419,7 +1419,46 @@ Generated: {generated_at}
             except Exception as e:
                 logger.error(f"Error getting scheduled goals: {e}")
                 return {"success": False, "message": str(e)}
-        
+
+        @self.app.get("/api/task_wips/{character}")
+        async def get_task_wips(character: str):
+            """Get task WIPs for a character."""
+            try:
+                selector = f"cognitive/{character}/task_wips"
+                replies = self.session.get(selector, timeout=2.0)
+                for reply in replies:
+                    if hasattr(reply, 'ok') and reply.ok is not None:
+                        payload_bytes = reply.ok.payload.to_bytes()
+                        response = json.loads(payload_bytes.decode('utf-8'))
+                        if response.get('success'):
+                            return {"success": True, "task_wips": response.get("task_wips", [])}
+                return {"success": True, "task_wips": []}
+            except Exception as e:
+                logger.error(f"Error getting task wips: {e}")
+                return {"success": False, "message": str(e)}
+
+        @self.app.post("/api/task_wip_delete/{character}")
+        async def task_wip_delete(character: str, data: dict = Body(...)):
+            """Delete a task WIP and all its associated artifacts."""
+            try:
+                payload = json.dumps(data).encode()
+                self.session.put(f"cognitive/{character}/control/task_wip_delete", payload)
+                return {"success": True}
+            except Exception as e:
+                logger.error(f"Error in task_wip_delete: {e}")
+                return {"success": False, "message": str(e)}
+
+        @self.app.post("/api/task_wip_interrupt/{character}")
+        async def task_wip_interrupt(character: str, data: dict = Body(...)):
+            """Interrupt an active task WIP."""
+            try:
+                payload = json.dumps(data).encode()
+                self.session.put(f"cognitive/{character}/control/task_wip_interrupt", payload)
+                return {"success": True}
+            except Exception as e:
+                logger.error(f"Error in task_wip_interrupt: {e}")
+                return {"success": False, "message": str(e)}
+
         @self.app.get("/api/characters")
         async def get_characters():
             """Get list of active characters that have announced themselves."""
@@ -2374,6 +2413,7 @@ Generated: {generated_at}
                     <div class="character-data-tab" data-tab="plans">Plans</div>
                     <div class="character-data-tab" data-tab="state">State</div>
                     <div class="character-data-tab" data-tab="tasks">Schedule</div>
+                    <div class="character-data-tab" data-tab="taskwips">Tasks</div>
                 </div>
                 
                 <!-- Character data content -->
@@ -2447,13 +2487,22 @@ Generated: {generated_at}
                             </div>
                         </div>
                     </div>
+
+                    <!-- Task WIPs tab content -->
+                    <div class="character-data-panel" id="taskWipsPanel">
+                        <div id="taskWipsList" style="padding: 6px;">
+                            <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
+                                Select a character to view tasks
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            
+
             <!-- Resizer divider -->
             <div class="sidebar-resizer" id="sidebarResizer"></div>
         </div>
-        
+
         <!-- Main Content Area -->
         <div class="main-content">
             <!-- Character-specific content area -->
@@ -2920,6 +2969,10 @@ Generated: {generated_at}
                 document.getElementById('schedulerPanel').classList.add('active');
                 const character = activeCharacter || 'Jill';
                 loadScheduleList(character);
+            } else if (tabName === 'taskwips') {
+                document.getElementById('taskWipsPanel').classList.add('active');
+                const character = activeCharacter || 'Jill';
+                loadTaskWipsList(character);
             }
         }
         
@@ -4612,7 +4665,112 @@ Generated: {generated_at}
             const el = document.getElementById(id);
             if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
         }
-        
+
+        async function loadTaskWipsList(character) {
+            const listDiv = document.getElementById('taskWipsList');
+            if (!listDiv) return;
+            listDiv.innerHTML = '<div style="color: #f39c12; text-align: center; padding: 20px;">⏳ Loading...</div>';
+            try {
+                const response = await fetch(`/api/task_wips/${character}`);
+                const result = await response.json();
+                if (!result.success) {
+                    listDiv.innerHTML = `<div style="color: #ff4757; padding: 10px;">Error: ${result.message || 'Unknown'}</div>`;
+                    return;
+                }
+                const tasks = result.tasks || [];
+                if (tasks.length === 0) {
+                    listDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No tasks established yet.<br><span style="font-size:10px;color:#666;">Use <code>task: ...</code> to create one.</span></div>';
+                    return;
+                }
+                let html = '';
+                tasks.forEach((t, i) => {
+                    const statusColors = {in_progress: '#f39c12', completed: '#2ecc71', interrupted: '#e74c3c'};
+                    const statusColor = statusColors[t.status] || '#888';
+                    const milestones = t.milestones_completed || [];
+                    const intention = (t.intention || '').substring(0, 120);
+                    const phase = t.phase || '?';
+                    const isActive = t._is_active;
+                    const noteName = t._note_name || '';
+                    const created = t.created ? new Date(t.created).toLocaleString() : '';
+
+                    html += `<div style="border-bottom:1px solid #404040; padding:8px 10px;">`;
+                    html += `<div style="display:flex; align-items:center; gap:6px; cursor:pointer;" onclick="toggleGoalAccordion('twip_detail_${i}')">`;
+                    html += `<span style="color:${statusColor}; font-size:10px; font-weight:bold; text-transform:uppercase;">${t.status || '?'}</span>`;
+                    if (isActive) html += `<span style="color:#3498db; font-size:9px;">● ACTIVE</span>`;
+                    html += `<span style="color:#ddd; font-size:12px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${intention}</span>`;
+                    html += `<span style="color:#666; font-size:10px;">${milestones.length} steps</span>`;
+                    html += `</div>`;
+
+                    // Detail section (collapsed)
+                    html += `<div id="twip_detail_${i}" style="display:none; margin-top:6px; padding:6px; background:#1a1a1a; border-radius:4px; font-size:11px;">`;
+                    html += `<div style="color:#888;">Phase: <span style="color:#ccc;">${phase}</span></div>`;
+                    html += `<div style="color:#888;">Created: <span style="color:#ccc;">${created}</span></div>`;
+                    html += `<div style="color:#888;">ID: <span style="color:#ccc;">${t.task_wip_id || '?'}</span></div>`;
+
+                    // Milestones
+                    if (milestones.length > 0) {
+                        html += `<div style="margin-top:4px; color:#888;">Milestones:</div>`;
+                        html += `<div style="margin-left:8px;">`;
+                        milestones.forEach(m => {
+                            const mColor = m.status === 'completed' ? '#2ecc71' : '#e74c3c';
+                            html += `<div style="color:${mColor}; font-size:10px; margin:2px 0;">● ${(m.goal_text || '').substring(0, 80)}</div>`;
+                        });
+                        html += `</div>`;
+                    }
+
+                    // Scheduled goal link (for completed tasks)
+                    if (t._scheduled_goal_id) {
+                        html += `<div style="margin-top:4px;"><a href="#" style="color:#3498db; font-size:11px; text-decoration:none;" onclick="event.preventDefault(); viewTaskScheduledGoal('${t._scheduled_goal_id}');">→ View scheduled goal: ${t._scheduled_goal_name || t._scheduled_goal_id}</a></div>`;
+                    }
+
+                    // Action buttons
+                    html += `<div style="margin-top:6px; display:flex; gap:6px;">`;
+                    if (isActive) {
+                        html += `<button onclick="interruptTaskWip('${character}', '${noteName}')" style="background:#e67e22; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:10px; cursor:pointer;">Interrupt</button>`;
+                    }
+                    html += `<button onclick="deleteTaskWip('${character}', '${noteName}')" style="background:#c0392b; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:10px; cursor:pointer;">Delete</button>`;
+                    html += `</div>`;
+
+                    html += `</div></div>`;
+                });
+                listDiv.innerHTML = html;
+            } catch (error) {
+                listDiv.innerHTML = `<div style="color: #ff4757; text-align: center; padding: 20px;">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function deleteTaskWip(character, noteName) {
+            if (!confirm('Delete this task and all associated goals?')) return;
+            try {
+                await fetch(`/api/task_wip_delete/${character}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({note_name: noteName})
+                });
+                setTimeout(() => loadTaskWipsList(character), 500);
+            } catch (e) { console.error('Delete task failed:', e); }
+        }
+
+        async function interruptTaskWip(character, noteName) {
+            try {
+                await fetch(`/api/task_wip_interrupt/${character}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({note_name: noteName})
+                });
+                setTimeout(() => loadTaskWipsList(character), 500);
+            } catch (e) { console.error('Interrupt task failed:', e); }
+        }
+
+        function viewTaskScheduledGoal(goalId) {
+            // Switch to Schedule tab and highlight the goal
+            switchCharacterDataTab('tasks');
+            setTimeout(() => {
+                const el = document.getElementById('goal_' + goalId);
+                if (el) { el.scrollIntoView({behavior: 'smooth', block: 'center'}); el.style.outline = '2px solid #3498db'; setTimeout(() => el.style.outline = '', 2000); }
+            }, 300);
+        }
+
         async function sendGoalCommand(character, cmd) {
             try {
                 const response = await fetch('/api/text_input', {

@@ -6,6 +6,7 @@ operating in information spaces (semantic/tool spaces).
 """
 
 import json
+import queue
 import time
 import logging
 import re
@@ -2883,7 +2884,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 sliced_content = content_str  # Full content for single-item unwrap
                 if out_var:
                     self._bind_variable(out_var, note_id)
-                prefixed_content = f"Note Content: {sliced_content}"
+                prefixed_content = sliced_content
                 logger.info(f"Loaded {target_arg}[{slice_arg}] → {display_var} = {note_id} (Note, unwrapped from Collection)")
                 return self._create_uniform_return('success', value=prefixed_content, resource_id=note_id)
             
@@ -2925,7 +2926,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         if out_var:
             self._bind_variable(out_var, resource_id)
-        prefixed_content = f"Note Content: {sliced_content}"
+        prefixed_content = sliced_content
         
         logger.info(f"Loaded {target_arg} → {display_var} = {resource_id} (Note, {len(sliced_content)}/{total_chars} chars)")
         return self._create_uniform_return('success', value=prefixed_content, resource_id=resource_id)
@@ -3346,9 +3347,16 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # Return truncated thought text, resource_id if Note was created
         return self._create_uniform_return('success', value=str(value), resource_id=resource_id)
     
+    _ASK_TIMEOUT_SECONDS = 300  # 5 minutes
+
     def _execute_ask(self, action: Dict) -> Dict:
         """
-        Ask target a question and terminate current turn immediately.
+        Ask target a question and block until a response arrives.
+
+        The planner thread blocks on executive_node._ask_response_queue.  The
+        main loop (OODA tick) detects ``awaiting_ask_response`` and routes the
+        next User message into that queue, unblocking this method.  All planner
+        state (bindings, step count, reasoning context) is preserved.
 
         Required: value
         Optional: target (defaults to 'User'), out
@@ -3358,9 +3366,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         question_text = self._resolve_value(action.get('value'))
         if question_text is None:
             return self._create_uniform_return('failed', reason='ask requires value')
-        
+
         target = action.get('target', 'User')
-        
+
         # Publish question to UI
         action_data = {
             'type': 'ask',
@@ -3381,7 +3389,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 act_type='ask',
                 close=False
             )
-        
+
         # For non-User targets, also send question to target's sense_data so they actually hear it
         if target != 'User':
             sense_data = {
@@ -3391,23 +3399,60 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 'content': json.dumps({'source': self.agent_name, 'text': str(question_text)})
             }
             self.session.put(f"cognitive/{target}/sense_data", json.dumps(sense_data))
-        
-        if out_var:
-            display_var = self._normalize_var_for_log(out_var)
-            logger.info(f"❓ Ask: '{question_text}' → terminating turn ({display_var}=Note_null)")
-            self._bind_variable(out_var, "Note_null")
-        else:
-            logger.info(f"❓ Ask: '{question_text}' → terminating turn")
+
+        # --- Blocking wait for response ---
+        # Signal main loop that we are waiting for a reply.
         self.executive_node.awaiting_ask_response = True
-        # Terminal dialog action model: end this turn after ask.
-        self.interrupt_requested = True
-        if self.executive_node:
-            self.executive_node.interrupt_requested = True
-            self.executive_node.execution_mode = 'step'
-            self.executive_node.execution_paused = True
-            self.executive_node.awaiting_user_input = False
-            self.executive_node._publish_execution_state()
-        return self._create_uniform_return('success', value=str(question_text), resource_id="Note_null")
+        self.executive_node.execution_paused = True
+        self.executive_node._publish_execution_state()
+
+        # Drain any stale items from a previous interrupted ask
+        while not self.executive_node._ask_response_queue.empty():
+            try:
+                self.executive_node._ask_response_queue.get_nowait()
+            except queue.Empty:
+                break
+
+        display_var = self._normalize_var_for_log(out_var) if out_var else None
+        logger.info(f"❓ Ask: '{question_text}' → blocking for response (timeout={self._ASK_TIMEOUT_SECONDS}s)")
+
+        try:
+            response_text = self.executive_node._ask_response_queue.get(
+                timeout=self._ASK_TIMEOUT_SECONDS
+            )
+        except queue.Empty:
+            response_text = None  # Timeout
+
+        # Clear blocking state
+        self.executive_node.awaiting_ask_response = False
+        self.executive_node.execution_paused = False
+        self.executive_node._publish_execution_state()
+
+        # None sentinel = timeout or interrupt
+        if response_text is None:
+            logger.info(f"❓ Ask: timed out or interrupted waiting for response")
+            if out_var:
+                self._bind_variable(out_var, "Note_null")
+            return self._create_uniform_return(
+                'failed', reason='ask timed out or was interrupted',
+                value=str(question_text), resource_id="Note_null",
+            )
+
+        # Create a Note with the user's response and bind to out var
+        logger.info(f"❓ Ask: received response ({len(response_text)} chars)")
+        note_id = self._persist_note(
+            response_text, source_context='ask_response',
+        )
+        if not note_id:
+            note_id = "Note_null"
+
+        if out_var:
+            self._bind_variable(out_var, note_id)
+            logger.info(f"❓ Ask: bound {display_var}={note_id}")
+
+        return self._create_uniform_return(
+            'success', value=str(response_text), resource_id=note_id,
+        )
 
     def _execute_bind(self, action: Dict) -> Dict:
         """

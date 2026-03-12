@@ -302,7 +302,7 @@ Discovery tools return Note or Collection candidates. Search-within tools search
 Note content is always a string. For extracting information FROM text content, use extract (LLM-based).
 
 Persistence Operations:
-- load: Retrieve persistent Note or Collection by ID or name. Returns prefixed content ("Note Content: <text>" or "Collection Content: <ids>"). Use slice=":" for full content or slice="0:N" for explicit amount; no length limit when slice is explicit. Default slice "0:4096" (Notes) or "0:5" (Collections). Use to get content into planner context.
+- load: Bind a persistent Note or Collection by ID or name into a $variable. Use ONLY to (a) bind named persistent notes, or (b) slice Collections. To read content from an already-bound $var, use get_text/get_json/get_items instead. slice=":" for full content; default "0:4096" (Notes) or "0:5" (Collections).
 - persist: Mark Note or Collection as persistent (saved to filesystem). Use after creating resources you want to keep.
 
 Collection Mutation Operations (require Collection):
@@ -566,8 +566,12 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "examples": PRIMITIVE_DOCS["bind"].get("examples", []),
             "schema_hint": PRIMITIVE_DOCS["bind"]["schema_hint"]
         },
+        "say": {
+            "description": "Send a message to the user or another agent. This is the DEFAULT for delivering information, reporting results, or making statements. Does not wait for a response. Use say unless you specifically need the recipient's answer.",
+            "schema_hint": {"value": "string or $variable", "target": "User or agent name (optional, default User)"}
+        },
         "ask": {
-            "description": "Send question to target and terminate current turn. Response will arrive in a future turn. Requires: value, out. Optional: target (default User).",
+            "description": "Send a question and BLOCK until the recipient responds (up to 5 min timeout). Use ONLY when you need the response to continue the plan. If you are delivering information, reporting results, or echoing data back, use say instead. Requires: value, out. Optional: target (default User).",
             "schema_hint": {"target": "User or agent name (optional)", "value": "string", "out": "$variable"}
         },
         "add": {
@@ -777,7 +781,7 @@ def tool_catalog_text(tools: Dict[str, Dict]) -> str:
         lines.append("#INFOSPACE CORE")
         for name, meta in sorted(core_tools):
             if name == "ask":
-                lines.append("#COMMUNICATION (ask=send+end-turn)")
+                lines.append("#COMMUNICATION (say=deliver message, ask=block for response)")
             lines.extend(format_tool(name, meta))
         lines.append("")  # Blank line before workflows
     
@@ -1284,10 +1288,6 @@ def validate_codegen_block(code: str) -> tuple:
     if len(lines) > 512:
         return False, f"Code block too long ({len(lines)} total lines, max 512)"
 
-    # Prevent premature user delivery from Stage 2; final delivery happens after done gate.
-    if re.search(r'["\']type["\']\s*:\s*["\']say["\']', code):
-        return False, "Forbidden action in code block: say"
-    
     # Check forbidden patterns
     for pattern in _CODEGEN_FORBIDDEN_PATTERNS:
         match = re.search(pattern, code)
@@ -2579,16 +2579,24 @@ ALWAYS follow all formatting instructions exactly.
             "if r2[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"synthesize failed\")\n"
             "return executor._create_uniform_return(\"success\", value=\"done\")\n"
             "```\n"
+            "Reading content example:\n"
+            "```python\n"
+            "# To read content from a bound $var, use get_text/get_json/get_items directly.\n"
+            "# NO need to call load first — these read straight from the resource store.\n"
+            "text = get_text(\"$my_note\")       # returns Note content as string\n"
+            "data = get_json(\"$my_note\")       # returns Note content parsed as dict (or None)\n"
+            "ids  = get_items(\"$my_collection\") # returns list of Note IDs in the Collection\n"
+            "```\n"
             "Loop example (multi-item processing):\n"
             "```python\n"
-            "items = executor.get_items(\"$inbox\")  # list of resource IDs\n"
+            "items = get_items(\"$inbox\")  # list of resource IDs from a Collection\n"
             "total = len(items)\n"
             "ok = 0\n"
             "errors = []\n"
             "for item_id in items:\n"
             "    r = executor.execute_action_tracked({\"type\": \"extract\", \"target\": item_id, \"instruction\": \"get subject\", \"out\": \"$subject\"}, \"codegen\")\n"
             "    if r[\"status\"] == \"success\":\n"
-            "        subj = executor.get_json(\"$subject\")\n"
+            "        subj = get_json(\"$subject\")\n"
             "        ok += 1\n"
             "    else:\n"
             "        errors.append(r.get(\"reason\", \"unknown\"))\n"
@@ -2601,16 +2609,19 @@ ALWAYS follow all formatting instructions exactly.
             "- Max 16 tool calls in a single code block via executor.execute_action_tracked(action_dict, \"codegen\")\n"
             "- Prefer longer cohesive blocks: if CURRENT_TASK has connected subtasks, combine them in one block.\n"
             "- Avoid single-call blocks unless that single call fully completes CURRENT_TASK.\n"
-            "- VARIABLE BINDING: \"out\": \"$name\" binds the result. Chain tool actions via target=\"$name\".\n"
+            "- VARIABLE BINDING: \"out\": \"$name\" binds the result resource. Chain tool actions via target=\"$name\".\n"
+            "- READING CONTENT: use get_text(\"$var\"), get_json(\"$var\"), get_items(\"$var\") to read resource content.\n"
+            "  These resolve the $binding to a resource ID and return its stored content.\n"
+            "  get_text -> string, get_json -> dict or None, get_items -> list of Note IDs.\n"
+            "  Call these as free functions (not executor.get_text). They work on any $var that has been bound.\n"
+            "- WHEN TO USE load: ONLY to (a) bind a named persistent note, e.g. load target=\"_my_saved_note\" out=\"$note\",\n"
+            "  or (b) slice a Collection into a subset. Do NOT call load just to read content — use the helpers above.\n"
             "- RETURN CONTRACT: r[\"status\"] — \"success\"/\"failed\". r[\"resource_id\"] — resource ID.\n"
-            "  r[\"data\"] — for Notes always string; for Collections list of {\"text\": content} per item.\n"
-            "  Use executor.get_text(\"$var\") or executor.get_json(\"$var\") to inspect Note content.\n"
+            "  r[\"value\"] — display string (for humans/logging, not for code logic — use get_text instead).\n"
             "  r.get(\"extra\",{}).get(\"item_count\") — item count for Collections.\n"
-            "  r[\"value\"] — display string (for humans, not for code logic).\n"
             "- CODE BLOCK SCOPE: each step executes in a fresh function. Python locals do NOT persist across steps.\n"
-            "- CROSS-STEP ACCESS: use $bindings only. To inspect existing resources use executor helper methods:\n"
-            "  executor.get_text(\"$var\") -> string, executor.get_json(\"$var\") -> dict or None, executor.get_items(\"$collection\") -> list.\n"
-            "- TYPE SAFETY: r[\"data\"] for Notes is always string; use executor.get_json() when structured access needed.\n"
+            "- CROSS-STEP ACCESS: use $bindings only. To read content from prior steps, use get_text/get_json/get_items.\n"
+            "- TYPE SAFETY: use get_json() when you need structured access to Note content.\n"
             "- STRUCTURED VALUES: pass dicts/lists directly as value — do not pre-serialize with json.dumps().\n"
             "- if/else control flow and loops are allowed.\n"
             "- Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
@@ -2633,7 +2644,7 @@ ALWAYS follow all formatting instructions exactly.
             "#Stage 3 RULES:\n"
             "- DONE=YES only when ALL required actions are complete.\n"
             "- If DONE=YES, NEXT_TASK must be blank.\n"
-            "- Do NOT use 'say' inside Stage 2 code blocks; final user delivery happens only after DONE=YES and quality checks.\n"
+            "- Use 'say' in code blocks when communication is part of the goal (e.g., reporting results, echoing data). Use 'ask' when you need the user's response to continue.\n"
             "- Efficiency rule: if prior step used only one tool call and GOAL is not done, set NEXT_TASK to combine adjacent subtasks.\n"
             "- SPIRAL DETECTION: If the same tool has failed 2+ times consecutively,\n"
             "  use a different approach or proceed with available data.\n"
@@ -3585,6 +3596,7 @@ ALWAYS follow all formatting instructions exactly.
     prompt += format_user(
         "#Stage 2 FORMAT:\n"
         "Write a Python code block to accomplish the CURRENT_TASK.\n"
+        "Linear example:\n"
         "```python\n"
         "r1 = executor.execute_action_tracked({\"type\": \"search-web\", \"query\": \"transformers survey\", \"out\": \"$papers\"}, \"codegen\")\n"
         "if r1[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"search failed\")\n"
@@ -3592,21 +3604,32 @@ ALWAYS follow all formatting instructions exactly.
         "if r2[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"synthesize failed\")\n"
         "return executor._create_uniform_return(\"success\", value=\"done\")\n"
         "```\n"
+        "Reading content example:\n"
+        "```python\n"
+        "# To read content from a bound $var, use get_text/get_json/get_items directly.\n"
+        "# NO need to call load first — these read straight from the resource store.\n"
+        "text = get_text(\"$my_note\")       # returns Note content as string\n"
+        "data = get_json(\"$my_note\")       # returns Note content parsed as dict (or None)\n"
+        "ids  = get_items(\"$my_collection\") # returns list of Note IDs in the Collection\n"
+        "```\n"
         "Rules:\n"
         "- use python code and / or tool calls to accomplish the CURRENT_TASK.\n"
         "- Max 16 tool calls in a single code block via executor.execute_action_tracked(action_dict, \"codegen\")\n"
         "- Prefer longer cohesive blocks: if CURRENT_TASK has connected subtasks, combine them in one block.\n"
         "- Avoid single-call blocks unless that single call fully completes CURRENT_TASK.\n"
-        "- VARIABLE BINDING: \"out\": \"$name\" binds the result. Chain tool actions via target=\"$name\".\n"
+        "- VARIABLE BINDING: \"out\": \"$name\" binds the result resource. Chain tool actions via target=\"$name\".\n"
+        "- READING CONTENT: use get_text(\"$var\"), get_json(\"$var\"), get_items(\"$var\") to read resource content.\n"
+        "  These resolve the $binding to a resource ID and return its stored content.\n"
+        "  get_text -> string, get_json -> dict or None, get_items -> list of Note IDs.\n"
+        "  Call these as free functions (not executor.get_text). They work on any $var that has been bound.\n"
+        "- WHEN TO USE load: ONLY to (a) bind a named persistent note, e.g. load target=\"_my_saved_note\" out=\"$note\",\n"
+        "  or (b) slice a Collection into a subset. Do NOT call load just to read content — use the helpers above.\n"
         "- RETURN CONTRACT: r[\"status\"] — \"success\"/\"failed\". r[\"resource_id\"] — resource ID.\n"
-        "  r[\"data\"] — for Notes always string; for Collections list of {\"text\": content} per item.\n"
-        "  Use get_text(\"$var\") or get_json(\"$var\") to inspect Note content.\n"
+        "  r[\"value\"] — display string (for humans/logging, not for code logic — use get_text instead).\n"
         "  r.get(\"extra\",{}).get(\"item_count\") — item count for Collections.\n"
-        "  r[\"value\"] — display string (for humans, not for code logic).\n"
         "- CODE BLOCK SCOPE: each step executes in a fresh function. Python locals do NOT persist across steps.\n"
-        "- CROSS-STEP ACCESS: use $bindings only. To inspect existing resources use helpers:\n"
-        "  get_text(\"$var\") -> string, get_json(\"$var\") -> dict or None, get_items(\"$collection\") -> list.\n"
-        "- TYPE SAFETY: r[\"data\"] for Notes is always string; use get_json() when structured access needed.\n"
+        "- CROSS-STEP ACCESS: use $bindings only. To read content from prior steps, use get_text/get_json/get_items.\n"
+        "- TYPE SAFETY: use get_json() when you need structured access to Note content.\n"
         "- if/else control flow and loops are allowed.\n"
         "- Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
         "\n"
@@ -3626,7 +3649,7 @@ ALWAYS follow all formatting instructions exactly.
         "#Stage 3 RULES:\n"
         "- DONE=YES only when ALL required actions are complete.\n"
         "- If DONE=YES, NEXT_TASK must be blank and VERIFICATION must be filled.\n"
-        "- Do NOT use 'say' inside Stage 2 code blocks; final user delivery happens only after DONE=YES and quality checks.\n"
+        "- Use 'say' in code blocks when communication is part of the goal (e.g., reporting results, echoing data). Use 'ask' when you need the user's response to continue.\n"
         "- Efficiency rule: if prior step used only one tool call and GOAL is not done, set NEXT_TASK to combine adjacent subtasks.\n"
         "- SPIRAL DETECTION: If the same tool has failed 2+ times consecutively,\n"
         "  use a different approach or proceed with available data.\n"

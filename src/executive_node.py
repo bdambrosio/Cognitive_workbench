@@ -1008,6 +1008,12 @@ class ZenohExecutiveNode:
         
         # Ask primitive state
         self.awaiting_ask_response = False
+        self._ask_response_queue: queue.Queue = queue.Queue()
+
+        # Task-in-progress (milestone loop) state
+        self.active_task_wip: Optional[str] = None       # Note name e.g. "_task_wip_1"
+        self.active_task_wip_waiting: bool = False        # True while a milestone goal runs
+        self._task_wip_counter: int = 0
 
         # Goal worker thread state
         self._goal_thread: Optional[threading.Thread] = None
@@ -1118,6 +1124,16 @@ class ZenohExecutiveNode:
             self._handle_goal_remove
         )
 
+        self.control_task_wip_delete_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/task_wip_delete",
+            self._handle_task_wip_delete
+        )
+
+        self.control_task_wip_interrupt_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/task_wip_interrupt",
+            self._handle_task_wip_interrupt
+        )
+
         # === ZENOH PUBLICATION ===
         # NAME: execution_state_update
         # TOPIC: cognitive/{character}/execution_state
@@ -1198,7 +1214,12 @@ class ZenohExecutiveNode:
             f"cognitive/{character_name}/scheduled_goals",
             self._scheduled_goals_query_handler
         )
-        
+
+        self.task_wips_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/task_wips",
+            self._task_wips_query_handler
+        )
+
         self.world_state_queryable = self.session.declare_queryable(
             f"cognitive/{character_name}/world_state",
             self._world_state_query_handler
@@ -1270,7 +1291,9 @@ class ZenohExecutiveNode:
             self.interrupt_requested = True
             if self.infospace_executor:
                 self.infospace_executor.interrupt_requested = True
-            self.awaiting_ask_response = False
+            if self.awaiting_ask_response:
+                self.awaiting_ask_response = False
+                self._ask_response_queue.put(None)  # Sentinel to unblock _execute_ask
             logger.info(f'🔚 {self.character_name} closed dialog with {entity_name} (from UI)')
             self._publish_execution_state()
         except Exception as e:
@@ -1365,6 +1388,10 @@ class ZenohExecutiveNode:
             # Drain sensor queues in priority order
             self._drain_sensor_queues()
 
+        # ── 1b. Advance task milestone loop if idle ───────────────────────
+        if self.active_task_wip and not self.active_task_wip_waiting and not self._is_goal_running():
+            self._advance_task_wip()
+
         # ── 2. Process text_input_queue ──────────────────────────────────
         if self.text_input_queue:
             # Peek at first item to classify it
@@ -1378,16 +1405,13 @@ class ZenohExecutiveNode:
                 text = content
                 source = 'console'
 
-            # 2a. Ask-reply: route to goal thread (which is paused waiting)
+            # 2a. Ask-reply: push response to blocking queue so planner thread unblocks
             if self.awaiting_ask_response:
                 if source == 'User':
                     self.text_input_queue.pop(0)
-                    logger.info(f'🚀 User reply to ask received, resuming goal')
-                    self.awaiting_ask_response = False
-                    self.execution_paused = False
-                    self._publish_execution_state()
-                    # Feed reply through _process_text_input (handles goal resume)
-                    self._process_text_input_item(sense_data)
+                    logger.info(f'🚀 User reply to ask received, pushing to _ask_response_queue')
+                    self._ask_response_queue.put(text)
+                    # awaiting_ask_response is cleared by _execute_ask when it unblocks
                 return  # While awaiting ask, ignore non-User input
 
             # 2b. Goal commands and explicit goals — dispatch to goal thread
@@ -2323,6 +2347,52 @@ class ZenohExecutiveNode:
             self._active_scheduled_goal_id = None
         if hasattr(self, "goal_scheduler"):
             self.goal_scheduler.notify_step_completed(goal_id)
+        # If this was a task milestone goal, update WIP Note and unblock milestone loop
+        task_wip_id = goal.get("task_wip_id")
+        if task_wip_id and self.active_task_wip:
+            # Check if the milestone was interrupted (not just failed)
+            last_result = updates.get("last_result", "")
+            was_interrupted = "Interrupted by user" in last_result
+            if was_interrupted:
+                # Interrupt bubbles up: abort the entire task establishment
+                logger.info(f'📋 Task WIP {task_wip_id}: milestone interrupted — aborting task')
+                wip = self._read_task_wip()
+                if wip:
+                    wip["status"] = "interrupted"
+                    wip["current_milestone"] = None
+                    wip["updated"] = datetime.now().isoformat()
+                    wip.setdefault("accumulated_findings", []).append(
+                        "Task interrupted by user during milestone execution"
+                    )
+                    self._update_task_wip(wip)
+                self.active_task_wip = None
+                self.active_task_wip_waiting = False
+                self._say_to_user("Task establishment interrupted.")
+            else:
+                try:
+                    result_summary = last_result[:500] if last_result else ("success" if success else "failed")
+                    milestone_record = {
+                        "goal_text": goal.get("goal_text", ""),
+                        "result_summary": result_summary,
+                        "status": "completed" if success else "failed",
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                    wip = self._read_task_wip()
+                    if wip:
+                        wip.setdefault("milestones_completed", []).append(milestone_record)
+                        wip["current_milestone"] = None
+                        wip["updated"] = datetime.now().isoformat()
+                        # Capture primary_product in accumulated_findings if present
+                        if primary_product:
+                            wip.setdefault("accumulated_findings", []).append(
+                                f"Milestone produced artifact: {primary_product}"
+                            )
+                        self._update_task_wip(wip)
+                    logger.info(f'📋 Task WIP {task_wip_id}: milestone completed ({updates["status"]})')
+                except Exception as e:
+                    logger.warning(f'Error updating task WIP after milestone: {e}')
+                self.active_task_wip_waiting = False
+
         # Clean up transient resources created during the goal
         if pre_resource_ids is not None and self.resource_manager:
             now_ids = set(self.resource_manager.resource_registry.keys())
@@ -2353,10 +2423,27 @@ class ZenohExecutiveNode:
         notify_user = source != "scheduler"
         goal_name = goal.get('name') or goal_id
 
+        # Prepend task context if this goal has a task_context_note
+        effective_goal_text = goal.get("goal_text", "")
+        task_ctx_note = goal.get("task_context_note")
+        if task_ctx_note and self.resource_manager:
+            try:
+                ctx_note_id = self.resource_manager.named_notes.get(task_ctx_note)
+                if ctx_note_id:
+                    ctx_data = self.resource_manager.resource_registry.get(ctx_note_id, {})
+                    ctx_content = ctx_data.get("content", "")
+                    if ctx_content:
+                        effective_goal_text = (
+                            f"TASK CONTEXT (from task establishment):\n{ctx_content}\n\n"
+                            f"GOAL:\n{effective_goal_text}"
+                        )
+            except Exception as e:
+                logger.warning(f'Error loading task context note {task_ctx_note}: {e}')
+
         def _run():
             result: Dict[str, Any] = {}
             try:
-                result = self.parse_and_set_goal("", goal.get("goal_text", "")) or {}
+                result = self.parse_and_set_goal("", effective_goal_text) or {}
             except Exception as e:
                 result = {"success": False, "error": str(e)}
             self._set_scheduled_goal_result(goal_id, result, used_cache=False, pre_resource_ids=pre_resource_ids)
@@ -2431,6 +2518,21 @@ class ZenohExecutiveNode:
             self._update_scheduled_goal(goal_id, status="interrupted", is_running=False)
             if self._active_scheduled_goal_id == goal_id:
                 self._active_scheduled_goal_id = None
+            # If this goal is a task milestone, abort the task WIP
+            if goal.get("task_wip_id") and self.active_task_wip:
+                logger.info(f'📋 Task WIP {goal.get("task_wip_id")}: milestone interrupted — aborting task')
+                wip = self._read_task_wip()
+                if wip:
+                    wip["status"] = "interrupted"
+                    wip["current_milestone"] = None
+                    wip["updated"] = datetime.now().isoformat()
+                    wip.setdefault("accumulated_findings", []).append(
+                        "Task interrupted: milestone goal interrupted by user"
+                    )
+                    self._update_task_wip(wip)
+                self.active_task_wip = None
+                self.active_task_wip_waiting = False
+                self._say_to_user("Task establishment interrupted.")
             if goal_id in self._scheduler_started_goals:
                 self._scheduler_started_goals.discard(goal_id)
                 self._record_scheduler_event(
@@ -2666,6 +2768,21 @@ class ZenohExecutiveNode:
                 self.interrupt_requested = True
                 if self.infospace_executor:
                     self.infospace_executor.interrupt_requested = True
+            # If this goal is a task milestone, abort the task WIP
+            if goal.get("task_wip_id") and self.active_task_wip:
+                logger.info(f'📋 Task WIP {goal.get("task_wip_id")}: milestone removed — aborting task')
+                wip = self._read_task_wip()
+                if wip:
+                    wip["status"] = "interrupted"
+                    wip["current_milestone"] = None
+                    wip["updated"] = datetime.now().isoformat()
+                    wip.setdefault("accumulated_findings", []).append(
+                        "Task interrupted: milestone goal removed by user"
+                    )
+                    self._update_task_wip(wip)
+                self.active_task_wip = None
+                self.active_task_wip_waiting = False
+                self._say_to_user("Task establishment interrupted.")
             deleted = self._delete_scheduled_goal(goal_id)
             if not deleted:
                 logger.warning(f"Goal {goal_id} could not be removed")
@@ -2680,6 +2797,81 @@ class ZenohExecutiveNode:
             logger.info(f"Goal {goal_id} removed via control endpoint")
         except Exception as e:
             logger.error(f"Error in goal_remove handler: {e}")
+
+    def _handle_task_wip_delete(self, sample):
+        """Handle request to delete a task WIP and all its associated artifacts."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            note_name = data.get("note_name")
+            if not note_name or not self.resource_manager:
+                return
+
+            # Read WIP content for cross-references
+            note_id = self.resource_manager.named_notes.get(note_name)
+            if not note_id:
+                logger.warning(f"Task WIP note {note_name} not found")
+                return
+            note_data = self.resource_manager.resource_registry.get(note_id)
+            wip = {}
+            if note_data:
+                content = note_data.get("properties", {}).get("content", "")
+                try:
+                    wip = json.loads(content) if isinstance(content, str) else content
+                except (json.JSONDecodeError, TypeError):
+                    pass
+
+            task_wip_id = wip.get("task_wip_id", "")
+            deleted_goals = []
+
+            # Delete associated scheduled goals (milestone + final recurring)
+            for goal in self._all_scheduled_goals():
+                if (goal.get("task_wip_id") == task_wip_id and task_wip_id) or \
+                   goal.get("task_context_note") == note_name:
+                    self._delete_scheduled_goal(goal["goal_id"])
+                    deleted_goals.append(goal["goal_id"])
+
+            # Delete the WIP note itself
+            if self.infospace_executor:
+                self.infospace_executor.delete_resource_and_unbind(note_id)
+
+            # Clear active task WIP if this is the active one
+            if self.active_task_wip == note_name:
+                self.interrupt_requested = True
+                if self.infospace_executor:
+                    self.infospace_executor.interrupt_requested = True
+                self.active_task_wip = None
+                self.active_task_wip_waiting = False
+
+            self._publish_execution_state()
+            logger.info(f"Task WIP {note_name} deleted (removed {len(deleted_goals)} goals: {deleted_goals})")
+        except Exception as e:
+            logger.error(f"Error in task_wip_delete handler: {e}")
+
+    def _handle_task_wip_interrupt(self, sample):
+        """Handle request to interrupt an active task WIP."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            note_name = data.get("note_name")
+            if not note_name or self.active_task_wip != note_name:
+                return
+            # Interrupt any running milestone goal
+            self.interrupt_requested = True
+            if self.infospace_executor:
+                self.infospace_executor.interrupt_requested = True
+            # Update WIP note
+            wip = self._read_task_wip()
+            if wip:
+                wip["status"] = "interrupted"
+                wip["current_milestone"] = None
+                wip.setdefault("accumulated_findings", []).append("Task interrupted by user via UI")
+                self._update_task_wip(wip)
+            self.active_task_wip = None
+            self.active_task_wip_waiting = False
+            self._say_to_user("Task establishment interrupted.")
+            self._publish_execution_state()
+            logger.info(f"Task WIP {note_name} interrupted via UI")
+        except Exception as e:
+            logger.error(f"Error in task_wip_interrupt handler: {e}")
 
     def _cleanup_transient_resources(self, created_ids: set, keep_ids: set = None, label: str = ""):
         """
@@ -2719,6 +2911,294 @@ class ZenohExecutiveNode:
         """Send a message to user via the say action."""
         if self.infospace_executor:
             self.infospace_executor.execute_action({"type": "say", "target": "user", "value": text})
+
+    # ── Task WIP (milestone loop) methods ─────────────────────────────────
+
+    def _begin_task_establishment(self, user_text: str):
+        """Create a task WIP Note and start the milestone loop."""
+        self._task_wip_counter += 1
+        wip_id = f"twip_{self._task_wip_counter}"
+        note_name = f"_task_wip_{self._task_wip_counter}"
+        now = datetime.now().isoformat()
+        wip_content = {
+            "task_wip_id": wip_id,
+            "intention": user_text,
+            "status": "in_progress",
+            "phase": "specification",
+            "milestones_completed": [],
+            "current_milestone": None,
+            "accumulated_findings": [],
+            "created": now,
+            "updated": now,
+        }
+        # Create and persist the WIP Note
+        self.infospace_executor.execute_action({
+            "type": "create-note",
+            "value": json.dumps(wip_content),
+            "name": note_name,
+            "out": f"${note_name}",
+        })
+        self.infospace_executor.execute_action({
+            "type": "persist",
+            "target": f"${note_name}",
+            "name": note_name,
+        })
+        self.active_task_wip = note_name
+        self.active_task_wip_waiting = False
+        logger.info(f'📋 Task WIP created: {note_name} — "{user_text[:80]}"')
+        self._say_to_user(f"Task received. Beginning establishment for: {user_text[:200]}")
+
+    @staticmethod
+    def _extract_json(text: str) -> str:
+        """Strip markdown fences and whitespace to extract raw JSON."""
+        s = text.strip()
+        # Strip ```json ... ``` or ``` ... ```
+        if s.startswith("```"):
+            first_nl = s.find("\n")
+            if first_nl != -1:
+                s = s[first_nl + 1:]
+            if s.endswith("```"):
+                s = s[:-3]
+        return s.strip()
+
+    def _read_task_wip(self) -> Optional[Dict[str, Any]]:
+        """Read the current task WIP Note content as a dict."""
+        if not self.active_task_wip or not self.resource_manager:
+            return None
+        try:
+            note_id = self.resource_manager.named_notes.get(self.active_task_wip)
+            if not note_id:
+                return None
+            note_data = self.resource_manager.resource_registry.get(note_id)
+            if not note_data:
+                return None
+            content = note_data.get("properties", {}).get("content", "")
+            if not content:
+                return None
+            return json.loads(self._extract_json(content))
+        except Exception as e:
+            logger.warning(f'Error reading task WIP {self.active_task_wip}: {e}')
+        return None
+
+    def _update_task_wip(self, wip: Dict[str, Any]):
+        """Write updated WIP content back to the Note."""
+        if not self.active_task_wip or not self.resource_manager:
+            return
+        wip["updated"] = datetime.now().isoformat()
+        try:
+            note_id = self.resource_manager.named_notes.get(self.active_task_wip)
+            if note_id:
+                self.resource_manager.update_note_content(note_id, json.dumps(wip))
+        except Exception as e:
+            logger.warning(f'Error updating task WIP {self.active_task_wip}: {e}')
+
+    _ADVANCE_TASK_PROMPT = (
+        "You are ESTABLISHING a recurring task — NOT executing it yet.\n"
+        "Task establishment prepares everything so the task can run autonomously later.\n"
+        "You will produce milestone goals that the planner executes one at a time.\n\n"
+        "IMPORTANT: Do NOT submit a goal that performs the task itself. Each milestone\n"
+        "should accomplish one establishment step. The task will be executed later as a\n"
+        "recurring scheduled goal.\n\n"
+        "TASK INTENTION:\n{intention}\n\n"
+        "CURRENT PHASE: {phase}\n\n"
+        "MILESTONES COMPLETED:\n{milestones}\n\n"
+        "ACCUMULATED FINDINGS:\n{findings}\n\n"
+        "MOST RECENT MILESTONE RESULT:\n{last_result}\n\n"
+        "PHASES (in typical order):\n"
+        "  specification — Clarify requirements with the user via `ask`. What exactly should\n"
+        "    the task do? What parameters, thresholds, or preferences matter? The goal you\n"
+        "    submit should use `ask` to have a conversation with the user, then store the\n"
+        "    collected answers in the task WIP note.\n"
+        "  capability_evaluation — Test whether the needed tools/data sources actually work.\n"
+        "    E.g., can we fetch the right emails? Can we access the web page? Submit a small\n"
+        "    probe goal that tries the key operation and reports what it found.\n"
+        "  infrastructure_setup — Create any persistent collections, notes, or other state\n"
+        "    the recurring task will need. E.g., create a digest collection, a tracking note.\n"
+        "  activation — All establishment is done. Move to COMPLETE.\n"
+        "  complete — The task is fully established and ready to be scheduled.\n\n"
+        "Determine what to do next. Your options are:\n"
+        "1. SUBMIT_GOAL: Submit a SHORT, FOCUSED milestone goal (one establishment step).\n"
+        "   Keep goal text concise — one clear objective, not a multi-step execution plan.\n"
+        "2. FALL_BACK: A previous milestone result was unexpected. Describe what to revisit.\n"
+        "3. COMPLETE: The task is fully established. Provide a summary.\n\n"
+        "Respond in this exact format:\n"
+        "ACTION: <SUBMIT_GOAL | FALL_BACK | COMPLETE>\n"
+        "PHASE: <which phase this belongs to>\n"
+        "GOAL_TEXT: <full goal text if SUBMIT_GOAL, or explanation if FALL_BACK/COMPLETE>\n"
+    )
+
+    def _advance_task_wip(self):
+        """Milestone decision: read WIP, call llm_generate, parse, act."""
+        wip = self._read_task_wip()
+        if not wip:
+            logger.warning('Task WIP read failed; clearing active_task_wip')
+            self.active_task_wip = None
+            return
+
+        # Format milestones and findings for prompt
+        milestones = wip.get("milestones_completed", [])
+        milestones_text = "None yet" if not milestones else "\n".join(
+            f"- [{m.get('status', '?')}] {m.get('goal_text', '')[:120]}: {m.get('result_summary', '')[:200]}"
+            for m in milestones
+        )
+        findings = wip.get("accumulated_findings", [])
+        findings_text = "None yet" if not findings else "\n".join(f"- {f}" for f in findings)
+
+        # Last milestone result
+        if milestones:
+            last = milestones[-1]
+            last_result = f"[{last.get('status', '?')}] {last.get('result_summary', 'No details')[:300]}"
+        else:
+            last_result = "None — this is the first milestone"
+
+        # Spiral detection: if last 2+ milestones failed in the same phase, warn the LLM
+        spiral_warning = ""
+        if len(milestones) >= 2:
+            recent_failed = []
+            for m in reversed(milestones):
+                if m.get("status") == "failed":
+                    recent_failed.append(m)
+                else:
+                    break
+            if len(recent_failed) >= 2:
+                spiral_warning = (
+                    f"\n⚠ REPEATED FAILURES: The last {len(recent_failed)} milestones in this phase "
+                    f"all failed. Do NOT retry the same approach. Instead:\n"
+                    f"  - Record what was learned as a finding (e.g., 'tool X does not support Y')\n"
+                    f"  - Move to the next phase with what you have, OR\n"
+                    f"  - COMPLETE with a note about the limitation\n"
+                    f"Do NOT submit another goal that is substantially similar to the failed ones.\n"
+                )
+
+        prompt = self._ADVANCE_TASK_PROMPT.format(
+            intention=wip.get("intention", ""),
+            phase=wip.get("phase", "specification"),
+            milestones=milestones_text,
+            findings=findings_text,
+            last_result=last_result,
+        )
+        if spiral_warning:
+            prompt += spiral_warning
+
+        try:
+            resp = self.llm_generate([prompt], max_tokens=500, temperature=0.3)
+            resp_text = getattr(resp, 'text', '') if hasattr(resp, 'text') else str(resp)
+        except Exception as e:
+            logger.error(f'Task WIP llm_generate failed: {e}')
+            self._say_to_user(f"Task milestone planning failed: {e}")
+            self.active_task_wip = None
+            return
+
+        # Parse response
+        action_match = re.search(r'ACTION:\s*(SUBMIT_GOAL|FALL_BACK|COMPLETE)', resp_text)
+        phase_match = re.search(r'PHASE:\s*(\S+)', resp_text)
+        goal_match = re.search(r'GOAL_TEXT:\s*(.+)', resp_text, re.DOTALL)
+
+        action = action_match.group(1) if action_match else None
+        new_phase = phase_match.group(1) if phase_match else wip.get("phase", "specification")
+        goal_text = goal_match.group(1).strip() if goal_match else ""
+
+        logger.info(f'📋 Task WIP advance: action={action} phase={new_phase} goal_text="{goal_text[:80]}"')
+
+        if action == "SUBMIT_GOAL" and goal_text:
+            # Update WIP phase and current_milestone
+            wip["phase"] = new_phase
+            wip["current_milestone"] = goal_text[:200]
+            self._update_task_wip(wip)
+
+            # Create scheduled goal with task_wip_id linkage
+            scheduled_goal = self._upsert_scheduled_goal(goal_text)
+            goal_id = scheduled_goal["goal_id"]
+            scheduled_goal["task_wip_id"] = wip.get("task_wip_id", "")
+            self._save_scheduled_goal(scheduled_goal)
+
+            self._active_scheduled_goal_id = goal_id
+            self._update_scheduled_goal(goal_id, is_running=True, status="running")
+            pre_resource_ids = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
+
+            def _run_milestone_goal():
+                result = self.parse_and_set_goal("", goal_text) or {}
+                self._set_scheduled_goal_result(goal_id, result, used_cache=False, pre_resource_ids=pre_resource_ids)
+                return result
+
+            self.active_task_wip_waiting = True
+            self._run_goal_on_thread(_run_milestone_goal)
+
+        elif action == "FALL_BACK":
+            # Remove last milestone and revert phase
+            if milestones:
+                wip["milestones_completed"] = milestones[:-1]
+            wip["phase"] = new_phase
+            wip["accumulated_findings"].append(f"Fell back: {goal_text[:200]}")
+            self._update_task_wip(wip)
+            logger.info(f'📋 Task WIP: fell back — {goal_text[:80]}')
+            # Loop will re-enter _advance_task_wip on next tick
+
+        elif action == "COMPLETE":
+            self._complete_task_wip(wip, goal_text)
+
+        else:
+            logger.warning(f'Task WIP: unparseable LLM response, aborting task')
+            logger.warning(f'Response was: {resp_text[:500]}')
+            self._say_to_user("Task establishment failed: could not determine next step.")
+            self.active_task_wip = None
+
+    def _complete_task_wip(self, wip: Dict[str, Any], summary: str):
+        """Finalize task: create scheduled goal and update WIP Note."""
+        intention = wip.get("intention", "")
+
+        # Ask LLM to synthesize the operational goal from accumulated findings
+        synth_prompt = (
+            f"A task has been fully specified. Synthesize an operational goal that can be executed recurring.\n\n"
+            f"INTENTION: {intention}\n"
+            f"FINDINGS: {json.dumps(wip.get('accumulated_findings', []))}\n"
+            f"MILESTONES: {json.dumps([m.get('goal_text', '') for m in wip.get('milestones_completed', [])])}\n\n"
+            f"Respond with:\n"
+            f"GOAL_TEXT: <the full recurring goal instruction>\n"
+            f"NAME: <short display name, max 60 chars>\n"
+            f"SCHEDULE: <manual | daily | recurring>\n"
+        )
+        try:
+            resp = self.llm_generate([synth_prompt], max_tokens=300, temperature=0.3)
+            resp_text = getattr(resp, 'text', '') if hasattr(resp, 'text') else str(resp)
+        except Exception as e:
+            logger.error(f'Task WIP completion synth failed: {e}')
+            resp_text = f"GOAL_TEXT: {intention}\nNAME: {intention[:60]}\nSCHEDULE: manual"
+
+        goal_match = re.search(r'GOAL_TEXT:\s*(.+?)(?:\n|$)', resp_text)
+        name_match = re.search(r'NAME:\s*(.+?)(?:\n|$)', resp_text)
+        sched_match = re.search(r'SCHEDULE:\s*(\S+)', resp_text)
+
+        op_goal_text = goal_match.group(1).strip() if goal_match else intention
+        op_name = name_match.group(1).strip()[:60] if name_match else intention[:60]
+        schedule_mode = sched_match.group(1).strip().lower() if sched_match else "manual"
+        if schedule_mode not in ("manual", "daily", "recurring", "auto"):
+            schedule_mode = "manual"
+
+        # Create the operational scheduled goal
+        scheduled_goal = self._upsert_scheduled_goal(op_goal_text)
+        goal_id = scheduled_goal["goal_id"]
+        scheduled_goal["name"] = op_name
+        scheduled_goal["name_customized"] = True
+        scheduled_goal["schedule_mode"] = schedule_mode
+        scheduled_goal["task_context_note"] = self.active_task_wip
+        self._save_scheduled_goal(scheduled_goal)
+
+        # Update WIP Note to completed
+        wip["status"] = "completed"
+        wip["phase"] = "complete"
+        wip["scheduled_goal_id"] = goal_id
+        wip["completion_summary"] = summary
+        self._update_task_wip(wip)
+
+        self.active_task_wip = None
+        self.active_task_wip_waiting = False
+        logger.info(f'📋 Task established: {op_name} (goal_id={goal_id}, schedule={schedule_mode})')
+        self._say_to_user(
+            f"Task established: {op_name}\n"
+            f"Schedule: {schedule_mode}\n"
+            f"Goal: {op_goal_text[:200]}"
+        )
 
     # ── Chat-mode response (lightweight, no planning pipeline) ────────────
 
@@ -3059,7 +3539,21 @@ class ZenohExecutiveNode:
 
             # Handle special commands from User BEFORE processing as dialog
             if source == 'User':
-                if _is_goal_cmd(clean_input):
+                # Task establishment prefix
+                if clean_input.lower().startswith('task:'):
+                    task_text = clean_input[5:].strip()
+                    if not task_text:
+                        self._say_to_user("Please provide a task description after 'task:'.")
+                        return
+                    if self.active_task_wip:
+                        self._say_to_user("A task is already being established. Please wait for it to complete.")
+                        return
+                    if self._is_goal_running():
+                        self._say_to_user("A goal is currently running. Please wait for it to complete.")
+                        return
+                    self._begin_task_establishment(task_text)
+                    return
+                elif _is_goal_cmd(clean_input):
                     goal_preview = clean_input[:80] + ('...' if len(clean_input) > 80 else '')
                     logger.info(f'📥 {self.character_name} Received goal: "{goal_preview}"')
                     self.conversation_store.close_dialog("User")
@@ -3950,7 +4444,9 @@ class ZenohExecutiveNode:
             self.execution_paused = True
             # Note: continuous_mode is NOT cleared here - user must toggle it off explicitly
             self.awaiting_user_input = False  # Clear awaiting flag
-            self.awaiting_ask_response = False
+            if self.awaiting_ask_response:
+                self.awaiting_ask_response = False
+                self._ask_response_queue.put(None)  # Sentinel to unblock _execute_ask
             self._publish_execution_state()
         except Exception as e:
             logger.error(f'Error handling stop command: {e}')
@@ -3968,6 +4464,9 @@ class ZenohExecutiveNode:
             self.execution_paused = True
             # Note: continuous_mode is NOT cleared here - user must toggle it off explicitly
             self.awaiting_user_input = False
+            if self.awaiting_ask_response:
+                self.awaiting_ask_response = False
+                self._ask_response_queue.put(None)  # Sentinel to unblock _execute_ask
             self._publish_execution_state()
         except Exception as e:
             logger.error(f'Error handling interrupt command: {e}')
@@ -4474,6 +4973,42 @@ class ZenohExecutiveNode:
             response = {"success": False, "error": str(e)}
             query.reply(query.key_expr, json.dumps(response).encode("utf-8"))
     
+    def _task_wips_query_handler(self, query):
+        """Handle query for task WIP notes."""
+        try:
+            tasks = []
+            if self.resource_manager:
+                for name, note_id in list(self.resource_manager.named_notes.items()):
+                    if not name.startswith("_task_wip_"):
+                        continue
+                    note_data = self.resource_manager.resource_registry.get(note_id)
+                    if not note_data:
+                        continue
+                    content = note_data.get("properties", {}).get("content", "")
+                    if not content:
+                        continue
+                    try:
+                        wip = json.loads(content) if isinstance(content, str) else {}
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+                    wip["_note_name"] = name
+                    wip["_note_id"] = note_id
+                    wip["_is_active"] = (name == self.active_task_wip)
+                    # Find associated scheduled goal (the final recurring one)
+                    for goal in self._all_scheduled_goals():
+                        if goal.get("task_context_note") == name:
+                            wip["_scheduled_goal_id"] = goal.get("goal_id", "")
+                            wip["_scheduled_goal_name"] = goal.get("name", "")
+                            break
+                    tasks.append(wip)
+            tasks.sort(key=lambda t: t.get("created", ""), reverse=True)
+            response = {"success": True, "tasks": tasks}
+            query.reply(query.key_expr, json.dumps(response).encode("utf-8"))
+        except Exception as e:
+            logger.error(f"Error in task_wips query handler: {e}")
+            response = {"success": False, "error": str(e)}
+            query.reply(query.key_expr, json.dumps(response).encode("utf-8"))
+
     def _world_state_query_handler(self, query):
         """Handle query for current world state."""
         try:
