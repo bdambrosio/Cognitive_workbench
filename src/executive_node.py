@@ -3024,7 +3024,7 @@ class ZenohExecutiveNode:
         "MILESTONES COMPLETED:\n{milestones}\n\n"
         "ACCUMULATED FINDINGS:\n{findings}\n\n"
         "MOST RECENT MILESTONE RESULT:\n{last_result}\n\n"
-        "PHASES (in typical order):\n"
+        "PHASES (in required order — you MUST visit each phase before moving to the next):\n"
         "  specification — Clarify requirements with the user via `ask`. What exactly should\n"
         "    the task do? What parameters, thresholds, or preferences matter? The goal you\n"
         "    submit should use `ask` to have a conversation with the user and return the\n"
@@ -3033,10 +3033,18 @@ class ZenohExecutiveNode:
         "  capability_evaluation — Test whether the needed tools/data sources actually work.\n"
         "    E.g., can we fetch the right emails? Can we access the web page? Submit a small\n"
         "    probe goal that tries the key operation and reports what it found.\n"
-        "  infrastructure_setup — Create any persistent collections, notes, or other state\n"
-        "    the recurring task will need. E.g., create a digest collection, a tracking note.\n"
+        "  infrastructure_setup — Create any persistent notes, collections, or other state\n"
+        "    the recurring task will need. If the task mentions creating or updating a named\n"
+        "    Note or Collection, create it now. E.g., create a digest collection, a tracking\n"
+        "    note, a named Note for storing results. Even if the phase has minimal work,\n"
+        "    submit a goal that creates/verifies the required resources exist.\n"
         "  activation — All establishment is done. Move to COMPLETE.\n"
         "  complete — The task is fully established and ready to be scheduled.\n\n"
+        "PHASE RULES:\n"
+        "- You may only advance to the NEXT phase (no skipping).\n"
+        "- COMPLETE is only valid from the activation phase.\n"
+        "- If a phase has nothing to do, submit a brief milestone that records\n"
+        "  'no setup needed' and advances to the next phase.\n\n"
         "Determine what to do next. Your options are:\n"
         "1. SUBMIT_GOAL: Submit a SHORT, FOCUSED milestone goal (one establishment step).\n"
         "   Keep goal text concise — one clear objective, not a multi-step execution plan.\n"
@@ -3123,6 +3131,31 @@ class ZenohExecutiveNode:
 
         logger.info(f'📋 Task WIP advance: action={action} phase={new_phase} goal_text="{goal_text[:80]}"')
 
+        # Phase ordering enforcement
+        _PHASE_ORDER = ["specification", "capability_evaluation", "infrastructure_setup", "activation", "complete"]
+        current_phase = wip.get("phase", "specification")
+        cur_idx = _PHASE_ORDER.index(current_phase) if current_phase in _PHASE_ORDER else 0
+        new_idx = _PHASE_ORDER.index(new_phase) if new_phase in _PHASE_ORDER else cur_idx
+
+        if action == "COMPLETE" and current_phase != "activation":
+            # Block premature completion — force through remaining phases
+            next_idx = min(cur_idx + 1, len(_PHASE_ORDER) - 2)  # cap at activation
+            forced_phase = _PHASE_ORDER[next_idx]
+            logger.info(f'📋 Task WIP: COMPLETE rejected from phase {current_phase}, advancing to {forced_phase}')
+            wip["phase"] = forced_phase
+            wip["accumulated_findings"].append(
+                f"Skipped to {forced_phase}: COMPLETE attempted from {current_phase}"
+            )
+            self._update_task_wip(wip)
+            # Loop will re-enter _advance_task_wip on next tick
+            return
+
+        if action == "SUBMIT_GOAL" and new_idx > cur_idx + 1:
+            # Block phase skipping — cap advance to next phase
+            capped_phase = _PHASE_ORDER[cur_idx + 1]
+            logger.info(f'📋 Task WIP: phase skip {current_phase}→{new_phase} capped to {capped_phase}')
+            new_phase = capped_phase
+
         if action == "SUBMIT_GOAL" and goal_text:
             # Update WIP phase and current_milestone
             wip["phase"] = new_phase
@@ -3179,7 +3212,8 @@ class ZenohExecutiveNode:
             f"MILESTONES: {json.dumps([m.get('goal_text', '') for m in wip.get('milestones_completed', [])])}\n\n"
             f"Respond with:\n"
             f"GOAL_TEXT: <the full recurring goal instruction>\n"
-            f"NAME: <short display name, max 60 chars>\n"
+            f"NAME: <distinctive name that captures the specific data source AND target artifact,\n"
+            f"  e.g. 'HF Daily Papers → Agent Architecture Notes', max 60 chars>\n"
             f"SCHEDULE: <manual | daily | recurring>\n"
         )
         try:
@@ -3205,6 +3239,9 @@ class ZenohExecutiveNode:
         scheduled_goal["name"] = op_name
         scheduled_goal["name_customized"] = True
         scheduled_goal["schedule_mode"] = schedule_mode
+        # Daily goals need a run_at time or they're never eligible for auto-execution
+        if schedule_mode == "daily" and not scheduled_goal.get("run_at"):
+            scheduled_goal["run_at"] = "09:00"
         scheduled_goal["task_context_note"] = self.active_task_wip
         self._save_scheduled_goal(scheduled_goal)
 
