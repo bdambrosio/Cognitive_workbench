@@ -1747,10 +1747,11 @@ Only provide the result, followed by the </end> tag.""")
                 chat_messages = [{"role": "user", "content": str(messages)}]
             
             # Prepare payload (OpenRouter uses OpenAI-compatible format)
+            reasoning_buffer = 500
             payload = {
                 "model": model,
                 "messages": chat_messages,
-                "max_tokens": max_tokens,
+                "max_tokens": max_tokens + reasoning_buffer,
                 "temperature": temperature,
                 "reasoning": {"effort": "low"},
                 "top_p": 1.0,

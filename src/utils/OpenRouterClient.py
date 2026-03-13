@@ -38,11 +38,12 @@ class OpenRouterClient():
         max_retries = 3
         for attempt in range(max_retries):
             try:
+                reasoning_buffer = 500
                 payload = {
                     "model": model,
                     "messages": prompt,
                     "reasoning": {"effort": "low"},
-                    "max_tokens": max_tokens,
+                    "max_tokens": max_tokens + reasoning_buffer,
                     "temperature": temperature,
                     "top_p": top_p,
                     "stop": stops,

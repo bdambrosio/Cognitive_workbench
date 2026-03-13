@@ -166,70 +166,20 @@ except ImportError:
 
 
 REFLECTION_FRAME_SCHEMA = {
-  "ReflectionFrame": {
-    "version": "2.0",
-
-    "_size_limits": {
-      "task_state.active_hypotheses": 6,
-      "task_state.proven_safe_paths": 6,
-      "task_state.exhausted_search.locations": 6,
-      "task_state.exhausted_search.objects": 6,
-      "task_state.exhausted_search.actions": 6,
-      "world_model_updates": 10,
-      "tool_insights": 6,
-      "context_forget": 8,
-      "open_questions": 4
-    },
-
-    "failure_mode": "incorrect_task_interpretation | incorrect_world_assumption | missing_affordance | tool_limitation_or_misbehavior | exhausted_or_misdirected_search",
-
-    "failure_evidence": ["string"],
-
-    "task_state": {
-      "summary": "string",
-      "immediate_blockers": ["string"],
-      "active_hypotheses": ["string"],
-      "proven_safe_paths": ["string"],
-      "exhausted_search": {
-        "locations": ["string"],
-        "objects": ["string"],
-        "actions": ["string"]
-      }
-    },
-
-    "world_model_updates": [
-      {
-        "fact": "string",
-        "polarity": "support | contradict",
-        "source": "observation | tool_guarantee",
-        "evidence": "string"
-      }
-    ],
-
-    "tool_insights": [
-      {
-        "tool": "string",
-        "insight": "string",
-        "status": "reliable | unreliable | constrained",
-        "evidence": "string"
-      }
-    ],
-
-    "context_forget": [
-      {
-        "item": "string",
-        "reason": "obsolete | goal_specific | location_specific | superseded"
-      }
-    ],
-
-    "open_questions": [
-      {
-        "question": "string",
-        "priority": "low | medium | high",
-        "requires_environment_interaction": True
-      }
-    ]
-  }
+  "world_model_updates": [
+    {
+      "fact": "string  -- general, reusable world fact (NOT tool behavior, NOT agent state)",
+      "polarity": "support | contradict",
+      "source": "observation | tool_guarantee"
+    }
+  ],
+  "tool_insights": [
+    {
+      "tool": "string  -- tool name",
+      "insight": "string  -- contract, limit, precondition, or failure mode",
+      "status": "reliable | unreliable | constrained"
+    }
+  ]
 }
 
 INCREMENTAL_PLAN_SPECIFICATIONS = """
@@ -4624,7 +4574,6 @@ class IncrementalPlanner:
             return {
                 'plan': None,
                 'response': final_answer,
-                'task_state': None,
                 'success': success,
                 'quality_status': quality_status,
                 'verification_answer': verification_answer,
@@ -4746,17 +4695,11 @@ class IncrementalPlanner:
             tool_model.build_task_tool_index()  # Rebuild so next plan sees fresh experience
             compressed_trace = _compress_trace(trace_str)
             reflection_frame = self._reflect(goal, world_model, max_steps, compressed_trace)
-            
-            # Extract inner ReflectionFrame content (LLM returns wrapped in 'ReflectionFrame' key)
-            reflection_content = reflection_frame.get('ReflectionFrame', reflection_frame)
-            task_state = reflection_content.get('task_state', {})
-            self._last_task_state = task_state
-            
-            # Update world_model from reflection_frame
+
+            # Update world_model from reflection
             if hasattr(self.executor, 'world_model') and self.executor.world_model:
-                self.executor.world_model.update(reflection_content)
+                self.executor.world_model.update(reflection_frame)
                 self.executor.world_model.save()
-                # Get updated world_model snapshot
                 world_model = self.executor.world_model.get()
             else:
                 logger.warning("WorldModel not available, skipping update")
@@ -4773,25 +4716,8 @@ class IncrementalPlanner:
             )
             self._append_jsonl(
                 hist_dir / "reflection_frame.jsonl",
-                {"seq": seq, "ts": now_iso, "agent": agent_name, "world": world_name, "goal": goal, "reflection_frame": reflection_content},
+                {"seq": seq, "ts": now_iso, "agent": agent_name, "world": world_name, "goal": goal, "reflection_frame": reflection_frame},
             )
-            if reflection_content.get("failure_mode") == "missing_affordance":
-                task = reflection_content.get("task_state") or {}
-                self._append_jsonl(
-                    hist_dir / "create_tool_opportunities.jsonl",
-                    {
-                        "seq": seq,
-                        "ts": now_iso,
-                        "agent": agent_name,
-                        "world": world_name,
-                        "goal": goal,
-                        "failure_evidence": reflection_content.get("failure_evidence", []),
-                        "open_questions": reflection_content.get("open_questions", []),
-                        "immediate_blockers": task.get("immediate_blockers", []),
-                        "available_tools": list(self.tools.keys()),
-                        "compressed_trace": compressed_trace,
-                    },
-                )
 
             # Extract plan actions from executor
             plan_actions = getattr(self.executor, '_plan_actions', [])
@@ -4850,7 +4776,6 @@ class IncrementalPlanner:
             return {
                 'plan': plan_actions,
                 'response': final_answer,
-                'task_state': task_state,
                 'success': success,
                 'quality_status': quality_status,
                 'verification_answer': verification_answer,
@@ -4982,225 +4907,39 @@ END_PLAN
 
     def _reflect(self, goal_text, world_model, steps, trace) -> Dict:
         """
-        Reflect on the plan execution outcome.
-        Args:
-            state: SGLang state
-            goal_text: Original goal text
-            world_model: World model from previous attempt
-            steps: Steps used
-            trace: Trace (str(s) from tool_planner_infospace.run())
-        Returns:
-            world_model: Revised world model
+        Reflect on plan execution. Extract general world facts and tool insights.
+        Returns dict with world_model_updates[] and tool_insights[].
         """
 
-        reflection_prompt = """ROLE
-You are a REFLECTION ANALYST inside the Cognitive Workbench.
+        reflection_prompt = """Extract GENERAL lessons from this execution trace. Output a single JSON object.
 
-You do NOT act.
-You do NOT plan.
-You do NOT invent knowledge.
+GOAL: {goal_text}
+STEPS USED: {steps}
 
-Your sole responsibility is to analyze ONE completed planner attempt and produce a
-ReflectionFrame that constrains future cognition correctly.
-
-You may reason internally, but your FINAL OUTPUT MUST BE A SINGLE VALID JSON OBJECT
-conforming EXACTLY to the ReflectionFrame schema provided by the runtime.
-
-============================================================
-AUTHORITATIVE INPUTS
-============================================================
-
-1) PREVIOUS TASK STATE (JSON)
-----------------------------
-{task_state}
-
-This is ephemeral, goal-scoped working memory from the prior attempt.
-It exists ONLY to support continuation of the SAME goal.
-
-2) PREVIOUS WORLD MODEL (JSON)
-------------------------------
+WORLD MODEL (existing knowledge):
 {world_model}
 
-This is persistent, cross-goal knowledge.
-You must treat it as stable and conservative.
-You are NOT authorized to forget or overwrite it wholesale.
-
-3) FULL EXECUTION TRACE (VERBATIM)
-----------------------------------
+EXECUTION TRACE:
 {trace}
 
-This is evidence, not memory.
-All claims must be grounded in this trace.
+RULES:
+- world_model_updates: only GENERAL facts that hold across different goals/times.
+  Do NOT include: agent state, current location, task-specific observations, tool behavior.
+  Use polarity="contradict" if the trace disproves an existing world model fact.
+  It is often correct to return an empty list.
+- tool_insights: contracts, limits, preconditions, or failure modes discovered about tools.
+  State as constraints, not praise. Only include if genuinely useful for future planning.
 
-4) ORIGINAL GOAL TEXT
----------------------
-{goal_text}
-
-5) STEP BUDGET USED
--------------------
-{steps}
-
-============================================================
-OBJECTIVE
-============================================================
-
-Produce a ReflectionFrame that:
-
-A) Updates TASK STATE for the NEXT attempt at THIS SAME goal (if any)
-B) Proposes WORLD MODEL updates ONLY if genuinely general and reusable
-C) Records TOOL INSIGHTS as contracts or constraints (not praise)
-D) Specifies CONTEXT-FORGET instructions to prune the NEXT prompt
-E) Adds CONTRADICTION evidence only via world_model_updates with polarity="contradict"
-
-Your output must be minimal, conservative, and behavior-constraining.
-
-============================================================
-CRITICAL EPISTEMIC RULES (READ CAREFULLY)
-============================================================
-
-1) EPHEMERAL VS PERSISTENT
-- Task-specific, time-specific, or location-specific facts MUST NOT enter the world model.
-- World model facts must remain true under DIFFERENT goals and later time.
-
-2) PROMOTION THRESHOLD
-DO NOT promote world facts that describe:
-- current agent state (health, food, idle, inventory)
-- current location or coordinates
-- current absence of objects
-- single observations from a trivial task
-
-A trivial or already-completed goal should produce FEW or ZERO world model updates.
-
-3) TOOL INSIGHTS
-Tool insights must be stated as:
-- guarantees
-- limits
-- preconditions
-- failure modes
-
-NOT qualitative descriptions or praise.
-
-4) TASK COMPLETION COLLAPSE
-If the goal was COMPLETED:
-- task_state MUST collapse to a minimal summary
-- active hypotheses SHOULD be empty
-- exhausted_search SHOULD be empty
-- no new task continuations should be implied
-
-5) CONTEXT FORGETTING AUTHORITY
-You MAY request forgetting of:
-- coordinates
-- local observations
-- trace details
-- temporary hypotheses
-- report text
-- previous task_state
-
-You MUST NOT request forgetting of:
-- the world model as a whole
-- tool contracts
-- invariants
-- cross-goal knowledge
-
-6) FAILURE MODE HONESTY
-If the goal was completed successfully, use:
-- failure_mode = "none"
-
-Minor recoveries or clarifications do NOT count as failures.
-
-============================================================
-REFLECTION PROCESS (FOLLOW IN ORDER)
-============================================================
-
-STEP 1 — Outcome Classification
-Determine whether the goal was:
-- completed successfully
-- incomplete
-- failed
-
-Select the appropriate failure_mode.
-Cite concrete trace evidence.
-
-STEP 2 — TASK STATE UPDATE (EPHEMERAL)
-Update ONLY what should bias the NEXT attempt at THIS SAME goal.
-
-Include:
-- brief summary
-- immediate blockers (if any)
-- active hypotheses (max 6, omit if goal complete)
-- proven safe anchors or paths (if relevant)
-- exhausted search (only if it matters for continuation)
-
-If the goal is complete, keep this section minimal.
-
-STEP 3 — WORLD MODEL UPDATE CANDIDATES (CONSERVATIVE)
-Propose world facts ONLY if they:
-- generalize across goals
-- are not tied to current agent state
-- reflect stable properties of the world (mechanics, structures, affordances)
-
-Each fact must be atomic, general, and reusable.
-If uncertain, do NOT promote.
-
-IMPORTANT: world_model_updates are EVIDENCE EVENTS, not belief labels.
-- polarity="support": the trace provides positive evidence the general fact holds.
-- polarity="contradict": the trace provides evidence the general fact is false or has a counterexample.
-- Do NOT output confidence/stability labels. Those are computed downstream from accumulated evidence.
-- WORLD FACTS ONLY: world_model_updates MUST NOT describe tool behavior and MUST NOT mention tool names.
-  - Bad (tool behavior): "path-explore can successfully navigate to frontier cells"
-  - Good (world fact): "Frontier cells may be obstructed even if adjacent cells look reachable"
-  - If a statement involves a specific tool (e.g., "mc-dig", "path-explore", "nav-*"), it belongs in tool_insights, not world_model_updates.
-
-It is acceptable — and often correct — to propose NO world updates.
-
-STEP 4 — TOOL INSIGHTS (META-COGNITION)
-Record any discovered tool properties that would constrain future planning:
-- guarantees
-- limits
-- misleading success signals
-- required preconditions
-
-Each insight must be stated as a contract or constraint.
-
-STEP 5 — CONTRADICTION VS CONTEXT FORGETTING
-- If the trace provides a counterexample to a GENERAL belief, add a world_model_updates entry with polarity="contradict".
-- CONTEXT_FORGET only episode- or goal-specific material to omit from the NEXT prompt.
-
-Never request forgetting of the world model itself.
-
-STEP 6 — OPEN QUESTIONS (OPTIONAL)
-List up to 4 precise, testable questions that would reduce uncertainty.
-Omit if none are needed.
-
-============================================================
-OUTPUT REQUIREMENTS (STRICT)
-============================================================
-
-- Output MUST be a SINGLE VALID JSON OBJECT
-- MUST conform EXACTLY to the ReflectionFrame schema
-- NO extra keys
-- NO explanations outside JSON
-- Prefer omission over verbosity
-- When in doubt, promote NOTHING
-
-============================================================
-OUTPUT (JSON ONLY)
-============================================================
-
-REFLECTION_FRAME_SCHEMA:
+OUTPUT SCHEMA (JSON only, no other text):
 {REFLECTION_FRAME_SCHEMA}
 """
-        # Convert world_model to JSON string to avoid format() interpreting braces as placeholders
-        task_state = getattr(self, "_last_task_state", {}) or {}
-        world_model = json.dumps(world_model, indent=2) if isinstance(world_model, dict) else str(world_model)
-        task_state = json.dumps(task_state, indent=2) if isinstance(task_state, dict) else str(task_state)
-        reflection_prompt = reflection_prompt.replace("{task_state}", task_state)
-        reflection_prompt = reflection_prompt.replace("{world_model}", world_model)
+        world_model_str = json.dumps(world_model, indent=2) if isinstance(world_model, dict) else str(world_model)
+        reflection_prompt = reflection_prompt.replace("{world_model}", world_model_str)
         reflection_prompt = reflection_prompt.replace("{goal_text}", goal_text)
         reflection_prompt = reflection_prompt.replace("{steps}", str(steps))
         reflection_prompt = reflection_prompt.replace("{REFLECTION_FRAME_SCHEMA}", json.dumps(REFLECTION_FRAME_SCHEMA, indent=2))
         reflection_prompt = reflection_prompt.replace("{trace}", trace)
-        reflection = self.executor.llm_generate(reflection_prompt, max_tokens=4096, is_json=True, temperature=0.0)
+        reflection = self.executor.llm_generate(reflection_prompt, max_tokens=1024, is_json=True, temperature=0.0)
 
         if reflection.text is None:
             logger.warning("Reflection LLM returned None (JSON parse failed or empty response); returning empty frame")
