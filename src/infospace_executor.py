@@ -96,7 +96,7 @@ class InfospaceExecutor:
         # vLLM config (set by executive_node if vLLM is used)
         self.vllm_model = None
         self.vllm_url = None
-        self.reasoning_config = None  # e.g. {"effort": "low"}, set from llm_config
+        self.extra_request_params = {}  # arbitrary params merged into LLM API payloads, set from llm_config
         
         # OpenAI API config (set by executive_node if OpenAI is used)
         self.openai_model = None
@@ -1410,7 +1410,7 @@ Only provide the result, followed by the </end> tag.""")
             # Convert messages to chat format
             if isinstance(messages, list):
                 # If list of strings, convert to messages array
-                chat_messages = [{"role": "system", "content": "Do not include reasoning, analysis, justification, or explanation. Respond only with the final answer."}]
+                chat_messages = []
                 for msg in messages:
                     if isinstance(msg, str):
                         # Simple heuristic: if starts with system/user/assistant markers, parse them
@@ -1434,25 +1434,32 @@ Only provide the result, followed by the </end> tag.""")
                 chat_messages = [{"role": "user", "content": str(messages)}]
             
             # Prepare payload
+            has_reasoning = "reasoning" in self.extra_request_params
             payload = {
                 "model": model,
                 "messages": chat_messages,
-                "max_tokens": max_tokens + (256 if self.reasoning_config else 0),
+                "max_tokens": max_tokens + (256 if has_reasoning else 0),
                 "temperature": temperature,
             }
-            if self.reasoning_config:
-                payload["reasoning"] = self.reasoning_config
+            # Merge extra_request_params into payload
+            # 'extra_body' contents are flattened into top-level (SDK convention → raw HTTP)
+            if self.extra_request_params:
+                for k, v in self.extra_request_params.items():
+                    if k == "extra_body" and isinstance(v, dict):
+                        payload.update(v)
+                    else:
+                        payload[k] = v
             if stops:
                 if isinstance(stops, list):
                     payload["stop"] = stops
                 else:
                     payload["stop"] = [stops]
 
-            
-            
             # Call vLLM API
             logger.debug(f"Calling vLLM API: {url} with model {model}")
             response = requests.post(url, json=payload, timeout=120)
+            if not response.ok:
+                logger.error(f"vLLM API error response body: {response.text[:500]}")
             response.raise_for_status()  # Fail fast
             
             result = response.json()
@@ -1747,16 +1754,23 @@ Only provide the result, followed by the </end> tag.""")
                 chat_messages = [{"role": "user", "content": str(messages)}]
             
             # Prepare payload (OpenRouter uses OpenAI-compatible format)
-            reasoning_buffer = 500
+            has_reasoning = "reasoning" in self.extra_request_params
             payload = {
                 "model": model,
                 "messages": chat_messages,
-                "max_tokens": max_tokens + reasoning_buffer,
+                "max_tokens": max_tokens + (500 if has_reasoning else 0),
                 "temperature": temperature,
-                "reasoning": {"effort": "low"},
                 "top_p": 1.0,
                 "stream": False,
             }
+            # Merge extra_request_params into payload
+            # 'extra_body' contents are flattened into top-level (SDK convention → raw HTTP)
+            if self.extra_request_params:
+                for k, v in self.extra_request_params.items():
+                    if k == "extra_body" and isinstance(v, dict):
+                        payload.update(v)
+                    else:
+                        payload[k] = v
             if stops:
                 if isinstance(stops, list):
                     payload["stop"] = stops

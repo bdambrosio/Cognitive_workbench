@@ -3649,7 +3649,11 @@ ALWAYS follow all formatting instructions exactly.
         compressed_for_llm = _build_compressed_prompt(prompt, keep_last_n_steps=2) if step >= 3 else None
         code_raw = vllm_gen(f"code_block_{step}", prompt, state, max_tokens=2048, temperature=GEN_TEMPERATURE, stop=["\n```"], executor=executor, llm_prompt=compressed_for_llm, reasoning_effort="medium")
         prompt += code_raw + "\n```\n"
+        # Strip echoed code fences if model includes them
         code_text = code_raw.strip()
+        import re as _re
+        code_text = _re.sub(r'^```(?:python)?\s*', '', code_text)
+        code_text = _re.sub(r'```\s*$', '', code_text).rstrip()
         
         logger.info(f"Step {step}: Code block ({len(code_text)} chars):\n{code_text}")
         call_count = count_codegen_action_calls(code_text)
@@ -3726,6 +3730,33 @@ ALWAYS follow all formatting instructions exactly.
         verification_val = _strip_think_tags(_extract_between_labels(stage3_block, "VERIFICATION:", "NEXT_TASK:"))
         next_task_val = _strip_numbered_prefix(_strip_think_tags(_extract_between_labels(stage3_block, "NEXT_TASK:", "REQUEST_TOOLS:")))
         request_tools_val = _strip_numbered_prefix(_strip_think_tags(_extract_after_label(stage3_block, "REQUEST_TOOLS:").strip()))
+
+        # JSON fallback: some models output Stage 3 as JSON instead of label format
+        if not done_val:
+            try:
+                import json as _json
+                stage3_json = _json.loads(_extract_braced_json_object(stage3_block))
+                if isinstance(stage3_json, dict):
+                    thoughts_val = thoughts_val or str(stage3_json.get("thoughts", ""))
+                    eval_target_val = eval_target_val or str(stage3_json.get("eval_target", ""))
+                    done_raw_json = stage3_json.get("done", "")
+                    # Normalize JSON booleans: true → "YES", false → "NO"
+                    if done_raw_json is True:
+                        done_val = "YES"
+                    elif done_raw_json is False:
+                        done_val = "NO"
+                    else:
+                        done_val = str(done_raw_json)
+                    verification_val = verification_val or str(stage3_json.get("verification", ""))
+                    next_task_val = next_task_val or str(stage3_json.get("next_task", ""))
+                    rt = stage3_json.get("request_tools", [])
+                    if isinstance(rt, list):
+                        request_tools_val = request_tools_val or _json.dumps(rt)
+                    else:
+                        request_tools_val = request_tools_val or str(rt)
+                    logger.info(f"Step {step}: Stage 3 parsed via JSON fallback (DONE={done_val})")
+            except (ValueError, KeyError, TypeError):
+                pass
 
         state[f"thoughts_{step}"] = thoughts_val
         state[f"eval_target_{step}"] = eval_target_val

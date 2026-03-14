@@ -480,7 +480,13 @@ class ZenohExecutiveNode:
         openrouter_model_path = llm_config.get('openrouter_model_path')
         openrouter_provider = llm_config.get('openrouter_provider')
         anthropic_model_path = llm_config.get('anthropic_model_path')
-        self.reasoning_config = llm_config.get('reasoning')  # e.g. {"effort": "low"}
+        # extra_request_params: arbitrary key-value pairs merged into LLM API payloads
+        # Subsumes the old 'reasoning' config key. Supports any backend-specific params
+        # e.g. {"reasoning": {"effort": "low"}, "extra_body": {"chat_template_kwargs": {"enable_thinking": false}}}
+        self.extra_request_params = llm_config.get('extra_request_params', {})
+        # Backwards compatibility: if old 'reasoning' key exists, fold it in
+        if not self.extra_request_params and llm_config.get('reasoning'):
+            self.extra_request_params = {"reasoning": llm_config['reasoning']}
 
         self.runtime = None
         self.llm_client = None
@@ -820,7 +826,7 @@ class ZenohExecutiveNode:
         if self.vllm_model and self.vllm_url:
             self.infospace_executor.vllm_model = self.vllm_model
             self.infospace_executor.vllm_url = self.vllm_url
-            self.infospace_executor.reasoning_config = self.reasoning_config
+        self.infospace_executor.extra_request_params = self.extra_request_params
         if self.openai_model and self.openai_api_key:
             self.infospace_executor.openai_model = self.openai_model
             self.infospace_executor.openai_api_key = self.openai_api_key

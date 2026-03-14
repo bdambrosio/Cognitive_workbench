@@ -167,9 +167,35 @@ def create_sglang_runtime(llm_config: dict):
         logger.info(f"Initializing SGLang Runtime with model: {sgl_model_path}")
         tokenizer = AutoTokenizer.from_pretrained(sgl_model_path)
 
+        # Optional custom chat template (e.g. to suppress thinking mode)
+        chat_template = llm_config.get('chat_template')
+
         if 'NVFP4' in sgl_model_path: # patch for Qwen3.5-122B-A10B-NVFP4 models as of 3/1/2026
             logger.info(f"🚀 Initializing SGLang Runtime with NVFP4 patch!")
-            runtime = sgl.Runtime(model_path=sgl_model_path,device="cuda",context_length=65536,tp_size=1,mem_fraction_static=0.9,quantization="modelopt_fp4",attention_backend="triton")
+            if chat_template:
+                logger.info(f"Using custom chat template: {chat_template}")
+                import os
+                os.environ["SGLANG_DISABLE_DEEP_GEMM"] = "1"
+
+                import sglang as sgl
+
+                runtime = sgl.Runtime(
+                    model_path="txn545/Qwen3.5-122B-A10B-NVFP4",
+                    tp_size=1,
+                    quantization="modelopt_fp4",
+                    attention_backend="triton",
+                    moe_runner_backend="flashinfer_cutlass",
+                    fp4_gemm_runner_backend="flashinfer_cutlass",
+                    mem_fraction_static=0.92,
+                    disable_cuda_graph=True,
+                    disable_radix_cache=True,
+                    kv_cache_dtype="bf16",
+                    context_length=32768,
+                    port=5000,
+                    chat_template=chat_template,
+                )
+                sgl.set_default_backend(runtime)            
+                #runtime = sgl.Runtime(model_path=sgl_model_path,device="cuda",context_length=65536,tp_size=1,mem_fraction_static=0.9,quantization="modelopt_fp4",attention_backend="triton",**({'chat_template': chat_template} if chat_template else {}))
         elif 'FP8' in sgl_model_path:
             logger.info("Initializing SGLang Runtime with FP8 patch")
             runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, dtype="auto", tp_size=1, mem_fraction_static=0.85, attention_backend="triton", fp8_gemm_runner_backend="cutlass")

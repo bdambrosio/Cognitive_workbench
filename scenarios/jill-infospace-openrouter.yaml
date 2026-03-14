@@ -4,8 +4,10 @@ world_config:
   world_name: "infolab"
 
 llm_config:
-  openrouter_model_path: "openai/gpt-5.4" #google/gemini-3-flash-preview" #qwen/qwen-2.5-72b-instruct" #"qwen/qwen3.5-397b-a17b"
-  #reasoning: {"effort": "low"}
+  openrouter_model_path: google/gemini-3-flash-preview" #qwen/qwen-2.5-72b-instruct" #"qwen/qwen3.5-397b-a17b"
+  #extra_request_params:
+  #  reasoning:
+  #    effort: "low"
   #openrouter_provider: "cerebras/fp16"
   grobid: "http://localhost:8070/"
   

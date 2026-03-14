@@ -9,7 +9,9 @@
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/src",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "SGLANG_DISABLE_DEEP_GEMM": "1",
+                "FLASHINFER_DISABLE_VERSION_CHECK": "1"
             },
             "args": ["jill-infospace.yaml", "--ui", "--resource-browser"],
             "justMyCode": false,
