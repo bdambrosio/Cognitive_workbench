@@ -1802,10 +1802,27 @@ class ZenohExecutiveNode:
         # Save fallback response to conversation only when no explicit say action occurred.
         # Skip for scheduled goal executions — they are not user conversations.
         is_scheduled_goal = bool(self._active_scheduled_goal_id)
-        if (not is_scheduled_goal) and (not last_say) and (not interrupted_final) and final_thoughts_clean and len(final_thoughts_clean) >= 20 and final_thoughts_clean.replace(' ', '').replace('.', '').replace(',', '').replace('!', '').replace('?', '').strip():
-            # Fall back to FINAL_ANSWER if no actual say action
-            logger.debug(f'Using FINAL_ANSWER for conversation (no say action found): {final_thoughts_clean[:50]}...')
-            self.conversation_store.record_outgoing("User", final_thoughts_clean, act_type="response")
+        if (not is_scheduled_goal) and (not last_say) and (not interrupted_final):
+            # Prefer primary_product content over FINAL_ANSWER when available,
+            # since FINAL_ANSWER is often empty/trivial while the artifact has the real data.
+            primary_product = plan_result.get('primary_product', '')
+            conv_text = final_thoughts_clean
+            if primary_product and (not conv_text or len(conv_text) < 20) and self.resource_manager:
+                try:
+                    res = self.resource_manager.get_resource(primary_product)
+                    if res:
+                        content = str(getattr(res, 'content', '') or getattr(res, 'text', '') or '')
+                        if not content:
+                            props = getattr(res, 'properties', {}) or {}
+                            content = str(props.get('text', '') or props.get('content', ''))
+                        if content and len(content) >= 20:
+                            conv_text = content[:1500]
+                            logger.debug(f'Using primary_product {primary_product} content for conversation record')
+                except Exception as e:
+                    logger.debug(f'Could not load primary_product for conversation record: {e}')
+            if conv_text and len(conv_text) >= 20 and conv_text.replace(' ', '').replace('.', '').replace(',', '').replace('!', '').replace('?', '').strip():
+                logger.debug(f'Recording conversation response ({len(conv_text)} chars): {conv_text[:50]}...')
+                self.conversation_store.record_outgoing("User", conv_text, act_type="response")
         
         # Publish result to action log for UI display.
         # Three cases:
@@ -2331,10 +2348,28 @@ class ZenohExecutiveNode:
             return
         success = bool(result and result.get("success"))
         primary_product = (result.get("primary_product") if isinstance(result, dict) else "") or ""
+        last_result_raw = (result.get("response") if isinstance(result, dict) else "") or (result.get("error") if isinstance(result, dict) else "") or ""
+
+        # Enrich last_result from primary_product content when the LLM
+        # response is empty/trivial but an actual artifact was produced.
+        if primary_product and (not last_result_raw or len(last_result_raw) < 20) and self.resource_manager:
+            try:
+                res = self.resource_manager.get_resource(primary_product)
+                if res:
+                    content = str(getattr(res, 'content', '') or getattr(res, 'text', '') or '')
+                    if not content:
+                        props = getattr(res, 'properties', {}) or {}
+                        content = str(props.get('text', '') or props.get('content', ''))
+                    if content and len(content) > len(last_result_raw):
+                        last_result_raw = content[:1500]
+                        logger.info(f'Enriched last_result from primary_product {primary_product} ({len(content)} chars)')
+            except Exception as e:
+                logger.debug(f'Could not load primary_product for last_result enrichment: {e}')
+
         updates: Dict[str, Any] = {
             "is_running": False,
             "status": "completed" if success else "failed",
-            "last_result": (result.get("response") if isinstance(result, dict) else "") or (result.get("error") if isinstance(result, dict) else "") or "",
+            "last_result": last_result_raw,
             "primary_product": primary_product,
         }
         if not used_cache and success:
@@ -2384,6 +2419,25 @@ class ZenohExecutiveNode:
                     phase = (wip or {}).get("phase", "")
                     summary_limit = 1500 if phase == "specification" else 500
                     result_summary = last_result[:summary_limit] if last_result else ("success" if success else "failed")
+
+                    # Fix B: If result_summary is empty/trivial but primary_product
+                    # exists, load the resource content. This catches cases where the
+                    # planner returned a status message but the actual data lives in
+                    # a bound resource (e.g. user answers from an ask action).
+                    if primary_product and (not result_summary or len(result_summary) < 20) and self.resource_manager:
+                        try:
+                            res = self.resource_manager.get_resource(primary_product)
+                            if res:
+                                content = str(getattr(res, 'content', '') or getattr(res, 'text', '') or '')
+                                if not content:
+                                    props = getattr(res, 'properties', {}) or {}
+                                    content = str(props.get('text', '') or props.get('content', ''))
+                                if content and len(content) > len(result_summary):
+                                    result_summary = content[:summary_limit]
+                                    logger.info(f'📋 Task WIP: enriched result_summary from primary_product {primary_product} ({len(content)} chars)')
+                        except Exception as e:
+                            logger.debug(f'Could not load primary_product content: {e}')
+
                     milestone_record = {
                         "goal_text": goal.get("goal_text", ""),
                         "result_summary": result_summary,
@@ -2394,14 +2448,18 @@ class ZenohExecutiveNode:
                         wip.setdefault("milestones_completed", []).append(milestone_record)
                         wip["current_milestone"] = None
                         wip["updated"] = datetime.now().isoformat()
-                        # Capture primary_product in accumulated_findings if present
-                        if primary_product:
+                        # Capture primary_product content in accumulated_findings
+                        if primary_product and result_summary and len(result_summary) > 20:
+                            wip.setdefault("accumulated_findings", []).append(
+                                f"Milestone result: {result_summary}"
+                            )
+                        elif primary_product:
                             wip.setdefault("accumulated_findings", []).append(
                                 f"Milestone produced artifact: {primary_product}"
                             )
                         # For specification phase, also capture the result as a finding
                         # so subsequent phases see user answers in ACCUMULATED FINDINGS
-                        if phase == "specification" and result_summary:
+                        if phase == "specification" and result_summary and len(result_summary) > 20:
                             wip.setdefault("accumulated_findings", []).append(
                                 f"User clarification: {result_summary}"
                             )
@@ -2467,7 +2525,11 @@ class ZenohExecutiveNode:
             self._set_scheduled_goal_result(goal_id, result, used_cache=False, pre_resource_ids=pre_resource_ids)
             if notify_user:
                 status = "completed" if result.get("success") else "failed"
-                self._say_to_user(f"Goal '{goal_name}' {status}.")
+                pp = (result.get("primary_product") if isinstance(result, dict) else "") or ""
+                if pp:
+                    self._say_to_user(f"Goal '{goal_name}' {status}. → {pp}")
+                else:
+                    self._say_to_user(f"Goal '{goal_name}' {status}.")
             return result
 
         self._run_goal_on_thread(_run)
@@ -3168,6 +3230,15 @@ class ZenohExecutiveNode:
             wip["current_milestone"] = goal_text[:200]
             self._update_task_wip(wip)
 
+            # --- Fix A: Direct ask for specification phase ---
+            # If the goal is purely "ask the user clarifying questions" during
+            # specification, skip the full planner and issue the ask directly.
+            # This avoids content loss where the planner returns a status message
+            # instead of the user's actual answers.
+            if new_phase == "specification" and self._is_ask_only_goal(goal_text):
+                self._run_direct_ask_milestone(wip, goal_text)
+                return
+
             # Create scheduled goal with task_wip_id linkage
             scheduled_goal = self._upsert_scheduled_goal(goal_text)
             goal_id = scheduled_goal["goal_id"]
@@ -3205,6 +3276,71 @@ class ZenohExecutiveNode:
             self._say_to_user("Task establishment failed: could not determine next step.")
             self.active_task_wip = None
             self._task_wip_pre_resource_ids = None
+
+    def _is_ask_only_goal(self, goal_text: str) -> bool:
+        """Detect whether a goal is purely about asking the user questions."""
+        lower = goal_text.lower()
+        ask_signals = ["ask the user", "clarify", "clarifying question", "confirm with the user"]
+        return any(s in lower for s in ask_signals)
+
+    def _run_direct_ask_milestone(self, wip: Dict[str, Any], goal_text: str):
+        """Execute a specification-phase ask directly, bypassing the planner.
+
+        Sends the goal text as a question to the user, blocks for a response,
+        and records the full answer text in accumulated_findings. This avoids
+        content loss that occurs when the planner's codegen returns a status
+        message instead of the actual user answer.
+        """
+        task_wip_id = wip.get("task_wip_id", "")
+
+        def _run():
+            try:
+                # Strip meta-phrasing — send the substantive questions to the user
+                self._say_to_user("I have some questions before I can set up this task:")
+                # Use the executor's ask machinery for blocking + UI integration
+                result = self.infospace_executor.execute_action({
+                    "type": "ask",
+                    "value": goal_text,
+                    "out": "$_spec_response",
+                })
+                response_text = ""
+                if result.get("status") == "success":
+                    # Load the response content from the bound note
+                    rid = result.get("resource_id", "")
+                    if rid and self.resource_manager:
+                        res = self.resource_manager.get_resource(rid)
+                        if res:
+                            response_text = str(getattr(res, 'content', '') or getattr(res, 'text', '') or '')
+                            if not response_text:
+                                props = getattr(res, 'properties', {}) or {}
+                                response_text = str(props.get('text', '') or props.get('content', ''))
+
+                success = bool(response_text)
+                summary_text = response_text[:1500] if response_text else "No response received"
+                milestone_record = {
+                    "goal_text": goal_text[:200],
+                    "result_summary": summary_text,
+                    "status": "completed" if success else "failed",
+                    "timestamp": datetime.now().isoformat(),
+                }
+                wip_fresh = self._read_task_wip()
+                if wip_fresh:
+                    wip_fresh.setdefault("milestones_completed", []).append(milestone_record)
+                    wip_fresh["current_milestone"] = None
+                    wip_fresh["updated"] = datetime.now().isoformat()
+                    wip_fresh.setdefault("accumulated_findings", []).append(
+                        f"User clarification: {summary_text}"
+                    )
+                    self._update_task_wip(wip_fresh)
+                logger.info(f'📋 Task WIP {task_wip_id}: direct-ask milestone completed ({len(response_text)} chars)')
+            except Exception as e:
+                logger.error(f'Direct-ask milestone failed: {e}')
+                traceback.print_exc()
+            finally:
+                self.active_task_wip_waiting = False
+
+        self.active_task_wip_waiting = True
+        self._run_goal_on_thread(_run)
 
     def _complete_task_wip(self, wip: Dict[str, Any], summary: str):
         """Finalize task: create scheduled goal and update WIP Note."""
