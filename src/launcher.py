@@ -360,6 +360,19 @@ def main():
         if proc:
             service_procs.append(proc)
 
+    # ---- URL listener (shared; sensors drain the queue) ----
+    # Start if any character declares a browser-visits sensor
+    _any_browser_sensor = any(
+        any(s.get('name') == 'browser-visits' for s in cfg.get('sensors', []))
+        for _, cfg in characters
+    )
+    if _any_browser_sensor:
+        try:
+            from url_listener import start as start_url_listener
+            start_url_listener(port=5004)
+        except Exception as e:
+            logger.warning(f"Failed to start URL listener: {e}")
+
     if service_procs:
         # Wait for UI to be healthy before launching agents (announcements need a listener)
         if args.ui:

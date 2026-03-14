@@ -4457,6 +4457,42 @@ class IncrementalPlanner:
             )
         raise RuntimeError("No planner backend available (SGLang, vLLM, Anthropic, OpenAI, or OpenRouter required)")
 
+    def switch_llm(self, mode: str, alt_config: dict):
+        """Switch planner's LLM routing between primary and alt.
+
+        When switching to 'alt', the planner's model path attributes are set from
+        alt_config so that _run_core_planner routes to the correct function
+        (tool_planner_infospace for SGLang, tool_planner_infospace_vllm for API backends).
+        When switching back to 'primary', the original config is restored.
+
+        Should only be called between goals.
+        """
+        if mode == 'alt':
+            # Save primary config on first switch
+            if not hasattr(self, '_primary_config'):
+                self._primary_config = {
+                    'vllm_model_path': self.vllm_model_path,
+                    'vllm_url': self.vllm_url,
+                    'vllm_model': self.vllm_model,
+                    'openrouter_model_path': self.openrouter_model_path,
+                    'anthropic_model_path': self.anthropic_model_path,
+                    'openai_model_path': self.openai_model_path,
+                }
+            # Apply alt config — set the matching backend, clear others
+            self.vllm_model_path = alt_config.get('vllm_model_path')
+            self.vllm_model = getattr(self.executor, 'alt_vllm_model', None)
+            self.vllm_url = getattr(self.executor, 'alt_vllm_url', None)
+            self.openrouter_model_path = alt_config.get('openrouter_model_path')
+            self.anthropic_model_path = alt_config.get('anthropic_model_path')
+            self.openai_model_path = alt_config.get('openai_model_path')
+            self.logger.info(f"Planner switched to alt LLM config")
+        elif mode == 'primary':
+            if hasattr(self, '_primary_config'):
+                for k, v in self._primary_config.items():
+                    setattr(self, k, v)
+                self.logger.info(f"Planner switched to primary LLM config")
+        self.executor.switch_llm(mode)
+
     def __del__(self):
         """Cleanup: close trace file on instance destruction."""
         if hasattr(self, 'trace_file') and self.trace_file:
@@ -4853,7 +4889,9 @@ END_VISION"""
         return vision_text
 
     def _preplan(self, goal_text: str) -> str:
-        tool_names = list(self.tools.keys())
+        tool_lines = [f"- {name}: {meta.get('description', 'no description')}"
+                      for name, meta in self.tools.items()]
+        tools_text = "\n".join(tool_lines)
         ABSTRACT_PLAN_PROMPT = f"""
 You will create a short, high-level problem-solving strategy for the goal below.
 This is NOT a domain explanation and NOT a tool invocation sequence.
@@ -4862,33 +4900,36 @@ It is a goal-specific strategy sketch that guides downstream incremental plannin
 Only use tools that appear in the provided tool list.
 
 AVAILABLE_TOOLS:
-{tool_names}
+{tools_text}
 
 GOAL:
 {goal_text}
 
 Instructions:
 
-1. If this is a simple, direct goal, return the original goal. DO NOTHING ELSE.
+1. If this is a simple, conversational, or single-operation goal (e.g., opinion,
+   greeting, single lookup, direct question), use a single step:
+   ABSTRACT_PLAN:
+   STEP 1: <the goal itself>
+   END_PLAN
 2. Otherwise:
-   - Identify what *types of operations* the goal requires  
+   - Identify what *types of operations* the goal requires
      (e.g., retrieval, extraction, transformation, comparison, generation).
-   - Match these operation types to the available tools.  
-     - Do not assume tools that are absent.  
+   - Match these operation types to the available tools.
+     - Do not assume tools that are absent.
      - If multiple tools could serve a role, state how to choose between them.
-   - Describe a minimal, ordered sequence of conceptual steps  
-     that a tool-using planner would follow to solve the goal.  
+   - Describe the minimum necessary sequence of conceptual steps.
+     Prefer fewer steps. Do not decompose what can be done in a single tool call.
      Describe *what must be achieved*, not how to call tools.
-   - Include fallback logic **only if the goal plausibly needs it**  
+   - Include fallback logic **only if the goal plausibly needs it**
      (e.g., multi-source lookup, ambiguous values, missing information).
-   - Do not include JSON, tool calls, URLs, or domain-specific knowledge.  
+   - Do not include JSON, tool calls, URLs, or domain-specific knowledge.
      The output must be a brief strategic outline, not an answer to the goal.
 
-Format:
+Format (use ONLY as many steps as needed — one step is fine for simple goals):
 ABSTRACT_PLAN:
 STEP 1: <what to achieve>
-STEP 2: <what to achieve>
-STEP 3: <what to achieve>
+[STEP 2: <what to achieve> — only if genuinely needed]
 END_PLAN
 """
 

@@ -357,9 +357,9 @@ class ZenohExecutiveNode:
         from utils.zenoh_utils import make_localhost_config
         self.session = zenoh.open(make_localhost_config())
         
-        # Autonomous mode state
-        self.previous_autonomous_goal_text = ''
-        self.autonomous_goal_state = ''
+        # LLM toggle state (Primary/Alt, switched between goals)
+        self.llm_mode = 'primary'  # 'primary' or 'alt'
+        self.llm_switch_pending = None  # Set to 'primary'/'alt' by UI, applied at next goal start
         
         # Subscriber for sense data (character-specific)
         self.sense_subscriber = self.session.declare_subscriber(
@@ -574,7 +574,7 @@ class ZenohExecutiveNode:
                 logger.error(f"❌ Failed to query vLLM server: {e}")
                 raise  # Fail fast
         
-        # Initialize alt LLM backend if alt_llm_config present (for synthesize, extract, etc.)
+        # Initialize alt LLM backend if alt_llm_config present (global alternate, toggled via UI)
         alt_llm_config = self.character_config.get('alt_llm_config', {})
         if alt_llm_config:
             alt_anthropic = alt_llm_config.get('anthropic_model_path')
@@ -998,8 +998,8 @@ class ZenohExecutiveNode:
         
         # OODA loop state
         self.current_goal = None
-        self.goal_source = None  # Track goal origin: 'ui', 'autonomous', or None
-        self.awaiting_user_input = False  # Pause autonomous behavior after UI goal completion
+        self.goal_source = None  # Track goal origin: 'ui' or None
+        self.awaiting_user_input = False
         self.continuous_mode = False  # Continuous mode: resubmit goal on completion
         self.continuous_goal_text = None  # Original goal text for continuous resubmission
         self.last_completed_goal_text = None  # Last completed goal text (for enabling continuous mode after completion)
@@ -1062,14 +1062,13 @@ class ZenohExecutiveNode:
         
         # Execution control (replaces turn management)
         self.execution_paused = True  # Start paused, wait for step/run command
-        self.execution_mode = 'step'  # 'step', 'run', or 'autonomous'
-        self.autonomous_mode = False  # Flag for autonomous execution mode
+        self.execution_mode = 'step'  # 'step' or 'run'
         self.interrupt_requested = False  # Global interrupt flag (checked once per planner step)
         
         # Subscribers for direct execution control from UI
-        self.control_autonomous_subscriber = self.session.declare_subscriber(
-            f"cognitive/{character_name}/control/autonomous",
-            self.handle_autonomous_command
+        self.control_llm_toggle_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/llm_toggle",
+            self.handle_llm_toggle
         )
         self.control_stop_subscriber = self.session.declare_subscriber(
             f"cognitive/{character_name}/control/stop",
@@ -1251,7 +1250,7 @@ class ZenohExecutiveNode:
 
         logger.info(f'🧠 Zenoh Executive Node initialized for character: {character_name}')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/sense_data')
-        logger.info(f'   - Subscribing to: cognitive/{character_name}/control/autonomous')
+        logger.info(f'   - Subscribing to: cognitive/{character_name}/control/llm_toggle')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/control/stop')
         logger.info(f'   - Subscribing to: cognitive/map/time_advanced')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/end_dialog')
@@ -2346,6 +2345,10 @@ class ZenohExecutiveNode:
         goal = self._get_scheduled_goal(goal_id)
         if not goal:
             return
+        # If the goal was already terminated (interrupted) by the user, don't overwrite
+        if goal.get("status") == "interrupted":
+            logger.info(f'Goal {goal_id} already interrupted — skipping result update')
+            return
         success = bool(result and result.get("success"))
         primary_product = (result.get("primary_product") if isinstance(result, dict) else "") or ""
         last_result_raw = (result.get("response") if isinstance(result, dict) else "") or (result.get("error") if isinstance(result, dict) else "") or ""
@@ -2488,6 +2491,8 @@ class ZenohExecutiveNode:
         if self._is_goal_running():
             self._say_to_user(f"A goal is already running. Please wait for it to complete.")
             return
+        # Apply any pending LLM switch before starting a new goal
+        self._apply_pending_llm_switch()
         self._active_scheduled_goal_id = goal_id
         self._update_scheduled_goal(goal_id, is_running=True, status="running")
         self._record_scheduler_event(
@@ -2669,8 +2674,7 @@ class ZenohExecutiveNode:
     def _scheduler_eligible_goals(self):
         """Return scheduled goals eligible for auto-proceed."""
         from datetime import date, datetime as _dt
-        if self.execution_mode == 'autonomous':
-            return []  # don't interfere with autonomous goal generation
+        # (autonomous mode removed)
         eligible = []
         for goal in self._all_scheduled_goals():
             if goal.get("is_running"):
@@ -3554,13 +3558,19 @@ class ZenohExecutiveNode:
         while self._sensor_alert_queue:
             alert = self._sensor_alert_queue.pop(0)
             sensor_name = alert.get('sensor_name', 'unknown')
-            content = alert.get('content', '')
-            logger.info(f'🚨 {self.character_name} processing alert from {sensor_name}: {content[:80]}')
+            summary = alert.get('content', '')
+            data = alert.get('data', [])
+            logger.info(f'🚨 {self.character_name} processing alert from {sensor_name}: {summary[:80]}')
+            # Build alert text with structured data if available
+            alert_text = f"[ALERT from sensor {sensor_name}]: {summary}"
+            if data:
+                for item in data:
+                    title = item.get('title', '')
+                    url = item.get('url', '')
+                    label = f"{title} — {url}" if title else url
+                    alert_text += f"\n  - {label}"
             # Respond to alert via chat-mode (read-only, in character)
-            self._handle_chat_response(
-                f"[ALERT from sensor {sensor_name}]: {content}",
-                source=f'sensor:{sensor_name}'
-            )
+            self._handle_chat_response(alert_text, source=f'sensor:{sensor_name}')
 
         # Triggers: dispatch the first eligible as next goal
         if self._sensor_trigger_queue:
@@ -4145,8 +4155,19 @@ class ZenohExecutiveNode:
             lines = []
             for entry in self._sensor_inform_queue:
                 sensor_name = entry.get('sensor_name', 'unknown')
-                content = entry.get('content', '')[:200]
-                lines.append(f"  - [{sensor_name}] {content}")
+                summary = entry.get('content', '')
+                data = entry.get('data', [])
+                if data:
+                    # Structured: summary line + itemized data
+                    lines.append(f"  - [{sensor_name}] {summary}")
+                    for item in data:
+                        title = item.get('title', '')
+                        url = item.get('url', '')
+                        label = f"{title} — {url}" if title else url
+                        lines.append(f"      {label}")
+                else:
+                    # Legacy plain-text
+                    lines.append(f"  - [{sensor_name}] {summary}")
             parts.append("Recent sensor observations:\n" + "\n".join(lines))
 
         return "\n".join(parts)
@@ -4322,13 +4343,29 @@ class ZenohExecutiveNode:
                 source = 'console'
             # Sensor reports: route by disposition into priority queues
             if source.startswith('sensor:') or (text_input and text_input.startswith('sensor ') and ' report\n' in text_input):
+                # Skip heartbeats — they carry no content
+                if isinstance(content_data, dict) and content_data.get('heartbeat'):
+                    return
+
                 disposition = content_data.get('disposition', 'inform') if isinstance(content_data, dict) else 'inform'
                 sensor_name = source.replace('sensor:', '') if source.startswith('sensor:') else 'unknown'
-                # Extract the actual content (strip the "sensor X report [disp]\n" prefix)
-                sensor_content = text_input
-                if '\n' in text_input:
-                    sensor_content = text_input.split('\n', 1)[1] if '\n' in text_input else text_input
-                sensor_entry = {'sensor_name': sensor_name, 'content': sensor_content, 'disposition': disposition}
+
+                # Structured content (summary + data) vs legacy plain-text
+                if isinstance(content_data, dict) and 'summary' in content_data:
+                    sensor_content = content_data['summary']
+                    sensor_data = content_data.get('data', [])
+                else:
+                    # Legacy: strip the "sensor X report [disp]\n" prefix
+                    sensor_content = text_input
+                    if '\n' in text_input:
+                        sensor_content = text_input.split('\n', 1)[1]
+                    sensor_data = []
+
+                # Skip empty content — nothing useful to queue
+                if not sensor_content and not sensor_data:
+                    return
+
+                sensor_entry = {'sensor_name': sensor_name, 'content': sensor_content, 'data': sensor_data, 'disposition': disposition}
 
                 if disposition == 'alert':
                     self._sensor_alert_queue.append(sensor_entry)
@@ -4359,61 +4396,48 @@ class ZenohExecutiveNode:
             traceback.print_exc()
             logger.error(f'Error processing sense data: {e}')
     
-    def handle_autonomous_command(self, sample):
-        """Handle autonomous command - start autonomous execution mode."""
+    def handle_llm_toggle(self, sample):
+        """Handle LLM Primary/Alt toggle from UI.
+
+        If no goal is running, applies immediately.
+        If a goal is in progress, queues the switch for the next goal boundary.
+        """
         try:
             if not hasattr(self, 'character_name'):
-                logger.warning('🤖 Autonomous command received before initialization complete')
+                logger.warning('🔄 LLM toggle received before initialization complete')
                 return
-            logger.info(f'🤖 Autonomous command received by {self.character_name}')
-            self.autonomous_mode = True
-            self.execution_mode = 'autonomous'
-            self.execution_paused = False
+            # Toggle: if currently primary, switch to alt; if alt, switch to primary
+            new_mode = 'alt' if self.llm_mode == 'primary' else 'primary'
+            if self._is_goal_running():
+                self.llm_switch_pending = new_mode
+                logger.info(f'🔄 {self.character_name} LLM switch to {new_mode} queued (goal in progress)')
+            else:
+                self.llm_switch_pending = new_mode
+                self._apply_pending_llm_switch()
             self._publish_execution_state()
         except Exception as e:
-            logger.error(f'Error handling autonomous command: {e}')
+            logger.error(f'Error handling LLM toggle: {e}')
             traceback.print_exc()
-            # Ensure button is enabled (unshaded) on error
-            self.autonomous_mode = False
-            self.execution_mode = 'step'
-            self.execution_paused = True
-            self._publish_execution_state()
-    
-    def run_autonomous_mode(self):
-        """Check if autonomous mode should continue or complete."""
-        # Autonomous mode completes when:
-        # 1. Flag is False (stopped by user)
-        # 2. No current goal and no current plan (no work to do)
-        if not self.autonomous_mode:
-            return  # Already stopped, exit
-        #generate a new goal
-        prompt = f"""
-        You are a strict goal generator.
-        You are generating a goal for autonomous mode operation.
-        Your previous goal, if any, was: \n{self.previous_autonomous_goal_text}\n
-        The resulting autonomous task state, if any, was: \n{self.autonomous_goal_state}\n
-        Given what you know about the world, your situation and your character, assess your current needs and pressing priorities.
-        Given these, generate 2-3 goal statements that you might work on next.
-        Finally, prioritize the goals by their importance, urgency, and feasibility, and return the highest priority goal.
-        Report to the user the highest priority goal, with clear desired outcome, followed by </end>.
-        Do NOT repeat the previous goal unless you are in an immediately life-threatening situation and it is the only way to save yourself.
-        Respond with no other text, no markdown, no code fences, no reasoning, no explanation, no commentary.
-        """
 
-        planner_response = self.incremental_planner.generate_plan(template='',goal=prompt, context=None, max_steps=16)
-        if not planner_response or not planner_response.get('success', False):
-            return False
-        goal_text = planner_response.get('response', '')
-        self.previous_autonomous_goal_text = goal_text
-        self.current_goal = Goal(goal_text, [self.character_name], description='', termination='')
-        self._publish_goal(self.current_goal)
-        planner_response = self.incremental_planner.generate_plan(template='',goal=goal_text, context=None, max_steps=16)
-        if not planner_response or not planner_response.get('success', False):
-            return False
-        self.autonomous_goal_state = planner_response.get('task_state', '')
-        self.execution_paused = False
+    def _apply_pending_llm_switch(self):
+        """Apply a pending LLM switch. Called at goal boundaries."""
+        if self.llm_switch_pending is None:
+            return
+        new_mode = self.llm_switch_pending
+        self.llm_switch_pending = None
+        if new_mode == self.llm_mode:
+            return
+        alt_config = self.character_config.get('alt_llm_config', {})
+        if new_mode == 'alt' and not alt_config:
+            logger.warning(f'🔄 {self.character_name} LLM switch to alt requested but no alt_llm_config configured')
+            return
+        self.llm_mode = new_mode
+        if hasattr(self, 'incremental_planner') and self.incremental_planner:
+            self.incremental_planner.switch_llm(new_mode, alt_config)
+        elif hasattr(self, 'infospace_executor') and self.infospace_executor:
+            self.infospace_executor.switch_llm(new_mode)
+        logger.info(f'🔄 {self.character_name} LLM switched to {new_mode}')
         self._publish_execution_state()
-        return True
     
     def handle_continuous_toggle(self, sample):
         """Handle continuous mode toggle - can be enabled/disabled at any time."""
@@ -4694,14 +4718,13 @@ class ZenohExecutiveNode:
             traceback.print_exc()
     
     def handle_stop_command(self, sample):
-        """Handle stop command - stop autonomous mode and pause execution."""
+        """Handle stop command - pause execution."""
         try:
             logger.info(f'⏹️ Stop command received by {self.character_name}')
             # Treat stop as an immediate interrupt signal so blocking waits can exit.
             self.interrupt_requested = True
             if self.infospace_executor:
                 self.infospace_executor.interrupt_requested = True
-            self.autonomous_mode = False
             self.execution_mode = 'step'
             self.execution_paused = True
             # Note: continuous_mode is NOT cleared here - user must toggle it off explicitly
@@ -4751,6 +4774,8 @@ class ZenohExecutiveNode:
                 'mode': self.execution_mode,
                 'character': self.character_name,
                 'continuous_mode': self.continuous_mode,
+                'llm_mode': self.llm_mode,
+                'llm_switch_pending': self.llm_switch_pending,
                 'active_dialog': active_dialog,
                 'goal_scheduler': scheduler_state,
                 'timestamp': time.time()

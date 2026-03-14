@@ -290,7 +290,7 @@ class FastAPIActionDisplayNode:
         # Publishers for direct execution control (will be set when character is known)
         self.control_step_publisher = None
         self.control_run_publisher = None
-        self.control_autonomous_publisher = None
+        self.control_llm_toggle_publisher = None
         self.control_stop_publisher = None
         self.control_continuous_publisher = None
         
@@ -477,12 +477,11 @@ class FastAPIActionDisplayNode:
                 # Give character a moment to receive the goal
                 await asyncio.sleep(0.3)
                 
-                # Automatically trigger autonomous mode to start plan execution
-                # This uses the same mechanism as the Autonomous button
-                if self.active_character_name and self.control_autonomous_publisher:
+                # Automatically trigger run mode to start plan execution
+                if self.active_character_name and self.control_run_publisher:
                     with self.turn_state_lock:
-                        self.turn_state['mode'] = 'autonomous'
-                    self.control_autonomous_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
+                        self.turn_state['mode'] = 'run'
+                    self.control_run_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
                 
                 await websocket.send_text(json.dumps({
                     'type': 'test_status',
@@ -827,24 +826,21 @@ class FastAPIActionDisplayNode:
             """Get User's conversation lock status (always unlocked with single character)."""
             return {"is_locked": False, "locked_with": []}
         
-        @self.app.post("/api/turn/autonomous")
-        async def autonomous_turns():
-            """Start autonomous execution."""
+        @self.app.post("/api/llm/toggle")
+        async def toggle_llm():
+            """Toggle between primary and alt LLM."""
             try:
                 if self.active_character_name is None:
                     return {"success": False, "message": "No character available yet"}
-                
-                logger.info(f"🤖 Autonomous command received in FastAPI")
-                
-                with self.turn_state_lock:
-                    self.turn_state['mode'] = 'autonomous'
-                
-                self.control_autonomous_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
-                logger.info(f"🤖 Autonomous command sent to {self.active_character_name}")
-                
-                return {"success": True, "message": "Autonomous command sent"}
+
+                logger.info(f"🔄 LLM toggle received in FastAPI")
+
+                self.control_llm_toggle_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
+                logger.info(f"🔄 LLM toggle sent to {self.active_character_name}")
+
+                return {"success": True, "message": "LLM toggle sent"}
             except Exception as e:
-                logger.error(f"Error in autonomous_turns: {e}")
+                logger.error(f"Error in toggle_llm: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
         
         @self.app.post("/api/turn/stop")
@@ -2533,9 +2529,9 @@ Generated: {generated_at}
                 </div>
                 
                 <div class="input-section">
-                    <h3>Turn Control</h3>
+                    <h3>Controls</h3>
                     <div style="margin-bottom: 15px;">
-                        <button id="autonomousButton" onclick="autonomousTurns()" style="background: #555; margin-right: 10px;" disabled title="Start autonomous execution">Autonomous</button>
+                        <button id="llmToggleButton" onclick="toggleLlm()" style="background: #4ecdc4; margin-right: 10px;" title="Using primary LLM">Primary</button>
                         <button onclick="stopTurns()" style="background: #ff6b6b; margin-right: 10px;" title="Pause execution">Stop</button>
                         <button onclick="openControlPanel()" style="background: #6c5ce7; color: white; margin-right: 10px;" title="Open control panel">⚙️ Control</button>
                         <button onclick="saveAll()" style="background: #95e1d3; color: #1a1a1a; margin-right: 10px;" title="Save all resources and memory to disk">Save</button>
@@ -2771,14 +2767,8 @@ Generated: {generated_at}
                                         selectCharacterTab(first);
                                     }
                                     // Enable controls if not in run mode
-                                    const autonomousButton = document.getElementById('autonomousButton');
                                     const testButton = document.getElementById('testButton');
-                                    if (currentTurnMode !== 'run' && currentTurnMode !== 'autonomous') {
-                                        if (autonomousButton) {
-                                            autonomousButton.disabled = false;
-                                            autonomousButton.style.background = '#4ecdc4';
-                                            autonomousButton.title = 'Click to start autonomous execution';
-                                        }
+                                    if (currentTurnMode !== 'run') {
                                         if (testButton) {
                                             testButton.disabled = false;
                                             testButton.style.background = '#f39c12';
@@ -2888,15 +2878,8 @@ Generated: {generated_at}
             initSidebarResizer();
             initCharacterDataTabs();
             
-            // Initialize buttons as disabled until system is ready
-            const autonomousButton = document.getElementById('autonomousButton');
+            // Initialize buttons until system is ready
             const testButton = document.getElementById('testButton');
-            
-            if (autonomousButton) {
-                autonomousButton.disabled = true;
-                autonomousButton.style.background = '#555';
-                autonomousButton.title = 'Waiting for system startup...';
-            }
             
             const continuousButton = document.getElementById('continuousButton');
             if (continuousButton) {
@@ -3494,26 +3477,24 @@ Generated: {generated_at}
              * Just apply what the backend tells us - no complex logic needed!
              */
             console.log(`🆕 Turn state update: turn=${stateData.turn.number}, mode=${stateData.turn.mode}, ` +
-                       `autonomous_enabled=${stateData.buttons.autonomous ? stateData.buttons.autonomous.enabled : 'N/A'}, ` +
+                       `llm_mode=${stateData.buttons.llm_toggle ? stateData.buttons.llm_toggle.mode : 'N/A'}, ` +
                        `progress=${stateData.turn.completed_count}/${stateData.turn.active_count}`);
-            
+
             // Store state for control panel access
             window.lastTurnState = stateData;
-            
+
             // Clear command lock when backend sends state update
             commandInProgress = false;
-            
+
             // Apply button states directly from backend computation
-            const autonomousButton = document.getElementById('autonomousButton');
+            const llmToggleButton = document.getElementById('llmToggleButton');
             const continuousButton = document.getElementById('continuousButton');
             const stopButton = document.getElementById('stopButton');
-            
-            if (autonomousButton) {
-                const shouldBeEnabled = stateData.buttons.autonomous ? stateData.buttons.autonomous.enabled : true;
-                autonomousButton.disabled = !shouldBeEnabled;
-                autonomousButton.style.background = shouldBeEnabled ? '#4ecdc4' : '#555';
-                autonomousButton.title = stateData.buttons.autonomous ? stateData.buttons.autonomous.tooltip : 'Click to start autonomous execution';
-                console.log(`🔘 Autonomous button: enabled=${shouldBeEnabled}, disabled=${autonomousButton.disabled}, background=${autonomousButton.style.background}, commandInProgress=${commandInProgress}`);
+
+            if (llmToggleButton && stateData.buttons.llm_toggle) {
+                llmToggleButton.textContent = stateData.buttons.llm_toggle.label;
+                llmToggleButton.style.background = stateData.buttons.llm_toggle.mode === 'alt' ? '#f39c12' : '#4ecdc4';
+                llmToggleButton.title = stateData.buttons.llm_toggle.tooltip;
             }
             
             if (continuousButton && stateData.buttons.continuous) {
@@ -3551,7 +3532,7 @@ Generated: {generated_at}
                 endBtn.title = hasActiveDialog ? 'End conversation (click to close)' : 'End conversation (or type goodbye, bye, etc.)';
             }
             
-            console.log(`✅ Applied button states: autonomous=${stateData.buttons.autonomous ? stateData.buttons.autonomous.enabled : 'N/A'}, ` +
+            console.log(`✅ Applied button states: llm=${stateData.buttons.llm_toggle ? stateData.buttons.llm_toggle.mode : 'N/A'}, ` +
                        `stop=${stateData.buttons.stop.enabled}, active_dialog=${stateData.active_dialog}`);
 
             // Cache scheduler state per character and update UI if it's the active character
@@ -4035,52 +4016,22 @@ Generated: {generated_at}
             }
         }
         
-        async function autonomousTurns() {
-            if (commandInProgress) return; // Prevent rapid clicks
-            commandInProgress = true;
-            
+        async function toggleLlm() {
             const resultDiv = document.getElementById('turnResult');
-            const autonomousButton = document.getElementById('autonomousButton');
-            
-            // Immediately disable and shade the button for responsive UI
-            if (autonomousButton) {
-                autonomousButton.disabled = true;
-                autonomousButton.style.background = '#555';
-                autonomousButton.title = 'Autonomous mode active...';
-            }
-            
             try {
-                const response = await fetch('/api/turn/autonomous', {
+                const response = await fetch('/api/llm/toggle', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
+                    headers: { 'Content-Type': 'application/json' }
                 });
-                
                 const result = await response.json();
-                
                 if (result.success) {
                     if (resultDiv) resultDiv.innerHTML = `<span class="success">${result.message}</span>`;
-                    // Button state will be updated by backend via turn_state_update message
+                    // Button state will be updated by backend via turn_state_update
                 } else {
                     if (resultDiv) resultDiv.innerHTML = `<span class="error">Error: ${result.message}</span>`;
-                    // Clear command lock on error so user can retry
-                    commandInProgress = false;
-                    if (autonomousButton) {
-                        autonomousButton.disabled = false;
-                        autonomousButton.style.background = '#4ecdc4';
-                        autonomousButton.title = 'Click to start autonomous execution';
-                    }
                 }
             } catch (error) {
                 if (resultDiv) resultDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
-                // Clear command lock on error so user can retry
-                commandInProgress = false;
-                if (autonomousButton) {
-                    autonomousButton.disabled = false;
-                    autonomousButton.style.background = '#4ecdc4';
-                    autonomousButton.title = 'Click to start autonomous execution';
-                }
             }
         }
         
@@ -5817,10 +5768,16 @@ Generated: {generated_at}
                 },
                 'active_dialog': active_dialog,
                 'buttons': {
-                    'autonomous': {
-                        'enabled': step_enabled or run_enabled,  # Enable if either step or run would be enabled
-                        'label': '🤖 Autonomous',
-                        'tooltip': 'Ready - click to start autonomous execution' if (step_enabled or run_enabled) else 'Execution in progress'
+                    'llm_toggle': {
+                        'mode': state_data.get('llm_mode', 'primary'),
+                        'pending': state_data.get('llm_switch_pending'),
+                        'label': ('Alt (pending)' if state_data.get('llm_switch_pending') == 'alt'
+                                  else 'Primary (pending)' if state_data.get('llm_switch_pending') == 'primary'
+                                  else 'Alt' if state_data.get('llm_mode') == 'alt'
+                                  else 'Primary'),
+                        'tooltip': (f"Using {state_data.get('llm_mode', 'primary')} LLM"
+                                    + (f" (switch to {state_data.get('llm_switch_pending')} pending)" if state_data.get('llm_switch_pending') else '')
+                                    + ' — click to toggle'),
                     },
                     'continuous': {
                         'enabled': continuous_enabled,
@@ -5839,7 +5796,7 @@ Generated: {generated_at}
                 'timestamp': state_data.get('timestamp', time.time())
             }
 
-            logger.info(f"🆕 Received execution_state: paused={paused}, mode={mode}, autonomous_enabled={step_enabled or run_enabled}")
+            logger.info(f"🆕 Received execution_state: paused={paused}, mode={mode}, llm_mode={state_data.get('llm_mode', 'primary')}")
             
             # Forward formatted state to websockets for UI rendering
             with self.websocket_lock:
@@ -6487,8 +6444,8 @@ Generated: {generated_at}
             self.control_run_publisher = self.session.declare_publisher(
                 f"cognitive/{character_name}/control/run"
             )
-            self.control_autonomous_publisher = self.session.declare_publisher(
-                f"cognitive/{character_name}/control/autonomous"
+            self.control_llm_toggle_publisher = self.session.declare_publisher(
+                f"cognitive/{character_name}/control/llm_toggle"
             )
             self.control_stop_publisher = self.session.declare_publisher(
                 f"cognitive/{character_name}/control/stop"

@@ -37,7 +37,8 @@ INFOSPACE_PRIMITIVES = frozenset({
     'get-metadata', 'set-metadata',
 })
 
-ALT_LLM_TOOLS = frozenset({'synthesize', 'extract', 'extract-struct', 'extract-references', 'refine'})
+# Legacy constant kept for reference; per-tool alt routing has been replaced by
+# a global Primary/Alt LLM toggle controlled from the UI.
 
 
 class InfospaceExecutor:
@@ -111,7 +112,7 @@ class InfospaceExecutor:
         self.anthropic_model = None
         self.anthropic_api_key = None
 
-        # Alt LLM config (for synthesize, extract, extract-struct, extract-references, refine)
+        # Alt LLM config (global alternate backend, toggled via UI Primary/Alt switch)
         self.alt_openai_model = None
         self.alt_openai_api_key = None
         self.alt_openrouter_model = None
@@ -121,6 +122,9 @@ class InfospaceExecutor:
         self.alt_vllm_url = None
         self.alt_anthropic_model = None
         self.alt_anthropic_api_key = None
+
+        # Active LLM selector: 'primary' or 'alt' (toggled between goals via UI)
+        self.active_llm = 'primary'
 
         # Global interrupt flag (can be set by UI via executive_node control channel)
         self.interrupt_requested: bool = False
@@ -1277,9 +1281,8 @@ Only provide the result, followed by the </end> tag.""")
             
             full_prompt = "".join(prompt_parts)
             
-            # Call LLM using unified wrapper (use alt for selected tools when configured, else main)
-            generate_fn = self._alt_llm_generate if tool_name in ALT_LLM_TOOLS else self.llm_generate
-            llm_response = generate_fn(
+            # Call LLM using unified wrapper (respects active_llm flag)
+            llm_response = self.llm_generate(
                 messages=[full_prompt],
                 bindings={},
                 max_tokens=1000,
@@ -1847,7 +1850,11 @@ Only provide the result, followed by the </end> tag.""")
             return Response(success=False, error=str(e))
     
     def llm_generate(self, messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None, reasoning_effort=None):
-        """Unified LLM generation interface using SGLang runtime or configured remote backends."""
+        """Unified LLM generation interface using SGLang runtime or configured remote backends.
+
+        When active_llm == 'alt' and an alt backend is configured, routes to the alt
+        backend instead of the primary.  Falls back to primary if no alt is available.
+        """
         # Apply bindings to messages if provided
         if bindings and isinstance(messages, list):
             processed_messages = []
@@ -1860,8 +1867,20 @@ Only provide the result, followed by the </end> tag.""")
                 else:
                     processed_messages.append(msg)
             messages = processed_messages
-        
-        # Use Anthropic if configured, then OpenAI, then OpenRouter, then vLLM, then SGLang
+
+        # If alt mode is active and an alt backend is configured, use it
+        if self.active_llm == 'alt':
+            if self.alt_anthropic_model and self.alt_anthropic_api_key:
+                return self._anthropic_generate(messages, max_tokens, temperature, stops, is_json=is_json, use_alt=True)
+            elif self.alt_openai_model and self.alt_openai_api_key:
+                return self._openai_generate(messages, max_tokens, temperature, stops, is_json=is_json, use_alt=True, reasoning_effort=reasoning_effort)
+            elif self.alt_openrouter_model and self.alt_openrouter_api_key:
+                return self._openrouter_generate(messages, max_tokens, temperature, stops, is_json=is_json, use_alt=True)
+            elif self.alt_vllm_model and self.alt_vllm_url:
+                return self._vllm_generate(messages, max_tokens, temperature, stops, is_json=is_json, use_alt=True)
+            # No alt configured — fall through to primary
+
+        # Primary backend: Anthropic → OpenAI → OpenRouter → vLLM → SGLang
         if self.anthropic_model and self.anthropic_api_key:
             return self._anthropic_generate(messages, max_tokens, temperature, stops, is_json=is_json)
         elif self.openai_model and self.openai_api_key:
@@ -1875,36 +1894,17 @@ Only provide the result, followed by the </end> tag.""")
         else:
             raise RuntimeError("No LLM backend available - ensure executive_node is started with sgl_model_path, vllm_model_path, anthropic_model_path, openai_model_path, or openrouter_model_path")
     
-    def _alt_llm_generate(self, messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
-        """Unified LLM generation using alt backend when configured; falls back to main llm_generate otherwise."""
-        if bindings and isinstance(messages, list):
-            processed_messages = []
-            for msg in messages:
-                if isinstance(msg, str):
-                    processed_msg = msg
-                    for key, value in bindings.items():
-                        processed_msg = processed_msg.replace(f"{{${key}}}", str(value))
-                    processed_messages.append(processed_msg)
-                else:
-                    processed_messages.append(msg)
-            messages = processed_messages
-        has_alt = (
-            (self.alt_anthropic_model and self.alt_anthropic_api_key) or
-            (self.alt_openai_model and self.alt_openai_api_key) or
-            (self.alt_openrouter_model and self.alt_openrouter_api_key) or
-            (self.alt_vllm_model and self.alt_vllm_url)
-        )
-        if has_alt:
-            if self.alt_anthropic_model and self.alt_anthropic_api_key:
-                return self._anthropic_generate(messages, max_tokens, temperature, stops, is_json=is_json, use_alt=True)
-            elif self.alt_openai_model and self.alt_openai_api_key:
-                return self._openai_generate(messages, max_tokens, temperature, stops, is_json=is_json, use_alt=True)
-            elif self.alt_openrouter_model and self.alt_openrouter_api_key:
-                return self._openrouter_generate(messages, max_tokens, temperature, stops, is_json=is_json, use_alt=True)
-            elif self.alt_vllm_model and self.alt_vllm_url:
-                return self._vllm_generate(messages, max_tokens, temperature, stops, is_json=is_json, use_alt=True)
-        return self.llm_generate(messages, bindings=None, max_tokens=max_tokens, temperature=temperature, is_json=is_json, stops=stops)
-    
+    def switch_llm(self, mode: str):
+        """Switch active LLM between 'primary' and 'alt'.
+
+        Should only be called between goals (not mid-execution).
+        """
+        if mode not in ('primary', 'alt'):
+            raise ValueError(f"Invalid LLM mode: {mode}")
+        prev = self.active_llm
+        self.active_llm = mode
+        logger.info(f"LLM switched from {prev} to {mode}")
+
     def _parse_json_response(self, response_text, original_prompt=None):
         """
         Parse JSON from response text, with repair mechanism.
@@ -2177,10 +2177,6 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         for key, value in self._tool_base_args_cache.items():
             if key not in resolved_args:
                 resolved_args[key] = value
-        
-        # Use alt_llm_generate for selected tools (uses alt backend when configured, else main)
-        if tool_name in ALT_LLM_TOOLS:
-            resolved_args['llm_generate'] = self._alt_llm_generate
         
         # Execute tool
         try:

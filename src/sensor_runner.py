@@ -187,14 +187,28 @@ class SensorRunner:
             reason = result.get('reason', 'unknown')
             return {'status': 'error', 'content': '', 'metadata': {'error': reason}}
 
-    def _push_to_agent(self, text: str):
-        """Publish sensor result to agent's sense_data channel."""
-        prefixed_text = f"sensor {self.sensor_name} report [{self.disposition}]\n{text}"
-        content_payload = {
-            'source': f'sensor:{self.sensor_name}',
-            'text': prefixed_text,
-            'disposition': self.disposition,
-        }
+    def _push_to_agent(self, content):
+        """Publish sensor result to agent's sense_data channel.
+
+        Args:
+            content: Either a plain string or a dict with 'summary' and 'data' keys.
+        """
+        # Structured content: carry summary + data as-is
+        if isinstance(content, dict) and 'summary' in content:
+            content_payload = {
+                'source': f'sensor:{self.sensor_name}',
+                'summary': content['summary'],
+                'data': content.get('data', []),
+                'disposition': self.disposition,
+            }
+        else:
+            # Legacy plain-text sensors
+            prefixed_text = f"sensor {self.sensor_name} report [{self.disposition}]\n{content}"
+            content_payload = {
+                'source': f'sensor:{self.sensor_name}',
+                'text': prefixed_text,
+                'disposition': self.disposition,
+            }
         sense_data = {
             'timestamp': datetime.now().isoformat(),
             'sequence_id': 0,

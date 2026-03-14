@@ -4,7 +4,7 @@ world_config:
   world_name: "infolab"
 
 llm_config:
-  openrouter_model_path: google/gemini-3-flash-preview" #qwen/qwen-2.5-72b-instruct" #"qwen/qwen3.5-397b-a17b"
+  openrouter_model_path: "google/gemini-3-flash-preview" #qwen/qwen-2.5-72b-instruct" #"qwen/qwen3.5-397b-a17b"
   #extra_request_params:
   #  reasoning:
   #    effort: "low"
@@ -43,6 +43,9 @@ characters:
             - https://rss.nytimes.com/services/xml/rss/nyt/Science.xml
             - https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml
             - https://rss.nytimes.com/services/xml/rss/nyt/Business.xml
+      - name: browser-visits
+        schedule: "30s"
+        disposition: "inform"
 
     capabilities: |
       Jill exists as an agent within Cognitive Workbench, a research framework for building autonomous agents with persistent memory, goal-directed planning, and tool use.

@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Page Visit Notifier",
+  "version": "1.0",
+  "description": "Sends visited URLs to a local listener",
+  "permissions": ["tabs"],
+  "host_permissions": ["http://localhost:5004/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}

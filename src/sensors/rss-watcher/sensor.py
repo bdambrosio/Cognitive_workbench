@@ -22,13 +22,21 @@ def run(context):
             title = entry.get('title', '')
             if keywords and not any(kw.lower() in title.lower() for kw in keywords):
                 continue
-            new_items.append(f"- {title}: {entry.get('link', '')}")
+            new_items.append({
+                'title': title,
+                'url': entry.get('link', ''),
+                'feed': feed_url,
+            })
 
     if not new_items:
         return {'status': 'nothing', 'content': '', 'metadata': {}}
 
+    n = len(new_items)
     return {
         'status': 'ok',
-        'content': f"RSS updates ({len(new_items)} new):\n" + "\n".join(new_items),
-        'metadata': {'item_count': len(new_items)},
+        'content': {
+            'summary': f"{n} new article{'s' if n != 1 else ''} from RSS feeds",
+            'data': new_items,
+        },
+        'metadata': {'item_count': n},
     }

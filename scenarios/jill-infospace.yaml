@@ -9,7 +9,7 @@ llm_config:
   grobid: "http://localhost:8070/"
 
 alt_llm_config:
-  openrouter_model_path: "qwen/qwen3-235b-a22b-2507"
+  openrouter_model_path: "google/gemini-3-flash-preview"
   
 setting: |
   Cognitive Workbench, a virtual modern 
