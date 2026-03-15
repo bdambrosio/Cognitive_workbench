@@ -3923,10 +3923,18 @@ ALWAYS follow all formatting instructions exactly.
                             logger.info("Done gate: Deep eval returned NEEDS_REVISION; reopening loop for one retry")
                             if hasattr(executor, "_done_gate_retry_active"):
                                 executor._done_gate_retry_active = True
+                            ask_nudge = ""
+                            if not _asked_user_this_goal:
+                                ask_nudge = (
+                                    "\nIf you lack the information needed to fix these issues (e.g., the source is "
+                                    "inaccessible, the goal is ambiguous, or you need the user's input to proceed), "
+                                    "use ASK_USER in your next Stage 3 instead of retrying the same approach."
+                                )
                             prompt += format_user(
                                 f"QUALITY GATE FAILED — you must revise the artifact in {last_eval_target}.\n"
                                 f"Issues found:\n{deep_text}\n\n"
                                 f"Regenerate or fix the artifact to address the FAILed criteria, then mark DONE again."
+                                f"{ask_nudge}"
                             )
                             prompt += format_assistant("Understood. I will revise the artifact to address the failed criteria.\n")
                             state[f"done_{step}"] = "NO"
