@@ -198,12 +198,15 @@ def create_sglang_runtime(llm_config: dict):
                 #runtime = sgl.Runtime(model_path=sgl_model_path,device="cuda",context_length=65536,tp_size=1,mem_fraction_static=0.9,quantization="modelopt_fp4",attention_backend="triton",**({'chat_template': chat_template} if chat_template else {}))
         elif 'FP8' in sgl_model_path:
             logger.info("Initializing SGLang Runtime with FP8 patch")
-            runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, dtype="auto", tp_size=1, mem_fraction_static=0.85, attention_backend="triton", fp8_gemm_runner_backend="cutlass")
+            runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, dtype="auto", tp_size=1, mem_fraction_static=0.85, attention_backend="triton", fp8_gemm_runner_backend="cutlass", chat_template=chat_template)
         else:
-            runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, dtype="auto", tp_size=1, mem_fraction_static=0.9, attention_backend="flashinfer")
+            if chat_template:
+                runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, dtype="auto", tp_size=1, mem_fraction_static=0.9, attention_backend="flashinfer", chat_template=chat_template)
+            else:
+                runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, dtype="auto", tp_size=1, mem_fraction_static=0.9, attention_backend="flashinfer")
 
         sgl.set_default_backend(runtime)
-        logger.info(f"SGLang Runtime initialized (model={sgl_model_path})")
+        logger.info(f"SGLang Runtime initialized (model={sgl_model_path})" + (f", chat_template={chat_template}" if chat_template else ""))
         return runtime, tokenizer
     except Exception as e:
         logger.error(f"Failed to initialize SGLang Runtime: {e}")

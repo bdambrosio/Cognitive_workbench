@@ -28,15 +28,34 @@ CODE_TEMPERATURE = 0.2         # Stage 2 code generation — low for correctness
 SELECT_TEMPERATURE = 0.1       # Tool selection, DONE/EVAL_TARGET classification — low for reliability
 REFLECT_TEMPERATURE = GEN_TEMPERATURE  # Reasoning, thoughts, next-task planning
 
-# Regex to strip <think>...</think> blocks that some models (e.g. Qwen3) prepend to output.
-# The actual answer follows after the closing </think> tag.
+# Regex to strip <think>...</think> blocks that leak into response content.
+#
+# OpenRouter routes requests across multiple providers (Google, DeepSeek,
+# Together, Fireworks, etc.) with inconsistent reasoning-token handling:
+#   - DeepSeek/Qwen3 models natively emit <think>...</think> inline in content.
+#   - Gemini models (2.5 Flash, 3 Flash, etc.) are supposed to return reasoning
+#     in a structured `reasoning_details` field, but <think> blocks can leak
+#     into the content field depending on provider/routing.
+#   - Other providers may inject think tags for reasoning-enabled models.
+#
+# Think blocks contain internal chain-of-thought reasoning, NOT answer content.
+# Always discard them entirely. If no content remains after stripping, the
+# response is malformed — do NOT extract think-block internals as a fallback,
+# since that would promote raw reasoning tokens (which may be speculative,
+# contradictory, or incomplete) to answer status.
 _THINK_TAG_RE = re.compile(r'<think>.*?</think>\s*', re.DOTALL)
 
 def _strip_think_tags(text: str) -> str:
     """Strip <think>...</think> blocks from model output, returning the actual answer."""
     if not isinstance(text, str):
         return text
-    return _THINK_TAG_RE.sub('', text)
+    result = _THINK_TAG_RE.sub('', text).strip()
+    if not result and '<think>' in text:
+        logger.warning(
+            "_strip_think_tags: entire response was inside <think> block — "
+            "no answer content (provider returned reasoning only, no response)"
+        )
+    return result
 
 # Configure logging with file handler
 # Add file handler directly to this module's logger (doesn't interfere with root logger config)
@@ -152,7 +171,7 @@ gen_tracer = GenTracer(tracer, tokenizer=None)  # or tokenizer=your_tokenizer
 _SGL_BACKEND_INITIALIZED = False
 try:
     import sglang as sgl
-    from sglang import function, system, user, assistant, gen
+    from sglang import function, system, user, assistant, gen, select
     HAS_SGLANG = True
     # Disable SGLang progress bars
     import os
@@ -354,7 +373,7 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
                 '{"type":"create-collection","name":"research","value":[],"out":"$papers"}',
                 '{"type":"create-collection","value":"$note","out":"$single_item"}'
             ],
-            "schema_hint": {"value": "array of $variables", "name": "string (optional)", "out": "$variable"}
+            "schema_hint": {"value": "[$var, ...] or []", "name": "optional, stable name", "out": "$var"}
         },
         "create-note": {
             "description": "Create a persistent Note object and bind to variable. IMPORTANT: The 'name' parameter (optional) creates a named Note that can be loaded by name later. Variable names in 'out' (e.g., '$my_note') are just bindings, NOT note names.",
@@ -371,7 +390,7 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
                 '{"type":"create-note","value":"$variable","out":"$new_note"}',
                 '{"type":"create-note","value":"important data","name":"important-note","out":"$my_note"}'
             ],
-            "schema_hint": {"value": "any content (string, number, boolean, array, object)", "name": "string (optional)", "out": "$variable"}
+            "schema_hint": {"value": "any (string, number, array, object, $var)", "name": "optional, stable name", "out": "$var"}
         },
         "get-metadata": {
             "description": "Retrieve metadata attached to a Note or Collection.",
@@ -384,7 +403,7 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
                 '{"type":"get-metadata","target":"$search_result","out":"$meta"}',
                 '{"type":"get-metadata","target":"Note_123","out":"$note_meta"}'
             ],
-            "schema_hint": {"target": "$variable or resource ID or name", "out": "$variable (optional)"}
+            "schema_hint": {"target": "$var, ID, or name", "out": "$var (optional)"}
         },
         "set-metadata": {
             "description": "Attach or update metadata on a Note or Collection.",
@@ -398,7 +417,7 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
                 '{"type":"set-metadata","target":"$report","value":"{\\"source\\": \\"weather.gov\\", \\"retrieved\\": \\"2026-02-21\\"}"}',
                 '{"type":"set-metadata","target":"$report","value":"$meta_text","out":"$meta_note"}'
             ],
-            "schema_hint": {"target": "$variable or resource ID or name", "value": "string or $variable", "out": "$variable (optional)"}
+            "schema_hint": {"target": "$var, ID, or name", "value": "string or $var", "out": "$var (optional)"}
         },
         "think": {
             "description": "generate an internal reflection on the state of the plan. Use for reasoning about the goal or the state of the plan, or to surface internal knowledge.",
@@ -411,7 +430,7 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
                 '{"type":"think","value":"Do I already have the information I need to answer the question?"}',
                 '{"type":"think","value":"$observation"}'
             ],
-            "schema_hint": {"value": "string or $variable"}
+            "schema_hint": {"value": "string or $var"}
         },
         "bind": {
             "description": "Bind a variable to an existing resource without creating or changing content.",
@@ -424,7 +443,7 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
                 '{"type":"bind","target":"$draft","out":"$final_report"}',
                 '{"type":"bind","target":"Note_42","out":"$summary"}'
             ],
-            "schema_hint": {"target": "$variable or resource ID or name", "out": "$variable"}
+            "schema_hint": {"target": "$var, ID, or name", "out": "$var"}
         },
     }
     
@@ -454,7 +473,7 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "schema_hint": PRIMITIVE_DOCS["set-metadata"]["schema_hint"]
         },
         "load": {
-            "description": "Load persistent Note or Collection by ID or name, with optional slice. Notes: slice is characters (default 0:4096). Collections: slice is items (default 0:5), returns a new Collection. Use slice=':' for full content (no limit) or slice='0:N' for explicit amount. Omit 'out' to load content into context only (no variable binding).",
+            "description": "Load Note/Collection by ID or name. Use slice=':' for full content. Omit out to load into context only.",
             "full_description": "Load a Note or Collection into planner context. The 'slice' parameter controls how much content is returned, using Python-style syntax: '0:1000' (first 1000), '1500:2000' (chars 1500–2000), '-500:' (last 500), ':' (everything, no limit), '5' (single item). Standard Python semantics including negative indices. Rejects only when both start and stop are non-negative and stop<start. For Notes, units are characters. For Collections, units are items — the result is a new Collection bound to out. Omit 'out' to load content into context only (no variable binding). Chunked pattern for large content: load slice='0:500' → process → load slice='500:1000' → process.",
             "examples": [
                 '{"type":"load","target":"$report","slice":":","out":"$full_report"}',
@@ -462,47 +481,39 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
                 '{"type":"load","target":"$papers","slice":"0:3","out":"$top_papers"}',
                 '{"type":"load","target":"$doc","slice":"0:500","out":"$chunk1"}'
             ],
-            "schema_hint": {"target": "string (ID or name) or $variable", "slice": "string (optional, e.g. '0:4096', ':', '0:5')", "out": "$variable (optional, omit to load into context only)"}
+            "schema_hint": {"target": "ID, name, or $var", "slice": "optional, e.g. ':', '0:5'", "out": "$var (optional)"}
         },
         "persist": {
             "description": "Mark Note/Collection as persistent (saved to filesystem). Optional name assigns a stable name for load-by-name (e.g., persist target=$report name=berkeley_weather_report).",
-            "schema_hint": {"target": "$variable", "name": "string (optional, stable name for load by name)"}
+            "schema_hint": {"target": "$var", "name": "optional, stable name"}
         },
         "discover-notes": {
-            "description": "Global discovery across all Notes using embedding-based retrieval. Returns Collection of Notes with text content.",
-            "schema_hint": {"query": "string (query)", "out": "$variable", "limit": "int (optional, default 5)", "threshold": "float (optional, default 0.3)"}
+            "description": "Global discovery across all Notes using embedding-based retrieval. Returns Collection.",
+            "schema_hint": {"query": "string (required)", "out": "$var", "limit": "int (optional, default 5)", "threshold": "float (optional, default 0.3)"}
         },
         "discover-collections": {
-            "description": "Global discovery across all Collections using embedding-based retrieval. Returns Collection of Notes with text content.",
-            "schema_hint": {"query": "string (query)", "out": "$variable", "limit": "int (optional, default 3)", "threshold": "float (optional, default 0.3)"}
+            "description": "Global discovery across all Collections using embedding-based retrieval. Returns Collection.",
+            "schema_hint": {"query": "string (required)", "out": "$var", "limit": "int (optional, default 3)", "threshold": "float (optional, default 0.3)"}
         },
         "search-within-collection": {
-            "description": "Search within a specific indexed Collection. Returns Collection of Notes with matched chunk text. Requires Collection to be indexed first.",
-            "schema_hint": {"target": "$variable (indexed Collection)", "query": "string (query)", "out": "$variable", "limit": "int (optional, default 5)", "threshold": "float (optional, default 0.0)"}
+            "description": "Search within an indexed Collection. Requires index first.",
+            "schema_hint": {"target": "$var (indexed Collection)", "query": "string (required)", "out": "$var", "limit": "int (optional)", "threshold": "float (optional)"}
         },
         "index": {
-            "description": "Build embedding index for Collection. Use this when you want to search the Collection later.",
-            "schema_hint": {"target": "$variable"}
+            "description": "Build embedding index for Collection (required before search-within-collection).",
+            "schema_hint": {"target": "$var"}
         },
         "map": {
-            "description": "Apply operation (primitive or tool)to each item in Collection. Use this to apply an operation to each item in a Collection.",
-            "schema_hint": {"target": "$variable", "operation": "string", "out": "$variable"}
+            "description": "Apply operation to each item in Collection.",
+            "schema_hint": {"target": "$var (Collection)", "operation": "string (tool name)", "out": "$var"}
         },
         "split": {
-            "description": "Transform Note structure into Collection: JSON array → Collection of Notes (one per element), or plain text → Collection of Notes (default: by sentence). NOT for inspecting Collection contents. Use flatten to merge Collection into single Note, or load to read content.",
-            "full_description": "Split transforms a single Note's internal structure into a Collection. Input must be a Note (not Collection) containing either: (1) JSON array - each element becomes a Note in output Collection, (2) JSON object with array field - extracts array from specified field (default 'results'), (3) JSONL format - multiple JSON objects separated by newlines, or (4) plain text - splits by delimiter (default 'sentence' for semantic processing). For plain text, default delimiter is 'sentence' which splits on sentence boundaries (. ! ? followed by space/newline), normalizes whitespace (removes internal newlines), and filters empty segments. Optional delimiter parameter: 'sentence' (default), 'paragraph' (double newlines), 'line' (single newlines), or custom string. This is a STRUCTURE TRANSFORMATION, not content inspection. To view Collection contents, use flatten (merge into single Note) or load to read content. Common mistake: trying to split a Collection to 'see inside it' - Collections are already split, use display instead.",
-            "examples": [
-                '{"type":"split","target":"$json_array_note","out":"$items"}  # [1,2,3] → Collection of 3 Notes',
-                '{"type":"split","target":"$text_note","out":"$sentences"}  # "First. Second!" → Collection of 2 Notes (default: sentence splitting)',
-                '{"type":"split","target":"$text_note","delimiter":"paragraph","out":"$paragraphs"}  # Split by paragraphs',
-                '{"type":"split","target":"$text_note","delimiter":"line","out":"$lines"}  # Split by lines',
-                '{"type":"split","target":"$nested_json","out":"$objects"}  # [{"x":1},{"x":2}] → Collection'
-            ],
-            "schema_hint": {"target": "$variable (Note with array/text)", "delimiter": "string (optional: 'sentence', 'paragraph', 'line', or custom)", "out": "$variable (Collection)"}
+            "description": "Note → Collection: JSON array or text → one Note per element/sentence.",
+            "schema_hint": {"target": "$var (Note)", "delimiter": "optional: sentence|paragraph|line|custom", "out": "$var (Collection)"}
         },
         "flatten": {
-            "description": "Flatten Collection to single Note.",
-            "schema_hint": {"target": "$variable", "out": "$variable"}
+            "description": "Collection → single Note (merge all items).",
+            "schema_hint": {"target": "$var (Collection)", "out": "$var"}
         },
         "think": {
             "description": PRIMITIVE_DOCS["think"]["description"],
@@ -517,92 +528,61 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "schema_hint": PRIMITIVE_DOCS["bind"]["schema_hint"]
         },
         "say": {
-            "description": "Send a message to the user or another agent. This is the DEFAULT for delivering information, reporting results, or making statements. Does not wait for a response. Use say unless you specifically need the recipient's answer.",
-            "schema_hint": {"value": "string or $variable", "target": "User or agent name (optional, default User)"}
+            "description": "Send message to user/agent. DEFAULT for reporting results. Does not wait for response.",
+            "schema_hint": {"value": "string or $var", "target": "optional, default User"}
         },
         "ask": {
-            "description": "Send a question and BLOCK until the recipient responds (up to 5 min timeout). Use ONLY when you need the response to continue the plan. If you are delivering information, reporting results, or echoing data back, use say instead. Requires: value, out. Optional: target (default User).",
-            "schema_hint": {"target": "User or agent name (optional)", "value": "string", "out": "$variable"}
+            "description": "Send question and BLOCK for response (5 min timeout). Use ONLY when you need the answer to continue.",
+            "schema_hint": {"value": "string (required)", "out": "$var (required)", "target": "optional, default User"}
         },
         "add": {
-            "description": "Add a Note to an existing Collection (mutates Collection in place). When used with map to add multiple Notes, use collection parameter: {\"type\":\"map\",\"target\":\"$notes\",\"operation\":\"add\",\"collection\":\"$collection\",\"out\":\"$collection\"}",
-            "schema_hint": {"target": "$variable (Collection)", "value": "$variable or literal", "out": "$variable"}
+            "description": "Add Note to Collection (mutates in place).",
+            "schema_hint": {"target": "$var (Collection)", "value": "$var or literal", "out": "$var"}
         },
         "remove": {
-            "description": "Remove a Note from a Collection (mutates Collection)",
-            "schema_hint": {"target": "$variable (Collection)", "value": "$variable or Note ID", "out": "$variable"}
+            "description": "Remove Note from Collection (mutates).",
+            "schema_hint": {"target": "$var (Collection)", "value": "$var or Note ID", "out": "$var"}
         },
         "union": {
-            "description": "Union of two Collections (A ∪ B) - all items from both, deduplicated",
-            "schema_hint": {"target": "$variable (Collection A)", "value": "$variable (Collection B)", "out": "$variable"}
+            "description": "Union of two Collections (A ∪ B), deduplicated.",
+            "schema_hint": {"target": "$var (A)", "value": "$var (B)", "out": "$var"}
         },
         "intersection": {
-            "description": "Intersection of two Collections (A ∩ B) - items in both",
-            "schema_hint": {"target": "$variable (Collection A)", "value": "$variable (Collection B)", "out": "$variable"}
+            "description": "Intersection of two Collections (A ∩ B).",
+            "schema_hint": {"target": "$var (A)", "value": "$var (B)", "out": "$var"}
         },
         "difference": {
-            "description": "Difference of two Collections (A - B) - items in A but not in B",
-            "schema_hint": {"target": "$variable (Collection A)", "value": "$variable (Collection B)", "out": "$variable"}
+            "description": "Difference of two Collections (A - B).",
+            "schema_hint": {"target": "$var (A)", "value": "$var (B)", "out": "$var"}
         },
         "size": {
-            "description": "Get item count of a Collection",
-            "schema_hint": {"target": "$variable (Collection)", "out": "$variable"}
+            "description": "Get item count of a Collection.",
+            "schema_hint": {"target": "$var (Collection)", "out": "$var"}
         },
         "project": {
-            "description": "Extract fields from each Note in Collection (SQL SELECT). Works only on Notes whose content is JSON string. For extracting info FROM plain text, use extract instead.",
-            "full_description": "Project extracts specified fields from each Note in a Collection, similar to SQL SELECT. Input Collection must contain Notes whose content is valid JSON (parseable). Output is a new Collection of projected Notes. Notes missing any requested field are excluded. Nested fields use dot notation (e.g., 'title', 'metadata.year'). Does NOT parse unstructured text — use extract for that.",
-            "examples": [
-                '{"type":"project","target":"$results","fields":["uri","score"],"out":"$filtered"}',
-                '{"type":"project","target":"$papers","fields":["title","year"],"out":"$paper_info"}'
-            ],
-            "schema_hint": {"target": "$variable (Collection of dict Notes)", "fields": "array of field paths (strings)", "out": "$variable"}
+            "description": "Extract fields from JSON Notes in Collection (SQL SELECT). Use extract for plain text.",
+            "schema_hint": {"target": "$var (Collection)", "fields": "[\"field1\", \"field2\"]", "out": "$var"}
         },
         "pluck": {
-            "description": "Extract single field value from each Note in Collection. Works only on Notes whose content is JSON string.",
-            "full_description": "Pluck extracts a single field from each Note in a Collection. Input Notes must have JSON content. Returns a Collection of Notes with just that field's value. Notes missing the field are excluded.",
-            "examples": [
-                '{"type":"pluck","target":"$papers","field":"title","out":"$titles"}',
-                '{"type":"pluck","target":"$results","field":"score","out":"$scores"}'
-            ],
-            "schema_hint": {"target": "$variable (Collection of dict Notes)", "field": "string (field path)", "out": "$variable"}
+            "description": "Extract single field from JSON Notes in Collection.",
+            "schema_hint": {"target": "$var (Collection)", "field": "string", "out": "$var"}
         },
         # head: deprecated, use load with slice instead. Executor still accepts head for backward compat.
         "sort": {
-            "description": "Sort Collection by a field value (SQL ORDER BY). Notes must have JSON content with sortable field.",
-            "full_description": "Sort a Collection by a field in each Note. Input Notes must have JSON content. Default ascending, use order:'desc' for descending. Notes missing the sort field are placed at end.",
-            "examples": [
-                '{"type":"sort","target":"$papers","by":"year","out":"$sorted_papers"}',
-                '{"type":"sort","target":"$results","by":"score","order":"desc","out":"$ranked"}'
-            ],
-            "schema_hint": {"target": "$variable (Collection of dict Notes)", "by": "string (field path)", "order": "string (optional, 'asc' or 'desc', default 'asc')", "out": "$variable"}
+            "description": "Sort Collection by field (SQL ORDER BY). JSON Notes only.",
+            "schema_hint": {"target": "$var (Collection)", "by": "string (field)", "order": "optional, asc|desc", "out": "$var"}
         },
         "filter-structured": {
-            "description": "Filter Collection by field conditions (SQL WHERE clause). Works only on Notes whose content is JSON string.",
-            "full_description": "Filter a Collection using SQL-like WHERE clause. Input Notes must have JSON content. Syntax: 'field > 100', 'year >= 2020', 'score == 1.0'. Multiple conditions: 'year > 2020 AND citations >= 100'. Notes missing fields are excluded.",
-            "examples": [
-                '{"type":"filter-structured","target":"$papers","where":"year >= 2020","out":"$recent"}',
-                '{"type":"filter-structured","target":"$results","where":"score > 0.5","out":"$high_quality"}'
-            ],
-            "schema_hint": {"target": "$variable (Collection of dict Notes)", "where": "string (SQL WHERE clause)", "out": "$variable"}
+            "description": "Filter Collection by field conditions (SQL WHERE). JSON Notes only.",
+            "schema_hint": {"target": "$var (Collection)", "where": "e.g. 'year >= 2020 AND score > 0.5'", "out": "$var"}
         },
         "join": {
-            "description": "Join two Collections on a common field (SQL JOIN). Creates new Collection of merged Notes where field values match. Inner join: only matching pairs included.",
-            "full_description": "Join two Collections by matching a field in Notes from both Collections. Input Collections must contain JSON/dict Notes with the specified join field. For each Note in target (left) Collection, finds matching Notes in value (right) Collection where field values are equal. Creates new Notes by merging matched pairs (right fields overwrite left on conflict). Only matched pairs are included (inner join). Use for combining related data from different sources.",
-            "examples": [
-                '{"type":"join","target":"$papers","value":"$citations","on":"paper_id","out":"$papers_with_citations"}',
-                '{"type":"join","target":"$users","value":"$profiles","on":"user_id","out":"$user_profiles"}'
-            ],
-            "schema_hint": {"target": "$variable (left Collection)", "value": "$variable (right Collection)", "on": "string (field name to join on)", "out": "$variable"}
+            "description": "Inner join two Collections on a common field (SQL JOIN).",
+            "schema_hint": {"target": "$var (left)", "value": "$var (right)", "on": "string (field name)", "out": "$var"}
         },
         "coerce": {
-            "description": "Convert Note content to different type/format. Supports: to-string, to-int, to-float, to-bool, to-json (parse JSON string), to-list (split string or wrap value). Use for type conversion before operations requiring specific types.",
-            "full_description": "Coerce converts a Note's content to a different type. Input is a Note (not Collection). Coercion types: 'to-string' (any -> string), 'to-int' (string/number -> integer), 'to-float' (string/number -> float), 'to-bool' (string/number -> boolean), 'to-json' (JSON string -> parsed object), 'to-list' (string -> split by delimiter, or value -> [value]). Use when operations require specific types (e.g., arithmetic needs numbers, sort needs comparable types).",
-            "examples": [
-                '{"type":"coerce","target":"$count_string","coercion":"to-int","out":"$count_number"}',
-                '{"type":"coerce","target":"$json_string","coercion":"to-json","out":"$parsed_object"}',
-                '{"type":"coerce","target":"$csv_line","coercion":"to-list","delimiter":",","out":"$fields"}'
-            ],
-            "schema_hint": {"target": "$variable (Note)", "coercion": "string (to-string|to-int|to-float|to-bool|to-json|to-list)", "delimiter": "string (optional, for to-list)", "out": "$variable"}
+            "description": "Convert Note content type: to-string|to-int|to-float|to-bool|to-json|to-list.",
+            "schema_hint": {"target": "$var (Note)", "coercion": "string (type)", "delimiter": "optional, for to-list", "out": "$var"}
         }
     }
     
@@ -695,28 +675,19 @@ def tool_catalog_text(tools: Dict[str, Dict]) -> str:
             world_tools[source].append((name, meta))
     
     # Helper function to format a tool entry
+    # Initial catalog uses short descriptions + compact schema hints.
+    # Full docs with examples are loaded on-demand via REQUEST_TOOLS → load_skill_docs().
     def format_tool(name: str, meta: Dict) -> List[str]:
         tool_lines = []
-        description = meta.get('full_description') or meta.get('description', 'No description')
-        tool_lines.append(f"- {name}: {description}")
-        
-        # Add examples for primitives with expanded docs
-        if 'examples' in meta and meta['examples']:
-            tool_lines.append(f"  examples:")
-            for ex in meta['examples']:
-                # Format example as single-line JSON if it's a dict or string
-                if isinstance(ex, dict):
-                    ex_str = json.dumps(ex, separators=(',', ':'))
-                elif isinstance(ex, str):
-                    # Try to parse and re-serialize as single-line if it's JSON
-                    try:
-                        parsed = json.loads(ex)
-                        ex_str = json.dumps(parsed, separators=(',', ':'))
-                    except (json.JSONDecodeError, TypeError):
-                        ex_str = ex
-                else:
-                    ex_str = str(ex)
-                tool_lines.append(f"    {ex_str}")
+        description = meta.get('description', 'No description')
+        schema = meta.get('schema_hint')
+        if schema and isinstance(schema, dict):
+            # Compact inline params: {key: hint, key: hint}
+            params = ", ".join(f"{k}: {v}" for k, v in schema.items())
+            tool_lines.append(f"- {name}: {description}")
+            tool_lines.append(f"  params: {{{params}}}")
+        else:
+            tool_lines.append(f"- {name}: {description}")
         return tool_lines
     
     # List world tools first, grouped by world name
@@ -2587,9 +2558,10 @@ ALWAYS follow all formatting instructions exactly.
             "#Stage 3 FORMAT:\n"
             "  THOUGHTS: <brief assessment of result and progress>\n"
             "  EVAL_TARGET: <single $variable (e.g. $report) of the key output artifact from this step, or NONE if no significant artifact>\n"
-            "  DONE: <YES or NO — is the entire GOAL satisfied?>\n"
+            "  DONE: YES or NO — is the entire GOAL satisfied?\n"
             "  NEXT_TASK: <next task description, or blank if DONE=YES>\n"
-            "  REQUEST_TOOLS: <json array of tool names needing docs, or []>\n"
+            "  REQUEST_TOOLS: YES or NO — do you need detailed docs for tools not yet loaded?\n"
+            "  ASK_USER: YES or NO — are you stuck and need user guidance?\n"
             "\n"
             "#Stage 3 RULES:\n"
             "- DONE=YES only when ALL required actions are complete.\n"
@@ -2600,7 +2572,10 @@ ALWAYS follow all formatting instructions exactly.
             "  use a different approach or proceed with available data.\n"
             "- PARTIAL FAILURE: For tasks processing multiple items, check the value string for counts.\n"
             "  '0 of N processed' is a failure — set DONE=NO and retry with a corrected approach.\n"
-            "- REQUEST_TOOLS: Always valid JSON: [] or [\"tool1\", \"tool2\"].\n"
+            "- REQUEST_TOOLS=YES: you will be prompted for tool names (e.g. search-web, extract).\n"
+            "- ASK_USER=YES: use only when you genuinely lack information the user has — wrong target,\n"
+            "  ambiguous goal, repeated failure you cannot diagnose, or a preference you cannot resolve.\n"
+            "  Always try at least once before asking. At most one ASK_USER per goal.\n"
             "\n"
             "Follow these formats exactly."
         )
@@ -2623,6 +2598,7 @@ ALWAYS follow all formatting instructions exactly.
         deep_eval_retried = False
         deep_eval_prev_artifact = None
         plan_local_bindings = set()
+        _asked_user_this_goal = False
         for step in range(max_steps):
             if _interrupt_requested(executor):
                 _clear_interrupt(executor)
@@ -2722,20 +2698,36 @@ ALWAYS follow all formatting instructions exactly.
                     s += user(f"VISION EVALUATION:\n{vision_eval_text}\nFAILs are advisory — attempt to address if easy, do NOT loop repeatedly. Proceed after at most three retries.\n")
                     s += assistant("Noted.\n")
             
-            # Stage 3: Structured reflection (5 fields)
+            # Stage 3: Structured reflection (6 fields, select() for categorical decisions)
             s += assistant(
                 "THOUGHTS: "
                 + gen(f"thoughts_{step}", max_tokens=128, temperature=REFLECT_TEMPERATURE, stop="\nEVAL_TARGET:")
                 + "\nEVAL_TARGET: "
                 + gen(f"eval_target_{step}", max_tokens=32, temperature=SELECT_TEMPERATURE, stop="\nDONE:")
                 + "\nDONE: "
-                + gen(f"done_{step}", max_tokens=8, temperature=SELECT_TEMPERATURE, stop="\nNEXT_TASK:")
+                + select(f"done_{step}", ["YES", "NO"])
                 + "\nNEXT_TASK: "
                 + gen(f"next_task_{step}", max_tokens=128, temperature=REFLECT_TEMPERATURE, stop="\nREQUEST_TOOLS:")
                 + "\nREQUEST_TOOLS: "
-                + gen(f"request_tools_{step}", max_tokens=96, temperature=SELECT_TEMPERATURE, stop=["\n\n", "\nTHOUGHTS:", "\nDONE:", "\nNEXT_TASK:", "\nREQUEST_TOOLS:", "\nEVAL_TARGET:"])
+                + select(f"request_tools_{step}", ["YES", "NO"])
+                + "\nASK_USER: "
+                + select(f"ask_user_{step}", ["YES", "NO"])
                 + "\n"
             )
+            # Conditional follow-up: generate tool list only when REQUEST_TOOLS=YES
+            if s[f"request_tools_{step}"] == "YES":
+                s += assistant(
+                    "REQUEST_TOOLS_LIST: "
+                    + gen(f"request_tools_list_{step}", max_tokens=96, temperature=SELECT_TEMPERATURE, stop=["\n\n", "\nTHOUGHTS:", "\nSTAGE", "\nASK_USER"])
+                    + "\n"
+                )
+            # Conditional follow-up: generate question text only when ASK_USER=YES
+            if s[f"ask_user_{step}"] == "YES":
+                s += assistant(
+                    "ASK_USER_QUESTION: "
+                    + gen(f"ask_user_question_{step}", max_tokens=192, temperature=REFLECT_TEMPERATURE, stop=["\n\n", "\nTHOUGHTS:", "\nSTAGE"])
+                    + "\n"
+                )
             
             def safe_get(state, key, default='N/A'):
                 try:
@@ -2747,7 +2739,10 @@ ALWAYS follow all formatting instructions exactly.
             logger.info(f"EVAL_TARGET: {safe_get(s, f'eval_target_{step}')}")
             logger.info(f"DONE: {safe_get(s, f'done_{step}')}")
             logger.info(f"NEXT_TASK: {safe_get(s, f'next_task_{step}')}")
-            logger.info(f"REQUEST_TOOLS: {safe_get(s, f'request_tools_{step}')}")
+            if s[f"request_tools_{step}"] == "YES":
+                logger.info(f"REQUEST_TOOLS: YES — {safe_get(s, f'request_tools_list_{step}', '')[:200]}")
+            if s[f"ask_user_{step}"] == "YES":
+                logger.info(f"ASK_USER: YES — {safe_get(s, f'ask_user_question_{step}', '')[:200]}")
 
             # Update last_eval_target from LLM-declared EVAL_TARGET (overrides heuristic)
             llm_eval_target_raw = safe_get(s, f"eval_target_{step}", "").strip()
@@ -2781,27 +2776,57 @@ ALWAYS follow all formatting instructions exactly.
                             logger.debug(f"Stage 3.1: Failed to update commentary for {rid}: {e}")
             
             # Stage 3.5: Dynamic tool loading (if requested)
-            requested_tools_raw = _strip_numbered_prefix(s[f"request_tools_{step}"].strip())
-            requested_tools = parse_request_tools(requested_tools_raw)
-            if requested_tools:
-                logger.info(f"Step {step}: LLM requested additional tools: {requested_tools}")
-                tools_to_load = [tool for tool in requested_tools if tool not in _loaded_skill_docs]
-                if tools_to_load:
-                    expanded_docs = load_skill_docs(tools_to_load, executor.available_tools)
-                    if expanded_docs:
-                        s += user(f"ADDITIONAL TOOL DOCUMENTATION:\n{expanded_docs}")
-                        s += assistant("I have reviewed the additional tool documentation.\n")
-                        logger.info(f"Stage 3.5: Loaded docs for {len(tools_to_load)} additional tools: {tools_to_load}")
-                        _loaded_skill_docs.update(tools_to_load)
-                else:
-                    logger.debug(f"Stage 3.5: All requested tools already have docs loaded, skipping")
-            elif requested_tools_raw and requested_tools_raw.lower() not in ["", "[]", "none", "null"]:
-                logger.warning(f"Step {step}: Failed to parse REQUEST_TOOLS: {requested_tools_raw[:100]}")
+            if s[f"request_tools_{step}"] == "YES":
+                requested_tools_raw = _strip_numbered_prefix(
+                    _strip_think_tags(safe_get(s, f"request_tools_list_{step}", "")).strip()
+                )
+                requested_tools = parse_request_tools(requested_tools_raw)
+                if requested_tools:
+                    logger.info(f"Step {step}: LLM requested additional tools: {requested_tools}")
+                    tools_to_load = [tool for tool in requested_tools if tool not in _loaded_skill_docs]
+                    if tools_to_load:
+                        expanded_docs = load_skill_docs(tools_to_load, executor.available_tools)
+                        if expanded_docs:
+                            s += user(f"ADDITIONAL TOOL DOCUMENTATION:\n{expanded_docs}")
+                            s += assistant("I have reviewed the additional tool documentation.\n")
+                            logger.info(f"Stage 3.5: Loaded docs for {len(tools_to_load)} additional tools: {tools_to_load}")
+                            _loaded_skill_docs.update(tools_to_load)
+                    else:
+                        logger.debug(f"Stage 3.5: All requested tools already have docs loaded, skipping")
+                elif requested_tools_raw:
+                    logger.warning(f"Step {step}: REQUEST_TOOLS=YES but failed to parse tool list: {requested_tools_raw[:100]}")
             
-            # Strip <think> tags from model outputs (Qwen3 thinking mode)
-            for _key in [f"thoughts_{step}", f"eval_target_{step}", f"done_{step}", f"next_task_{step}", f"request_tools_{step}"]:
+            # Strip <think> tags from model outputs (Qwen3 thinking mode / OpenRouter provider variance)
+            # Note: done_{step}, request_tools_{step}, and ask_user_{step} use select(), not gen(), so they're immune.
+            for _key in [f"thoughts_{step}", f"eval_target_{step}", f"next_task_{step}", f"request_tools_list_{step}", f"ask_user_question_{step}"]:
                 if _key in s:
                     s[_key] = _strip_think_tags(s[_key])
+
+            # Stage 3.6: ASK_USER — pause and ask the user for guidance (at most once per goal)
+            if s[f"ask_user_{step}"] == "YES" and not _asked_user_this_goal:
+                ask_question = _strip_think_tags(safe_get(s, f"ask_user_question_{step}", "")).strip()
+                if ask_question:
+                    _asked_user_this_goal = True
+                    logger.info(f"Step {step}: ASK_USER triggered — pausing for user input")
+                    ask_result = executor.execute_action_tracked(
+                        {"type": "ask", "value": ask_question, "out": "$_user_guidance"},
+                        "codegen"
+                    )
+                    if ask_result.get("status") == "success":
+                        user_response = ask_result.get("value", "")
+                        s += user(f"USER_GUIDANCE (response to your question): {user_response}\nIncorporate this guidance into your next step.")
+                        s += assistant("Understood, I will incorporate the user's guidance.\n")
+                        logger.info(f"Step {step}: User responded to ASK_USER: {user_response[:200]}")
+                    else:
+                        s += user("ASK_USER timed out or was interrupted. Proceed with your best judgment.")
+                        s += assistant("Understood, proceeding without user input.\n")
+                        logger.info(f"Step {step}: ASK_USER failed or timed out — continuing")
+                    # Check for interrupt after ask (user may have cancelled)
+                    if _interrupt_requested(executor):
+                        _clear_interrupt(executor)
+                        s["ask_completed_successfully"] = True
+                        s["final_answer"] = "Interrupted by user."
+                        break
 
             # Check if done
             done_raw = _strip_numbered_prefix(s[f"done_{step}"].strip()).upper()
@@ -2891,6 +2916,19 @@ ALWAYS follow all formatting instructions exactly.
             )
             if stall_reason:
                 logger.info(stall_reason)
+                # If we haven't nudged yet, give one more step with ASK_USER hint
+                if not stall_guard_state.get("nudged"):
+                    s += user(
+                        "STALL DETECTED: You are repeating the same approach without progress. "
+                        "Consider using ASK_USER in your next Stage 3 to get guidance from the user, "
+                        "or try a fundamentally different approach. One more step allowed."
+                    )
+                    s += assistant("Understood, I will reassess.\n")
+                    logger.info(f"Step {step}: Stall guard triggered — nudging ASK_USER before giving up")
+                    stall_guard_state["prev_signature"] = None
+                    stall_guard_state["repeat_count"] = 0
+                    stall_guard_state["nudged"] = True
+                    continue  # Give one more iteration
                 draft_text = _resolve_eval_target_text(last_eval_target, executor) if last_eval_target else ""
                 caveat = "Loop guard: repeated planning pattern detected. Delivering best available draft from this cycle."
                 s["VERIFICATION_ANSWER"] = "PARTIAL"
@@ -2904,7 +2942,8 @@ ALWAYS follow all formatting instructions exactly.
                 logger.info(f"Step {step}: Next task: {current_task}")
             else:
                 logger.warning(f"Step {step}: No NEXT_TASK provided, stopping")
-        
+                break
+
         # Interrupt checkpoint: exit from tool_planner_infospace
         if executor and _interrupt_requested(executor):
             _clear_interrupt(executor)
@@ -3346,7 +3385,8 @@ def tool_planner_infospace_vllm(template, goal: str, world_model: Dict, characte
         remainder = _extract_after_label(text, label)
         if not remainder:
             return ""
-        # Strip leading whitespace and take first line
+        # Strip think tags before line extraction (think blocks may span multiple lines)
+        remainder = _strip_think_tags(remainder)
         remainder = remainder.lstrip()
         line = remainder.splitlines()[0] if remainder.splitlines() else remainder
         return _strip_numbered_prefix(line.strip())
@@ -4009,7 +4049,8 @@ ALWAYS follow all formatting instructions exactly.
             logger.info(f"Step {step}: Next task: {current_task}")
         else:
             logger.warning(f"Step {step}: No NEXT_TASK provided, stopping")
-    
+            break
+
     # Interrupt checkpoint: exit from tool_planner_infospace
     if executor and _interrupt_requested(executor):
         _clear_interrupt(executor)
