@@ -3595,6 +3595,7 @@ ALWAYS follow all formatting instructions exactly.
         "  VERIFICATION: <if DONE=YES: list observable facts proving GOAL is met, and any missing outcomes. Write SUCCESS, PARTIAL, or INCONCLUSIVE. If DONE=NO, leave blank.>\n"
         "  NEXT_TASK: <next task description, or blank if DONE=YES>\n"
         "  REQUEST_TOOLS: <json array of tool names needing docs, or []>\n"
+        "  ASK_USER: <optional — if stuck and retrying won't help, a concise question. Include what you tried, why you're stuck, and 2-3 options if possible. Leave blank otherwise.>\n"
         "\n"
         "#Stage 3 RULES:\n"
         "- DONE=YES only when ALL required actions are complete.\n"
@@ -3603,6 +3604,9 @@ ALWAYS follow all formatting instructions exactly.
         "- Efficiency rule: if prior step used only one tool call and GOAL is not done, set NEXT_TASK to combine adjacent subtasks.\n"
         "- SPIRAL DETECTION: If the same tool has failed 2+ times consecutively,\n"
         "  use a different approach or proceed with available data.\n"
+        "- ASK_USER: Use only when you genuinely lack information the user has — wrong target,\n"
+        "  ambiguous goal, repeated failure you cannot diagnose, or a preference you cannot resolve.\n"
+        "  Always try at least once before asking. At most one ASK_USER per goal.\n"
         "- REQUEST_TOOLS: Always valid JSON: [] or [\"tool1\", \"tool2\"].\n"
         "\n"
         "Follow these formats exactly."
@@ -3630,6 +3634,7 @@ ALWAYS follow all formatting instructions exactly.
     deep_eval_retried = False
     deep_eval_prev_artifact = None
     plan_local_bindings = set()
+    _asked_user_this_goal = False
     for step in range(max_steps):
         if _interrupt_requested(executor):
             _clear_interrupt(executor)
@@ -3729,7 +3734,8 @@ ALWAYS follow all formatting instructions exactly.
         done_val = _strip_think_tags(_extract_line_value(stage3_block, "DONE:"))
         verification_val = _strip_think_tags(_extract_between_labels(stage3_block, "VERIFICATION:", "NEXT_TASK:"))
         next_task_val = _strip_numbered_prefix(_strip_think_tags(_extract_between_labels(stage3_block, "NEXT_TASK:", "REQUEST_TOOLS:")))
-        request_tools_val = _strip_numbered_prefix(_strip_think_tags(_extract_after_label(stage3_block, "REQUEST_TOOLS:").strip()))
+        request_tools_val = _strip_numbered_prefix(_strip_think_tags(_extract_between_labels(stage3_block, "REQUEST_TOOLS:", "ASK_USER:") or _extract_after_label(stage3_block, "REQUEST_TOOLS:")).strip())
+        ask_user_val = _strip_think_tags(_extract_after_label(stage3_block, "ASK_USER:").strip())
 
         # JSON fallback: some models output Stage 3 as JSON instead of label format
         if not done_val:
@@ -3754,6 +3760,7 @@ ALWAYS follow all formatting instructions exactly.
                         request_tools_val = request_tools_val or _json.dumps(rt)
                     else:
                         request_tools_val = request_tools_val or str(rt)
+                    ask_user_val = ask_user_val or str(stage3_json.get("ask_user", ""))
                     logger.info(f"Step {step}: Stage 3 parsed via JSON fallback (DONE={done_val})")
             except (ValueError, KeyError, TypeError):
                 pass
@@ -3764,7 +3771,8 @@ ALWAYS follow all formatting instructions exactly.
         state[f"verification_{step}"] = verification_val
         state[f"next_task_{step}"] = next_task_val
         state[f"request_tools_{step}"] = _strip_code_fences(request_tools_val)
-        
+        state[f"ask_user_{step}"] = ask_user_val
+
         def safe_get(state_dict, key, default='N/A'):
             try:
                 return state_dict[key]
@@ -3778,6 +3786,8 @@ ALWAYS follow all formatting instructions exactly.
             logger.info(f"VERIFICATION: {verification_val}")
         logger.info(f"NEXT_TASK: {safe_get(state, f'next_task_{step}')}")
         logger.info(f"REQUEST_TOOLS: {safe_get(state, f'request_tools_{step}')}")
+        if ask_user_val:
+            logger.info(f"ASK_USER: {ask_user_val[:200]}")
 
         llm_eval_target_raw = state.get(f"eval_target_{step}", "").strip()
         if llm_eval_target_raw and llm_eval_target_raw.upper() != "NONE":
@@ -3826,7 +3836,26 @@ ALWAYS follow all formatting instructions exactly.
                 logger.debug(f"Stage 3.5: All requested tools already have docs loaded, skipping")
         elif requested_tools_raw and requested_tools_raw.lower() not in ["", "[]", "none", "null"]:
             logger.warning(f"Step {step}: Failed to parse REQUEST_TOOLS: {requested_tools_raw[:100]}")
-        
+
+        # Stage 3.6: ASK_USER — pause and ask the user for guidance (at most once per goal)
+        ask_user_raw = state.get(f"ask_user_{step}", "").strip()
+        if ask_user_raw and ask_user_raw.lower() not in ("", "none", "null", "n/a", "blank") and not _asked_user_this_goal:
+            _asked_user_this_goal = True
+            logger.info(f"Step {step}: ASK_USER triggered — pausing for user input")
+            ask_result = executor.execute_action_tracked(
+                {"type": "ask", "value": ask_user_raw, "out": "$_user_guidance"},
+                "codegen"
+            )
+            if ask_result.get("status") == "success":
+                user_response = ask_result.get("value", "")
+                prompt += format_user(f"USER_GUIDANCE (response to your question): {user_response}\nIncorporate this guidance into your next step.")
+                prompt += format_assistant("Understood, I will incorporate the user's guidance.\n")
+                logger.info(f"Step {step}: User responded to ASK_USER: {user_response[:200]}")
+            else:
+                prompt += format_user("ASK_USER timed out or was interrupted. Proceed with your best judgment.")
+                prompt += format_assistant("Understood, proceeding without user input.\n")
+                logger.info(f"Step {step}: ASK_USER failed or timed out — continuing")
+
         # Check if done
         done_raw = _strip_numbered_prefix(state.get(f"done_{step}", "").strip()).upper()
         next_task_raw = _strip_numbered_prefix(state.get(f"next_task_{step}", "").strip())
@@ -3945,6 +3974,20 @@ ALWAYS follow all formatting instructions exactly.
         )
         if stall_reason:
             logger.info(stall_reason)
+            # If we haven't nudged yet, give one more step with ASK_USER hint
+            if not stall_guard_state.get("nudged"):
+                prompt += format_user(
+                    "STALL DETECTED: You are repeating the same approach without progress. "
+                    "Consider using ASK_USER in your next Stage 3 to get guidance from the user, "
+                    "or try a fundamentally different approach. One more step allowed."
+                )
+                prompt += format_assistant("Understood, I will reassess.\n")
+                logger.info(f"Step {step}: Stall guard triggered — nudging ASK_USER before giving up")
+                # Reset stall guard so the nudge step gets a clean pass
+                stall_guard_state["prev_signature"] = None
+                stall_guard_state["repeat_count"] = 0
+                stall_guard_state["nudged"] = True  # Don't nudge again — next stall triggers normal bailout
+                continue  # Give one more iteration
             draft_text = _resolve_eval_target_text(last_eval_target, executor) if last_eval_target else ""
             caveat = "Loop guard: repeated planning pattern detected. Delivering best available draft from this cycle."
             state["VERIFICATION_ANSWER"] = "PARTIAL"

@@ -64,3 +64,4 @@ scenarios/*/
 
 # Musings (generated/runtime)
 src/musings/
+zenoh-venv/
