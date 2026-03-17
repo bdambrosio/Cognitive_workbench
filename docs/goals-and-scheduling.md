@@ -50,7 +50,7 @@ When a goal's schedule mode is set to **daily**, a time picker appears in the UI
 
 ### How it works
 
-The **TaskScheduler** (`task_scheduler.py`) is a daemon thread that runs in the background:
+The **GoalScheduler** (`goal_scheduler.py`) is a daemon thread that runs in the background:
 
 1. It checks for eligible goals every 15 seconds (configurable via `interval` in the scenario YAML)
 2. A goal is eligible when:

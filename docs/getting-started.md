@@ -35,11 +35,13 @@ The system reads API keys and service credentials from environment variables. Se
 
 | Variable | Tool | Notes |
 |----------|------|-------|
-| `GMAIL_ADDRESS` | check-email | Your Gmail address |
-| `GMAIL_APP_PASSWORD` | check-email | 16-character app password (requires 2FA enabled; generate at [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)) |
+| `GMAIL_ADDRESS` | check-email, send-email | Your Gmail address |
+| `GMAIL_APP_PASSWORD` | check-email, send-email | 16-character app password (requires 2FA enabled; generate at [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)) |
 | `GOOGLE_API_KEY` | search-web | Google Custom Search API key |
 | `GOOGLE_CX` | search-web | Google Custom Search Engine ID |
 | `ALPHA_VANTAGE_API_KEY` | stock-price | From [alphavantage.co](https://www.alphavantage.co/) |
+| `BLUESKY_ACCOUNT_HANDLE` | post-bluesky | Bluesky handle (e.g., `alice.bsky.social`) |
+| `BLUESKY_APP_PASSWORD` | post-bluesky | App password from Bluesky Settings > App Passwords |
 | `OBSIDIAN_MCP_URL` | search-obsidian | Obsidian MCP server URL (default: `http://127.0.0.1`) |
 | `OBSIDIAN_MCP_API_KEY` | search-obsidian | Obsidian MCP server API key |
 
@@ -152,10 +154,11 @@ Options:
 |---------------|-------------|
 | `jill-infospace.yaml` | Core agent — infospace reasoning, web search, semantic scholar (SGLang) |
 | `jill-infospace-openrouter.yaml` | Same as above but using OpenRouter API |
+| `jill-infospace-anthropic.yaml` | Same as above but using Anthropic Claude |
+| `jill-infospace-openai.yaml` | Same as above but using OpenAI API |
 | `jill-infospace-vllm.yaml` | Same as above but using vLLM backend |
 | `jill-fs.yaml` | File system world — fs-list, fs-read, fs-grep, fs-find tools |
 | `jill-fs-openrouter.yaml` | File system world via OpenRouter |
-| `jill-fs-anthropic.yaml` | File system world via Anthropic Claude |
 | `jill-minecraft.yaml` | Minecraft integration — navigation, crafting, 3D world |
 | `jill-osworld.yaml` | OS/desktop automation world |
 | `jill-scienceworld.yaml` | ScienceWorld simulation for science tasks |

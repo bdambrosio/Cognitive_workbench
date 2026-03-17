@@ -109,10 +109,11 @@ Each character is a named entry with:
 |------|---------|-------|-------------|
 | `jill-infospace.yaml` | SGLang | infolab | Core agent with web search, semantic scholar |
 | `jill-infospace-openrouter.yaml` | OpenRouter | infolab | Same, via OpenRouter API |
+| `jill-infospace-anthropic.yaml` | Anthropic | infolab | Same, via Anthropic Claude |
+| `jill-infospace-openai.yaml` | OpenAI | infolab | Same, via OpenAI API |
 | `jill-infospace-vllm.yaml` | vLLM | infolab | Same, via vLLM backend |
 | `jill-fs.yaml` | SGLang | fs | File system tools (list, read, grep, find) |
 | `jill-fs-openrouter.yaml` | OpenRouter | fs | File system via OpenRouter |
-| `jill-fs-anthropic.yaml` | Anthropic | fs | File system via Claude |
 | `jill-minecraft.yaml` | SGLang | minecraft | 3D world navigation and crafting |
 | `jill-osworld.yaml` | SGLang | osworld | Desktop automation |
 | `jill-scienceworld.yaml` | SGLang | scienceworld | Science simulation tasks |
@@ -191,7 +192,7 @@ Cognitive_workbench/
 │   ├── infospace_resource_manager.py  # Persistence + FAISS
 │   ├── fastapi_action_display.py  # Web UI
 │   ├── resource_browser.py        # Resource browser UI
-│   ├── task_scheduler.py          # Autonomous scheduler
+│   ├── goal_scheduler.py          # Autonomous goal scheduler
 │   ├── conversation_store.py      # Dialog tracking
 │   ├── tool_model.py              # Tool success tracking
 │   ├── world_model.py             # Persistent knowledge base

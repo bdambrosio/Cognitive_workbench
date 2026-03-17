@@ -44,7 +44,7 @@ User: "goal: Find recent papers on multi-agent coordination"
 - **[Goal Scheduling](docs/goals-and-scheduling.md)** — submit goals with `goal:` prefix; schedule them for manual, automatic, recurring, or daily-at-time execution
 - **[Envisioning & Quality Control](docs/envisioning-and-quality-control.md)** — lightweight LLM framing for coherent dialog; post-execution reflection for failure recovery and learning
 - **[Infospace Memory](docs/architecture.md#infospace-memory-model)** — Notes, Collections, and Relations as structured working memory with FAISS semantic search
-- **[Extensible Tools](docs/tools-and-primitives.md)** — 20+ built-in tools (web search, email, academic papers, shell scripts) plus world-specific integrations
+- **[Extensible Tools](docs/tools-and-primitives.md)** — 24 built-in tools (web search, email, Bluesky, academic papers, shell scripts) plus world-specific integrations
 - **[Missing Affordance Monitoring](docs/envisioning-and-quality-control.md#missing-affordance-monitoring)** — automatic detection and logging of capability gaps for future tool development
 - **[World Integrations](docs/configuration.md#available-scenarios)** — optional worlds (Minecraft, file system, desktop automation, ScienceWorld) with specialized tools
 - **[Web UI](docs/ui-guide.md)** — real-time dashboard with action log, goal scheduling, and resource browser
@@ -130,8 +130,11 @@ See [Getting Started](docs/getting-started.md) for full setup details, environme
 |----------|-------|---------|
 | `jill-infospace.yaml` | Core infospace | SGLang (local GPU) |
 | `jill-infospace-openrouter.yaml` | Core infospace | OpenRouter (cloud) |
+| `jill-infospace-anthropic.yaml` | Core infospace | Anthropic Claude |
+| `jill-infospace-openai.yaml` | Core infospace | OpenAI |
+| `jill-infospace-vllm.yaml` | Core infospace | vLLM (local GPU) |
 | `jill-fs.yaml` | File system | SGLang |
-| `jill-fs-anthropic.yaml` | File system | Anthropic Claude |
+| `jill-fs-openrouter.yaml` | File system | OpenRouter (cloud) |
 | `jill-minecraft.yaml` | Minecraft 3D world | SGLang |
 | `jill-osworld.yaml` | Desktop automation | SGLang |
 | `jill-scienceworld.yaml` | Science simulation | SGLang |
@@ -155,7 +158,7 @@ Cognitive_workbench/
     ├── infospace_executor.py           # Primitives + tool execution
     ├── infospace_resource_manager.py   # Notes/Collections/Relations + FAISS
     ├── fastapi_action_display.py      # Web UI
-    ├── task_scheduler.py              # Autonomous goal scheduling
+    ├── goal_scheduler.py              # Autonomous goal scheduling
     ├── tools/                         # Core tools (search-web, run-script, etc.)
     ├── world-tools/                   # World-specific tools (minecraft, fs, etc.)
     ├── scripts/                       # Shell scripts for run-script tool

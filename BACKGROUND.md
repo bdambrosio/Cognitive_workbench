@@ -105,14 +105,14 @@ Memory is not "storage for the action system" - it's **central to cognition**. T
 - RAG-indexed content (semantic search)
 - Action history (for reflection)
 
-### 3. Planning vs. Execution Separation
+### 3. Incremental Planning
 
-Agents don't mix reasoning and acting. They:
-1. Generate complete plans (with variables, conditionals, loops)
-2. Execute plans step-by-step
-3. Re-plan on failure or goal change
+Agents interleave reasoning and acting in a tight loop. They:
+1. Generate one plan step at a time
+2. Execute it and observe the result
+3. Decide the next step based on what actually happened
 
-This enables **plan inspection**, **editing**, and **learning** - you can't improve what you can't examine.
+This enables **adaptive execution** — the plan emerges from real results, not predictions. Each step is inspectable and logged for reflection and learning.
 
 ### 4. Tool Composition
 
@@ -135,7 +135,7 @@ This makes agent behavior more predictable and debuggable than pure LLM generati
 
 ## Relation to Other Work
 
-**vs. ReAct/Reasoning+Acting**: Similar tool use, but Cognitive Workbench emphasizes *planning ahead* rather than interleaved reasoning-action.
+**vs. ReAct/Reasoning+Acting**: Similar interleaved reasoning-action pattern, but Cognitive Workbench adds persistent memory, structured reflection, autonomous goal scheduling, and a typed information space.
 
 **vs. AutoGPT/BabyAGI**: Similar autonomous goal pursuit, but with explicit architecture (OODA, memory, infospace) rather than emergent behavior.
 
@@ -150,18 +150,15 @@ This makes agent behavior more predictable and debuggable than pure LLM generati
 ## Current Limitations and Future Work
 
 **Limitations:**
-- Plans can be brittle (validation strictness)
 - Single-agent reflection (no multi-agent learning yet)
-- Limited world simulation (2D grid, basic physics)
-- Tool execution is serial (could parallelize)
+- Tool execution is serial within a plan step (could parallelize)
+- Quality gate evaluation can be conservative (false negatives)
 
 **Future directions:**
-1. **Hierarchical planning**: Plans that generate sub-plans dynamically
-2. **Cross-agent knowledge sharing**: Agents teaching each other
-3. **Continuous learning**: Automated reflection and heuristic generation
-4. **Richer worlds**: 3D spaces, complex objects, realistic physics
-5. **Interactive planning**: Multi-turn dialogue with planner
-6. **Meta-tools**: Tools that create/modify other tools
+1. **Cross-agent knowledge sharing**: Agents teaching each other
+2. **Continuous learning**: Automated reflection and heuristic generation
+3. **Meta-tools**: Tools that create/modify other tools (partially implemented via `create-tool`)
+4. **Richer memory backends**: Integration with external memory systems
 
 ---
 

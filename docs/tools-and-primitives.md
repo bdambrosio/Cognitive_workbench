@@ -153,34 +153,34 @@ These live in `src/tools/` and are always available:
 | Tool | Description |
 |------|-------------|
 | `check-email` | Read Gmail inbox via IMAP. Requires `GMAIL_ADDRESS` and `GMAIL_APP_PASSWORD` |
+| `send-email` | Send email via Gmail SMTP. Requires `GMAIL_ADDRESS` and `GMAIL_APP_PASSWORD` |
+| `post-bluesky` | Post to Bluesky social network via AT Protocol |
+| `bluesky-instructions` | Returns API instructions for retrieving Bluesky engagement metrics |
 
 ### Document Processing
 
 | Tool | Description |
 |------|-------------|
-| `extract` | Extract structured content from text (entities, facts, claims) |
-| `extract-references` | Extract bibliographic references from text |
-| `extract-struct` | Extract structured data (JSON) from unstructured text |
-| `summarize` | Summarize text content |
-| `refine` | Iteratively improve text quality |
+| `extract` | LLM-guided extraction or transformation from a single Note |
+| `extract-references` | Extract bibliographic references from PDF files (uses GROBID) |
+| `extract-struct` | Extract structured metadata (title, authors, year) from text using LLM |
 
 ### Analysis & Synthesis
 
 | Tool | Description |
 |------|-------------|
-| `assess` | Evaluate content quality or relevance |
-| `relate` | Find relationships between documents |
-| `synthesize` | Combine multiple sources into a coherent summary |
-| `filter-semantic` | Filter content by semantic similarity to a query |
-| `format-citation` | Format bibliographic citations |
+| `assess` | Boolean test of text content against a natural language predicate |
+| `synthesize` | Cross-document integration, comparison, and reporting from Collections |
+| `filter-semantic` | Semantic filter: evaluate Collection items against a predicate |
+| `format-citation` | Format paper citations to BibTeX format |
 
 ### Knowledge Management
 
 | Tool | Description |
 |------|-------------|
-| `generate-note` | Generate a new Note from a prompt |
-| `search-obsidian` | Search an Obsidian vault via MCP server. Requires `OBSIDIAN_MCP_URL` |
-| `text-find` | Find patterns in text content |
+| `generate-note` | Generate new text or code content from scratch using LLM |
+| `search-obsidian` | Search Obsidian notes via Local REST API. Requires `OBSIDIAN_MCP_URL` |
+| `text-find` | Locate pattern or substring and return position with context |
 
 ### Computation
 
@@ -193,14 +193,16 @@ These live in `src/tools/` and are always available:
 
 | Tool | Description |
 |------|-------------|
-| `stock-price` | Look up current stock prices. Requires `ALPHA_VANTAGE_API_KEY` |
+| `stock-price` | Get current stock quote (price, change, volume). Requires `ALPHA_VANTAGE_API_KEY` |
 
-### System
+### System & Management
 
 | Tool | Description |
 |------|-------------|
 | `run-script` | Run a shell script from `src/scripts/` (see below) |
-| `create-tool` | Analyze missing affordance logs and propose new tool specifications |
+| `create-tool` | Generate a new tool definition (Python or instruction-based) |
+| `check-health` | Collect system and cognitive health metrics with status classifications |
+| `manage-goals` | Create, list, update, and delete scheduled goals programmatically |
 
 ## The run-script Tool
 
@@ -268,7 +270,7 @@ When a scenario sets `world_config.world_name`, tools from `src/world-tools/<wor
 | `fs` | fs-list, fs-read, fs-grep, fs-find, fs-head, fs-stat | Sandboxed filesystem access |
 | `osworld` | osworld-execute, osworld-observe, osworld-status, osworld-reset | Desktop automation |
 | `scienceworld` | scienceworld-act, scienceworld-reset | Science simulation |
-| `infolab` | *(none — uses core tools only)* | Default infospace-only world |
+| `infolab` | fs-list, fs-read, fs-grep, fs-find, fs-head, fs-stat | Default infospace world with sandboxed filesystem |
 
 ## Tool Catalog in the Planner
 

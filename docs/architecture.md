@@ -114,7 +114,7 @@ The Executive Node (`executive_node.py`) is the central coordinator for each cha
 - **Goal queue**: Goals arrive from user input (`goal:` prefix), scheduled goals, or inter-agent messages
 - **OODA loop**: Continuous observe-orient-decide-act cycle
 - **Zenoh pub/sub**: Publishes actions to `cognitive/{character}/action`, subscribes to sense data and control channels
-- **Task Scheduler**: Daemon thread that auto-proceeds scheduled goals (see [Goals & Scheduling](goals-and-scheduling.md))
+- **Goal Scheduler**: Daemon thread that auto-proceeds scheduled goals (see [Goals & Scheduling](goals-and-scheduling.md))
 - **Conversation Store**: Tracks dialog history per entity for envisioning (see [Envisioning & QC](envisioning-and-quality-control.md))
 - **Interrupt handling**: Goals can be interrupted mid-execution; the planner checks an `interrupt_requested` flag at key checkpoints
 
@@ -221,7 +221,7 @@ Zenoh enables multi-character scenarios where agents communicate via pub/sub, an
 | `src/infospace_executor.py` | Tool execution engine, primitives, uniform_return |
 | `src/infospace_resource_manager.py` | Notes/Collections/Relations persistence, FAISS indexing |
 | `src/conversation_store.py` | Dialog persistence and tracking |
-| `src/task_scheduler.py` | Autonomous goal scheduling daemon |
+| `src/goal_scheduler.py` | Autonomous goal scheduling daemon |
 | `src/tool_model.py` | Tool success tracking, embedding-based recommendations |
 | `src/world_model.py` | Cross-goal persistent knowledge |
 | `src/fastapi_action_display.py` | Web UI (FastAPI + WebSockets) |
