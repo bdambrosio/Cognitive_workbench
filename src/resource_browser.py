@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import zenoh
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 import uvicorn
 
@@ -88,6 +88,13 @@ class ResourceBrowser:
         async def delete_resource(resource_id: str):
             """Delete a resource."""
             return self.delete_resource_via_zenoh(resource_id)
+
+        @self.app.put("/api/resource/{resource_id}")
+        async def update_resource(resource_id: str, request: Request):
+            """Update a Note's content."""
+            body = await request.json()
+            content = body.get('content', '')
+            return self.update_resource_via_zenoh(resource_id, content)
     
     def query_resources(self) -> Dict:
         """Query executive_node for resource list."""
@@ -144,7 +151,22 @@ class ResourceBrowser:
                 return data
         
         return {'success': False, 'error': f'No response from executive_node for deletion'}
-    
+
+    def update_resource_via_zenoh(self, resource_id: str, content: str) -> Dict:
+        """Update Note content via Zenoh query to executive_node."""
+        key = f"cognitive/*/resource/update/{resource_id}"
+        logger.info(f"Updating resource: {key}")
+
+        payload = json.dumps({'content': content}).encode('utf-8')
+
+        from zenoh import QueryTarget, ConsolidationMode
+        for reply in self.session.get(key, payload=payload, target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=2.0):
+            if reply.ok:
+                data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                return data
+
+        return {'success': False, 'error': f'No response from executive_node for update'}
+
     def get_html(self) -> str:
         """Generate HTML UI."""
         return """
@@ -298,6 +320,40 @@ class ResourceBrowser:
             padding: 4px 10px;
         }
         .copy-btn:hover { background: #4e4e52; }
+        .edit-textarea {
+            width: 100%;
+            min-height: 200px;
+            background: #1e1e1e;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #d4d4d4;
+            resize: vertical;
+        }
+        .edit-textarea:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+        .edit-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .save-btn {
+            background: #388a34;
+            font-size: 12px;
+            padding: 6px 14px;
+        }
+        .save-btn:hover { background: #45a340; }
+        .cancel-btn {
+            background: #6c6c6c;
+            font-size: 12px;
+            padding: 6px 14px;
+        }
+        .cancel-btn:hover { background: #7e7e7e; }
         
         .context-menu {
             position: fixed;
@@ -494,9 +550,12 @@ class ResourceBrowser:
             }
         }
         
+        // Track original content for cancel
+        let originalContent = '';
+
         function displayResource(resource) {
             const display = document.getElementById('content-display');
-            
+
             // Validate resource structure (accept either id or name field)
             const resourceId = resource.id || resource.name;
             if (!resource || !resourceId) {
@@ -504,12 +563,13 @@ class ResourceBrowser:
                 console.error('Invalid resource (missing id/name):', resource);
                 return;
             }
-            
-            const type = resourceId.startsWith('Note_') ? 'Note' : 'Collection';
+
+            const isNote = resourceId.startsWith('Note_');
             const content = resource.content || '';
+            originalContent = content;
             const metadata = resource.properties || {};
             const friendlyName = metadata.note_name || metadata.collection_name || '';
-            
+
             let metadataHtml = '';
             if (Object.keys(metadata).length > 0) {
                 metadataHtml = '<div class="metadata">';
@@ -519,19 +579,64 @@ class ResourceBrowser:
                 }
                 metadataHtml += '</div>';
             }
-            
+
+            const headerButtons = isNote
+                ? `<button class="copy-btn" onclick="copyContent()">📋 Copy</button>`
+                : `<button class="copy-btn" onclick="copyContent()">📋 Copy</button>`;
+
+            const contentHtml = isNote
+                ? `<textarea class="edit-textarea" id="content-text">${escapeHtml(content)}</textarea>
+                   <div class="edit-actions">
+                       <button class="save-btn" onclick="saveContent('${resourceId}')">Save</button>
+                       <button class="cancel-btn" onclick="cancelEdit()">Cancel</button>
+                   </div>`
+                : `<div class="content-body" id="content-text">${escapeHtml(content)}</div>`;
+
             display.innerHTML = `
                 <div class="content-header">
                     <div class="content-title">${escapeHtml(resourceId)}${friendlyName ? `<span style="color:#9cdcfe;font-size:13px;font-weight:normal;margin-left:8px;">${escapeHtml(friendlyName)}</span>` : ''}</div>
-                    <button class="copy-btn" onclick="copyContent()">📋 Copy</button>
+                    ${headerButtons}
                 </div>
                 ${metadataHtml}
-                <div class="content-body" id="content-text">${escapeHtml(content)}</div>
+                ${contentHtml}
             `;
+        }
+
+        async function saveContent(resourceId) {
+            const textarea = document.getElementById('content-text');
+            const newContent = textarea.value;
+            try {
+                const response = await fetch(`/api/resource/${resourceId}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({content: newContent})
+                });
+                const data = await response.json();
+                if (data.success) {
+                    originalContent = newContent;
+                    // Brief visual feedback
+                    const btn = document.querySelector('.save-btn');
+                    btn.textContent = 'Saved';
+                    btn.style.background = '#2d7d2a';
+                    setTimeout(() => { btn.textContent = 'Save'; btn.style.background = ''; }, 1500);
+                } else {
+                    alert('Save failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch (e) {
+                alert('Save failed: ' + e.message);
+            }
+        }
+
+        function cancelEdit() {
+            const textarea = document.getElementById('content-text');
+            if (textarea) {
+                textarea.value = originalContent;
+            }
         }
         
         function copyContent() {
-            const text = document.getElementById('content-text').textContent;
+            const el = document.getElementById('content-text');
+            const text = el.tagName === 'TEXTAREA' ? el.value : el.textContent;
             navigator.clipboard.writeText(text).then(() => {
                 alert('Content copied to clipboard');
             });

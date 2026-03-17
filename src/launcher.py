@@ -194,16 +194,22 @@ def create_sglang_runtime(llm_config: dict):
                     port=5000,
                     chat_template=chat_template,
                 )
+                
                 sgl.set_default_backend(runtime)            
                 #runtime = sgl.Runtime(model_path=sgl_model_path,device="cuda",context_length=65536,tp_size=1,mem_fraction_static=0.9,quantization="modelopt_fp4",attention_backend="triton",**({'chat_template': chat_template} if chat_template else {}))
         elif 'FP8' in sgl_model_path:
-            logger.info("Initializing SGLang Runtime with FP8 patch")
-            runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, dtype="auto", tp_size=1, mem_fraction_static=0.85, attention_backend="triton", fp8_gemm_runner_backend="cutlass", chat_template=chat_template)
+            logger.info("Initializing SGLang Runtime for FP8")
+            if chat_template:
+                runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, 
+                          dtype="auto", tp_size=1, mem_fraction_static=0.85, attention_backend="triton", fp8_gemm_runner_backend="cutlass", chat_template=chat_template)
+            else:
+                runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, 
+                          dtype="auto", tp_size=1, mem_fraction_static=0.85, attention_backend="triton", fp8_gemm_runner_backend="cutlass")
         else:
             if chat_template:
                 runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, dtype="auto", tp_size=1, mem_fraction_static=0.9, attention_backend="flashinfer", chat_template=chat_template)
             else:
-                runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, dtype="auto", tp_size=1, mem_fraction_static=0.9, attention_backend="flashinfer")
+                runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, dtype="auto", tp_size=1, mem_fraction_static=0.9, attention_backend="triton")
 
         sgl.set_default_backend(runtime)
         logger.info(f"SGLang Runtime initialized (model={sgl_model_path})" + (f", chat_template={chat_template}" if chat_template else ""))

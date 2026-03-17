@@ -364,6 +364,8 @@ class InfospaceExecutor:
         if self.executive_node:
             self.executive_node.last_say_text = ''
             self.executive_node.last_out_resource_id = None
+        # Refresh filesystem catalog so new goals see current files
+        self._run_init_tool()
     
     def call_subplanner(self, goal: str, context: Optional[str] = None, max_steps: int = 8, trace: Optional[str] = None) -> str:
         """
@@ -1371,7 +1373,10 @@ Only provide the result, followed by the </end> tag.""")
             # Run the function
             state = generate_text.run(prompt_text=prompt)
             result_text = state["output"].strip()
-            
+
+            # Strip <think>...</think> blocks (reasoning models like Qwen3)
+            result_text = re.sub(r'<think>.*?</think>\s*', '', result_text, flags=re.DOTALL)
+
             # Post-process JSON if requested
             if is_json:
                 result_text = self._parse_json_response(result_text, prompt)

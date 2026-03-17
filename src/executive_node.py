@@ -1191,6 +1191,10 @@ class ZenohExecutiveNode:
             self._handle_resource_create_note_query
         )
         
+        self.resource_update_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/resource/update/*",
+            self._handle_resource_update_query
+        )
         self.resource_clear_transient_queryable = self.session.declare_queryable(
             f"cognitive/{character_name}/resource/clear_transient",
             self._handle_resource_clear_transient_query
@@ -4994,9 +4998,58 @@ class ZenohExecutiveNode:
             }
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
     
+    def _handle_resource_update_query(self, query):
+        """Handle query to update Note content (for resource_browser)."""
+        try:
+            if not self.resource_manager:
+                response = {
+                    'success': False,
+                    'error': 'Resource update only available for infospace characters'
+                }
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+
+            # Extract resource_id from query key (cognitive/{character}/resource/update/{resource_id})
+            key_parts = str(query.key_expr).split('/')
+            if len(key_parts) < 5:
+                response = {
+                    'success': False,
+                    'error': 'Invalid resource update query format'
+                }
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+
+            resource_id = key_parts[-1]
+
+            # Parse payload for new content
+            payload_bytes = query.payload.to_bytes() if query.payload else b'{}'
+            params = json.loads(payload_bytes.decode('utf-8')) if payload_bytes else {}
+            new_content = params.get('content', '')
+
+            success, error_msg = self.resource_manager.update_note_content(resource_id, new_content)
+
+            if success:
+                response = {
+                    'success': True,
+                    'message': f'Note {resource_id} updated'
+                }
+            else:
+                response = {
+                    'success': False,
+                    'error': error_msg or f'Failed to update {resource_id}'
+                }
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+        except Exception as e:
+            logger.error(f'Error handling resource update query: {e}')
+            response = {
+                'success': False,
+                'error': str(e)
+            }
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+
     def _handle_resource_clear_transient_query(self, query):
         """Handle query to clear all Notes and Collections except Note_null, persistent resources, and conversation collections.
-        
+
         Optional JSON payload: {"global": true} to also reset world_model and tool_model to empty.
         """
         if not self.resource_manager:
@@ -5583,7 +5636,11 @@ class ZenohExecutiveNode:
             if self.infospace_executor:
                 self.infospace_executor.interrupt_requested = False
             logger.info(f'🛑 {self.character_name} interrupting existing plan for new goal')
-            
+
+            # Refresh filesystem catalog so the planner sees current files
+            if self.infospace_executor:
+                self.infospace_executor._run_init_tool()
+
             if not self.observations:
                 self._observe()
             self.current_goal = Goal(parsed_goal, [self.character_name], description='', termination='')

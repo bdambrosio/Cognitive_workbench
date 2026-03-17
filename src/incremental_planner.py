@@ -205,122 +205,45 @@ INCREMENTAL_PLAN_SPECIFICATIONS = """
 # INFOSPACE TYPE SYSTEM & RULES
 
 Types:
-- Note: Single value/document 
-  - Can be named (e.g., "my-note") for stable referencing via load
-  - Named Notes can be loaded by name or by ID (e.g., "Note_123")
-- Collection: List of Note/Collection IDs 
-  - Can be named (e.g., "my-collection") for stable referencing via load
-  - Named Collections can be loaded by name or by ID (e.g., "Collection_456")
-- Variable: a session-local name referencing Notes or Collections. Variables *always* start with "$".
+- Note: Single value/document (content is always a string). Can be named for stable referencing via load.
+- Collection: List of Note/Collection IDs. Can be named for stable referencing via load.
+- $variable: A session-local binding referencing a Note or Collection. Always starts with "$".
+  Use "$var" for bindings, bare IDs (Note_123) or names ("my-note") for direct references.
 
-Note Content Format (text-only model):
-- Note content is always a string.
-- Metadata is stored transparently by the system. Use get-metadata / set-metadata to read and write it.
-- Structured ops (project/pluck/filter-structured/sort/join) work on Notes whose content is valid JSON text.
+Note Content:
+- Always a string. Metadata via get-metadata/set-metadata.
+- Structured ops (project/pluck/filter-structured/sort/join) require valid JSON text content.
+- For plain text, use extract (LLM-based).
 
-Action Syntax:
-- An action is a JSON object specifying the application of a primitive or tool. 
-  - e.g. {"type": "primitive or tool name", "target": "$variable_a", "value": "literal_value", "out": "$variable_b"} 
-- ALWAYS use "$variable" for references (e.g. target, value, source, or out fields)
-- Correct: {"target": "$my_variable"}
-- Wrong: {"target": "my_variable"}
-- Note reference by ID or name: Use directly without $ (e.g., "target": "Note_123" or "target": "attention-note")
-- Collection reference by ID or name: Use directly without $ (e.g., "target": "Collection_456" or "target": "research-papers")
-- Literal strings: Use directly without $ (e.g., "value": "hello")
-- Literal numbers: Use directly without $ (e.g., "value": 123)
-- Literal booleans: Use directly without $ (e.g., "value": true)
+Primitive Type Compatibility (world/skill tools have their own contracts):
+ - split: Note → Collection (array/lines → items)
+ - flatten: Collection → Note (merge items)
+ - extract: Note; LLM-guided extraction/transformation
+ - synthesize: Collection; cross-document integration/comparison/reporting
+ - map: Collection; apply op to each item
+ - project, pluck, sort, filter-structured: Collection; SQL-like ops (JSON Notes only)
+ - join: Collection; merge 2 Collections (SQL JOIN, JSON Notes only)
+ - add, remove, size: Collection; mutation
+ - union, intersection, difference: Collection; set ops
+ - load: Note, Collection; bind persistent resource, slice for subset
+ - persist: Note, Collection; save to filesystem
+ - discover-notes, discover-collections: global search (no target), returns Collection
+ - search-within-collection: search indexed Collection, returns Collection
 
-Parameter Naming Convention:
-- `target`: Typically references a Variable (starts with "$"), Note ID/name, or Collection ID/name
-- `value`: Typically contains a literal (string, number, boolean) or may reference a Variable/Note/Collection
-- This convention is consistent across primitives and tools, though specific tools may have tool-specific parameter names
-
-InfospacePrimitive Action / Type Compatibility:
-This table applies only to native infospace primitives. World/skill tools are governed by their own contracts.
-Operation_name: applicable to: <Note | Collection | Note, Collection>;   Purpose
- - split: Note;  Note structure → Collection
- - flatten: Collection;  Collection → single Note
- - as-json, extract, coerce: Note;  Transform Note content
- - extract: Note;  LLM-guided extraction, compression, or transformation of single-Note content
- - synthesize: Collection;  Cross-document integration, comparison, and reporting
- - map: Collection;  Apply op to each Collection item
- - project, pluck, sort, filter: Collection;  SQL-like Collection ops
- - join: Collection;  Merge 2 Collections (SQL JOIN)
- - add, remove, size: Collection;  Collection mutation operations
- - union, intersection, difference: Collection;  Set operations on Collections
- - load: Note, Collection;  Load persistent resource
- - persist: Note, Collection;  Mark resource as persistent
- - discover-notes, discover-collections: N/A;  Global discovery (return Coll.)
- - search-within-collection: Collection;  Search indexed Collection
- - get-metadata: Note, Collection;  Retrieve system metadata attached to a resource
- - set-metadata: Note, Collection;  Attach or update metadata on a resource
-
-Key distinctions:
-- split (Note→Coll): Transforms internal structure (array/lines) into separate items
-- flatten (Coll→Note): Opposite of split, merges Collection into single Note
-- load: Use to GET content *into planner context*. Supports slice parameter for controlled access (e.g., slice="0:3" for first 3 Collection items, slice=":" for full Note content). Slicing a Collection returns a new Collection.
-- persist: Mark resource as persistent (saved to filesystem)
-
-Discovery and Search Primitives:
-- discover-notes: Global discovery across all Notes (no target needed). Returns Collection of Notes with text content.
-- discover-collections: Global discovery across all Collections (no target needed). Returns Collection of Notes with text content.
-- search-within-collection: Search within a specific indexed Collection (requires target Collection, must be indexed first). Returns Collection of Notes with matched chunk text.
-
-Discovery tools return Note or Collection candidates. Search-within tools search known containers. If you think you need a target field, you are not doing discovery.
-
-Note content is always a string. For extracting information FROM text content, use extract (LLM-based).
-
-Persistence Operations:
-- load: Bind a persistent Note or Collection by ID or name into a $variable. Use ONLY to (a) bind named persistent notes, or (b) slice Collections. To read content from an already-bound $var, use get_text/get_json/get_items instead. slice=":" for full content; default "0:4096" (Notes) or "0:5" (Collections).
-- persist: Mark Note or Collection as persistent (saved to filesystem). Use after creating resources you want to keep.
-
-Collection Mutation Operations (require Collection):
-- add: Add Note or Collection to existing Collection (mutates in place)
-- remove: Remove Note from Collection (mutates in place)
-- size: Get item count of Collection (returns Note with integer)
-- union: Combine two Collections (A ∪ B) - all items, deduplicated
-- intersection: Items in both Collections (A ∩ B)
-- difference: Items in A but not B (A - B)
-
-Structured-data Collection Operations (require Notes whose content is JSON string):
-- project: Extract fields from JSON content (SELECT columns) → new Collection
-- pluck: Extract single field as simple values → Collection of values
-- filter-structured: Filter by field conditions (WHERE clauses) → filtered Collection
-- sort: Sort by field value (ORDER BY) → sorted Collection
-- join: Combine two Collections on matching field (INNER JOIN) → merged Collection
-
-To take first N items from a Collection, use load with slice (e.g., load with slice="0:5"). This replaces the old head primitive.
-
-IMPORTANT: project/pluck/filter-structured work only on Notes whose content is valid JSON (e.g., from create-note with dict value).
-To extract information FROM plain text content, use extract (LLM-based extraction).
-
-Use cases:
-- project: Extract fields from JSON Notes (e.g., create-note with structured data)
-- pluck: Get single field from JSON Notes
-- filter-structured: Filter JSON Notes by field conditions
-- sort: Sort JSON Notes by field value
-- load with slice: Get top 5 after sorting (slice="0:5"), take first result (slice="0")
-- join: Merge JSON Notes from two Collections on matching field
+Key Semantics:
+- load: ONLY for (a) binding named persistent notes, or (b) slicing Collections. To read content, use get_text/get_json/get_items.
+  slice=":" for full content; default "0:4096" (Notes) or "0:5" (Collections).
+- persist: Mark resource as persistent (saved to filesystem).
+- discover-*: No target needed. search-within-collection: requires indexed target Collection.
+- Slice a Collection for first N items: tool("load", target="$coll", slice="0:5", out="$top")
 
 Efficiency Heuristics:
-- Use tools directly on Notes for single items
-- Create Collections only for 2+ Notes together
-- split, extract, as-json work on Notes ONLY, not Collections
-- Use extract directly on Notes for single-item work
-- Use map(extract) for per-item extraction across a Collection
-- Use synthesize for cross-item integration, comparison, or reporting
-- Two-phase pattern: map(extract) → synthesize (extract per item, then integrate)
-- Single-phase: synthesize with focus (when per-item extraction isn't needed)
-- Use map to apply Note operations to each Collection item
-
-Common Patterns:
-- Add multiple Notes to Collection via map: {"type":"map","target":"$notes","operation":"add","collection":"$collection","out":"$collection"}
-- Add all items from one Collection to another: {"type":"union","target":"$target_collection","value":"$source_collection","out":"$target_collection"}
-- Combine two Collections into new one: {"type":"union","target":"$coll1","value":"$coll2","out":"$combined"}
+- extract on Notes, synthesize on Collections, map(extract) for per-item then synthesize to integrate
+- project/pluck/filter-structured: JSON Notes only. For plain text use extract.
+- Create Collections only for 2+ items
 
 #TOOLS
-Tool System
-  - Tools include primitive tools, discussed above, and external tools, loaded at runtime from the tools directory.
+Tools include primitives (above) and external tools loaded at runtime. See catalog below.
 """
 
 
@@ -675,17 +598,39 @@ def tool_catalog_text(tools: Dict[str, Dict]) -> str:
             world_tools[source].append((name, meta))
     
     # Helper function to format a tool entry
-    # Initial catalog uses short descriptions + compact schema hints.
+    # Each tool gets: description, params, and an example tool() call.
     # Full docs with examples are loaded on-demand via REQUEST_TOOLS → load_skill_docs().
     def format_tool(name: str, meta: Dict) -> List[str]:
         tool_lines = []
         description = meta.get('description', 'No description')
         schema = meta.get('schema_hint')
         if schema and isinstance(schema, dict):
-            # Compact inline params: {key: hint, key: hint}
-            params = ", ".join(f"{k}: {v}" for k, v in schema.items())
+            # Line 1: description
             tool_lines.append(f"- {name}: {description}")
+            # Line 2: compact params
+            params = ", ".join(f"{k}: {v}" for k, v in schema.items())
             tool_lines.append(f"  params: {{{params}}}")
+            # Line 3: example tool() call from schema keys
+            example_args = []
+            for k, v in schema.items():
+                if 'optional' in str(v).lower():
+                    continue
+                hint = str(v).lower()
+                if k == 'out':
+                    example_args.append(f'out="$result"')
+                elif k == 'target':
+                    example_args.append(f'target="$var"')
+                elif k == 'value':
+                    example_args.append(f'value="..."')
+                elif 'string' in hint or '$var' in hint:
+                    example_args.append(f'{k}="..."')
+                elif 'int' in hint:
+                    example_args.append(f'{k}=5')
+                elif 'float' in hint:
+                    example_args.append(f'{k}=0.5')
+                else:
+                    example_args.append(f'{k}="..."')
+            tool_lines.append(f'  e.g. tool("{name}", {", ".join(example_args)})')
         else:
             tool_lines.append(f"- {name}: {description}")
         return tool_lines
@@ -1215,12 +1160,11 @@ def validate_codegen_block(code: str) -> tuple:
         if match:
             return False, f"Forbidden pattern: {match.group()}"
     
-    # Count execute_action_tracked calls (must be 1-16)
-    call_count = len(re.findall(r'executor\.execute_action_tracked\s*\(', code))
-    if call_count < 1:
-        return False, "No execute_action_tracked() calls found"
+    # Count tool calls: tool() shorthand + legacy execute_action_tracked (0-16; 0 allowed for read-only)
+    call_count = (len(re.findall(r'\btool\s*\(', code))
+                  + len(re.findall(r'executor\.execute_action_tracked\s*\(', code)))
     if call_count > 16:
-        return False, f"Too many execute_action_tracked() calls ({call_count}, max 16)"
+        return False, f"Too many tool calls ({call_count}, max 16)"
 
     # Must have a return with _create_uniform_return
     if 'executor._create_uniform_return' not in code:
@@ -1278,10 +1222,11 @@ def extract_code_block(raw_text: str) -> str:
 
 
 def count_codegen_action_calls(code: str) -> int:
-    """Count execute_action_tracked calls in a generated Stage 2 code block."""
+    """Count tool calls (tool() shorthand + legacy execute_action_tracked) in a code block."""
     if not code:
         return 0
-    return len(re.findall(r'executor\.execute_action_tracked\s*\(', code))
+    return (len(re.findall(r'\btool\s*\(', code))
+            + len(re.findall(r'executor\.execute_action_tracked\s*\(', code)))
 
 
 def execute_codegen_block(code: str, executor, method_name: str = "codegen") -> Dict:
@@ -1352,6 +1297,15 @@ def execute_codegen_block(code: str, executor, method_name: str = "codegen") -> 
             return content
         return []
 
+    def tool(type_name, **kwargs):
+        """Shorthand for executor.execute_action_tracked.
+
+        Usage:  r = tool("search-web", query="transformers survey", out="$papers")
+        Returns the same dict as execute_action_tracked (keys: status, resource_id, value, extra).
+        """
+        action = {"type": type_name, **kwargs}
+        return executor.execute_action_tracked(action, method_name)
+
     # Expose helpers both as free functions and executor methods.
     # This prevents common codegen failures like calling executor.get_json(...).
     executor.get_text = get_text
@@ -1362,6 +1316,7 @@ def execute_codegen_block(code: str, executor, method_name: str = "codegen") -> 
         "executor": executor,
         "json": json,
         "logger": logger,
+        "tool": tool,
         "get_text": get_text,
         "get_json": get_json,
         "get_items": get_items,
@@ -2369,11 +2324,13 @@ if HAS_SGLANG:
         system_parts.append(f"Situation/Context:\n{recent_context}\n\n")
         #system_parts.append(f"Again, \n#GOAL:\n\n{template}\n{goal}\n\n")
         if preplan:
-            system_parts.append(f"\n## {preplan}\n")
-            system_parts.append(f"\n## End ABSTRACT_PLAN\n")
+            system_parts.append(f"\n## ABSTRACT_PLAN\n{preplan}\n## End ABSTRACT_PLAN\n")
 
         if vision_criteria:
-            system_parts.append(f"\n## QUALITY VISION\nEvaluate your output against these criteria. If an intermediate artifact fails a criterion, adjust your approach (e.g., use more detailed instructions, re-extract with richer prompts).\n{vision_criteria}\n## End QUALITY VISION\n")
+            system_parts.append(f"\n## QUALITY VISION (external — checked by the system, NOT by your code)\n"
+            f"These criteria are evaluated externally at the done gate. Do NOT implement them as checks in your code blocks.\n"
+            f"They are shown here so you understand what quality looks like — use them to guide your approach, not to build verification loops.\n"
+            f"{vision_criteria}\n## End QUALITY VISION\n")
 
         if similar_plan:
             system_parts.append(f"##PREVIOUS PLAN FOR SIMILAR GOAL:\n{similar_plan['plan']}\n")
@@ -2390,7 +2347,8 @@ if HAS_SGLANG:
         
         # Add current date and time
 
-        system_parts.append(f"WORLD_MODEL: {json.dumps(world_model, indent=2)}\n")
+        wm_slim = {k: world_model.get(k, []) for k in ("facts", "tool_contracts")}
+        system_parts.append(f"WORLD_MODEL: {json.dumps(wm_slim, indent=2)}\n")
 
         # Tool model experience hints (Thompson-sampled, only when sufficient data)
         if executor and hasattr(executor, 'tool_model') and executor.tool_model:
@@ -2494,9 +2452,9 @@ ALWAYS follow all formatting instructions exactly.
             "Write a Python code block to accomplish the CURRENT_TASK.\n"
             "Linear example:\n"
             "```python\n"
-            "r1 = executor.execute_action_tracked({\"type\": \"search-web\", \"query\": \"transformers survey\", \"out\": \"$papers\"}, \"codegen\")\n"
+            "r1 = tool(\"search-web\", query=\"transformers survey\", out=\"$papers\")\n"
             "if r1[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"search failed\")\n"
-            "r2 = executor.execute_action_tracked({\"type\": \"synthesize\", \"target\": \"$papers\", \"focus\": \"key findings\", \"out\": \"$summary\"}, \"codegen\")\n"
+            "r2 = tool(\"synthesize\", target=\"$papers\", focus=\"key findings\", out=\"$summary\")\n"
             "if r2[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"synthesize failed\")\n"
             "return executor._create_uniform_return(\"success\", value=\"done\")\n"
             "```\n"
@@ -2515,7 +2473,7 @@ ALWAYS follow all formatting instructions exactly.
             "ok = 0\n"
             "errors = []\n"
             "for item_id in items:\n"
-            "    r = executor.execute_action_tracked({\"type\": \"extract\", \"target\": item_id, \"instruction\": \"get subject\", \"out\": \"$subject\"}, \"codegen\")\n"
+            "    r = tool(\"extract\", target=item_id, instruction=\"get subject\", out=\"$subject\")\n"
             "    if r[\"status\"] == \"success\":\n"
             "        subj = get_json(\"$subject\")\n"
             "        ok += 1\n"
@@ -2526,34 +2484,20 @@ ALWAYS follow all formatting instructions exactly.
             "return executor._create_uniform_return(\"success\", value=f\"Processed {ok}/{total}\", extra={\"errors\": errors})\n"
             "```\n"
             "Rules:\n"
-            "- use python code and / or tool calls to accomplish the CURRENT_TASK.\n"
-            "- Max 16 tool calls in a single code block via executor.execute_action_tracked(action_dict, \"codegen\")\n"
+            "- Call tools via: r = tool(\"tool-name\", param=value, out=\"$var\")\n"
+            "- tool() returns dict with r[\"status\"] (\"success\"/\"failed\"), r[\"resource_id\"], r[\"value\"] (display string).\n"
+            "- Max 16 tool() calls per code block.\n"
             "- Prefer longer cohesive blocks: if CURRENT_TASK has connected subtasks, combine them in one block.\n"
-            "- Avoid single-call blocks unless that single call fully completes CURRENT_TASK.\n"
-            "- VARIABLE BINDING: \"out\": \"$name\" binds the result resource. Chain tool actions via target=\"$name\".\n"
-            "- READING CONTENT: use get_text(\"$var\"), get_json(\"$var\"), get_items(\"$var\") to read resource content.\n"
-            "  These resolve the $binding to a resource ID and return its stored content.\n"
-            "  get_text -> string, get_json -> dict or None, get_items -> list of Note IDs.\n"
-            "  Call these as free functions (not executor.get_text). They work on any $var that has been bound.\n"
-            "- WHEN TO USE load: ONLY to (a) bind a named persistent note, e.g. load target=\"_my_saved_note\" out=\"$note\",\n"
-            "  or (b) slice a Collection into a subset. Do NOT call load just to read content — use the helpers above.\n"
-            "- RETURN CONTRACT: r[\"status\"] — \"success\"/\"failed\". r[\"resource_id\"] — resource ID.\n"
-            "  r[\"value\"] — display string (for humans/logging, not for code logic — use get_text instead).\n"
-            "  r.get(\"extra\",{}).get(\"item_count\") — item count for Collections.\n"
+            "- out=\"$name\" binds the result resource. Chain via target=\"$name\" in the next call.\n"
+            "- Read content: get_text(\"$var\") → string, get_json(\"$var\") → dict or None, get_items(\"$var\") → list of Note IDs.\n"
+            "  These work on any $var that has been bound. No need to call load first.\n"
+            "- load: ONLY for (a) binding a named persistent note, or (b) slicing a Collection.\n"
+            "- Pass dicts/lists directly as value — do not pre-serialize with json.dumps().\n"
             "- CODE BLOCK SCOPE: each step executes in a fresh function. Python locals do NOT persist across steps.\n"
-            "- CROSS-STEP ACCESS: use $bindings only. To read content from prior steps, use get_text/get_json/get_items.\n"
-            "- TYPE SAFETY: use get_json() when you need structured access to Note content.\n"
-            "- STRUCTURED VALUES: pass dicts/lists directly as value — do not pre-serialize with json.dumps().\n"
+            "  Only $bindings (created via out=) persist. Use get_text/get_json/get_items for cross-step access.\n"
             "- if/else control flow and loops are allowed.\n"
             "- Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
-            "- LOOP PATTERN: execute_action_tracked never raises — do NOT use try/except in loops.\n"
-            "  Track ok/errors counts explicitly. Return failed if zero items succeeded.\n"
-            "  Include counts in the return value: f\"Processed {ok}/{total}\".\n"
-            "\n"
-            "#Stage 2 VARIABLE LIFETIME:\n"
-            "  Only variables created via 'out' persist across steps or code blocks.\n"
-            "  Chain by passing the variable name (e.g. target='$papers') to the next action.\n"
-            "  Temporary Python variables (r1, text, data, etc.) are code-block-local only.\n"
+            "- LOOP PATTERN: tool() never raises — do NOT use try/except. Track ok/errors counts explicitly.\n"
             "\n"
             "#Stage 3 FORMAT:\n"
             "  THOUGHTS: <brief assessment of result and progress>\n"
@@ -2621,6 +2565,8 @@ ALWAYS follow all formatting instructions exactly.
             )
             
             code_text = _strip_think_tags(s[f"code_block_{step}"].strip())
+            # Strip trailing incomplete backtick fences (model sometimes emits `` or ` without newline)
+            code_text = re.sub(r'`{1,3}\s*$', '', code_text).rstrip()
             s[f"code_block_{step}"] = code_text
             logger.info(f"Step {step}: Code block ({len(code_text)} chars):\n{code_text}")
             call_count = count_codegen_action_calls(code_text)
@@ -3475,12 +3421,14 @@ def tool_planner_infospace_vllm(template, goal: str, world_model: Dict, characte
     system_parts.append(f"Setting:\n{character_context}\n\n")
     system_parts.append(f"Situation/Context:\n{recent_context}\n\n")
     if preplan:
-        system_parts.append(f"\n## {preplan}\n")
-        system_parts.append(f"\n## End ABSTRACT_PLAN\n")
-    
+        system_parts.append(f"\n## ABSTRACT_PLAN\n{preplan}\n## End ABSTRACT_PLAN\n")
+
     if vision_criteria:
-        system_parts.append(f"\n## QUALITY VISION\nEvaluate your output against these criteria. If an intermediate artifact fails a criterion, adjust your approach (e.g., use more detailed instructions, re-extract with richer prompts).\n{vision_criteria}\n## End QUALITY VISION\n")
-    
+        system_parts.append(f"\n## QUALITY VISION (external — checked by the system, NOT by your code)\n"
+            f"These criteria are evaluated externally at the done gate. Do NOT implement them as checks in your code blocks.\n"
+            f"They are shown here so you understand what quality looks like — use them to guide your approach, not to build verification loops.\n"
+            f"{vision_criteria}\n## End QUALITY VISION\n")
+
     if similar_plan:
         system_parts.append(f"##PREVIOUS PLAN FOR SIMILAR GOAL:\n{similar_plan['plan']}\n")
         system_parts.append(f"OUTCOME: {similar_plan['outcome']} ERRORS: {similar_plan['error_count']}\n")
@@ -3494,7 +3442,8 @@ def tool_planner_infospace_vllm(template, goal: str, world_model: Dict, characte
             for section_name, context_text in world_prompt_context.items():
                 system_parts.append(f"\n# {section_name.upper().replace('_', ' ')}\n{context_text}\n")
     
-    system_parts.append(f"WORLD_MODEL: {json.dumps(world_model, indent=2)}\n")
+    wm_slim = {k: world_model.get(k, []) for k in ("facts", "tool_contracts")}
+    system_parts.append(f"WORLD_MODEL: {json.dumps(wm_slim, indent=2)}\n")
 
     # Tool model experience hints (Thompson-sampled, only when sufficient data)
     if executor and hasattr(executor, 'tool_model') and executor.tool_model:
@@ -3588,9 +3537,9 @@ ALWAYS follow all formatting instructions exactly.
         "Write a Python code block to accomplish the CURRENT_TASK.\n"
         "Linear example:\n"
         "```python\n"
-        "r1 = executor.execute_action_tracked({\"type\": \"search-web\", \"query\": \"transformers survey\", \"out\": \"$papers\"}, \"codegen\")\n"
+        "r1 = tool(\"search-web\", query=\"transformers survey\", out=\"$papers\")\n"
         "if r1[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"search failed\")\n"
-        "r2 = executor.execute_action_tracked({\"type\": \"synthesize\", \"target\": \"$papers\", \"focus\": \"key findings\", \"out\": \"$summary\"}, \"codegen\")\n"
+        "r2 = tool(\"synthesize\", target=\"$papers\", focus=\"key findings\", out=\"$summary\")\n"
         "if r2[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"synthesize failed\")\n"
         "return executor._create_uniform_return(\"success\", value=\"done\")\n"
         "```\n"
@@ -3603,30 +3552,20 @@ ALWAYS follow all formatting instructions exactly.
         "ids  = get_items(\"$my_collection\") # returns list of Note IDs in the Collection\n"
         "```\n"
         "Rules:\n"
-        "- use python code and / or tool calls to accomplish the CURRENT_TASK.\n"
-        "- Max 16 tool calls in a single code block via executor.execute_action_tracked(action_dict, \"codegen\")\n"
+        "- Call tools via: r = tool(\"tool-name\", param=value, out=\"$var\")\n"
+        "- tool() returns dict with r[\"status\"] (\"success\"/\"failed\"), r[\"resource_id\"], r[\"value\"] (display string).\n"
+        "- Max 16 tool() calls per code block.\n"
         "- Prefer longer cohesive blocks: if CURRENT_TASK has connected subtasks, combine them in one block.\n"
-        "- Avoid single-call blocks unless that single call fully completes CURRENT_TASK.\n"
-        "- VARIABLE BINDING: \"out\": \"$name\" binds the result resource. Chain tool actions via target=\"$name\".\n"
-        "- READING CONTENT: use get_text(\"$var\"), get_json(\"$var\"), get_items(\"$var\") to read resource content.\n"
-        "  These resolve the $binding to a resource ID and return its stored content.\n"
-        "  get_text -> string, get_json -> dict or None, get_items -> list of Note IDs.\n"
-        "  Call these as free functions (not executor.get_text). They work on any $var that has been bound.\n"
-        "- WHEN TO USE load: ONLY to (a) bind a named persistent note, e.g. load target=\"_my_saved_note\" out=\"$note\",\n"
-        "  or (b) slice a Collection into a subset. Do NOT call load just to read content — use the helpers above.\n"
-        "- RETURN CONTRACT: r[\"status\"] — \"success\"/\"failed\". r[\"resource_id\"] — resource ID.\n"
-        "  r[\"value\"] — display string (for humans/logging, not for code logic — use get_text instead).\n"
-        "  r.get(\"extra\",{}).get(\"item_count\") — item count for Collections.\n"
+        "- out=\"$name\" binds the result resource. Chain via target=\"$name\" in the next call.\n"
+        "- Read content: get_text(\"$var\") → string, get_json(\"$var\") → dict or None, get_items(\"$var\") → list of Note IDs.\n"
+        "  These work on any $var that has been bound. No need to call load first.\n"
+        "- load: ONLY for (a) binding a named persistent note, or (b) slicing a Collection.\n"
+        "- Pass dicts/lists directly as value — do not pre-serialize with json.dumps().\n"
         "- CODE BLOCK SCOPE: each step executes in a fresh function. Python locals do NOT persist across steps.\n"
-        "- CROSS-STEP ACCESS: use $bindings only. To read content from prior steps, use get_text/get_json/get_items.\n"
-        "- TYPE SAFETY: use get_json() when you need structured access to Note content.\n"
+        "  Only $bindings (created via out=) persist. Use get_text/get_json/get_items for cross-step access.\n"
         "- if/else control flow and loops are allowed.\n"
         "- Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
-        "\n"
-        "#Stage 2 VARIABLE LIFETIME:\n"
-        "  Only variables created via 'out' persist across steps or code blocks.\n"
-        "  Chain by passing the variable name (e.g. target='$papers') to the next action.\n"
-        "  Temporary Python variables (r1, text, data, etc.) are code-block-local only.\n"
+        "- LOOP PATTERN: tool() never raises — do NOT use try/except. Track ok/errors counts explicitly.\n"
         "\n"
         "#Stage 3 FORMAT:\n"
         "  THOUGHTS: <brief assessment of result and progress>\n"
@@ -3698,7 +3637,7 @@ ALWAYS follow all formatting instructions exactly.
         code_text = code_raw.strip()
         import re as _re
         code_text = _re.sub(r'^```(?:python)?\s*', '', code_text)
-        code_text = _re.sub(r'```\s*$', '', code_text).rstrip()
+        code_text = _re.sub(r'`{1,3}\s*$', '', code_text).rstrip()
         
         logger.info(f"Step {step}: Code block ({len(code_text)} chars):\n{code_text}")
         call_count = count_codegen_action_calls(code_text)
@@ -4696,29 +4635,35 @@ class IncrementalPlanner:
                 verification_answer = _strip_numbered_prefix(str(state['VERIFICATION_ANSWER']).strip()).upper() if 'VERIFICATION_ANSWER' in state else ""
             except (KeyError, TypeError):
                 verification_answer = ""
-            # Safely determine success status (handle interrupt case)
-            success = False
+            # Determine success and quality_status from planner signals
+            interrupted = (final_answer == "Interrupted by user.")
+            ask_success = False
+            try:
+                ask_success = bool(state['ask_completed_successfully']) if 'ask_completed_successfully' in state else False
+            except (KeyError, TypeError):
+                pass
+
+            done_yes = False
             if f'done_{step}' in state:
                 try:
-                    done_str = state[f'done_{step}']
-                    if done_str and isinstance(done_str, str):
-                        success = _strip_numbered_prefix(done_str.strip()).upper().startswith("YES")
+                    done_str = str(state[f'done_{step}']).strip()
+                    done_yes = _strip_numbered_prefix(done_str).upper().startswith("YES")
                 except (KeyError, TypeError, AttributeError):
                     pass
-            # If interrupted, final_answer will be "Interrupted by user."
-            # Exception: ask to User completed successfully (intentional pause, not failure)
-            elif final_answer == "Interrupted by user.":
-                try:
-                    success = bool(state['ask_completed_successfully']) if 'ask_completed_successfully' in state else False
-                except (KeyError, TypeError):
-                    success = False
-            if final_answer == "Interrupted by user.":
-                quality_status = "interrupted" if not success else "passed"
-            elif success:
-                quality_status = "passed"
-            elif verification_answer == "PARTIAL":
+
+            has_result = bool(final_answer and not interrupted)
+
+            if interrupted:
+                success = ask_success
+                quality_status = "passed" if ask_success else "interrupted"
+            elif done_yes:
+                success = True
+                quality_status = "needs_revision" if verification_answer == "PARTIAL" else "passed"
+            elif has_result and verification_answer == "PARTIAL":
+                success = True
                 quality_status = "needs_revision"
             else:
+                success = False
                 quality_status = "failed"
 
             primary_product = _find_side_effect_content_source(self.executor)
@@ -4894,29 +4839,35 @@ class IncrementalPlanner:
                 verification_answer = _strip_numbered_prefix(str(state['VERIFICATION_ANSWER']).strip()).upper() if 'VERIFICATION_ANSWER' in state else ""
             except (KeyError, TypeError):
                 verification_answer = ""
-            # Safely determine success status (handle interrupt case)
-            success = False
+            # Determine success and quality_status from planner signals
+            interrupted = (final_answer == "Interrupted by user.")
+            ask_success = False
+            try:
+                ask_success = bool(state['ask_completed_successfully']) if 'ask_completed_successfully' in state else False
+            except (KeyError, TypeError):
+                pass
+
+            done_yes = False
             if f'done_{step}' in state:
                 try:
-                    done_str = state[f'done_{step}']
-                    if done_str and isinstance(done_str, str):
-                        success = _strip_numbered_prefix(done_str.strip()).upper().startswith("YES")
+                    done_str = str(state[f'done_{step}']).strip()
+                    done_yes = _strip_numbered_prefix(done_str).upper().startswith("YES")
                 except (KeyError, TypeError, AttributeError):
                     pass
-            # If interrupted, final_answer will be "Interrupted by user."
-            # Exception: ask to User completed successfully (intentional pause, not failure)
-            elif final_answer == "Interrupted by user.":
-                try:
-                    success = bool(state['ask_completed_successfully']) if 'ask_completed_successfully' in state else False
-                except (KeyError, TypeError):
-                    success = False
-            if final_answer == "Interrupted by user.":
-                quality_status = "interrupted" if not success else "passed"
-            elif success:
-                quality_status = "passed"
-            elif verification_answer == "PARTIAL":
+
+            has_result = bool(final_answer and not interrupted)
+
+            if interrupted:
+                success = ask_success
+                quality_status = "passed" if ask_success else "interrupted"
+            elif done_yes:
+                success = True
+                quality_status = "needs_revision" if verification_answer == "PARTIAL" else "passed"
+            elif has_result and verification_answer == "PARTIAL":
+                success = True
                 quality_status = "needs_revision"
             else:
+                success = False
                 quality_status = "failed"
             
             # Extract primary product.

@@ -3,7 +3,7 @@ name: create-tool
 type: python
 description: "Generate a new tool. Python tools go to staging for review. Instruction tools (no code) are created and registered immediately."
 schema_hint:
-  name: "string (tool name, e.g. bluesky-metrics)"
+  name: "string (tool name, e.g. bluesky-instructions)"
   description: "string (one-line description)"
   requirements: "string (what it does, what APIs/libs/env vars/params/output)"
   tool_type: "string (optional): 'python' (default, staged) or 'instruction' (no code, immediate)"
@@ -18,7 +18,7 @@ Generate a new Cognitive Workbench tool. Supports two modes:
 
 ## Input
 
-- `name`: Tool name (used as directory and action type, e.g. `bluesky-metrics`)
+- `name`: Tool name (used as directory and action type, e.g. `bluesky-instructions`)
 - `description`: One-line description for the tool catalog
 - `requirements`: For python tools: full specification. For instruction tools: the instructional content that becomes the tool output.
 - `tool_type`: `"python"` (default) or `"instruction"`
@@ -48,7 +48,7 @@ Failure: reason (syntax error, LLM failure, name conflict).
 
 **Create an instruction tool from research results:**
 ```json
-{"type":"create-tool","name":"bluesky-metrics","description":"Instructions for retrieving Bluesky engagement metrics via public API","requirements":"Use fetch-text to call https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor={HANDLE} for profile metrics and app.bsky.feed.getAuthorFeed for post engagement. No auth required.","tool_type":"instruction","out":"$result"}
+{"type":"create-tool","name":"bluesky-instructions","description":"Instructions for retrieving Bluesky engagement metrics via public API","requirements":"Use fetch-text to call https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor={HANDLE} for profile metrics and app.bsky.feed.getAuthorFeed for post engagement. No auth required.","tool_type":"instruction","out":"$result"}
 ```
 
 **Generate a new Python tool:**
