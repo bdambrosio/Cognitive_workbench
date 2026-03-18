@@ -7,7 +7,7 @@ Runtime-only dialog state is tracked in memory.
 
 import json
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 
 class ConversationStore:
@@ -23,6 +23,8 @@ class ConversationStore:
         self._current_dialog_id: Dict[str, str] = {}
         self._active_dialogs: Dict[str, bool] = {}
         self._dialog_turn_counts: Dict[str, int] = {}
+        # Called with (entity, dialog_id, note_ids) when a dialog is closed
+        self._archive_callback: Optional[Callable[[str, str, List[str]], None]] = None
 
     def initialize(self) -> bool:
         """Ensure conversation collection exists."""
@@ -131,8 +133,68 @@ class ConversationStore:
         return ok
 
     def close_dialog(self, entity_name: str = "User") -> None:
+        """Close dialog with entity, archive its turns, then remove them from conversation collection."""
         entity = self._normalize_entity(entity_name)
+        dialog_id = self._current_dialog_id.get(entity)
+        if not self._active_dialogs.get(entity) and not dialog_id:
+            return  # Nothing to close
+
         self._active_dialogs[entity] = False
+
+        # Collect note IDs belonging to this dialog and trigger archival
+        if dialog_id and self._archive_callback:
+            note_ids = self._get_dialog_note_ids(dialog_id)
+            if note_ids:
+                try:
+                    self._archive_callback(entity, dialog_id, note_ids)
+                    self._remove_notes_from_collection(note_ids)
+                except Exception as e:
+                    self.logger.error(f'Error during dialog archive for {entity}/{dialog_id}: {e}')
+
+        # Clear dialog tracking for this entity
+        self._current_dialog_id.pop(entity, None)
+        self._dialog_turn_counts[entity] = 0
+
+    def _get_dialog_note_ids(self, dialog_id: str) -> List[str]:
+        """Return note IDs in the conversation collection that belong to a specific dialog_id."""
+        collection_id = self._ensure_conversation_collection()
+        if not collection_id:
+            return []
+        collection = self.resource_manager.get_resource(collection_id)
+        if not collection:
+            return []
+        note_ids = collection.get("properties", {}).get("content", [])
+        if not isinstance(note_ids, list):
+            return []
+
+        matched = []
+        for note_id in note_ids:
+            if not isinstance(note_id, str) or not note_id.startswith("Note_"):
+                continue
+            turn = self._parse_turn_note(note_id)
+            if turn and turn.get("dialog_id") == dialog_id:
+                matched.append(note_id)
+        return matched
+
+    def _remove_notes_from_collection(self, note_ids_to_remove: List[str]) -> bool:
+        """Remove specific note IDs from the conversation collection."""
+        collection_id = self._ensure_conversation_collection()
+        if not collection_id:
+            return False
+        collection = self.resource_manager.get_resource(collection_id)
+        if not collection:
+            return False
+        current = collection.get("properties", {}).get("content", [])
+        if not isinstance(current, list):
+            return False
+        remove_set = set(note_ids_to_remove)
+        remaining = [nid for nid in current if nid not in remove_set]
+        success, _, err = self.resource_manager.add_to_collection(
+            collection_id, None, self.character_name, operation='update', content=remaining
+        )
+        if not success:
+            self.logger.warning(f'Failed to remove archived turns from conversation: {err}')
+        return bool(success)
 
     def has_active_dialogs(self) -> bool:
         return any(self._active_dialogs.values())

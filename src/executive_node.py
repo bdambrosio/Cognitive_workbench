@@ -900,7 +900,17 @@ class ZenohExecutiveNode:
             logger=logger
         )
         self.conversation_store.initialize()
-        
+        self.conversation_store._archive_callback = self._archive_dialog
+
+        from user_concern_model import UserConcernModel
+        self.user_concern_model = UserConcernModel(
+            resource_manager=self.resource_manager,
+            character_name=self.character_name,
+            llm_generate=llm_generate,
+            infospace_executor=self.infospace_executor,
+        )
+        self.user_concern_model.load()
+
         self._scheduled_goal_counter = 0
         self._active_scheduled_goal_id = None
         self._initialize_scheduled_goals()
@@ -1290,12 +1300,19 @@ class ZenohExecutiveNode:
             logger.error(f'Error handling save command: {e}')
 
     def _handle_close_dialog(self, sample):
-        """Handle close_dialog from UI (End conversation button)."""
+        """Handle close_dialog from UI (End conversation button).
+
+        The archive callback (synthesize + concern model) is heavyweight and must
+        NOT block the zenoh subscriber thread — otherwise subsequent zenoh
+        callbacks (sense_data, etc.) are starved.  We therefore schedule archiving
+        on a background thread and only do the lightweight bookkeeping here.
+        """
         try:
             payload_bytes = sample.payload.to_bytes()
             data = json.loads(payload_bytes.decode('utf-8'))
             entity_name = data.get('entity_name', 'User')
-            self.conversation_store.close_dialog(entity_name)
+
+            # Lightweight bookkeeping (fast, safe on zenoh thread)
             self._dialog_cooldowns[entity_name] = time.time()
             self._dialog_purposes.pop(entity_name, None)
             # End-dialog should immediately terminate any in-progress ask/wait.
@@ -1305,8 +1322,19 @@ class ZenohExecutiveNode:
             if self.awaiting_ask_response:
                 self.awaiting_ask_response = False
                 self._ask_response_queue.put(None)  # Sentinel to unblock _execute_ask
-            logger.info(f'🔚 {self.character_name} closed dialog with {entity_name} (from UI)')
-            self._publish_execution_state()
+
+            # Schedule close_dialog (which triggers archive) off the zenoh thread
+            def _close_and_archive():
+                try:
+                    self.conversation_store.close_dialog(entity_name)
+                except Exception as e:
+                    logger.warning(f'Error in deferred close_dialog: {e}')
+                finally:
+                    logger.info(f'🔚 {self.character_name} closed dialog with {entity_name} (from UI)')
+                    self._publish_execution_state()
+
+            t = threading.Thread(target=_close_and_archive, daemon=True, name='close-dialog')
+            t.start()
         except Exception as e:
             logger.warning(f'Error handling close_dialog: {e}')
     
@@ -1445,7 +1473,12 @@ class ZenohExecutiveNode:
             # 2c. Regular user text or agent message → chat-mode response
             if source == 'User':
                 self.text_input_queue.pop(0)
+                # Clear stale interrupt from prior End/Stop so chat LLM call succeeds
+                self.interrupt_requested = False
+                if self.infospace_executor:
+                    self.infospace_executor.interrupt_requested = False
                 self._handle_chat_response(text, source)
+                self._publish_execution_state()
                 return
 
             # 2d. Agent-to-agent messages — process through existing pipeline
@@ -2393,6 +2426,18 @@ class ZenohExecutiveNode:
             status=updates["status"],
             result=updates["last_result"],
         )
+        # Update user concern model from goal completion
+        try:
+            goal_text = goal.get("name", "") or goal.get("goal_text", "")
+            outcome = updates.get("last_result", "")[:500]
+            self.user_concern_model.update_from_goal_completion(
+                goal_statement=goal_text,
+                outcome_summary=outcome,
+                goal_id=goal_id,
+                success=bool(success),
+            )
+        except Exception as e:
+            logger.warning(f'Error updating concern model from goal {goal_id}: {e}')
         if self._active_scheduled_goal_id == goal_id:
             self._active_scheduled_goal_id = None
         if hasattr(self, "goal_scheduler"):
@@ -2495,6 +2540,9 @@ class ZenohExecutiveNode:
         if self._is_goal_running():
             self._say_to_user(f"A goal is already running. Please wait for it to complete.")
             return
+        # Close any active User conversation when starting a goal
+        if source != "scheduler" and source != "sensor_trigger":
+            self.conversation_store.close_dialog("User")
         # Apply any pending LLM switch before starting a new goal
         self._apply_pending_llm_switch()
         self._active_scheduled_goal_id = goal_id
@@ -2974,7 +3022,7 @@ class ZenohExecutiveNode:
             return
         keep_ids = set(keep_ids or ())
         _PRESERVED_COLLECTIONS = {"conversation", "conversation_history", "_tasks", "_scheduled_goals"}
-        _PRESERVED_NOTES = {"_situation", "_situation_prev"}
+        _PRESERVED_NOTES = {"_situation", "_situation_prev", "_user_concerns"}
         _PRESERVED_NOTE_PREFIXES = ("_task_", "_scheduled_goal_")
         deleted = 0
         for resource_id in created_ids:
@@ -3520,6 +3568,29 @@ class ZenohExecutiveNode:
             logger.error(f'Error in chat response: {e}')
             traceback.print_exc()
 
+    def _handle_sensor_alert_response(self, alert_text: str, sensor_name: str):
+        """Respond to a sensor alert in character, without recording conversation turns."""
+        system_prompt = self._update_system_prompt()
+        user_prompt = (
+            f"Sensor alert from {sensor_name}:\n{alert_text}\n\n"
+            f"React briefly in character. This is an internal sensor notification, not a conversation."
+        )
+        try:
+            result = self.llm_generate(
+                messages=[system_prompt, user_prompt],
+                max_tokens=300,
+                temperature=0.7,
+            )
+            if result.success and result.text:
+                response = result.text.strip()
+                self._say_to_user(response)
+                logger.info(f'🚨 {self.character_name} sensor alert response: {response[:80]}...')
+            else:
+                logger.warning(f'Sensor alert LLM call failed: {getattr(result, "error", "unknown")}')
+        except Exception as e:
+            logger.error(f'Error in sensor alert response: {e}')
+            traceback.print_exc()
+
     # ── Goal worker thread ────────────────────────────────────────────────
 
     def _run_goal_on_thread(self, fn, *args, **kwargs):
@@ -3558,7 +3629,7 @@ class ZenohExecutiveNode:
 
         Order: alerts → triggers → informs.
         """
-        # Alerts: generate chat-style acknowledgement
+        # Alerts: generate chat-style acknowledgement (no conversation recording)
         while self._sensor_alert_queue:
             alert = self._sensor_alert_queue.pop(0)
             sensor_name = alert.get('sensor_name', 'unknown')
@@ -3573,8 +3644,8 @@ class ZenohExecutiveNode:
                     url = item.get('url', '')
                     label = f"{title} — {url}" if title else url
                     alert_text += f"\n  - {label}"
-            # Respond to alert via chat-mode (read-only, in character)
-            self._handle_chat_response(alert_text, source=f'sensor:{sensor_name}')
+            # Respond to alert without recording conversation turns
+            self._handle_sensor_alert_response(alert_text, sensor_name)
 
         # Triggers: dispatch the first eligible as next goal
         if self._sensor_trigger_queue:
@@ -3605,94 +3676,182 @@ class ZenohExecutiveNode:
             self.infospace_executor._remove_bindings_for_resource(resource_id)
         return success, error_msg
 
+    def _archive_dialog(self, entity: str, dialog_id: str, note_ids: list):
+        """Archive a single completed dialog: synthesize its turns into conversation_history.
+
+        Called by conversation_store.close_dialog via the archive callback.
+        note_ids are the Note IDs belonging to this dialog (still in the conversation collection).
+        """
+        if not self.infospace_executor:
+            logger.warning('Infospace executor not available, skipping dialog archiving')
+            return
+        if not note_ids:
+            return
+
+        # Skip trivial conversations (single outgoing ask with no reply)
+        if len(note_ids) == 1:
+            turn = self.conversation_store._parse_turn_note(note_ids[0])
+            if turn and turn.get("act_type") == "ask" and turn.get("direction") == "out":
+                logger.info(f'Skipping archive for ask-only dialog {dialog_id}')
+                return
+
+        logger.info(f'📝 Archiving dialog {dialog_id} ({len(note_ids)} turns) for {entity}...')
+
+        try:
+            # Build a temporary collection binding for synthesize
+            # Bind the note IDs so synthesize can read them
+            binding_name = '_archive_dialog_src'
+            conv_collection_id = self.resource_manager.named_collections.get("conversation")
+            if not conv_collection_id:
+                logger.warning('No conversation collection found, skipping dialog archiving')
+                return
+
+            # Create a temporary collection with just this dialog's notes
+            success, tmp_coll_id, err, _ = self.resource_manager.create_collection(
+                self.character_name, list(note_ids), "list", "conversation-store",
+                f"dialog {dialog_id}", f"_tmp_dialog_{dialog_id}", {}
+            )
+            if not success or not tmp_coll_id:
+                logger.warning(f'Failed to create temp collection for dialog archive: {err}')
+                return
+
+            self.infospace_executor.plan_bindings[0][binding_name] = tmp_coll_id
+
+            # Synthesize the dialog turns
+            summarize_action = {
+                "type": "synthesize",
+                "target": f"${binding_name}",
+                "focus": f"concise conversation summary between {self.character_name} and {entity}",
+                "out": "$_dialog_summary"
+            }
+            summarize_result = self.infospace_executor.execute_action(summarize_action)
+
+            if summarize_result.get('status') != 'success':
+                logger.warning(f'Failed to synthesize dialog {dialog_id}: {summarize_result.get("reason", "unknown")}')
+                return
+
+            summary_note_id = summarize_result.get('resource_id')
+            if not summary_note_id:
+                summary_note_id = self.infospace_executor._get_binding('_dialog_summary')
+            if not summary_note_id:
+                logger.warning(f'Synthesize did not return a Note ID for dialog {dialog_id}')
+                return
+
+            # Verify content
+            summary_content = self.infospace_executor._get_content(summary_note_id)
+            if not summary_content or (isinstance(summary_content, str) and not summary_content.strip()):
+                logger.warning(f'Summarization returned empty result for dialog {dialog_id}')
+                return
+
+            # Persist and add to conversation_history
+            persist_action = {"type": "persist", "target": "$_dialog_summary"}
+            self.infospace_executor.execute_action(persist_action)
+
+            add_action = {
+                "type": "add", "target": "conversation_history",
+                "value": "$_dialog_summary", "out": "$conversation_history"
+            }
+            add_result = self.infospace_executor.execute_action(add_action)
+
+            if add_result.get('status') == 'success':
+                logger.info(f'✓ Archived dialog {dialog_id} ({len(note_ids)} turns) to conversation_history')
+            else:
+                logger.warning(f'Failed to add dialog summary to conversation_history: {add_result.get("reason", "unknown")}')
+
+            # Update user concern model from conversation summary
+            try:
+                self.user_concern_model.update_from_conversation(
+                    summary_content, dialog_id, entity
+                )
+            except Exception as e:
+                logger.warning(f'Error updating concern model from dialog {dialog_id}: {e}')
+
+            # Clean up temp collection and bindings
+            if tmp_coll_id and self.resource_manager:
+                self.resource_manager.resource_registry.pop(tmp_coll_id, None)
+                self.resource_manager.named_collections.pop(f"_tmp_dialog_{dialog_id}", None)
+            for scope in self.infospace_executor.plan_bindings:
+                scope.pop(binding_name, None)
+                scope.pop('_dialog_summary', None)
+
+        except Exception as e:
+            logger.error(f'Error archiving dialog {dialog_id}: {e}')
+            import traceback
+            traceback.print_exc()
+
     def _archive_conversation(self):
-        """
-        Archive conversation on shutdown: synthesize conversation collection and add to conversation_history.
-        Only archives if conversation collection exists and is not empty.
-        """
-        logger.info(f'📝 Starting conversation archiving for {self.character_name}...')
-        
+        """Shutdown fallback: archive any remaining unarchived turns in the conversation collection."""
+        logger.info(f'📝 Shutdown archive fallback for {self.character_name}...')
+
         if not self.infospace_executor:
             logger.warning('Infospace executor not available, skipping conversation archiving')
             return
-        
+
         try:
             # Load conversation collection
             load_action = {"type": "load", "target": "conversation", "out": "$conv"}
             result = self.infospace_executor.execute_action(load_action)
-            
+
             if result.get('status') != 'success' or not result.get('resource_id'):
                 logger.info('No conversation collection found, skipping archiving')
                 return
-            
-            conv_collection_id = result.get('resource_id')
-            
-            # Check if collection is empty using size primitive
+
+            # Check if collection is empty
             size_action = {"type": "size", "target": "$conv", "out": "$conv_size"}
             size_result = self.infospace_executor.execute_action(size_action)
-            
+
             if size_result.get('status') != 'success':
                 logger.warning(f'Failed to get conversation size: {size_result.get("reason", "unknown")}')
                 return
-            
-            # Get size value (should be an integer)
+
             conv_size = size_result.get('value', 0)
             try:
                 conv_size = int(conv_size) if isinstance(conv_size, str) else conv_size
             except (ValueError, TypeError):
                 logger.warning(f'Invalid conversation size value: {conv_size}')
                 return
-            
+
             if conv_size == 0:
-                logger.info('Conversation collection is empty, skipping archiving')
+                logger.info('Conversation collection is empty (all dialogs already archived), skipping')
                 return
 
             if conv_size == 1 and self.conversation_store.is_ask_only_conversation():
                 logger.info('Conversation has only a single ask turn, skipping archiving')
                 return
-            
-            logger.info(f'📝 Archiving conversation with {conv_size} items...')
-            
-            # Summarize conversation collection using synthesize tool
-            summarize_action = {"type": "synthesize", "target":  "$conv", "focus": "concise conversation summary", "out": "$summary"}
+
+            logger.info(f'📝 Shutdown fallback: archiving {conv_size} remaining turns...')
+
+            # Synthesize whatever remains
+            summarize_action = {"type": "synthesize", "target": "$conv", "focus": "concise conversation summary", "out": "$summary"}
             summarize_result = self.infospace_executor.execute_action(summarize_action)
-            
+
             if summarize_result.get('status') != 'success':
                 logger.warning(f'Failed to synthesize conversation: {summarize_result.get("reason", "unknown")}')
                 return
-            
-            # The synthesize tool already created a Note and bound it to $summary
-            # Get the Note ID from the result (resource_id) or from plan_bindings
+
             summary_note_id = summarize_result.get('resource_id')
             if not summary_note_id:
-                # Try to get from plan_bindings
                 summary_note_id = self.infospace_executor.plan_bindings_flat.get('summary')
             if not summary_note_id:
                 logger.warning('Summarize tool did not return a Note ID')
                 return
-            
-            # Verify the summary note has content
+
             summary_content = self.infospace_executor._get_content(summary_note_id)
             if not summary_content or (isinstance(summary_content, str) and not summary_content.strip()):
                 logger.warning('Summarization returned empty result, skipping archiving')
                 return
-            
-            # Ensure summary note is persisted before adding to persistent collection
+
             persist_action = {"type": "persist", "target": "$summary"}
-            persist_result = self.infospace_executor.execute_action(persist_action)
-            if persist_result.get('status') != 'success':
-                logger.warning(f'Failed to persist summary note: {persist_result.get("reason", "unknown")}')
-                # Continue anyway - note will be saved when resource manager saves
-            
-            # Add the summary note (already created by synthesize tool) to conversation_history
+            self.infospace_executor.execute_action(persist_action)
+
             add_action = {"type": "add", "target": "conversation_history", "value": "$summary", "out": "$conversation_history"}
             add_result = self.infospace_executor.execute_action(add_action)
-            
+
             if add_result.get('status') == 'success':
-                logger.info(f'✓ Successfully archived conversation summary ({conv_size} items) to conversation_history')
+                logger.info(f'✓ Shutdown fallback: archived {conv_size} remaining turns to conversation_history')
             else:
                 logger.warning(f'Failed to add summary to conversation_history: {add_result.get("reason", "unknown")}')
-                
+
         except Exception as e:
             logger.error(f'Error archiving conversation: {e}')
             import traceback
@@ -3827,6 +3986,7 @@ class ZenohExecutiveNode:
                     if self._is_goal_running():
                         self._say_to_user("A goal is currently running. Please wait for it to complete.")
                         return
+                    self.conversation_store.close_dialog("User")
                     self._begin_task_establishment(task_text)
                     return
                 elif _is_goal_cmd(clean_input):
@@ -3854,7 +4014,6 @@ class ZenohExecutiveNode:
                     parts = clean_input.strip().split()
                     target_id = parts[1] if len(parts) > 1 else None
                     if target_id and target_id.startswith('goal_'):
-                        self.conversation_store.close_dialog("User")
                         self._handle_goal_proceed(goal_id=target_id)
                     return
                 elif clean_input.strip().lower().startswith('terminate'):
@@ -4605,7 +4764,7 @@ class ZenohExecutiveNode:
                 return
             
             PRESERVED_COLLECTIONS = {'conversation', 'conversation_history', '_tasks', '_scheduled_goals'}
-            PRESERVED_NOTES = {'_situation', '_situation_prev'}
+            PRESERVED_NOTES = {'_situation', '_situation_prev', '_user_concerns'}
             PRESERVED_NOTE_PREFIXES = ('_task_', '_scheduled_goal_')
             
             deleted_notes = 0
@@ -4665,7 +4824,7 @@ class ZenohExecutiveNode:
                 return
             
             PRESERVED_COLLECTIONS = {'conversation', 'conversation_history', '_tasks', '_scheduled_goals'}
-            PRESERVED_NOTES = {'_situation', '_situation_prev'}
+            PRESERVED_NOTES = {'_situation', '_situation_prev', '_user_concerns'}
             PRESERVED_NOTE_PREFIXES = ('_task_', '_scheduled_goal_')
             
             deleted_notes = 0
@@ -5068,7 +5227,7 @@ class ZenohExecutiveNode:
         
         # Collections and Notes to preserve (by name) - should persist across benchmark runs
         PRESERVED_COLLECTIONS = {'conversation', 'conversation_history', '_tasks', '_scheduled_goals'}
-        PRESERVED_NOTES = {'_situation', '_situation_prev'}
+        PRESERVED_NOTES = {'_situation', '_situation_prev', '_user_concerns'}
         PRESERVED_NOTE_PREFIXES = ('_task_', '_scheduled_goal_')
         
         deleted_notes = 0
