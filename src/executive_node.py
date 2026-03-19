@@ -3697,6 +3697,16 @@ class ZenohExecutiveNode:
 
         logger.info(f'📝 Archiving dialog {dialog_id} ({len(note_ids)} turns) for {entity}...')
 
+        # Build raw turn transcript for the concern model (before summarization loses detail)
+        raw_turn_lines = []
+        for nid in note_ids:
+            turn = self.conversation_store._parse_turn_note(nid)
+            if turn:
+                speaker = turn.get('source', '?')
+                text = turn.get('text', '')
+                raw_turn_lines.append(f"{speaker}: {text}")
+        raw_transcript = "\n".join(raw_turn_lines)
+
         try:
             # Build a temporary collection binding for synthesize
             # Bind the note IDs so synthesize can read them
@@ -3716,6 +3726,15 @@ class ZenohExecutiveNode:
                 return
 
             self.infospace_executor.plan_bindings[0][binding_name] = tmp_coll_id
+
+            # Update user concern model from raw dialog turns (before summarization)
+            if raw_transcript:
+                try:
+                    self.user_concern_model.update_from_conversation(
+                        raw_transcript, dialog_id, entity
+                    )
+                except Exception as e:
+                    logger.warning(f'Error updating concern model from dialog {dialog_id}: {e}')
 
             # Synthesize the dialog turns
             summarize_action = {
@@ -3757,14 +3776,6 @@ class ZenohExecutiveNode:
                 logger.info(f'✓ Archived dialog {dialog_id} ({len(note_ids)} turns) to conversation_history')
             else:
                 logger.warning(f'Failed to add dialog summary to conversation_history: {add_result.get("reason", "unknown")}')
-
-            # Update user concern model from conversation summary
-            try:
-                self.user_concern_model.update_from_conversation(
-                    summary_content, dialog_id, entity
-                )
-            except Exception as e:
-                logger.warning(f'Error updating concern model from dialog {dialog_id}: {e}')
 
             # Clean up temp collection and bindings
             if tmp_coll_id and self.resource_manager:
