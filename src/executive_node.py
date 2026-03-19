@@ -2428,13 +2428,25 @@ class ZenohExecutiveNode:
         )
         # Update user concern model from goal completion
         try:
-            goal_text = goal.get("name", "") or goal.get("goal_text", "")
-            outcome = updates.get("last_result", "")[:500]
+            full_goal_text = goal.get("goal_text", "") or goal.get("name", "")
+            outcome = updates.get("last_result", "")[:800]
+            # Fetch primary product content for richer concern context
+            artifact_content = ''
+            pp = updates.get("primary_product", "")
+            if pp and self.resource_manager:
+                try:
+                    res = self.resource_manager.get_resource(pp)
+                    if res:
+                        props = res.get('properties', {}) if isinstance(res, dict) else {}
+                        artifact_content = str(props.get('content', '') or props.get('text', ''))[:1000]
+                except Exception:
+                    pass
             self.user_concern_model.update_from_goal_completion(
-                goal_statement=goal_text,
+                goal_statement=full_goal_text,
                 outcome_summary=outcome,
                 goal_id=goal_id,
                 success=bool(success),
+                result_artifact=artifact_content,
             )
         except Exception as e:
             logger.warning(f'Error updating concern model from goal {goal_id}: {e}')

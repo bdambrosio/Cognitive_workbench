@@ -215,18 +215,22 @@ class UserConcernModel:
 
     def update_from_goal_completion(self, goal_statement: str,
                                      outcome_summary: str, goal_id: str,
-                                     success: bool):
+                                     success: bool,
+                                     result_artifact: str = ''):
         """Update concern model after a goal completes."""
         if not goal_statement:
             return
         timestamp = datetime.now().isoformat()
         status_word = "succeeded" if success else "failed"
-        interaction_text = (
-            f"Completed goal ({status_word}):\n"
-            f"Goal: {goal_statement}\n"
-            f"Outcome: {outcome_summary or '(no summary)'}\n"
-            f"Timestamp: {timestamp}"
-        )
+        parts = [
+            f"Completed goal ({status_word}):",
+            f"Goal: {goal_statement}",
+            f"Outcome: {outcome_summary or '(no summary)'}",
+        ]
+        if result_artifact:
+            parts.append(f"Result artifact: {result_artifact}")
+        parts.append(f"Timestamp: {timestamp}")
+        interaction_text = "\n".join(parts)
         evidence_ref = f"goal:{goal_id}:{timestamp}"
         self._run_patch(interaction_text, evidence_ref)
 
@@ -247,7 +251,7 @@ class UserConcernModel:
         try:
             result = self.llm_generate(
                 messages=[PATCH_SYSTEM_PROMPT, user_prompt],
-                max_tokens=600,
+                max_tokens=3000,
                 temperature=0.3,
                 is_json=True,
             )
