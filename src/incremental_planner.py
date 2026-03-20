@@ -671,7 +671,8 @@ def tool_catalog_text(tools: Dict[str, Dict]) -> str:
     return "\n".join(lines)
 
 
-def load_skill_docs(tool_names: List[str], available_tools: Dict[str, Dict]) -> str:
+def load_skill_docs(tool_names: List[str], available_tools: Dict[str, Dict],
+                    executor_action_names: Optional[set] = None) -> str:
     """
     Load full SKILL.md documentation for selected tools and primitives.
     
@@ -726,7 +727,17 @@ def load_skill_docs(tool_names: List[str], available_tools: Dict[str, Dict]) -> 
                         break
         
         if not skill_file:
-            logger.debug(f"Stage 1.5: No SKILL.md found for {tool_name}")
+            # Distinguish "real tool, no docs" from "nonexistent tool"
+            is_known = (tool_name in available_tools
+                        or primitive_dir.exists()
+                        or (executor_action_names and tool_name in executor_action_names))
+            if not is_known:
+                logger.warning(f"Stage 1.5: No tool named '{tool_name}' exists")
+                lines.append(f"\n## {tool_name.upper()}")
+                lines.append(f"⚠ ERROR: No tool named '{tool_name}' exists. Do NOT use this tool. "
+                             f"Check the tool catalog above for the correct tool name.")
+            else:
+                logger.debug(f"Stage 1.5: No SKILL.md found for {tool_name} (tool exists, no docs)")
             continue
         
         try:
@@ -2428,7 +2439,8 @@ ALWAYS follow all formatting instructions exactly.
                 tools_to_load = [tool for tool in selected_tools if tool not in _loaded_skill_docs]
                 
                 if tools_to_load:
-                    expanded_docs = load_skill_docs(tools_to_load, executor.available_tools)
+                    _exec_actions = set(executor._get_known_action_names()) if hasattr(executor, '_get_known_action_names') else set()
+                    expanded_docs = load_skill_docs(tools_to_load, executor.available_tools, _exec_actions)
                     if expanded_docs:
                         s += user(expanded_docs)
                         s += assistant("I have reviewed the detailed documentation for the selected tools.\n")
@@ -2453,9 +2465,9 @@ ALWAYS follow all formatting instructions exactly.
             "Linear example:\n"
             "```python\n"
             "r1 = tool(\"search-web\", query=\"transformers survey\", out=\"$papers\")\n"
-            "if r1[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"search failed\")\n"
+            "if r1[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=f\"search failed: {r1.get('reason', 'unknown')}\")\n"
             "r2 = tool(\"synthesize\", target=\"$papers\", focus=\"key findings\", out=\"$summary\")\n"
-            "if r2[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"synthesize failed\")\n"
+            "if r2[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=f\"synthesize failed: {r2.get('reason', 'unknown')}\")\n"
             "return executor._create_uniform_return(\"success\", value=\"done\")\n"
             "```\n"
             "Reading content example:\n"
@@ -2731,7 +2743,8 @@ ALWAYS follow all formatting instructions exactly.
                     logger.info(f"Step {step}: LLM requested additional tools: {requested_tools}")
                     tools_to_load = [tool for tool in requested_tools if tool not in _loaded_skill_docs]
                     if tools_to_load:
-                        expanded_docs = load_skill_docs(tools_to_load, executor.available_tools)
+                        _exec_actions = set(executor._get_known_action_names()) if hasattr(executor, '_get_known_action_names') else set()
+                        expanded_docs = load_skill_docs(tools_to_load, executor.available_tools, _exec_actions)
                         if expanded_docs:
                             s += user(f"ADDITIONAL TOOL DOCUMENTATION:\n{expanded_docs}")
                             s += assistant("I have reviewed the additional tool documentation.\n")
@@ -3514,7 +3527,8 @@ ALWAYS follow all formatting instructions exactly.
             tools_to_load = [tool for tool in selected_tools if tool not in _loaded_skill_docs]
             
             if tools_to_load:
-                expanded_docs = load_skill_docs(tools_to_load, executor.available_tools)
+                _exec_actions = set(executor._get_known_action_names()) if hasattr(executor, '_get_known_action_names') else set()
+                expanded_docs = load_skill_docs(tools_to_load, executor.available_tools, _exec_actions)
                 if expanded_docs:
                     prompt += format_user(expanded_docs)
                     prompt += format_assistant("I have reviewed the detailed documentation for the selected tools.\n")
@@ -3538,9 +3552,9 @@ ALWAYS follow all formatting instructions exactly.
         "Linear example:\n"
         "```python\n"
         "r1 = tool(\"search-web\", query=\"transformers survey\", out=\"$papers\")\n"
-        "if r1[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"search failed\")\n"
+        "if r1[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=f\"search failed: {r1.get('reason', 'unknown')}\")\n"
         "r2 = tool(\"synthesize\", target=\"$papers\", focus=\"key findings\", out=\"$summary\")\n"
-        "if r2[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"synthesize failed\")\n"
+        "if r2[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=f\"synthesize failed: {r2.get('reason', 'unknown')}\")\n"
         "return executor._create_uniform_return(\"success\", value=\"done\")\n"
         "```\n"
         "Reading content example:\n"
@@ -3805,7 +3819,8 @@ ALWAYS follow all formatting instructions exactly.
             logger.info(f"Step {step}: LLM requested additional tools: {requested_tools}")
             tools_to_load = [tool for tool in requested_tools if tool not in _loaded_skill_docs]
             if tools_to_load:
-                expanded_docs = load_skill_docs(tools_to_load, executor.available_tools)
+                _exec_actions = set(executor._get_known_action_names()) if hasattr(executor, '_get_known_action_names') else set()
+                expanded_docs = load_skill_docs(tools_to_load, executor.available_tools, _exec_actions)
                 if expanded_docs:
                     prompt += format_user(f"ADDITIONAL TOOL DOCUMENTATION:\n{expanded_docs}")
                     prompt += format_assistant("I have reviewed the additional tool documentation.\n")

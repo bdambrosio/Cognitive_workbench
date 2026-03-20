@@ -73,6 +73,7 @@ def _is_goal_cmd(s):
 
 # Import LLM client
 from llm_client import ZenohLLMClient
+import character_evaluator
 
 # SGLang imports
 try:
@@ -1043,6 +1044,9 @@ class ZenohExecutiveNode:
         self._sensor_trigger_queue: list = []  # disposition='trigger:X' — goal dispatch
         self._sensor_inform_queue: list = []   # disposition='inform' — rolling context (last 10)
         
+        # Last character evaluator assessment (for orientation-to-chat integration)
+        self._last_character_eval: Optional[Dict[str, Any]] = None
+
         # Track last action outputs for plan_result
         self.last_say_text = ''
         self.last_out_resource_id = None
@@ -1449,6 +1453,14 @@ class ZenohExecutiveNode:
                 if source == 'User':
                     self.text_input_queue.pop(0)
                     logger.info(f'🚀 User reply to ask received, pushing to _ask_response_queue')
+                    self._character_eval_run(
+                        "user_text",
+                        text,
+                        "user",
+                        event_summary="Ask_reply",
+                        is_goal_command=False,
+                        is_proceed_like=False,
+                    )
                     self._ask_response_queue.put(text)
                     # awaiting_ask_response is cleared by _execute_ask when it unblocks
                 return  # While awaiting ask, ignore non-User input
@@ -2559,6 +2571,9 @@ class ZenohExecutiveNode:
         self._apply_pending_llm_switch()
         self._active_scheduled_goal_id = goal_id
         self._update_scheduled_goal(goal_id, is_running=True, status="running")
+        # Attach evaluator assessment if available (from the eval that ran when input was received)
+        if self._last_character_eval:
+            self._update_scheduled_goal(goal_id, initial_assessment=self._last_character_eval)
         self._record_scheduler_event(
             "start",
             goal_id=goal_id,
@@ -3236,6 +3251,20 @@ class ZenohExecutiveNode:
                     f"Do NOT submit another goal that is substantially similar to the failed ones.\n"
                 )
 
+        # Add user concerns for milestone framing
+        concerns_text = ""
+        try:
+            active_concerns = self.user_concern_model.get_concerns(active_only=True) or []
+            if active_concerns:
+                concern_lines = []
+                for c in active_concerns[:5]:
+                    label = c.get("concern_label", "?")
+                    desc = (c.get("concern_description") or "")[:120]
+                    concern_lines.append(f"  - {label}: {desc}")
+                concerns_text = "\n".join(concern_lines)
+        except Exception:
+            pass
+
         prompt = self._ADVANCE_TASK_PROMPT.format(
             intention=wip.get("intention", ""),
             phase=wip.get("phase", "specification"),
@@ -3243,6 +3272,8 @@ class ZenohExecutiveNode:
             findings=findings_text,
             last_result=last_result,
         )
+        if concerns_text:
+            prompt += f"\nUSER CONCERNS (relevant context — what the user currently cares about):\n{concerns_text}\n"
         if spiral_warning:
             prompt += spiral_warning
 
@@ -3537,6 +3568,7 @@ class ZenohExecutiveNode:
 
         Used when no goal: prefix is present.  Read-only — no resource mutations.
         """
+        assessment = self._character_eval_run("user_text", text, source, is_goal_command=False, is_proceed_like=False)
         # Record the incoming turn so envision sees full history
         self.conversation_store.record_incoming(source, text)
 
@@ -3546,7 +3578,10 @@ class ZenohExecutiveNode:
         # Build system prompt (character + setting + capabilities + drives + agent state)
         system_prompt = self._update_system_prompt()
 
-        # Build user prompt with dialog history + envision guidance + user message
+        # Build orientation summary from evaluator assessment
+        orientation = character_evaluator.build_orientation_summary(assessment, text)
+
+        # Build user prompt with dialog history + envision guidance + orientation + user message
         recent_turns = ""
         entity_data = self.conversation_store.get_entity_context(source, limit=6, scope='current')
         if entity_data and 'conversation_history' in entity_data:
@@ -3555,17 +3590,22 @@ class ZenohExecutiveNode:
                     text_preview = str(entry['text'])[:200]
                     recent_turns += f"{entry['source']}: {text_preview}\n"
 
+        orientation_block = f"\n{orientation}\n\n" if orientation else "\n"
         user_prompt = (
             f"RECENT DIALOG:\n{recent_turns}\n"
             f"Their move: {envision['turn_intent']}\n"
-            f"Your move: {envision['my_move']}\n\n"
+            f"Your move: {envision['my_move']}\n"
+            f"{orientation_block}"
             f"Message from {source}: {text}\n\n"
             f"Respond in character. Be concise."
         )
 
         try:
             result = self.llm_generate(
-                messages=[system_prompt, user_prompt],
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
                 max_tokens=400,
                 temperature=0.7,
             )
@@ -3589,7 +3629,10 @@ class ZenohExecutiveNode:
         )
         try:
             result = self.llm_generate(
-                messages=[system_prompt, user_prompt],
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
                 max_tokens=300,
                 temperature=0.7,
             )
@@ -3955,6 +3998,8 @@ class ZenohExecutiveNode:
         if text_input and text_input.strip():
             clean_input = text_input.strip().strip('"').strip("'")
             goal = clean_input.strip().strip('"').strip("'")
+            etype, igc, ipl = self._character_eval_flags_from_process_input(source, clean_input)
+            self._character_eval_run(etype, clean_input, source, is_goal_command=igc, is_proceed_like=ipl)
             
             # If awaiting ask response, the ask primitive is polling text_input_queue directly
             # So we should not process text inputs here - they'll be consumed by the polling loop
@@ -4024,6 +4069,8 @@ class ZenohExecutiveNode:
                         return
                     self._active_scheduled_goal_id = goal_id
                     self._update_scheduled_goal(goal_id, is_running=True, status="running")
+                    if self._last_character_eval:
+                        self._update_scheduled_goal(goal_id, initial_assessment=self._last_character_eval)
                     pre_resource_ids = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
 
                     def _run_user_goal():
@@ -4358,6 +4405,126 @@ class ZenohExecutiveNode:
 
         return "\n".join(parts)
 
+    def _character_eval_enabled(self) -> bool:
+        cfg = self.character_config.get("character_evaluator") or self.character_config.get("jill_evaluator") or {}
+        return bool(cfg.get("enabled", True))
+
+    def _character_eval_normalize_source(self, source: str, sensor_name: str = "") -> str:
+        if source == "User":
+            return "user"
+        if source.startswith("sensor:"):
+            return source
+        if sensor_name and source in ("unknown", ""):
+            return f"sensor:{sensor_name}"
+        return source or "unknown"
+
+    def _character_eval_build_goals_compact(self) -> List[Dict[str, Any]]:
+        out: List[Dict[str, Any]] = []
+        try:
+            for g in self._all_scheduled_goals():
+                out.append({
+                    "goal_id": g.get("goal_id"),
+                    "goal_label": g.get("name") or (g.get("goal_text") or "")[:120],
+                    "goal_status": g.get("status"),
+                    "goal_summary": (g.get("last_result") or "")[:200],
+                })
+        except Exception:
+            pass
+        return out[:24]
+
+    def _character_eval_build_recent_context(self, entity_for_dialog: str = "User") -> str:
+        parts: List[str] = []
+        try:
+            entity_data = self.conversation_store.get_entity_context(entity_for_dialog, limit=6, scope="current")
+            if entity_data and "conversation_history" in entity_data:
+                for entry in entity_data["conversation_history"][-6:]:
+                    if isinstance(entry, dict) and "source" in entry and "text" in entry:
+                        parts.append(f"{entry['source']}: {str(entry['text'])[:200]}")
+        except Exception:
+            pass
+        if self._sensor_inform_queue:
+            for entry in self._sensor_inform_queue[-5:]:
+                sn = entry.get("sensor_name", "?")
+                parts.append(f"sensor[{sn}]: {str(entry.get('content', ''))[:120]}")
+        return "\n".join(parts)
+
+    def _character_eval_build_activity_state(self) -> str:
+        try:
+            return self._build_agent_state_block()[:2000]
+        except Exception:
+            return ""
+
+    def _character_eval_flags_from_process_input(self, source: str, clean_input: str) -> Tuple[str, bool, bool]:
+        c = clean_input.strip()
+        low = c.lower()
+        is_scheduler = source == "scheduler"
+        is_proceed = low.startswith("proceed") or low == "next step"
+        is_reuse = low.startswith("reuse")
+        is_terminate = low.startswith("terminate")
+        is_clear_cache = low.startswith("clear-cache")
+        is_unblock = low.startswith("unblock")
+        is_task_cmd = c.startswith("task:") or low in ("tasks", "task list", "list tasks")
+        is_goal = _is_goal_cmd(c)
+        json_action = source == "User" and c.startswith("{")
+        is_goal_command = bool(
+            is_scheduler or is_goal or is_task_cmd or is_reuse or is_terminate or is_clear_cache or is_unblock or json_action
+        )
+        is_proceed_like = bool(
+            is_proceed or is_reuse or (is_scheduler and (low.startswith("proceed") or low.startswith("reuse")))
+        )
+        agent_like = source not in ("unknown", "console", "User", "scheduler")
+        event_type = "user_text" if agent_like else "goal_initiation"
+        return event_type, is_goal_command, is_proceed_like
+
+    def _character_eval_run(
+        self,
+        event_type: str,
+        content: str,
+        source: str,
+        *,
+        event_summary: Optional[str] = None,
+        disposition: str = "",
+        sensor_name: str = "",
+        is_goal_command: bool = False,
+        is_proceed_like: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        if not self._character_eval_enabled():
+            return None
+        try:
+            nsrc = self._character_eval_normalize_source(source, sensor_name)
+            afford: Optional[List[str]] = None
+            if self.available_tools:
+                aff = character_evaluator.filter_relevant_affordances(content, list(self.available_tools.keys()))
+                afford = aff or None
+            uc: List[Dict[str, Any]] = []
+            try:
+                uc = self.user_concern_model.get_concerns(active_only=False) or []
+            except Exception:
+                pass
+            goals = self._character_eval_build_goals_compact()
+            recent = self._character_eval_build_recent_context()
+            activity = self._character_eval_build_activity_state()
+            ev = character_evaluator.build_event_dict(
+                event_type,
+                content,
+                nsrc,
+                event_summary=event_summary,
+                disposition=disposition,
+                sensor_name=sensor_name,
+                is_goal_command=is_goal_command,
+                is_proceed_like=is_proceed_like,
+            )
+            assessment = character_evaluator.evaluate(
+                ev, character_evaluator.DEFAULT_CHARACTER_CONCERNS, uc, goals, recent, activity, afford,
+                llm_generate=self.llm_generate,
+            )
+            character_evaluator.log_assessment(assessment)
+            self._last_character_eval = assessment
+            return assessment
+        except Exception as e:
+            logger.warning(f"Character orientation evaluator skipped: {e}")
+            return None
+
     def _update_system_prompt(self):
         """Update the system prompt with the current situation."""
         # Build system prompt fresh from character_config (not cached observations)
@@ -4480,7 +4647,23 @@ class ZenohExecutiveNode:
                 last_action = self.action_history[-1]
                 result_str = self._truncate_result(last_action.result)
                 recent_context += f"\n# Last action:\n  {last_action.action.get('type')}: {last_action.action.get('target')} - {result_str}\n"
-            
+
+            # Add active user concerns for planner framing
+            try:
+                active_concerns = self.user_concern_model.get_concerns(active_only=True) or []
+                if active_concerns:
+                    concern_lines = []
+                    for c in active_concerns[:5]:
+                        label = c.get("concern_label", "?")
+                        desc = (c.get("concern_description") or "")[:120]
+                        weight = c.get("weight", "")
+                        w_str = f" (weight={weight})" if weight else ""
+                        concern_lines.append(f"  - {label}{w_str}: {desc}")
+                    recent_context += "\n# User concerns (context for framing, not direct instructions):\n"
+                    recent_context += "\n".join(concern_lines) + "\n"
+            except Exception:
+                pass
+
             # Build context for planner (always needed for infospace)
             context = {
                 'variables': self.infospace_executor.plan_bindings_flat if self.infospace_executor else {},
@@ -4552,6 +4735,17 @@ class ZenohExecutiveNode:
                     return
 
                 sensor_entry = {'sensor_name': sensor_name, 'content': sensor_content, 'data': sensor_data, 'disposition': disposition}
+
+                self._character_eval_run(
+                    "sensor_event",
+                    sensor_content,
+                    source if source.startswith("sensor:") else f"sensor:{sensor_name}",
+                    event_summary=(sensor_content[:200] if sensor_content else "") or str(len(sensor_data)) + " data items",
+                    disposition=disposition,
+                    sensor_name=sensor_name,
+                    is_goal_command=False,
+                    is_proceed_like=disposition.startswith("trigger:"),
+                )
 
                 if disposition == 'alert':
                     self._sensor_alert_queue.append(sensor_entry)

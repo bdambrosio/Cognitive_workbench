@@ -20,7 +20,7 @@ from infospace_resource_manager import InfospaceResourceManager
 # Try to import SGLang for runtime support
 try:
     import sglang as sgl
-    from sglang import function, user, assistant, gen
+    from sglang import function, system as sgl_system, user, assistant, gen
     HAS_SGLANG = True
 except ImportError:
     HAS_SGLANG = False
@@ -1054,8 +1054,22 @@ class InfospaceExecutor:
             logger.error(traceback.format_exc())
             return self._create_uniform_return('failed', reason=f'Execution error: {str(e)}')
     
+    def _get_known_action_names(self) -> set:
+        """Return all known action names (built-in handlers + available tools)."""
+        builtins = {
+            'apply', 'create-note', 'create-collection', 'create-relation',
+            'find-relations', 'related', 'get-metadata', 'set-metadata',
+            'persist', 'load', 'index', 'organize',
+            'search-within-collection', 'discover-notes', 'discover-collections',
+            'say', 'think', 'ask', 'bind',
+            'coerce', 'map', 'flatten', 'add', 'split',
+            'size', 'union', 'intersection', 'difference', 'remove',
+            'project', 'pluck', 'head', 'filter-structured', 'sort', 'join',
+        }
+        return builtins | set(self.available_tools.keys())
+
     # ==================== Core Operations ====================
-        
+
     def _execute_apply(self, action: Dict) -> Dict:
         """
         Apply tool to input data.
@@ -1343,21 +1357,43 @@ Only provide the result, followed by the </end> tag.""")
                 self.error = error
 
         try:
-            # Convert messages to single prompt string
+            # Parse messages into (system_text, user_text) for proper role separation
+            system_parts = []
+            user_parts = []
             if isinstance(messages, list):
-                prompt = '\n'.join(str(m) for m in messages)
+                for msg in messages:
+                    if isinstance(msg, dict):
+                        role = msg.get("role", "user")
+                        content = msg.get("content", "")
+                        if role == "system":
+                            system_parts.append(content)
+                        else:
+                            user_parts.append(content)
+                    elif isinstance(msg, str):
+                        raw = msg.strip()
+                        if raw.startswith('<|system|>'):
+                            system_parts.append(raw.replace('<|system|>', '', 1).strip())
+                        elif raw.startswith('<|user|>'):
+                            user_parts.append(raw.replace('<|user|>', '', 1).strip())
+                        elif raw.startswith('<|assistant|>'):
+                            user_parts.append(raw.replace('<|assistant|>', '', 1).strip())
+                        else:
+                            user_parts.append(msg)
             else:
-                prompt = str(messages)
-            
-            # Log and traceback if content is too large
-            prompt_length = len(prompt)
-            if prompt_length > 100000:
-                logger.warning(f"⚠️  Attempting to send {prompt_length} chars to sglang")
-            
-            # Create a simple generation function
+                user_parts.append(str(messages))
+
+            system_text = '\n'.join(system_parts)
+            user_text = '\n'.join(user_parts)
+            total_length = len(system_text) + len(user_text)
+            if total_length > 100000:
+                logger.warning(f"⚠️  Attempting to send {total_length} chars to sglang")
+
+            # Create generation function with proper role separation
             @function
-            def generate_text(s, prompt_text, is_json=False):
-                s += user(prompt_text)
+            def generate_text(s, system_text, user_text, is_json=False):
+                if system_text:
+                    s += sgl_system(system_text)
+                s += user(user_text)
                 # Convert stops list to string (SGLang uses stop as string, take first if list)
                 stop_str = None
                 if stops:
@@ -1369,9 +1405,9 @@ Only provide the result, followed by the </end> tag.""")
                 if stop_str:
                     gen_kwargs["stop"] = stop_str
                 s += assistant(gen("output", **gen_kwargs))
-            
+
             # Run the function
-            state = generate_text.run(prompt_text=prompt)
+            state = generate_text.run(system_text=system_text, user_text=user_text)
             result_text = state["output"].strip()
 
             # Strip <think>...</think> blocks (reasoning models like Qwen3)
@@ -1379,7 +1415,7 @@ Only provide the result, followed by the </end> tag.""")
 
             # Post-process JSON if requested
             if is_json:
-                result_text = self._parse_json_response(result_text, prompt)
+                result_text = self._parse_json_response(result_text, user_text)
             
             return Response(success=True, text=result_text)
         except Exception as e:
