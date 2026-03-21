@@ -21,6 +21,7 @@ from datetime import datetime
 from typing import Dict, List, Any, Set
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Body
 from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 from pathlib import Path
 from concurrent.futures import TimeoutError
@@ -339,7 +340,12 @@ class FastAPIActionDisplayNode:
         
         # Setup FastAPI routes
         self._setup_routes()
-        
+
+        # Mount static files for the activation-field UI (must come after routes)
+        static_dir = Path("static")
+        if static_dir.exists():
+            self.app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
         print(f'🖥️  FastAPI Action Display Node initialized on port {port}')
         print('   - Subscribing to: cognitive/*/action (all characters)')
         print('   - Subscribing to: cognitive/*/goal (character goals)')
@@ -519,6 +525,15 @@ class FastAPIActionDisplayNode:
         
         @self.app.get("/", response_class=HTMLResponse)
         async def get_main_page():
+            """Serve the new activation-field UI if available, else fall back to classic."""
+            ui_path = Path("static/ui/index.html")
+            if ui_path.exists():
+                return HTMLResponse(content=ui_path.read_text())
+            return self._get_html_template()
+
+        @self.app.get("/classic", response_class=HTMLResponse)
+        async def get_classic_page():
+            """Serve the original panel-based UI."""
             return self._get_html_template()
         
         @self.app.websocket("/ws")
@@ -1813,7 +1828,98 @@ Generated: {generated_at}
                 logger.error(f"Error setting activity: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
 
-    
+        @self.app.get("/api/topology/{character}")
+        async def get_topology(character: str):
+            """Build a graph topology (nodes + edges) for the activation-field UI.
+
+            Aggregates goals, concerns, bindings, and inventory into a single
+            node/edge structure suitable for D3 force-directed rendering.
+            """
+            nodes = []
+            edges = []
+
+            # Agent node
+            nodes.append({"id": "agent", "type": "agent", "label": character, "activation": 1.0})
+
+            # ── Goals ──────────────────────────────────────
+            try:
+                selector = f"cognitive/{character}/scheduled_goals"
+                replies = self.session.get(selector, timeout=2.0)
+                for reply in replies:
+                    if hasattr(reply, 'ok') and reply.ok is not None:
+                        response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                        if response.get('success'):
+                            for g in response.get('goals', []):
+                                gid = g.get('goal_id', g.get('name', ''))
+                                status = g.get('status', 'ready')
+                                label = g.get('name') or (g.get('goal_text', '') or '')[:60]
+                                activation = {'running': 1.0, 'ready': 0.5, 'pending': 0.4,
+                                              'scheduled': 0.4, 'completed': 0.2, 'failed': 0.15
+                                              }.get(status, 0.3)
+                                nodes.append({
+                                    "id": gid, "type": "goal", "label": label,
+                                    "status": status, "activation": activation, "data": g,
+                                })
+                                if status == 'running':
+                                    edges.append({"source": "agent", "target": gid, "type": "produces"})
+                        break
+            except Exception as e:
+                logger.warning(f"Topology: goals query failed: {e}")
+
+            # ── Bindings ───────────────────────────────────
+            running_goal_id = None
+            for n in nodes:
+                if n.get('type') == 'goal' and n.get('status') == 'running':
+                    running_goal_id = n['id']
+                    break
+            try:
+                selector = f"cognitive/{character}/plan_bindings"
+                replies = self.session.get(selector, timeout=2.0)
+                for reply in replies:
+                    if hasattr(reply, 'ok') and reply.ok is not None:
+                        response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                        if response.get('success'):
+                            for var_name, value in response.get('bindings', {}).items():
+                                bind_id = f"binding_{var_name}"
+                                resource_id = value if isinstance(value, str) else (value.get('resource_id', '') if isinstance(value, dict) else '')
+                                preview = value if isinstance(value, str) else json.dumps(value)[:100]
+                                nodes.append({
+                                    "id": bind_id, "type": "binding", "label": var_name,
+                                    "activation": 0.6,
+                                    "data": {"variable": var_name, "resource_id": resource_id, "value_preview": preview},
+                                })
+                                if running_goal_id:
+                                    edges.append({"source": running_goal_id, "target": bind_id, "type": "binding"})
+                        break
+            except Exception as e:
+                logger.warning(f"Topology: bindings query failed: {e}")
+
+            # ── Inventory (persistent notes/collections) ───
+            try:
+                query_key = f"cognitive/{character}/memory/inventory"
+                replies = self.session.get(query_key, timeout=2.0)
+                for reply in replies:
+                    if hasattr(reply, 'ok') and reply.ok is not None:
+                        response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                        if response.get('success'):
+                            for item in response.get('value', []):
+                                if not isinstance(item, dict):
+                                    continue
+                                note_id = item.get('resource_id', item.get('name', ''))
+                                if not note_id or note_id.startswith('_'):
+                                    continue
+                                name = item.get('name', note_id)
+                                nodes.append({
+                                    "id": note_id, "type": "note", "label": name,
+                                    "activation": 0.3,
+                                    "data": {"resource_id": note_id, **item},
+                                })
+                        break
+            except Exception as e:
+                logger.warning(f"Topology: inventory query failed: {e}")
+
+            return {"success": True, "nodes": nodes, "edges": edges}
+
     def _get_html_template(self) -> str:
         """Get the HTML template for the web UI."""
         return r"""
