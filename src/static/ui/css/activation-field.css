@@ -58,7 +58,7 @@ html, body {
 .node circle, .node rect { transition: r 0.5s ease, opacity 0.3s ease; }
 .node text {
     fill: var(--text-dim);
-    font-size: 13px;
+    font-size: 15px;
     text-anchor: middle;
     pointer-events: none;
     user-select: none;
@@ -85,6 +85,18 @@ html, body {
     filter: drop-shadow(0 0 4px currentColor);
 }
 
+/* Completion glow — 10 second pulsing highlight for goals with primary_product */
+.completion-glow circle, .completion-glow rect {
+    animation: completion-pulse 1.5s ease-in-out 7;
+}
+.completion-glow text {
+    fill: var(--text-bright);
+}
+@keyframes completion-pulse {
+    0%, 100% { filter: drop-shadow(0 0 6px var(--goal-running)); }
+    50% { filter: drop-shadow(0 0 16px var(--goal-running)) drop-shadow(0 0 24px var(--accent)); }
+}
+
 /* Activation delta flash */
 @keyframes delta-flash-up {
     0% { filter: drop-shadow(0 0 12px #00ff88); }
@@ -109,15 +121,19 @@ html, body {
     position: fixed;
     top: 0; right: 0;
     width: var(--inspector-width);
-    height: calc(100% - var(--dock-height));
+    bottom: var(--dock-height);
     background: var(--bg-surface);
     border-left: 1px solid var(--border);
-    z-index: 10;
+    z-index: 16;
     display: flex;
     flex-direction: column;
     transform: translateX(100%);
-    transition: transform var(--transition-speed) ease;
+    transition: transform var(--transition-speed) ease, bottom var(--transition-speed) ease;
     overflow: hidden;
+}
+/* Shrink inspector when a slide panel (chat/goal) is open */
+.inspector.panel-open {
+    bottom: calc(var(--dock-height) + 50vh);
 }
 .inspector.visible { transform: translateX(0); }
 .inspector.hidden { transform: translateX(100%); }
@@ -241,6 +257,15 @@ html, body {
 .dock-btn.active {
     background: var(--accent-dim);
     border-color: var(--accent);
+}
+.dock-btn.has-unread {
+    border-color: var(--goal-running);
+    color: var(--goal-running);
+    animation: unread-pulse 1.5s ease-in-out infinite;
+}
+@keyframes unread-pulse {
+    0%, 100% { border-color: var(--goal-running); }
+    50% { border-color: var(--accent); }
 }
 
 .btn-icon {

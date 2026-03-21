@@ -104,11 +104,19 @@ const handlers = {
             state.recentActions = state.recentActions.slice(-30);
         }
 
-        // Chat messages from say/ask actions
-        if (msg.action_type === 'say' || msg.action_type === 'ask') {
+        // Chat messages from say/ask actions (may be prefixed as codegen:say, etc.)
+        const bareType = (msg.action_type || '').split(':').pop();
+        if (bareType === 'say' || bareType === 'ask') {
             const target = msg.target || '';
             if (target.toLowerCase() === 'user' || !target) {
-                state.addChatMessage('agent', msg.text || msg.value || '');
+                // Text may be in text, value, or nested in raw_data
+                const text = msg.text
+                    || msg.value
+                    || (msg.raw_data && (msg.raw_data.text || msg.raw_data.value))
+                    || '';
+                if (text) {
+                    state.addChatMessage('agent', text);
+                }
             }
         }
 

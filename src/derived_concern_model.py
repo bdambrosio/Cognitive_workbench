@@ -463,10 +463,22 @@ class DerivedConcernModel:
             items = [f"{a['id']}={a.get('activation', 0):.2f}({a.get('trend', '?')})" for a in top]
             parts.append(f"  Top concerns: {', '.join(items)}")
 
-        uc_snapshot = getattr(living_state, 'user_concern_snapshot', {})
+        uc_snapshot = getattr(living_state, 'user_concern_snapshot', [])
         if uc_snapshot:
-            items = [f"{count} {status}" for status, count in uc_snapshot.items()]
-            parts.append(f"  User concerns: {', '.join(items)}")
+            if isinstance(uc_snapshot, list):
+                # New format: list of concern dicts
+                status_counts = {}
+                for c in uc_snapshot:
+                    s = c.get('status', '?')
+                    status_counts[s] = status_counts.get(s, 0) + 1
+                items = [f"{count} {status}" for status, count in sorted(status_counts.items())]
+            elif isinstance(uc_snapshot, dict):
+                # Legacy format: {status: count}
+                items = [f"{count} {status}" for status, count in uc_snapshot.items()]
+            else:
+                items = []
+            if items:
+                parts.append(f"  User concerns: {', '.join(items)}")
 
         fg = getattr(living_state, 'foregrounded_goal_id', None)
         if fg:

@@ -48,14 +48,36 @@ const renderers = {
 
     goal(node) {
         const d = node.data || {};
-        titleEl.textContent = `Goal: ${node.label || node.id}`;
+        const goalId = d.goal_id || node.id;
+        const noteId = d.note_id || '';
+        const product = d.primary_product || '';
+        titleEl.textContent = `Goal: ${node.label || goalId}`;
         contentEl.innerHTML = `
+            <p class="field-label">${escapeHtml(goalId)}${noteId ? ` \u00b7 ${escapeHtml(noteId)}` : ''}</p>
             <h3>Status</h3>
             <p><span class="status-badge status-${node.status || 'ready'}">${node.status || 'unknown'}</span></p>
             ${d.goal_text ? `<h3>Goal Text</h3><pre>${escapeHtml(d.goal_text)}</pre>` : ''}
             ${d.last_result ? `<h3>Last Result</h3><pre>${escapeHtml(d.last_result)}</pre>` : ''}
-            ${d.primary_product ? `<h3>Output</h3><p class="field-value">${escapeHtml(d.primary_product)}</p>` : ''}
+            ${product ? `<h3>Output</h3><p class="field-value">${escapeHtml(product)}</p><div id="goal-product-content"></div>` : ''}
         `;
+        // Auto-load primary_product content if it's a Note ID
+        if (product && product.match(/^(Note|Collection)_\d+$/)) {
+            const area = document.getElementById('goal-product-content');
+            if (area) {
+                area.innerHTML = '<p class="field-label">Loading content...</p>';
+                api.getResource(product).then(res => {
+                    if (res.success && res.content != null) {
+                        const text = typeof res.content === 'string'
+                            ? res.content : JSON.stringify(res.content, null, 2);
+                        area.innerHTML = `<pre>${escapeHtml(text)}</pre>`;
+                    } else {
+                        area.innerHTML = `<p class="field-label" style="color: var(--text-dim); font-style: italic;">Resource ${escapeHtml(product)} was cleaned up after goal completion.</p>`;
+                    }
+                }).catch(() => {
+                    area.innerHTML = `<p class="field-label" style="color: var(--text-dim); font-style: italic;">Resource ${escapeHtml(product)} is no longer available.</p>`;
+                });
+            }
+        }
         actionsEl.innerHTML = goalActions(node);
         bindGoalActions(node);
     },
@@ -87,21 +109,25 @@ const renderers = {
     },
 
     note(node) {
-        titleEl.textContent = `Note: ${node.label || node.id}`;
-        contentEl.innerHTML = `<h3>Loading...</h3>`;
+        const resId = node.data?.resource_id || node.id;
+        titleEl.textContent = `Note: ${node.label || resId}`;
+        contentEl.innerHTML = `<h3>Loading ${escapeHtml(resId)}...</h3>`;
         actionsEl.innerHTML = '';
         // Fetch content
-        api.getResource(node.data?.resource_id || node.id).then(res => {
-            if (res.success && res.content) {
+        console.log(`[inspector] fetching resource: ${resId}`);
+        api.getResource(resId).then(res => {
+            console.log(`[inspector] resource response:`, res);
+            if (res.success && res.content != null) {
                 contentEl.innerHTML = `
                     <h3>Content</h3>
                     <pre>${escapeHtml(typeof res.content === 'string' ? res.content : JSON.stringify(res.content, null, 2))}</pre>
                 `;
             } else {
-                contentEl.innerHTML = `<p class="field-label">Could not load content.</p>`;
+                contentEl.innerHTML = `<p class="field-label">Could not load: ${escapeHtml(res.message || 'unknown error')}</p>`;
             }
-        }).catch(() => {
-            contentEl.innerHTML = `<p class="field-label">Error loading content.</p>`;
+        }).catch((e) => {
+            console.error(`[inspector] resource fetch error:`, e);
+            contentEl.innerHTML = `<p class="field-label">Error loading content: ${escapeHtml(String(e))}</p>`;
         });
     },
 
@@ -120,7 +146,9 @@ const renderers = {
 
         // Auto-load the referenced Note content
         if (resId) {
+            console.log(`[inspector] binding: fetching resource ${resId}`);
             api.getResource(resId).then(res => {
+                console.log(`[inspector] binding resource response:`, res);
                 const area = document.getElementById('binding-content-area');
                 if (!area) return;
                 if (res.success && res.content != null) {
@@ -129,11 +157,12 @@ const renderers = {
                         : JSON.stringify(res.content, null, 2);
                     area.innerHTML = `<pre>${escapeHtml(text)}</pre>`;
                 } else {
-                    area.innerHTML = `<p class="field-label">Could not load content for ${escapeHtml(resId)}.</p>`;
+                    area.innerHTML = `<p class="field-label">Could not load: ${escapeHtml(res.message || resId)}</p>`;
                 }
-            }).catch(() => {
+            }).catch((e) => {
+                console.error(`[inspector] binding resource error:`, e);
                 const area = document.getElementById('binding-content-area');
-                if (area) area.innerHTML = `<p class="field-label">Error loading content.</p>`;
+                if (area) area.innerHTML = `<p class="field-label">Error: ${escapeHtml(String(e))}</p>`;
             });
         }
     },

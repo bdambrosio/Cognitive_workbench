@@ -39,12 +39,22 @@ export function initDock() {
         chatInput.value = '';
     }
 
+    const chatToggleBtn = document.getElementById('dock-chat-toggle');
+    let unreadCount = 0;
+
     state.on('chat-message', (msg) => {
         const div = document.createElement('div');
         div.className = `chat-msg chat-msg-${msg.role}`;
         div.textContent = msg.text;
         chatMessages.appendChild(div);
         chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        // Show unread badge if chat panel is closed and message is from agent
+        if (activePanel !== 'chat-panel' && msg.role === 'agent') {
+            unreadCount++;
+            chatToggleBtn.textContent = `Chat (${unreadCount})`;
+            chatToggleBtn.classList.add('has-unread');
+        }
     });
 
     // ── Goal Entry ───────────────────────────────────────
@@ -131,6 +141,21 @@ function openPanel(id) {
     el.classList.remove('hidden');
     el.classList.add('visible');
     activePanel = id;
+    // Clear unread badge when chat opens
+    if (id === 'chat-panel') {
+        clearChatUnread();
+    }
+    // Shrink inspector to avoid overlap
+    const inspector = document.getElementById('inspector');
+    if (inspector) inspector.classList.add('panel-open');
+}
+
+function clearChatUnread() {
+    const btn = document.getElementById('dock-chat-toggle');
+    if (btn) {
+        btn.textContent = 'Chat';
+        btn.classList.remove('has-unread');
+    }
 }
 
 function closePanel(id) {
@@ -138,6 +163,11 @@ function closePanel(id) {
     el.classList.remove('visible');
     el.classList.add('hidden');
     if (activePanel === id) activePanel = null;
+    // Restore inspector height when no panel is open
+    if (!activePanel) {
+        const inspector = document.getElementById('inspector');
+        if (inspector) inspector.classList.remove('panel-open');
+    }
 }
 
 // ── Confirmation Dialog ──────────────────────────────────

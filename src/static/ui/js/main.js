@@ -6,7 +6,7 @@
 
 import { state } from './state.js';
 import { connect } from './websocket.js';
-import { initGraph, flashNode } from './graph.js';
+import { initGraph, flashNode, highlightCompletion } from './graph.js';
 import { initInspector } from './inspector.js';
 import { initDock } from './dock.js';
 import { initPulse, triggerPulse } from './pulse.js';
@@ -80,21 +80,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── Topology Refresh ─────────────────────────────────────
 
+// Track previous goal statuses to detect completion transitions
+const prevGoalStatuses = new Map();
+
 async function refreshTopology() {
     if (!state.character) return;
 
     try {
         const res = await api.getTopology(state.character);
         if (res.success && res.nodes && res.edges) {
+            console.log(`[topology] ${res.nodes.length} nodes, ${res.edges.length} edges`);
+            // Detect goals that just completed with a primary_product
+            detectGoalCompletions(res.nodes);
             state.setTopology(res.nodes, res.edges);
         } else {
-            // Fallback: build topology from individual endpoints
+            console.log('[topology] endpoint returned empty, using fallback');
             await buildTopologyFromEndpoints();
         }
-    } catch {
-        // Topology endpoint may not exist yet; fallback
+    } catch (e) {
+        console.warn('[topology] endpoint failed, using fallback:', e);
         await buildTopologyFromEndpoints();
     }
+}
+
+function detectGoalCompletions(nodes) {
+    for (const n of nodes) {
+        if (n.type !== 'goal') continue;
+        const prev = prevGoalStatuses.get(n.id);
+        const curr = n.status;
+        prevGoalStatuses.set(n.id, curr);
+        // Transition to completed/failed with a primary_product
+        if (prev && prev !== curr && (curr === 'completed' || curr === 'failed')) {
+            const product = n.data?.primary_product;
+            if (product) {
+                highlightGoalCompletion(n.id, product);
+            }
+        }
+    }
+}
+
+function highlightGoalCompletion(goalId, primaryProduct) {
+    console.log(`[topology] goal ${goalId} completed with product: ${primaryProduct}`);
+    highlightCompletion(goalId);
+    state.emit('goal-completed-with-product', { goalId, primaryProduct });
 }
 
 async function buildTopologyFromEndpoints() {
@@ -140,26 +168,31 @@ async function buildTopologyFromEndpoints() {
         console.warn('Failed to fetch goals:', e);
     }
 
-    // Fetch bindings
+    // Fetch bindings (skip system-internal _ prefixed only)
+    const runningGoal = nodes.find(n => n.type === 'goal' && n.status === 'running');
     try {
         const bindRes = await api.getPlanBindings(char);
         if (bindRes.success && bindRes.bindings) {
-            const runningGoal = nodes.find(n => n.type === 'goal' && n.status === 'running');
-            for (const [varName, value] of Object.entries(bindRes.bindings)) {
-                const bindId = `binding_${varName}`;
-                const resourceId = typeof value === 'string' ? value : (value?.resource_id || '');
-                const preview = typeof value === 'string' ? value : JSON.stringify(value).slice(0, 100);
+            for (const [varName, bindInfo] of Object.entries(bindRes.bindings)) {
+                const cleanName = varName.replace(/^\$/, '');
+                if (cleanName.startsWith('_')) continue;
+
+                const resourceId = (typeof bindInfo === 'object' && bindInfo?.value)
+                    ? bindInfo.value
+                    : (typeof bindInfo === 'string' ? bindInfo : '');
+                const label = `$${cleanName}`;
+                const bindId = `binding_${cleanName}`;
                 nodes.push({
                     id: bindId,
                     type: 'binding',
-                    label: varName,
-                    activation: 0.6,
-                    data: { variable: varName, resource_id: resourceId, value_preview: preview },
+                    label,
+                    data: { variable: label, resource_id: resourceId, value_preview: resourceId },
                 });
-                // Link binding to running goal
-                if (runningGoal) {
-                    edges.push({ source: runningGoal.id, target: bindId, type: 'binding' });
-                }
+                edges.push({
+                    source: runningGoal ? runningGoal.id : 'agent',
+                    target: bindId,
+                    type: 'binding',
+                });
             }
         }
     } catch (e) {
@@ -201,33 +234,34 @@ async function refreshBindings() {
         const runningGoal = Array.from(state.nodes.values())
             .find(n => n.type === 'goal' && n.status === 'running');
 
-        // Add new bindings
-        for (const [varName, value] of Object.entries(newBindings)) {
-            const bindId = `binding_${varName}`;
-            const resourceId = typeof value === 'string' ? value : (value?.resource_id || '');
-            const preview = typeof value === 'string' ? value : JSON.stringify(value).slice(0, 100);
+        // Update all visible bindings (skip system-internal _ prefix only)
+        const visibleBindings = new Set();
+        for (const [varName, bindInfo] of Object.entries(newBindings)) {
+            const cleanName = varName.replace(/^\$/, '');
+            if (cleanName.startsWith('_')) continue;
+
+            const bindId = `binding_${cleanName}`;
+            visibleBindings.add(bindId);
+            const resourceId = (typeof bindInfo === 'object' && bindInfo?.value)
+                ? bindInfo.value
+                : (typeof bindInfo === 'string' ? bindInfo : '');
+            const label = `$${cleanName}`;
 
             if (!state.nodes.has(bindId)) {
                 state.upsertNode(bindId, {
                     type: 'binding',
-                    label: varName,
-                    activation: 0.8,
-                    data: { variable: varName, resource_id: resourceId, value_preview: preview },
+                    label,
+                    data: { variable: label, resource_id: resourceId, value_preview: resourceId },
                 });
-                if (runningGoal) {
-                    state.upsertEdge(runningGoal.id, bindId, 'binding');
-                }
+                state.upsertEdge(runningGoal ? runningGoal.id : 'agent', bindId, 'binding');
                 flashNode(bindId, 'up');
             }
         }
 
-        // Fade bindings no longer present
+        // Remove bindings no longer present
         for (const [id, node] of state.nodes) {
-            if (node.type === 'binding') {
-                const varName = node.data?.variable;
-                if (varName && !(varName in newBindings)) {
-                    state.upsertNode(id, { activation: 0.1 });
-                }
+            if (node.type === 'binding' && !visibleBindings.has(id)) {
+                state.removeNode(id);
             }
         }
 

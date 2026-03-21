@@ -2392,6 +2392,8 @@ class ZenohExecutiveNode:
             goal, changed = self._normalize_scheduled_goal(goal)
             if changed and goal.get("goal_id"):
                 self._save_scheduled_goal(goal)
+            # Include the storage Note ID for UI reference
+            goal["note_id"] = note_id
             goals.append(goal)
         goals.sort(key=lambda g: g.get("created", ""))
         return goals

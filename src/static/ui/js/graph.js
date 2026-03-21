@@ -14,19 +14,19 @@ let selectedNodeId = null;
 
 // Node size ranges by type
 const SIZE = {
-    agent:   { min: 22, max: 22 },
-    goal:    { min: 10, max: 18 },
-    concern: { min: 8, max: 14 },
-    note:    { min: 6, max: 10 },
-    binding: { min: 5, max: 8 },
+    agent:           { min: 32, max: 32 },
+    goal:            { min: 14, max: 24 },
+    concern:         { min: 12, max: 18 },
+    note:            { min: 10, max: 14 },
+    binding:         { min: 8, max: 12 },
 };
 
-// Force parameters
+// Force parameters — tight cluster, strong center pull
 const FORCES = {
-    charge: -120,
-    linkDistance: 80,
-    centerStrength: 0.03,
-    collideRadius: 30,
+    charge: -30,
+    linkDistance: 40,
+    centerStrength: 0.15,
+    collideRadius: 18,
 };
 
 export function initGraph() {
@@ -201,7 +201,10 @@ function glowClass(d) {
 
 function nodeSize(d) {
     const range = SIZE[d.type] || SIZE.note;
-    const scale = d.activation || d.weight || 0.5;
+    // Only goals and concerns have meaningful activation; others use midpoint
+    const scale = (d.type === 'goal' || d.type === 'concern_user' || d.type === 'concern_derived')
+        ? (d.activation || 0.5)
+        : 0.5;
     return range.min + (range.max - range.min) * Math.min(scale, 1);
 }
 
@@ -228,6 +231,17 @@ export function flashNode(nodeId, direction) {
             .classed('delta-up', false)
             .classed('delta-down', false);
     }, 700);
+}
+
+// ── Completion highlight (10-second glow) ────────────
+
+export function highlightCompletion(nodeId) {
+    const sel = nodeGroup.selectAll('g.node').filter(d => d.id === nodeId);
+    if (sel.empty()) return;
+    sel.classed('completion-glow', true);
+    setTimeout(() => {
+        sel.classed('completion-glow', false);
+    }, 10000);
 }
 
 // ── Selection ────────────────────────────────────────────
@@ -276,10 +290,15 @@ function ensureTooltip() {
 
 function showTooltip(event, d) {
     const tip = ensureTooltip();
-    let text = d.label || d.id;
-    if (d.status) text += ` [${d.status}]`;
-    if (d.activation != null) text += ` — activation: ${d.activation}`;
-    if (d.weight != null) text += ` — weight: ${d.weight}`;
+    const typeLabel = {
+        agent: 'Agent', goal: 'Goal', concern_user: 'User Concern',
+        concern_derived: 'Derived Concern', note: 'Note',
+        binding: 'Binding',
+    }[d.type] || d.type;
+    let text = `[${typeLabel}] ${d.label || d.id}`;
+    if (d.status) text += ` (${d.status})`;
+    if (d.type === 'goal' && d.activation != null) text += ` — activation: ${d.activation}`;
+    if (d.data?.resource_id) text += ` — ${d.data.resource_id}`;
     tip.textContent = text;
     tip.classList.add('visible');
     tip.style.left = (event.pageX + 12) + 'px';

@@ -346,6 +346,18 @@ class FastAPIActionDisplayNode:
         if static_dir.exists():
             self.app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
+        # Disable caching for UI development: force browsers to always fetch fresh JS/CSS
+        from starlette.middleware.base import BaseHTTPMiddleware
+        class NoCacheUIMiddleware(BaseHTTPMiddleware):
+            async def dispatch(self, request, call_next):
+                response = await call_next(request)
+                if request.url.path.startswith('/static/ui/'):
+                    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+                    response.headers['Pragma'] = 'no-cache'
+                    response.headers['Expires'] = '0'
+                return response
+        self.app.add_middleware(NoCacheUIMiddleware)
+
         print(f'🖥️  FastAPI Action Display Node initialized on port {port}')
         print('   - Subscribing to: cognitive/*/action (all characters)')
         print('   - Subscribing to: cognitive/*/goal (character goals)')
@@ -1687,10 +1699,12 @@ Generated: {generated_at}
             try:
                 if not hasattr(self, 'session'):
                     return {"success": False, "message": "Zenoh session not available"}
-                
+
                 # Query executive_node for resource content
-                query_key = f"cognitive/{self.last_character_name}/resource/view/{resource_id}" if self.last_character_name else f"cognitive/*/resource/view/{resource_id}"
-                
+                char = self.last_character_name or self.active_character_name
+                query_key = f"cognitive/{char}/resource/view/{resource_id}" if char else f"cognitive/*/resource/view/{resource_id}"
+                logger.info(f"Resource view: querying {query_key}")
+
                 replies = self.session.get(query_key, target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=5.0 if not self.debug else 300.0)
                 for reply in replies:
                     if hasattr(reply, 'ok') and reply.ok is not None:
@@ -1844,7 +1858,8 @@ Generated: {generated_at}
             # ── Goals ──────────────────────────────────────
             try:
                 selector = f"cognitive/{character}/scheduled_goals"
-                replies = self.session.get(selector, timeout=2.0)
+                replies = self.session.get(selector, timeout=3.0)
+                goal_count = 0
                 for reply in replies:
                     if hasattr(reply, 'ok') and reply.ok is not None:
                         response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
@@ -1862,7 +1877,11 @@ Generated: {generated_at}
                                 })
                                 if status == 'running':
                                     edges.append({"source": "agent", "target": gid, "type": "produces"})
+                                goal_count += 1
+                        else:
+                            logger.warning(f"Topology: goals query returned success=false: {response}")
                         break
+                logger.info(f"Topology: found {goal_count} goals for {character}")
             except Exception as e:
                 logger.warning(f"Topology: goals query failed: {e}")
 
@@ -1872,6 +1891,7 @@ Generated: {generated_at}
                 if n.get('type') == 'goal' and n.get('status') == 'running':
                     running_goal_id = n['id']
                     break
+
             try:
                 selector = f"cognitive/{character}/plan_bindings"
                 replies = self.session.get(selector, timeout=2.0)
@@ -1879,17 +1899,39 @@ Generated: {generated_at}
                     if hasattr(reply, 'ok') and reply.ok is not None:
                         response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                         if response.get('success'):
-                            for var_name, value in response.get('bindings', {}).items():
-                                bind_id = f"binding_{var_name}"
-                                resource_id = value if isinstance(value, str) else (value.get('resource_id', '') if isinstance(value, dict) else '')
-                                preview = value if isinstance(value, str) else json.dumps(value)[:100]
+                            for var_name, bind_info in response.get('bindings', {}).items():
+                                clean_name = var_name.lstrip('$')
+                                # Skip system-internal bindings (underscore prefix)
+                                if clean_name.startswith('_'):
+                                    continue
+                                # Parse the response format: {type, value} or plain string
+                                if isinstance(bind_info, dict):
+                                    resource_id = bind_info.get('value', '')
+                                    preview = resource_id
+                                elif isinstance(bind_info, str):
+                                    resource_id = bind_info
+                                    preview = bind_info
+                                else:
+                                    resource_id = str(bind_info)
+                                    preview = resource_id[:100]
+                                bind_id = f"binding_{clean_name}"
+                                # If a goal is running, new bindings (not yet seen) attach to it;
+                                # otherwise all bindings attach to agent
                                 nodes.append({
-                                    "id": bind_id, "type": "binding", "label": var_name,
-                                    "activation": 0.6,
-                                    "data": {"variable": var_name, "resource_id": resource_id, "value_preview": preview},
+                                    "id": bind_id,
+                                    "type": "binding",
+                                    "label": f"${clean_name}",
+                                    "data": {
+                                        "variable": f"${clean_name}",
+                                        "resource_id": resource_id,
+                                        "value_preview": preview,
+                                    },
                                 })
-                                if running_goal_id:
-                                    edges.append({"source": running_goal_id, "target": bind_id, "type": "binding"})
+                                edges.append({
+                                    "source": running_goal_id or "agent",
+                                    "target": bind_id,
+                                    "type": "binding",
+                                })
                         break
             except Exception as e:
                 logger.warning(f"Topology: bindings query failed: {e}")
@@ -1911,7 +1953,6 @@ Generated: {generated_at}
                                 name = item.get('name', note_id)
                                 nodes.append({
                                     "id": note_id, "type": "note", "label": name,
-                                    "activation": 0.3,
                                     "data": {"resource_id": note_id, **item},
                                 })
                         break
