@@ -119,6 +119,22 @@ def test_update_after_orient_activations():
     assert state.last_event["assessment"]["goal_relevance"] == "strong"
 
 
+def test_update_after_orient_concern_descriptions():
+    state = OodaLivingState()
+    event = FakeEvent()
+    state.update_after_observe(event)
+
+    oriented = FakeOrientedEvent(event=event, assessment={"notes": ""})
+    descs = {
+        "attend_to_user": "attend_to_user — Responsiveness to user",
+        "homeostasis": "homeostasis — Operational health",
+    }
+    state.update_after_orient(oriented, {"attend_to_user": 0.5, "homeostasis": 0.1}, descs)
+
+    assert state.concern_activations[0]["description"] == "attend_to_user — Responsiveness to user"
+    assert state.concern_activations[1]["description"] == "homeostasis — Operational health"
+
+
 def test_update_after_orient_epistemic_markers():
     state = OodaLivingState()
     event = FakeEvent()
@@ -153,7 +169,7 @@ def test_update_after_orient_epistemic_none_ignored():
 
 def test_update_after_act_transition():
     state = OodaLivingState()
-    event = FakeEvent(goal_id="goal_3", classification="proceed")
+    event = FakeEvent(content="proceed goal_3", goal_id="goal_3", classification="proceed")
     state.update_after_observe(event)
 
     # Fake orient with activations
@@ -167,6 +183,7 @@ def test_update_after_act_transition():
     line = state.transitions[0]
     assert "proceed_goal" in line
     assert "goal_3" in line
+    assert "proceed goal_3" in line  # content hint
     assert "\u2192 running" in line
     assert state.last_event["action_taken"] == "proceed_goal"
 
@@ -200,13 +217,15 @@ def test_update_goals():
 def test_update_user_concerns_snapshot():
     state = OodaLivingState()
     concerns = [
-        {"status": "ongoing"},
-        {"status": "ongoing"},
-        {"status": "dormant"},
+        {"concern_id": "c1", "concern_label": "solar panels", "status": "ongoing", "weight": 0.8, "stance": "concerned"},
+        {"concern_id": "c2", "concern_label": "backup power", "status": "dormant", "weight": 0.3, "stance": "exploratory"},
     ]
     state.update_user_concerns_snapshot(concerns)
 
-    assert state.user_concern_snapshot == {"ongoing": 2, "dormant": 1}
+    assert len(state.user_concern_snapshot) == 2
+    assert state.user_concern_snapshot[0]["label"] == "solar panels"
+    assert state.user_concern_snapshot[0]["status"] == "ongoing"
+    assert state.user_concern_snapshot[1]["label"] == "backup power"
 
 
 # ── Serialization round-trip ──────────────────────────────────────────
@@ -220,8 +239,10 @@ def test_serialization_round_trip():
         {"homeostasis": 0.3, "attend_to_user": 0.1},
     )
     state.update_after_act(FakeAction(type="chat_response"))
-    state.update_goals([{"goal_id": "g1", "name": "G", "status": "ready"}], "g1")
-    state.update_user_concerns_snapshot([{"status": "ongoing"}])
+    state.update_goals([{"goal_id": "g1", "name": "G", "goal_text": "Do G", "status": "ready"}], "g1")
+    state.update_user_concerns_snapshot([
+        {"concern_id": "c1", "concern_label": "solar", "status": "ongoing", "weight": 0.5, "stance": "exploratory"},
+    ])
 
     data = state.to_dict()
     restored = OodaLivingState()
@@ -230,7 +251,8 @@ def test_serialization_round_trip():
     assert restored.concern_activations == state.concern_activations
     assert restored.foregrounded_goal_id == "g1"
     assert len(restored.transitions) == 1
-    assert restored.user_concern_snapshot == {"ongoing": 1}
+    assert len(restored.user_concern_snapshot) == 1
+    assert restored.user_concern_snapshot[0]["label"] == "solar"
     assert len(restored._activation_history) == 2
 
 

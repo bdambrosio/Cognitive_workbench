@@ -62,9 +62,9 @@ class OodaLivingState:
     def __init__(self) -> None:
         # Orientation landscape
         self.concern_activations: List[Dict[str, Any]] = []
-        # [{id, activation, trend}] sorted descending by activation
-        self.user_concern_snapshot: Dict[str, int] = {}
-        # {status: count} e.g. {"ongoing": 2, "dormant": 1}
+        # [{id, activation, trend, description?}] sorted descending by activation
+        self.user_concern_snapshot: List[Dict[str, Any]] = []
+        # [{id, label, status, weight, stance}]
         self.goal_field: List[Dict[str, Any]] = []
         # [{goal_id, label, status}]
         self.foregrounded_goal_id: Optional[str] = None
@@ -108,14 +108,17 @@ class OodaLivingState:
         self,
         oriented,
         concern_activations: Dict[str, float],
+        concern_descriptions: Optional[Dict[str, str]] = None,
     ) -> None:
         """Record assessment and update activation trends.
 
         Args:
             oriented: OrientedEvent dataclass (event + assessment).
             concern_activations: The executive_node's _character_concern_activations dict.
+            concern_descriptions: Optional {concern_id: "label — description"} for content.
         """
         assessment = getattr(oriented, "assessment", None) or {}
+        _descs = concern_descriptions or {}
 
         # Extract assessment summary
         self.last_event["assessment"] = {
@@ -132,18 +135,21 @@ class OodaLivingState:
                 self._activation_history[cid] = deque(maxlen=_ACTIVATION_HISTORY_LEN)
             self._activation_history[cid].append(value)
 
-        # Build sorted activation list with trends
+        # Build sorted activation list with trends and descriptions
         self.concern_activations = []
         for cid, value in sorted(
             concern_activations.items(), key=lambda x: x[1], reverse=True
         ):
             history = self._activation_history.get(cid, deque())
             trend = _trend_label(history)
-            self.concern_activations.append({
+            entry: Dict[str, Any] = {
                 "id": cid,
                 "activation": round(value, 3),
                 "trend": trend,
-            })
+            }
+            if cid in _descs:
+                entry["description"] = _descs[cid]
+            self.concern_activations.append(entry)
 
         # Extract epistemic markers from assessment notes
         notes = assessment.get("notes", "")
@@ -169,10 +175,14 @@ class OodaLivingState:
         action_type = getattr(action, "type", "unknown")
         self.last_event["action_taken"] = action_type
 
-        # Build transition line
+        # Build transition line with content context
         ts = _now_hms()
         goal_id = self.last_event.get("goal_id") or ""
         goal_part = f" {goal_id}" if goal_id else ""
+
+        # Content hint (first ~40 chars of event content)
+        content_preview = self.last_event.get("content_preview", "")
+        content_hint = f' "{content_preview[:40]}"' if content_preview else ""
 
         # Top concern with trend arrow
         concern_part = ""
@@ -191,17 +201,22 @@ class OodaLivingState:
         elif action_type == "terminate_goal":
             result_hint = "terminated"
 
-        line = f"[{ts}] {action_type}{goal_part}{concern_part} | \u2192 {result_hint}"
+        line = f"[{ts}] {action_type}{goal_part}{content_hint}{concern_part} | \u2192 {result_hint}"
         self.transitions.append(line)
         self._dirty = True
 
     def update_user_concerns_snapshot(self, concerns: Sequence[Dict[str, Any]]) -> None:
-        """Refresh user concern status counts."""
-        counts: Dict[str, int] = {}
-        for c in concerns:
-            status = c.get("status", "unknown")
-            counts[status] = counts.get(status, 0) + 1
-        self.user_concern_snapshot = counts
+        """Refresh user concern snapshot with content details."""
+        self.user_concern_snapshot = [
+            {
+                "id": c.get("concern_id", ""),
+                "label": c.get("concern_label", ""),
+                "status": c.get("status", "?"),
+                "weight": c.get("weight", 0),
+                "stance": c.get("stance", ""),
+            }
+            for c in concerns[:10]
+        ]
         self._dirty = True
 
     def update_goals(
@@ -209,12 +224,13 @@ class OodaLivingState:
         goals: Sequence[Dict[str, Any]],
         foregrounded_id: Optional[str] = None,
     ) -> None:
-        """Refresh goal field snapshot."""
+        """Refresh goal field snapshot with content."""
         self.goal_field = []
         for g in goals[:12]:
             self.goal_field.append({
                 "goal_id": g.get("goal_id"),
                 "label": g.get("name") or (g.get("goal_text") or "")[:80],
+                "goal_text": (g.get("goal_text") or "")[:200],
                 "status": g.get("status", "?"),
             })
         self.foregrounded_goal_id = foregrounded_id
@@ -222,20 +238,126 @@ class OodaLivingState:
 
     # ── Persistence ────────────────────────────────────────────────────
 
-    def maybe_persist(self, write_named_note_fn: Callable[[str, str], Any]) -> None:
-        """Save to named Note if dirty and debounce interval has elapsed."""
+    def maybe_persist(
+        self,
+        write_named_note_fn: Callable[[str, str], Any],
+        derived_concerns: Optional[Sequence[Dict[str, Any]]] = None,
+    ) -> None:
+        """Save to named Note if dirty and debounce interval has elapsed.
+
+        Args:
+            write_named_note_fn: Callable that persists (name, content).
+            derived_concerns: Optional derived concern list for rendered snapshot.
+        """
         if not self._dirty:
             return
         now = time.monotonic()
         if now - self._last_persist_time < _PERSIST_DEBOUNCE_SECS:
             return
         try:
-            content = json.dumps(self.to_dict(), default=str)
+            data = self.to_dict()
+            # Include pre-rendered markdown for human/LLM review
+            data["rendered"] = self._render_markdown(derived_concerns or [])
+            content = json.dumps(data, default=str)
             write_named_note_fn(NOTE_NAME, content)
             self._dirty = False
             self._last_persist_time = now
         except Exception as e:
             logger.warning(f"OodaLivingState: persist failed: {e}")
+
+    def _render_markdown(self, derived_concerns: Sequence[Dict[str, Any]]) -> str:
+        """Render a human-readable markdown summary of current orientation state."""
+        parts: List[str] = []
+
+        # Concern activations
+        if self.concern_activations:
+            lines = ["## Concern Activations"]
+            for a in self.concern_activations:
+                arrow = _trend_arrow(a.get("trend", "stable"))
+                desc = a.get("description", "")
+                desc_part = f" — {desc}" if desc else ""
+                lines.append(f"- **{a['id']}** ({a.get('activation', 0)}{arrow}){desc_part}")
+            parts.append("\n".join(lines))
+
+        # Derived concerns
+        active_derived = [c for c in derived_concerns if c.get("status") in ("surfaced", "active")]
+        if active_derived:
+            lines = ["## Derived Concerns"]
+            for c in active_derived:
+                label = c.get("concern_label", "?")
+                desc = c.get("concern_description", "")
+                status = c.get("status", "?")
+                origin = c.get("origin", "?")
+                parent = c.get("parent_user_concern_id")
+                parent_part = f", derived from {parent}" if parent else ""
+                lines.append(f"- **{label}** [{status}, {origin}{parent_part}]: {desc}")
+            parts.append("\n".join(lines))
+
+        # User concerns
+        if self.user_concern_snapshot:
+            lines = ["## User Concerns"]
+            for c in self.user_concern_snapshot:
+                label = c.get("label", "?")
+                status = c.get("status", "?")
+                weight = c.get("weight", 0)
+                stance = c.get("stance", "")
+                stance_part = f", {stance}" if stance else ""
+                lines.append(f"- [{status}] **{label}** (weight={weight}{stance_part})")
+            parts.append("\n".join(lines))
+
+        # Goals
+        if self.goal_field:
+            lines = ["## Goals"]
+            for g in self.goal_field:
+                gid = g.get("goal_id", "?")
+                label = g.get("label", "?")
+                status = g.get("status", "?")
+                fg = " [FOREGROUNDED]" if gid == self.foregrounded_goal_id else ""
+                goal_text = g.get("goal_text", "")
+                text_part = f": {goal_text}" if goal_text and goal_text != label else ""
+                lines.append(f"- [{status}] {gid} \"{label}\"{fg}{text_part}")
+            parts.append("\n".join(lines))
+
+        # Last event
+        if self.last_event:
+            lines = ["## Last Event"]
+            et = self.last_event.get("event_type", "")
+            cls = self.last_event.get("classification", "")
+            src = self.last_event.get("source", "")
+            preview = self.last_event.get("content_preview", "")
+            lines.append(f"- **{et}/{cls}** from {src}: \"{preview}\"")
+            assessment = self.last_event.get("assessment", {})
+            if assessment:
+                rationale = assessment.get("rationale", "")
+                lines.append(
+                    f"- Assessment: matters={assessment.get('matters', '?')}, "
+                    f"goal_relevance={assessment.get('goal_relevance', '?')}, "
+                    f"urgency={assessment.get('urgency', '?')}, "
+                    f"action={assessment.get('action', '?')}"
+                )
+                if rationale:
+                    lines.append(f"- Rationale: {rationale}")
+            action = self.last_event.get("action_taken", "")
+            if action:
+                lines.append(f"- Action taken: {action}")
+            parts.append("\n".join(lines))
+
+        # Transitions
+        transitions = list(self.transitions)
+        if transitions:
+            lines = ["## Recent Transitions"]
+            for t in reversed(transitions):
+                lines.append(t)
+            parts.append("\n".join(lines))
+
+        # Epistemic markers
+        if self.epistemic_markers:
+            lines = ["## Epistemic Boundaries"]
+            for m in self.epistemic_markers:
+                lines.append(f"- {m}")
+            parts.append("\n".join(lines))
+
+        return "\n\n".join(parts)
 
     def load(self, infospace_executor) -> bool:
         """Load state from named Note. Returns True if loaded successfully."""
@@ -278,7 +400,9 @@ class OodaLivingState:
 
     def from_dict(self, data: Dict[str, Any]) -> None:
         self.concern_activations = data.get("concern_activations", [])
-        self.user_concern_snapshot = data.get("user_concern_snapshot", {})
+        # Handle both old format (dict of counts) and new format (list of concern details)
+        uc_data = data.get("user_concern_snapshot", [])
+        self.user_concern_snapshot = uc_data if isinstance(uc_data, list) else []
         self.goal_field = data.get("goal_field", [])
         self.foregrounded_goal_id = data.get("foregrounded_goal_id")
         self.last_event = data.get("last_event", {})

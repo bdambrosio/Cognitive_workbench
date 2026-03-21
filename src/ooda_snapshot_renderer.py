@@ -40,14 +40,14 @@ def render_reflective_snapshot(
     # ── Orientation Landscape ──────────────────────────────────────────
     landscape_lines: List[str] = []
 
-    # Concern activations with trends
+    # Concern activations with trends and descriptions
     activations = getattr(living_state, "concern_activations", [])
     if activations:
-        items = []
         for a in activations:
             arrow = _trend_arrow(a.get("trend", "stable"))
-            items.append(f"{a['id']}({a.get('activation', 0)}{arrow})")
-        landscape_lines.append(f"- Concern activations: {', '.join(items)}")
+            desc = a.get("description", "")
+            desc_part = f": {desc}" if desc else ""
+            landscape_lines.append(f"- **{a['id']}** ({a.get('activation', 0)}{arrow}){desc_part}")
 
     # Derived concerns
     active_derived = [
@@ -55,14 +55,24 @@ def render_reflective_snapshot(
         if c.get("status") in ("surfaced", "active")
     ]
     if active_derived:
-        items = [f"{c.get('concern_label', '?')} ({c.get('status', '?')})" for c in active_derived]
-        landscape_lines.append(f"- Derived concerns: [{', '.join(items)}]")
+        for c in active_derived:
+            label = c.get("concern_label", "?")
+            desc = c.get("concern_description", "")
+            status = c.get("status", "?")
+            landscape_lines.append(f"- Derived: **{label}** [{status}]: {desc}")
 
     # User concern snapshot
-    uc_snapshot = getattr(living_state, "user_concern_snapshot", {})
+    uc_snapshot = getattr(living_state, "user_concern_snapshot", [])
     if uc_snapshot:
-        items = [f"{count} {status}" for status, count in sorted(uc_snapshot.items())]
-        landscape_lines.append(f"- User concerns: [{', '.join(items)}]")
+        if isinstance(uc_snapshot, list):
+            for c in uc_snapshot:
+                label = c.get("label", "?")
+                status = c.get("status", "?")
+                weight = c.get("weight", 0)
+                landscape_lines.append(f"- User: [{status}] **{label}** (w={weight})")
+        elif isinstance(uc_snapshot, dict):
+            items = [f"{count} {status}" for status, count in sorted(uc_snapshot.items())]
+            landscape_lines.append(f"- User concerns: [{', '.join(items)}]")
 
     # Goal field
     goal_field = getattr(living_state, "goal_field", [])

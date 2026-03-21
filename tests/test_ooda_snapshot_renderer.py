@@ -15,11 +15,17 @@ def _make_populated_state():
     """Create a living state with representative data."""
     state = OodaLivingState()
     state.concern_activations = [
-        {"id": "attend_to_user_concerns", "activation": 0.42, "trend": "rising"},
-        {"id": "homeostasis", "activation": 0.21, "trend": "stable"},
-        {"id": "attend_to_user", "activation": 0.08, "trend": "falling"},
+        {"id": "attend_to_user_concerns", "activation": 0.42, "trend": "rising",
+         "description": "attend_to_user_concerns — Ongoing user topics"},
+        {"id": "homeostasis", "activation": 0.21, "trend": "stable",
+         "description": "homeostasis — Operational health"},
+        {"id": "attend_to_user", "activation": 0.08, "trend": "falling",
+         "description": "attend_to_user — Responsiveness to user"},
     ]
-    state.user_concern_snapshot = {"ongoing": 2, "dormant": 1}
+    state.user_concern_snapshot = [
+        {"id": "c1", "label": "solar panel output", "status": "ongoing", "weight": 0.8, "stance": "concerned"},
+        {"id": "c2", "label": "battery health", "status": "dormant", "weight": 0.3, "stance": "exploratory"},
+    ]
     state.goal_field = [
         {"goal_id": "goal_13", "label": "research topic X", "status": "running"},
         {"goal_id": "goal_14", "label": "write report", "status": "ready"},
@@ -67,22 +73,26 @@ def test_render_reflective_snapshot_concern_activations():
     state = _make_populated_state()
     result = render_reflective_snapshot(state, [], [])
 
-    assert "attend_to_user_concerns(0.42\u2191)" in result
-    assert "homeostasis(0.21\u2192)" in result
-    assert "attend_to_user(0.08\u2193)" in result
+    assert "attend_to_user_concerns" in result
+    assert "0.42" in result
+    assert "Ongoing user topics" in result  # description included
+    assert "homeostasis" in result
+    assert "attend_to_user" in result
 
 
 def test_render_reflective_snapshot_derived_concerns():
     state = _make_populated_state()
     derived = [
-        {"concern_label": "monitor solar", "status": "active"},
-        {"concern_label": "old thing", "status": "resolved"},  # should be excluded
-        {"concern_label": "new idea", "status": "surfaced"},
+        {"concern_label": "monitor solar", "concern_description": "Track output drops", "status": "active"},
+        {"concern_label": "old thing", "concern_description": "Done", "status": "resolved"},  # should be excluded
+        {"concern_label": "new idea", "concern_description": "Fresh insight", "status": "surfaced"},
     ]
     result = render_reflective_snapshot(state, derived, [])
 
-    assert "monitor solar (active)" in result
-    assert "new idea (surfaced)" in result
+    assert "monitor solar" in result
+    assert "[active]" in result
+    assert "new idea" in result
+    assert "[surfaced]" in result
     assert "old thing" not in result
 
 

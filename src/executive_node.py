@@ -1491,11 +1491,32 @@ class ZenohExecutiveNode:
             return
         self._ooda_living_state.update_after_observe(event)
         oriented = self._ooda_orient(event)
-        self._ooda_living_state.update_after_orient(oriented, self._character_concern_activations)
+        # Build concern descriptions map for living state content
+        _concern_descs = {}
+        try:
+            for c in character_evaluator.DEFAULT_CHARACTER_CONCERNS:
+                _concern_descs[c["id"]] = f"{c.get('label', '')} — {c.get('description', '')[:100]}"
+            for c in self._derived_concern_model.get_concerns(active_only=True):
+                _concern_descs[c.get("concern_id", "")] = (
+                    f"{c.get('concern_label', '')} — {c.get('concern_description', '')[:100]}"
+                )
+        except Exception:
+            pass
+        self._ooda_living_state.update_after_orient(
+            oriented, self._character_concern_activations, _concern_descs)
+        # Refresh goals and user concerns in living state
+        try:
+            self._ooda_living_state.update_goals(
+                self._all_scheduled_goals(), self._active_scheduled_goal_id)
+            self._ooda_living_state.update_user_concerns_snapshot(
+                self.user_concern_model.get_concerns() or [])
+        except Exception:
+            pass
         action = self._ooda_decide(oriented)
         self._ooda_act(action)
         self._ooda_living_state.update_after_act(action)
-        self._ooda_living_state.maybe_persist(self._write_named_note)
+        self._ooda_living_state.maybe_persist(
+            self._write_named_note, self._derived_concern_model.get_concerns())
 
     def _ooda_idle_tick(self) -> None:
         """Directed idle behavior: derived concern maintenance and living state persistence."""
@@ -1506,7 +1527,11 @@ class ZenohExecutiveNode:
                     self._ooda_living_state, uc)
             except Exception as e:
                 logger.debug(f"Idle tick derived concern update skipped: {e}")
-        self._ooda_living_state.maybe_persist(self._write_named_note)
+        try:
+            dc = self._derived_concern_model.get_concerns()
+        except Exception:
+            dc = []
+        self._ooda_living_state.maybe_persist(self._write_named_note, dc)
 
     def _announce_character(self):
         """Announce character presence to the action display node."""
