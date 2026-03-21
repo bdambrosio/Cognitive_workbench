@@ -1495,10 +1495,10 @@ class ZenohExecutiveNode:
         _concern_descs = {}
         try:
             for c in character_evaluator.DEFAULT_CHARACTER_CONCERNS:
-                _concern_descs[c["id"]] = f"{c.get('label', '')} — {c.get('description', '')[:100]}"
+                _concern_descs[c["id"]] = f"{c.get('label', '')} — {c.get('description', '')}"
             for c in self._derived_concern_model.get_concerns(active_only=True):
                 _concern_descs[c.get("concern_id", "")] = (
-                    f"{c.get('concern_label', '')} — {c.get('concern_description', '')[:100]}"
+                    f"{c.get('concern_label', '')} — {c.get('concern_description', '')}"
                 )
         except Exception:
             pass
@@ -1516,7 +1516,8 @@ class ZenohExecutiveNode:
         self._ooda_act(action)
         self._ooda_living_state.update_after_act(action)
         self._ooda_living_state.maybe_persist(
-            self._write_named_note, self._derived_concern_model.get_concerns())
+            self._write_named_note, self._derived_concern_model.get_concerns(),
+            planner_summary=self._get_planner_summary())
 
     def _ooda_idle_tick(self) -> None:
         """Directed idle behavior: derived concern maintenance and living state persistence."""
@@ -1531,7 +1532,9 @@ class ZenohExecutiveNode:
             dc = self._derived_concern_model.get_concerns()
         except Exception:
             dc = []
-        self._ooda_living_state.maybe_persist(self._write_named_note, dc)
+        self._ooda_living_state.maybe_persist(
+            self._write_named_note, dc,
+            planner_summary=self._get_planner_summary())
 
     def _announce_character(self):
         """Announce character presence to the action display node."""
@@ -2036,10 +2039,31 @@ class ZenohExecutiveNode:
             logger.warning(f'Error loading situation note: {e}')
 
     def _build_situation_context(self) -> str:
-        """Build situation context from persisted situation note."""
-        if self.situation_context:
-            return self.situation_context
-        return ""
+        """Build situation context from persisted situation note.
+
+        Refreshes collection item counts from live resource data so the
+        prompt never shows stale counts (e.g. '0 items' for a collection
+        that has grown since the situation note was last written).
+        """
+        if not self.situation_context:
+            return ""
+        text = self.situation_context
+        # Refresh item counts for named collections from live resource data
+        rm = self.resource_manager
+        if rm:
+            import re
+            for name, cid in rm.named_collections.items():
+                if name.startswith('_'):
+                    continue
+                res = rm.get_resource(cid)
+                if not res:
+                    continue
+                live_count = res.get('properties', {}).get('item_count', 0)
+                # Replace stale count patterns like:  Collection_2 "name" (0 items)
+                pattern = re.escape(f'{cid} "{name}"') + r' \(\d+ items\)'
+                replacement = f'{cid} "{name}" ({live_count} items)'
+                text = re.sub(pattern, replacement, text)
+        return text
 
     def _update_situation_note(self, goal_text: str, plan_result: dict):
         """Update the living context (_situation) note after goal completion.
@@ -2091,7 +2115,7 @@ class ZenohExecutiveNode:
                 recent = [g for g in scheduled if g.get('status') in ('completed', 'failed')]
                 recent.sort(key=lambda g: g.get('updated', ''), reverse=True)
                 for g in recent[:5]:
-                    name = g.get('name') or g.get('goal_text', '?')[:60]
+                    name = g.get('name') or g.get('goal_text', '?')
                     product = g.get('primary_product', '')
                     g_status = g.get('status', '?')
                     line = f"  {name} [{g_status}]"
@@ -2130,7 +2154,21 @@ class ZenohExecutiveNode:
                     prompt, max_tokens=400, temperature=0.2
                 )
                 if response.success and response.text and response.text.strip().lower() != 'none':
-                    new_learnings = response.text.strip()
+                    # Clean LLM output: strip leading 'none' lines and keep only bullet lines
+                    raw = response.text.strip()
+                    cleaned_lines = []
+                    for ln in raw.split('\n'):
+                        stripped = ln.strip()
+                        if stripped.lower() == 'none' or stripped == '':
+                            # Skip bare 'none' and blank lines between bullets
+                            if cleaned_lines:
+                                continue  # drop mid-list noise
+                            else:
+                                continue  # drop leading noise
+                        cleaned_lines.append(ln)
+                    cleaned = '\n'.join(cleaned_lines).strip()
+                    if cleaned:
+                        new_learnings = cleaned
 
             # --- Assemble note ---
             parts = []
@@ -3288,7 +3326,7 @@ class ZenohExecutiveNode:
                 concern_lines = []
                 for c in active_concerns[:5]:
                     label = c.get("concern_label", "?")
-                    desc = (c.get("concern_description") or "")[:120]
+                    desc = c.get("concern_description") or ""
                     concern_lines.append(f"  - {label}: {desc}")
                 concerns_text = "\n".join(concern_lines)
         except Exception:
@@ -4749,6 +4787,31 @@ class ZenohExecutiveNode:
             return result_str
         return result_str[:max_len] + '...'
     
+    def _get_planner_summary(self) -> str:
+        """Return a one-line summary of current planner/goal state for OODA rendering."""
+        try:
+            if self.current_goal and self.current_goal.name != 'sleep':
+                goal_label = self.current_goal.name[:60]
+                if self.current_plan:
+                    status = (self.current_plan.get('quality_status', 'in_progress')
+                              if isinstance(self.current_plan, dict) else 'active')
+                    return f"{status} — \"{goal_label}\""
+                return f"active — \"{goal_label}\""
+            return "idle"
+        except Exception:
+            return ""
+
+    def _resolve_ooda_readable_note_id(self) -> str:
+        """Resolve the Note ID of the readable OODA state snapshot, or '' if unavailable."""
+        try:
+            from ooda_living_state import READABLE_NOTE_NAME
+            if self.resource_manager:
+                rid = self.resource_manager.named_notes.get(READABLE_NOTE_NAME, '')
+                return rid
+        except Exception:
+            pass
+        return ''
+
     def _build_agent_state_block(self) -> str:
         """Build the authoritative agent state block.
 
@@ -4784,12 +4847,12 @@ class ZenohExecutiveNode:
             scheduled = self._all_scheduled_goals()
             if scheduled:
                 def _goal_line(g):
-                    name = g.get('name') or g.get('goal_text', '?')[:80]
+                    name = g.get('name') or g.get('goal_text', '?')
                     status = g.get('status', '?')
                     result = g.get('last_result', '')
                     line = f"  - {name} [{status}]"
                     if result:
-                        line += f" — {result[:100]}"
+                        line += f" — {result}"
                     return line
 
                 pending = [g for g in scheduled if g.get('status') in ('ready', 'pending', 'scheduled')]
@@ -4905,6 +4968,14 @@ class ZenohExecutiveNode:
         # Authoritative agent state — overrides conversation history
         system_prompt += f"\n{self._build_agent_state_block()}\n"
 
+        # Reference to the readable OODA state snapshot
+        ooda_note_id = self._resolve_ooda_readable_note_id()
+        if ooda_note_id:
+            system_prompt += (
+                f"\nA snapshot of {self.character_name}'s current state of mind "
+                f"can be found in OODA_STATE ({ooda_note_id}).\n"
+            )
+
         return system_prompt
 
     def _refresh_observations(self):
@@ -4997,7 +5068,7 @@ class ZenohExecutiveNode:
                     concern_lines = []
                     for c in active_concerns[:5]:
                         label = c.get("concern_label", "?")
-                        desc = (c.get("concern_description") or "")[:120]
+                        desc = c.get("concern_description") or ""
                         weight = c.get("weight", "")
                         w_str = f" (weight={weight})" if weight else ""
                         concern_lines.append(f"  - {label}{w_str}: {desc}")

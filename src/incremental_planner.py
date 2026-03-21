@@ -5042,8 +5042,10 @@ Instructions:
 - If no obvious failure modes apply (e.g., a simple lookup or report), return "No vision criteria needed."
 - Prefer returning "No vision criteria needed." over generating speculative criteria.
 
-Format — number each criterion with a short label:
-1. label: "testable predicate"
+Format — number each criterion with a short FAILURE label (e.g., "output_empty", "missing_X"):
+Label names must describe the FAILURE being detected, not the passing state.
+For example: use "output_empty" not "no_output"; use "topic_mismatch" not "off_topic".
+1. failure_label: "testable predicate that is True when the failure is present"
 END_VISION"""
 
         result = self.executor.llm_generate(VISION_PROMPT, max_tokens=192, temperature=GEN_TEMPERATURE, stops=["\nEND_VISION", "END_VISION"])
@@ -5102,12 +5104,18 @@ STEP 1: <what to achieve>
 END_PLAN
 """
 
-        abstract_plan = self.executor.llm_generate(ABSTRACT_PLAN_PROMPT, max_tokens=256, temperature=GEN_TEMPERATURE, stops=["\nEND_PLAN:", "END_PLAN:"])
+        abstract_plan = self.executor.llm_generate(ABSTRACT_PLAN_PROMPT, max_tokens=256, temperature=GEN_TEMPERATURE, stops=["\nEND_PLAN", "END_PLAN"])
         if not abstract_plan.success or not abstract_plan.text:
             error_msg = getattr(abstract_plan, "error", None) or "Unknown error"
             logger.error(f"_preplan failed: {error_msg}")
             return "No preplan available"
-        return abstract_plan.text.strip()
+        # Strip anything after END_PLAN (LLM may echo prompt after the plan)
+        text = abstract_plan.text.strip()
+        end_marker = "END_PLAN"
+        idx = text.find(end_marker)
+        if idx >= 0:
+            text = text[:idx + len(end_marker)]
+        return text.strip()
 
     def _feedback(self, outcome: bool) -> Dict:
         """

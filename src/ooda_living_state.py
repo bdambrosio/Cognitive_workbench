@@ -19,6 +19,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence
 logger = logging.getLogger(__name__)
 
 NOTE_NAME = "_ooda_state"
+READABLE_NOTE_NAME = "_ooda_state_readable"
 
 # Trend thresholds for activation history
 _TREND_RISING = 0.05
@@ -229,8 +230,8 @@ class OodaLivingState:
         for g in goals[:12]:
             self.goal_field.append({
                 "goal_id": g.get("goal_id"),
-                "label": g.get("name") or (g.get("goal_text") or "")[:80],
-                "goal_text": (g.get("goal_text") or "")[:200],
+                "label": g.get("name") or (g.get("goal_text") or ""),
+                "goal_text": g.get("goal_text") or "",
                 "status": g.get("status", "?"),
             })
         self.foregrounded_goal_id = foregrounded_id
@@ -242,12 +243,14 @@ class OodaLivingState:
         self,
         write_named_note_fn: Callable[[str, str], Any],
         derived_concerns: Optional[Sequence[Dict[str, Any]]] = None,
+        planner_summary: str = "",
     ) -> None:
         """Save to named Note if dirty and debounce interval has elapsed.
 
         Args:
             write_named_note_fn: Callable that persists (name, content).
             derived_concerns: Optional derived concern list for rendered snapshot.
+            planner_summary: One-line summary of current planner state (e.g. "in_progress step 3/16").
         """
         if not self._dirty:
             return
@@ -256,14 +259,27 @@ class OodaLivingState:
             return
         try:
             data = self.to_dict()
-            # Include pre-rendered markdown for human/LLM review
-            data["rendered"] = self._render_markdown(derived_concerns or [])
             content = json.dumps(data, default=str)
             write_named_note_fn(NOTE_NAME, content)
+            # Persist a self-explanatory markdown note for planner/human consumption
+            readable = self._render_readable_markdown(
+                derived_concerns or [], planner_summary=planner_summary)
+            write_named_note_fn(READABLE_NOTE_NAME, readable)
             self._dirty = False
             self._last_persist_time = now
         except Exception as e:
             logger.warning(f"OodaLivingState: persist failed: {e}")
+
+    def _compute_activation_delta(self, concern_id: str) -> float:
+        """Return the change in activation from the previous tick for a concern.
+
+        Returns 0.0 if fewer than 2 history entries exist.
+        """
+        history = self._activation_history.get(concern_id)
+        if not history or len(history) < 2:
+            return 0.0
+        h = list(history)
+        return h[-1] - h[-2]
 
     def _render_markdown(self, derived_concerns: Sequence[Dict[str, Any]]) -> str:
         """Render a human-readable markdown summary of current orientation state."""
@@ -355,6 +371,298 @@ class OodaLivingState:
             lines = ["## Epistemic Boundaries"]
             for m in self.epistemic_markers:
                 lines.append(f"- {m}")
+            parts.append("\n".join(lines))
+
+        return "\n\n".join(parts)
+
+    def _render_readable_markdown(
+        self,
+        derived_concerns: Sequence[Dict[str, Any]],
+        planner_summary: str = "",
+    ) -> str:
+        """Render a self-explanatory markdown snapshot of the agent's OODA state.
+
+        Captures both the current state AND the dynamics (deltas, trends) of
+        the OODA loop. Intended for planner and human consumption.
+        """
+        parts: List[str] = []
+        ts = _now_iso()
+
+        # ── Orientation Summary ───────────────────────────────────────────
+        # A 1-2 sentence snapshot: what is foregrounded, what just happened.
+        summary_bits: List[str] = []
+
+        fg_goal = None
+        if self.foregrounded_goal_id and self.goal_field:
+            fg_goal = next(
+                (g for g in self.goal_field
+                 if g.get("goal_id") == self.foregrounded_goal_id),
+                None,
+            )
+        if fg_goal:
+            summary_bits.append(
+                f"Foregrounded goal: \"{fg_goal.get('label', '?')}\" [{fg_goal.get('status', '?')}].")
+        elif any(g.get("status") == "running" for g in self.goal_field):
+            running = [g for g in self.goal_field if g.get("status") == "running"]
+            summary_bits.append(
+                f"Running: \"{running[0].get('label', '?')}\".")
+
+        if self.concern_activations:
+            top = self.concern_activations[0]
+            top_label = top.get("description", top["id"]).split(" — ")[0]
+            summary_bits.append(
+                f"Dominant concern: {top_label} ({top.get('activation', 0)}{_trend_arrow(top.get('trend', 'stable'))}).")
+
+        if self.last_event:
+            action_taken = self.last_event.get("action_taken", "")
+            src = self.last_event.get("source", "")
+            if action_taken:
+                summary_bits.append(f"Last action: {action_taken} (from {src}).")
+
+        if planner_summary:
+            summary_bits.append(f"Planner: {planner_summary}.")
+
+        header = (
+            f"# OODA State\n"
+            f"Continuously updated orientation record — state and dynamics of the agent's attention, goals, and concerns.\n"
+            f"Updated: {ts}\n\n"
+            f"## Orientation Summary\n"
+        )
+        header += " ".join(summary_bits) if summary_bits else "No active orientation."
+        parts.append(header)
+
+        # ── Foreground ────────────────────────────────────────────────────
+        fg_lines: List[str] = [
+            "## Foreground",
+            "What is driving current behavior: the active goal and dominant concern.",
+        ]
+        if fg_goal:
+            goal_text = fg_goal.get("goal_text", "")
+            if goal_text and goal_text != fg_goal.get("label", ""):
+                fg_lines.append(f"- **Goal**: {fg_goal.get('label', '?')} [{fg_goal.get('status', '?')}]: {goal_text}")
+            else:
+                fg_lines.append(f"- **Goal**: {fg_goal.get('label', '?')} [{fg_goal.get('status', '?')}]")
+        elif self.goal_field:
+            running = [g for g in self.goal_field if g.get("status") == "running"]
+            if running:
+                g = running[0]
+                goal_text = g.get("goal_text", "")
+                if goal_text and goal_text != g.get("label", ""):
+                    fg_lines.append(f"- **Goal**: {g.get('label', '?')} [running]: {goal_text}")
+                else:
+                    fg_lines.append(f"- **Goal**: {g.get('label', '?')} [running]")
+            else:
+                fg_lines.append("- **Goal**: none running")
+
+        if self.concern_activations:
+            top = self.concern_activations[0]
+            cid = top["id"]
+            activation = top.get("activation", 0)
+            delta = self._compute_activation_delta(cid)
+            delta_str = f" (Δ{delta:+.3f})" if delta != 0 else ""
+            desc = top.get("description", cid)
+            fg_lines.append(
+                f"- **Concern**: {desc} — activation {activation}"
+                f"{_trend_arrow(top.get('trend', 'stable'))}{delta_str}")
+
+        if planner_summary:
+            fg_lines.append(f"- **Planner**: {planner_summary}")
+        parts.append("\n".join(fg_lines))
+
+        # ── Attention Dynamics ────────────────────────────────────────────
+        # All concerns with nonzero activation or nonzero delta, sorted by activation.
+        if self.concern_activations:
+            lines = [
+                "## Attention",
+                "What the agent is attending to. Activation reflects attentional pull; "
+                "delta (Δ) shows change since last tick.",
+            ]
+            for a in self.concern_activations:
+                cid = a["id"]
+                activation = a.get("activation", 0)
+                trend = a.get("trend", "stable")
+                delta = self._compute_activation_delta(cid)
+                # Skip negligible concerns (low activation AND no recent change)
+                if activation < 0.05 and abs(delta) < 0.01:
+                    continue
+                desc = a.get("description", cid)
+                # Use short label (before " — ") for compactness
+                short_label = desc.split(" — ")[0] if " — " in desc else desc
+                delta_str = f", Δ{delta:+.3f}" if delta != 0 else ""
+                arrow = _trend_arrow(trend)
+                lines.append(
+                    f"- **{short_label}** — {activation}{arrow}{delta_str}")
+            if len(lines) > 2:  # more than just header
+                parts.append("\n".join(lines))
+
+        # ── Goals (tiered) ────────────────────────────────────────────────
+        if self.goal_field:
+            running = [g for g in self.goal_field if g.get("status") == "running"]
+            ready = [g for g in self.goal_field if g.get("status") in ("ready", "pending", "scheduled")]
+            recent_done = [g for g in self.goal_field
+                           if g.get("status") in ("completed", "failed")][-3:]  # last 3
+
+            lines = [
+                "## Goals",
+                "Running goals are being actively executed. Ready goals await dispatch. "
+                "Recently completed goals shown for context.",
+            ]
+            if running:
+                for g in running:
+                    label = g.get("label", "?")
+                    goal_text = g.get("goal_text", "")
+                    fg = " **[FOREGROUNDED]**" if g.get("goal_id") == self.foregrounded_goal_id else ""
+                    if goal_text and goal_text != label:
+                        lines.append(f"- [running]{fg} **{label}**: {goal_text}")
+                    else:
+                        lines.append(f"- [running]{fg} {label}")
+            else:
+                lines.append("- No goals currently running.")
+
+            if ready:
+                for g in ready:
+                    label = g.get("label", "?")
+                    goal_text = g.get("goal_text", "")
+                    if goal_text and goal_text != label:
+                        lines.append(f"- [ready] **{label}**: {goal_text}")
+                    else:
+                        lines.append(f"- [ready] {label}")
+
+            if recent_done:
+                for g in recent_done:
+                    label = g.get("label", "?")
+                    status = g.get("status", "?")
+                    lines.append(f"- [{status}] {label}")
+
+            # Count of omitted completed goals
+            total_done = len([g for g in self.goal_field
+                              if g.get("status") in ("completed", "failed")])
+            omitted = total_done - len(recent_done)
+            if omitted > 0:
+                lines.append(f"- ({omitted} earlier completed goals omitted)")
+            parts.append("\n".join(lines))
+
+        # ── User Concerns (filtered) ─────────────────────────────────────
+        if self.user_concern_snapshot:
+            ongoing = [c for c in self.user_concern_snapshot
+                       if c.get("status") in ("ongoing", "active", "open")]
+            closed = [c for c in self.user_concern_snapshot
+                      if c.get("status") == "closed"]
+
+            lines = [
+                "## User Concerns",
+                "Topics the user has raised. Weight reflects importance; stance reflects attitude. "
+                "Only ongoing concerns shown in full; closed concerns summarized.",
+            ]
+            if ongoing:
+                for c in ongoing:
+                    label = c.get("label", "?")
+                    weight = c.get("weight", 0)
+                    stance = c.get("stance", "")
+                    stance_part = f", {stance}" if stance else ""
+                    lines.append(f"- [ongoing] **{label}** (weight={weight}{stance_part})")
+            else:
+                lines.append("- No ongoing user concerns.")
+
+            if closed:
+                labels = [c.get("label", "?") for c in closed]
+                lines.append(f"- Closed ({len(closed)}): {'; '.join(labels)}")
+            parts.append("\n".join(lines))
+
+        # ── Derived Concerns ──────────────────────────────────────────────
+        active_derived = [c for c in derived_concerns
+                          if c.get("status") in ("surfaced", "active")]
+        if active_derived:
+            lines = [
+                "## Derived Concerns",
+                "Concerns inferred from user behavior or context. "
+                "May drive proactive action without explicit instruction.",
+            ]
+            for c in active_derived:
+                label = c.get("concern_label", "?")
+                desc = c.get("concern_description", "")
+                parent = c.get("parent_user_concern_id")
+                origin_part = f" (from: {parent})" if parent else ""
+                lines.append(f"- **{label}**{origin_part}: {desc}")
+            parts.append("\n".join(lines))
+
+        # ── Last Orientation Step ─────────────────────────────────────────
+        if self.last_event:
+            lines = [
+                "## Last Orientation Step",
+                "What happened on the most recent OODA tick: the event observed, "
+                "how it was assessed, and what action was taken.",
+            ]
+            et = self.last_event.get("event_type", "")
+            cls = self.last_event.get("classification", "")
+            src = self.last_event.get("source", "")
+            preview = self.last_event.get("content_preview", "")
+            lines.append(f"- Event: **{et}/{cls}** from {src}: \"{preview}\"")
+
+            assessment = self.last_event.get("assessment", {})
+            if assessment:
+                matters = assessment.get("matters", "?")
+                goal_rel = assessment.get("goal_relevance", "?")
+                urgency = assessment.get("urgency", "?")
+                action_choice = assessment.get("action", "?")
+                lines.append(
+                    f"- Assessment: matters={matters}, goal_relevance={goal_rel}, "
+                    f"urgency={urgency}, action={action_choice}")
+                rationale = assessment.get("rationale", "")
+                if rationale:
+                    lines.append(f"- Rationale: {rationale}")
+
+            # Show activation changes from this tick
+            deltas = []
+            for a in self.concern_activations:
+                cid = a["id"]
+                d = self._compute_activation_delta(cid)
+                if abs(d) >= 0.01:
+                    short = a.get("description", cid).split(" — ")[0]
+                    deltas.append(f"{short} {d:+.3f}")
+            if deltas:
+                lines.append(f"- Activation changes: {', '.join(deltas)}")
+
+            action_taken = self.last_event.get("action_taken", "")
+            if action_taken:
+                lines.append(f"- Action taken: {action_taken}")
+            parts.append("\n".join(lines))
+
+        # ── Recent Transitions ────────────────────────────────────────────
+        transitions = list(self.transitions)
+        if transitions:
+            lines = [
+                "## Recent Transitions",
+                "Log of recent observe-orient-act cycles, most recent first.",
+            ]
+            for t in reversed(transitions):
+                lines.append(t)
+            parts.append("\n".join(lines))
+
+        # ── Unresolved / Opaque ───────────────────────────────────────────
+        # Collect: epistemic markers + goals stuck in ready state
+        unresolved_lines: List[str] = []
+        if self.epistemic_markers:
+            for m in self.epistemic_markers:
+                unresolved_lines.append(f"- {m}")
+        # Flag ready goals that might be stalled (heuristic: ready but not foregrounded
+        # while other goals are running)
+        if self.goal_field:
+            ready_goals = [g for g in self.goal_field
+                           if g.get("status") in ("ready", "pending")]
+            running_goals = [g for g in self.goal_field
+                             if g.get("status") == "running"]
+            if ready_goals and running_goals:
+                for g in ready_goals:
+                    unresolved_lines.append(
+                        f"- Goal waiting: \"{g.get('label', '?')}\" (ready but not foregrounded)")
+
+        if unresolved_lines:
+            lines = [
+                "## Unresolved / Opaque",
+                "Things the agent cannot currently determine, or items that may need attention.",
+            ]
+            lines.extend(unresolved_lines)
             parts.append("\n".join(lines))
 
         return "\n\n".join(parts)
