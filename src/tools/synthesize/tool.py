@@ -375,8 +375,12 @@ def _do_narrative_synthesis(input_text: str, fmt: str, focus: str, instruction: 
     chunks = segment_text_boundary_aware(input_text, max_chunk_size=16000)
     chunk_count = len(chunks)
 
-    # Compute target length
-    target_tokens = int(_compute_target_length(effective_tokens, fmt, compression_ratio))
+    # Compute target length (output sizing guidance overrides formula when present)
+    guided_tokens = kwargs.get('target_tokens')
+    if guided_tokens and isinstance(guided_tokens, (int, float)) and int(guided_tokens) > 0:
+        target_tokens = int(guided_tokens)
+    else:
+        target_tokens = int(_compute_target_length(effective_tokens, fmt, compression_ratio))
 
     # Style-specific instructions
     style_instructions = {

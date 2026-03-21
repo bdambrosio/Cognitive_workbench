@@ -4,7 +4,7 @@ Test suite for infospace tools and primitives.
 
 Validates that:
 - Primitives (create-note, create-collection, split, flatten, etc.) work correctly
-- Python tools (calculate, summarize, refine, etc.) execute and return proper format
+- Python tools (calculate, summarize, extract, etc.) execute and return proper format
 - Tool chains work correctly (search -> filter -> summarize)
 
 Uses Zenoh API similar to test_minecraft_coordinates.py pattern.
@@ -18,7 +18,7 @@ Available tests:
     - primitives: Test core primitives (create-note, create-collection, split, flatten, etc.)
     - calculate: Test calculate tool
     - word-count: Test word-count tool
-    - refine: Test refine tool (LLM-based)
+    - extract: Test extract tool (LLM-based)
     - summarize: Test summarize tool (LLM-based)
     - assess: Test assess tool (LLM-based)
     - generate: Test generate-note tool (LLM-based)
@@ -453,30 +453,30 @@ def test_word_count(session: zenoh.Session, character: str) -> Tuple[bool, str]:
         return False, f"word-count: wrong count ({value})"
 
 
-def test_refine(session: zenoh.Session, character: str) -> Tuple[bool, str]:
-    """Test refine tool (LLM-based transformation)."""
-    print("\n=== Test: refine ===")
+def test_extract(session: zenoh.Session, character: str) -> Tuple[bool, str]:
+    """Test extract tool (LLM-based transformation)."""
+    print("\n=== Test: extract ===")
 
-    # Create a note and refine it
+    # Create a note and extract from it
     plan_result = execute_multi_step_plan(session, character, [
         {"type": "create-note", "value": "The meeting is scheduled for January 15, 2025 at 3pm in conference room B. Attendees: Alice, Bob, Charlie.", "out": "$text"},
-        {"type": "refine", "target": "$text", "instruction": "Extract the date and time as JSON", "out": "$extracted"}
+        {"type": "extract", "target": "$text", "instruction": "Extract the date and time as JSON", "out": "$extracted"}
     ], timeout=120.0)
 
     if not plan_result.get('success'):
-        return False, f"refine failed: {plan_result.get('error', 'unknown')}"
+        return False, f"extract failed: {plan_result.get('error', 'unknown')}"
 
     last_result = plan_result.get('last_action_result', {})
     value = last_result.get('value', '')
 
     # Should contain date/time info
     if 'January' in str(value) or '15' in str(value) or '2025' in str(value) or '3' in str(value):
-        print(f"  ✓ Refined result contains date/time info")
+        print(f"  ✓ Extracted result contains date/time info")
         print(f"    Result: {str(value)[:200]}...")
-        return True, "refine: OK"
+        return True, "extract: OK"
     else:
         print(f"  ✗ Result doesn't seem to contain expected info: {value}")
-        return False, f"refine: unexpected result"
+        return False, f"extract: unexpected result"
 
 
 def test_summarize(session: zenoh.Session, character: str) -> Tuple[bool, str]:
@@ -776,7 +776,7 @@ def run_all_tests(session: zenoh.Session, character: str) -> Dict[str, Tuple[boo
         ("Primitives", test_primitives),
         ("Calculate", test_calculate),
         ("Word Count", test_word_count),
-        ("Refine", test_refine),
+        ("Extract", test_extract),
         ("Summarize", test_summarize),
         ("Assess", test_assess),
         ("Generate Note", test_generate_note),
@@ -849,7 +849,7 @@ def main():
                 "primitives": ("Primitives", test_primitives),
                 "calculate": ("Calculate", test_calculate),
                 "word-count": ("Word Count", test_word_count),
-                "refine": ("Refine", test_refine),
+                "extract": ("Extract", test_extract),
                 "summarize": ("Summarize", test_summarize),
                 "assess": ("Assess", test_assess),
                 "generate": ("Generate Note", test_generate_note),

@@ -4,7 +4,7 @@ world_config:
   world_name: "infolab"
 
 llm_config:
-  openai_model_path: "gpt-5.4"
+  openai_model_path: "gpt-5.4-mini"
   grobid: "http://localhost:8070/"
 
 setting: |

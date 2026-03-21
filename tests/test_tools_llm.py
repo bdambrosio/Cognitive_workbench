@@ -3,12 +3,12 @@
 LLM Tools Test Suite for Cognitive Workbench.
 
 Tests LLM-based tools that require model inference:
-- refine - Text transformation/extraction
+- extract - Text transformation/extraction
 - summarize - Text summarization
 - generate-note - Content generation
 - extract-entities - Named entity extraction
 - assess - Quality/relevance assessment
-- relate - Relationship analysis
+- synthesize (comparison) - Relationship analysis
 
 Each test:
 1. Clears bindings before execution
@@ -227,8 +227,8 @@ def run_test(
 # TEST CASES
 # ==========================================
 
-def test_refine(session: zenoh.Session, character: str, verbose: bool = False) -> Dict[str, Any]:
-    """Test refine tool for text transformation."""
+def test_extract_transform(session: zenoh.Session, character: str, verbose: bool = False) -> Dict[str, Any]:
+    """Test extract tool for text transformation."""
     plan = [
         {
             "type": "create-note",
@@ -236,16 +236,16 @@ def test_refine(session: zenoh.Session, character: str, verbose: bool = False) -
             "out": "$input_text"
         },
         {
-            "type": "refine",
+            "type": "extract",
             "target": "$input_text",
             "instruction": "Convert to uppercase",
-            "out": "$refined"
+            "out": "$extracted"
         }
     ]
     return run_test(
-        session, character, "refine (uppercase)",
+        session, character, "extract (uppercase)",
         plan,
-        expected_output_var="$refined",
+        expected_output_var="$extracted",
         validate_content=True,
         verbose=verbose
     )
@@ -346,8 +346,8 @@ def test_assess(session: zenoh.Session, character: str, verbose: bool = False) -
     )
 
 
-def test_relate(session: zenoh.Session, character: str, verbose: bool = False) -> Dict[str, Any]:
-    """Test relate tool."""
+def test_synthesize_comparison(session: zenoh.Session, character: str, verbose: bool = False) -> Dict[str, Any]:
+    """Test synthesize tool in comparison mode."""
     plan = [
         {
             "type": "create-note",
@@ -360,14 +360,15 @@ def test_relate(session: zenoh.Session, character: str, verbose: bool = False) -
             "out": "$note2"
         },
         {
-            "type": "relate",
+            "type": "synthesize",
             "target": "$note1",
             "other": "$note2",
+            "format": "comparison",
             "out": "$relation"
         }
     ]
     return run_test(
-        session, character, "relate (compare two notes)",
+        session, character, "synthesize comparison (two notes)",
         plan,
         expected_output_var="$relation",
         validate_content=True,
@@ -398,12 +399,12 @@ def main():
     
     # Run tests
     tests = [
-        test_refine,
+        test_extract_transform,
         test_summarize,
         test_generate_note,
         test_extract_entities,
         test_assess,
-        test_relate,
+        test_synthesize_comparison,
     ]
     
     results = []

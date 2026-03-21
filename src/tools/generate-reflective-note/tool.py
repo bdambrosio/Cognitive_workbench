@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-LLM-based content generation tool.
-Generates new text or code from scratch using natural language prompts.
-No source documents — for generation from source material, use synthesize.
+LLM-based reflective content generation tool.
+Like generate-note, but with access to the planner's internal reasoning state
+(system prompt, goal analysis, tool selection, situation context) as background.
+Enables the agent to generate content informed by its current orientation.
 """
 import logging
 from typing import Any, Dict, Optional
@@ -26,16 +27,19 @@ def _success(executor: InfospaceExecutor, result: str, extra: Optional[Dict[str,
 
 def tool(input_value=None, runtime=None, **kwargs):
     """
-    Generate new content using natural language prompt.
-    Creates content from scratch using the LLM's own knowledge — no source documents.
-    For generation from source material, use synthesize instead.
-    
+    Generate content with awareness of the agent's current reasoning state.
+
+    Works like generate-note but includes the planner's internal state
+    (character context, goal analysis, tool selection, situation awareness)
+    as background context for the LLM, enabling reflective or
+    state-aware generation.
+
     Args:
         input_value: Unused (for compatibility with executor interface)
         **kwargs: Tool parameters
             - prompt: Generation instruction (REQUIRED)
             - style: "code" or "text" (optional, default: "text")
-    
+
     Returns:
         Generated content as string
     """
@@ -44,23 +48,34 @@ def tool(input_value=None, runtime=None, **kwargs):
         return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
 
     prompt = kwargs.get('prompt', '')
-    # If no prompt but value is in kwargs (planner mistake: used 'value' instead of 'prompt'), use value as prompt
     if not prompt and 'value' in kwargs:
         prompt = kwargs.get('value')
-    
+
     if not prompt:
         return _fail(executor, "prompt parameter required")
-    
+
     style = kwargs.get('style', 'text').lower()
 
-    # Deprecation: if context is provided, log warning and ignore
-    context_arg = kwargs.get('context', '')
-    if context_arg:
-        logger.warning(f"generate-note: 'context' parameter is deprecated. Use synthesize for generation from source material. Ignoring context.")
-    
-    # Build generation prompt based on style
+    # Retrieve planner reasoning state (snapshotted at Stage 1 by the planner)
+    reflective_state = getattr(executor, '_planner_reflective_state', '') or ''
+    if reflective_state:
+        state_len = len(reflective_state)
+        logger.info(f"generate-reflective-note: using reflective state ({state_len} chars)")
+        reflective_block = (
+            f"\n## Internal Reflective State\n"
+            f"The following is the agent's current reasoning context — goal analysis, "
+            f"situation awareness, character orientation, and planning state. "
+            f"Use this as background when responding to the instruction.\n\n"
+            f"{reflective_state}\n"
+            f"## End Internal Reflective State\n\n"
+        )
+    else:
+        logger.warning("generate-reflective-note: no reflective state available, proceeding without")
+        reflective_block = ""
+
+    # Build generation prompt
     if style == 'code':
-        generation_prompt = f"""Generate code according to the following instruction.
+        generation_prompt = f"""{reflective_block}Generate code according to the following instruction.
 
 Instruction: {prompt}
 
@@ -73,12 +88,14 @@ End your response with:
         max_tokens = 4000
         temperature = 0.2
     else:
-        generation_prompt = f"""Generate text content according to the following instruction.
+        generation_prompt = f"""{reflective_block}Generate text content according to the following instruction.
+Use the Internal Reflective State above as background context to inform your response.
 
 Instruction: {prompt}
 
 Return only the generated content, no explanation, no code fences, no markdown formatting.
 Do not include any introductory text, reasoning, or commentary.
+Do not describe or summarize the reflective state — use it to inform your content.
 Only provide the generated content itself, followed by the </end> tag.
 End your response with:
 </end>
@@ -91,10 +108,8 @@ End your response with:
     if guided_tokens and isinstance(guided_tokens, (int, float)) and int(guided_tokens) > 0:
         max_tokens = int(guided_tokens)
 
+    logger.info(f"generate-reflective-note: {prompt[:50]}... (style={style}, state={len(reflective_block)} chars)")
 
-    logger.info(f"generate-note: {prompt[:50]}... (style={style})")
-    
-    # Use unified llm_generate callback (required)
     llm_generate = kwargs.get('llm_generate')
     if not llm_generate:
         return _fail(executor, "llm_generate callback is required")
@@ -105,24 +120,24 @@ End your response with:
         is_json=False,
         stops=['</end>']
     )
-    
-    # Send heartbeat after LLM call to reset timeout
+
     heartbeat = kwargs.get('heartbeat')
     if heartbeat:
         heartbeat()
-    
+
     if not response.success:
-        logger.error(f"generate-note failed: {response.error}")
+        logger.error(f"generate-reflective-note failed: {response.error}")
         return _fail(executor, "llm_generate_failed", value=f"Error: {response.error}", extra={"llm_error": response.error})
-    
+
     result = response.text.strip()
-    logger.info(f"generate-note complete: output_len={len(result)}")
-    
+    logger.info(f"generate-reflective-note complete: output_len={len(result)}")
+
     return _success(
         executor,
         result,
         {
             "style": style,
             "prompt_length": len(prompt),
+            "reflective_state_length": len(reflective_block),
         },
     )

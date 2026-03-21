@@ -196,7 +196,7 @@ def build_prompt(
     lines.append(f"goal:")
     lines.append(f"  question: {question.strip()}") 
     #lines.append(f"  do not use display, search-web, or semantic-scholar in your reasoning. Only use generate to find information.")
-    lines.append(f"  do not use search-web or semantic-scholar in your reasoning. use generate or think to surface knowledge, or refine to extract information from text.")
+    lines.append(f"  do not use search-web or semantic-scholar in your reasoning. use generate or think to surface knowledge, or extract to extract information from text.")
     lines.append(f"  choices:")
     lines.append(f"    A: {choices[0].strip()}")
     lines.append(f"    B: {choices[1].strip()}")

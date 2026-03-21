@@ -201,6 +201,52 @@ REFLECTION_FRAME_SCHEMA = {
   ]
 }
 
+def _build_bindings_inventory(plan_local_bindings: set, executor) -> str:
+    """Build a compact one-line-per-binding inventory of plan-local resources.
+
+    Only includes bindings created during the current plan execution.
+    Skips internal/temp bindings (prefixed with '_').
+    Returns empty string if no bindings or on error.
+    """
+    if not plan_local_bindings or not executor:
+        return ""
+    try:
+        bindings_flat = executor.plan_bindings_flat
+        rm = executor.resource_manager
+        if not rm:
+            return ""
+
+        parts = []
+        for name in sorted(plan_local_bindings):
+            if name.startswith('_') or name.startswith('map_temp'):
+                continue
+            rid = bindings_flat.get(name)
+            if not rid or not isinstance(rid, str):
+                continue
+            res = rm.get_resource(rid)
+            if not res:
+                parts.append(f"${name}: {rid} (unresolved)")
+                continue
+            rtype = res.get('type')
+            type_name = getattr(rtype, 'name', str(rtype)) if rtype else '?'
+            props = res.get('properties', {})
+            content = props.get('content')
+            if type_name == 'Collection' and isinstance(content, list):
+                parts.append(f"${name}: Collection ({len(content)} items)")
+            elif content is not None:
+                chars = len(str(content))
+                parts.append(f"${name}: Note ({chars} chars)")
+            else:
+                parts.append(f"${name}: {type_name}")
+
+        if not parts:
+            return ""
+        return "BINDINGS: " + " | ".join(parts) + "\n"
+    except Exception as e:
+        logger.debug(f"_build_bindings_inventory failed: {e}")
+        return ""
+
+
 INCREMENTAL_PLAN_SPECIFICATIONS = """
 # INFOSPACE TYPE SYSTEM & RULES
 
@@ -2314,7 +2360,15 @@ if HAS_SGLANG:
         
         # Track which tools have had their skill docs loaded (re-initialized each call, persists across stages)
         # Store in state so it persists across stages within this call, but reset at start of each new call
-        _loaded_skill_docs = set[Any]()          
+        _loaded_skill_docs = set[Any]()
+
+        # Extract output sizing guidance from recent_context (if present)
+        _output_guidance_line = ""
+        if "OUTPUT GUIDANCE" in recent_context and "target_tokens:" in recent_context:
+            import re as _re
+            _m = _re.search(r'target_tokens:\s*(\d+)', recent_context)
+            if _m:
+                _output_guidance_line = f"OUTPUT SIZING: pass target_tokens={_m.group(1)} to the tool call that produces the FINAL output artifact.\n"          
         
         # Stage 0: Resource retrieval (if executor available)
         available_resources_text = ""
@@ -2417,10 +2471,13 @@ ALWAYS follow all formatting instructions exactly.
             + "</first_task>\n"
         )
         
-        # Strip <think> tags from Stage 1 outputs
+        # Strip <think> tags and partial XML fragments from Stage 1 outputs
         for _key in ['stage1_reasoning', 'selected_tools_json', 'first_task']:
             if _key in s:
-                s[_key] = _strip_think_tags(s[_key])
+                val = _strip_think_tags(s[_key])
+                # Remove trailing partial XML tags (e.g., "</" left by stop-token truncation)
+                val = re.sub(r'</?[a-z_]*\s*$', '', val).rstrip()
+                s[_key] = val
 
         try:
             logger.info(f"Stage 1: Reasoning: {s['stage1_reasoning']}")
@@ -2452,12 +2509,31 @@ ALWAYS follow all formatting instructions exactly.
         except (KeyError, json.JSONDecodeError, TypeError) as e:
             logger.warning(f"Failed to parse selected tools for doc expansion: {e}")
         
+        # Snapshot planner reasoning state for generate-reflective-note tool
+        if executor:
+            try:
+                base_state = str(s)
+                # Append OODA orientation snapshot if available
+                try:
+                    from ooda_snapshot_renderer import render_reflective_snapshot
+                    _ls = getattr(executor, '_ooda_living_state', None)
+                    _dc = getattr(executor, '_derived_concerns_snapshot', [])
+                    _uc = getattr(executor, '_user_concerns_snapshot', [])
+                    snapshot = render_reflective_snapshot(_ls, _dc, _uc)
+                    if snapshot:
+                        base_state += f"\n\n{snapshot}"
+                except Exception:
+                    pass
+                executor._planner_reflective_state = base_state
+            except Exception:
+                executor._planner_reflective_state = ""
+
         # Interrupt checkpoint: after Stage 1, before step loop
         if executor and _interrupt_requested(executor):
             _clear_interrupt(executor)
             s["final_answer"] = "Interrupted by user."
             return s
-        
+
         # Stage 2/3 format instructions
         s += user(
             "#Stage 2 FORMAT:\n"
@@ -2510,6 +2586,10 @@ ALWAYS follow all formatting instructions exactly.
             "- if/else control flow and loops are allowed.\n"
             "- Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
             "- LOOP PATTERN: tool() never raises — do NOT use try/except. Track ok/errors counts explicitly.\n"
+            "- OUTPUT SIZING: If OUTPUT GUIDANCE appears in the context with a target_tokens value,\n"
+            "  pass target_tokens=<N> to the tool call that produces the FINAL output artifact of the goal\n"
+            "  (the primary product — e.g. the last synthesize, generate-note, or extract call).\n"
+            "  Do NOT apply target_tokens to intermediate/preparatory tool calls.\n"
             "\n"
             "#Stage 3 FORMAT:\n"
             "  THOUGHTS: <brief assessment of result and progress>\n"
@@ -2562,10 +2642,13 @@ ALWAYS follow all formatting instructions exactly.
                 break
 
             # Stage 2: Generate and execute code block
+            _bindings_line = _build_bindings_inventory(plan_local_bindings, executor) if step > 0 else ""
             s += user(
                 f"STAGE 2 (step {step + 1}/{max_steps}):\n"
                 f"#GOAL: {goal_for_step}\n#END GOAL\n"
+                f"{_bindings_line}"
                 f"CURRENT_TASK: {current_task}\n"
+                f"{_output_guidance_line}"
                 "Write a Python code block using Stage 2 FORMAT.\n"
                 "Reminder: chain via $bindings (out=\"$name\"), end with return executor._create_uniform_return(...), max 16 tool calls. Locals don't persist across steps. No try/except — check r[\"status\"] instead.\n"
             )
@@ -3415,7 +3498,15 @@ def tool_planner_infospace_vllm(template, goal: str, world_model: Dict, characte
     
     # Track which tools have had their skill docs loaded
     _loaded_skill_docs = set[Any]()
-    
+
+    # Extract output sizing guidance from recent_context (if present)
+    _output_guidance_line = ""
+    if "OUTPUT GUIDANCE" in recent_context and "target_tokens:" in recent_context:
+        import re as _re
+        _m = _re.search(r'target_tokens:\s*(\d+)', recent_context)
+        if _m:
+            _output_guidance_line = f"OUTPUT SIZING: pass target_tokens={_m.group(1)} to the tool call that produces the FINAL output artifact.\n"
+
     # Stage 0: Resource retrieval (if executor available)
     available_resources_text = ""
     if executor:
@@ -3539,12 +3630,19 @@ ALWAYS follow all formatting instructions exactly.
     except (KeyError, json.JSONDecodeError, TypeError) as e:
         logger.warning(f"Failed to parse selected tools for doc expansion: {e}")
     
+    # Snapshot planner reasoning state for generate-reflective-note tool
+    if executor:
+        try:
+            executor._planner_reflective_state = prompt
+        except Exception:
+            executor._planner_reflective_state = ""
+
     # Interrupt checkpoint: after Stage 1, before step loop
     if executor and _interrupt_requested(executor):
         _clear_interrupt(executor)
         state["final_answer"] = "Interrupted by user."
         return state
-    
+
     # Stage 2/3 format instructions
     prompt += format_user(
         "#Stage 2 FORMAT:\n"
@@ -3580,6 +3678,10 @@ ALWAYS follow all formatting instructions exactly.
         "- if/else control flow and loops are allowed.\n"
         "- Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
         "- LOOP PATTERN: tool() never raises — do NOT use try/except. Track ok/errors counts explicitly.\n"
+        "- OUTPUT SIZING: If OUTPUT GUIDANCE appears in the context with a target_tokens value,\n"
+        "  pass target_tokens=<N> to the tool call that produces the FINAL output artifact of the goal\n"
+        "  (the primary product — e.g. the last synthesize, generate-note, or extract call).\n"
+        "  Do NOT apply target_tokens to intermediate/preparatory tool calls.\n"
         "\n"
         "#Stage 3 FORMAT:\n"
         "  THOUGHTS: <brief assessment of result and progress>\n"
@@ -3635,10 +3737,13 @@ ALWAYS follow all formatting instructions exactly.
             break
         
         # Stage 2: Generate code block
+        _bindings_line = _build_bindings_inventory(plan_local_bindings, executor) if step > 0 else ""
         prompt += format_user(
             f"STAGE 2 (step {step + 1}/{max_steps}):\n"
             f"#GOAL: {goal_for_step}\n#END GOAL\n"
+            f"{_bindings_line}"
             f"CURRENT_TASK: {current_task}\n"
+            f"{_output_guidance_line}"
             "Write a Python code block using Stage 2 FORMAT.\n"
         )
 
@@ -4758,6 +4863,12 @@ class IncrementalPlanner:
             if situation_context:
                 recent_context = f"\n# SITUATION AWARENESS\n{situation_context}\n" + recent_context
             recent_context += self.build_context(goal=goal)
+
+            # Inject output size guidance for primary-product sizing
+            output_guidance = context.get('output_guidance') if context else None
+            if output_guidance and output_guidance.get('target_tokens'):
+                from output_sizing import format_guidance_for_planner
+                recent_context += f"\n{format_guidance_for_planner(output_guidance)}\n"
                 
             # Find similar plans using plan guidance
             #similar_plans = self.plan_guidance.find_similar_plans(goal)

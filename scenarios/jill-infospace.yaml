@@ -9,7 +9,7 @@ llm_config:
   grobid: "http://localhost:8070/"
 
 alt_llm_config:
-  openrouter_model_path: "google/gemini-3-flash-preview"
+  openrouter_model_path: "openai/gpt-5.4-mini"#"google/gemini-3-flash-preview"
   
 setting: |
   Cognitive Workbench, a virtual modern 

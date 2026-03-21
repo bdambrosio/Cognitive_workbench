@@ -71,9 +71,48 @@ SCHEDULED_GOALS_COLLECTION = "_scheduled_goals"
 def _is_goal_cmd(s):
     return s and s.strip().lower().startswith('goal:')
 
+
+# ── OODA pipeline data structures ──────────────────────────────────────
+
+@dataclass
+class EventPacket:
+    """Structured event produced by Observe stage."""
+    event_type: str          # 'user_text', 'sensor_event', 'goal_initiation'
+    classification: str      # 'goal', 'proceed', 'reuse', 'terminate', 'clear_cache',
+                             # 'chat', 'alert', 'trigger', 'ask_reply', 'task_cmd',
+                             # 'direct_action', 'agent_message', 'scheduler_cmd',
+                             # 'unblock', 'end_conversation'
+    content: str
+    source: str
+    raw_sense_data: dict
+    goal_id: Optional[str] = None
+    goal_name: Optional[str] = None
+    close_flag: bool = False
+    is_reaction: bool = False
+
+
+@dataclass
+class OrientedEvent:
+    """Event enriched with character evaluation from Orient stage."""
+    event: EventPacket
+    assessment: Optional[Dict[str, Any]]
+
+
+@dataclass
+class Action:
+    """Routing decision produced by Decide stage."""
+    type: str               # 'dispatch_goal', 'proceed_goal', 'reuse_goal',
+                            # 'terminate_goal', 'clear_cache', 'chat_response',
+                            # 'alert_response', 'ask_reply', 'task_command',
+                            # 'direct_action', 'agent_message', 'no_action'
+    payload: dict
+    assessment: Optional[Dict[str, Any]] = None
+
+
 # Import LLM client
 from llm_client import ZenohLLMClient
 import character_evaluator
+from output_sizing import compute_output_guidance, format_guidance_for_planner
 
 # SGLang imports
 try:
@@ -912,6 +951,19 @@ class ZenohExecutiveNode:
         )
         self.user_concern_model.load()
 
+        from ooda_living_state import OodaLivingState
+        self._ooda_living_state = OodaLivingState()
+        self._ooda_living_state.load(self.infospace_executor)
+
+        from derived_concern_model import DerivedConcernModel
+        self._derived_concern_model = DerivedConcernModel(
+            resource_manager=self.resource_manager,
+            character_name=self.character_name,
+            llm_generate=llm_generate,
+            infospace_executor=self.infospace_executor,
+        )
+        self._derived_concern_model.load()
+
         self._scheduled_goal_counter = 0
         self._active_scheduled_goal_id = None
         self._initialize_scheduled_goals()
@@ -1046,6 +1098,7 @@ class ZenohExecutiveNode:
         
         # Last character evaluator assessment (for orientation-to-chat integration)
         self._last_character_eval: Optional[Dict[str, Any]] = None
+        self._character_concern_activations: Dict[str, float] = {}
 
         # Track last action outputs for plan_result
         self.last_say_text = ''
@@ -1411,110 +1464,49 @@ class ZenohExecutiveNode:
             self.shutdown()
     
     def _main_loop_tick(self):
-        """One iteration of the main loop.
+        """One iteration of the main loop — OODA pipeline.
 
-        Responsibilities:
-        - Route user text: ask-reply → goal thread, goal: prefix → goal thread, else → chat-mode
-        - Route goal commands (proceed/reuse/terminate) → goal dispatch
-        - Handle goal thread completion → drain sensor queues
-        - Chat-mode: lightweight LLM response while goal thread is busy or idle
+        Structure: goal completion check → task WIP → Observe → Orient → Decide → Act
         """
-        # ── 1. Check goal thread completion ──────────────────────────────
+        # ── Goal completion (thread join check) ──────────────────────────
         if self._goal_done_event.is_set() and not self._is_goal_running():
             self._goal_done_event.clear()
             logger.info(f'✅ {self.character_name} goal thread completed')
-            # Return to idle state so UI shows step/run buttons, not interrupt
             self.execution_paused = True
             self.execution_mode = 'step'
-            # Scheduler notification handled by _set_scheduled_goal_result in worker
             self._publish_execution_state()
-            # Drain sensor queues in priority order
-            self._drain_sensor_queues()
 
-        # ── 1b. Advance task milestone loop if idle ───────────────────────
+        # ── Task WIP advancement (separate loop) ─────────────────────────
         if self.active_task_wip and not self.active_task_wip_waiting and not self._is_goal_running():
             self._advance_task_wip()
 
-        # ── 2. Process text_input_queue ──────────────────────────────────
-        if self.text_input_queue:
-            # Peek at first item to classify it
-            sense_data = self.text_input_queue[0]
-            content = sense_data.get('content', '')
-            try:
-                content_data = json.loads(content)
-                text = content_data.get('text', '')
-                source = content_data.get('source', 'unknown')
-            except (json.JSONDecodeError, TypeError):
-                text = content
-                source = 'console'
+        # ── Skip event processing while goal is running ──────────────────
+        if self._is_goal_running():
+            return
 
-            # 2a. Ask-reply: push response to blocking queue so planner thread unblocks
-            if self.awaiting_ask_response:
-                if source == 'User':
-                    self.text_input_queue.pop(0)
-                    logger.info(f'🚀 User reply to ask received, pushing to _ask_response_queue')
-                    self._character_eval_run(
-                        "user_text",
-                        text,
-                        "user",
-                        event_summary="Ask_reply",
-                        is_goal_command=False,
-                        is_proceed_like=False,
-                    )
-                    self._ask_response_queue.put(text)
-                    # awaiting_ask_response is cleared by _execute_ask when it unblocks
-                return  # While awaiting ask, ignore non-User input
+        # ── OODA pipeline ────────────────────────────────────────────────
+        event = self._ooda_observe()
+        if event is None:
+            self._ooda_idle_tick()
+            return
+        self._ooda_living_state.update_after_observe(event)
+        oriented = self._ooda_orient(event)
+        self._ooda_living_state.update_after_orient(oriented, self._character_concern_activations)
+        action = self._ooda_decide(oriented)
+        self._ooda_act(action)
+        self._ooda_living_state.update_after_act(action)
+        self._ooda_living_state.maybe_persist(self._write_named_note)
 
-            # 2b. Goal commands and explicit goals — dispatch to goal thread
-            clean = text.strip().strip('"').strip("'")
-            is_goal = _is_goal_cmd(text)
-            is_proceed = clean.lower().startswith('proceed') or clean.lower() == 'next step'
-            is_reuse = clean.lower().startswith('reuse')
-            is_terminate = clean.lower().startswith('terminate')
-            is_clear_cache = clean.lower().startswith('clear-cache')
-            is_unblock = clean.lower().startswith('unblock')
-            is_task_cmd = clean.startswith('task:') or clean.lower() in ('tasks', 'task list', 'list tasks')
-            is_command = is_goal or is_proceed or is_reuse or is_terminate or is_clear_cache or is_unblock or is_task_cmd
-            is_scheduler = source == 'scheduler'
-
-            if is_command or is_scheduler:
-                self.text_input_queue.pop(0)
-                self._process_text_input_item(sense_data)
-                return
-
-            # 2c. Regular user text or agent message → chat-mode response
-            if source == 'User':
-                self.text_input_queue.pop(0)
-                # Clear stale interrupt from prior End/Stop so chat LLM call succeeds
-                self.interrupt_requested = False
-                if self.infospace_executor:
-                    self.infospace_executor.interrupt_requested = False
-                self._handle_chat_response(text, source)
-                self._publish_execution_state()
-                return
-
-            # 2d. Agent-to-agent messages — process through existing pipeline
-            if source not in ('unknown', 'console'):
-                self.text_input_queue.pop(0)
-                self._process_text_input_item(sense_data)
-                return
-
-            # 2e. Unknown source — drop
-            self.text_input_queue.pop(0)
-
-        # ── 3. Run OODA observe (keeps observations fresh) ───────────────
+    def _ooda_idle_tick(self) -> None:
+        """Directed idle behavior: derived concern maintenance and living state persistence."""
         if not self._is_goal_running():
-            self._run_ooda_loop()
-
-    def _process_text_input_item(self, sense_data: dict):
-        """Process a single text input item through the existing dispatch pipeline.
-
-        Wraps the original _process_text_input logic but accepts the item directly
-        instead of popping from queue (caller already popped it).
-        """
-        # Re-inject into queue head so _process_text_input can pop it
-        self.text_input_queue.insert(0, sense_data)
-        self._process_text_input()
+            try:
+                uc = self.user_concern_model.get_concerns(active_only=True)
+                self._derived_concern_model.update_from_idle_tick(
+                    self._ooda_living_state, uc)
+            except Exception as e:
+                logger.debug(f"Idle tick derived concern update skipped: {e}")
+        self._ooda_living_state.maybe_persist(self._write_named_note)
 
     def _announce_character(self):
         """Announce character presence to the action display node."""
@@ -2462,6 +2454,18 @@ class ZenohExecutiveNode:
             )
         except Exception as e:
             logger.warning(f'Error updating concern model from goal {goal_id}: {e}')
+        # Update derived concern model from goal completion
+        try:
+            self._derived_concern_model.update_from_goal_completion(
+                goal_statement=full_goal_text,
+                outcome_summary=outcome,
+                goal_id=goal_id,
+                success=bool(success),
+                user_concerns=self.user_concern_model.get_concerns(),
+                living_state=self._ooda_living_state,
+            )
+        except Exception as e:
+            logger.warning(f'Error updating derived concerns from goal {goal_id}: {e}')
         if self._active_scheduled_goal_id == goal_id:
             self._active_scheduled_goal_id = None
         if hasattr(self, "goal_scheduler"):
@@ -3049,7 +3053,7 @@ class ZenohExecutiveNode:
             return
         keep_ids = set(keep_ids or ())
         _PRESERVED_COLLECTIONS = {"conversation", "conversation_history", "_tasks", "_scheduled_goals"}
-        _PRESERVED_NOTES = {"_situation", "_situation_prev", "_user_concerns"}
+        _PRESERVED_NOTES = {"_situation", "_situation_prev", "_user_concerns", "_ooda_state", "_derived_concerns"}
         _PRESERVED_NOTE_PREFIXES = ("_task_", "_scheduled_goal_")
         deleted = 0
         for resource_id in created_ids:
@@ -3563,12 +3567,12 @@ class ZenohExecutiveNode:
 
     # ── Chat-mode response (lightweight, no planning pipeline) ────────────
 
-    def _handle_chat_response(self, text: str, source: str = 'User'):
+    def _handle_chat_response(self, text: str, source: str = 'User', assessment: Optional[Dict[str, Any]] = None):
         """Respond to user via direct LLM call, bypassing the planning pipeline.
 
         Used when no goal: prefix is present.  Read-only — no resource mutations.
+        Assessment is provided by the Orient stage of the OODA pipeline.
         """
-        assessment = self._character_eval_run("user_text", text, source, is_goal_command=False, is_proceed_like=False)
         # Record the incoming turn so envision sees full history
         self.conversation_store.record_incoming(source, text)
 
@@ -3661,6 +3665,15 @@ class ZenohExecutiveNode:
         self.execution_mode = 'run'
         self._publish_execution_state()
 
+        # Stash OODA snapshots on executor for planner/reflective-note consumption
+        try:
+            self.infospace_executor._ooda_living_state = self._ooda_living_state
+            dc = getattr(self, '_derived_concern_model', None)
+            self.infospace_executor._derived_concerns_snapshot = dc.get_concerns() if dc else []
+            self.infospace_executor._user_concerns_snapshot = self.user_concern_model.get_concerns() or []
+        except Exception:
+            pass
+
         def _worker():
             try:
                 result = fn(*args, **kwargs)
@@ -3678,47 +3691,6 @@ class ZenohExecutiveNode:
     def _is_goal_running(self) -> bool:
         """True if a goal is currently executing on the worker thread."""
         return self._goal_thread is not None and self._goal_thread.is_alive()
-
-    def _drain_sensor_queues(self):
-        """Drain sensor priority queues after a goal completes.
-
-        Order: alerts → triggers → informs.
-        """
-        # Alerts: generate chat-style acknowledgement (no conversation recording)
-        while self._sensor_alert_queue:
-            alert = self._sensor_alert_queue.pop(0)
-            sensor_name = alert.get('sensor_name', 'unknown')
-            summary = alert.get('content', '')
-            data = alert.get('data', [])
-            logger.info(f'🚨 {self.character_name} processing alert from {sensor_name}: {summary[:80]}')
-            # Build alert text with structured data if available
-            alert_text = f"[ALERT from sensor {sensor_name}]: {summary}"
-            if data:
-                for item in data:
-                    title = item.get('title', '')
-                    url = item.get('url', '')
-                    label = f"{title} — {url}" if title else url
-                    alert_text += f"\n  - {label}"
-            # Respond to alert without recording conversation turns
-            self._handle_sensor_alert_response(alert_text, sensor_name)
-
-        # Triggers: dispatch the first eligible as next goal
-        if self._sensor_trigger_queue:
-            trigger = self._sensor_trigger_queue.pop(0)
-            goal_name = trigger.get('goal_name', '')
-            logger.info(f'⚡ {self.character_name} dispatching triggered goal: {goal_name}')
-            # Find the scheduled goal matching trigger target
-            for goal in self._all_scheduled_goals():
-                if goal.get('name') == goal_name or goal.get('goal_text', '').strip() == goal_name:
-                    goal_id = goal.get('goal_id')
-                    if goal_id:
-                        self._handle_goal_proceed(goal_id=goal_id, source='sensor_trigger')
-                        break
-            else:
-                logger.warning(f'Triggered goal "{goal_name}" not found in scheduled goals')
-            # Remaining triggers stay queued for next drain cycle
-
-        # Informs: retained as rolling context in _build_agent_state_block (not drained)
 
     def _delete_resource_and_unbind(self, resource_id: str):
         """Delete a resource and clear any binding variables targeting it."""
@@ -3981,8 +3953,8 @@ class ZenohExecutiveNode:
             logger.warning(f'Failed to create character note: {result.get("reason", "unknown")}')
             return False
 
-    def _process_text_input(self):
-        """Process one queued text input."""
+    def _DEAD_process_text_input_original(self):
+        """DEAD CODE — replaced by OODA pipeline. Retained for reference during verification."""
         sense_data = self.text_input_queue.pop(0)
         content = sense_data['content']
         close_flag = False
@@ -4267,29 +4239,462 @@ class ZenohExecutiveNode:
         # Fallback: generic framing
         return {'turn_intent': f'{source} is communicating', 'my_move': f'Engage with {source} — contribute your own perspective'}
 
-    def _run_ooda_loop(self):
-        """Execute the OODA loop: Observe, Orient, Decide, Act."""
-        try:
-            # Clear plan generation flag from previous turn
-            plan_was_just_generated = self.plan_just_generated
-            self.plan_just_generated = False
-            
-            # Request fresh situation update for UI
-            time.sleep(0.1)
-            # Observe: Collect current situation and sense data
-            observations = self._observe()
-            # Manual characters skip orient/plan entirely
+    # ── OODA pipeline ───────────────────────────────────────────────────
+
+    def _ooda_observe(self) -> Optional[EventPacket]:
+        """OBSERVE: Dequeue one event, classify it, return EventPacket or None."""
+
+        # --- Helper: parse sense_data JSON into (text, source, close_flag) ---
+        def _parse_sense(sense_data: dict) -> Tuple[str, str, bool]:
+            content = sense_data.get('content', '')
+            try:
+                d = json.loads(content)
+                return d.get('text', ''), d.get('source', 'unknown'), d.get('close', False)
+            except (json.JSONDecodeError, TypeError):
+                return content, 'console', False
+
+        # Priority 1: sensor alerts
+        if self._sensor_alert_queue:
+            entry = self._sensor_alert_queue.pop(0)
+            return EventPacket(
+                event_type='sensor_event', classification='alert',
+                content=entry.get('content', ''), source=f"sensor:{entry.get('sensor_name', 'unknown')}",
+                raw_sense_data=entry,
+            )
+
+        # Priority 2: sensor triggers (reaction path)
+        if self._sensor_trigger_queue:
+            entry = self._sensor_trigger_queue.pop(0)
+            return EventPacket(
+                event_type='sensor_event', classification='trigger',
+                content=entry.get('content', ''), source=f"sensor:{entry.get('sensor_name', 'unknown')}",
+                raw_sense_data=entry, goal_name=entry.get('goal_name'),
+                is_reaction=True,
+            )
+
+        # Priority 3: text input queue
+        if not self.text_input_queue:
+            return None
+
+        sense_data = self.text_input_queue[0]
+        text, source, close_flag = _parse_sense(sense_data)
+        if not text or not text.strip():
+            self.text_input_queue.pop(0)
+            return None
+
+        clean = text.strip().strip('"').strip("'")
+        low = clean.lower()
+
+        # Ask-reply intercept
+        if self.awaiting_ask_response:
+            if source == 'User':
+                self.text_input_queue.pop(0)
+                return EventPacket(
+                    event_type='user_text', classification='ask_reply',
+                    content=text, source=source, raw_sense_data=sense_data,
+                )
+            return None  # ignore non-User while awaiting ask
+
+        self.text_input_queue.pop(0)
+
+        # Classify the event
+        is_scheduler = source == 'scheduler'
+        is_goal = _is_goal_cmd(text)
+        is_proceed = low.startswith('proceed') or low == 'next step'
+        is_reuse = low.startswith('reuse')
+        is_terminate = low.startswith('terminate')
+        is_clear_cache = low.startswith('clear-cache')
+        is_unblock = low.startswith('unblock')
+        is_task_cmd = clean.startswith('task:') or low in ('tasks', 'task list', 'list tasks')
+        is_json_action = source == 'User' and clean.startswith('{')
+        is_agent = source not in ('unknown', 'console', 'User', 'scheduler')
+        end_phrases = ('goodbye', 'bye', 'end conversation', "we're done", "that's all", 'done talking')
+
+        # Extract goal_id for commands that target one
+        goal_id = None
+        parts = clean.split()
+        if len(parts) > 1 and parts[1].startswith('goal_'):
+            goal_id = parts[1]
+
+        if is_scheduler:
+            classification = 'scheduler_cmd'
+            event_type = 'goal_initiation'
+        elif is_goal:
+            classification = 'goal'
+            event_type = 'goal_initiation'
+        elif is_proceed:
+            classification = 'proceed'
+            event_type = 'goal_initiation'
+        elif is_reuse:
+            classification = 'reuse'
+            event_type = 'goal_initiation'
+        elif is_terminate:
+            classification = 'terminate'
+            event_type = 'goal_initiation'
+        elif is_clear_cache:
+            classification = 'clear_cache'
+            event_type = 'goal_initiation'
+        elif is_unblock:
+            classification = 'unblock'
+            event_type = 'goal_initiation'
+        elif is_task_cmd:
+            classification = 'task_cmd'
+            event_type = 'goal_initiation'
+        elif is_json_action:
+            classification = 'direct_action'
+            event_type = 'goal_initiation'
+        elif is_agent:
+            classification = 'agent_message'
+            event_type = 'user_text'
+        elif source == 'User' and low in end_phrases:
+            classification = 'end_conversation'
+            event_type = 'user_text'
+        elif source == 'User':
+            classification = 'chat'
+            event_type = 'user_text'
+        else:
+            # Unknown source — drop
+            return None
+
+        return EventPacket(
+            event_type=event_type, classification=classification,
+            content=text, source=source, raw_sense_data=sense_data,
+            goal_id=goal_id, goal_name=None, close_flag=close_flag,
+        )
+
+    def _ooda_orient(self, event: EventPacket) -> OrientedEvent:
+        """ORIENT: Evaluate event significance via character evaluator. Single eval site."""
+        assessment = None
+        if self._character_eval_enabled():
+            try:
+                content = event.content
+                source = event.source
+                sensor_name = ''
+                disposition = ''
+                if event.event_type == 'sensor_event':
+                    sensor_name = event.raw_sense_data.get('sensor_name', '')
+                    disposition = event.raw_sense_data.get('disposition', '')
+
+                nsrc = self._character_eval_normalize_source(source, sensor_name)
+                afford = None
+                if self.available_tools:
+                    aff = character_evaluator.filter_relevant_affordances(content, list(self.available_tools.keys()))
+                    afford = aff or None
+
+                uc: List[Dict[str, Any]] = []
+                try:
+                    uc = self.user_concern_model.get_concerns(active_only=False) or []
+                except Exception:
+                    pass
+
+                is_goal_command = event.classification in ('goal', 'proceed', 'reuse', 'terminate',
+                    'clear_cache', 'unblock', 'task_cmd', 'direct_action', 'scheduler_cmd')
+                is_proceed_like = event.classification in ('proceed', 'reuse') or (
+                    event.classification == 'scheduler_cmd' and ('proceed' in event.content.lower() or 'reuse' in event.content.lower())
+                ) or (event.classification == 'trigger')
+
+                ev = character_evaluator.build_event_dict(
+                    event.event_type, content, nsrc,
+                    disposition=disposition, sensor_name=sensor_name,
+                    is_goal_command=is_goal_command, is_proceed_like=is_proceed_like,
+                )
+                target_goal_id = event.goal_id if is_proceed_like else None
+                # Combine fixed character concerns with agent-derived concerns
+                all_concerns = list(character_evaluator.DEFAULT_CHARACTER_CONCERNS)
+                try:
+                    all_concerns += self._derived_concern_model.get_concerns_for_evaluator()
+                except Exception:
+                    pass
+                assessment = character_evaluator.evaluate(
+                    ev, all_concerns, uc,
+                    self._character_eval_build_goals_compact(),
+                    self._character_eval_build_recent_context(),
+                    self._character_eval_build_activity_state(),
+                    afford,
+                    llm_generate=self.llm_generate,
+                    target_goal_id=target_goal_id,
+                )
+                character_evaluator.log_assessment(assessment)
+            except Exception as e:
+                logger.warning(f"Orient: character evaluation skipped: {e}")
+
+        self._last_character_eval = assessment
+
+        # Update character concern activations (exponential decay)
+        if assessment:
+            self._update_character_concern_activations(assessment)
+
+        return OrientedEvent(event=event, assessment=assessment)
+
+    def _update_character_concern_activations(self, assessment: Dict[str, Any]):
+        """Update running character concern activation levels from assessment."""
+        DECAY = 0.9
+        BUMP = {'strong': 0.3, 'moderate': 0.15, 'weak': 0.05, 'none': 0.0}
+        notes = assessment.get('notes', '')
+        if 'concerns:' not in notes:
+            # Decay all activations
+            for cid in self._character_concern_activations:
+                self._character_concern_activations[cid] *= DECAY
+            return
+        # Parse "concerns: homeostasis=strong, attend_to_user=moderate"
+        for segment in notes.split(';'):
+            segment = segment.strip()
+            if segment.startswith('concerns:'):
+                pairs = segment[len('concerns:'):].strip()
+                for pair in pairs.split(','):
+                    pair = pair.strip()
+                    if '=' in pair:
+                        cid, level = pair.rsplit('=', 1)
+                        cid = cid.strip()
+                        level = level.strip()
+                        old = self._character_concern_activations.get(cid, 0.0)
+                        self._character_concern_activations[cid] = old * DECAY + BUMP.get(level, 0.0)
+                break
+
+    def _ooda_decide(self, oriented: OrientedEvent) -> Action:
+        """DECIDE: Pure routing — map classification to Action. No LLM calls."""
+        evt = oriented.event
+        a = oriented.assessment
+
+        if evt.classification == 'ask_reply':
+            return Action('ask_reply', {'text': evt.content}, a)
+
+        if evt.classification == 'trigger':
+            goal_id = self._find_goal_id_by_name(evt.goal_name)
+            if goal_id:
+                return Action('proceed_goal', {'goal_id': goal_id, 'source': 'sensor_trigger'}, a)
+            logger.warning(f"Decide: triggered goal '{evt.goal_name}' not found")
+            return Action('no_action', {}, a)
+
+        if evt.classification == 'alert':
+            alert_text, sensor_name = self._format_alert_text(evt.raw_sense_data)
+            return Action('alert_response', {'alert_text': alert_text, 'sensor_name': sensor_name}, a)
+
+        if evt.classification == 'goal':
+            goal_text = evt.content.strip().strip('"').strip("'")
+            if goal_text.lower().startswith('goal:'):
+                goal_text = goal_text[5:].strip()
+            return Action('dispatch_goal', {'goal_text': goal_text}, a)
+
+        if evt.classification == 'proceed':
+            return Action('proceed_goal', {'goal_id': evt.goal_id, 'source': evt.source}, a)
+
+        if evt.classification == 'reuse':
+            return Action('reuse_goal', {'goal_id': evt.goal_id}, a)
+
+        if evt.classification == 'terminate':
+            return Action('terminate_goal', {'goal_id': evt.goal_id}, a)
+
+        if evt.classification == 'clear_cache':
+            return Action('clear_cache', {'goal_id': evt.goal_id}, a)
+
+        if evt.classification == 'scheduler_cmd':
+            cmd = evt.content.strip().lower()
+            if cmd.startswith('proceed'):
+                return Action('proceed_goal', {'goal_id': evt.goal_id, 'source': 'scheduler'}, a)
+            elif cmd.startswith('reuse'):
+                return Action('reuse_goal', {'goal_id': evt.goal_id}, a)
+            return Action('no_action', {}, a)
+
+        if evt.classification == 'task_cmd':
+            return Action('task_command', {'text': evt.content}, a)
+
+        if evt.classification == 'direct_action':
+            return Action('direct_action', {'json_text': evt.content.strip()}, a)
+
+        if evt.classification == 'chat':
+            return Action('chat_response', {'text': evt.content, 'source': evt.source}, a)
+
+        if evt.classification == 'agent_message':
+            return Action('agent_message', {'text': evt.content, 'source': evt.source,
+                          'close_flag': evt.close_flag}, a)
+
+        if evt.classification == 'end_conversation':
+            self.conversation_store.close_dialog("User")
+            logger.info(f'📥 {self.character_name} User ended conversation')
+            return Action('no_action', {}, a)
+
+        if evt.classification == 'unblock':
+            # Unblock is a no-op signal (interrupt already handled by sense_data_callback)
+            return Action('no_action', {}, a)
+
+        return Action('no_action', {}, a)
+
+    def _find_goal_id_by_name(self, goal_name: str) -> Optional[str]:
+        """Find a scheduled goal ID by name or goal_text."""
+        if not goal_name:
+            return None
+        for goal in self._all_scheduled_goals():
+            if goal.get('name') == goal_name or goal.get('goal_text', '').strip() == goal_name:
+                return goal.get('goal_id')
+        return None
+
+    def _format_alert_text(self, entry: dict) -> Tuple[str, str]:
+        """Format a sensor alert entry into (alert_text, sensor_name)."""
+        sensor_name = entry.get('sensor_name', 'unknown')
+        summary = entry.get('content', '')
+        data = entry.get('data', [])
+        alert_text = f"[ALERT from sensor {sensor_name}]: {summary}"
+        if data:
+            for item in data:
+                title = item.get('title', '')
+                url = item.get('url', '')
+                label = f"{title} — {url}" if title else url
+                alert_text += f"\n  - {label}"
+        return alert_text, sensor_name
+
+    def _ooda_act(self, action: Action):
+        """ACT: Execute the chosen action. Single dispatch point."""
+        t = action.type
+        p = action.payload
+
+        if t == 'no_action':
             return
 
-        except Exception as e:
-            logger.error(f'Error in OODA loop: {e}')
-            logger.error(traceback.format_exc())
-        finally:
-            # In step mode, pause after plan execution (skip if already paused)
-            if self.execution_mode == 'step' and not self.execution_paused:
-                self.execution_paused = True
-                self._publish_execution_state()
+        if t == 'ask_reply':
+            self._ask_response_queue.put(p['text'])
+            return
 
+        if t == 'alert_response':
+            self._handle_sensor_alert_response(p['alert_text'], p['sensor_name'])
+            return
+
+        if t == 'dispatch_goal':
+            self.conversation_store.close_dialog("User")
+            scheduled_goal = self._upsert_scheduled_goal(p['goal_text'])
+            goal_id = scheduled_goal["goal_id"]
+            if self._is_goal_running():
+                self._say_to_user("A goal is already running. Please wait for it to complete.")
+                return
+            self._active_scheduled_goal_id = goal_id
+            self._update_scheduled_goal(goal_id, is_running=True, status="running")
+            if action.assessment:
+                self._update_scheduled_goal(goal_id, initial_assessment=action.assessment)
+            pre = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
+            goal_text = p['goal_text']
+            def _run():
+                result = self.parse_and_set_goal("", goal_text) or {}
+                self._set_scheduled_goal_result(goal_id, result, used_cache=False, pre_resource_ids=pre)
+                return result
+            self._run_goal_on_thread(_run)
+            return
+
+        if t == 'proceed_goal':
+            if not p.get('goal_id'):
+                self._say_to_user("Please specify which goal to proceed, e.g. 'proceed goal_1'.")
+                return
+            self._handle_goal_proceed(goal_id=p['goal_id'], source=p.get('source', 'user'))
+            return
+
+        if t == 'reuse_goal':
+            if not p.get('goal_id'):
+                self._say_to_user("Please specify which goal to reuse, e.g. 'reuse goal_1'.")
+                return
+            self._handle_goal_reuse(goal_id=p['goal_id'])
+            return
+
+        if t == 'terminate_goal':
+            if not p.get('goal_id'):
+                self._say_to_user("Please specify which goal to terminate, e.g. 'terminate goal_1'.")
+                return
+            self._handle_goal_terminate(goal_id=p['goal_id'])
+            return
+
+        if t == 'clear_cache':
+            if p.get('goal_id'):
+                self._handle_goal_cache_clear(goal_id=p['goal_id'])
+            else:
+                self._say_to_user("Please specify which goal cache to clear, e.g. 'clear-cache goal_1'.")
+            return
+
+        if t == 'task_command':
+            task_text = p['text']
+            if task_text.lower().startswith('task:'):
+                task_text = task_text[5:].strip()
+            if not task_text or task_text.lower() in ('tasks', 'task list', 'list tasks'):
+                # List tasks — not a creation command
+                self._say_to_user("Task listing not yet implemented via text input.")
+                return
+            if self.active_task_wip:
+                self._say_to_user("A task is already being established. Please wait for it to complete.")
+                return
+            if self._is_goal_running():
+                self._say_to_user("A goal is currently running. Please wait for it to complete.")
+                return
+            self.conversation_store.close_dialog("User")
+            self._begin_task_establishment(task_text)
+            return
+
+        if t == 'direct_action':
+            try:
+                action_dict = json.loads(p['json_text'])
+                if isinstance(action_dict, dict) and 'type' in action_dict:
+                    result = self.infospace_executor.execute_action(action_dict)
+                    self._publish_action_result(action_dict, result, action_dict.get('type'), datetime.now())
+            except json.JSONDecodeError:
+                pass
+            except Exception as e:
+                logger.error(f'Direct action execution failed: {e}')
+            return
+
+        if t == 'chat_response':
+            # Clear stale interrupt from prior End/Stop
+            self.interrupt_requested = False
+            if self.infospace_executor:
+                self.infospace_executor.interrupt_requested = False
+            self._create_character_note()
+            self._handle_chat_response(p['text'], p['source'], assessment=action.assessment)
+            self._publish_execution_state()
+            return
+
+        if t == 'agent_message':
+            self._create_character_note()
+            self._handle_agent_message(p['text'], p['source'], p.get('close_flag', False), action.assessment)
+            return
+
+        logger.warning(f"Act: unhandled action type '{t}'")
+
+    def _handle_agent_message(self, text: str, source: str, close_flag: bool, assessment: Optional[Dict[str, Any]]):
+        """Handle agent-to-agent message: record, dedup, envision, create dialog goal."""
+        clean_input = text.strip().strip('"').strip("'")
+
+        # Record incoming message
+        self.conversation_store.record_incoming(source, clean_input, close=close_flag)
+
+        # Dedup
+        if self._last_agent_message.get(source) == clean_input:
+            logger.info(f'📥 {self.character_name} Skipping duplicate message from {source}')
+            return
+        self._last_agent_message[source] = clean_input
+
+        # Close flag: other agent ended conversation
+        if close_flag:
+            logger.info(f'📥 {self.character_name} Dialog closed by {source} (close flag)')
+            self.conversation_store.close_dialog(source)
+            self._dialog_cooldowns[source] = time.time()
+            self._dialog_purposes.pop(source, None)
+            return
+
+        # Cooldown check
+        cooldown_until = self._dialog_cooldowns.get(source, 0)
+        if time.time() - cooldown_until < 10:
+            logger.info(f'📥 {self.character_name} Suppressing re-open from {source} (cooldown)')
+            return
+
+        # Envision and create dialog goal
+        purpose = self._dialog_purposes.get(source, '')
+        envision = self._envision_conversation_turn(source, clean_input, purpose)
+        goal_text = f"Continue dialog with {source}"
+        context = (
+            f"\n## CONTEXT ##\n"
+            f"Their move: {envision['turn_intent']}\n"
+            f"Your move: {envision['my_move']}\n"
+            f"Message from {source}: {clean_input[:500]}"
+        )
+        logger.info(f'📥 {self.character_name} Processing agent message from {source}')
+        self.execution_paused = False
+        self._publish_execution_state()
+        self.parse_and_set_goal("", f"{goal_text}{context}")
 
     def format_situation(self):
         """Format the situation data for the LLM (infospace only - no spatial data)."""
@@ -4425,6 +4830,7 @@ class ZenohExecutiveNode:
                 out.append({
                     "goal_id": g.get("goal_id"),
                     "goal_label": g.get("name") or (g.get("goal_text") or "")[:120],
+                    "goal_text": g.get("goal_text") or "",
                     "goal_status": g.get("status"),
                     "goal_summary": (g.get("last_result") or "")[:200],
                 })
@@ -4454,76 +4860,8 @@ class ZenohExecutiveNode:
         except Exception:
             return ""
 
-    def _character_eval_flags_from_process_input(self, source: str, clean_input: str) -> Tuple[str, bool, bool]:
-        c = clean_input.strip()
-        low = c.lower()
-        is_scheduler = source == "scheduler"
-        is_proceed = low.startswith("proceed") or low == "next step"
-        is_reuse = low.startswith("reuse")
-        is_terminate = low.startswith("terminate")
-        is_clear_cache = low.startswith("clear-cache")
-        is_unblock = low.startswith("unblock")
-        is_task_cmd = c.startswith("task:") or low in ("tasks", "task list", "list tasks")
-        is_goal = _is_goal_cmd(c)
-        json_action = source == "User" and c.startswith("{")
-        is_goal_command = bool(
-            is_scheduler or is_goal or is_task_cmd or is_reuse or is_terminate or is_clear_cache or is_unblock or json_action
-        )
-        is_proceed_like = bool(
-            is_proceed or is_reuse or (is_scheduler and (low.startswith("proceed") or low.startswith("reuse")))
-        )
-        agent_like = source not in ("unknown", "console", "User", "scheduler")
-        event_type = "user_text" if agent_like else "goal_initiation"
-        return event_type, is_goal_command, is_proceed_like
-
-    def _character_eval_run(
-        self,
-        event_type: str,
-        content: str,
-        source: str,
-        *,
-        event_summary: Optional[str] = None,
-        disposition: str = "",
-        sensor_name: str = "",
-        is_goal_command: bool = False,
-        is_proceed_like: bool = False,
-    ) -> Optional[Dict[str, Any]]:
-        if not self._character_eval_enabled():
-            return None
-        try:
-            nsrc = self._character_eval_normalize_source(source, sensor_name)
-            afford: Optional[List[str]] = None
-            if self.available_tools:
-                aff = character_evaluator.filter_relevant_affordances(content, list(self.available_tools.keys()))
-                afford = aff or None
-            uc: List[Dict[str, Any]] = []
-            try:
-                uc = self.user_concern_model.get_concerns(active_only=False) or []
-            except Exception:
-                pass
-            goals = self._character_eval_build_goals_compact()
-            recent = self._character_eval_build_recent_context()
-            activity = self._character_eval_build_activity_state()
-            ev = character_evaluator.build_event_dict(
-                event_type,
-                content,
-                nsrc,
-                event_summary=event_summary,
-                disposition=disposition,
-                sensor_name=sensor_name,
-                is_goal_command=is_goal_command,
-                is_proceed_like=is_proceed_like,
-            )
-            assessment = character_evaluator.evaluate(
-                ev, character_evaluator.DEFAULT_CHARACTER_CONCERNS, uc, goals, recent, activity, afford,
-                llm_generate=self.llm_generate,
-            )
-            character_evaluator.log_assessment(assessment)
-            self._last_character_eval = assessment
-            return assessment
-        except Exception as e:
-            logger.warning(f"Character orientation evaluator skipped: {e}")
-            return None
+    # _character_eval_flags_from_process_input DELETED — merged into _ooda_observe
+    # _character_eval_run DELETED — inlined into _ooda_orient
 
     def _update_system_prompt(self):
         """Update the system prompt with the current situation."""
@@ -4544,8 +4882,8 @@ class ZenohExecutiveNode:
 
         return system_prompt
 
-    def _observe(self):
-        """Observe: Collect current situation and sense data (infospace only)."""
+    def _refresh_observations(self):
+        """Refresh cached observations (system prompt + situation context). Used by _plan()."""
         try:
             # Use _update_system_prompt() to get fresh system prompt (includes ScienceWorld-populated setting)
             system_prompt = self._update_system_prompt()
@@ -4570,27 +4908,6 @@ class ZenohExecutiveNode:
             user_prompt = self.format_situation()
             self.observations = {'static': system_prompt, 'dynamic': user_prompt}
             return self.observations
-
-    def _orient(self):
-        """Orient: Assess current state and drives"""
-
-        prompt = f"""
-        You are a strict goal generator.
-        Given what you know about the world, your situation and your character, assess your current needs and pressing priorities.
-        Given these, generate 2-3 goal statements that you might work on next.
-        Finally, prioritize the goals by their importance, urgency, and feasibility, and return the highest priority goal.
-        Your response should be a single goal statement, with clear desired outcome and a clear termination condition, followed by </end>.
-        Respond with no other text, no markdown, no code fences, no reasoning, no explanation, no commentary.
-        """
-        response = self.llm_generate(
-                messages=[prompt],
-                max_tokens=200,
-                temperature=0.3,
-                stops=['</end>'],
-                )
-        self.current_goal = Goal(response.text.strip(), [self.character_name], description='', termination='')
-        return self.current_goal
-
 
     def _plan(self, template, goal: Goal):
         """Plan: Return existing plan or create single-action plan from goal."""
@@ -4664,6 +4981,17 @@ class ZenohExecutiveNode:
             except Exception:
                 pass
 
+            # Compute output size guidance from evaluator assessment + concerns
+            output_guidance = None
+            try:
+                output_guidance = compute_output_guidance(
+                    self._last_character_eval,
+                    active_concerns,
+                    goal_text,
+                )
+            except Exception:
+                pass
+
             # Build context for planner (always needed for infospace)
             context = {
                 'variables': self.infospace_executor.plan_bindings_flat if self.infospace_executor else {},
@@ -4672,6 +5000,7 @@ class ZenohExecutiveNode:
                 'recent_context': recent_context,
                 'executor': self.infospace_executor,  # Pass executor for incremental planner
                 'vision_goal': goal_text,
+                'output_guidance': output_guidance,
             }
             
             # Initialize plan identifiers before plan generation (needed for incremental planner action tracking)
@@ -4736,17 +5065,7 @@ class ZenohExecutiveNode:
 
                 sensor_entry = {'sensor_name': sensor_name, 'content': sensor_content, 'data': sensor_data, 'disposition': disposition}
 
-                self._character_eval_run(
-                    "sensor_event",
-                    sensor_content,
-                    source if source.startswith("sensor:") else f"sensor:{sensor_name}",
-                    event_summary=(sensor_content[:200] if sensor_content else "") or str(len(sensor_data)) + " data items",
-                    disposition=disposition,
-                    sensor_name=sensor_name,
-                    is_goal_command=False,
-                    is_proceed_like=disposition.startswith("trigger:"),
-                )
-
+                # Character evaluation happens in _ooda_orient when event is dequeued
                 if disposition == 'alert':
                     self._sensor_alert_queue.append(sensor_entry)
                     logger.info(f'🚨 {self.character_name} sensor ALERT queued from {sensor_name}: {sensor_content[:80]}')
@@ -4981,7 +5300,7 @@ class ZenohExecutiveNode:
                 return
             
             PRESERVED_COLLECTIONS = {'conversation', 'conversation_history', '_tasks', '_scheduled_goals'}
-            PRESERVED_NOTES = {'_situation', '_situation_prev', '_user_concerns'}
+            PRESERVED_NOTES = {'_situation', '_situation_prev', '_user_concerns', '_ooda_state', '_derived_concerns'}
             PRESERVED_NOTE_PREFIXES = ('_task_', '_scheduled_goal_')
             
             deleted_notes = 0
@@ -5041,7 +5360,7 @@ class ZenohExecutiveNode:
                 return
             
             PRESERVED_COLLECTIONS = {'conversation', 'conversation_history', '_tasks', '_scheduled_goals'}
-            PRESERVED_NOTES = {'_situation', '_situation_prev', '_user_concerns'}
+            PRESERVED_NOTES = {'_situation', '_situation_prev', '_user_concerns', '_ooda_state', '_derived_concerns'}
             PRESERVED_NOTE_PREFIXES = ('_task_', '_scheduled_goal_')
             
             deleted_notes = 0
@@ -5444,7 +5763,7 @@ class ZenohExecutiveNode:
         
         # Collections and Notes to preserve (by name) - should persist across benchmark runs
         PRESERVED_COLLECTIONS = {'conversation', 'conversation_history', '_tasks', '_scheduled_goals'}
-        PRESERVED_NOTES = {'_situation', '_situation_prev', '_user_concerns'}
+        PRESERVED_NOTES = {'_situation', '_situation_prev', '_user_concerns', '_ooda_state', '_derived_concerns'}
         PRESERVED_NOTE_PREFIXES = ('_task_', '_scheduled_goal_')
         
         deleted_notes = 0
@@ -6018,7 +6337,7 @@ class ZenohExecutiveNode:
                 self.infospace_executor._run_init_tool()
 
             if not self.observations:
-                self._observe()
+                self._refresh_observations()
             self.current_goal = Goal(parsed_goal, [self.character_name], description='', termination='')
             
             # If continuous mode is active, update goal text for resubmission

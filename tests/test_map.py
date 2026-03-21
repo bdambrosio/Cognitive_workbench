@@ -615,8 +615,7 @@ def test_map_single_item(session: zenoh.Session, character: str, verbose: bool =
 
 
 def test_map_with_instruction_param(session: zenoh.Session, character: str, verbose: bool = False) -> Dict:
-    """Test map with a primitive that takes instruction parameter (if refine is available)."""
-    # This test may fail if refine isn't available, but that's okay
+    """Test map with a primitive that takes instruction parameter (extract tool)."""
     plan = [
         {
             "type": "create-note",
@@ -637,7 +636,7 @@ def test_map_with_instruction_param(session: zenoh.Session, character: str, verb
             "type": "map",
             "target": "$coll",
             "operation": {
-                "tool": "refine",
+                "tool": "extract",
                 "instruction": "Make it uppercase"
             },
             "out": "$mapped"

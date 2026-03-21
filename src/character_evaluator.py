@@ -311,14 +311,23 @@ def _format_user_concerns_block(user_concerns: Sequence[Dict[str, Any]]) -> str:
     return "\n".join(parts)
 
 
-def _format_goals_block(goals_compact: Sequence[Dict[str, Any]]) -> str:
+def _format_goals_block(goals_compact: Sequence[Dict[str, Any]],
+                        target_goal_id: Optional[str] = None) -> str:
     if not goals_compact:
         return "(no active goals)"
     parts = []
     for g in goals_compact[:12]:
         label = g.get("goal_label") or g.get("name") or "(unlabeled)"
         status = g.get("goal_status", "?")
-        parts.append(f"- [{status}] {label}")
+        gid = g.get("goal_id")
+        if target_goal_id and gid == target_goal_id:
+            goal_text = g.get("goal_text") or ""
+            if goal_text:
+                parts.append(f"- [{status}] {label} [TARGET — full goal text below]\n  {goal_text[:600]}")
+            else:
+                parts.append(f"- [{status}] {label} [TARGET]")
+        else:
+            parts.append(f"- [{status}] {label}")
     return "\n".join(parts)
 
 
@@ -334,6 +343,7 @@ def evaluate(
     relevant_affordances: Optional[List[str]] = None,
     *,
     llm_generate: Optional[Callable] = None,
+    target_goal_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Assess event significance via LLM call, then expand compact keys into
@@ -355,6 +365,7 @@ def evaluate(
             event_type, source, content_str, disposition,
             character_concerns, user_concerns, goals_compact,
             recent_context, activity_state, llm_generate,
+            target_goal_id=target_goal_id,
         )
 
     if llm_result is not None:
@@ -377,12 +388,14 @@ def _llm_evaluate(
     recent_context: str,
     activity_state: str,
     llm_generate: Callable,
+    *,
+    target_goal_id: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Call the LLM and parse the compact JSON response."""
     system_prompt = EVALUATOR_SYSTEM_PROMPT.format(
         concerns_block=_format_concerns_block(character_concerns),
         user_concerns_block=_format_user_concerns_block(user_concerns),
-        goals_block=_format_goals_block(goals_compact),
+        goals_block=_format_goals_block(goals_compact, target_goal_id=target_goal_id),
     )
     user_prompt = EVALUATOR_USER_PROMPT.format(
         event_type=event_type,

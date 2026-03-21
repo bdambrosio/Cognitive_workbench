@@ -13,6 +13,7 @@ No source documents — for generation from source material, use `synthesize` in
 
 - `prompt`: Generation instruction (required)
 - `style`: `"code"` or `"text"` (optional, default: `"text"`)
+- `target_tokens`: Integer (optional). Target output length in tokens. Overrides default max_tokens when provided via OUTPUT GUIDANCE.
 
 ## Output
 

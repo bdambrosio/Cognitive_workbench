@@ -19,6 +19,7 @@ cross-document synthesis.
 
 - `target`: Note (variable, ID, or name) — MUST be a single Note
 - `instruction`: String describing what to extract or how to transform (required)
+- `target_tokens`: Integer (optional). Target output length in tokens. Overrides default max_tokens when provided via OUTPUT GUIDANCE.
 - `out`: Variable name for resulting Note
 
 ## Output

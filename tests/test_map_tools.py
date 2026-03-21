@@ -3,10 +3,10 @@
 Map Tools Test Suite for Cognitive Workbench.
 
 Tests the `map` primitive with tools that take arguments beyond target/out:
-- refine - with instruction parameter
+- extract - with instruction parameter
 - calculate - with variables parameter
 - summarize - with focus/max_length parameters
-- relate - with other parameter (Note reference)
+- synthesize (comparison) - with other parameter (Note reference)
 - search-web - with query parameter (API-based, long timeout)
 - semantic-scholar - with query parameter (API-based, long timeout)
 
@@ -283,8 +283,8 @@ def run_test(
 # TEST CASES
 # ==========================================
 
-def test_map_refine(session: zenoh.Session, character: str, verbose: bool = False) -> Dict[str, Any]:
-    """Test map with refine tool using instruction parameter."""
+def test_map_extract(session: zenoh.Session, character: str, verbose: bool = False) -> Dict[str, Any]:
+    """Test map with extract tool using instruction parameter."""
     plan = [
         {
             "type": "create-note",
@@ -305,14 +305,14 @@ def test_map_refine(session: zenoh.Session, character: str, verbose: bool = Fals
             "type": "map",
             "target": "$coll",
             "operation": {
-                "tool": "refine",
+                "tool": "extract",
                 "instruction": "Convert to uppercase"
             },
             "out": "$mapped"
         }
     ]
     return run_test(
-        session, character, "map refine (instruction: uppercase)",
+        session, character, "map extract (instruction: uppercase)",
         plan,
         expected_size=2,
         validate_content=True,
@@ -397,8 +397,8 @@ def test_map_summarize(session: zenoh.Session, character: str, verbose: bool = F
     )
 
 
-def test_map_relate(session: zenoh.Session, character: str, verbose: bool = False) -> Dict[str, Any]:
-    """Test map with relate tool using other parameter."""
+def test_map_synthesize_comparison(session: zenoh.Session, character: str, verbose: bool = False) -> Dict[str, Any]:
+    """Test map with synthesize comparison using other parameter."""
     plan = [
         {
             "type": "create-note",
@@ -424,14 +424,15 @@ def test_map_relate(session: zenoh.Session, character: str, verbose: bool = Fals
             "type": "map",
             "target": "$coll",
             "operation": {
-                "tool": "relate",
+                "tool": "synthesize",
+                "format": "comparison",
                 "other": "$fixed_note"
             },
             "out": "$mapped"
         }
     ]
     return run_test(
-        session, character, "map relate (other: fixed note)",
+        session, character, "map synthesize comparison (other: fixed note)",
         plan,
         expected_size=2,
         validate_content=True,
@@ -540,10 +541,10 @@ def main():
     
     # Run tests
     tests = [
-        test_map_refine,
+        test_map_extract,
         test_map_calculate,
         test_map_summarize,
-        test_map_relate,
+        test_map_synthesize_comparison,
     ]
     
     if not args.skip_api:

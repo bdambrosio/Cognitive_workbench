@@ -79,8 +79,12 @@ End your response with:
 </end>
 """
         
-        # Calculate max_tokens based on chunk size
-        max_tokens = len(chunk_text) // 2
+        # Calculate max_tokens based on chunk size (or output sizing guidance)
+        guided_tokens = kwargs.get('target_tokens')
+        if guided_tokens and isinstance(guided_tokens, (int, float)) and int(guided_tokens) > 0:
+            max_tokens = int(guided_tokens)
+        else:
+            max_tokens = len(chunk_text) // 2
         
         # Use unified llm_generate callback (required)
         llm_generate = kwargs.get('llm_generate')

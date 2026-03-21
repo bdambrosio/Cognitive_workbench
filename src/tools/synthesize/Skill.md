@@ -37,6 +37,8 @@ combining, comparing, and generating insight from a Collection.
   to input. Only meaningful for narrative/technical/comprehensive formats.
 - `instruction`: Optional free-form instruction for specialized synthesis tasks.
   Overrides format-specific defaults when provided.
+- `target_tokens`: Integer (optional). Target output length in tokens. Overrides
+  computed target length when provided via OUTPUT GUIDANCE.
 - `out`: Variable name for resulting Note
 
 ## Output
