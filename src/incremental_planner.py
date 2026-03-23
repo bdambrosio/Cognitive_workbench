@@ -80,6 +80,62 @@ if not logger.handlers:
         # Fall back to console-only if file handler setup fails
         pass
 
+# ── Self-model data helpers (thin wrappers, fail silently) ────────────────
+
+def _safe_get_scheduler_status(executor: InfospaceExecutor) -> dict:
+    try:
+        en = getattr(executor, 'executive_node', None)
+        if en and hasattr(en, 'goal_scheduler'):
+            return en.goal_scheduler.get_status()
+    except Exception:
+        pass
+    return {}
+
+def _safe_get_all_tasks(executor: InfospaceExecutor) -> list:
+    """Read all task WIP notes (establishing + operational) as parsed dicts."""
+    try:
+        rm = getattr(executor, 'resource_manager', None)
+        if not rm:
+            return []
+        tasks = []
+        for name, note_id in list(rm.named_notes.items()):
+            if not name.startswith('_task_wip_'):
+                continue
+            res = rm.get_resource(note_id)
+            content = getattr(res, 'content', '') if res else ''
+            if content:
+                import json as _json
+                tasks.append(_json.loads(content))
+        return tasks
+    except Exception:
+        return []
+
+def _safe_get_scheduled_goals(executor: InfospaceExecutor) -> list:
+    try:
+        en = getattr(executor, 'executive_node', None)
+        if en and hasattr(en, '_all_scheduled_goals'):
+            return list(en._all_scheduled_goals())
+    except Exception:
+        pass
+    return []
+
+def _safe_get_sensor_configs(executor: InfospaceExecutor) -> list:
+    try:
+        en = getattr(executor, 'executive_node', None)
+        return getattr(en, 'sensor_configs', []) if en else []
+    except Exception:
+        return []
+
+def _safe_get_execution_mode(executor: InfospaceExecutor) -> str:
+    try:
+        en = getattr(executor, 'executive_node', None)
+        if en:
+            return getattr(en, 'execution_mode', 'step')
+    except Exception:
+        pass
+    return 'step'
+
+
 # Setup OpenTelemetry tracing
 try:
     from opentelemetry import trace
@@ -2524,6 +2580,22 @@ ALWAYS follow all formatting instructions exactly.
                         base_state += f"\n\n{snapshot}"
                 except Exception:
                     pass
+                # Append operational self-model section
+                try:
+                    from ooda_snapshot_renderer import render_self_model_section
+                    self_model = render_self_model_section(
+                        scheduler_status=_safe_get_scheduler_status(executor),
+                        tasks=_safe_get_all_tasks(executor),
+                        derived_concerns=_dc,
+                        scheduled_goals=_safe_get_scheduled_goals(executor),
+                        sensor_configs=_safe_get_sensor_configs(executor),
+                        execution_mode=_safe_get_execution_mode(executor),
+                        tool_count=len(getattr(executor, 'available_tools', {})),
+                    )
+                    if self_model:
+                        base_state += f"\n\n{self_model}"
+                except Exception:
+                    pass
                 executor._planner_reflective_state = base_state
             except Exception:
                 executor._planner_reflective_state = ""
@@ -3633,7 +3705,35 @@ ALWAYS follow all formatting instructions exactly.
     # Snapshot planner reasoning state for generate-reflective-note tool
     if executor:
         try:
-            executor._planner_reflective_state = prompt
+            base_state = prompt
+            # Append OODA orientation snapshot
+            try:
+                from ooda_snapshot_renderer import render_reflective_snapshot
+                _ls = getattr(executor, '_ooda_living_state', None)
+                _dc = getattr(executor, '_derived_concerns_snapshot', [])
+                _uc = getattr(executor, '_user_concerns_snapshot', [])
+                snapshot = render_reflective_snapshot(_ls, _dc, _uc)
+                if snapshot:
+                    base_state += f"\n\n{snapshot}"
+            except Exception:
+                pass
+            # Append operational self-model section
+            try:
+                from ooda_snapshot_renderer import render_self_model_section
+                self_model = render_self_model_section(
+                    scheduler_status=_safe_get_scheduler_status(executor),
+                    tasks=_safe_get_all_tasks(executor),
+                    derived_concerns=_dc,
+                    scheduled_goals=_safe_get_scheduled_goals(executor),
+                    sensor_configs=_safe_get_sensor_configs(executor),
+                    execution_mode=_safe_get_execution_mode(executor),
+                    tool_count=len(getattr(executor, 'available_tools', {})),
+                )
+                if self_model:
+                    base_state += f"\n\n{self_model}"
+            except Exception:
+                pass
+            executor._planner_reflective_state = base_state
         except Exception:
             executor._planner_reflective_state = ""
 

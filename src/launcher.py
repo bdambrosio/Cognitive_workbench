@@ -411,6 +411,39 @@ def main():
     except Exception as e:
         logger.warning(f"Could not publish ready signal: {e}")
 
+    # ---- Load sensor metadata (before agent launch so configs are enriched) ----
+    all_sensors = {}
+    try:
+        from utils.sensor_loader import load_sensors, parse_schedule as _parse_schedule
+        src_dir = Path(__file__).parent
+        all_sensors = load_sensors(str(src_dir / 'sensors'))
+    except Exception as e:
+        logger.warning(f"Sensor metadata loading failed (non-fatal): {e}")
+
+    # Enrich each character config with resolved sensor summaries for self-model
+    if all_sensors:
+        for _char_name, _config in characters:
+            sensor_summaries = []
+            for sensor_cfg in _config.get('sensors', []):
+                s_name = sensor_cfg.get('name', '')
+                if s_name not in all_sensors:
+                    continue
+                meta = all_sensors[s_name]
+                effective_disposition = sensor_cfg.get('disposition', meta.get('disposition', 'inform'))
+                schedule_secs = meta.get('schedule_seconds', 300)
+                if 'schedule' in sensor_cfg:
+                    parsed = _parse_schedule(sensor_cfg['schedule'])
+                    if parsed is not None:
+                        schedule_secs = parsed
+                sensor_summaries.append({
+                    'name': s_name,
+                    'type': meta.get('type', 'unknown'),
+                    'disposition': effective_disposition,
+                    'schedule_seconds': schedule_secs,
+                    'description': meta.get('description', ''),
+                })
+            _config['_sensor_configs'] = sensor_summaries
+
     # ---- Launch agent threads ----
     shutdown_event = threading.Event()
     threads: List[threading.Thread] = []
@@ -425,11 +458,7 @@ def main():
     # ---- Launch sensor threads ----
     sensor_threads: List[threading.Thread] = []
     try:
-        from utils.sensor_loader import load_sensors
         from sensor_runner import SensorRunner
-
-        src_dir = Path(__file__).parent
-        all_sensors = load_sensors(str(src_dir / 'sensors'))
 
         if all_sensors:
             for char_name, config in characters:

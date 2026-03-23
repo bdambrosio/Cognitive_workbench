@@ -170,3 +170,133 @@ def render_evaluator_context(
         parts.append(f"fg_goal={fg_id}")
 
     return "; ".join(parts)
+
+
+# ── Self-Model Rendering ──────────────────────────────────────────────────
+
+def render_self_model_section(
+    scheduler_status: Optional[Dict[str, Any]] = None,
+    tasks: Optional[Sequence[Dict[str, Any]]] = None,
+    derived_concerns: Optional[Sequence[Dict[str, Any]]] = None,
+    scheduled_goals: Optional[Sequence[Dict[str, Any]]] = None,
+    sensor_configs: Optional[Sequence[Dict[str, Any]]] = None,
+    execution_mode: str = "step",
+    tool_count: int = 0,
+) -> str:
+    """Render the operational self-model section for planner consumption.
+
+    Target budget: ~550 tokens. Returns markdown string or "" if no data.
+    """
+    parts: List[str] = []
+    tasks = list(tasks or [])
+    derived_concerns = list(derived_concerns or [])
+    sensor_configs = list(sensor_configs or [])
+    scheduled_goals = list(scheduled_goals or [])
+    scheduler_status = scheduler_status or {}
+
+    # ── How I Work (semi-static, ~100 tokens) ─────────────────────────
+    task_count = len(tasks)
+    sensor_count = len(sensor_configs)
+    parts.append(
+        "### How I Work\n"
+        "I operate via a continuous OODA loop. I pursue sustained activities through tasks — "
+        "persistent commitments linked to concerns. Each task accumulates state across executions "
+        "and manages a sequence of goals. Goals are my atomic unit of action (planned and executed "
+        f"step-by-step). I have {tool_count} tools and {sensor_count} sensor(s). "
+        "I can have multiple active tasks but execute only one goal at a time."
+    )
+
+    # ── Current Operational State (~60 tokens) ────────────────────────
+    sched_enabled = scheduler_status.get("enabled", False)
+    sched_interval = scheduler_status.get("interval", 0)
+    sched_executing = scheduler_status.get("executing_goal_id")
+    sched_state = "executing" if sched_executing else "idle"
+    paused = "paused" if execution_mode == "step" else "running"
+
+    operational = [t for t in tasks if t.get("lifecycle") == "operational"]
+    establishing = [t for t in tasks if t.get("lifecycle") != "operational"
+                    and t.get("status") == "in_progress"]
+
+    state_lines = [
+        f"- Scheduler: {'enabled' if sched_enabled else 'disabled'}, {int(sched_interval)}s interval, {sched_state}",
+        f"- Active tasks: {len(operational)} operational, {len(establishing)} establishing",
+        f"- Execution mode: {paused}",
+    ]
+    parts.append("### Current Operational State\n" + "\n".join(state_lines))
+
+    # ── My Commitments (active tasks + concern gaps, ~60 tokens/task) ─
+    commitment_lines: List[str] = []
+    # Build concern→task map for gap detection
+    concern_to_task: Dict[str, str] = {}
+    for t in tasks:
+        cid = t.get("linked_concern_id")
+        if cid:
+            concern_to_task[cid] = t.get("task_wip_id", t.get("task_id", "?"))
+
+    for t in tasks:
+        wip_id = t.get("task_wip_id", t.get("task_id", "?"))
+        intention = t.get("intention", "?")
+        lifecycle = t.get("lifecycle", "establishing")
+        linked = t.get("linked_concern_id", "")
+
+        if lifecycle == "operational":
+            sched = t.get("schedule_mode", "manual")
+            last_exec = t.get("last_executed")
+            exec_count = t.get("execution_count", 0)
+            history = t.get("execution_history", [])
+            last_summary = ""
+            if history:
+                last_entry = history[-1]
+                last_summary = f" → {last_entry.get('outcome', '?')}"
+                s = last_entry.get("summary", "")
+                if s:
+                    last_summary += f": {s[:60]}"
+
+            last_str = f"Last: {last_exec[:16]}{last_summary}" if last_exec else "Never executed"
+            commitment_lines.append(
+                f"- **{wip_id}** [operational{', ' + linked if linked else ''}]\n"
+                f"  Intention: {intention}\n"
+                f"  Schedule: {sched} | {last_str} | {exec_count} runs"
+            )
+        else:
+            phase = t.get("phase", "?")
+            status = t.get("status", "?")
+            milestones = t.get("milestones_completed", [])
+            last_ms = ""
+            if milestones:
+                last_ms = f"\n  Last milestone: {milestones[-1].get('goal_text', '')[:60]} ({milestones[-1].get('status', '?')})"
+            commitment_lines.append(
+                f"- **{wip_id}** [establishing, phase: {phase}, {status}]\n"
+                f"  Intention: {intention}{last_ms}"
+            )
+
+    # Concern gaps: active/surfaced concerns with no task
+    for c in derived_concerns:
+        if c.get("status") not in ("surfaced", "active"):
+            continue
+        cid = c.get("concern_id", "")
+        if cid in concern_to_task:
+            continue
+        label = c.get("concern_label", "?")
+        weight = c.get("weight", 0)
+        commitment_lines.append(
+            f"- {cid} \"{label}\" [active, w={weight}] — NO TASK"
+        )
+
+    if commitment_lines:
+        parts.append("### My Commitments (Active Tasks)\n" + "\n".join(commitment_lines))
+    else:
+        parts.append("### My Commitments (Active Tasks)\nNo active tasks or unserviced concerns.")
+
+    # ── My Sensing (~20 tokens/sensor) ────────────────────────────────
+    if sensor_configs:
+        sensor_lines = []
+        for s in sensor_configs:
+            name = s.get("name", "?")
+            stype = s.get("type", "?")
+            disp = s.get("disposition", "?")
+            sched_s = s.get("schedule_seconds", 0)
+            sensor_lines.append(f"- {name}: {stype}-type, disposition={disp}, every {int(sched_s)}s")
+        parts.append("### Active Sensors\n" + "\n".join(sensor_lines))
+
+    return "## Operational Self-Model\n\n" + "\n\n".join(parts)

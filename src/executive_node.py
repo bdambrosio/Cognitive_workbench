@@ -962,6 +962,8 @@ class ZenohExecutiveNode:
             llm_generate=llm_generate,
             infospace_executor=self.infospace_executor,
         )
+        self._derived_concern_model.set_seed_concerns(
+            self.character_config.get('seed_concerns', []))
         self._derived_concern_model.load()
 
         self._scheduled_goal_counter = 0
@@ -1095,6 +1097,9 @@ class ZenohExecutiveNode:
         self._sensor_alert_queue: list = []    # disposition='alert' — high priority
         self._sensor_trigger_queue: list = []  # disposition='trigger:X' — goal dispatch
         self._sensor_inform_queue: list = []   # disposition='inform' — rolling context (last 10)
+
+        # Sensor configuration summary (enriched by launcher before agent start)
+        self.sensor_configs: list = self.character_config.get('_sensor_configs', [])
         
         # Last character evaluator assessment (for orientation-to-chat integration)
         self._last_character_eval: Optional[Dict[str, Any]] = None
@@ -1480,6 +1485,20 @@ class ZenohExecutiveNode:
         if self.active_task_wip and not self.active_task_wip_waiting and not self._is_goal_running():
             self._advance_task_wip()
 
+        # ── Route ask replies while goal thread is blocked on _execute_ask ─
+        if self.awaiting_ask_response and self.text_input_queue:
+            for i, sense_data in enumerate(self.text_input_queue):
+                content = sense_data.get('content', '')
+                try:
+                    d = json.loads(content)
+                    text, source = d.get('text', ''), d.get('source', 'unknown')
+                except (json.JSONDecodeError, TypeError):
+                    text, source = content, 'console'
+                if text and text.strip() and source == 'User':
+                    self.text_input_queue.pop(i)
+                    self._ask_response_queue.put(text)
+                    break
+
         # ── Skip event processing while goal is running ──────────────────
         if self._is_goal_running():
             return
@@ -1528,6 +1547,8 @@ class ZenohExecutiveNode:
                     self._ooda_living_state, uc)
             except Exception as e:
                 logger.debug(f"Idle tick derived concern update skipped: {e}")
+            # Stub: detect active concerns that lack a linked task (Phase 2 autonomy)
+            self._check_unserviced_concerns()
         try:
             dc = self._derived_concern_model.get_concerns()
         except Exception:
@@ -1535,6 +1556,32 @@ class ZenohExecutiveNode:
         self._ooda_living_state.maybe_persist(
             self._write_named_note, dc,
             planner_summary=self._get_planner_summary())
+
+    _UNSERVICED_CONCERN_LOG_COOLDOWN = 300.0  # log at most every 5 minutes
+    _last_unserviced_concern_log: float = 0.0
+
+    def _check_unserviced_concerns(self):
+        """Stub: detect active concerns without linked tasks. Log only (Phase 2 autonomy)."""
+        now = time.monotonic()
+        if now - self._last_unserviced_concern_log < self._UNSERVICED_CONCERN_LOG_COOLDOWN:
+            return
+        try:
+            active_concerns = self._derived_concern_model.get_concerns(active_only=True)
+            if not active_concerns:
+                return
+            # Build set of concern IDs that have linked tasks
+            task_data = self._get_all_task_data()
+            serviced_ids = {t.get('linked_concern_id') for t in task_data if t.get('linked_concern_id')}
+            unserviced = [c for c in active_concerns if c.get('concern_id') not in serviced_ids]
+            if unserviced:
+                labels = ', '.join(c.get('concern_label', '?') for c in unserviced)
+                logger.info(
+                    f'🔮 {len(unserviced)} active concern(s) without tasks: {labels} '
+                    f'[stub — concern-driven task creation deferred to Phase 2]'
+                )
+                self.__class__._last_unserviced_concern_log = now
+        except Exception as e:
+            logger.debug(f'Unserviced concern check skipped: {e}')
 
     def _announce_character(self):
         """Announce character presence to the action display node."""
@@ -2614,6 +2661,39 @@ class ZenohExecutiveNode:
                     logger.warning(f'Error updating task WIP after milestone: {e}')
                 self.active_task_wip_waiting = False
 
+        # If this was an operational task-linked goal, update task execution history
+        task_note_name = goal.get("task_context_note")
+        if task_note_name and not task_wip_id:
+            try:
+                note_id = self.resource_manager.named_notes.get(task_note_name) if self.resource_manager else None
+                if note_id:
+                    res = self.resource_manager.get_resource(note_id)
+                    content = getattr(res, 'content', '') if res else ''
+                    task_data = json.loads(content) if content else None
+                    if task_data and task_data.get("lifecycle") == "operational":
+                        last_result = updates.get("last_result", "")
+                        exec_record = {
+                            "goal_id": goal_id,
+                            "goal_text": goal.get("goal_text", "")[:200],
+                            "timestamp": datetime.now().isoformat(),
+                            "outcome": "success" if success else "failed",
+                            "summary": (last_result or "")[:300],
+                        }
+                        history = task_data.get("execution_history", [])
+                        history.append(exec_record)
+                        # Ring buffer: keep last N entries
+                        if len(history) > self._TASK_EXECUTION_HISTORY_MAX:
+                            history = history[-self._TASK_EXECUTION_HISTORY_MAX:]
+                        task_data["execution_history"] = history
+                        task_data["last_executed"] = datetime.now().isoformat()
+                        task_data["execution_count"] = task_data.get("execution_count", 0) + 1
+                        task_data["updated"] = datetime.now().isoformat()
+                        # Write back
+                        self.resource_manager.update_note_content(note_id, json.dumps(task_data))
+                        logger.info(f'📋 Task {task_note_name}: operational execution #{task_data["execution_count"]} recorded ({exec_record["outcome"]})')
+            except Exception as e:
+                logger.warning(f'Error updating operational task {task_note_name} after goal completion: {e}')
+
         # Clean up transient resources created during the goal
         if pre_resource_ids is not None and self.resource_manager:
             now_ids = set(self.resource_manager.resource_registry.keys())
@@ -3150,6 +3230,8 @@ class ZenohExecutiveNode:
 
     # ── Task WIP (milestone loop) methods ─────────────────────────────────
 
+    _TASK_EXECUTION_HISTORY_MAX = 20  # ring buffer size for operational task execution history
+
     def _begin_task_establishment(self, user_text: str):
         """Create a task WIP Note and start the milestone loop."""
         self._task_wip_counter += 1
@@ -3219,6 +3301,23 @@ class ZenohExecutiveNode:
         except Exception as e:
             logger.warning(f'Error reading task WIP {self.active_task_wip}: {e}')
         return None
+
+    def _get_all_task_data(self) -> list:
+        """Read all task WIP notes (establishing + operational) as parsed dicts."""
+        tasks = []
+        if not self.resource_manager:
+            return tasks
+        try:
+            for name, note_id in list(self.resource_manager.named_notes.items()):
+                if not name.startswith('_task_wip_'):
+                    continue
+                res = self.resource_manager.get_resource(note_id)
+                content = getattr(res, 'content', '') if res else ''
+                if content:
+                    tasks.append(json.loads(content))
+        except Exception as e:
+            logger.warning(f'Error reading task data: {e}')
+        return tasks
 
     def _update_task_wip(self, wip: Dict[str, Any]):
         """Write updated WIP content back to the Note."""
@@ -3555,11 +3654,20 @@ class ZenohExecutiveNode:
         scheduled_goal["task_context_note"] = self.active_task_wip
         self._save_scheduled_goal(scheduled_goal)
 
-        # Update WIP Note to completed
+        # Transition WIP Note to operational lifecycle
         wip["status"] = "completed"
         wip["phase"] = "complete"
         wip["scheduled_goal_id"] = goal_id
         wip["completion_summary"] = summary
+        # Operational lifecycle fields (self-model: concern → task → goal chain)
+        wip["lifecycle"] = "operational"
+        wip["establishment_milestones"] = wip.get("milestones_completed", [])
+        wip["establishment_findings"] = wip.get("accumulated_findings", [])
+        wip["execution_history"] = []
+        wip["operational_goal_id"] = goal_id
+        wip["schedule_mode"] = schedule_mode
+        wip["last_executed"] = None
+        wip["execution_count"] = 0
         self._update_task_wip(wip)
 
         # Clean up establishment artifacts
@@ -3659,14 +3767,35 @@ class ZenohExecutiveNode:
                     text_preview = str(entry['text'])[:200]
                     recent_turns += f"{entry['source']}: {text_preview}\n"
 
+        # Render operational self-model for self-aware chat responses
+        self_model_block = ""
+        try:
+            from ooda_snapshot_renderer import render_self_model_section
+            dc = getattr(self, '_derived_concern_model', None)
+            self_model_block = render_self_model_section(
+                scheduler_status=self.goal_scheduler.get_status() if hasattr(self, 'goal_scheduler') else {},
+                tasks=self._get_all_task_data(),
+                derived_concerns=dc.get_concerns() if dc else [],
+                scheduled_goals=list(self._all_scheduled_goals()),
+                sensor_configs=self.sensor_configs,
+                execution_mode=getattr(self, 'execution_mode', 'step'),
+                tool_count=len(self.infospace_executor.available_tools) if self.infospace_executor else 0,
+            )
+        except Exception:
+            pass
+
         orientation_block = f"\n{orientation}\n\n" if orientation else "\n"
+        self_model_insert = f"\n{self_model_block}\n\n" if self_model_block else ""
         user_prompt = (
             f"RECENT DIALOG:\n{recent_turns}\n"
             f"Their move: {envision['turn_intent']}\n"
             f"Your move: {envision['my_move']}\n"
             f"{orientation_block}"
+            f"{self_model_insert}"
             f"Message from {source}: {text}\n\n"
-            f"Respond in character. Be concise."
+            f"Respond directly to what {source} said. Ground your response in your "
+            f"actual operational state (concerns, tasks, recent goals, self-model) "
+            f"rather than generic descriptions. Be concise and in character."
         )
 
         try:

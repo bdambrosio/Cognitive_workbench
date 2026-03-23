@@ -16,7 +16,7 @@ from typing import Any, Callable, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 # Controlled vocabularies
-ORIGIN_VALUES = ('user_concern_derived', 'orientation_derived', 'goal_reflection')
+ORIGIN_VALUES = ('user_concern_derived', 'orientation_derived', 'goal_reflection', 'seed')
 STATUS_VALUES = ('surfaced', 'active', 'resolved', 'abandoned')
 
 NOTE_NAME = '_derived_concerns'
@@ -48,10 +48,16 @@ Rules:
 - Link to parent user concern when the derivation is clear.
 - weight is a float 0.0-1.0 reflecting the agent's assessment of priority.
 - Keep rationale short and concrete.
-- Maximum 8 active+surfaced concerns at any time. If at limit, resolve or abandon before surfacing.
+- Maximum 8 active+surfaced concerns at any time (seeded concerns do not count toward this limit). \
+If at limit, resolve or abandon before surfacing.
+- Concerns with "seeded": true are standing operational priorities from the agent's character \
+configuration. They represent ongoing commitments, not one-time issues. You may resolve them \
+when temporarily addressed, or update their weight to reflect current priority. Do NOT abandon \
+seeded concerns — they will re-surface automatically. When surfacing new concerns, consider \
+whether they are better represented as updates to existing seeded concerns rather than separate entries.
 
 Controlled vocabularies:
-  origin: user_concern_derived, orientation_derived, goal_reflection
+  origin: user_concern_derived, orientation_derived, goal_reflection, seed
   status: surfaced, active, resolved, abandoned
 
 Respond with ONLY a JSON object. No markdown fences, no commentary."""
@@ -129,11 +135,20 @@ class DerivedConcernModel:
         self._concern_counter = 0
         self._last_updated: Optional[str] = None
         self._last_idle_update: float = 0.0
+        self._seed_concerns: List[Dict[str, Any]] = []
+
+    def set_seed_concerns(self, seeds: List[Dict[str, Any]]):
+        """Set seed concern definitions from character config. Call before load()."""
+        self._seed_concerns = seeds or []
 
     # ── Persistence ───────────────────────────────────────────────────
 
     def load(self) -> bool:
-        """Load concern list from the persisted _derived_concerns Note."""
+        """Load concern list from the persisted _derived_concerns Note.
+
+        On first run (no note or empty), injects seed concerns if configured.
+        On subsequent runs, re-surfaces any seeded concerns that were abandoned.
+        """
         if not self.infospace_executor:
             return False
         try:
@@ -142,11 +157,17 @@ class DerivedConcernModel:
             )
             if result.get('status') != 'success' or not result.get('resource_id'):
                 logger.info('No derived concerns note found (first run)')
+                if self._seed_concerns:
+                    self._inject_seeds()
+                    self._save()
                 return True
 
             content = self.infospace_executor._get_content(result['resource_id'])
             if not content or not isinstance(content, str) or not content.strip():
                 logger.info('Derived concerns note is empty')
+                if self._seed_concerns:
+                    self._inject_seeds()
+                    self._save()
                 return True
 
             data = json.loads(content)
@@ -162,6 +183,35 @@ class DerivedConcernModel:
                             self._concern_counter = num
                     except (ValueError, IndexError):
                         pass
+
+            # Re-surface any seeded concerns that were abandoned
+            resurfaced = 0
+            for c in self.concerns:
+                if c.get('seeded') and c.get('status') == 'abandoned':
+                    c['status'] = 'surfaced'
+                    c['status_rationale'] = 'Re-surfaced: standing concern from character configuration'
+                    c['recency'] = datetime.now().isoformat()
+                    resurfaced += 1
+            if resurfaced:
+                logger.info(f'Re-surfaced {resurfaced} abandoned seeded concern(s)')
+
+            # Inject any configured seeds not already present (upgrade path)
+            injected_missing = 0
+            if self._seed_concerns:
+                existing_labels = {c.get('concern_label') for c in self.concerns
+                                   if c.get('seeded')}
+                missing = [s for s in self._seed_concerns
+                           if s.get('label') not in existing_labels]
+                if missing:
+                    old_seeds = self._seed_concerns
+                    self._seed_concerns = missing
+                    self._inject_seeds()
+                    self._seed_concerns = old_seeds
+                    injected_missing = len(missing)
+
+            if resurfaced or injected_missing:
+                self._save()
+
             logger.info(f'\u2713 Loaded {len(self.concerns)} derived concerns')
             return True
         except json.JSONDecodeError as e:
@@ -170,6 +220,29 @@ class DerivedConcernModel:
         except Exception as e:
             logger.warning(f'Error loading derived concerns: {e}')
             return False
+
+    def _inject_seeds(self):
+        """Create initial derived concerns from seed definitions."""
+        for seed in self._seed_concerns:
+            self._concern_counter += 1
+            concern = {
+                'concern_id': f'dconcern_{self._concern_counter}',
+                'concern_label': seed.get('label', ''),
+                'concern_description': seed.get('description', ''),
+                'weight': float(seed.get('weight', 0.3)),
+                'origin': 'seed',
+                'status': 'active',
+                'status_rationale': 'Standing concern from character configuration',
+                'parent_user_concern_id': None,
+                'category': seed.get('category', ''),
+                'seeded': True,
+                'recency': datetime.now().isoformat(),
+                'touch_count': 0,
+                'evidence_refs': ['character_config_seed'],
+                'history_summary': '',
+            }
+            self.concerns.append(concern)
+        logger.info(f'Injected {len(self._seed_concerns)} seed concerns')
 
     def _save(self):
         """Persist the concern list to the _derived_concerns Note."""
@@ -269,8 +342,9 @@ class DerivedConcernModel:
             indent=2, ensure_ascii=False,
         ) if user_concerns else "[]"
 
-        # Count active+surfaced to inform the LLM about capacity
-        active_count = sum(1 for c in self.concerns if c.get('status') in ('surfaced', 'active'))
+        # Count active+surfaced to inform the LLM about capacity (seeded don't count)
+        active_count = sum(1 for c in self.concerns
+                           if c.get('status') in ('surfaced', 'active') and not c.get('seeded'))
 
         user_prompt = (
             f"## Current derived concerns ({active_count}/{_MAX_ACTIVE_CONCERNS} active+surfaced)\n"
@@ -342,8 +416,9 @@ class DerivedConcernModel:
             if not new_concern or not new_concern.get('concern_label'):
                 logger.warning('surface_concern patch missing new_concern or concern_label')
                 return
-            # Check capacity
-            active_count = sum(1 for c in self.concerns if c.get('status') in ('surfaced', 'active'))
+            # Check capacity (seeded concerns don't count toward limit)
+            active_count = sum(1 for c in self.concerns
+                               if c.get('status') in ('surfaced', 'active') and not c.get('seeded'))
             if active_count >= _MAX_ACTIVE_CONCERNS:
                 logger.warning(f'Derived concern capacity reached ({active_count}/{_MAX_ACTIVE_CONCERNS}), skipping surface')
                 return
@@ -394,15 +469,21 @@ class DerivedConcernModel:
             logger.info(f'Derived concern model: \u2713{concern_id} resolved \u2014 {patch.get("why_this_resolve", "")}')
 
         elif op == 'abandon_concern':
-            updates['status'] = 'abandoned'
-            self._merge_updates(target, updates, evidence_ref)
-            logger.info(f'Derived concern model: \u2717{concern_id} abandoned \u2014 {patch.get("why_this_abandon", "")}')
+            if target.get('seeded'):
+                logger.info(f'Derived concern model: blocked abandon of seeded concern {concern_id} — resolving instead')
+                updates['status'] = 'resolved'
+                self._merge_updates(target, updates, evidence_ref)
+            else:
+                updates['status'] = 'abandoned'
+                self._merge_updates(target, updates, evidence_ref)
+                logger.info(f'Derived concern model: \u2717{concern_id} abandoned \u2014 {patch.get("why_this_abandon", "")}')
 
     def _merge_updates(self, target: Dict[str, Any], updates: Dict[str, Any],
                        evidence_ref: str):
         """Merge field updates into an existing concern entry."""
         for field in ('weight', 'status', 'status_rationale', 'concern_description',
-                      'concern_label', 'origin', 'parent_user_concern_id', 'history_summary'):
+                      'concern_label', 'origin', 'parent_user_concern_id', 'history_summary',
+                      'category'):
             if field in updates:
                 if field == 'weight':
                     target[field] = float(updates[field])

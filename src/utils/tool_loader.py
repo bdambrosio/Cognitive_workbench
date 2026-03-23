@@ -87,14 +87,12 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
     
     tools = {}
     
-    # Primitive action names that tools cannot collide with
-    primitive_names = {
-        'move', 'say', 'think', 'take', 'place', 'inspect', 'use', 'scan',
-        'apply', 'create-note', 'create-collection', 'persist', 'load', 'index', 'organize', 'search',
-        'extract', 'filter', 'merge', 'coerce',
-        'aggregate', 'sort', 'group_by', 'compare', 'map', 'flatten', 'add', 'split',
-        'while', 'if', 'wait', 'sleep', 'focus'
-    }
+    # Primitive action names that tools cannot collide with (canonical source)
+    try:
+        from infospace_executor import INFOSPACE_PRIMITIVES
+        primitive_names = set(INFOSPACE_PRIMITIVES)
+    except ImportError:
+        primitive_names = set()
     
     # Scan immediate subdirectories
     for tool_dir in sorted(tools_dir.iterdir()):
