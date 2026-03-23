@@ -6857,6 +6857,8 @@ Respond with JSON:
                 status['budget_remaining_seconds'] = sched.get('budget_remaining_seconds', 0)
                 status['budget_total_seconds'] = sched.get('budget_total_seconds', 0)
                 status['budget_window_seconds'] = sched.get('budget_window_seconds', 0)
+            # Include task milestone activity log (suppressed say actions)
+            status['task_activity_log'] = getattr(self, '_task_wip_activity_log', [])
             response = {'success': True, **status}
             query.reply(query.key_expr, json.dumps(response, default=str).encode('utf-8'))
         except Exception as e:

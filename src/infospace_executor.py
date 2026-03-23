@@ -3296,26 +3296,45 @@ Make sure the string is in a format that can be parsed by the json.loads functio
     def _execute_say(self, action: Dict) -> Dict:
         """
         Produce output (agent speech/communication).
-        
+
         Required: type, value
         Optional: target (default: "user")
         """
         value = self._resolve_value(action.get('value'))
         target = action.get('target', 'user')
-        
+
         if value is None:
             return self._create_uniform_return('failed', reason='say requires value')
-        
+
         # Check for empty or whitespace-only value to prevent blank say actions
         value_str = str(value).strip()
         if not value_str:
             logger.warning(f'Say action skipped - value is empty or whitespace only')
             return self._create_uniform_return('failed', reason='say requires non-empty value')
-        
+
         # Capitalize 'user' to 'User' for character name
         if target.lower() == 'user':
             target = 'User'
-        
+
+        # Suppress public say during task establishment milestones.
+        # These are internal planner observations, not user conversation.
+        # Capture in WIP activity log instead of broadcasting.
+        if (self.executive_node
+                and getattr(self.executive_node, 'active_task_wip', None)
+                and getattr(self.executive_node, 'active_task_wip_waiting', False)):
+            logger.info(f"Say [{target}] (task-internal, suppressed): {value_str[:120]}")
+            # Store in a WIP activity buffer for Task Manager inspection
+            if not hasattr(self.executive_node, '_task_wip_activity_log'):
+                self.executive_node._task_wip_activity_log = []
+            self.executive_node._task_wip_activity_log.append({
+                'timestamp': datetime.now().isoformat(),
+                'text': value_str[:500],
+            })
+            # Cap the buffer
+            if len(self.executive_node._task_wip_activity_log) > 50:
+                self.executive_node._task_wip_activity_log = self.executive_node._task_wip_activity_log[-30:]
+            return self._create_uniform_return('success', value=value_str)
+
         # Send message to target's sense_data (mirrors physical space send_text_input)
         content_payload = {'source': self.agent_name, 'text': value_str}
         if action.get('close'):
