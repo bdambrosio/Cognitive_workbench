@@ -156,15 +156,16 @@ class TaskManager:
             if not user_concerns and not derived_concerns:
                 user_concerns, derived_concerns = self._read_concerns_from_resources(character)
 
-            # Fetch learning notes from resources
+            # Fetch consolidated learnings (single _operational_learnings note)
+            # Falls back to individual _task_learning_* notes if consolidated doesn't exist
             resources = self._zenoh_get(f"cognitive/{character}/resources") or {}
             learnings = []
+            consolidated_found = False
             if resources.get('success'):
                 for r in resources.get('resources', []):
-                    # Resource name is in properties.note_name, not top-level 'name'
                     props = r.get('properties', {})
                     name = props.get('note_name', '') or r.get('name', '')
-                    if name.startswith('_task_learning_'):
+                    if name == '_operational_learnings':
                         rid = r.get('id', '')
                         detail = self._zenoh_get(f"cognitive/{character}/resource/{rid}")
                         if detail and detail.get('success'):
@@ -173,9 +174,28 @@ class TaskManager:
                             try:
                                 parsed = json.loads(content) if isinstance(content, str) else content
                                 if isinstance(parsed, dict):
-                                    learnings.append(parsed)
+                                    learnings = [parsed]
+                                    consolidated_found = True
                             except (json.JSONDecodeError, TypeError):
                                 pass
+                        break
+                # Fallback: individual learning notes
+                if not consolidated_found:
+                    for r in resources.get('resources', []):
+                        props = r.get('properties', {})
+                        name = props.get('note_name', '') or r.get('name', '')
+                        if name.startswith('_task_learning_'):
+                            rid = r.get('id', '')
+                            detail = self._zenoh_get(f"cognitive/{character}/resource/{rid}")
+                            if detail and detail.get('success'):
+                                res = detail.get('resource', {})
+                                content = res.get('properties', {}).get('content', '') or detail.get('content', '')
+                                try:
+                                    parsed = json.loads(content) if isinstance(content, str) else content
+                                    if isinstance(parsed, dict):
+                                        learnings.append(parsed)
+                                except (json.JSONDecodeError, TypeError):
+                                    pass
             return {
                 'success': True,
                 'user_concerns': user_concerns,
@@ -703,16 +723,39 @@ function renderDoneTask(t) {
 
 function renderLearnings(learnings) {
     const el = document.getElementById('learnings');
-    document.getElementById('learnings-count').textContent = learnings.length;
-    if (!learnings.length) { el.innerHTML = '<div class="empty">No learnings yet</div>'; return; }
-    el.innerHTML = learnings.map(l => `<div class="learning-card">
-        <div class="learning-summary">${esc(l.summary || '')}</div>
-        <div style="font-size:11px;color:#888;margin-bottom:4px">
-            Task: ${esc(l.task_wip_id || '?')} | Outcome: ${esc(l.outcome || '?')}
-            | Concern: ${esc(l.concern_recommendation || '?')}
-        </div>
-        ${(l.learnings||[]).map(item => `<div class="learning-item">${esc(item)}</div>`).join('')}
-    </div>`).join('');
+    if (!learnings.length) {
+        document.getElementById('learnings-count').textContent = '0';
+        el.innerHTML = '<div class="empty">No learnings yet</div>';
+        return;
+    }
+    // Check if this is a consolidated format (single _operational_learnings note)
+    const first = learnings[0];
+    if (first.consolidated_learnings) {
+        const items = first.consolidated_learnings || [];
+        document.getElementById('learnings-count').textContent = items.length;
+        let html = '<div class="learning-card">';
+        if (first.task_summary) {
+            html += `<div class="learning-summary">${esc(first.task_summary)}</div>`;
+        }
+        html += `<div style="font-size:11px;color:#888;margin-bottom:4px">
+            Last task: ${esc(first.last_task_intention || '?')} | Outcome: ${esc(first.last_task_outcome || '?')}
+            | Distilled: ${fmtDate(first.last_distilled_at)}
+        </div>`;
+        html += items.map(item => `<div class="learning-item">${esc(item)}</div>`).join('');
+        html += '</div>';
+        el.innerHTML = html;
+    } else {
+        // Fallback: individual learning notes (legacy format)
+        document.getElementById('learnings-count').textContent = learnings.length;
+        el.innerHTML = learnings.map(l => `<div class="learning-card">
+            <div class="learning-summary">${esc(l.summary || l.task_summary || '')}</div>
+            <div style="font-size:11px;color:#888;margin-bottom:4px">
+                Task: ${esc(l.task_wip_id || '?')} | Outcome: ${esc(l.outcome || '?')}
+                | Concern: ${esc(l.concern_recommendation || '?')}
+            </div>
+            ${(l.learnings||[]).map(item => `<div class="learning-item">${esc(item)}</div>`).join('')}
+        </div>`).join('');
+    }
 }
 
 // ── Actions ──────────────────────────────────────────────────────
