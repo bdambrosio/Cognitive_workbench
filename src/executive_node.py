@@ -3921,22 +3921,24 @@ Respond with JSON:
                     f"Do NOT submit another goal that is substantially similar to the failed ones.\n"
                 )
 
-        # Phase milestone cap: auto-advance if too many milestones in one phase
-        _MAX_MILESTONES_PER_PHASE = 3
+        # Phase milestone cap: auto-advance if too many milestones in one phase.
+        # Caps are per-phase — establishment phases are bounded, operational execution is not.
+        _PHASE_CAPS = {
+            "specification": 3,
+            "capability_evaluation": 3,
+            "infrastructure_setup": 5,
+            "activation": 1,
+        }
         current_phase = wip.get("phase", "specification")
-        phase_milestone_count = sum(
-            1 for m in milestones
-            # Count milestones whose goal_text was generated for the current phase.
-            # We don't track phase per milestone, so count recent consecutive successes.
-        )
-        # More precise: count consecutive completed milestones from the end
+        phase_cap = _PHASE_CAPS.get(current_phase)
+        # Count consecutive completed milestones from the end
         recent_successes_in_phase = 0
         for m in reversed(milestones):
             if m.get("status") == "completed":
                 recent_successes_in_phase += 1
             else:
                 break
-        if recent_successes_in_phase >= _MAX_MILESTONES_PER_PHASE:
+        if phase_cap and recent_successes_in_phase >= phase_cap:
             _PHASE_ORDER = ["specification", "capability_evaluation", "infrastructure_setup", "activation", "complete"]
             cur_idx = _PHASE_ORDER.index(current_phase) if current_phase in _PHASE_ORDER else 0
             if current_phase == "activation" or cur_idx >= len(_PHASE_ORDER) - 2:
