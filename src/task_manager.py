@@ -609,16 +609,47 @@ function renderProposedTask(t) {
 
 function renderActiveTask(t) {
     const noteName = t._note_name || '';
+    const cycleState = t.cycle_state || 'idle';
+    const cycleGoals = t.cycle_goals_completed || [];
+    const cooldown = t.cooldown_seconds || 3600;
+    const lastExec = t.last_executed;
+    const stateColor = cycleState === 'running' ? '#6db1db' : cycleState === 'idle' ? '#888' : '#aaa';
+    // Compute next eligible time
+    let nextEligible = '—';
+    if (lastExec && cycleState === 'idle') {
+        try {
+            const next = new Date(new Date(lastExec).getTime() + cooldown * 1000);
+            const now = new Date();
+            if (next > now) {
+                const mins = Math.round((next - now) / 60000);
+                nextEligible = `in ${mins}m`;
+            } else {
+                nextEligible = 'now';
+            }
+        } catch(e) { nextEligible = '—'; }
+    } else if (!lastExec) {
+        nextEligible = 'now (never run)';
+    }
     return `<div class="task-card">
         <div class="task-header">
             <div class="task-intention">${esc(t.intention)}</div>
             <span class="task-status active">active</span>
         </div>
         <div class="task-meta">
-            Goal: <span>${esc(t._scheduled_goal_name || t.operational_goal_id || '—')}</span>
-            &nbsp;|&nbsp; Schedule: <span>${t.schedule_mode || '—'}</span>
+            State: <span style="color:${stateColor}">${cycleState}</span>
             &nbsp;|&nbsp; Executions: <span>${t.execution_count || 0}</span>
+            &nbsp;|&nbsp; Next: <span>${nextEligible}</span>
+            &nbsp;|&nbsp; Cooldown: <span>${Math.round(cooldown/60)}m</span>
         </div>
+        ${cycleState === 'running' && cycleGoals.length ? `<div style="margin-top:6px;font-size:11px;color:#888">
+            <div style="color:#6db1db;margin-bottom:2px">Cycle in progress (${cycleGoals.length} goals):</div>
+            ${cycleGoals.map(g => `<div style="padding:1px 0">
+                <span style="color:${g.status==='completed'?'#6ddb6d':'#db6d6d'}">${g.status==='completed'?'✓':'✗'}</span>
+                ${esc((g.goal_text||'').substring(0,200))}
+            </div>`).join('')}
+        </div>` : ''}
+        ${t.current_milestone ? `<div style="margin-top:4px;font-size:11px;color:#6db1db">Running: ${esc(t.current_milestone.substring(0,200))}</div>` : ''}
+        ${lastExec ? `<div style="margin-top:4px;font-size:10px;color:#666">Last run: ${fmtDate(lastExec)}</div>` : ''}
         <div class="task-actions">
             <button class="danger" onclick="abandonTask('${esc(noteName)}')">Abandon</button>
             <button class="danger" onclick="deleteTask('${esc(noteName)}')">Delete</button>
