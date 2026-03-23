@@ -4244,10 +4244,28 @@ Respond with JSON:
         "- Reference notes by NAME, never by Note ID.\n"
         "- Do not repeat work already done in this cycle.\n"
         "- If the task's intention is fully satisfied, say CYCLE_DONE.\n"
-        "- Keep goals concise — one clear objective per goal.\n\n"
+        "- Keep goal text concise — one clear objective.\n"
+        "- Include SUCCESS_CRITERIA so the result can be evaluated.\n"
+        "- Include TOOLS_HINT if you know which tools are needed.\n\n"
         "Respond in this exact format:\n"
         "ACTION: <SUBMIT_GOAL | CYCLE_DONE>\n"
-        "GOAL_TEXT: <goal text if SUBMIT_GOAL, or cycle summary if CYCLE_DONE>\n"
+        "GOAL_TEXT: <the goal — what to accomplish (one sentence)>\n"
+        "SUCCESS_CRITERIA: <how to tell if the goal succeeded (one sentence)>\n"
+        "TOOLS_HINT: <comma-separated tool names, or 'none'>\n"
+    )
+
+    _CYCLE_REFLECTION_PROMPT = (
+        "You are evaluating the result of a goal within a task execution cycle.\n\n"
+        "GOAL: {goal_text}\n"
+        "SUCCESS CRITERIA: {success_criteria}\n"
+        "RESULT STATUS: {status}\n"
+        "RESULT SUMMARY: {result_summary}\n\n"
+        "Evaluate:\n"
+        "ACHIEVED: <YES | PARTIAL | NO>\n"
+        "EVIDENCE: <one sentence — what in the result proves achievement or failure>\n"
+        "PROGRESS: <one sentence — how this advances the overall task intention>\n"
+        "NEXT: <CONTINUE | RETRY | PIVOT | CYCLE_DONE>\n"
+        "REASON: <one sentence — why this next action>\n"
     )
 
     _MAX_GOALS_PER_CYCLE = 5  # Safety cap per execution cycle
@@ -4257,6 +4275,7 @@ Respond with JSON:
         try:
             # Check autonomy budget
             if hasattr(self, 'goal_scheduler') and self.goal_scheduler.budget_remaining() <= 0:
+                logger.debug('Task selection: autonomy budget exhausted')
                 return None
 
             active_tasks = [
@@ -4272,10 +4291,8 @@ Respond with JSON:
             for t in active_tasks:
                 cycle_state = t.get("cycle_state", "idle")
                 if cycle_state == "running":
-                    # Mid-cycle — always eligible (finish what you started)
                     eligible.append(t)
                 elif cycle_state in ("idle", None):
-                    # Check cooldown
                     last = t.get("last_executed")
                     cooldown = t.get("cooldown_seconds", 3600)
                     if last is None:
@@ -4291,12 +4308,18 @@ Respond with JSON:
             if not eligible:
                 return None
 
-            # Sort: running tasks first (finish current work), then by staleness
+            # Sort: running tasks first, then by staleness
             eligible.sort(key=lambda t: (
                 0 if t.get("cycle_state") == "running" else 1,
                 t.get("last_executed") or "",
             ))
-            return eligible[0]
+            selected = eligible[0]
+            logger.info(
+                f'📋 Task selected: {selected.get("_note_name", "?")} '
+                f'(cycle={selected.get("cycle_state", "idle")}, '
+                f'executions={selected.get("execution_count", 0)}, '
+                f'eligible={len(eligible)}/{len(active_tasks)})')
+            return selected
         except Exception as e:
             logger.debug(f'Task selection failed: {e}')
             return None
@@ -4304,15 +4327,15 @@ Respond with JSON:
     def _advance_task_execution(self, task_note_name: str):
         """Advance an operational task — decide and dispatch next goal for this cycle.
 
-        Analogous to _advance_task_wip but for operational execution.
-        The task dynamically decides its next goal based on accumulated cycle state.
+        The outer planning loop: reads cycle state, asks the LLM for a structured
+        goal specification, dispatches it via the inner planner, and evaluates
+        results with structured reflection.
         """
         if not self.resource_manager:
             return
-        # Read task WIP
         note_id = self.resource_manager.named_notes.get(task_note_name)
         if not note_id:
-            logger.warning(f'Operational task {task_note_name} not found')
+            logger.warning(f'📋 Task {task_note_name}: not found, clearing')
             self._operational_task_note = None
             return
         note_data = self.resource_manager.resource_registry.get(note_id)
@@ -4330,24 +4353,43 @@ Respond with JSON:
             wip["cycle_state"] = "running"
             wip["cycle_goals_completed"] = []
             wip["cycle_findings"] = []
+            wip["_cycle_stall_sig"] = ""
+            wip["_cycle_stall_count"] = 0
+            logger.info(f'📋 Task {task_note_name}: starting new cycle')
             self._write_operational_task(task_note_name, note_id, wip)
 
-        # Cycle goal cap — force CYCLE_DONE if too many goals
+        # Check if last goal's reflection said RETRY or PIVOT
+        last_reflection = wip.get("_last_reflection", {})
+        reflection_next = last_reflection.get("next", "")
+
+        # Cycle goal cap
         cycle_goals = wip.get("cycle_goals_completed", [])
         if len(cycle_goals) >= self._MAX_GOALS_PER_CYCLE:
-            logger.info(f'📋 Task {task_note_name}: cycle cap reached ({len(cycle_goals)} goals), ending cycle')
+            logger.info(f'📋 Task {task_note_name}: cycle cap ({len(cycle_goals)} goals)')
             self._complete_task_cycle(task_note_name, note_id, wip,
                                       f"Cycle capped at {len(cycle_goals)} goals")
             return
 
-        # Format prompt context
+        # If reflection said CYCLE_DONE, end the cycle
+        if reflection_next == "CYCLE_DONE":
+            reason = last_reflection.get("reason", "Reflection determined cycle complete")
+            logger.info(f'📋 Task {task_note_name}: reflection says CYCLE_DONE — {reason[:80]}')
+            self._complete_task_cycle(task_note_name, note_id, wip, reason)
+            return
+
+        # Stall detection: check if we're generating the same goal repeatedly
+        stall_sig = wip.get("_cycle_stall_sig", "")
+        stall_count = wip.get("_cycle_stall_count", 0)
+
+        # Format prompt context — include reflection verdict if available
         cycle_goals_text = "None yet" if not cycle_goals else "\n".join(
-            f"- [{g.get('status', '?')}] {g.get('goal_text', '')[:200]}"
+            f"- [{g.get('status', '?')}] {g.get('goal_text', '')[:150]}"
+            f"{' (ACHIEVED: ' + g.get('reflection_achieved', '?') + ')' if g.get('reflection_achieved') else ''}"
             for g in cycle_goals
         )
         cycle_findings = wip.get("cycle_findings", [])
         cycle_findings_text = "None yet" if not cycle_findings else "\n".join(
-            f"- {f}" for f in cycle_findings
+            f"- {f}" for f in cycle_findings[-8:]  # Last 8 findings to avoid prompt bloat
         )
         establishment_findings = wip.get("establishment_findings", [])
         est_text = "None" if not establishment_findings else "\n".join(
@@ -4359,6 +4401,15 @@ Respond with JSON:
             for i, h in enumerate(exec_history[-3:])
         )
 
+        # If reflection said PIVOT, inject that context
+        pivot_context = ""
+        if reflection_next == "PIVOT":
+            pivot_context = (
+                f"\n⚠ PREVIOUS GOAL FAILED — reflection recommended PIVOT.\n"
+                f"Reason: {last_reflection.get('reason', 'unknown')}\n"
+                f"Do NOT retry the same approach. Try a different strategy.\n"
+            )
+
         prompt = self._OPERATIONAL_TASK_PROMPT.format(
             intention=wip.get("intention", ""),
             establishment_findings=est_text,
@@ -4366,25 +4417,55 @@ Respond with JSON:
             cycle_findings=cycle_findings_text,
             execution_history=history_text,
         )
+        if pivot_context:
+            prompt += pivot_context
 
         try:
-            resp = self.llm_generate([prompt], max_tokens=400, temperature=0.3)
+            resp = self.llm_generate([prompt], max_tokens=500, temperature=0.3)
             resp_text = getattr(resp, 'text', '') if hasattr(resp, 'text') else str(resp)
         except Exception as e:
-            logger.error(f'Operational task advance LLM failed: {e}')
+            logger.error(f'📋 Task {task_note_name}: advance LLM failed: {e}')
             self._operational_task_note = None
             return
 
-        # Parse response
+        # Parse structured response
         action_match = re.search(r'ACTION:\s*(SUBMIT_GOAL|CYCLE_DONE)', resp_text)
-        goal_match = re.search(r'GOAL_TEXT:\s*(.+)', resp_text, re.DOTALL)
+        goal_match = re.search(r'GOAL_TEXT:\s*(.+?)(?:\nSUCCESS_CRITERIA:|\nTOOLS_HINT:|\Z)', resp_text, re.DOTALL)
+        criteria_match = re.search(r'SUCCESS_CRITERIA:\s*(.+?)(?:\nTOOLS_HINT:|\Z)', resp_text, re.DOTALL)
+        tools_match = re.search(r'TOOLS_HINT:\s*(.+?)(?:\n|$)', resp_text)
 
         action = action_match.group(1) if action_match else None
         goal_text = goal_match.group(1).strip() if goal_match else ""
+        success_criteria = criteria_match.group(1).strip() if criteria_match else ""
+        tools_hint = tools_match.group(1).strip() if tools_match else ""
+
+        logger.info(
+            f'📋 Task {task_note_name}: advance decision={action} '
+            f'goal="{goal_text[:60]}" criteria="{success_criteria[:60]}" '
+            f'tools={tools_hint[:40]}')
 
         if action == "SUBMIT_GOAL" and goal_text:
-            # Update current goal on WIP
+            # Stall detection: normalize goal text and compare to previous
+            normalized = re.sub(r'[^a-z0-9 ]', '', goal_text.lower())[:200]
+            if normalized == stall_sig and stall_sig:
+                stall_count += 1
+                wip["_cycle_stall_count"] = stall_count
+                if stall_count >= 2:
+                    logger.warning(
+                        f'📋 Task {task_note_name}: STALL detected — '
+                        f'same goal generated {stall_count + 1} times, ending cycle')
+                    self._complete_task_cycle(task_note_name, note_id, wip,
+                                              f"Stall: same goal repeated {stall_count + 1} times")
+                    return
+            else:
+                wip["_cycle_stall_sig"] = normalized
+                wip["_cycle_stall_count"] = 0
+
+            # Store goal spec for later reflection
             wip["current_milestone"] = goal_text[:500]
+            wip["_current_success_criteria"] = success_criteria[:300]
+            wip["_current_tools_hint"] = tools_hint[:200]
+            wip["_last_reflection"] = {}
             self._write_operational_task(task_note_name, note_id, wip)
 
             # Run goal on thread
@@ -4392,7 +4473,6 @@ Respond with JSON:
 
             def _run_operational_goal():
                 result = self.parse_and_set_goal("", goal_text) or {}
-                # Clean up transient resources
                 if pre_resource_ids is not None and self.resource_manager:
                     now_ids = set(self.resource_manager.resource_registry.keys())
                     created_ids = now_ids - pre_resource_ids
@@ -4405,20 +4485,18 @@ Respond with JSON:
             self._operational_task_note = task_note_name
             self._operational_goal_waiting = True
 
-            # Track budget: record start time for autonomous goals
             if hasattr(self, 'goal_scheduler') and wip.get('linked_concern_id'):
                 self.goal_scheduler._executing_is_autonomous = True
                 self.goal_scheduler._autonomous_start_time = time.monotonic()
 
             self._run_goal_on_thread(_run_operational_goal)
-            logger.info(f'📋 Task {task_note_name}: dispatched operational goal — "{goal_text[:80]}"')
 
         elif action == "CYCLE_DONE":
+            logger.info(f'📋 Task {task_note_name}: LLM says CYCLE_DONE — "{goal_text[:80]}"')
             self._complete_task_cycle(task_note_name, note_id, wip, goal_text)
 
         else:
-            logger.warning(f'Operational task advance: unparseable response — "{resp_text[:200]}"')
-            # If we can't parse, end the cycle to avoid loops
+            logger.warning(f'📋 Task {task_note_name}: unparseable advance — "{resp_text[:200]}"')
             self._complete_task_cycle(task_note_name, note_id, wip,
                                       "Cycle ended: unparseable advance response")
 
@@ -4431,7 +4509,7 @@ Respond with JSON:
             logger.warning(f'Error updating operational task {note_name}: {e}')
 
     def _record_operational_goal_result(self):
-        """Called when an operational goal completes. Updates task cycle state."""
+        """Called when an operational goal completes. Runs structured reflection."""
         if not self._operational_task_note or not self.resource_manager:
             self._operational_task_note = None
             return
@@ -4452,19 +4530,69 @@ Respond with JSON:
         success = result.get('success', False)
         response = result.get('response', '') or result.get('text', '') or ''
         if not response and isinstance(result, dict):
-            response = result.get('primary_product', '') or str(result)[:300]
+            response = result.get('primary_product', '') or str(result)[:500]
         clean_response = self._sanitize_note_ids(str(response)[:500])
 
+        goal_text = wip.get("current_milestone", "")
+        success_criteria = wip.get("_current_success_criteria", "")
+        status_str = "completed" if success else "failed"
+
+        # ── Structured reflection ────────────────────────────────────────
+        reflection = {"achieved": "?", "evidence": "", "progress": "",
+                      "next": "CONTINUE", "reason": ""}
+        try:
+            refl_prompt = self._CYCLE_REFLECTION_PROMPT.format(
+                goal_text=goal_text[:300],
+                success_criteria=success_criteria[:200],
+                status=status_str,
+                result_summary=clean_response[:400],
+            )
+            refl_resp = self.llm_generate([refl_prompt], max_tokens=200, temperature=0.2)
+            refl_text = getattr(refl_resp, 'text', '') if hasattr(refl_resp, 'text') else str(refl_resp)
+
+            # Parse reflection fields
+            for field, key in [('ACHIEVED', 'achieved'), ('EVIDENCE', 'evidence'),
+                               ('PROGRESS', 'progress'), ('NEXT', 'next'), ('REASON', 'reason')]:
+                m = re.search(rf'{field}:\s*(.+?)(?:\n|$)', refl_text)
+                if m:
+                    reflection[key] = m.group(1).strip()
+            # Normalize NEXT to expected values
+            next_val = reflection["next"].upper()
+            if next_val not in ("CONTINUE", "RETRY", "PIVOT", "CYCLE_DONE"):
+                reflection["next"] = "CONTINUE"
+            else:
+                reflection["next"] = next_val
+        except Exception as e:
+            logger.debug(f'📋 Task {note_name}: reflection failed: {e}')
+
+        logger.info(
+            f'📋 Task {note_name}: goal {status_str} | '
+            f'achieved={reflection["achieved"]} | '
+            f'next={reflection["next"]} | '
+            f'evidence="{reflection["evidence"][:60]}"')
+
+        # ── Record goal with reflection ──────────────────────────────────
         goal_record = {
-            "goal_text": wip.get("current_milestone", "")[:200],
+            "goal_text": goal_text[:200],
             "result_summary": clean_response[:300],
-            "status": "completed" if success else "failed",
+            "status": status_str,
             "timestamp": datetime.now().isoformat(),
+            "success_criteria": success_criteria[:200],
+            "reflection_achieved": reflection["achieved"],
+            "reflection_next": reflection["next"],
         }
         wip.setdefault("cycle_goals_completed", []).append(goal_record)
-        if clean_response and len(clean_response) > 10:
+
+        # Add reflection evidence as a finding (more useful than raw summary)
+        if reflection["evidence"]:
+            wip.setdefault("cycle_findings", []).append(
+                f'{reflection["achieved"]}: {reflection["evidence"][:200]}')
+        elif clean_response and len(clean_response) > 10:
             wip.setdefault("cycle_findings", []).append(
                 f"Goal result: {clean_response[:200]}")
+
+        # Store reflection for next advance call to act on
+        wip["_last_reflection"] = reflection
         wip["current_milestone"] = None
 
         # Record autonomous budget
@@ -4473,16 +4601,17 @@ Respond with JSON:
             self.goal_scheduler._executing_is_autonomous = False
 
         self._write_operational_task(note_name, note_id, wip)
-        logger.info(f'📋 Task {note_name}: operational goal completed ({goal_record["status"]})')
         # Note: _operational_task_note stays set so next tick re-advances this task
 
     def _complete_task_cycle(self, note_name: str, note_id: str,
                              wip: Dict[str, Any], summary: str):
         """Complete one execution cycle of an operational task."""
         cycle_goals = wip.get("cycle_goals_completed", [])
+        achieved_count = sum(1 for g in cycle_goals if g.get("reflection_achieved", "").startswith("YES"))
         cycle_record = {
             "timestamp": datetime.now().isoformat(),
             "goals_count": len(cycle_goals),
+            "goals_achieved": achieved_count,
             "summary": self._sanitize_note_ids(summary[:300]),
             "outcome": "completed",
         }
@@ -4497,12 +4626,15 @@ Respond with JSON:
         wip["cycle_goals_completed"] = []
         wip["cycle_findings"] = []
         wip["current_milestone"] = None
+        wip["_last_reflection"] = {}
+        wip["_cycle_stall_sig"] = ""
+        wip["_cycle_stall_count"] = 0
         self._write_operational_task(note_name, note_id, wip)
         self._operational_task_note = None
         self._operational_goal_waiting = False
         logger.info(
             f'📋 Task {note_name}: cycle #{wip["execution_count"]} complete '
-            f'({len(cycle_goals)} goals) — {summary[:80]}')
+            f'({achieved_count}/{len(cycle_goals)} goals achieved) — {summary[:80]}')
 
     def _complete_task_wip(self, wip: Dict[str, Any], summary: str):
         """Finalize task establishment: set up operational state for tick-loop dispatch.

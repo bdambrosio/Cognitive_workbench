@@ -667,10 +667,18 @@ function renderActiveTask(t) {
         </div>
         ${cycleState === 'running' && cycleGoals.length ? `<div style="margin-top:6px;font-size:11px;color:#888">
             <div style="color:#6db1db;margin-bottom:2px">Cycle in progress (${cycleGoals.length} goals):</div>
-            ${cycleGoals.map(g => `<div style="padding:1px 0">
-                <span style="color:${g.status==='completed'?'#6ddb6d':'#db6d6d'}">${g.status==='completed'?'✓':'✗'}</span>
-                ${esc((g.goal_text||'').substring(0,200))}
-            </div>`).join('')}
+            ${cycleGoals.map(g => {
+                const achieved = g.reflection_achieved || '?';
+                const achievedColor = achieved.startsWith('YES') ? '#6ddb6d' : achieved.startsWith('NO') ? '#db6d6d' : '#dbb86d';
+                const nextAction = g.reflection_next || '';
+                return `<div style="padding:2px 0;line-height:1.4">
+                    <span style="color:${g.status==='completed'?'#6ddb6d':'#db6d6d'}">${g.status==='completed'?'✓':'✗'}</span>
+                    ${esc((g.goal_text||'').substring(0,200))}
+                    <span style="color:${achievedColor};font-weight:600"> [${achieved}]</span>
+                    ${nextAction && nextAction !== 'CONTINUE' ? `<span style="color:#f0a050"> → ${nextAction}</span>` : ''}
+                    ${g.success_criteria ? `<div style="color:#666;font-size:10px;margin-left:16px">criteria: ${esc(g.success_criteria.substring(0,120))}</div>` : ''}
+                </div>`;
+            }).join('')}
         </div>` : ''}
         ${t.current_milestone ? `<div style="margin-top:4px;font-size:11px;color:#6db1db">Running: ${esc(t.current_milestone.substring(0,200))}</div>` : ''}
         ${lastExec ? `<div style="margin-top:4px;font-size:10px;color:#666">Last run: ${fmtDate(lastExec)}</div>` : ''}
