@@ -3857,6 +3857,15 @@ Respond with JSON:
         "  between milestones when notes are recreated. Use load(target=\"note-name\")\n"
         "  not load(target=\"Note_NNN\"). This applies to goal text, code, and any\n"
         "  references to notes created in previous milestones.\n\n"
+        "MILESTONE PROGRESSION RULE:\n"
+        "- Each new milestone MUST accomplish something NOT already covered by a\n"
+        "  completed milestone above. Do NOT re-verify, re-test, or re-create\n"
+        "  work that already succeeded.\n"
+        "- If all necessary work for the current phase is done, advance to the\n"
+        "  next phase immediately. Do NOT add redundant verification milestones.\n"
+        "- A test that passed does not need to be re-run. A note that was created\n"
+        "  and verified does not need re-verification.\n"
+        "- When in doubt, advance. Over-verification wastes resources.\n\n"
         "Determine what to do next. Your options are:\n"
         "1. SUBMIT_GOAL: Submit a SHORT, FOCUSED milestone goal (one establishment step).\n"
         "   Keep goal text concise — one clear objective, not a multi-step execution plan.\n"
@@ -3911,6 +3920,40 @@ Respond with JSON:
                     f"  - COMPLETE with a note about the limitation\n"
                     f"Do NOT submit another goal that is substantially similar to the failed ones.\n"
                 )
+
+        # Phase milestone cap: auto-advance if too many milestones in one phase
+        _MAX_MILESTONES_PER_PHASE = 3
+        current_phase = wip.get("phase", "specification")
+        phase_milestone_count = sum(
+            1 for m in milestones
+            # Count milestones whose goal_text was generated for the current phase.
+            # We don't track phase per milestone, so count recent consecutive successes.
+        )
+        # More precise: count consecutive completed milestones from the end
+        recent_successes_in_phase = 0
+        for m in reversed(milestones):
+            if m.get("status") == "completed":
+                recent_successes_in_phase += 1
+            else:
+                break
+        if recent_successes_in_phase >= _MAX_MILESTONES_PER_PHASE:
+            _PHASE_ORDER = ["specification", "capability_evaluation", "infrastructure_setup", "activation", "complete"]
+            cur_idx = _PHASE_ORDER.index(current_phase) if current_phase in _PHASE_ORDER else 0
+            if current_phase == "activation" or cur_idx >= len(_PHASE_ORDER) - 2:
+                # At activation — auto-complete the task
+                logger.info(f'📋 Task WIP: phase cap reached at {current_phase}, auto-completing')
+                self._complete_task_wip(wip, f"Auto-completed: {recent_successes_in_phase} successful milestones in {current_phase}")
+                return
+            else:
+                next_phase = _PHASE_ORDER[cur_idx + 1]
+                logger.info(
+                    f'📋 Task WIP: phase cap reached ({recent_successes_in_phase} successes in {current_phase}), '
+                    f'auto-advancing to {next_phase}')
+                wip["phase"] = next_phase
+                wip["accumulated_findings"].append(
+                    f"Phase {current_phase} capped at {recent_successes_in_phase} milestones — auto-advanced to {next_phase}")
+                self._update_task_wip(wip)
+                return  # Will re-enter _advance_task_wip on next tick with new phase
 
         # Add user concerns for milestone framing
         concerns_text = ""
