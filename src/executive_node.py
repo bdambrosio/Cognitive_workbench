@@ -4032,7 +4032,7 @@ Respond with JSON:
         if action == "SUBMIT_GOAL" and goal_text:
             # Update WIP phase and current_milestone
             wip["phase"] = new_phase
-            wip["current_milestone"] = goal_text[:200]
+            wip["current_milestone"] = goal_text[:500]
             self._update_task_wip(wip)
 
             # --- Fix A: Direct ask for specification phase ---

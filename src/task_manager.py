@@ -640,9 +640,9 @@ function renderEstablishingTask(t) {
             ${t.current_milestone ? `&nbsp;|&nbsp; Current: <span>${esc(t.current_milestone)}</span>` : ''}
         </div>
         ${milestones.length ? `<div style="margin-top:6px;font-size:11px;color:#888">
-            ${milestones.map(m => `<div style="padding:2px 0">
+            ${milestones.map(m => `<div style="padding:2px 0;line-height:1.4">
                 <span style="color:${m.status==='completed'?'#6ddb6d':'#db6d6d'}">${m.status==='completed'?'✓':'✗'}</span>
-                ${esc((m.goal_text||'').substring(0,80))}
+                ${esc((m.goal_text||'').substring(0,200))}
             </div>`).join('')}
         </div>` : ''}
         <div class="task-actions">
