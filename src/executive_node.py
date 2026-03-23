@@ -1587,16 +1587,29 @@ class ZenohExecutiveNode:
             self._write_named_note, dc,
             planner_summary=self._get_planner_summary())
 
+    def _build_serviced_concern_ids(self) -> set:
+        """Build set of concern IDs that have linked tasks (any non-terminal state)."""
+        task_data = self._get_all_task_data()
+        serviced = set()
+        for t in task_data:
+            if t.get('status') in ('abandoned', 'archived'):
+                continue
+            cid = t.get('linked_concern_id')
+            if cid:
+                serviced.add(cid)
+            for cid in t.get('linked_concern_ids', []):
+                serviced.add(cid)
+        return serviced
+
     def _triage_idle_tick(self):
         """Concern triage integration: nominate from activations, tick deferrals, run triage."""
         self._concern_triage.tick_deferred()
 
+        serviced_ids = self._build_serviced_concern_ids()
+
         # Activation-monitor nominations: check living state concern activations
         try:
             active_concerns = self._derived_concern_model.get_concerns(active_only=True)
-            # Build set of concern IDs that already have linked tasks
-            task_data = self._get_all_task_data()
-            serviced_ids = {t.get('linked_concern_id') for t in task_data if t.get('linked_concern_id')}
             for ca in self._ooda_living_state.concern_activations:
                 cid = ca.get('id', '')
                 if cid in serviced_ids:
@@ -1618,12 +1631,6 @@ class ZenohExecutiveNode:
         # Seed concern nomination: active seed concerns without linked tasks
         try:
             all_derived = self._derived_concern_model.get_concerns() or []
-            task_data = self._get_all_task_data()
-            serviced_ids = {t.get('linked_concern_id') for t in task_data if t.get('linked_concern_id')}
-            # Also count linked_concern_ids lists
-            for t in task_data:
-                for cid in t.get('linked_concern_ids', []):
-                    serviced_ids.add(cid)
             # Find unserviced active seed concerns, sorted by staleness
             # (oldest recency = most stale = nominated first)
             seed_unserviced = [
@@ -2002,12 +2009,22 @@ Respond with JSON:
         )
 
     def _apply_concern_recommendation(self, concern_id: str, recommendation: str, rationale: str):
-        """Apply a distillation concern recommendation to the derived concern model."""
+        """Apply a distillation concern recommendation to the derived concern model.
+
+        Seed concerns are never resolved or abandoned by distillation — they are
+        permanent operational priorities. A completed task means the concern is
+        being serviced, not that it no longer matters.
+        """
         op_map = {'resolve': 'resolve_concern', 'abandon': 'abandon_concern'}
         op = op_map.get(recommendation)
         if not op:
             return  # 'keep_active' — no action needed
         try:
+            # Don't resolve/abandon seed concerns — they're permanent
+            for c in self._derived_concern_model.get_concerns():
+                if c.get('concern_id') == concern_id and c.get('seeded'):
+                    logger.info(f'Distillation: skipping {recommendation} for seed concern {concern_id}')
+                    return
             patch = {
                 'op': op,
                 'concern_id': concern_id,
