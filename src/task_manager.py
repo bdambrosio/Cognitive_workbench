@@ -582,8 +582,12 @@ function renderTriage(triage) {
 function renderTasks(tasks) {
     const proposed = tasks.filter(t => t.status === 'proposed');
     const active = tasks.filter(t => t.status === 'active');
-    const establishing = tasks.filter(t => t.status === 'in_progress' || t.status === 'establishing');
+    const establishing = tasks.filter(t => t.status === 'in_progress' || t.status === 'establishing' || t.status === 'interrupted');
     const done = tasks.filter(t => ['completed', 'archived', 'abandoned'].includes(t.status));
+    // Catch tasks that don't match any category
+    const knownStatuses = new Set(['proposed', 'active', 'in_progress', 'establishing', 'interrupted', 'completed', 'archived', 'abandoned']);
+    const unknown = tasks.filter(t => !knownStatuses.has(t.status));
+    if (unknown.length) establishing.push(...unknown);  // show unknowns in establishing
 
     document.getElementById('proposed-count').textContent = proposed.length;
     document.getElementById('active-count').textContent = active.length;
