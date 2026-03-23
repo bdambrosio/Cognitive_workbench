@@ -261,6 +261,16 @@ def launch_resource_browser(world_label: str) -> Optional[subprocess.Popen]:
         return None
 
 
+def launch_task_manager() -> Optional[subprocess.Popen]:
+    try:
+        proc = subprocess.Popen([sys.executable, 'task_manager.py', '--port', '3002', '--no-browser'])
+        logger.info("Task Manager launched on port 3002")
+        return proc
+    except Exception as e:
+        logger.error(f"Failed to launch Task Manager: {e}")
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Agent thread
 # ---------------------------------------------------------------------------
@@ -304,6 +314,7 @@ def main():
     parser.add_argument('--ui', action='store_true', help='Launch FastAPI web UI')
     parser.add_argument('--ui-port', type=int, default=3000, help='Port for web UI (default: 3000)')
     parser.add_argument('--resource-browser', action='store_true', help='Launch Resource Browser (port 3001)')
+    parser.add_argument('--task-manager', action='store_true', help='Launch Task & Concern Manager (port 3002)')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     args = parser.parse_args()
 
@@ -366,6 +377,10 @@ def main():
             service_procs.append(proc)
     if args.resource_browser:
         proc = launch_resource_browser(world_name)
+        if proc:
+            service_procs.append(proc)
+    if args.task_manager:
+        proc = launch_task_manager()
         if proc:
             service_procs.append(proc)
 

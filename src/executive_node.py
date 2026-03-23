@@ -966,6 +966,9 @@ class ZenohExecutiveNode:
             self.character_config.get('seed_concerns', []))
         self._derived_concern_model.load()
 
+        from concern_triage import ConcernTriage
+        self._concern_triage = ConcernTriage()
+
         self._scheduled_goal_counter = 0
         self._active_scheduled_goal_id = None
         self._initialize_scheduled_goals()
@@ -974,10 +977,13 @@ class ZenohExecutiveNode:
         from goal_scheduler import GoalScheduler
         sched_cfg = self.character_config.get('goal_scheduler', self.character_config.get('task_scheduler', {}))
         interval_min = sched_cfg.get('interval', 15)  # minutes (consistent with UI)
+        autonomy_cfg = self.character_config.get('autonomy', {})
         self.goal_scheduler = GoalScheduler(
             character_name=self.character_name,
             interval=float(interval_min) * 60.0,  # convert to seconds
             enabled=sched_cfg.get('enabled', False),
+            budget_minutes=float(autonomy_cfg.get('budget_minutes_per_hour', 15)),
+            budget_window_minutes=float(autonomy_cfg.get('budget_window_minutes', 60)),
         )
         self.goal_scheduler.start(
             check_fn=self._scheduler_eligible_goals,
@@ -1213,6 +1219,20 @@ class ZenohExecutiveNode:
             self._handle_task_wip_interrupt
         )
 
+        # Task management control (for task manager UI)
+        self.control_task_approve_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/task_approve",
+            self._handle_task_approve
+        )
+        self.control_task_abandon_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/task_abandon",
+            self._handle_task_abandon
+        )
+        self.control_task_edit_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/task_edit",
+            self._handle_task_edit
+        )
+
         # === ZENOH PUBLICATION ===
         # NAME: execution_state_update
         # TOPIC: cognitive/{character}/execution_state
@@ -1301,6 +1321,16 @@ class ZenohExecutiveNode:
         self.task_wips_queryable = self.session.declare_queryable(
             f"cognitive/{character_name}/task_wips",
             self._task_wips_query_handler
+        )
+
+        self.concerns_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/concerns",
+            self._concerns_query_handler
+        )
+
+        self.triage_status_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/triage_status",
+            self._triage_status_query_handler
         )
 
         self.world_state_queryable = self.session.declare_queryable(
@@ -1539,7 +1569,7 @@ class ZenohExecutiveNode:
             planner_summary=self._get_planner_summary())
 
     def _ooda_idle_tick(self) -> None:
-        """Directed idle behavior: derived concern maintenance and living state persistence."""
+        """Directed idle behavior: derived concern maintenance, triage, and living state persistence."""
         if not self._is_goal_running():
             try:
                 uc = self.user_concern_model.get_concerns(active_only=True)
@@ -1547,8 +1577,8 @@ class ZenohExecutiveNode:
                     self._ooda_living_state, uc)
             except Exception as e:
                 logger.debug(f"Idle tick derived concern update skipped: {e}")
-            # Stub: detect active concerns that lack a linked task (Phase 2 autonomy)
-            self._check_unserviced_concerns()
+            # Concern triage: tick deferred timers, nominate from activations, run triage
+            self._triage_idle_tick()
         try:
             dc = self._derived_concern_model.get_concerns()
         except Exception:
@@ -1557,31 +1587,436 @@ class ZenohExecutiveNode:
             self._write_named_note, dc,
             planner_summary=self._get_planner_summary())
 
-    _UNSERVICED_CONCERN_LOG_COOLDOWN = 300.0  # log at most every 5 minutes
-    _last_unserviced_concern_log: float = 0.0
+    def _triage_idle_tick(self):
+        """Concern triage integration: nominate from activations, tick deferrals, run triage."""
+        self._concern_triage.tick_deferred()
 
-    def _check_unserviced_concerns(self):
-        """Stub: detect active concerns without linked tasks. Log only (Phase 2 autonomy)."""
-        now = time.monotonic()
-        if now - self._last_unserviced_concern_log < self._UNSERVICED_CONCERN_LOG_COOLDOWN:
-            return
+        # Activation-monitor nominations: check living state concern activations
         try:
             active_concerns = self._derived_concern_model.get_concerns(active_only=True)
-            if not active_concerns:
-                return
-            # Build set of concern IDs that have linked tasks
+            # Build set of concern IDs that already have linked tasks
             task_data = self._get_all_task_data()
             serviced_ids = {t.get('linked_concern_id') for t in task_data if t.get('linked_concern_id')}
-            unserviced = [c for c in active_concerns if c.get('concern_id') not in serviced_ids]
-            if unserviced:
-                labels = ', '.join(c.get('concern_label', '?') for c in unserviced)
-                logger.info(
-                    f'🔮 {len(unserviced)} active concern(s) without tasks: {labels} '
-                    f'[stub — concern-driven task creation deferred to Phase 2]'
+            for ca in self._ooda_living_state.concern_activations:
+                cid = ca.get('id', '')
+                if cid in serviced_ids:
+                    continue
+                # Only nominate derived concerns (not built-in character concerns)
+                concern = next((c for c in active_concerns if c.get('concern_id') == cid), None)
+                if not concern:
+                    continue
+                self._concern_triage.nominate_from_activation(
+                    concern_id=cid,
+                    concern_label=concern.get('concern_label', cid),
+                    concern_description=concern.get('concern_description', ''),
+                    activation=ca.get('activation', 0.0),
+                    trend=ca.get('trend', 'stable'),
                 )
-                self.__class__._last_unserviced_concern_log = now
         except Exception as e:
-            logger.debug(f'Unserviced concern check skipped: {e}')
+            logger.debug(f'Triage activation nomination skipped: {e}')
+
+        # Seed concern nomination: active seed concerns without linked tasks
+        try:
+            all_derived = self._derived_concern_model.get_concerns() or []
+            task_data = self._get_all_task_data()
+            serviced_ids = {t.get('linked_concern_id') for t in task_data if t.get('linked_concern_id')}
+            # Also count linked_concern_ids lists
+            for t in task_data:
+                for cid in t.get('linked_concern_ids', []):
+                    serviced_ids.add(cid)
+            # Find unserviced active seed concerns, sorted by staleness
+            # (oldest recency = most stale = nominated first)
+            seed_unserviced = [
+                c for c in all_derived
+                if c.get('seeded') and c.get('status') == 'active'
+                and c.get('concern_id') not in serviced_ids
+            ]
+            seed_unserviced.sort(key=lambda c: c.get('recency', ''))
+            # Nominate at most 1 per idle tick to avoid flooding the queue
+            for c in seed_unserviced[:1]:
+                self._concern_triage.nominate_seed(
+                    concern_id=c.get('concern_id', ''),
+                    concern_label=c.get('concern_label', ''),
+                    concern_description=c.get('concern_description', ''),
+                )
+        except Exception as e:
+            logger.debug(f'Triage seed nomination skipped: {e}')
+
+        # Run triage if candidates are queued and cooldown has elapsed
+        if self._concern_triage.should_run_triage():
+            try:
+                task_data = self._get_all_task_data()
+                # Filter to non-terminal tasks for deduplication context
+                live_tasks = [t for t in task_data
+                              if t.get('status') in ('proposed', 'in_progress', 'establishing', 'active')]
+                context = self._build_triage_context()
+                decisions = self._concern_triage.run_triage(
+                    existing_tasks=live_tasks,
+                    agent_context=context,
+                    llm_generate=self.llm_generate,
+                )
+                self._handle_triage_decisions(decisions)
+            except Exception as e:
+                logger.warning(f'Triage execution failed: {e}', exc_info=True)
+
+    def _build_triage_context(self) -> str:
+        """Build brief agent context string for the triage LLM prompt."""
+        parts = []
+        if self._is_goal_running():
+            parts.append('Currently executing a goal.')
+        else:
+            parts.append('Idle — no goal running.')
+        try:
+            goals = self._all_scheduled_goals()
+            active = [g for g in goals if g.get('status') == 'running']
+            ready = [g for g in goals if g.get('status') == 'ready']
+            parts.append(f'{len(active)} running, {len(ready)} ready goals.')
+        except Exception:
+            pass
+        try:
+            uc = self.user_concern_model.get_concerns(active_only=True) or []
+            if uc:
+                labels = ', '.join(c.get('concern_label', '?') for c in uc[:5])
+                parts.append(f'Active user concerns: {labels}')
+        except Exception:
+            pass
+        return ' '.join(parts)
+
+    def _handle_triage_decisions(self, decisions):
+        """Process triage decisions: create proposed tasks, attach to existing, etc."""
+        from concern_triage import TriageDecision
+        for d in decisions:
+            if d.action == 'create_task':
+                self._create_proposed_task(d.concern_id, d.task_intention, d.reason)
+            elif d.action == 'attach_to_task':
+                self._attach_concern_to_task(d.concern_id, d.existing_task_id)
+            # defer and dismiss are handled by ConcernTriage internally
+
+    def _create_proposed_task(self, concern_id: str, intention: str, reason: str):
+        """Create a proposed task from a triage decision. Awaits user approval."""
+        self._task_wip_counter += 1
+        wip_id = f"twip_{self._task_wip_counter}"
+        note_name = f"_task_wip_{self._task_wip_counter}"
+        now = datetime.now().isoformat()
+        wip_content = {
+            "task_wip_id": wip_id,
+            "intention": intention,
+            "status": "proposed",
+            "phase": "proposed",
+            "milestones_completed": [],
+            "current_milestone": None,
+            "accumulated_findings": [],
+            "linked_concern_id": concern_id,
+            "proposal_reason": reason,
+            "created": now,
+            "updated": now,
+        }
+        self.infospace_executor.execute_action({
+            "type": "create-note",
+            "value": json.dumps(wip_content),
+            "name": note_name,
+            "out": f"${note_name}",
+        })
+        self.infospace_executor.execute_action({
+            "type": "persist",
+            "target": f"${note_name}",
+            "name": note_name,
+        })
+        logger.info(f'📋 Proposed task created: {note_name} — "{intention[:80]}" (concern: {concern_id})')
+        self._say_to_user(
+            f"Task proposed: {intention[:200]}\n"
+            f"Reason: {reason}\n"
+            f"Awaiting approval in Task Manager."
+        )
+
+    def _attach_concern_to_task(self, concern_id: str, task_wip_id: str):
+        """Link a concern to an existing task."""
+        if not self.resource_manager:
+            return
+        try:
+            # Find the task WIP note by scanning named notes
+            for name, note_id in list(self.resource_manager.named_notes.items()):
+                if not name.startswith('_task_wip_'):
+                    continue
+                note_data = self.resource_manager.resource_registry.get(note_id)
+                if not note_data:
+                    continue
+                content_str = note_data.get('properties', {}).get('content', '')
+                if not content_str:
+                    continue
+                try:
+                    t = json.loads(content_str)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+                if t.get('task_wip_id') != task_wip_id:
+                    continue
+                # Found the matching task — update linked concerns
+                linked = t.get('linked_concern_ids', [])
+                if t.get('linked_concern_id') and t['linked_concern_id'] not in linked:
+                    linked = [t['linked_concern_id']] + linked
+                if concern_id not in linked:
+                    linked.append(concern_id)
+                t['linked_concern_ids'] = linked
+                t['updated'] = datetime.now().isoformat()
+                self.infospace_executor.execute_action({
+                    "type": "create-note",
+                    "value": json.dumps(t),
+                    "name": name,
+                    "out": f"${name}",
+                })
+                self.infospace_executor.execute_action({
+                    "type": "persist",
+                    "target": f"${name}",
+                    "name": name,
+                })
+                logger.info(f'📋 Concern {concern_id} attached to task {task_wip_id}')
+                return
+            logger.warning(f'Triage: task {task_wip_id} not found for concern attachment')
+        except Exception as e:
+            logger.warning(f'Triage: failed to attach concern {concern_id} to task {task_wip_id}: {e}')
+
+    def _approve_proposed_task(self, note_name: str, edited_intention: str = ''):
+        """Approve a proposed task, transitioning it to establishing.
+
+        Called from the task manager UI via Zenoh control endpoint.
+        """
+        # Guard: don't approve while another task is actively establishing
+        if self.active_task_wip:
+            logger.warning(f'Task approve: cannot approve {note_name} — '
+                           f'{self.active_task_wip} is currently establishing')
+            self._say_to_user(
+                f"Cannot approve task now — another task is currently establishing. "
+                f"Wait for it to complete or abandon it first.")
+            return
+        if not self.resource_manager:
+            return
+        note_id = self.resource_manager.named_notes.get(note_name)
+        if not note_id:
+            logger.warning(f'Task approve: note {note_name} not found')
+            return
+        try:
+            res = self.resource_manager.get_resource(note_id)
+            content = json.loads(res.get('properties', {}).get('content', '{}'))
+        except Exception as e:
+            logger.warning(f'Task approve: could not read {note_name}: {e}')
+            return
+        if content.get('status') != 'proposed':
+            logger.warning(f'Task approve: {note_name} is not in proposed state (is {content.get("status")})')
+            return
+
+        # Allow the user to edit the intention at approval time
+        if edited_intention:
+            content['intention'] = edited_intention
+
+        # Triage-originated tasks skip specification — the triage already
+        # provided a concrete intention, there's nothing to ask the user.
+        # We inject a synthetic completed milestone so the advance LLM sees
+        # specification as done and doesn't try to ask questions.
+        if content.get('linked_concern_id'):
+            start_phase = 'capability_evaluation'
+            content['milestones_completed'] = [{
+                'goal_text': 'Specification pre-satisfied by triage (autonomous task)',
+                'result_summary': (
+                    f'Task intention provided by concern triage: {content.get("intention", "")[:200]}. '
+                    f'No user clarification needed — proceed with capability evaluation.'
+                ),
+                'status': 'completed',
+                'timestamp': datetime.now().isoformat(),
+            }]
+            content['accumulated_findings'] = [
+                f'Specification: {content.get("intention", "")[:300]} (from triage, no user input needed)',
+            ]
+        else:
+            start_phase = 'specification'
+
+        # Transition to establishing — the main loop will pick it up
+        content['status'] = 'in_progress'
+        content['phase'] = start_phase
+        content['updated'] = datetime.now().isoformat()
+        self.infospace_executor.execute_action({
+            "type": "create-note",
+            "value": json.dumps(content),
+            "name": note_name,
+            "out": f"${note_name}",
+        })
+        self.infospace_executor.execute_action({
+            "type": "persist",
+            "target": f"${note_name}",
+            "name": note_name,
+        })
+        # Activate the WIP so the main loop picks it up
+        self.active_task_wip = note_name
+        self.active_task_wip_waiting = False
+        self._task_wip_pre_resource_ids = set(
+            self.resource_manager.resource_registry.keys()
+        ) if self.resource_manager else set()
+        logger.info(f'📋 Task approved: {note_name} — "{content["intention"][:80]}"')
+        self._say_to_user(f'Task approved and establishing: {content["intention"][:200]}')
+
+    def _abandon_task(self, note_name: str, reason: str = ''):
+        """Abandon a task at any lifecycle stage. Triggers distillation if there's work to learn from."""
+        if not self.resource_manager:
+            return
+        note_id = self.resource_manager.named_notes.get(note_name)
+        if not note_id:
+            logger.warning(f'Task abandon: note {note_name} not found')
+            return
+        try:
+            res = self.resource_manager.get_resource(note_id)
+            content = json.loads(res.get('properties', {}).get('content', '{}'))
+        except Exception as e:
+            logger.warning(f'Task abandon: could not read {note_name}: {e}')
+            return
+        old_status = content.get('status', '')
+        content['status'] = 'abandoned'
+        content['abandon_reason'] = reason
+        content['updated'] = datetime.now().isoformat()
+        self.infospace_executor.execute_action({
+            "type": "create-note",
+            "value": json.dumps(content),
+            "name": note_name,
+            "out": f"${note_name}",
+        })
+        self.infospace_executor.execute_action({
+            "type": "persist",
+            "target": f"${note_name}",
+            "name": note_name,
+        })
+        # If this was the active WIP, clear it
+        if self.active_task_wip == note_name:
+            self.active_task_wip = None
+            self.active_task_wip_waiting = False
+            self._task_wip_pre_resource_ids = None
+        # Distill learnings if there was any establishment work
+        if content.get('milestones_completed'):
+            self._distill_task_learnings(content, outcome='abandoned')
+        logger.info(f'📋 Task abandoned: {note_name} (was {old_status})')
+        self._say_to_user(f'Task abandoned: {content.get("intention", "")[:200]}')
+
+    # ── Task distillation ────────────────────────────────────────────────
+
+    _DISTILL_SYSTEM_PROMPT = """\
+You distill operational learnings from completed or abandoned tasks for an autonomous agent.
+
+Given the task record (intention, milestones, findings, outcome), extract:
+1. A concise summary of what was attempted and what happened.
+2. Key learnings — what worked, what didn't, what was surprising.
+3. A recommendation for how the linked concern should be updated (resolve, keep active, etc.).
+
+Respond with JSON:
+{
+  "summary": "1-2 sentence outcome summary",
+  "learnings": ["concrete learning 1", "concrete learning 2", ...],
+  "concern_recommendation": "resolve|keep_active|abandon",
+  "concern_rationale": "short explanation"
+}
+"""
+
+    def _distill_task_learnings(self, task_data: Dict[str, Any], outcome: str = 'completed'):
+        """Extract learnings from a completed/abandoned task and persist as a learning note.
+
+        This is intentionally simple — marshals information for the LLM and persists
+        the result. Not the final solution for distillation; a clean framework for
+        capturing what we have.
+        """
+        intention = task_data.get('intention', '')
+        milestones = task_data.get('milestones_completed', [])
+        findings = task_data.get('accumulated_findings', [])
+        wip_id = task_data.get('task_wip_id', '')
+        concern_id = task_data.get('linked_concern_id', '')
+
+        user_prompt = (
+            f"TASK INTENTION: {intention}\n"
+            f"OUTCOME: {outcome}\n"
+            f"MILESTONES:\n{json.dumps(milestones, indent=2)}\n"
+            f"ACCUMULATED FINDINGS:\n{json.dumps(findings, indent=2)}\n"
+        )
+        if task_data.get('completion_summary'):
+            user_prompt += f"COMPLETION SUMMARY: {task_data['completion_summary']}\n"
+        if task_data.get('abandon_reason'):
+            user_prompt += f"ABANDON REASON: {task_data['abandon_reason']}\n"
+
+        try:
+            resp = self.llm_generate(
+                [self._DISTILL_SYSTEM_PROMPT, user_prompt],
+                max_tokens=400,
+                temperature=0.2,
+                is_json=True,
+            )
+            resp_text = getattr(resp, 'text', '') if hasattr(resp, 'text') else str(resp)
+            # resp_text may already be parsed JSON (dict/list) when is_json=True
+            if isinstance(resp_text, dict):
+                distillation = resp_text
+            else:
+                t = str(resp_text).strip()
+                if t.startswith('```'):
+                    first_nl = t.find('\n')
+                    if first_nl != -1:
+                        t = t[first_nl + 1:]
+                    if t.endswith('```'):
+                        t = t[:-3]
+                    t = t.strip()
+                distillation = json.loads(t)
+        except Exception as e:
+            logger.warning(f'Task distillation LLM call failed: {e}')
+            distillation = {
+                'summary': f'Task {"completed" if outcome == "completed" else "abandoned"}: {intention[:100]}',
+                'learnings': findings[:3] if findings else [],
+                'concern_recommendation': 'keep_active',
+                'concern_rationale': 'distillation failed — defaulting to keep_active',
+            }
+
+        # Persist as a learning note
+        learning_note_name = f"_task_learning_{wip_id}"
+        learning_content = {
+            'task_wip_id': wip_id,
+            'intention': intention,
+            'outcome': outcome,
+            'linked_concern_id': concern_id,
+            'distilled_at': datetime.now().isoformat(),
+            **distillation,
+        }
+        self.infospace_executor.execute_action({
+            "type": "create-note",
+            "value": json.dumps(learning_content),
+            "name": learning_note_name,
+            "out": f"${learning_note_name}",
+        })
+        self.infospace_executor.execute_action({
+            "type": "persist",
+            "target": f"${learning_note_name}",
+            "name": learning_note_name,
+        })
+
+        # Update linked concern based on recommendation
+        if concern_id and distillation.get('concern_recommendation'):
+            self._apply_concern_recommendation(
+                concern_id,
+                distillation['concern_recommendation'],
+                distillation.get('concern_rationale', ''),
+            )
+
+        logger.info(
+            f'📋 Task distillation: {wip_id} → {distillation.get("summary", "")[:80]} '
+            f'({len(distillation.get("learnings", []))} learnings, concern→{distillation.get("concern_recommendation", "?")})'
+        )
+
+    def _apply_concern_recommendation(self, concern_id: str, recommendation: str, rationale: str):
+        """Apply a distillation concern recommendation to the derived concern model."""
+        op_map = {'resolve': 'resolve_concern', 'abandon': 'abandon_concern'}
+        op = op_map.get(recommendation)
+        if not op:
+            return  # 'keep_active' — no action needed
+        try:
+            patch = {
+                'op': op,
+                'concern_id': concern_id,
+                'field_updates': {'status_rationale': rationale},
+            }
+            self._derived_concern_model._apply_patch(patch, f'distillation:{concern_id}')
+            self._derived_concern_model._save()
+        except Exception as e:
+            logger.debug(f'Concern recommendation application skipped: {e}')
 
     def _announce_character(self):
         """Announce character presence to the action display node."""
@@ -3311,10 +3746,19 @@ class ZenohExecutiveNode:
             for name, note_id in list(self.resource_manager.named_notes.items()):
                 if not name.startswith('_task_wip_'):
                     continue
-                res = self.resource_manager.get_resource(note_id)
-                content = getattr(res, 'content', '') if res else ''
-                if content:
-                    tasks.append(json.loads(content))
+                note_data = self.resource_manager.resource_registry.get(note_id)
+                if not note_data:
+                    continue
+                content = note_data.get('properties', {}).get('content', '')
+                if not content:
+                    continue
+                try:
+                    wip = json.loads(content) if isinstance(content, str) else content
+                    if isinstance(wip, dict):
+                        wip['_note_name'] = name
+                        tasks.append(wip)
+                except (json.JSONDecodeError, TypeError):
+                    continue
         except Exception as e:
             logger.warning(f'Error reading task data: {e}')
         return tasks
@@ -3652,10 +4096,12 @@ class ZenohExecutiveNode:
         if schedule_mode == "daily" and not scheduled_goal.get("run_at"):
             scheduled_goal["run_at"] = "09:00"
         scheduled_goal["task_context_note"] = self.active_task_wip
+        # Tag origin for autonomy budget tracking
+        scheduled_goal["origin"] = "autonomous" if wip.get("linked_concern_id") else "user"
         self._save_scheduled_goal(scheduled_goal)
 
-        # Transition WIP Note to operational lifecycle
-        wip["status"] = "completed"
+        # Transition WIP Note to active (operational) lifecycle
+        wip["status"] = "active"
         wip["phase"] = "complete"
         wip["scheduled_goal_id"] = goal_id
         wip["completion_summary"] = summary
@@ -3669,6 +4115,9 @@ class ZenohExecutiveNode:
         wip["last_executed"] = None
         wip["execution_count"] = 0
         self._update_task_wip(wip)
+
+        # Distill establishment learnings
+        self._distill_task_learnings(wip, outcome='established')
 
         # Clean up establishment artifacts
         self._cleanup_task_establishment(wip, goal_id)
@@ -4617,6 +5066,8 @@ class ZenohExecutiveNode:
         # Update character concern activations (exponential decay)
         if assessment:
             self._update_character_concern_activations(assessment)
+            # Orient-stage triage nomination: strong bump on a cold concern
+            self._triage_orient_nominations(assessment)
 
         return OrientedEvent(event=event, assessment=assessment)
 
@@ -4644,6 +5095,45 @@ class ZenohExecutiveNode:
                         old = self._character_concern_activations.get(cid, 0.0)
                         self._character_concern_activations[cid] = old * DECAY + BUMP.get(level, 0.0)
                 break
+
+    def _triage_orient_nominations(self, assessment: Dict[str, Any]):
+        """Check orient assessment for strong bumps on cold concerns — nominate for triage."""
+        notes = assessment.get('notes', '')
+        if 'concerns:' not in notes:
+            return
+        BUMP_LEVELS = {'strong', 'moderate', 'weak', 'none'}
+        for segment in notes.split(';'):
+            segment = segment.strip()
+            if not segment.startswith('concerns:'):
+                continue
+            pairs = segment[len('concerns:'):].strip()
+            for pair in pairs.split(','):
+                pair = pair.strip()
+                if '=' not in pair:
+                    continue
+                cid, level = pair.rsplit('=', 1)
+                cid, level = cid.strip(), level.strip()
+                if level not in BUMP_LEVELS:
+                    continue
+                activation = self._character_concern_activations.get(cid, 0.0)
+                # Look up concern description from derived concerns
+                desc, label = '', cid
+                try:
+                    for c in self._derived_concern_model.get_concerns(active_only=True):
+                        if c.get('concern_id') == cid:
+                            label = c.get('concern_label', cid)
+                            desc = c.get('concern_description', '')
+                            break
+                except Exception:
+                    pass
+                self._concern_triage.nominate_from_orient(
+                    concern_id=cid,
+                    concern_label=label,
+                    concern_description=desc,
+                    activation=activation,
+                    bump_level=level,
+                )
+            break
 
     def _ooda_decide(self, oriented: OrientedEvent) -> Action:
         """DECIDE: Pure routing — map classification to Action. No LLM calls."""
@@ -6270,6 +6760,110 @@ class ZenohExecutiveNode:
             logger.error(f"Error in task_wips query handler: {e}")
             response = {"success": False, "error": str(e)}
             query.reply(query.key_expr, json.dumps(response).encode("utf-8"))
+
+    def _concerns_query_handler(self, query):
+        """Handle query for all concerns (user + derived) with activation levels."""
+        try:
+            # User concerns
+            user_concerns = []
+            try:
+                user_concerns = self.user_concern_model.get_concerns(active_only=False) or []
+            except Exception:
+                pass
+
+            # Derived concerns
+            derived_concerns = []
+            try:
+                derived_concerns = self._derived_concern_model.get_concerns() or []
+            except Exception:
+                pass
+
+            # Activation levels from living state
+            activations = {}
+            for ca in self._ooda_living_state.concern_activations:
+                activations[ca.get('id', '')] = {
+                    'activation': ca.get('activation', 0.0),
+                    'trend': ca.get('trend', 'stable'),
+                }
+
+            response = {
+                'success': True,
+                'user_concerns': user_concerns,
+                'derived_concerns': derived_concerns,
+                'activations': activations,
+            }
+            query.reply(query.key_expr, json.dumps(response, default=str).encode('utf-8'))
+        except Exception as e:
+            logger.error(f'Error in concerns query handler: {e}')
+            query.reply(query.key_expr, json.dumps({'success': False, 'error': str(e)}).encode('utf-8'))
+
+    def _triage_status_query_handler(self, query):
+        """Handle query for triage system status including autonomy budget."""
+        try:
+            status = self._concern_triage.get_status()
+            # Include autonomy budget from goal scheduler
+            if hasattr(self, 'goal_scheduler'):
+                sched = self.goal_scheduler.get_status()
+                status['budget_remaining_seconds'] = sched.get('budget_remaining_seconds', 0)
+                status['budget_total_seconds'] = sched.get('budget_total_seconds', 0)
+                status['budget_window_seconds'] = sched.get('budget_window_seconds', 0)
+            response = {'success': True, **status}
+            query.reply(query.key_expr, json.dumps(response, default=str).encode('utf-8'))
+        except Exception as e:
+            logger.error(f'Error in triage_status query handler: {e}')
+            query.reply(query.key_expr, json.dumps({'success': False, 'error': str(e)}).encode('utf-8'))
+
+    def _handle_task_approve(self, sample):
+        """Handle task approval from task manager UI."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            note_name = data.get('note_name', '')
+            edited_intention = data.get('intention', '')
+            if note_name:
+                self._approve_proposed_task(note_name, edited_intention)
+        except Exception as e:
+            logger.warning(f'Task approve control error: {e}')
+
+    def _handle_task_abandon(self, sample):
+        """Handle task abandonment from task manager UI."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            note_name = data.get('note_name', '')
+            reason = data.get('reason', 'abandoned via task manager')
+            if note_name:
+                self._abandon_task(note_name, reason)
+        except Exception as e:
+            logger.warning(f'Task abandon control error: {e}')
+
+    def _handle_task_edit(self, sample):
+        """Handle task intention edit from task manager UI."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            note_name = data.get('note_name', '')
+            new_intention = data.get('intention', '')
+            if not note_name or not new_intention:
+                return
+            note_id = self.resource_manager.named_notes.get(note_name) if self.resource_manager else None
+            if not note_id:
+                return
+            res = self.resource_manager.get_resource(note_id)
+            content = json.loads(res.get('properties', {}).get('content', '{}'))
+            content['intention'] = new_intention
+            content['updated'] = datetime.now().isoformat()
+            self.infospace_executor.execute_action({
+                "type": "create-note",
+                "value": json.dumps(content),
+                "name": note_name,
+                "out": f"${note_name}",
+            })
+            self.infospace_executor.execute_action({
+                "type": "persist",
+                "target": f"${note_name}",
+                "name": note_name,
+            })
+            logger.info(f'📋 Task edited: {note_name} — new intention: "{new_intention[:80]}"')
+        except Exception as e:
+            logger.warning(f'Task edit control error: {e}')
 
     def _world_state_query_handler(self, query):
         """Handle query for current world state."""

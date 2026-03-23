@@ -1482,6 +1482,69 @@ Generated: {generated_at}
                 logger.error(f"Error in task_wip_interrupt: {e}")
                 return {"success": False, "message": str(e)}
 
+        @self.app.post("/api/task_approve/{character}")
+        async def task_approve(character: str, data: dict = Body(...)):
+            """Approve a proposed task."""
+            try:
+                payload = json.dumps(data).encode()
+                self.session.put(f"cognitive/{character}/control/task_approve", payload)
+                return {"success": True}
+            except Exception as e:
+                logger.error(f"Error in task_approve: {e}")
+                return {"success": False, "message": str(e)}
+
+        @self.app.post("/api/task_abandon/{character}")
+        async def task_abandon(character: str, data: dict = Body(...)):
+            """Abandon a task."""
+            try:
+                payload = json.dumps(data).encode()
+                self.session.put(f"cognitive/{character}/control/task_abandon", payload)
+                return {"success": True}
+            except Exception as e:
+                logger.error(f"Error in task_abandon: {e}")
+                return {"success": False, "message": str(e)}
+
+        @self.app.post("/api/task_edit/{character}")
+        async def task_edit(character: str, data: dict = Body(...)):
+            """Edit a task's intention."""
+            try:
+                payload = json.dumps(data).encode()
+                self.session.put(f"cognitive/{character}/control/task_edit", payload)
+                return {"success": True}
+            except Exception as e:
+                logger.error(f"Error in task_edit: {e}")
+                return {"success": False, "message": str(e)}
+
+        @self.app.get("/api/concerns/{character}")
+        async def get_concerns(character: str):
+            """Get all concerns with activation levels for a character."""
+            try:
+                selector = f"cognitive/{character}/concerns"
+                replies = self.session.get(selector, timeout=2.0)
+                for reply in replies:
+                    if hasattr(reply, 'ok') and reply.ok is not None:
+                        payload_bytes = reply.ok.payload.to_bytes()
+                        return json.loads(payload_bytes.decode('utf-8'))
+                return {"success": True, "user_concerns": [], "derived_concerns": [], "activations": {}}
+            except Exception as e:
+                logger.error(f"Error getting concerns: {e}")
+                return {"success": False, "message": str(e)}
+
+        @self.app.get("/api/triage_status/{character}")
+        async def get_triage_status(character: str):
+            """Get triage system status for a character."""
+            try:
+                selector = f"cognitive/{character}/triage_status"
+                replies = self.session.get(selector, timeout=2.0)
+                for reply in replies:
+                    if hasattr(reply, 'ok') and reply.ok is not None:
+                        payload_bytes = reply.ok.payload.to_bytes()
+                        return json.loads(payload_bytes.decode('utf-8'))
+                return {"success": True, "candidates": [], "deferred": {}}
+            except Exception as e:
+                logger.error(f"Error getting triage status: {e}")
+                return {"success": False, "message": str(e)}
+
         @self.app.get("/api/characters")
         async def get_characters():
             """Get list of active characters that have announced themselves."""
@@ -2684,6 +2747,7 @@ Generated: {generated_at}
                         <button onclick="saveAll()" style="background: #95e1d3; color: #1a1a1a; margin-right: 10px;" title="Save all resources and memory to disk">Save</button>
                         <button onclick="exportToObsidian()" style="background: #7c3aed; color: white; margin-right: 10px;" title="Export action log to Obsidian vault">Obsidian</button>
                         <button onclick="openResourceBrowser()" style="background: #0e639c; color: white; margin-right: 10px;" title="Open resource browser in new tab to view Notes and Collections">🔍 Browser</button>
+                        <button onclick="openTaskManager()" style="background: #388a34; color: white; margin-right: 10px;" title="Open task & concern manager">📋 Tasks</button>
                         <button onclick="shutdownWithSave()" style="background: #ff4757; color: white;" title="Save all data and shutdown the system">Shutdown</button>
                     </div>
                     <div style="margin-bottom: 15px; padding: 10px; background: #333; border-radius: 5px;">
@@ -4264,7 +4328,11 @@ Generated: {generated_at}
             // Just open it - browser will show connection error if not running
             window.open('http://localhost:3001', '_blank');
         }
-        
+
+        function openTaskManager() {
+            window.open('http://localhost:3002', '_blank');
+        }
+
         // Test Runner Functions
         function openTestRunner() {
             const modal = document.getElementById('testModal');
