@@ -3082,9 +3082,12 @@ Respond with JSON:
                         except Exception as e:
                             logger.debug(f'Could not load primary_product content: {e}')
 
+                    # Sanitize Note IDs → named references to prevent stale ID leakage
+                    clean_summary = self._sanitize_note_ids(result_summary)
+                    clean_goal_text = self._sanitize_note_ids(goal.get("goal_text", ""))
                     milestone_record = {
-                        "goal_text": goal.get("goal_text", ""),
-                        "result_summary": result_summary,
+                        "goal_text": clean_goal_text,
+                        "result_summary": clean_summary,
                         "status": "completed" if success else "failed",
                         "timestamp": datetime.now().isoformat(),
                     }
@@ -3093,13 +3096,15 @@ Respond with JSON:
                         wip["current_milestone"] = None
                         wip["updated"] = datetime.now().isoformat()
                         # Capture primary_product content in accumulated_findings
-                        if primary_product and result_summary and len(result_summary) > 20:
+                        if primary_product and clean_summary and len(clean_summary) > 20:
                             wip.setdefault("accumulated_findings", []).append(
-                                f"Milestone result: {result_summary}"
+                                f"Milestone result: {clean_summary}"
                             )
                         elif primary_product:
+                            # Use named note if available, else fall back to ID
+                            artifact_name = self._sanitize_note_ids(primary_product)
                             wip.setdefault("accumulated_findings", []).append(
-                                f"Milestone produced artifact: {primary_product}"
+                                f"Milestone produced artifact: {artifact_name}"
                             )
                         # For specification phase, also capture the result as a finding
                         # so subsequent phases see user answers in ACCUMULATED FINDINGS
@@ -3780,6 +3785,27 @@ Respond with JSON:
             logger.warning(f'Error reading task data: {e}')
         return tasks
 
+    def _sanitize_note_ids(self, text: str) -> str:
+        """Replace literal Note IDs (e.g., Note_827) with their named equivalents.
+
+        Prevents stale ID references from leaking into milestone history,
+        accumulated findings, and goal text — where they would confuse
+        subsequent milestones that should load by name instead.
+        """
+        if not self.resource_manager or not text:
+            return text
+        # Build reverse map: Note_ID → name (for named notes only)
+        id_to_name = {}
+        for name, note_id in self.resource_manager.named_notes.items():
+            if not name.startswith('_'):  # Skip internal system notes
+                id_to_name[note_id] = name
+        # Replace occurrences like "Note_827" with "note-name (Note_827)"
+        # or just "note-name" to keep it clean
+        for note_id, name in id_to_name.items():
+            if note_id in text:
+                text = text.replace(note_id, f'"{name}"')
+        return text
+
     def _update_task_wip(self, wip: Dict[str, Any]):
         """Write updated WIP content back to the Note."""
         if not self.active_task_wip or not self.resource_manager:
@@ -3825,6 +3851,12 @@ Respond with JSON:
         "- COMPLETE is only valid from the activation phase.\n"
         "- If a phase has nothing to do, submit a brief milestone that records\n"
         "  'no setup needed' and advances to the next phase.\n\n"
+        "NOTE REFERENCE RULE:\n"
+        "- ALWAYS reference persistent notes by NAME (e.g., `check-health-digest`),\n"
+        "  NEVER by Note ID (e.g., `Note_827`). Note IDs are ephemeral — they change\n"
+        "  between milestones when notes are recreated. Use load(target=\"note-name\")\n"
+        "  not load(target=\"Note_NNN\"). This applies to goal text, code, and any\n"
+        "  references to notes created in previous milestones.\n\n"
         "Determine what to do next. Your options are:\n"
         "1. SUBMIT_GOAL: Submit a SHORT, FOCUSED milestone goal (one establishment step).\n"
         "   Keep goal text concise — one clear objective, not a multi-step execution plan.\n"
@@ -4045,9 +4077,10 @@ Respond with JSON:
 
                 success = bool(response_text)
                 summary_text = response_text[:1500] if response_text else "No response received"
+                clean_summary = self._sanitize_note_ids(summary_text)
                 milestone_record = {
                     "goal_text": goal_text[:200],
-                    "result_summary": summary_text,
+                    "result_summary": clean_summary,
                     "status": "completed" if success else "failed",
                     "timestamp": datetime.now().isoformat(),
                 }
@@ -4057,7 +4090,7 @@ Respond with JSON:
                     wip_fresh["current_milestone"] = None
                     wip_fresh["updated"] = datetime.now().isoformat()
                     wip_fresh.setdefault("accumulated_findings", []).append(
-                        f"User clarification: {summary_text}"
+                        f"User clarification: {clean_summary}"
                     )
                     self._update_task_wip(wip_fresh)
                 logger.info(f'📋 Task WIP {task_wip_id}: direct-ask milestone completed ({len(response_text)} chars)')
