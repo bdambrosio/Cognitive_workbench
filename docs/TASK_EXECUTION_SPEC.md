@@ -25,23 +25,63 @@ A task is a sustained operational commitment — something the agent has decided
 - **Intention**: what the task accomplishes (from triage or user)
 - **Linked concern**: the derived concern that motivated it
 - **Lifecycle**: proposed -> establishing -> active -> completed/archived/abandoned
-- **Execution state**: idle / pending / running / cooldown
-- **WIP chain**: a sequence of goals (steps) that constitute one execution cycle
+- **Execution state**: idle / running / cooldown
+- **Task state**: persistent scratch pad accumulated across goals within a cycle
 
-A task is NOT a single goal. A task may require multiple goals per execution
-cycle (e.g., "check health, update digest, report anomalies" = 3 steps).
+A task is NOT a single goal. A task is an **outer loop** that dynamically
+decides what goal to run next based on accumulated state — analogous to how
+the incremental planner decides what step to run next within a single goal.
 
 ### Goal (Step)
 
-A goal is a single executable unit — one planner run. Goals are the atoms of
-execution. During task establishment, goals are milestones. During operational
-execution, goals are steps in the task's recurring work.
+A goal is a single executable unit — one full planner run. Goals are the atoms
+of scheduling. The tick loop dispatches one goal per tick across all active
+tasks. Between goals, other tasks and user events get their turn.
 
 ### Execution Cycle
 
-One complete run of an active task. May involve 1-N goals executed sequentially.
-When the last goal in the cycle completes, the task returns to idle and its
-cooldown timer starts.
+One complete operational run of an active task. A cycle consists of 1-N goals
+decided dynamically by the task's operational advance LLM. The cycle ends when
+the LLM decides the task's work for this cycle is complete. The task then
+enters cooldown until its next cycle.
+
+---
+
+## The Two-Level Planner Architecture
+
+The system has two nested planning loops:
+
+```
+OUTER LOOP: Task operational cycle (this spec)
+  - State: task WIP (intention, findings, execution history, cycle state)
+  - Decision: LLM decides next goal for this cycle
+  - Execution: dispatches one goal per tick (yields between goals)
+  - Termination: LLM says "cycle complete" → cooldown
+
+  INNER LOOP: Incremental planner (existing)
+    - State: goal context, bindings, step history
+    - Decision: LLM decides next step for this goal
+    - Execution: runs steps sequentially within a single goal
+    - Termination: LLM says "done" → goal complete
+```
+
+This mirrors the existing establishment loop, where `_advance_task_wip` is
+the outer loop deciding milestone goals, and the planner is the inner loop
+executing each milestone. The operational cycle uses the **same pattern**
+with a **different prompt** (operational instead of establishment).
+
+### Comparison
+
+| Aspect | Establishment (current) | Operational (this spec) |
+|--------|------------------------|------------------------|
+| Outer loop | `_advance_task_wip` | `_advance_task_execution` (new) |
+| Decision | "What milestone next?" | "What goal next for this cycle?" |
+| Phase gating | spec → capability → infra → activation | None — dynamic |
+| Concurrency | One at a time | Multiple tasks, round-robin |
+| Prompt | `_ADVANCE_TASK_PROMPT` | `_OPERATIONAL_TASK_PROMPT` (new) |
+| Yields | Does not yield between milestones | Yields after each goal |
+| Budget | Not budgeted (user approved) | Budgeted (autonomous) |
+| Termination | Phases complete → COMPLETE | LLM says "CYCLE_DONE" |
 
 ---
 
@@ -53,24 +93,19 @@ cooldown timer starts.
                     +-----+-----+
                           | approve (Task Manager UI)
                     +-----v-----+
-                    |establishing|  (milestone loop running)
+                    |establishing|  (milestone loop, single-threaded)
                     +-----+-----+
                           | _complete_task_wip
                     +-----v-----+
-              +---->|   idle    |  (active, waiting for next execution)
+              +---->|   idle    |  (active, waiting for next cycle)
               |     +-----+-----+
-              |           | _tick selects this task (round-robin)
+              |           | tick loop selects (round-robin, cooldown elapsed)
               |     +-----v-----+
-              |     |  pending  |  (selected, goal about to be dispatched)
+              |     |  running  |  (executing goals for this cycle)
               |     +-----+-----+
-              |           | goal dispatched to thread
+              |           | LLM says CYCLE_DONE
               |     +-----v-----+
-              |     |  running  |  (goal executing on worker thread)
-              |     +-----+-----+
-              |           | goal completes
-              |           |
-              |     +-----v-----+
-              |     | cooldown  |  (minimum interval before next run)
+              |     | cooldown  |  (minimum interval before next cycle)
               |     +-----+-----+
               |           | cooldown expires
               +-----------+
@@ -78,204 +113,222 @@ cooldown timer starts.
 
 Terminal states: `completed`, `archived`, `abandoned`
 
----
-
-## The Tick Loop: Task-Aware Execution
-
-The `_main_loop_tick` currently has this structure:
-
-```
-1. Goal completion check
-2. Task WIP advancement (if establishing)
-3. Ask reply routing
-4. Skip if goal running
-5. OODA pipeline
-```
-
-The revised structure for multi-task execution:
-
-```
-1. Goal completion check
-   - If goal thread done: record result, update executing task state
-   - Clear running state
-
-2. Task execution dispatch (if no goal running)
-   - Select next eligible task (round-robin among idle tasks past cooldown)
-   - Check autonomy budget (skip if exhausted)
-   - Dispatch next goal/step for selected task
-   - Set task state to running
-
-3. Task establishment advancement (if establishing task exists and no goal running)
-   - Only one task can be establishing at a time
-   - Submit next milestone goal
-
-4. Ask reply routing (if goal blocked on ask)
-
-5. If goal running: return (skip OODA)
-
-6. OODA pipeline (only when truly idle — no tasks running, no establishment)
-   - Observe -> Orient -> Decide -> Act
-   - Triage runs here (idle tick path)
-   - User chat/events processed here
-```
-
-### Key changes from current:
-
-- **Step 2 is new**: active tasks get dispatched from the tick loop, not from
-  the goal scheduler. The tick loop owns task execution.
-- **Round-robin selection**: each tick picks the next eligible task, cycling
-  through all active tasks fairly. No task starves another.
-- **Budget check at dispatch time**: if autonomy budget is exhausted, no
-  autonomous task runs this tick. User-initiated goals bypass the budget.
-- **OODA only when idle**: the OODA pipeline (including user chat) runs only
-  when no task is executing. This preserves responsiveness — tasks yield
-  between goals, and the agent can respond to the user in those gaps.
+Note: there is no "pending" state. Selection and dispatch happen in the
+same tick — a task goes directly from idle to running.
 
 ---
 
-## Task Selection: Round-Robin with Cooldowns
+## The Operational Advance Loop
 
-### Data Structures
+When the tick loop selects a task for execution, it calls
+`_advance_task_execution(task_wip)` — the operational analog of
+`_advance_task_wip`.
 
-Each active task tracks:
+### Task WIP State During Execution
+
+The task WIP note accumulates state across goals within a cycle:
 
 ```python
 {
-    "execution_state": "idle",       # idle | pending | running | cooldown
-    "last_executed": "ISO timestamp",
-    "cooldown_seconds": 3600,        # minimum interval between executions
-    "execution_count": 0,
-    "priority": "normal",            # normal | high (user-initiated get high)
+    # Identity (set during establishment)
+    "task_wip_id": "twip_1",
+    "intention": "Run check-health diagnostic and report failures",
+    "status": "active",
+    "lifecycle": "operational",
+    "linked_concern_id": "dconcern_2",
+
+    # Operational state (persists across cycles)
+    "execution_count": 3,
+    "last_executed": "2026-03-23T10:00:00Z",
+    "cooldown_seconds": 3600,
+    "execution_history": [...],          # ring buffer of past cycles
+
+    # Cycle state (reset each cycle, accumulates across goals within cycle)
+    "cycle_state": "running",            # idle | running | done
+    "cycle_goals_completed": [           # goals completed in THIS cycle
+        {
+            "goal_text": "Run check-health and capture output",
+            "result_summary": "Overall status: ok, no concerns",
+            "status": "completed",
+            "timestamp": "2026-03-23T11:00:05Z"
+        }
+    ],
+    "cycle_findings": [                  # accumulated within THIS cycle
+        "Health check returned ok, all subsystems nominal"
+    ],
+
+    # Establishment artifacts (from setup, read-only during execution)
+    "establishment_findings": [...],
+    "establishment_milestones": [...],
 }
 ```
 
-### Selection Algorithm
+### The Advance Prompt
 
 ```
-eligible_tasks = [
-    t for t in active_tasks
-    if t.execution_state == "idle"
-    and (now - t.last_executed) > t.cooldown_seconds
-    and autonomy_budget_remaining > 0
-]
+_OPERATIONAL_TASK_PROMPT:
 
-# Round-robin: sort by last_executed ascending (stalest first)
-eligible_tasks.sort(key=lambda t: t.last_executed or "")
+You are executing one cycle of a recurring autonomous task.
 
-if eligible_tasks:
-    next_task = eligible_tasks[0]
-    dispatch(next_task)
+TASK INTENTION: {intention}
+
+ESTABLISHMENT CONTEXT: {establishment_findings}
+
+CYCLE STATE:
+Goals completed this cycle: {cycle_goals_completed}
+Findings this cycle: {cycle_findings}
+
+EXECUTION HISTORY (recent cycles): {recent_execution_history}
+
+Determine what to do next. Your options are:
+1. SUBMIT_GOAL: Submit a goal for the next step of this cycle.
+2. CYCLE_DONE: This cycle is complete. Summarize what was accomplished.
+
+IMPORTANT:
+- Each goal should be a single, focused operation.
+- Reference notes by NAME, never by ID.
+- Do not repeat work already done in this cycle.
+- If the task's intention is fully satisfied by completed goals, say CYCLE_DONE.
+
+Respond in this format:
+ACTION: <SUBMIT_GOAL | CYCLE_DONE>
+GOAL_TEXT: <goal text if SUBMIT_GOAL, or cycle summary if CYCLE_DONE>
 ```
 
-This ensures:
-- Tasks that haven't run in the longest time go first
-- Cooldowns prevent rapid re-execution
-- Budget gate prevents runaway autonomous work
-- A task that just finished goes to the back of the queue
+### Goal-to-Task State Flow
 
-### Cooldown Defaults (configurable per-task)
+When a goal completes within an operational cycle:
 
-| Task origin | Default cooldown |
-|------------|-----------------|
-| Seed concern (health monitoring) | 3600s (1 hour) |
-| Seed concern (workspace maintenance) | 7200s (2 hours) |
-| Derived concern (event-triggered) | 1800s (30 min) |
-| User-initiated task | 0s (run immediately when selected) |
+```
+1. Goal thread finishes → _set_task_goal_result(task_wip, result)
+2. Append to cycle_goals_completed
+3. Append findings from result to cycle_findings
+4. Sanitize Note IDs in findings (existing _sanitize_note_ids)
+5. Persist updated task WIP
+6. Task state remains "running" — next tick may select it again
+```
+
+When the advance LLM says CYCLE_DONE:
+
+```
+1. Record cycle in execution_history (ring buffer, max 20)
+2. Increment execution_count
+3. Set last_executed = now
+4. Clear cycle_goals_completed and cycle_findings
+5. Set cycle_state = "idle"
+6. Cooldown timer starts (elapsed time check, not a timer thread)
+```
 
 ---
 
-## Execution Cycle: Multi-Step Tasks
+## Tick Loop: Task-Aware Execution
 
-A task's operational execution may require multiple sequential goals. The
-task WIP stores an `operational_steps` field — either a single goal text
-(simple task) or a list of steps (complex task).
-
-### Simple Task (single goal)
+### Revised `_main_loop_tick` Structure
 
 ```python
-operational_steps = [
-    {"goal_text": "Run check-health and update check-health-digest", "status": "pending"}
-]
+def _main_loop_tick(self):
+    # 1. Goal completion: check if worker thread finished
+    if self._goal_done_event.is_set() and not self._is_goal_running():
+        self._goal_done_event.clear()
+        self._handle_goal_completion()  # updates task state, records result
+
+    # 2. Task establishment: if one task is establishing, advance it
+    if self.active_task_wip and not self.active_task_wip_waiting and not self._is_goal_running():
+        self._advance_task_wip()
+        return  # establishment gets priority — one task at a time
+
+    # 3. Ask reply routing (while goal blocked on ask)
+    if self.awaiting_ask_response and self.text_input_queue:
+        self._route_ask_reply()
+
+    # 4. Skip event processing while goal is running
+    if self._is_goal_running():
+        return
+
+    # 5. Task execution dispatch (round-robin)
+    if not self.active_task_wip:  # don't dispatch while establishing
+        task = self._select_next_task()
+        if task:
+            self._advance_task_execution(task)
+            return  # dispatched a goal — done for this tick
+
+    # 6. OODA pipeline (only when truly idle)
+    event = self._ooda_observe()
+    if event is None:
+        self._ooda_idle_tick()  # triage runs here
+        return
+    # ... orient, decide, act
 ```
 
-Each execution cycle runs the one goal, records the result, returns to idle.
-
-### Complex Task (multi-step)
+### Task Selection
 
 ```python
-operational_steps = [
-    {"goal_text": "Fetch new papers from HuggingFace daily feed", "status": "pending"},
-    {"goal_text": "Summarize and append to research-digest note", "status": "pending"},
-    {"goal_text": "Check if any papers match active user concerns", "status": "pending"},
-]
+def _select_next_task(self) -> Optional[Dict]:
+    """Select the next eligible task for execution (round-robin by staleness)."""
+    if self._is_goal_running():
+        return None
+
+    # Check autonomy budget
+    if self.goal_scheduler.budget_remaining() <= 0:
+        return None
+
+    active_tasks = [
+        t for t in self._get_all_task_data()
+        if t.get("status") == "active"
+        and t.get("lifecycle") == "operational"
+        and t.get("cycle_state", "idle") in ("idle", "running")
+    ]
+
+    now = time.time()
+    eligible = []
+    for t in active_tasks:
+        if t.get("cycle_state") == "running":
+            # Already mid-cycle — always eligible (continue where we left off)
+            eligible.append(t)
+        elif t.get("cycle_state", "idle") == "idle":
+            # Check cooldown
+            last = t.get("last_executed")
+            cooldown = t.get("cooldown_seconds", 3600)
+            if last is None or (now - parse_iso(last)) > cooldown:
+                eligible.append(t)
+
+    if not eligible:
+        return None
+
+    # Sort: running tasks first (finish what you started), then by staleness
+    eligible.sort(key=lambda t: (
+        0 if t.get("cycle_state") == "running" else 1,
+        t.get("last_executed") or ""
+    ))
+
+    return eligible[0]
 ```
 
-Each tick dispatches the **next pending step**. When step 1 completes, the
-task remains `running` but yields — next tick may dispatch step 2 (or may
-dispatch a different task's step if round-robin selects differently).
-
-This is the key insight: **the tick loop dispatches one goal per tick, across
-all tasks**. A 3-step task takes 3 ticks to complete one cycle. Between each
-tick, other tasks (or user events) can interleave. No task monopolizes the
-executive.
-
-### Step Completion
-
-When a step goal completes:
-
-1. Mark step as completed in the task's `operational_steps`
-2. If more pending steps remain: task stays `running`, next step dispatches
-   on a future tick (after round-robin considers other tasks)
-3. If all steps completed: execution cycle done
-   - Record in `execution_history`
-   - Increment `execution_count`
-   - Update `last_executed`
-   - Transition to `cooldown`
-4. If step fails: record failure, optionally retry or skip depending on
-   task configuration
-
----
-
-## Task Establishment vs Task Execution
-
-These are two distinct modes that share the tick loop but have different
-mechanics:
-
-| Aspect | Establishment | Execution |
-|--------|--------------|-----------|
-| State | `in_progress` | `active` (idle/pending/running/cooldown) |
-| Goal source | `_advance_task_wip` LLM decision | `operational_steps` list |
-| Concurrency | One at a time | Multiple tasks, round-robin |
-| Phase gating | specification -> capability_evaluation -> etc. | No phases |
-| Budget | Not budgeted (user approved it) | Budgeted (autonomous) |
-| Yield | Does not yield between milestones | Yields between steps |
-
-### Establishment completion
-
-When `_complete_task_wip` runs, instead of creating a scheduled goal, it:
-
-1. Sets `status = "active"`, `execution_state = "idle"`
-2. Populates `operational_steps` from the synthesized goal
-3. Sets `cooldown_seconds` based on task type / triage recommendation
-4. The task is now in the active pool for round-robin dispatch
-5. No scheduled goal is created — the tick loop manages execution directly
+Key behaviors:
+- Tasks mid-cycle (running) are always eligible — finish what you started
+- Idle tasks must pass cooldown check
+- Running tasks get priority over idle tasks (complete current work)
+- Among idle tasks, stalest-first (round-robin by last_executed)
 
 ---
 
 ## Integration with Concern Triage
 
-The triage system creates proposed tasks. When approved:
+The triage system creates proposed tasks. The lifecycle:
 
-1. Task enters establishment (milestone loop)
-2. Establishment determines what the task does and what infrastructure it needs
-3. `_complete_task_wip` synthesizes `operational_steps` and `cooldown_seconds`
-4. Task enters the active pool
+```
+Concern activation → Triage nomination → Triage LLM decision
+    → create_task → proposed (awaiting approval)
+    → approve → establishing (milestone loop)
+    → complete → active (idle, in execution pool)
+    → tick selects → running (cycle goals execute)
+    → cycle done → cooldown → idle → (repeat)
+```
 
-The concern remains linked. After each execution cycle:
-
-- If the task succeeded and the concern type is non-recurring: mark concern resolved
-- If the task is recurring (seed concern): concern stays active, task re-executes
-  after cooldown
+After each execution cycle:
+- Seed concern tasks: concern stays active, task re-executes after cooldown
+- Event-triggered concern tasks: may resolve concern after successful cycle
+- Distillation fires on task abandonment/archival, not on every cycle
 
 ---
 
@@ -283,47 +336,45 @@ The concern remains linked. After each execution cycle:
 
 The autonomy budget gates task dispatch, not task existence:
 
-```
-if task.origin == "autonomous" and budget_remaining <= 0:
-    skip  # don't dispatch this tick, try again later
+- **Establishing**: Not budgeted. The user approved it (or it's a triage
+  proposal the user approved). Establishment can be interrupted via Task
+  Manager if it's consuming too much.
+- **Operational execution**: Budgeted. Each goal's wall-clock execution time
+  is tracked against the rolling budget window.
+- **User-initiated goals** (via chat/UI): Not budgeted. Always execute.
 
-if task.origin == "user":
-    always dispatch  # user-initiated tasks bypass budget
-```
-
-Budget is consumed when a goal actually executes (tracked by wall-clock time
-of goal thread execution). Proposing, approving, and establishing tasks do
-not consume budget — only operational execution does.
+Budget check happens in `_select_next_task` — if budget is exhausted, no
+autonomous task is selected. The OODA pipeline still runs (user events,
+triage), but no autonomous goals execute until budget replenishes.
 
 ---
 
 ## Interaction with User Events
 
 The OODA pipeline processes user chat, sensor events, and other inputs. It
-runs only when no goal is executing:
+runs only when no goal is executing AND no task was dispatched this tick:
 
 ```
-Tick: [task goal runs] → [goal completes] → [next tick: OODA runs] → [next tick: another task goal]
+Tick timeline with 3 active tasks (A, B, C):
+
+Tick 1: Select A (running, mid-cycle) → dispatch A goal 2 → [executing]
+Tick 2: Goal running → skip
+...
+Tick N: A goal 2 completes → record result
+Tick N+1: Select B (idle, cooldown elapsed) → dispatch B goal 1 → [executing]
+...
+Tick M: B goal 1 completes → advance says CYCLE_DONE → B enters cooldown
+Tick M+1: No task selected (A idle/cooldown, B cooldown, C cooldown)
+          → OODA pipeline runs → user chat processed → triage checks
+Tick M+2: Select C (idle, cooldown elapsed) → dispatch C goal 1
+...
 ```
 
-This means user messages are processed in the gaps between task goal
-executions. With 3 active tasks each taking ~30 seconds per goal:
-
-- Task A step 1 runs (30s)
-- Gap: OODA tick processes user message, triage runs (instant)
-- Task B step 1 runs (30s)
-- Gap: OODA tick
-- Task C step 1 runs (30s)
-- Gap: OODA tick
-- Task A step 2 runs (if multi-step)
-- ...
-
-The agent remains responsive to the user even with multiple active tasks,
-because tasks yield between steps and the OODA pipeline runs in the gaps.
-
-If a user sends a high-priority message (e.g., a goal command), the OODA
-pipeline processes it on the next gap tick and can interrupt or preempt
-autonomous task execution.
+The agent remains responsive because:
+1. Tasks yield between goals (each goal = one tick of dispatch)
+2. OODA runs when no task needs dispatch
+3. User-initiated goals can preempt by entering the text_input_queue
+   and being classified by the OODA pipeline as a goal command
 
 ---
 
@@ -333,56 +384,65 @@ The Task Manager displays:
 
 | Field | Source |
 |-------|--------|
-| Status | `execution_state` (idle/pending/running/cooldown) |
+| Execution state | `cycle_state` (idle/running) + cooldown check |
 | Last run | `last_executed` timestamp |
 | Next eligible | `last_executed + cooldown_seconds` |
 | Executions | `execution_count` |
-| Current step | `operational_steps[current_index].goal_text` |
-| Step progress | `completed_steps / total_steps` |
-| Budget remaining | From goal scheduler budget tracker |
+| Current cycle | `cycle_goals_completed` list |
+| Cycle progress | Number of goals completed this cycle |
+| Budget remaining | From autonomy budget tracker |
 
 Actions available:
-- **Run now**: Override cooldown, dispatch immediately on next tick
-- **Pause**: Set `execution_state = "paused"`, excluded from selection
-- **Resume**: Set `execution_state = "idle"`, re-enters selection pool
+- **Run now**: Reset cooldown, set `cycle_state = "idle"` — eligible next tick
+- **Pause**: Set `cycle_state = "paused"` — excluded from selection
+- **Resume**: Set `cycle_state = "idle"` — re-enters selection pool
 - **Abandon**: Terminal state, triggers distillation
 - **Delete**: Remove task and all artifacts
 - **Edit cooldown**: Adjust `cooldown_seconds`
 
 ---
 
-## Migration Path
+## Cooldown Defaults
 
-The current implementation uses the goal scheduler for operational task goals.
-The migration to tick-loop-managed execution:
+Fixed values, configurable per-task at creation time:
 
-1. **Phase 1** (current): Tasks create scheduled goals via `_complete_task_wip`.
-   Goal scheduler auto-proceeds them. This works but has fairness and
-   responsiveness issues.
-
-2. **Phase 2** (this spec): `_complete_task_wip` populates `operational_steps`
-   instead of creating a scheduled goal. The tick loop manages dispatch
-   directly. Goal scheduler remains for simple user goals only.
-
-3. **Phase 3** (future): Multi-step tasks, step-level error handling,
-   conditional branching in operational steps.
+| Task origin | Default cooldown |
+|------------|-----------------|
+| Seed concern (health monitoring) | 3600s (1 hour) |
+| Seed concern (workspace maintenance) | 7200s (2 hours) |
+| Derived concern (event-triggered) | 1800s (30 min) |
+| User-initiated task | 0s (run on demand) |
 
 ---
 
-## Open Questions
+## Establishment → Operational Transition
 
-1. **Establishment budget**: Should task establishment consume autonomy budget?
-   Currently it doesn't (the user approved it). But a long establishment with
-   many milestones could monopolize the LLM.
+When `_complete_task_wip` runs (task establishment complete):
 
-2. **Preemption**: Can a user goal preempt a running autonomous task goal?
-   Currently no — goals run to completion on their thread. Preemption would
-   require interrupt support in the planner.
+1. Synthesize operational context from establishment findings
+2. Set `status = "active"`, `lifecycle = "operational"`
+3. Initialize `cycle_state = "idle"`, `cycle_goals_completed = []`,
+   `cycle_findings = []`
+4. Set `cooldown_seconds` based on task origin/type
+5. **Do NOT create a scheduled goal** — the tick loop manages execution
+6. Clear `self.active_task_wip` — establishment is done
+7. Task is now in the active pool for round-robin dispatch
 
-3. **Step synthesis**: Who decides the `operational_steps` list? Currently
-   `_complete_task_wip` synthesizes a single goal. Multi-step synthesis
-   would need a richer prompt or a separate planning phase.
+---
 
-4. **Cooldown tuning**: Should cooldowns be static or adaptive? A task that
-   keeps finding nothing to do could lengthen its cooldown. A task that
-   detects anomalies could shorten it.
+## Resolved Design Decisions
+
+1. **Establishment budget**: Not budgeted. User approved the establishment.
+   Establishment can be interrupted via Task Manager if excessive.
+
+2. **Preemption**: No. A goal is the basic unit of scheduling. Once dispatched,
+   it runs to completion. The planner supports interrupts but not resumption.
+   Between goals, other tasks and user events get their turn.
+
+3. **Step synthesis**: Dynamic, not pre-planned. The operational advance LLM
+   decides the next goal based on accumulated cycle state — same pattern as
+   the incremental planner deciding the next step. No fixed `operational_steps`
+   list.
+
+4. **Cooldown tuning**: Fixed per-task. KISS. May revisit with adaptive
+   cooldowns later if needed.
