@@ -3900,22 +3900,7 @@ Respond with JSON:
         "MILESTONES COMPLETED:\n{milestones}\n\n"
         "ACCUMULATED FINDINGS:\n{findings}\n\n"
         "MOST RECENT MILESTONE RESULT:\n{last_result}\n\n"
-        "PHASES (in required order — you MUST visit each phase before moving to the next):\n"
-        "  specification — Clarify requirements with the user via `ask`. What exactly should\n"
-        "    the task do? What parameters, thresholds, or preferences matter? The goal you\n"
-        "    submit should use `ask` to have a conversation with the user and return the\n"
-        "    collected answers as its final result. The answers will be recorded\n"
-        "    automatically in the milestone history.\n"
-        "  capability_evaluation — Test whether the needed tools/data sources actually work.\n"
-        "    E.g., can we fetch the right emails? Can we access the web page? Submit a small\n"
-        "    probe goal that tries the key operation and reports what it found.\n"
-        "  infrastructure_setup — Create any persistent notes, collections, or other state\n"
-        "    the recurring task will need. If the task mentions creating or updating a named\n"
-        "    Note or Collection, create it now. E.g., create a digest collection, a tracking\n"
-        "    note, a named Note for storing results. Even if the phase has minimal work,\n"
-        "    submit a goal that creates/verifies the required resources exist.\n"
-        "  activation — All establishment is done. Move to COMPLETE.\n"
-        "  complete — The task is fully established and ready to be scheduled.\n\n"
+        "{phases}\n\n"
         "PHASE RULES:\n"
         "- You may only advance to the NEXT phase (no skipping).\n"
         "- COMPLETE is only valid from the activation phase.\n"
@@ -4041,12 +4026,37 @@ Respond with JSON:
         except Exception:
             pass
 
+        # Build phases section — omit specification for triage-originated tasks
+        is_autonomous = bool(wip.get("linked_concern_id"))
+        phases_lines = ["PHASES (in required order — you MUST visit each phase before moving to the next):"]
+        if not is_autonomous:
+            phases_lines.append(
+                "  specification — Clarify requirements with the user via `ask`. What exactly should\n"
+                "    the task do? What parameters, thresholds, or preferences matter? The goal you\n"
+                "    submit should use `ask` to have a conversation with the user and return the\n"
+                "    collected answers as its final result. The answers will be recorded\n"
+                "    automatically in the milestone history.")
+        phases_lines.append(
+            "  capability_evaluation — Test whether the needed tools/data sources actually work.\n"
+            "    E.g., can we fetch the right emails? Can we access the web page? Submit a small\n"
+            "    probe goal that tries the key operation and reports what it found.")
+        phases_lines.append(
+            "  infrastructure_setup — Create any persistent notes, collections, or other state\n"
+            "    the recurring task will need. If the task mentions creating or updating a named\n"
+            "    Note or Collection, create it now. E.g., create a digest collection, a tracking\n"
+            "    note, a named Note for storing results. Even if the phase has minimal work,\n"
+            "    submit a goal that creates/verifies the required resources exist.")
+        phases_lines.append("  activation — All establishment is done. Move to COMPLETE.")
+        phases_lines.append("  complete — The task is fully established and ready to be scheduled.")
+        phases_text = "\n".join(phases_lines)
+
         prompt = self._ADVANCE_TASK_PROMPT.format(
             intention=wip.get("intention", ""),
             phase=wip.get("phase", "specification"),
             milestones=milestones_text,
             findings=findings_text,
             last_result=last_result,
+            phases=phases_text,
         )
         if concerns_text:
             prompt += f"\nUSER CONCERNS (relevant context — what the user currently cares about):\n{concerns_text}\n"
