@@ -5199,7 +5199,7 @@ class ZenohExecutiveNode:
                     self._create_character_note()
                     # End-of-conversation keywords
                     end_phrases = ('goodbye', 'bye', 'end conversation', 'make it so')
-                    if clean_input.strip().lower() in end_phrases:
+                    if clean_input.strip().lower().rstrip('.,!') in end_phrases:
                         self.conversation_store.close_dialog("User")
                         logger.info(f'📥 {self.character_name} User ended conversation')
                         return
@@ -5462,7 +5462,7 @@ class ZenohExecutiveNode:
         elif is_agent:
             classification = 'agent_message'
             event_type = 'user_text'
-        elif source == 'User' and low in end_phrases:
+        elif source == 'User' and low.rstrip('.,!') in end_phrases:
             classification = 'end_conversation'
             event_type = 'user_text'
         elif source == 'User':

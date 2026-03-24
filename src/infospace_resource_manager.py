@@ -960,8 +960,12 @@ class InfospaceResourceManager:
         # Register in registry
         self.resource_registry[note_id] = note_data
         
-        # Register named note if name provided
+        # Register named note if name provided, deleting any prior note with same name
         if note_name:
+            old_id = self.named_notes.get(note_name)
+            if old_id and old_id != note_id and old_id in self.resource_registry:
+                logger.info(f"📝 Replacing named Note '{note_name}': {old_id} → {note_id}")
+                self.delete_resource(old_id)
             self.named_notes[note_name] = note_id
             logger.info(f"📝 Created named Note: '{note_name}' = {note_id} by {canonical_character_name}")
         else:
@@ -1407,6 +1411,11 @@ class InfospaceResourceManager:
             old_name = props.get('note_name')
             if old_name and self.named_notes.get(old_name) == resource_id:
                 del self.named_notes[old_name]
+            # Delete any prior note that held this name
+            prior_id = self.named_notes.get(name)
+            if prior_id and prior_id != resource_id and prior_id in self.resource_registry:
+                logger.info(f"📝 Replacing named Note '{name}': {prior_id} → {resource_id}")
+                self.delete_resource(prior_id)
             props['note_name'] = name
             self.named_notes[name] = resource_id
             logger.info(f"📝 Named Note {resource_id} as '{name}'")
