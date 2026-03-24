@@ -236,6 +236,13 @@ class TaskManager:
             self._zenoh_put(f"cognitive/{character}/control/task_wip_interrupt", data)
             return {'success': True}
 
+        @self.app.post("/api/concern/{character}")
+        def manage_concern(character: str, data: dict = Body(...)):
+            """Manage a concern: close, resolve, abandon, or delete."""
+            character = character.strip().capitalize()
+            self._zenoh_put(f"cognitive/{character}/control/concern_manage", data)
+            return {'success': True}
+
     # ── HTML UI ──────────────────────────────────────────────────────────
 
     def get_html(self) -> str:
@@ -496,6 +503,10 @@ function renderConcerns(containerId, concerns, countId) {
                 <div style="font-size:10px;color:#666;margin-top:4px">
                     stance: ${c.stance || '—'} | touches: ${c.touch_count || 0}
                 </div>
+                <div class="task-actions" style="margin-top:6px">
+                    <button class="secondary" style="font-size:10px;padding:2px 8px" onclick="manageConcern('${esc(c.concern_id)}','user','close')">Close</button>
+                    <button class="danger" style="font-size:10px;padding:2px 8px" onclick="manageConcern('${esc(c.concern_id)}','user','delete')">Delete</button>
+                </div>
             </div>
         </div>`;
     }).join('');
@@ -529,6 +540,13 @@ function renderDerivedConcerns(containerId, concerns, countId) {
                 ${c.parent_user_concern_id ? `<div style="font-size:10px;color:#666;margin-top:4px">parent: ${esc(c.parent_user_concern_id)}</div>` : ''}
                 <div style="font-size:10px;color:#666;margin-top:2px">
                     ${c.seeded ? 'seed concern' : ''} ${c.status_rationale ? '| ' + esc(c.status_rationale) : ''}
+                </div>
+                <div class="task-actions" style="margin-top:6px">
+                    ${c.status === 'active' || c.status === 'surfaced' ? `
+                        <button class="approve" style="font-size:10px;padding:2px 8px" onclick="manageConcern('${esc(c.concern_id)}','derived','resolve')">Resolve</button>
+                        <button class="secondary" style="font-size:10px;padding:2px 8px" onclick="manageConcern('${esc(c.concern_id)}','derived','abandon')">Abandon</button>
+                    ` : ''}
+                    <button class="danger" style="font-size:10px;padding:2px 8px" onclick="manageConcern('${esc(c.concern_id)}','derived','delete')">Delete</button>
                 </div>
             </div>
         </div>`;
@@ -808,6 +826,16 @@ async function interruptTask(noteName) {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({note_name: noteName}),
+    });
+    setTimeout(refresh, 500);
+}
+
+async function manageConcern(concernId, type, action) {
+    if (action === 'delete' && !confirm(`Delete concern ${concernId}? This cannot be undone.`)) return;
+    await fetch(`/api/concern/${char()}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({concern_id: concernId, type: type, action: action}),
     });
     setTimeout(refresh, 500);
 }

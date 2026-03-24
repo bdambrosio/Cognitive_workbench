@@ -1236,6 +1236,10 @@ class ZenohExecutiveNode:
             f"cognitive/{character_name}/control/task_edit",
             self._handle_task_edit
         )
+        self.control_concern_manage_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/concern_manage",
+            self._handle_concern_manage
+        )
 
         # === ZENOH PUBLICATION ===
         # NAME: execution_state_update
@@ -7487,6 +7491,59 @@ Respond with JSON:
             logger.info(f'📋 Task edited: {note_name} — new intention: "{new_intention[:80]}"')
         except Exception as e:
             logger.warning(f'Task edit control error: {e}')
+
+    def _handle_concern_manage(self, sample):
+        """Handle concern management from Task Manager UI.
+
+        Supports actions: close (user concerns), resolve/abandon (derived),
+        delete (either). Works through the existing patch system for
+        resolve/abandon, or direct removal for delete/close.
+        """
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            concern_id = data.get('concern_id', '')
+            action = data.get('action', '')  # close, resolve, abandon, delete
+            concern_type = data.get('type', '')  # user, derived
+            if not concern_id or not action:
+                return
+
+            if concern_type == 'user':
+                if action == 'close':
+                    for c in self.user_concern_model.concerns:
+                        if c.get('concern_id') == concern_id:
+                            c['status'] = 'closed'
+                            c['end_disposition'] = 'resolved'
+                            break
+                    self.user_concern_model._save()
+                    logger.info(f'📋 User concern {concern_id} closed via Task Manager')
+                elif action == 'delete':
+                    self.user_concern_model.concerns = [
+                        c for c in self.user_concern_model.concerns
+                        if c.get('concern_id') != concern_id
+                    ]
+                    self.user_concern_model._save()
+                    logger.info(f'📋 User concern {concern_id} deleted via Task Manager')
+
+            elif concern_type == 'derived':
+                if action in ('resolve', 'abandon'):
+                    op = 'resolve_concern' if action == 'resolve' else 'abandon_concern'
+                    patch = {
+                        'op': op,
+                        'concern_id': concern_id,
+                        'field_updates': {'status_rationale': f'{action}d via Task Manager'},
+                    }
+                    self._derived_concern_model._apply_patch(patch, f'ui:{action}')
+                    self._derived_concern_model._save()
+                    logger.info(f'📋 Derived concern {concern_id} {action}d via Task Manager')
+                elif action == 'delete':
+                    self._derived_concern_model.concerns = [
+                        c for c in self._derived_concern_model.concerns
+                        if c.get('concern_id') != concern_id
+                    ]
+                    self._derived_concern_model._save()
+                    logger.info(f'📋 Derived concern {concern_id} deleted via Task Manager')
+        except Exception as e:
+            logger.warning(f'Concern manage error: {e}')
 
     def _world_state_query_handler(self, query):
         """Handle query for current world state."""
