@@ -358,6 +358,8 @@ html, body {
     outline: none;
 }
 .chat-input-row textarea:focus { border-color: var(--accent); }
+.chat-end-btn { background: var(--bg-raised); color: var(--text-dim); font-size: 11px; }
+.chat-end-btn:hover { color: var(--text); }
 
 /* Goal entry panel */
 .goal-entry {

@@ -156,46 +156,20 @@ class TaskManager:
             if not user_concerns and not derived_concerns:
                 user_concerns, derived_concerns = self._read_concerns_from_resources(character)
 
-            # Fetch consolidated learnings (single _operational_learnings note)
-            # Falls back to individual _task_learning_* notes if consolidated doesn't exist
+            # Fetch _situation note content
+            situation_text = ''
             resources = self._zenoh_get(f"cognitive/{character}/resources") or {}
-            learnings = []
-            consolidated_found = False
             if resources.get('success'):
                 for r in resources.get('resources', []):
                     props = r.get('properties', {})
                     name = props.get('note_name', '') or r.get('name', '')
-                    if name == '_operational_learnings':
+                    if name == '_situation':
                         rid = r.get('id', '')
                         detail = self._zenoh_get(f"cognitive/{character}/resource/{rid}")
                         if detail and detail.get('success'):
                             res = detail.get('resource', {})
-                            content = res.get('properties', {}).get('content', '') or detail.get('content', '')
-                            try:
-                                parsed = json.loads(content) if isinstance(content, str) else content
-                                if isinstance(parsed, dict):
-                                    learnings = [parsed]
-                                    consolidated_found = True
-                            except (json.JSONDecodeError, TypeError):
-                                pass
+                            situation_text = res.get('properties', {}).get('content', '') or detail.get('content', '')
                         break
-                # Fallback: individual learning notes
-                if not consolidated_found:
-                    for r in resources.get('resources', []):
-                        props = r.get('properties', {})
-                        name = props.get('note_name', '') or r.get('name', '')
-                        if name.startswith('_task_learning_'):
-                            rid = r.get('id', '')
-                            detail = self._zenoh_get(f"cognitive/{character}/resource/{rid}")
-                            if detail and detail.get('success'):
-                                res = detail.get('resource', {})
-                                content = res.get('properties', {}).get('content', '') or detail.get('content', '')
-                                try:
-                                    parsed = json.loads(content) if isinstance(content, str) else content
-                                    if isinstance(parsed, dict):
-                                        learnings.append(parsed)
-                                except (json.JSONDecodeError, TypeError):
-                                    pass
             return {
                 'success': True,
                 'user_concerns': user_concerns,
@@ -203,7 +177,7 @@ class TaskManager:
                 'activations': activations,
                 'tasks': tasks_resp.get('tasks', []),
                 'triage': triage,
-                'learnings': learnings,
+                'situation': situation_text,
             }
 
         @self.app.post("/api/approve/{character}")
@@ -375,14 +349,26 @@ button.secondary:hover { background: #4e4e4e; }
 }
 .triage-candidate:last-child { border-bottom: none; }
 
-/* Learnings */
-.learning-card {
+/* Situation note */
+.situation-card {
     background: #2d2d30; border: 1px solid #3e3e42; border-radius: 4px;
-    padding: 10px 12px; margin-bottom: 8px; font-size: 12px;
+    font-size: 12px; overflow: hidden;
 }
-.learning-summary { color: #ce9178; margin-bottom: 4px; }
-.learning-item { color: #9cdcfe; padding: 2px 0; }
-.learning-item::before { content: "• "; color: #555; }
+.situation-header {
+    padding: 8px 12px; cursor: pointer; user-select: none;
+    display: flex; justify-content: space-between; align-items: center;
+}
+.situation-header:hover { background: #333; }
+.situation-header .chevron { color: #888; transition: transform 0.2s; }
+.situation-card.open .chevron { transform: rotate(90deg); }
+.situation-body {
+    max-height: 0; overflow: hidden; transition: max-height 0.3s ease;
+}
+.situation-card.open .situation-body { max-height: 2000px; }
+.situation-content {
+    padding: 8px 12px 12px; color: #9cdcfe; white-space: pre-wrap;
+    border-top: 1px solid #3e3e42; line-height: 1.5;
+}
 
 /* Empty state */
 .empty { color: #666; font-size: 13px; padding: 20px 0; text-align: center; }
@@ -435,8 +421,8 @@ button.secondary:hover { background: #4e4e4e; }
         <div class="section-title">Completed / Archived (<span id="done-count">0</span>)</div>
         <div id="done-tasks"></div>
 
-        <div class="section-title">Learnings (<span id="learnings-count">0</span>)</div>
-        <div id="learnings"></div>
+        <div class="section-title">Situation</div>
+        <div id="situation"></div>
     </div>
 </div>
 
@@ -461,7 +447,7 @@ function render() {
     renderDerivedConcerns('derived-concerns', data.derived_concerns || [], 'dc-count');
     renderTriage(data.triage || {});
     renderTasks(data.tasks || []);
-    renderLearnings(data.learnings || []);
+    renderSituation(data.situation || '');
 }
 
 function activationColor(v) {
@@ -751,41 +737,21 @@ function renderDoneTask(t) {
     </div>`;
 }
 
-function renderLearnings(learnings) {
-    const el = document.getElementById('learnings');
-    if (!learnings.length) {
-        document.getElementById('learnings-count').textContent = '0';
-        el.innerHTML = '<div class="empty">No learnings yet</div>';
+function renderSituation(text) {
+    const el = document.getElementById('situation');
+    if (!text) {
+        el.innerHTML = '<div class="empty">No situation note</div>';
         return;
     }
-    // Check if this is a consolidated format (single _operational_learnings note)
-    const first = learnings[0];
-    if (first.consolidated_learnings) {
-        const items = first.consolidated_learnings || [];
-        document.getElementById('learnings-count').textContent = items.length;
-        let html = '<div class="learning-card">';
-        if (first.task_summary) {
-            html += `<div class="learning-summary">${esc(first.task_summary)}</div>`;
-        }
-        html += `<div style="font-size:11px;color:#888;margin-bottom:4px">
-            Last task: ${esc(first.last_task_intention || '?')} | Outcome: ${esc(first.last_task_outcome || '?')}
-            | Distilled: ${fmtDate(first.last_distilled_at)}
-        </div>`;
-        html += items.map(item => `<div class="learning-item">${esc(item)}</div>`).join('');
-        html += '</div>';
-        el.innerHTML = html;
-    } else {
-        // Fallback: individual learning notes (legacy format)
-        document.getElementById('learnings-count').textContent = learnings.length;
-        el.innerHTML = learnings.map(l => `<div class="learning-card">
-            <div class="learning-summary">${esc(l.summary || l.task_summary || '')}</div>
-            <div style="font-size:11px;color:#888;margin-bottom:4px">
-                Task: ${esc(l.task_wip_id || '?')} | Outcome: ${esc(l.outcome || '?')}
-                | Concern: ${esc(l.concern_recommendation || '?')}
-            </div>
-            ${(l.learnings||[]).map(item => `<div class="learning-item">${esc(item)}</div>`).join('')}
-        </div>`).join('');
-    }
+    el.innerHTML = `<div class="situation-card" onclick="this.classList.toggle('open')">
+        <div class="situation-header">
+            <span style="color:#ce9178;">Agent situation context</span>
+            <span class="chevron">&#9654;</span>
+        </div>
+        <div class="situation-body">
+            <div class="situation-content">${esc(text)}</div>
+        </div>
+    </div>`;
 }
 
 // ── Actions ──────────────────────────────────────────────────────

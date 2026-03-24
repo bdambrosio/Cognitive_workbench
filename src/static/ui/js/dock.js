@@ -39,6 +39,16 @@ export function initDock() {
         chatInput.value = '';
     }
 
+    // ── End Conversation ────────────────────────────────
+    const chatEnd = document.getElementById('chat-end');
+    chatEnd.addEventListener('click', () => {
+        if (!state.character) return;
+        confirm('End conversation?', () => {
+            api.endDialog(state.character);
+            state.addChatMessage('system', 'Conversation ended.');
+        });
+    });
+
     const chatToggleBtn = document.getElementById('dock-chat-toggle');
     let unreadCount = 0;
 

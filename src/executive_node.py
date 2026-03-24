@@ -1714,8 +1714,12 @@ class ZenohExecutiveNode:
         try:
             uc = self.user_concern_model.get_concerns(active_only=True) or []
             if uc:
-                labels = ', '.join(c.get('concern_label', '?') for c in uc[:5])
-                parts.append(f'Active user concerns: {labels}')
+                concern_details = []
+                for c in uc[:5]:
+                    label = c.get('concern_label', '?')
+                    desc = c.get('concern_description', '')
+                    concern_details.append(f'- {label}: {desc}' if desc else f'- {label}')
+                parts.append('Active user concerns:\n' + '\n'.join(concern_details))
         except Exception:
             pass
         return ' '.join(parts)
@@ -1925,162 +1929,9 @@ class ZenohExecutiveNode:
             self.active_task_wip = None
             self.active_task_wip_waiting = False
             self._task_wip_pre_resource_ids = None
-        # Distill learnings if there was any establishment work
-        if content.get('milestones_completed'):
-            self._distill_task_learnings(content, outcome='abandoned')
         logger.info(f'📋 Task abandoned: {note_name} (was {old_status})')
         self._say_to_user(f'Task abandoned: {content.get("intention", "")[:200]}')
 
-    # ── Task distillation ────────────────────────────────────────────────
-
-    _DISTILL_SYSTEM_PROMPT = """\
-You distill and consolidate operational learnings for an autonomous agent.
-
-You receive:
-- A NEW task record (intention, milestones, findings, outcome) to distill.
-- EXISTING consolidated learnings from prior tasks (may be empty if first time).
-
-Produce a SINGLE consolidated set of learnings that:
-1. Integrates the new task's findings with existing knowledge.
-2. Removes redundancies — if the same learning appears in both, keep one copy.
-3. Keeps learnings concrete and actionable (not vague).
-4. Caps at 15 learnings total. If merging would exceed 15, drop the least actionable.
-5. Includes a 1-2 sentence summary of the new task.
-6. Recommends how the linked concern should be updated.
-
-Respond with JSON:
-{
-  "task_summary": "1-2 sentence summary of THIS task",
-  "consolidated_learnings": ["concrete learning 1", "concrete learning 2", ...],
-  "concern_recommendation": "resolve|keep_active|abandon",
-  "concern_rationale": "short explanation"
-}
-"""
-
-    def _distill_task_learnings(self, task_data: Dict[str, Any], outcome: str = 'completed'):
-        """Extract learnings from a completed/abandoned task and consolidate with existing learnings.
-
-        Loads all existing learnings, passes them as context to the distillation LLM,
-        and produces a single consolidated `_operational_learnings` note. Individual
-        per-task learning notes are removed after consolidation.
-        """
-        intention = task_data.get('intention', '')
-        milestones = task_data.get('milestones_completed', [])
-        findings = task_data.get('accumulated_findings', [])
-        wip_id = task_data.get('task_wip_id', '')
-        concern_id = task_data.get('linked_concern_id', '')
-
-        # Load existing consolidated learnings
-        existing_learnings = []
-        existing_note_names = []
-        if self.resource_manager:
-            for name, nid in list(self.resource_manager.named_notes.items()):
-                if name == '_operational_learnings' or name.startswith('_task_learning_'):
-                    existing_note_names.append((name, nid))
-                    try:
-                        nd = self.resource_manager.resource_registry.get(nid)
-                        content = nd.get('properties', {}).get('content', '') if nd else ''
-                        parsed = json.loads(content) if isinstance(content, str) and content else {}
-                        if name == '_operational_learnings':
-                            existing_learnings = parsed.get('consolidated_learnings', [])
-                        else:
-                            existing_learnings.extend(parsed.get('learnings', []))
-                    except Exception:
-                        pass
-
-        # Build prompt
-        user_prompt = (
-            f"NEW TASK:\n"
-            f"INTENTION: {intention}\n"
-            f"OUTCOME: {outcome}\n"
-            f"MILESTONES:\n{json.dumps(milestones, indent=2)}\n"
-            f"ACCUMULATED FINDINGS:\n{json.dumps(findings, indent=2)}\n"
-        )
-        if task_data.get('completion_summary'):
-            user_prompt += f"COMPLETION SUMMARY: {task_data['completion_summary']}\n"
-        if task_data.get('abandon_reason'):
-            user_prompt += f"ABANDON REASON: {task_data['abandon_reason']}\n"
-        if existing_learnings:
-            user_prompt += (
-                f"\nEXISTING CONSOLIDATED LEARNINGS ({len(existing_learnings)} items):\n"
-                + json.dumps(existing_learnings[:15], indent=2) + "\n"
-            )
-        else:
-            user_prompt += "\nEXISTING CONSOLIDATED LEARNINGS: (none — first distillation)\n"
-
-        try:
-            resp = self.llm_generate(
-                [self._DISTILL_SYSTEM_PROMPT, user_prompt],
-                max_tokens=600,
-                temperature=0.2,
-                is_json=True,
-            )
-            resp_text = getattr(resp, 'text', '') if hasattr(resp, 'text') else str(resp)
-            if isinstance(resp_text, dict):
-                distillation = resp_text
-            else:
-                t = str(resp_text).strip()
-                if t.startswith('```'):
-                    first_nl = t.find('\n')
-                    if first_nl != -1:
-                        t = t[first_nl + 1:]
-                    if t.endswith('```'):
-                        t = t[:-3]
-                    t = t.strip()
-                distillation = json.loads(t)
-        except Exception as e:
-            logger.warning(f'Task distillation LLM call failed: {e}')
-            distillation = {
-                'task_summary': f'Task {"completed" if outcome == "completed" else "abandoned"}: {intention[:100]}',
-                'consolidated_learnings': (existing_learnings or []) + (findings[:3] if findings else []),
-                'concern_recommendation': 'keep_active',
-                'concern_rationale': 'distillation failed — defaulting to keep_active',
-            }
-
-        # Persist as the single consolidated learnings note
-        consolidated = {
-            'last_task_wip_id': wip_id,
-            'last_task_intention': intention,
-            'last_task_outcome': outcome,
-            'last_distilled_at': datetime.now().isoformat(),
-            'task_summary': distillation.get('task_summary', ''),
-            'consolidated_learnings': distillation.get('consolidated_learnings', [])[:15],
-            'concern_recommendation': distillation.get('concern_recommendation', 'keep_active'),
-            'concern_rationale': distillation.get('concern_rationale', ''),
-        }
-        self.infospace_executor.execute_action({
-            "type": "create-note",
-            "value": json.dumps(consolidated),
-            "name": "_operational_learnings",
-            "out": "$_operational_learnings",
-        })
-        self.infospace_executor.execute_action({
-            "type": "persist",
-            "target": "$_operational_learnings",
-            "name": "_operational_learnings",
-        })
-
-        # Delete old individual learning notes (now consolidated)
-        for name, nid in existing_note_names:
-            if name != '_operational_learnings':
-                try:
-                    self._delete_resource_and_unbind(nid)
-                except Exception:
-                    pass
-
-        # Update linked concern based on recommendation
-        if concern_id and distillation.get('concern_recommendation'):
-            self._apply_concern_recommendation(
-                concern_id,
-                distillation['concern_recommendation'],
-                distillation.get('concern_rationale', ''),
-            )
-
-        learnings = distillation.get('consolidated_learnings', [])
-        logger.info(
-            f'📋 Task distillation: {wip_id} → {distillation.get("task_summary", "")[:80]} '
-            f'({len(learnings)} consolidated learnings, concern→{distillation.get("concern_recommendation", "?")})'
-        )
 
     def _apply_concern_recommendation(self, concern_id: str, recommendation: str, rationale: str):
         """Apply a distillation concern recommendation to the derived concern model.
@@ -4693,9 +4544,6 @@ Respond with JSON:
         wip["cycle_findings"] = []
         self._update_task_wip(wip)
 
-        # Distill establishment learnings
-        self._distill_task_learnings(wip, outcome='established')
-
         # Clean up establishment artifacts (no operational_goal_id to exclude)
         self._cleanup_task_establishment_simple(wip)
 
@@ -5350,7 +5198,7 @@ Respond with JSON:
                     # Regular user input
                     self._create_character_note()
                     # End-of-conversation keywords
-                    end_phrases = ('goodbye', 'bye', 'end conversation', "we're done", "that's all", 'done talking')
+                    end_phrases = ('goodbye', 'bye', 'end conversation', 'make it so')
                     if clean_input.strip().lower() in end_phrases:
                         self.conversation_store.close_dialog("User")
                         logger.info(f'📥 {self.character_name} User ended conversation')
@@ -5576,7 +5424,7 @@ Respond with JSON:
         is_task_cmd = clean.startswith('task:') or low in ('tasks', 'task list', 'list tasks')
         is_json_action = source == 'User' and clean.startswith('{')
         is_agent = source not in ('unknown', 'console', 'User', 'scheduler')
-        end_phrases = ('goodbye', 'bye', 'end conversation', "we're done", "that's all", 'done talking')
+        end_phrases = ('goodbye', 'bye', 'end conversation', 'make it so')
 
         # Extract goal_id for commands that target one
         goal_id = None
