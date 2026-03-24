@@ -3064,7 +3064,11 @@ Respond with JSON:
             status=updates["status"],
             result=updates["last_result"],
         )
-        # Update user concern model from goal completion
+        # Update concern models from goal completion.
+        # Autonomous goals (establishment milestones with task_wip_id) update only the
+        # derived concern model — they are agent-internal activity, not user interactions.
+        # User-initiated goals update both models.
+        is_autonomous_goal = bool(goal.get("task_wip_id"))
         try:
             full_goal_text = goal.get("goal_text", "") or goal.get("name", "")
             outcome = updates.get("last_result", "")[:800]
@@ -3079,16 +3083,19 @@ Respond with JSON:
                         artifact_content = str(props.get('content', '') or props.get('text', ''))[:1000]
                 except Exception:
                     pass
-            self.user_concern_model.update_from_goal_completion(
-                goal_statement=full_goal_text,
-                outcome_summary=outcome,
-                goal_id=goal_id,
-                success=bool(success),
-                result_artifact=artifact_content,
-            )
+            if not is_autonomous_goal:
+                self.user_concern_model.update_from_goal_completion(
+                    goal_statement=full_goal_text,
+                    outcome_summary=outcome,
+                    goal_id=goal_id,
+                    success=bool(success),
+                    result_artifact=artifact_content,
+                )
+            else:
+                logger.debug(f'Skipping user concern update for autonomous goal {goal_id}')
         except Exception as e:
             logger.warning(f'Error updating concern model from goal {goal_id}: {e}')
-        # Update derived concern model from goal completion
+        # Derived concern model: always update (agent learns from all goal outcomes)
         try:
             self._derived_concern_model.update_from_goal_completion(
                 goal_statement=full_goal_text,
