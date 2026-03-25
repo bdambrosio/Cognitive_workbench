@@ -5374,7 +5374,7 @@ class ZenohExecutiveNode:
                     # Regular user input
                     self._create_character_note()
                     # End-of-conversation keywords
-                    end_phrases = ('goodbye', 'bye', 'end conversation', 'make it so')
+                    end_phrases = ('goodbye', 'bye', 'end conversation')
                     if clean_input.strip().lower().rstrip('.,!') in end_phrases:
                         self.conversation_store.close_dialog("User")
                         logger.info(f'📥 {self.character_name} User ended conversation')
@@ -5598,9 +5598,10 @@ class ZenohExecutiveNode:
         is_clear_cache = low.startswith('clear-cache')
         is_unblock = low.startswith('unblock')
         is_task_cmd = clean.startswith('task:') or low in ('tasks', 'task list', 'list tasks')
+        is_make_it_so = source == 'User' and low.rstrip('.,!') == 'make it so'
         is_json_action = source == 'User' and clean.startswith('{')
         is_agent = source not in ('unknown', 'console', 'User', 'scheduler')
-        end_phrases = ('goodbye', 'bye', 'end conversation', 'make it so')
+        end_phrases = ('goodbye', 'bye', 'end conversation')
 
         # Extract goal_id for commands that target one
         goal_id = None
@@ -5632,6 +5633,9 @@ class ZenohExecutiveNode:
         elif is_task_cmd:
             classification = 'task_cmd'
             event_type = 'goal_initiation'
+        elif is_make_it_so:
+            classification = 'make_it_so'
+            event_type = 'user_text'
         elif is_json_action:
             classification = 'direct_action'
             event_type = 'goal_initiation'
@@ -5828,6 +5832,11 @@ class ZenohExecutiveNode:
             elif cmd.startswith('reuse'):
                 return Action('reuse_goal', {'goal_id': evt.goal_id}, a)
             return Action('no_action', {}, a)
+
+        if evt.classification == 'make_it_so':
+            return Action('propose_from_conversation', {
+                'text': evt.content, 'source': evt.source,
+            }, a)
 
         if evt.classification == 'task_cmd':
             return Action('task_command', {'text': evt.content}, a)
