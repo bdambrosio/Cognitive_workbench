@@ -23,10 +23,10 @@ const SIZE = {
 
 // Force parameters — tight cluster, strong center pull
 const FORCES = {
-    charge: -30,
-    linkDistance: 40,
+    charge: -50,
+    linkDistance: 65,
     centerStrength: 0.15,
-    collideRadius: 18,
+    collideRadius: 28,
 };
 
 export function initGraph() {

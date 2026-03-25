@@ -120,21 +120,25 @@ Best for: quick setup, no GPU required.
 2. **Launch the core agent with the web UI:**
    ```bash
    cd src
-   python3 launcher.py ../scenarios/jill-infospace.yaml --ui --resource-browser
+   python3 launcher.py ../scenarios/jill-infospace.yaml --ui --resource-browser --task-manager
    ```
 
    > Edit the scenario YAML first if you need to change the LLM model or backend.
 
 3. **Open the UI** at [http://localhost:3000](http://localhost:3000) (it may auto-open).
 
-4. **Submit a goal** by typing in the text input field:
+   The default view is the **Activation Field** — a D3 force-directed graph showing the agent, its goals, concerns, and resources as interactive nodes. Click any node to inspect it, use the bottom dock bar to chat, add goals, and control execution. You can switch to the text-based **Classic UI** via the dock bar or by navigating to `/classic`.
+
+4. **Submit a goal** using the **+ Goal** button in the dock bar, or type in the chat panel with a `goal:` prefix:
    ```
    goal: Find and summarize recent papers on transformer architectures
    ```
 
-   The `goal:` prefix tells the system to treat this as a goal for the planner, not a chat message. You'll see the planner work through stages in the action log.
+   The `goal:` prefix tells the system to treat this as a goal for the planner, not a chat message. You'll see goal nodes appear on the graph and the OODA pulse animate as the planner works.
 
 5. **Browse resources** at [http://localhost:3001](http://localhost:3001) to inspect Notes and Collections created during execution.
+
+6. **Monitor concerns and tasks** at [http://localhost:3002](http://localhost:3002) to see the concern-to-task triage pipeline.
 
 ## Launcher Options
 
@@ -145,6 +149,7 @@ Options:
   --ui                  Launch the web UI (port 3000)
   --ui-port PORT        Custom UI port (default: 3000)
   --resource-browser    Launch the Resource Browser (port 3001)
+  --task-manager        Launch the Task & Concern Manager (port 3002)
   --debug               Enable verbose logging (same as CWB_DEBUG=1)
 ```
 

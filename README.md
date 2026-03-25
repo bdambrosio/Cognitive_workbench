@@ -10,7 +10,7 @@ A research framework for autonomous agents with incremental planning, persistent
 
 Cognitive Workbench is experimental research software for studying LLM-based cognitive architectures. It prioritizes **inspectable agent behavior** and fast iteration over stability.
 
-The core idea: an **incremental planner** that interleaves reasoning with tool execution. Rather than generating a complete plan and then executing it, the planner generates one step at a time, runs it, observes the result, and decides what to do next. This tight feedback loop — combined with persistent memory, reflective quality control, and autonomous goal scheduling — produces agents that can pursue complex goals over extended periods. (AI gen'd chart below, not quite right, but close enough)
+The core idea: an **incremental planner** that interleaves reasoning with tool execution. Rather than generating a complete plan and then executing it, the planner generates one step at a time, runs it, observes the result, and decides what to do next. This tight feedback loop — combined with persistent memory, reflective quality control, and autonomous goal scheduling — produces agents that can pursue complex goals over extended periods.
 
 ```
 User: "goal: Find recent papers on multi-agent coordination"
@@ -42,12 +42,13 @@ User: "goal: Find recent papers on multi-agent coordination"
 
 - **[Incremental Planning](docs/architecture.md)** — the planner interleaves LLM reasoning with tool execution, adapting its approach based on real results
 - **[Goal Scheduling](docs/goals-and-scheduling.md)** — submit goals with `goal:` prefix; schedule them for manual, automatic, recurring, or daily-at-time execution
+- **[Concern Model](docs/user_concern_model.md)** — user concerns and agent-derived concerns with activation-based triage into actionable tasks
 - **[Envisioning & Quality Control](docs/envisioning-and-quality-control.md)** — lightweight LLM framing for coherent dialog; post-execution reflection for failure recovery and learning
 - **[Infospace Memory](docs/architecture.md#infospace-memory-model)** — Notes, Collections, and Relations as structured working memory with FAISS semantic search
 - **[Extensible Tools](docs/tools-and-primitives.md)** — 24 built-in tools (web search, email, Bluesky, academic papers, shell scripts) plus world-specific integrations
-- **[Missing Affordance Monitoring](docs/envisioning-and-quality-control.md#missing-affordance-monitoring)** — automatic detection and logging of capability gaps for future tool development
+- **[Sensors](docs/ui-guide.md#sensors)** — autonomous data collectors (browser visit tracking, RSS feeds) that feed real-world context to the agent
+- **[Web UI](docs/ui-guide.md)** — real-time activation field visualization, chat, goal management, resource browser, and task/concern manager
 - **[World Integrations](docs/configuration.md#available-scenarios)** — optional worlds (Minecraft, file system, desktop automation, ScienceWorld) with specialized tools
-- **[Web UI](docs/ui-guide.md)** — real-time dashboard with action log, goal scheduling, and resource browser
 
 ## Quick Start
 
@@ -63,7 +64,7 @@ pip install -r requirements.txt
 
 ### 2. Configure an LLM backend
 
-**Option A — Local GPU (SGLang):** 
+**Option A — Local GPU (SGLang):**
  - Edit `scenarios/jill-infospace.yaml` and set `sgl_model_path` to your preferred model. SGLang can be finicky, sorry, but use of @function makes reasoning loop so much faster.
  - Or `scenarios/jill-infospace-vllm.yaml` and set `vllm_model_path` to your preferred model.
 
@@ -82,35 +83,48 @@ alt_llm_config:
 ### 3. Run
 
 ```bash
-source zenoh_env/bin/activate # or however you setup your venv
+source zenoh_venv/bin/activate
 cd src
 
-python3 launcher.py ../scenarios/jill-infospace.yaml --ui --resource-browser
+python3 launcher.py ../scenarios/jill-infospace.yaml --ui --resource-browser --task-manager
 # Or for OpenRouter:
-python3 launcher.py ../scenarios/jill-infospace-openrouter.yaml --ui --resource-browser
+python3 launcher.py ../scenarios/jill-infospace-openrouter.yaml --ui --resource-browser --task-manager
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and type:
+Open [http://localhost:3000](http://localhost:3000) and submit a goal via the **+ Goal** button:
 ```
-goal: Find and summarize recent papers on transformer architectures
+Find and summarize recent papers on transformer architectures
 ```
 
 See [Getting Started](docs/getting-started.md) for full setup details, environment variables, and troubleshooting.
 
-## Documentation
+## Web UI
 
-| Document | Description |
-|----------|-------------|
-| **[Getting Started](docs/getting-started.md)** | Installation, credentials, LLM backend setup, first run |
-| **[Architecture](docs/architecture.md)** | Core cognitive architecture — incremental planner, OODA loop, infospace memory |
-| **[Goals & Scheduling](docs/goals-and-scheduling.md)** | Goal submission (`goal:` prefix), scheduled goals, daily-at-time, autonomous execution |
-| **[Envisioning & QC](docs/envisioning-and-quality-control.md)** | Conversational envisioning, reflection, failure recovery, missing affordance monitoring |
-| **[Tools & Primitives](docs/tools-and-primitives.md)** | Infospace primitives, tool catalog, run-script, plan tools |
-| **[Configuration](docs/configuration.md)** | Scenario YAML reference, available scenarios, directory structure |
-| **[UI Guide](docs/ui-guide.md)** | Web dashboard, resource browser, API endpoints |
-| **[Tool Development](docs/TOOL_DEVELOPMENT_GUIDE.md)** | Creating new tools (`Skill.md` + `tool.py`) |
-| **[Background](BACKGROUND.md)** | Research motivation and philosophy |
-| **[Contributor Guidelines](src/AGENTS.md)** | Code style, testing, commit conventions |
+The system provides four web-facing components. See the [UI Guide](docs/ui-guide.md) for full details.
+
+### Activation Field (port 3000)
+
+The default view is an interactive D3 force-directed graph centered on the agent. Nodes represent the agent, its goals, concerns, notes, and variable bindings — sized and colored by activation level. Click any node to inspect it in the side panel.
+
+The bottom dock bar provides controls for chat, goal entry, execution control (stop, continuous, LLM toggle), and links to the other UI components.
+
+An OODA pulse overlay shows the agent's cognitive cycle in real time — expanding colored rings indicate Observe (blue), Orient (yellow), Decide (orange), and Act (green) phases.
+
+### Classic UI (port 3000/classic)
+
+A text-oriented alternative with a scrollable action log, character sidebar with tabs (Plan, Bindings, Goals, Plans, State, Schedule, Tasks), and direct text input for goals and chat.
+
+### Resource Browser (port 3001)
+
+Browse, view, edit, and delete Notes and Collections — the agent's working memory. Two-panel layout with a resource list and content viewer.
+
+### Task & Concern Manager (port 3002)
+
+Monitor the concern-to-task pipeline. The left panel shows user and derived concerns with activation levels and management controls (close, resolve, abandon, delete). The right panel shows task WIPs with approve/edit/abandon controls, scheduled goals, situation notes, and triage status.
+
+### Browser Extension (optional)
+
+A Chrome extension that captures page visits and feeds them to the agent via the `browser-visits` sensor. Install by loading the `browser_extension/` directory as an unpacked extension.
 
 ## How It Works (In Brief)
 
@@ -123,6 +137,7 @@ See [Getting Started](docs/getting-started.md) for full setup details, environme
 4. **Reflection** analyzes the full execution trace — updates task state, world model, tool insights
 5. **If it failed** with a missing capability, the gap is logged for future tool development
 6. **Scheduled goals** can repeat daily at a set time, or auto-proceed through multi-step workflows
+7. **Sensors** (browser visits, RSS feeds) run on timers and feed real-world context back into the agent's concern model
 
 ## Available Scenarios
 
@@ -151,19 +166,44 @@ Cognitive_workbench/
 ├── requirements.txt                   # Python dependencies
 ├── docs/                              # Detailed documentation
 ├── scenarios/                         # Scenario YAML files + runtime data
+├── browser_extension/                 # Chrome extension for page visit tracking
 └── src/
     ├── launcher.py                    # Entry point
     ├── executive_node.py              # OODA loop coordinator
     ├── incremental_planner.py         # Core planner (the heart of the system)
     ├── infospace_executor.py           # Primitives + tool execution
     ├── infospace_resource_manager.py   # Notes/Collections/Relations + FAISS
-    ├── fastapi_action_display.py      # Web UI
+    ├── fastapi_action_display.py      # Web UI (Activation Field + Classic)
+    ├── resource_browser.py            # Resource Browser UI
+    ├── task_manager.py                # Task & Concern Manager UI
     ├── goal_scheduler.py              # Autonomous goal scheduling
+    ├── concern_triage.py              # Concern → task pipeline
+    ├── derived_concern_model.py       # Agent-derived concerns
+    ├── sensor_runner.py               # Sensor scheduling and execution
+    ├── sensors/                       # Sensor implementations
+    │   ├── browser-visits/            # Browser page visit sensor
+    │   └── rss-watcher/               # RSS feed monitor
     ├── tools/                         # Core tools (search-web, run-script, etc.)
     ├── world-tools/                   # World-specific tools (minecraft, fs, etc.)
+    ├── static/ui/                     # Activation Field frontend (HTML/JS/CSS)
     ├── scripts/                       # Shell scripts for run-script tool
     └── utils/                         # Shared utilities
 ```
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| **[Getting Started](docs/getting-started.md)** | Installation, credentials, LLM backend setup, first run |
+| **[Architecture](docs/architecture.md)** | Core cognitive architecture — incremental planner, OODA loop, infospace memory |
+| **[UI Guide](docs/ui-guide.md)** | Activation Field, Classic UI, Resource Browser, Task Manager, sensors |
+| **[Goals & Scheduling](docs/goals-and-scheduling.md)** | Goal submission (`goal:` prefix), scheduled goals, daily-at-time, autonomous execution |
+| **[Envisioning & QC](docs/envisioning-and-quality-control.md)** | Conversational envisioning, reflection, failure recovery, missing affordance monitoring |
+| **[Tools & Primitives](docs/tools-and-primitives.md)** | Infospace primitives, tool catalog, run-script, plan tools |
+| **[Configuration](docs/configuration.md)** | Scenario YAML reference, available scenarios, directory structure |
+| **[Tool Development](docs/TOOL_DEVELOPMENT_GUIDE.md)** | Creating new tools (`Skill.md` + `tool.py`) |
+| **[Background](BACKGROUND.md)** | Research motivation and philosophy |
+| **[Contributor Guidelines](src/AGENTS.md)** | Code style, testing, commit conventions |
 
 ## Contributing
 

@@ -190,9 +190,13 @@ Cognitive_workbench/
 │   ├── incremental_planner.py     # Core planner
 │   ├── infospace_executor.py      # Primitive + tool execution
 │   ├── infospace_resource_manager.py  # Persistence + FAISS
-│   ├── fastapi_action_display.py  # Web UI
-│   ├── resource_browser.py        # Resource browser UI
+│   ├── fastapi_action_display.py  # Web UI (Activation Field + Classic)
+│   ├── resource_browser.py        # Resource Browser UI (port 3001)
+│   ├── task_manager.py            # Task & Concern Manager UI (port 3002)
 │   ├── goal_scheduler.py          # Autonomous goal scheduler
+│   ├── concern_triage.py          # Concern → task pipeline
+│   ├── derived_concern_model.py   # Agent-derived concerns
+│   ├── sensor_runner.py           # Sensor scheduling and execution
 │   ├── conversation_store.py      # Dialog tracking
 │   ├── tool_model.py              # Tool success tracking
 │   ├── world_model.py             # Persistent knowledge base
@@ -208,6 +212,8 @@ Cognitive_workbench/
 │   │   ├── fs/
 │   │   ├── osworld/
 │   │   └── scienceworld/
+│   ├── sensors/                   # Sensor implementations (browser-visits, rss-watcher)
+│   ├── static/ui/                 # Activation Field frontend (HTML/JS/CSS)
 │   ├── scripts/                   # Shell scripts for run-script tool
 │   ├── utils/                     # Shared utilities
 │   │   ├── llm_api.py
