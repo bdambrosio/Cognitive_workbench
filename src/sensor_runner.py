@@ -220,7 +220,7 @@ class SensorRunner:
                 f"cognitive/{self.character_name}/sense_data",
                 json.dumps(sense_data)
             )
-            logger.info(f"Sensor {self.sensor_name}: pushed {len(text)} chars to {self.character_name}")
+            logger.info(f"Sensor {self.sensor_name}: pushed sense_data to {self.character_name}")
         except Exception as e:
             logger.error(f"Sensor {self.sensor_name}: failed to publish: {e}")
 
