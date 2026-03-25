@@ -65,3 +65,30 @@ scenarios/*/
 # Musings (generated/runtime)
 src/musings/
 zenoh-venv/
+
+# Misc files to ignore
+bfg-1.14.0.jar
+README.old
+=6.0
+.cursorrules
+\#scratch\#
+.wiki
+
+# Runtime/temp state files
+current_display.txt
+current_subplanner.txt
+create_conversation_collection.json
+src/=
+src/ERROR
+
+# Binary/generated artifacts
+*.safetensors
+*.faiss
+*.index.meta
+*.bak
+*.mp4
+*.pptx
+*.pdf
+# Ignore stray images in docs, but keep functional icons/assets
+docs/*.png
+# Keep browser_extension icons and src/static tracked (small, functional)
