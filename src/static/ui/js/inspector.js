@@ -11,11 +11,19 @@ const contentEl = document.getElementById('inspector-content');
 const actionsEl = document.getElementById('inspector-actions');
 const closeBtn = document.getElementById('inspector-close');
 
+let currentNodeId = null;
+
 export function initInspector() {
     closeBtn.addEventListener('click', () => close());
     state.on('node-selected', (node) => {
-        if (node) show(node);
-        else close();
+        if (node) { currentNodeId = node.id; show(node); }
+        else { currentNodeId = null; close(); }
+    });
+    // Auto-refresh agent details when topology updates and agent is selected
+    state.on('topology-refresh', () => {
+        if (currentNodeId === 'agent' && panel.classList.contains('visible')) {
+            loadAgentDetails();
+        }
     });
 }
 
@@ -27,6 +35,7 @@ function show(node) {
 }
 
 function close() {
+    currentNodeId = null;
     panel.classList.remove('visible');
     panel.classList.add('hidden');
 }
