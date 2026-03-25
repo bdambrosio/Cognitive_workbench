@@ -545,7 +545,7 @@ class OodaLivingState:
         # ── User Concerns (filtered) ─────────────────────────────────────
         if self.user_concern_snapshot:
             ongoing = [c for c in self.user_concern_snapshot
-                       if c.get("status") in ("ongoing", "active", "open")]
+                       if c.get("status") in ("open", "active")]
             closed = [c for c in self.user_concern_snapshot
                       if c.get("status") == "closed"]
 

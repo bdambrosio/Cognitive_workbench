@@ -28,6 +28,7 @@ ORIENT_COLD_CEILING = 0.35           # Concern must be below this to count as "c
 TRIAGE_COOLDOWN_SECS = 120.0         # Min seconds between triage LLM calls
 DEFER_TICKS = 30                     # How many idle ticks a deferred concern is suppressed
 MAX_CANDIDATES = 6                   # Cap candidates per triage call
+MAX_SEED_DEFERRALS = 3               # Auto-escalate seeded concerns after N consecutive deferrals
 
 
 # ── Data structures ──────────────────────────────────────────────────────────
@@ -38,8 +39,9 @@ class TriageCandidate:
     concern_id: str
     concern_label: str
     concern_description: str
-    source: str                      # 'activation' | 'orient_bypass'
+    source: str                      # 'activation' | 'orient_bypass' | 'seed_unserviced'
     activation: float
+    seeded: bool = False
     nominated_at: float = field(default_factory=time.monotonic)
 
 
@@ -62,7 +64,7 @@ or being deferred/dismissed.
 
 You will receive:
 - CANDIDATES: concerns that have been nominated (high activation or event-triggered)
-- EXISTING_TASKS: tasks already proposed, establishing, or active — with their intentions and linked concerns
+- EXISTING_TASKS: tasks already proposed, establishing, or active — with their intentions, linked concerns, cycle_state (idle/running), and last_executed timestamp
 - CONTEXT: brief summary of current agent state
 
 For each candidate, decide ONE action:
@@ -91,6 +93,7 @@ class ConcernTriage:
     def __init__(self):
         self._candidates: List[TriageCandidate] = []
         self._deferred: Dict[str, int] = {}          # concern_id → remaining defer ticks
+        self._defer_streak: Dict[str, int] = {}      # concern_id → consecutive defer count
         self._last_triage_time: float = 0.0
         self._triage_tick_count: int = 0
 
@@ -142,14 +145,16 @@ class ConcernTriage:
             return
         if self._is_already_nominated(concern_id):
             return
+        streak = self._defer_streak.get(concern_id, 0)
         self._candidates.append(TriageCandidate(
             concern_id=concern_id,
             concern_label=concern_label,
             concern_description=concern_description,
             source='seed_unserviced',
             activation=0.0,
+            seeded=True,
         ))
-        logger.info(f'🎯 Triage: seed-nominated {concern_label} (unserviced)')
+        logger.info(f'🎯 Triage: seed-nominated {concern_label} (unserviced, defer_streak={streak})')
 
     def nominate_from_orient(
         self,
@@ -246,6 +251,8 @@ class ConcernTriage:
                 'intention': t.get('intention', ''),
                 'status': t.get('status', ''),
                 'linked_concern_id': t.get('linked_concern_id', ''),
+                'cycle_state': t.get('cycle_state', ''),
+                'last_executed': t.get('last_executed', ''),
             }
             for t in existing_tasks
         ], indent=2) if existing_tasks else '[]'
@@ -276,17 +283,43 @@ class ConcernTriage:
         # when the LLM backend uses is_json=True internally
         decisions = self._parse_triage_response(resp_text, candidates)
 
-        # Apply defer decisions
+        # Build seeded lookup from candidates for escalation check
+        seeded_candidates = {c.concern_id: c for c in candidates if c.seeded}
+
+        # Apply defer decisions + escalation for seeded concerns
         for d in decisions:
             if d.action == 'defer':
-                self._deferred[d.concern_id] = DEFER_TICKS
+                self._defer_streak[d.concern_id] = self._defer_streak.get(d.concern_id, 0) + 1
+                streak = self._defer_streak[d.concern_id]
+
+                # Escalate seeded concerns that have been deferred too many times
+                if d.concern_id in seeded_candidates and streak >= MAX_SEED_DEFERRALS:
+                    c = seeded_candidates[d.concern_id]
+                    logger.info(
+                        f'🎯 Triage: escalating seeded concern {d.concern_id} '
+                        f'after {streak} consecutive deferrals → create_task'
+                    )
+                    d.action = 'create_task'
+                    d.task_intention = (
+                        f'Run {c.concern_label}: {c.concern_description}'
+                    )
+                    d.reason = f'auto-escalated after {streak} consecutive deferrals of seeded concern'
+                    self._defer_streak[d.concern_id] = 0
+                else:
+                    self._deferred[d.concern_id] = DEFER_TICKS
             elif d.action == 'dismiss':
                 # Dismissed concerns get a longer suppression
                 self._deferred[d.concern_id] = DEFER_TICKS * 3
+                self._defer_streak.pop(d.concern_id, None)
+            else:
+                # create_task or attach_to_task — reset streak
+                self._defer_streak.pop(d.concern_id, None)
 
         logger.info(
             f'🎯 Triage complete: {len(decisions)} decisions — '
-            + ', '.join(f'{d.concern_id}→{d.action}' for d in decisions)
+            + ', '.join(
+                f'{d.concern_id}→{d.action}({d.reason})' for d in decisions
+            )
         )
         return decisions
 

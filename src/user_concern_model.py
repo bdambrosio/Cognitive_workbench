@@ -24,7 +24,7 @@ END_DISPOSITION_VALUES = (
     'resolved', 'clearer', 'still_uncertain', 'still_concerned',
     'more_interested', 'blocked', 'deferred', 'satisfied', 'dissatisfied',
 )
-STATUS_VALUES = ('ongoing', 'closed', 'dormant', 'reopened')
+STATUS_VALUES = ('open', 'closed')
 
 PATCH_SYSTEM_PROMPT = """\
 You maintain a compact model of a user's active concerns.
@@ -50,7 +50,7 @@ Rules:
 Controlled vocabularies:
   stance: exploratory, skeptical, committed, concerned, frustrated, enthusiastic, ambivalent
   end_disposition: resolved, clearer, still_uncertain, still_concerned, more_interested, blocked, deferred, satisfied, dissatisfied
-  status: ongoing, closed, dormant, reopened
+  status: open, closed
 
 Respond with ONLY a JSON object. No markdown fences, no commentary."""
 
@@ -66,7 +66,7 @@ For add_concern:
     "stance_rationale": "...",
     "end_disposition": "...",
     "end_disposition_rationale": "...",
-    "status": "ongoing",
+    "status": "open",
     "status_rationale": "...",
     "history_summary": "..."
   },
@@ -157,6 +157,18 @@ class UserConcernModel:
                             self._concern_counter = num
                     except (ValueError, IndexError):
                         pass
+            # Migrate old statuses to simplified 2-value model
+            migrated = 0
+            for c in self.concerns:
+                old_status = c.get('status', '')
+                if old_status in ('ongoing', 'reopened'):
+                    c['status'] = 'open'
+                    migrated += 1
+                elif old_status == 'dormant':
+                    c['status'] = 'closed'
+                    migrated += 1
+            if migrated:
+                logger.info(f'Migrated {migrated} concerns to new status model (open/closed)')
             logger.info(f'✓ Loaded {len(self.concerns)} user concerns')
             return True
         except json.JSONDecodeError as e:
@@ -321,7 +333,7 @@ class UserConcernModel:
                 'stance_rationale': new_concern.get('stance_rationale', ''),
                 'end_disposition': new_concern.get('end_disposition', 'still_uncertain'),
                 'end_disposition_rationale': new_concern.get('end_disposition_rationale', ''),
-                'status': new_concern.get('status', 'ongoing'),
+                'status': new_concern.get('status', 'open'),
                 'status_rationale': new_concern.get('status_rationale', ''),
                 'evidence_refs': [evidence_ref],
                 'history_summary': new_concern.get('history_summary', ''),
@@ -365,6 +377,12 @@ class UserConcernModel:
                     target[field] = float(updates[field])
                 else:
                     target[field] = updates[field]
+                # Normalize old status values the LLM might still emit
+                if field == 'status':
+                    if target[field] in ('ongoing', 'reopened'):
+                        target[field] = 'open'
+                    elif target[field] == 'dormant':
+                        target[field] = 'closed'
 
         # Always update recency and touch_count
         target['recency'] = datetime.now().isoformat()
@@ -382,4 +400,4 @@ class UserConcernModel:
         """Return current concern list, optionally filtered to active concerns."""
         if not active_only:
             return list(self.concerns)
-        return [c for c in self.concerns if c.get('status') in ('ongoing', 'reopened')]
+        return [c for c in self.concerns if c.get('status') == 'open']

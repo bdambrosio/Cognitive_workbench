@@ -210,6 +210,12 @@ class TaskManager:
             self._zenoh_put(f"cognitive/{character}/control/task_wip_interrupt", data)
             return {'success': True}
 
+        @self.app.post("/api/run_now/{character}")
+        def run_now_task(character: str, data: dict = Body(...)):
+            character = character.strip().capitalize()
+            self._zenoh_put(f"cognitive/{character}/control/task_run_now", data)
+            return {'success': True}
+
         @self.app.post("/api/concern/{character}")
         def manage_concern(character: str, data: dict = Body(...)):
             """Manage a concern: close, resolve, abandon, or delete."""
@@ -292,10 +298,28 @@ button.secondary:hover { background: #4e4e4e; }
     font-size: 10px; padding: 1px 6px; border-radius: 8px;
     background: #3e3e42; color: #aaa;
 }
+.concern-status.open { background: #2a4d2a; color: #6ddb6d; }
 .concern-status.active { background: #2a4d2a; color: #6ddb6d; }
 .concern-status.surfaced { background: #4d3e2a; color: #dbb86d; }
 .concern-status.resolved { background: #2a3d4d; color: #6db1db; }
 .concern-desc { color: #999; margin-top: 4px; line-height: 1.4; }
+
+/* Status group accordions */
+.status-group { margin-bottom: 6px; }
+.status-group-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 8px; cursor: pointer; user-select: none;
+    background: #252526; border: 1px solid #3e3e42; border-radius: 4px;
+    font-size: 11px; color: #aaa; text-transform: capitalize;
+}
+.status-group-header:hover { background: #2a2a2d; }
+.status-group-chevron {
+    font-size: 10px; color: #666; display: inline-block;
+    transition: transform 0.15s;
+}
+.status-group.open .status-group-chevron { transform: rotate(90deg); }
+.status-group-body { display: none; padding-top: 4px; }
+.status-group.open .status-group-body { display: block; }
 .activation-bar {
     margin-top: 5px; height: 4px; background: #3e3e42;
     border-radius: 2px; overflow: hidden;
@@ -459,84 +483,114 @@ function activationColor(v) {
 function toggleConcern(el) {
     el.closest('.concern-card').classList.toggle('open');
 }
+function toggleStatusGroup(el) {
+    el.closest('.status-group').classList.toggle('open');
+}
+
+function renderConcernGroup(items, status, expanded, cardRenderer) {
+    if (!items.length) return '';
+    return `<div class="status-group ${expanded ? 'open' : ''}">
+        <div class="status-group-header" onclick="toggleStatusGroup(this)">
+            <span><span class="status-group-chevron">▶</span> ${status} (${items.length})</span>
+        </div>
+        <div class="status-group-body">
+            ${items.map(cardRenderer).join('')}
+        </div>
+    </div>`;
+}
 
 function renderConcerns(containerId, concerns, countId) {
     const el = document.getElementById(containerId);
-    const visible = concerns.filter(c => c.status !== 'closed');
-    document.getElementById(countId).textContent = visible.length;
-    if (!visible.length) { el.innerHTML = '<div class="empty">No concerns</div>'; return; }
-    el.innerHTML = visible.map(c => {
-        const act = (data.activations || {})[c.concern_id] || {};
-        const av = act.activation || 0;
-        const trend = act.trend || 'stable';
-        const arrow = trend === 'rising' ? '↑' : trend === 'falling' ? '↓' : '→';
-        const trendClass = trend === 'rising' ? 'trend-rising' : trend === 'falling' ? 'trend-falling' : '';
-        return `<div class="concern-card">
-            <div class="concern-summary" onclick="toggleConcern(this)">
-                <div class="concern-header">
-                    <span><span class="concern-chevron">▶</span><span class="concern-label">${esc(c.concern_label)}</span></span>
-                    <span class="concern-status ${c.status}">${c.status}</span>
-                </div>
-                <div class="activation-bar" style="margin-top:4px"><div class="activation-fill" style="width:${av*100}%;background:${activationColor(av)}"></div></div>
-                <div class="activation-info">
-                    <span>activation: ${av.toFixed(2)}</span>
-                    <span class="${trendClass}">${arrow} ${trend}</span>
-                    <span>weight: ${(c.weight||0).toFixed(2)}</span>
-                </div>
+    document.getElementById(countId).textContent = concerns.length;
+    if (!concerns.length) { el.innerHTML = '<div class="empty">No concerns</div>'; return; }
+    const groups = {open: [], closed: []};
+    concerns.forEach(c => { (groups[c.status] || groups.open).push(c); });
+    el.innerHTML =
+        renderConcernGroup(groups.open, 'open', true, renderUserConcernCard) +
+        renderConcernGroup(groups.closed, 'closed', false, renderUserConcernCard);
+}
+
+function renderUserConcernCard(c) {
+    const act = (data.activations || {})[c.concern_id] || {};
+    const av = act.activation || 0;
+    const trend = act.trend || 'stable';
+    const arrow = trend === 'rising' ? '↑' : trend === 'falling' ? '↓' : '→';
+    const trendClass = trend === 'rising' ? 'trend-rising' : trend === 'falling' ? 'trend-falling' : '';
+    return `<div class="concern-card">
+        <div class="concern-summary" onclick="toggleConcern(this)">
+            <div class="concern-header">
+                <span><span class="concern-chevron">▶</span><span class="concern-label">${esc(c.concern_label)}</span></span>
+                <span class="concern-status ${c.status}">${c.status}</span>
             </div>
-            <div class="concern-details">
-                ${c.concern_description ? `<div class="concern-desc" style="margin-top:6px">${esc(c.concern_description)}</div>` : ''}
-                <div style="font-size:10px;color:#666;margin-top:4px">
-                    stance: ${c.stance || '—'} | touches: ${c.touch_count || 0}
-                </div>
-                <div class="task-actions" style="margin-top:6px">
-                    <button class="secondary" style="font-size:10px;padding:2px 8px" onclick="manageConcern('${esc(c.concern_id)}','user','close')">Close</button>
-                    <button class="danger" style="font-size:10px;padding:2px 8px" onclick="manageConcern('${esc(c.concern_id)}','user','delete')">Delete</button>
-                </div>
+            <div class="activation-bar" style="margin-top:4px"><div class="activation-fill" style="width:${av*100}%;background:${activationColor(av)}"></div></div>
+            <div class="activation-info">
+                <span>activation: ${av.toFixed(2)}</span>
+                <span class="${trendClass}">${arrow} ${trend}</span>
+                <span>weight: ${(c.weight||0).toFixed(2)}</span>
             </div>
-        </div>`;
-    }).join('');
+        </div>
+        <div class="concern-details">
+            ${c.concern_description ? `<div class="concern-desc" style="margin-top:6px">${esc(c.concern_description)}</div>` : ''}
+            <div style="font-size:10px;color:#666;margin-top:4px">
+                stance: ${c.stance || '—'} | touches: ${c.touch_count || 0}
+            </div>
+            <div class="task-actions" style="margin-top:6px">
+                ${c.status === 'open'
+                    ? `<button class="secondary" style="font-size:10px;padding:2px 8px" onclick="manageConcern('${esc(c.concern_id)}','user','close')">Close</button>`
+                    : `<button class="secondary" style="font-size:10px;padding:2px 8px" onclick="manageConcern('${esc(c.concern_id)}','user','reopen')">Reopen</button>`}
+                <button class="danger" style="font-size:10px;padding:2px 8px" onclick="manageConcern('${esc(c.concern_id)}','user','delete')">Delete</button>
+            </div>
+        </div>
+    </div>`;
 }
 
 function renderDerivedConcerns(containerId, concerns, countId) {
     const el = document.getElementById(containerId);
     document.getElementById(countId).textContent = concerns.length;
     if (!concerns.length) { el.innerHTML = '<div class="empty">No derived concerns</div>'; return; }
-    el.innerHTML = concerns.map(c => {
-        const act = (data.activations || {})[c.concern_id] || {};
-        const av = act.activation || 0;
-        const trend = act.trend || 'stable';
-        const arrow = trend === 'rising' ? '↑' : trend === 'falling' ? '↓' : '→';
-        const trendClass = trend === 'rising' ? 'trend-rising' : trend === 'falling' ? 'trend-falling' : '';
-        return `<div class="concern-card">
-            <div class="concern-summary" onclick="toggleConcern(this)">
-                <div class="concern-header">
-                    <span><span class="concern-chevron">▶</span><span class="concern-label">${esc(c.concern_label)}</span></span>
-                    <span class="concern-status ${c.status}">${c.status}</span>
-                </div>
-                <div class="activation-bar" style="margin-top:4px"><div class="activation-fill" style="width:${av*100}%;background:${activationColor(av)}"></div></div>
-                <div class="activation-info">
-                    <span>activation: ${av.toFixed(2)}</span>
-                    <span class="${trendClass}">${arrow} ${trend}</span>
-                    <span>origin: ${c.origin || '?'}</span>
-                </div>
+    const groups = {active: [], surfaced: [], resolved: [], abandoned: []};
+    concerns.forEach(c => { (groups[c.status] || groups.active).push(c); });
+    el.innerHTML =
+        renderConcernGroup(groups.active, 'active', true, renderDerivedConcernCard) +
+        renderConcernGroup(groups.surfaced, 'surfaced', true, renderDerivedConcernCard) +
+        renderConcernGroup(groups.resolved, 'resolved', false, renderDerivedConcernCard) +
+        renderConcernGroup(groups.abandoned, 'abandoned', false, renderDerivedConcernCard);
+}
+
+function renderDerivedConcernCard(c) {
+    const act = (data.activations || {})[c.concern_id] || {};
+    const av = act.activation || 0;
+    const trend = act.trend || 'stable';
+    const arrow = trend === 'rising' ? '↑' : trend === 'falling' ? '↓' : '→';
+    const trendClass = trend === 'rising' ? 'trend-rising' : trend === 'falling' ? 'trend-falling' : '';
+    return `<div class="concern-card">
+        <div class="concern-summary" onclick="toggleConcern(this)">
+            <div class="concern-header">
+                <span><span class="concern-chevron">▶</span><span class="concern-label">${esc(c.concern_label)}</span></span>
+                <span class="concern-status ${c.status}">${c.status}</span>
             </div>
-            <div class="concern-details">
-                ${c.concern_description ? `<div class="concern-desc" style="margin-top:6px">${esc(c.concern_description)}</div>` : ''}
-                ${c.parent_user_concern_id ? `<div style="font-size:10px;color:#666;margin-top:4px">parent: ${esc(c.parent_user_concern_id)}</div>` : ''}
-                <div style="font-size:10px;color:#666;margin-top:2px">
-                    ${c.seeded ? 'seed concern' : ''} ${c.status_rationale ? '| ' + esc(c.status_rationale) : ''}
-                </div>
-                <div class="task-actions" style="margin-top:6px">
-                    ${c.status === 'active' || c.status === 'surfaced' ? `
-                        <button class="approve" style="font-size:10px;padding:2px 8px" onclick="manageConcern('${esc(c.concern_id)}','derived','resolve')">Resolve</button>
-                        <button class="secondary" style="font-size:10px;padding:2px 8px" onclick="manageConcern('${esc(c.concern_id)}','derived','abandon')">Abandon</button>
-                    ` : ''}
-                    <button class="danger" style="font-size:10px;padding:2px 8px" onclick="manageConcern('${esc(c.concern_id)}','derived','delete')">Delete</button>
-                </div>
+            <div class="activation-bar" style="margin-top:4px"><div class="activation-fill" style="width:${av*100}%;background:${activationColor(av)}"></div></div>
+            <div class="activation-info">
+                <span>activation: ${av.toFixed(2)}</span>
+                <span class="${trendClass}">${arrow} ${trend}</span>
+                <span>origin: ${c.origin || '?'}</span>
             </div>
-        </div>`;
-    }).join('');
+        </div>
+        <div class="concern-details">
+            ${c.concern_description ? `<div class="concern-desc" style="margin-top:6px">${esc(c.concern_description)}</div>` : ''}
+            ${c.parent_user_concern_id ? `<div style="font-size:10px;color:#666;margin-top:4px">parent: ${esc(c.parent_user_concern_id)}</div>` : ''}
+            <div style="font-size:10px;color:#666;margin-top:2px">
+                ${c.seeded ? 'seed concern' : ''} ${c.status_rationale ? '| ' + esc(c.status_rationale) : ''}
+            </div>
+            <div class="task-actions" style="margin-top:6px">
+                ${c.status === 'active' || c.status === 'surfaced' ? `
+                    <button class="approve" style="font-size:10px;padding:2px 8px" onclick="manageConcern('${esc(c.concern_id)}','derived','resolve')">Resolve</button>
+                    <button class="secondary" style="font-size:10px;padding:2px 8px" onclick="manageConcern('${esc(c.concern_id)}','derived','abandon')">Abandon</button>
+                ` : ''}
+                <button class="danger" style="font-size:10px;padding:2px 8px" onclick="manageConcern('${esc(c.concern_id)}','derived','delete')">Delete</button>
+            </div>
+        </div>
+    </div>`;
 }
 
 function renderTriage(triage) {
@@ -687,6 +741,7 @@ function renderActiveTask(t) {
         ${t.current_milestone ? `<div style="margin-top:4px;font-size:11px;color:#6db1db">Running: ${esc(t.current_milestone.substring(0,200))}</div>` : ''}
         ${lastExec ? `<div style="margin-top:4px;font-size:10px;color:#666">Last run: ${fmtDate(lastExec)}</div>` : ''}
         <div class="task-actions">
+            ${cycleState === 'idle' ? `<button class="secondary" onclick="runNowTask('${esc(noteName)}')">Run Now</button>` : ''}
             <button class="danger" onclick="abandonTask('${esc(noteName)}')">Abandon</button>
             <button class="danger" onclick="deleteTask('${esc(noteName)}')">Delete</button>
         </div>
@@ -789,6 +844,15 @@ async function deleteTask(noteName) {
 
 async function interruptTask(noteName) {
     await fetch(`/api/interrupt/${char()}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({note_name: noteName}),
+    });
+    setTimeout(refresh, 500);
+}
+
+async function runNowTask(noteName) {
+    await fetch(`/api/run_now/${char()}`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({note_name: noteName}),

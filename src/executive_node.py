@@ -104,7 +104,8 @@ class Action:
     type: str               # 'dispatch_goal', 'proceed_goal', 'reuse_goal',
                             # 'terminate_goal', 'clear_cache', 'chat_response',
                             # 'alert_response', 'ask_reply', 'task_command',
-                            # 'direct_action', 'agent_message', 'no_action'
+                            # 'direct_action', 'agent_message', 'proactive_remark',
+                            # 'no_action'
     payload: dict
     assessment: Optional[Dict[str, Any]] = None
 
@@ -1093,6 +1094,7 @@ class ZenohExecutiveNode:
         self.active_task_wip: Optional[str] = None       # Note name e.g. "_task_wip_1"
         self.active_task_wip_waiting: bool = False        # True while a milestone goal runs
         self._task_wip_counter: int = 0
+        self._resync_task_wip_counter()
 
         # Operational task execution state
         self._operational_task_note: Optional[str] = None  # Note name of task with running goal
@@ -1114,6 +1116,10 @@ class ZenohExecutiveNode:
         # Last character evaluator assessment (for orientation-to-chat integration)
         self._last_character_eval: Optional[Dict[str, Any]] = None
         self._character_concern_activations: Dict[str, float] = {}
+
+        # Tier 2 Decide: proactive remark suppression
+        self._last_proactive_remark_at: float = 0.0
+        self._proactive_remark_cooldown: float = 180.0  # seconds
 
         # Track last action outputs for plan_result
         self.last_say_text = ''
@@ -1235,6 +1241,10 @@ class ZenohExecutiveNode:
         self.control_task_edit_subscriber = self.session.declare_subscriber(
             f"cognitive/{character_name}/control/task_edit",
             self._handle_task_edit
+        )
+        self.control_task_run_now_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/task_run_now",
+            self._handle_task_run_now
         )
         self.control_concern_manage_subscriber = self.session.declare_subscriber(
             f"cognitive/{character_name}/control/concern_manage",
@@ -1617,6 +1627,22 @@ class ZenohExecutiveNode:
         self._ooda_living_state.maybe_persist(
             self._write_named_note, dc,
             planner_summary=self._get_planner_summary())
+
+    def _resync_task_wip_counter(self):
+        """Scan existing _task_wip_N named notes and set counter to max N found."""
+        if not self.resource_manager:
+            return
+        max_n = 0
+        for name in self.resource_manager.named_notes:
+            if name.startswith('_task_wip_'):
+                try:
+                    n = int(name[len('_task_wip_'):])
+                    max_n = max(max_n, n)
+                except (ValueError, IndexError):
+                    continue
+        if max_n > self._task_wip_counter:
+            self._task_wip_counter = max_n
+            logger.info(f'Resynced _task_wip_counter to {max_n}')
 
     def _build_serviced_concern_ids(self) -> set:
         """Build set of concern IDs that have linked tasks (any non-terminal state)."""
@@ -4104,6 +4130,7 @@ class ZenohExecutiveNode:
         "RULES:\n"
         "- Each goal should be a single, focused operation.\n"
         "- Reference notes by NAME, never by Note ID.\n"
+        "- When a prior goal produced a named note, mention it by name so the next goal can load it.\n"
         "- Do not repeat work already done in this cycle.\n"
         "- If the task's intention is fully satisfied, say CYCLE_DONE.\n"
         "- Keep goal text concise — one clear objective.\n"
@@ -4330,6 +4357,21 @@ class ZenohExecutiveNode:
             wip["_last_reflection"] = {}
             self._write_operational_task(task_note_name, note_id, wip)
 
+            # Append cycle context so the planner knows what prior goals produced
+            if cycle_goals:
+                context_lines = []
+                for g in cycle_goals:
+                    summary = g.get('result_summary', '')[:200]
+                    g_text = g.get('goal_text', '')[:100]
+                    if summary:
+                        context_lines.append(f"- [{g.get('status', '?')}] {g_text}\n  Result: {summary}")
+                if context_lines:
+                    goal_text = (
+                        f"{goal_text}\n\n## CONTEXT ##\n"
+                        f"Prior goals completed in this cycle:\n"
+                        + "\n".join(context_lines)
+                    )
+
             # Run goal on thread
             pre_resource_ids = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
 
@@ -4515,9 +4557,7 @@ class ZenohExecutiveNode:
                     if c.get("concern_id") == wip.get("linked_concern_id"):
                         if c.get("seeded"):
                             label = c.get("concern_label", "")
-                            if "workspace" in label.lower() or "maintenance" in label.lower():
-                                cooldown = 7200  # 2 hours for workspace maintenance
-                            elif "knowledge" in label.lower() or "improvement" in label.lower():
+                            if "knowledge" in label.lower() or "improvement" in label.lower():
                                 cooldown = 7200  # 2 hours for knowledge improvement
                             else:
                                 cooldown = 3600  # 1 hour for other seed concerns
@@ -4717,7 +4757,7 @@ class ZenohExecutiveNode:
             f"Message from {source}: {text}\n\n"
             f"Respond directly to what {source} said. Ground your response in your "
             f"actual operational state (concerns, tasks, recent goals, self-model) "
-            f"rather than generic descriptions. Be concise and in character."
+            f"rather than generic descriptions. Be concise and in character.\n</end>"
         )
 
         try:
@@ -4728,9 +4768,10 @@ class ZenohExecutiveNode:
                 ],
                 max_tokens=400,
                 temperature=0.7,
+                stops=["</end>"],
             )
             if result.success and result.text:
-                response = result.text.strip()
+                response = result.text.replace("</end>", "").strip()
                 self._say_to_user(response)
                 self.conversation_store.record_outgoing(source, response, act_type="chat")
                 logger.info(f'💬 {self.character_name} chat response to {source}: {response[:80]}...')
@@ -4765,6 +4806,45 @@ class ZenohExecutiveNode:
         except Exception as e:
             logger.error(f'Error in sensor alert response: {e}')
             traceback.print_exc()
+
+    def _handle_proactive_remark(self, text: str, source: str, rationale: str):
+        """Generate an unsolicited observation based on Orient's assessment.
+
+        Lightweight LLM call. The LLM can respond [SKIP] if on reflection
+        the observation isn't worth sharing.
+        """
+        system_prompt = self._update_system_prompt()
+        user_prompt = (
+            f"You've noticed something in your ambient sensor data that may be worth "
+            f"briefly mentioning to the user.\n\n"
+            f"What you noticed: {rationale}\n"
+            f"Source data: {str(text)[:500]}\n\n"
+            f"If this is genuinely interesting or relevant to the user's known interests "
+            f"or your active concerns, share a brief, natural observation (1-2 sentences). "
+            f"Do not be sycophantic or over-eager. Be concise and in character.\n"
+            f"If on reflection it's not worth mentioning, respond with exactly: [SKIP]"
+        )
+        try:
+            result = self.llm_generate(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                max_tokens=150,
+                temperature=0.7,
+            )
+            if result.success and result.text:
+                response = result.text.strip()
+                if '[SKIP]' in response:
+                    logger.info(f'💭 {self.character_name} proactive remark skipped (LLM declined)')
+                    return
+                self._say_to_user(response)
+                self._last_proactive_remark_at = time.monotonic()
+                logger.info(f'💭 {self.character_name} proactive remark: {response[:80]}...')
+            else:
+                logger.debug(f'Proactive remark LLM call failed: {getattr(result, "error", "unknown")}')
+        except Exception as e:
+            logger.debug(f'Error in proactive remark: {e}')
 
     # ── Goal worker thread ────────────────────────────────────────────────
 
@@ -5675,7 +5755,149 @@ class ZenohExecutiveNode:
             # Unblock is a no-op signal (interrupt already handled by sense_data_callback)
             return Action('no_action', {}, a)
 
+        # Tier 2: consult Orient's assessment for unrouted events
+        if a and (a.get('action_evaluation') or {}).get('action_choice', 'no_action') != 'no_action':
+            return self._decide_tier2(oriented)
+
         return Action('no_action', {}, a)
+
+    # ── Tier 2 Decide ──────────────────────────────────────────────────
+
+    def _decide_tier2(self, oriented: OrientedEvent) -> Action:
+        """Tier 2 Decide: consult Orient's assessment when Tier 1 has no route.
+
+        Rules-based. Checks Orient's action recommendation against agent state
+        and returns an appropriate instantiation.
+        """
+        a = oriented.assessment
+        evt = oriented.event
+        action_choice = (a.get('action_evaluation') or {}).get('action_choice', 'no_action')
+        sal = a.get('salience_factors') or {}
+        novelty = sal.get('novelty', 'none')
+        persistence = sal.get('persistence_worthiness', 'none')
+
+        # Parse concern bumps to detect "nothing matched"
+        concern_bumps = self._parse_orient_concern_bumps(a)
+        has_strong_match = any(v in ('strong', 'moderate') for v in concern_bumps.values())
+
+        # Side effect: surface new concern if novel + persistent + no match
+        if (novelty in ('moderate', 'high')
+                and persistence in ('moderate', 'high')
+                and not has_strong_match):
+            self._trigger_concern_from_event(evt, a)
+
+        # Instantiation: remark
+        if action_choice == 'inform_user':
+            if self._can_proactive_remark(novelty):
+                return Action('proactive_remark', {
+                    'text': evt.content,
+                    'source': evt.source,
+                    'rationale': a.get('overall_rationale', ''),
+                }, a)
+            return Action('no_action', {}, a)
+
+        # Instantiation: advance existing goal
+        if action_choice == 'trigger_existing_goal':
+            # Orient thinks a goal is relevant but didn't specify which —
+            # match via the concern that bumped strongest
+            if concern_bumps and not self._is_goal_running():
+                strongest = max(concern_bumps, key=lambda k: {'strong': 3, 'moderate': 2, 'weak': 1, 'none': 0}.get(concern_bumps[k], 0))
+                goal_id = self._find_goal_for_concern(strongest)
+                if goal_id:
+                    return Action('proceed_goal', {'goal_id': goal_id, 'source': 'orient'}, a)
+            return Action('no_action', {}, a)
+
+        # Instantiation: formulate new goal
+        if action_choice == 'formulate_new_goal':
+            if not self._is_goal_running() and not self.active_task_wip:
+                goal_text = self._formulate_goal_from_orient(evt, a)
+                if goal_text:
+                    return Action('dispatch_goal', {'goal_text': goal_text}, a)
+            return Action('no_action', {}, a)
+
+        return Action('no_action', {}, a)
+
+    def _parse_orient_concern_bumps(self, assessment: Dict[str, Any]) -> Dict[str, str]:
+        """Extract concern_id → bump_level from Orient's notes field."""
+        notes = (assessment or {}).get('notes', '')
+        bumps = {}
+        if 'concerns:' not in notes:
+            return bumps
+        for segment in notes.split(';'):
+            segment = segment.strip()
+            if segment.startswith('concerns:'):
+                for pair in segment[len('concerns:'):].strip().split(','):
+                    pair = pair.strip()
+                    if '=' in pair:
+                        cid, level = pair.rsplit('=', 1)
+                        bumps[cid.strip()] = level.strip()
+                break
+        return bumps
+
+    def _can_proactive_remark(self, novelty: str) -> bool:
+        """Check suppression guards for proactive remarks."""
+        if self._is_goal_running() or self.active_task_wip:
+            return False
+        if novelty == 'none':
+            return False
+        now = time.monotonic()
+        if (now - self._last_proactive_remark_at) < self._proactive_remark_cooldown:
+            return False
+        return True
+
+    def _find_goal_for_concern(self, concern_id: str) -> Optional[str]:
+        """Find a scheduled goal linked to a concern (via task WIP)."""
+        for t in self._get_all_task_data():
+            if t.get('status') != 'active' or t.get('lifecycle') != 'operational':
+                continue
+            if t.get('linked_concern_id') == concern_id or concern_id in (t.get('linked_concern_ids') or []):
+                goal_name = t.get('_scheduled_goal_name')
+                if goal_name:
+                    gid = self._find_goal_id_by_name(goal_name)
+                    if gid:
+                        return gid
+        return None
+
+    def _trigger_concern_from_event(self, evt: EventPacket, assessment: Dict[str, Any]):
+        """Ask derived concern model whether this event warrants a new concern."""
+        try:
+            content = evt.content if isinstance(evt.content, str) else str(evt.content)
+            rationale = assessment.get('overall_rationale', '')
+            interaction_text = (
+                f"Observed event (source: {evt.source}):\n"
+                f"{content[:500]}\n"
+                f"Orient assessment: {rationale}"
+            )
+            evidence_ref = f"orient_event:{datetime.now().isoformat()}"
+            uc = self.user_concern_model.get_concerns(active_only=False) or []
+            self._derived_concern_model.update_from_event(interaction_text, uc, evidence_ref)
+        except Exception as e:
+            logger.debug(f'Tier 2 concern trigger failed: {e}')
+
+    def _formulate_goal_from_orient(self, evt: EventPacket, assessment: Dict[str, Any]) -> Optional[str]:
+        """Generate goal text from Orient's assessment + event content."""
+        content = evt.content if isinstance(evt.content, str) else str(evt.content)
+        rationale = assessment.get('overall_rationale', '')
+        try:
+            result = self.llm_generate(
+                messages=[
+                    {"role": "system", "content":
+                        "You formulate a concise goal statement for an autonomous agent. "
+                        "The goal should be a single actionable sentence describing what to accomplish. "
+                        "Respond with ONLY the goal text, nothing else."},
+                    {"role": "user", "content":
+                        f"Event: {content[:400]}\n"
+                        f"Assessment: {rationale}\n\n"
+                        f"Formulate a goal for the agent to pursue based on this event."},
+                ],
+                max_tokens=100,
+                temperature=0.3,
+            )
+            if result.success and result.text:
+                return result.text.strip()
+        except Exception as e:
+            logger.debug(f'Tier 2 goal formulation failed: {e}')
+        return None
 
     def _find_goal_id_by_name(self, goal_name: str) -> Optional[str]:
         """Find a scheduled goal ID by name or goal_text."""
@@ -5807,6 +6029,10 @@ class ZenohExecutiveNode:
         if t == 'agent_message':
             self._create_character_note()
             self._handle_agent_message(p['text'], p['source'], p.get('close_flag', False), action.assessment)
+            return
+
+        if t == 'proactive_remark':
+            self._handle_proactive_remark(p['text'], p.get('source', ''), p.get('rationale', ''))
             return
 
         logger.warning(f"Act: unhandled action type '{t}'")
@@ -5983,7 +6209,10 @@ class ZenohExecutiveNode:
                     for item in data:
                         title = item.get('title', '')
                         url = item.get('url', '')
+                        desc = item.get('description', '')
                         label = f"{title} — {url}" if title else url
+                        if desc:
+                            label += f" ({desc[:120]})"
                         lines.append(f"      {label}")
                 else:
                     # Legacy plain-text
@@ -7340,6 +7569,42 @@ class ZenohExecutiveNode:
         except Exception as e:
             logger.warning(f'Task edit control error: {e}')
 
+    def _handle_task_run_now(self, sample):
+        """Handle 'run now' request — make an active task immediately eligible."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            note_name = data.get('note_name', '')
+            if not note_name or not self.resource_manager:
+                return
+            note_id = self.resource_manager.named_notes.get(note_name)
+            if not note_id:
+                return
+            res = self.resource_manager.get_resource(note_id)
+            content = json.loads(res.get('properties', {}).get('content', '{}'))
+            if content.get('status') != 'active' or content.get('lifecycle') != 'operational':
+                logger.warning(f'📋 Run-now rejected: {note_name} is not an active operational task')
+                return
+            if content.get('cycle_state') == 'running':
+                logger.info(f'📋 Run-now: {note_name} already has a cycle running')
+                return
+            # Zero out last_executed so it becomes immediately eligible
+            content['last_executed'] = None
+            content['updated'] = datetime.now().isoformat()
+            self.infospace_executor.execute_action({
+                "type": "create-note",
+                "value": json.dumps(content),
+                "name": note_name,
+                "out": f"${note_name}",
+            })
+            self.infospace_executor.execute_action({
+                "type": "persist",
+                "target": f"${note_name}",
+                "name": note_name,
+            })
+            logger.info(f'📋 Task run-now: {note_name} — cooldown cleared, eligible on next tick')
+        except Exception as e:
+            logger.warning(f'Task run-now control error: {e}')
+
     def _handle_concern_manage(self, sample):
         """Handle concern management from Task Manager UI.
 
@@ -7364,6 +7629,13 @@ class ZenohExecutiveNode:
                             break
                     self.user_concern_model._save()
                     logger.info(f'📋 User concern {concern_id} closed via Task Manager')
+                elif action == 'reopen':
+                    for c in self.user_concern_model.concerns:
+                        if c.get('concern_id') == concern_id:
+                            c['status'] = 'open'
+                            break
+                    self.user_concern_model._save()
+                    logger.info(f'📋 User concern {concern_id} reopened via Task Manager')
                 elif action == 'delete':
                     self.user_concern_model.concerns = [
                         c for c in self.user_concern_model.concerns
