@@ -301,6 +301,7 @@ button.secondary:hover { background: #4e4e4e; }
 .concern-status.open { background: #2a4d2a; color: #6ddb6d; }
 .concern-status.active { background: #2a4d2a; color: #6ddb6d; }
 .concern-status.surfaced { background: #4d3e2a; color: #dbb86d; }
+.concern-status.satisfied { background: #2a4d3d; color: #6ddba5; }
 .concern-status.resolved { background: #2a3d4d; color: #6db1db; }
 .concern-desc { color: #999; margin-top: 4px; line-height: 1.4; }
 
@@ -548,12 +549,15 @@ function renderDerivedConcerns(containerId, concerns, countId) {
     const el = document.getElementById(containerId);
     document.getElementById(countId).textContent = concerns.length;
     if (!concerns.length) { el.innerHTML = '<div class="empty">No derived concerns</div>'; return; }
-    const groups = {active: [], surfaced: [], resolved: [], abandoned: []};
-    concerns.forEach(c => { (groups[c.status] || groups.active).push(c); });
+    const groups = {active: [], surfaced: [], satisfied: [], abandoned: []};
+    concerns.forEach(c => {
+        const s = c.status === 'resolved' ? 'satisfied' : c.status;  // migration compat
+        (groups[s] || groups.active).push(c);
+    });
     el.innerHTML =
         renderConcernGroup(groups.active, 'active', true, renderDerivedConcernCard) +
         renderConcernGroup(groups.surfaced, 'surfaced', true, renderDerivedConcernCard) +
-        renderConcernGroup(groups.resolved, 'resolved', false, renderDerivedConcernCard) +
+        renderConcernGroup(groups.satisfied, 'satisfied', false, renderDerivedConcernCard) +
         renderConcernGroup(groups.abandoned, 'abandoned', false, renderDerivedConcernCard);
 }
 
@@ -582,10 +586,30 @@ function renderDerivedConcernCard(c) {
             <div style="font-size:10px;color:#666;margin-top:2px">
                 ${c.seeded ? 'seed concern' : ''} ${c.status_rationale ? '| ' + esc(c.status_rationale) : ''}
             </div>
+            <div style="font-size:10px;color:#888;margin-top:4px;display:flex;align-items:center;gap:6px">
+                <span>Revisit:</span>
+                <select id="revisit_${c.concern_id}" style="font-size:10px;background:#2d2d30;color:#ccc;border:1px solid #555;border-radius:3px;padding:1px 4px"
+                    onchange="manageConcern('${esc(c.concern_id)}','derived','set_revisit',parseFloat(this.value))">
+                    ${[1,2,4,8,12,24,48,168,720,0].map(h =>
+                        `<option value="${h}" ${(c.revisit_hours||24)==h ? 'selected' : ''}>${h === 0 ? 'one-time' : h < 24 ? h+'h' : h === 24 ? '1 day' : h === 48 ? '2 days' : h === 168 ? '1 week' : '30 days'}</option>`
+                    ).join('')}
+                </select>
+                ${c.status === 'satisfied' && c.satisfied_at ? (() => {
+                    const satMs = new Date(c.satisfied_at).getTime();
+                    const nowMs = Date.now();
+                    const revisitMs = (c.revisit_hours || 24) * 3600000;
+                    const remainMs = Math.max(0, satMs + revisitMs - nowMs);
+                    const remainH = (remainMs / 3600000).toFixed(1);
+                    return `<span style="color:#6ddba5">reactivates in ${remainH}h</span>`;
+                })() : ''}
+            </div>
             <div class="task-actions" style="margin-top:6px">
                 ${c.status === 'active' || c.status === 'surfaced' ? `
-                    <button class="approve" style="font-size:10px;padding:2px 8px" onclick="manageConcern('${esc(c.concern_id)}','derived','resolve')">Resolve</button>
+                    <button class="approve" style="font-size:10px;padding:2px 8px" onclick="manageConcern('${esc(c.concern_id)}','derived','satisfy')">Satisfy</button>
                     <button class="secondary" style="font-size:10px;padding:2px 8px" onclick="manageConcern('${esc(c.concern_id)}','derived','abandon')">Abandon</button>
+                ` : ''}
+                ${c.status === 'satisfied' ? `
+                    <button class="approve" style="font-size:10px;padding:2px 8px" onclick="manageConcern('${esc(c.concern_id)}','derived','activate_concern')">Reactivate</button>
                 ` : ''}
                 <button class="danger" style="font-size:10px;padding:2px 8px" onclick="manageConcern('${esc(c.concern_id)}','derived','delete')">Delete</button>
             </div>
@@ -860,12 +884,14 @@ async function runNowTask(noteName) {
     setTimeout(refresh, 500);
 }
 
-async function manageConcern(concernId, type, action) {
+async function manageConcern(concernId, type, action, revisitHours) {
     if (action === 'delete' && !confirm(`Delete concern ${concernId}? This cannot be undone.`)) return;
+    const body = {concern_id: concernId, type: type, action: action};
+    if (revisitHours !== undefined) body.revisit_hours = revisitHours;
     await fetch(`/api/concern/${char()}`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({concern_id: concernId, type: type, action: action}),
+        body: JSON.stringify(body),
     });
     setTimeout(refresh, 500);
 }

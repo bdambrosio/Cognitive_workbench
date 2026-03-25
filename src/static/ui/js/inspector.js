@@ -186,7 +186,7 @@ function goalActions(node) {
         btns.push(`<button class="dock-btn" data-action="interrupt">Interrupt</button>`);
     }
     if (status === 'completed' || status === 'failed') {
-        btns.push(`<button class="dock-btn" data-action="rerun">Rerun</button>`);
+        btns.push(`<button class="dock-btn" data-action="run">Run</button>`);
     }
     btns.push(`<button class="dock-btn dock-btn-danger" data-action="remove">Remove</button>`);
     return btns.join('');
@@ -202,8 +202,8 @@ function bindGoalActions(node) {
                 await api.sendTextInput(char, `proceed ${goalId}`);
             } else if (action === 'interrupt') {
                 await api.goalInterrupt(char, { goal_id: goalId });
-            } else if (action === 'rerun') {
-                await api.sendTextInput(char, `reuse ${goalId}`);
+            } else if (action === 'run') {
+                await api.sendTextInput(char, `proceed ${goalId}`);
             } else if (action === 'remove') {
                 await api.goalRemove(char, { goal_id: goalId });
             }

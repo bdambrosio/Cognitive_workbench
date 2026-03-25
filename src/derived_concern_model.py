@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 # Controlled vocabularies
 ORIGIN_VALUES = ('user_concern_derived', 'orientation_derived', 'goal_reflection', 'seed')
-STATUS_VALUES = ('surfaced', 'active', 'resolved', 'abandoned')
+STATUS_VALUES = ('surfaced', 'active', 'satisfied', 'abandoned')
 
 NOTE_NAME = '_derived_concerns'
 IDLE_COOLDOWN_SECS = 60.0
@@ -36,29 +36,27 @@ emit exactly ONE JSON patch operation.
 Patch types:
 - surface_concern: a new concern the agent has identified (status: surfaced)
 - activate_concern: a surfaced concern the agent commits to acting on (status: active)
-- resolve_concern: a concern that has been addressed (status: resolved)
+- satisfy_concern: a concern currently addressed — will revisit after its revisit period (status: satisfied)
 - abandon_concern: a concern no longer worth pursuing (status: abandoned)
 - no_change: no material change warranted
 
 Rules:
 - Emit at most one patch per invocation.
-- Prefer activating or resolving existing concerns over surfacing new ones.
+- Prefer activating or satisfying existing concerns over surfacing new ones.
 - Only surface when clearly warranted by user concerns or orientation state.
 - Concerns should be actionable — something the agent can actually do.
 - Link to parent user concern when the derivation is clear.
 - weight is a float 0.0-1.0 reflecting the agent's assessment of priority.
 - Keep rationale short and concrete.
-- Maximum 8 active+surfaced concerns at any time (seeded concerns do not count toward this limit). \
-If at limit, resolve or abandon before surfacing.
-- Concerns with "seeded": true are standing operational priorities from the agent's character \
-configuration. They represent ongoing commitments, not one-time issues. You may resolve them \
-when temporarily addressed, or update their weight to reflect current priority. Do NOT abandon \
-seeded concerns — they will re-surface automatically. When surfacing new concerns, consider \
-whether they are better represented as updates to existing seeded concerns rather than separate entries.
+- Maximum 8 active+surfaced concerns at any time. If at limit, satisfy or abandon before surfacing.
+- "satisfied" is NOT terminal — satisfied concerns automatically return to "active" after their \
+revisit period expires. Use satisfy_concern when a task has adequately addressed a concern for now.
+- Include revisit_hours in field_updates when satisfying (default: 24 for most concerns, \
+4 for homeostatic/operational concerns). The user can override this.
 
 Controlled vocabularies:
   origin: user_concern_derived, orientation_derived, goal_reflection, seed
-  status: surfaced, active, resolved, abandoned
+  status: surfaced, active, satisfied, abandoned
 
 Respond with ONLY a JSON object. No markdown fences, no commentary."""
 
@@ -89,16 +87,17 @@ For activate_concern:
   "why_this_activate": "..."
 }"""
 
-RESOLVE_CONCERN_SCHEMA = """\
-For resolve_concern:
+SATISFY_CONCERN_SCHEMA = """\
+For satisfy_concern:
 {
-  "op": "resolve_concern",
+  "op": "satisfy_concern",
   "concern_id": "dconcern_NNN",
   "field_updates": {
     "weight": ...,
+    "revisit_hours": 24,
     "status_rationale": "..."
   },
-  "why_this_resolve": "..."
+  "why_this_satisfy": "..."
 }"""
 
 ABANDON_CONCERN_SCHEMA = """\
@@ -184,16 +183,23 @@ class DerivedConcernModel:
                     except (ValueError, IndexError):
                         pass
 
-            # Re-surface any seeded concerns that were abandoned
-            resurfaced = 0
+            # Migrate legacy 'resolved' status to 'satisfied'
+            migrated = 0
             for c in self.concerns:
-                if c.get('seeded') and c.get('status') == 'abandoned':
-                    c['status'] = 'surfaced'
-                    c['status_rationale'] = 'Re-surfaced: standing concern from character configuration'
-                    c['recency'] = datetime.now().isoformat()
-                    resurfaced += 1
-            if resurfaced:
-                logger.info(f'Re-surfaced {resurfaced} abandoned seeded concern(s)')
+                if c.get('status') == 'resolved':
+                    c['status'] = 'satisfied'
+                    if not c.get('satisfied_at'):
+                        c['satisfied_at'] = c.get('recency', datetime.now().isoformat())
+                    if not c.get('revisit_hours'):
+                        c['revisit_hours'] = 4.0 if c.get('seeded') else 24.0
+                    migrated += 1
+                # Ensure all concerns have the new fields
+                if 'revisit_hours' not in c:
+                    c['revisit_hours'] = 4.0 if c.get('seeded') else 24.0
+                if 'satisfied_at' not in c:
+                    c['satisfied_at'] = None
+            if migrated:
+                logger.info(f'Migrated {migrated} resolved concern(s) to satisfied')
 
             # Inject any configured seeds not already present (upgrade path)
             injected_missing = 0
@@ -209,7 +215,7 @@ class DerivedConcernModel:
                     self._seed_concerns = old_seeds
                     injected_missing = len(missing)
 
-            if resurfaced or injected_missing:
+            if migrated or injected_missing:
                 self._save()
 
             logger.info(f'\u2713 Loaded {len(self.concerns)} derived concerns')
@@ -236,6 +242,8 @@ class DerivedConcernModel:
                 'parent_user_concern_id': None,
                 'category': seed.get('category', ''),
                 'seeded': True,
+                'revisit_hours': float(seed.get('revisit_hours', 4.0)),
+                'satisfied_at': None,
                 'recency': datetime.now().isoformat(),
                 'touch_count': 0,
                 'evidence_refs': ['character_config_seed'],
@@ -271,6 +279,37 @@ class DerivedConcernModel:
                 {"type": "persist", "target": "$_dcm_save"}
             )
         logger.info(f'\u2713 Saved {len(self.concerns)} derived concerns')
+
+    # ── Revisit expiration ──────────────────────────────────────────
+
+    def check_revisit_expirations(self) -> List[str]:
+        """Check satisfied concerns for expired revisit timers. Returns reactivated IDs."""
+        reactivated = []
+        now = datetime.now()
+        for c in self.concerns:
+            if c.get('status') != 'satisfied':
+                continue
+            satisfied_at = c.get('satisfied_at')
+            revisit_hours = c.get('revisit_hours')
+            if not satisfied_at or not revisit_hours:
+                continue
+            try:
+                sat_dt = datetime.fromisoformat(satisfied_at)
+                elapsed_hours = (now - sat_dt).total_seconds() / 3600.0
+                if elapsed_hours >= float(revisit_hours):
+                    c['status'] = 'active'
+                    c['satisfied_at'] = None
+                    c['status_rationale'] = f'Revisit period ({revisit_hours}h) expired — reactivated'
+                    c['recency'] = now.isoformat()
+                    reactivated.append(c.get('concern_id', ''))
+                    logger.info(
+                        f'Concern {c.get("concern_id")} reactivated after '
+                        f'{elapsed_hours:.1f}h (revisit_hours={revisit_hours})')
+            except (ValueError, TypeError):
+                continue
+        if reactivated:
+            self._save()
+        return reactivated
 
     # ── Trigger: idle tick ────────────────────────────────────────────
 
@@ -342,9 +381,9 @@ class DerivedConcernModel:
             indent=2, ensure_ascii=False,
         ) if user_concerns else "[]"
 
-        # Count active+surfaced to inform the LLM about capacity (seeded don't count)
+        # Count active+surfaced to inform the LLM about capacity
         active_count = sum(1 for c in self.concerns
-                           if c.get('status') in ('surfaced', 'active') and not c.get('seeded'))
+                           if c.get('status') in ('surfaced', 'active'))
 
         user_prompt = (
             f"## Current derived concerns ({active_count}/{_MAX_ACTIVE_CONCERNS} active+surfaced)\n"
@@ -353,7 +392,7 @@ class DerivedConcernModel:
             f"{uc_json}\n\n"
             f"## Trigger context\n{interaction_text}\n\n"
             f"## Schemas\n{SURFACE_CONCERN_SCHEMA}\n{ACTIVATE_CONCERN_SCHEMA}\n"
-            f"{RESOLVE_CONCERN_SCHEMA}\n{ABANDON_CONCERN_SCHEMA}\n{NO_CHANGE_SCHEMA}\n\n"
+            f"{SATISFY_CONCERN_SCHEMA}\n{ABANDON_CONCERN_SCHEMA}\n{NO_CHANGE_SCHEMA}\n\n"
             f"Analyze the context and emit one JSON patch."
         )
 
@@ -397,7 +436,8 @@ class DerivedConcernModel:
         if not isinstance(patch, dict) or 'op' not in patch:
             logger.warning(f'Derived concern patch missing "op" field: {str(patch)[:200]}')
             return None
-        valid_ops = ('surface_concern', 'activate_concern', 'resolve_concern', 'abandon_concern', 'no_change')
+        valid_ops = ('surface_concern', 'activate_concern', 'satisfy_concern', 'abandon_concern', 'no_change',
+                     'resolve_concern')  # resolve_concern accepted for backward compat, mapped to satisfy
         if patch['op'] not in valid_ops:
             logger.warning(f'Unknown derived concern patch op: {patch["op"]}')
             return None
@@ -416,9 +456,9 @@ class DerivedConcernModel:
             if not new_concern or not new_concern.get('concern_label'):
                 logger.warning('surface_concern patch missing new_concern or concern_label')
                 return
-            # Check capacity (seeded concerns don't count toward limit)
+            # Check capacity
             active_count = sum(1 for c in self.concerns
-                               if c.get('status') in ('surfaced', 'active') and not c.get('seeded'))
+                               if c.get('status') in ('surfaced', 'active'))
             if active_count >= _MAX_ACTIVE_CONCERNS:
                 logger.warning(f'Derived concern capacity reached ({active_count}/{_MAX_ACTIVE_CONCERNS}), skipping surface')
                 return
@@ -460,30 +500,31 @@ class DerivedConcernModel:
 
         if op == 'activate_concern':
             updates['status'] = 'active'
+            target['satisfied_at'] = None  # Clear any previous satisfaction
             self._merge_updates(target, updates, evidence_ref)
             logger.info(f'Derived concern model: \u25b6{concern_id} activated \u2014 {patch.get("why_this_activate", "")}')
 
-        elif op == 'resolve_concern':
-            updates['status'] = 'resolved'
+        elif op in ('satisfy_concern', 'resolve_concern'):
+            # resolve_concern is accepted for backward compat, treated as satisfy
+            updates['status'] = 'satisfied'
+            revisit = float(updates.pop('revisit_hours', 0) or target.get('revisit_hours', 24))
+            updates['revisit_hours'] = revisit
             self._merge_updates(target, updates, evidence_ref)
-            logger.info(f'Derived concern model: \u2713{concern_id} resolved \u2014 {patch.get("why_this_resolve", "")}')
+            target['satisfied_at'] = datetime.now().isoformat()
+            why_key = 'why_this_satisfy' if op == 'satisfy_concern' else 'why_this_resolve'
+            logger.info(f'Derived concern model: \u2713{concern_id} satisfied (revisit in {revisit}h) \u2014 {patch.get(why_key, "")}')
 
         elif op == 'abandon_concern':
-            if target.get('seeded'):
-                logger.info(f'Derived concern model: blocked abandon of seeded concern {concern_id} — resolving instead')
-                updates['status'] = 'resolved'
-                self._merge_updates(target, updates, evidence_ref)
-            else:
-                updates['status'] = 'abandoned'
-                self._merge_updates(target, updates, evidence_ref)
-                logger.info(f'Derived concern model: \u2717{concern_id} abandoned \u2014 {patch.get("why_this_abandon", "")}')
+            updates['status'] = 'abandoned'
+            self._merge_updates(target, updates, evidence_ref)
+            logger.info(f'Derived concern model: \u2717{concern_id} abandoned \u2014 {patch.get("why_this_abandon", "")}')
 
     def _merge_updates(self, target: Dict[str, Any], updates: Dict[str, Any],
                        evidence_ref: str):
         """Merge field updates into an existing concern entry."""
         for field in ('weight', 'status', 'status_rationale', 'concern_description',
                       'concern_label', 'origin', 'parent_user_concern_id', 'history_summary',
-                      'category'):
+                      'category', 'revisit_hours'):
             if field in updates:
                 if field == 'weight':
                     target[field] = float(updates[field])

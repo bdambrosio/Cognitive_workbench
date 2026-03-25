@@ -1618,6 +1618,11 @@ class ZenohExecutiveNode:
                     self._ooda_living_state, uc)
             except Exception as e:
                 logger.debug(f"Idle tick derived concern update skipped: {e}")
+            # Check for satisfied concerns whose revisit period has expired
+            try:
+                self._derived_concern_model.check_revisit_expirations()
+            except Exception as e:
+                logger.debug(f"Revisit expiration check skipped: {e}")
             # Concern triage: tick deferred timers, nominate from activations, run triage
             self._triage_idle_tick()
         try:
@@ -1684,27 +1689,6 @@ class ZenohExecutiveNode:
                 )
         except Exception as e:
             logger.debug(f'Triage activation nomination skipped: {e}')
-
-        # Seed concern nomination: active seed concerns without linked tasks
-        try:
-            all_derived = self._derived_concern_model.get_concerns() or []
-            # Find unserviced active seed concerns, sorted by staleness
-            # (oldest recency = most stale = nominated first)
-            seed_unserviced = [
-                c for c in all_derived
-                if c.get('seeded') and c.get('status') == 'active'
-                and c.get('concern_id') not in serviced_ids
-            ]
-            seed_unserviced.sort(key=lambda c: c.get('recency', ''))
-            # Nominate at most 1 per idle tick to avoid flooding the queue
-            for c in seed_unserviced[:1]:
-                self._concern_triage.nominate_seed(
-                    concern_id=c.get('concern_id', ''),
-                    concern_label=c.get('concern_label', ''),
-                    concern_description=c.get('concern_description', ''),
-                )
-        except Exception as e:
-            logger.debug(f'Triage seed nomination skipped: {e}')
 
         # Run triage if candidates are queued and cooldown has elapsed
         if self._concern_triage.should_run_triage():
@@ -1960,22 +1944,12 @@ class ZenohExecutiveNode:
 
 
     def _apply_concern_recommendation(self, concern_id: str, recommendation: str, rationale: str):
-        """Apply a distillation concern recommendation to the derived concern model.
-
-        Seed concerns are never resolved or abandoned by distillation — they are
-        permanent operational priorities. A completed task means the concern is
-        being serviced, not that it no longer matters.
-        """
-        op_map = {'resolve': 'resolve_concern', 'abandon': 'abandon_concern'}
+        """Apply a distillation concern recommendation to the derived concern model."""
+        op_map = {'resolve': 'satisfy_concern', 'abandon': 'abandon_concern'}
         op = op_map.get(recommendation)
         if not op:
             return  # 'keep_active' — no action needed
         try:
-            # Don't resolve/abandon seed concerns — they're permanent
-            for c in self._derived_concern_model.get_concerns():
-                if c.get('concern_id') == concern_id and c.get('seeded'):
-                    logger.info(f'Distillation: skipping {recommendation} for seed concern {concern_id}')
-                    return
             patch = {
                 'op': op,
                 'concern_id': concern_id,
@@ -4119,11 +4093,14 @@ class ZenohExecutiveNode:
     # ── Operational task execution (round-robin dispatch) ────────────────
 
     _OPERATIONAL_TASK_PROMPT = (
-        "You are executing one cycle of a recurring autonomous task.\n"
-        "Each cycle, you decide what goal to run next based on what has been\n"
-        "accomplished so far. When the cycle's work is complete, say CYCLE_DONE.\n\n"
+        "You are executing one cycle of a RECURRING autonomous task.\n"
+        "This task runs periodically. Even if prior cycles completed successfully,\n"
+        "you MUST perform the work again — conditions change between runs.\n"
+        "Prior success does NOT mean the task is done; it means it was done THEN.\n\n"
         "TASK INTENTION:\n{intention}\n\n"
         "ESTABLISHMENT CONTEXT (what was learned during setup):\n{establishment_findings}\n\n"
+        "CURRENT TIME: {current_time}\n"
+        "LAST ACTUAL WORK: {last_work_time}\n\n"
         "THIS CYCLE — GOALS COMPLETED:\n{cycle_goals}\n\n"
         "THIS CYCLE — FINDINGS:\n{cycle_findings}\n\n"
         "RECENT EXECUTION HISTORY (prior cycles):\n{execution_history}\n\n"
@@ -4131,8 +4108,9 @@ class ZenohExecutiveNode:
         "- Each goal should be a single, focused operation.\n"
         "- Reference notes by NAME, never by Note ID.\n"
         "- When a prior goal produced a named note, mention it by name so the next goal can load it.\n"
-        "- Do not repeat work already done in this cycle.\n"
-        "- If the task's intention is fully satisfied, say CYCLE_DONE.\n"
+        "- Do not repeat work already done in THIS cycle.\n"
+        "- You MUST submit at least one goal per cycle. CYCLE_DONE is only valid AFTER\n"
+        "  at least one goal has been completed in this cycle.\n"
         "- Keep goal text concise — one clear objective.\n"
         "- Include SUCCESS_CRITERIA so the result can be evaluated.\n"
         "- Include TOOLS_HINT if you know which tools are needed.\n\n"
@@ -4299,9 +4277,18 @@ class ZenohExecutiveNode:
                 f"Do NOT retry the same approach. Try a different strategy.\n"
             )
 
+        # Compute last actual work time (last cycle that submitted at least one goal)
+        last_work_time = "Never"
+        for h in reversed(exec_history):
+            if h.get("goals_count", 0) > 0:
+                last_work_time = h.get("timestamp", "Unknown")
+                break
+
         prompt = self._OPERATIONAL_TASK_PROMPT.format(
             intention=wip.get("intention", ""),
             establishment_findings=est_text,
+            current_time=datetime.now().isoformat(timespec='minutes'),
+            last_work_time=last_work_time,
             cycle_goals=cycle_goals_text,
             cycle_findings=cycle_findings_text,
             execution_history=history_text,
@@ -4396,6 +4383,22 @@ class ZenohExecutiveNode:
             self._run_goal_on_thread(_run_operational_goal)
 
         elif action == "CYCLE_DONE":
+            # Reject zero-goal CYCLE_DONE — recurring tasks must do work each cycle
+            if not cycle_goals:
+                logger.warning(
+                    f'📋 Task {task_note_name}: rejected zero-goal CYCLE_DONE, '
+                    f'ending cycle without updating last_executed or execution_count')
+                wip["cycle_state"] = "idle"
+                wip["cycle_goals_completed"] = []
+                wip["cycle_findings"] = []
+                wip["current_milestone"] = None
+                wip["_last_reflection"] = {}
+                wip["_cycle_stall_sig"] = ""
+                wip["_cycle_stall_count"] = 0
+                self._write_operational_task(task_note_name, note_id, wip)
+                self._operational_task_note = None
+                self._operational_goal_waiting = False
+                return
             logger.info(f'📋 Task {task_note_name}: LLM says CYCLE_DONE — "{goal_text[:80]}"')
             self._complete_task_cycle(task_note_name, note_id, wip, goal_text)
 
@@ -4746,18 +4749,42 @@ class ZenohExecutiveNode:
         except Exception:
             pass
 
+        # Add user concerns for grounding
+        user_concerns_block = ""
+        try:
+            active_uc = self.user_concern_model.get_concerns(active_only=True) or []
+            if active_uc:
+                lines = ["## User Concerns"]
+                for c in active_uc[:8]:
+                    label = c.get("concern_label", "?")
+                    desc = c.get("concern_description", "")
+                    weight = c.get("weight", "")
+                    status = c.get("status", "")
+                    w_str = f" (weight={weight})" if weight else ""
+                    lines.append(f"- {label}{w_str} [{status}]: {desc}")
+                user_concerns_block = "\n".join(lines)
+        except Exception:
+            pass
+
         orientation_block = f"\n{orientation}\n\n" if orientation else "\n"
         self_model_insert = f"\n{self_model_block}\n\n" if self_model_block else ""
+        concerns_insert = f"\n{user_concerns_block}\n\n" if user_concerns_block else ""
         user_prompt = (
             f"RECENT DIALOG:\n{recent_turns}\n"
             f"Their move: {envision['turn_intent']}\n"
             f"Your move: {envision['my_move']}\n"
             f"{orientation_block}"
             f"{self_model_insert}"
+            f"{concerns_insert}"
             f"Message from {source}: {text}\n\n"
             f"Respond directly to what {source} said. Ground your response in your "
             f"actual operational state (concerns, tasks, recent goals, self-model) "
-            f"rather than generic descriptions. Be concise and in character.\n</end>"
+            f"rather than generic descriptions. Be concise and in character.\n"
+            f"IMPORTANT: You CANNOT execute tools or run actions in this conversational turn. "
+            f"NEVER claim to have run a tool, executed a check, or performed an action that "
+            f"you did not actually perform. If the user asks you to do something that requires "
+            f"tool execution, tell them you can do it as a goal (e.g., 'I can run that as a "
+            f"goal — would you like me to?').\n</end>"
         )
 
         try:
@@ -5796,15 +5823,18 @@ class ZenohExecutiveNode:
                 }, a)
             return Action('no_action', {}, a)
 
-        # Instantiation: advance existing goal
+        # Instantiation: advance existing goal or operational task
         if action_choice == 'trigger_existing_goal':
-            # Orient thinks a goal is relevant but didn't specify which —
-            # match via the concern that bumped strongest
             if concern_bumps and not self._is_goal_running():
                 strongest = max(concern_bumps, key=lambda k: {'strong': 3, 'moderate': 2, 'weak': 1, 'none': 0}.get(concern_bumps[k], 0))
+                # First try: scheduled goal linked to this concern
                 goal_id = self._find_goal_for_concern(strongest)
                 if goal_id:
                     return Action('proceed_goal', {'goal_id': goal_id, 'source': 'orient'}, a)
+                # Second try: operational task linked to this concern — dispatch immediately
+                task_note = self._find_task_for_concern(strongest)
+                if task_note:
+                    return Action('dispatch_operational_task', {'task_note': task_note}, a)
             return Action('no_action', {}, a)
 
         # Instantiation: formulate new goal
@@ -5856,6 +5886,15 @@ class ZenohExecutiveNode:
                     gid = self._find_goal_id_by_name(goal_name)
                     if gid:
                         return gid
+        return None
+
+    def _find_task_for_concern(self, concern_id: str) -> Optional[str]:
+        """Find an operational task note name linked to a concern."""
+        for t in self._get_all_task_data():
+            if t.get('status') != 'active' or t.get('lifecycle') != 'operational':
+                continue
+            if t.get('linked_concern_id') == concern_id or concern_id in (t.get('linked_concern_ids') or []):
+                return t.get('_note_name')
         return None
 
     def _trigger_concern_from_event(self, evt: EventPacket, assessment: Dict[str, Any]):
@@ -5970,6 +6009,14 @@ class ZenohExecutiveNode:
                 self._say_to_user("Please specify which goal to reuse, e.g. 'reuse goal_1'.")
                 return
             self._handle_goal_reuse(goal_id=p['goal_id'])
+            return
+
+        if t == 'dispatch_operational_task':
+            task_note = p.get('task_note')
+            if task_note and not self._is_goal_running() and not self._operational_goal_waiting:
+                logger.info(f'📋 Dispatching operational task {task_note} from trigger_existing_goal')
+                self._say_to_user(f"Running task now...")
+                self._advance_task_execution(task_note)
             return
 
         if t == 'terminate_goal':
@@ -6397,6 +6444,26 @@ class ZenohExecutiveNode:
                         concern_lines.append(f"  - {label}{w_str}: {desc}")
                     recent_context += "\n# User concerns (context for framing, not direct instructions):\n"
                     recent_context += "\n".join(concern_lines) + "\n"
+            except Exception:
+                pass
+
+            # Add active derived concerns for planner framing
+            try:
+                dc = getattr(self, '_derived_concern_model', None)
+                if dc:
+                    active_dc = [c for c in dc.get_concerns()
+                                 if c.get('status') in ('active', 'surfaced')]
+                    if active_dc:
+                        dc_lines = []
+                        for c in active_dc[:5]:
+                            label = c.get("concern_label", "?")
+                            desc = c.get("concern_description") or ""
+                            weight = c.get("weight", "")
+                            origin = c.get("origin", "")
+                            w_str = f" (weight={weight})" if weight else ""
+                            dc_lines.append(f"  - {label}{w_str} [{origin}]: {desc}")
+                        recent_context += "\n# Agent-derived concerns (my current operational priorities):\n"
+                        recent_context += "\n".join(dc_lines) + "\n"
             except Exception:
                 pass
 
@@ -7645,16 +7712,38 @@ class ZenohExecutiveNode:
                     logger.info(f'📋 User concern {concern_id} deleted via Task Manager')
 
             elif concern_type == 'derived':
-                if action in ('resolve', 'abandon'):
-                    op = 'resolve_concern' if action == 'resolve' else 'abandon_concern'
+                if action in ('resolve', 'satisfy', 'abandon'):
+                    op = 'abandon_concern' if action == 'abandon' else 'satisfy_concern'
                     patch = {
                         'op': op,
                         'concern_id': concern_id,
                         'field_updates': {'status_rationale': f'{action}d via Task Manager'},
                     }
+                    if action in ('resolve', 'satisfy'):
+                        revisit = data.get('revisit_hours')
+                        if revisit is not None:
+                            patch['field_updates']['revisit_hours'] = float(revisit)
                     self._derived_concern_model._apply_patch(patch, f'ui:{action}')
                     self._derived_concern_model._save()
                     logger.info(f'📋 Derived concern {concern_id} {action}d via Task Manager')
+                elif action == 'set_revisit':
+                    revisit = data.get('revisit_hours')
+                    if revisit is not None:
+                        for c in self._derived_concern_model.concerns:
+                            if c.get('concern_id') == concern_id:
+                                c['revisit_hours'] = float(revisit)
+                                break
+                        self._derived_concern_model._save()
+                        logger.info(f'📋 Derived concern {concern_id} revisit set to {revisit}h')
+                elif action == 'activate_concern':
+                    patch = {
+                        'op': 'activate_concern',
+                        'concern_id': concern_id,
+                        'field_updates': {'status_rationale': 'Reactivated via Task Manager'},
+                    }
+                    self._derived_concern_model._apply_patch(patch, 'ui:reactivate')
+                    self._derived_concern_model._save()
+                    logger.info(f'📋 Derived concern {concern_id} reactivated via Task Manager')
                 elif action == 'delete':
                     self._derived_concern_model.concerns = [
                         c for c in self._derived_concern_model.concerns
