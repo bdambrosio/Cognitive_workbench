@@ -1792,6 +1792,64 @@ class ZenohExecutiveNode:
             f"Awaiting approval in Task Manager."
         )
 
+    def _propose_task_from_conversation(self, user_text: str, source: str):
+        """Extract a task intention from recent conversation and create a proposed task.
+
+        Called when the evaluator thinks the user wants existing work to advance
+        (e.g., confirming a proposed action). Uses an LLM call to extract what
+        the agent proposed and the user confirmed.
+        """
+        try:
+            # Gather recent conversation for context
+            entity_data = self.conversation_store.get_entity_context(source, limit=6, scope='current')
+            recent_turns = ""
+            if entity_data and 'conversation_history' in entity_data:
+                for entry in entity_data['conversation_history'][-6:]:
+                    if isinstance(entry, dict) and 'source' in entry and 'text' in entry:
+                        recent_turns += f"{entry['source']}: {str(entry['text'])[:300]}\n"
+
+            prompt = (
+                f"Recent conversation:\n{recent_turns}\n"
+                f"Latest message from {source}: {user_text}\n\n"
+                f"The user appears to be confirming or requesting that the agent proceed with "
+                f"something discussed in the conversation. Extract the specific task intention "
+                f"the user wants done.\n\n"
+                f"Respond with ONLY a JSON object:\n"
+                f'{{"intention": "one-sentence description of what to do", '
+                f'"reason": "why this was extracted from the conversation"}}\n'
+                f"If the conversation doesn't contain a clear actionable request, respond:\n"
+                f'{{"intention": "", "reason": "no clear task found"}}'
+            )
+
+            result = self.llm_generate(
+                messages=[prompt],
+                max_tokens=300,
+                temperature=0.2,
+                is_json=True,
+            )
+            if not result.success or not result.text:
+                logger.warning('propose_from_conversation: LLM call failed')
+                return
+
+            # Parse response
+            resp = result.text if isinstance(result.text, dict) else json.loads(str(result.text))
+            intention = resp.get('intention', '').strip()
+            reason = resp.get('reason', '')
+
+            if not intention:
+                logger.info(f'propose_from_conversation: no actionable task found — {reason}')
+                # Fall back to chat response
+                self._handle_chat_response(user_text, source, assessment=None)
+                return
+
+            # Create proposed task (reuse existing mechanism)
+            self._create_proposed_task('', intention, f"From conversation: {reason}")
+
+        except Exception as e:
+            logger.warning(f'propose_from_conversation failed: {e}')
+            # Fall back to chat response
+            self._handle_chat_response(user_text, source, assessment=None)
+
     def _attach_concern_to_task(self, concern_id: str, task_wip_id: str):
         """Link a concern to an existing task."""
         if not self.resource_manager:
@@ -5834,18 +5892,13 @@ class ZenohExecutiveNode:
                 }, a)
             return Action('no_action', {}, a)
 
-        # Instantiation: advance existing goal or operational task
+        # Instantiation: user wants existing work to advance — propose a task from conversation
         if action_choice == 'trigger_existing_goal':
-            if concern_bumps and not self._is_goal_running():
-                strongest = max(concern_bumps, key=lambda k: {'strong': 3, 'moderate': 2, 'weak': 1, 'none': 0}.get(concern_bumps[k], 0))
-                # First try: scheduled goal linked to this concern
-                goal_id = self._find_goal_for_concern(strongest)
-                if goal_id:
-                    return Action('proceed_goal', {'goal_id': goal_id, 'source': 'orient'}, a)
-                # Second try: operational task linked to this concern — dispatch immediately
-                task_note = self._find_task_for_concern(strongest)
-                if task_note:
-                    return Action('dispatch_operational_task', {'task_note': task_note}, a)
+            if not self._is_goal_running() and not self.active_task_wip:
+                return Action('propose_from_conversation', {
+                    'text': evt.content,
+                    'source': evt.source,
+                }, a)
             return Action('no_action', {}, a)
 
         # Instantiation: formulate new goal
@@ -5886,19 +5939,6 @@ class ZenohExecutiveNode:
             return False
         return True
 
-    def _find_goal_for_concern(self, concern_id: str) -> Optional[str]:
-        """Find a scheduled goal linked to a concern (via task WIP)."""
-        for t in self._get_all_task_data():
-            if t.get('status') != 'active' or t.get('lifecycle') != 'operational':
-                continue
-            if t.get('linked_concern_id') == concern_id or concern_id in (t.get('linked_concern_ids') or []):
-                goal_name = t.get('_scheduled_goal_name')
-                if goal_name:
-                    gid = self._find_goal_id_by_name(goal_name)
-                    if gid:
-                        return gid
-        return None
-
     def _record_ooda_event(self, event, oriented, action):
         """Record an OODA cycle event for the UI feed."""
         try:
@@ -5923,15 +5963,6 @@ class ZenohExecutiveNode:
                 self._ooda_event_feed = self._ooda_event_feed[-self._OODA_FEED_MAX:]
         except Exception:
             pass
-
-    def _find_task_for_concern(self, concern_id: str) -> Optional[str]:
-        """Find an operational task note name linked to a concern."""
-        for t in self._get_all_task_data():
-            if t.get('status') != 'active' or t.get('lifecycle') != 'operational':
-                continue
-            if t.get('linked_concern_id') == concern_id or concern_id in (t.get('linked_concern_ids') or []):
-                return t.get('_note_name')
-        return None
 
     def _trigger_concern_from_event(self, evt: EventPacket, assessment: Dict[str, Any]):
         """Ask derived concern model whether this event warrants a new concern."""
@@ -6047,12 +6078,8 @@ class ZenohExecutiveNode:
             self._handle_goal_reuse(goal_id=p['goal_id'])
             return
 
-        if t == 'dispatch_operational_task':
-            task_note = p.get('task_note')
-            if task_note and not self._is_goal_running() and not self._operational_goal_waiting:
-                logger.info(f'📋 Dispatching operational task {task_note} from trigger_existing_goal')
-                self._say_to_user(f"Running task now...")
-                self._advance_task_execution(task_note)
+        if t == 'propose_from_conversation':
+            self._propose_task_from_conversation(p.get('text', ''), p.get('source', 'User'))
             return
 
         if t == 'terminate_goal':
