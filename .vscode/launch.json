@@ -13,7 +13,7 @@
                 "SGLANG_DISABLE_DEEP_GEMM": "1",
                 "FLASHINFER_DISABLE_VERSION_CHECK": "1"
             },
-            "args": ["jill-infospace.yaml", "--ui", "--resource-browser"],
+            "args": ["jill-infospace.yaml", "--ui", "--resource-browser", "--task-manager"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -28,7 +28,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["jill-infospace-openai.yaml", "--ui", "--resource-browser"],
+            "args": ["jill-infospace-openai.yaml", "--ui", "--resource-browser", "--task-manager"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -43,7 +43,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["jill-infospace-openrouter.yaml", "--ui", "--resource-browser"],
+            "args": ["jill-infospace-openrouter.yaml", "--ui", "--resource-browser", "--task-manager"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -58,7 +58,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["jill-infospace-anthropic.yaml", "--ui", "--resource-browser"],
+            "args": ["jill-infospace-anthropic.yaml", "--ui", "--resource-browser", "--task-manager"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -73,7 +73,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["jill-infospace-vllm.yaml", "--ui", "--resource-browser"],
+            "args": ["jill-infospace-vllm.yaml", "--ui", "--resource-browser", "--task-manager"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -88,7 +88,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["jill-osworld.yaml", "--ui", "--resource-browser"],
+            "args": ["jill-osworld.yaml", "--ui", "--resource-browser", "--task-manager"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -103,7 +103,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["jill-minecraft.yaml", "--ui", "--resource-browser"],
+            "args": ["jill-minecraft.yaml", "--ui", "--resource-browser", "--task-manager"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -118,7 +118,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["jill-scienceworld.yaml", "--ui", "--resource-browser"],
+            "args": ["jill-scienceworld.yaml", "--ui", "--resource-browser", "--task-manager"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -133,7 +133,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["jill_benchmark.yaml", "--ui", "--resource-browser"],
+            "args": ["jill_benchmark.yaml", "--ui", "--resource-browser", "--task-manager"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -148,7 +148,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["jack-and-jill.yaml", "--ui", "--resource-browser"],
+            "args": ["jack-and-jill.yaml", "--ui", "--resource-browser", "--task-manager"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"

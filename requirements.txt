@@ -7,7 +7,6 @@ PyYAML>=6.0
 # Web framework and server
 fastapi>=0.116.0
 uvicorn[standard]>=0.35.0
-websockets>=15.0.0
 
 # Data processing and scientific computing
 numpy>=2.3.0
@@ -24,15 +23,16 @@ transformers>=4.30.0  # Used by executive_node for AutoTokenizer
 faiss-cpu>=1.7.0  # Vector search for infospace memory
 torch>=2.9.1  # VoxelAffordanceModel inference
 zstandard>=0.22.0  # Training data compression
+safetensors>=0.4.0  # LoRA adapter storage
 
 # GUI
 PyQt6>=6.0.0
 
 # Sensors
 feedparser>=6.0.0  # Used by rss-watcher sensor
+psutil>=5.9.0  # Process management in launcher
 
 # Utilities and tools
-python-dotenv>=1.1.0
 unstructured>=0.10.0
 wordfreq>=3.0.0
 pymupdf>=1.24.0
@@ -41,7 +41,9 @@ python-docx>=1.1.0
 lxml>=4.9.0  # Used by utils/grobid.py for PDF parsing
 spacy>=3.7.0  # Used by test_space.py
 imageio>=2.30.0  # Used by utils/create-log-gif
+Pillow>=10.0.0  # Image processing for log GIF creation
 
 # Development and testing (optional)
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
+datasets>=2.14.0  # HuggingFace datasets for eval benchmarks
