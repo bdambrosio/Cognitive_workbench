@@ -117,6 +117,10 @@ const handlers = {
                 if (text) {
                     state.addChatMessage('agent', text);
                 }
+                // Fire ask-pending event so UI can alert the user
+                if (bareType === 'ask') {
+                    state.emit('ask-pending', { text: text || 'Agent is asking a question', character: msg.character });
+                }
             }
         }
 

@@ -5,6 +5,11 @@
 import { state } from './state.js';
 import * as api from './api.js';
 
+// Module-level state for ask-pending alerts
+let askPending = false;
+let titleFlashInterval = null;
+const originalTitle = document.title;
+
 export function initDock() {
     // ── Slide panel toggles ──────────────────────────────
     setupToggle('dock-chat-toggle', 'chat-panel');
@@ -52,6 +57,11 @@ export function initDock() {
     const chatToggleBtn = document.getElementById('dock-chat-toggle');
     let unreadCount = 0;
 
+    // Request notification permission on load
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+
     state.on('chat-message', (msg) => {
         const div = document.createElement('div');
         div.className = `chat-msg chat-msg-${msg.role}`;
@@ -64,6 +74,33 @@ export function initDock() {
             unreadCount++;
             chatToggleBtn.textContent = `Chat (${unreadCount})`;
             chatToggleBtn.classList.add('has-unread');
+        }
+    });
+
+    // ── Ask Pending Alerts ────────────────────────────────
+    state.on('ask-pending', ({ text, character }) => {
+        if (askPending) return;  // already alerting
+        askPending = true;
+
+        // 1. Pulse the chat button
+        chatToggleBtn.classList.add('ask-pending');
+
+        // 2. Flash the document title
+        let flash = false;
+        titleFlashInterval = setInterval(() => {
+            flash = !flash;
+            document.title = flash ? `⚠ ${character || 'Agent'} is asking...` : originalTitle;
+        }, 1000);
+
+        // 3. Browser notification (if permitted)
+        if ('Notification' in window && Notification.permission === 'granted') {
+            const preview = (text || '').slice(0, 120);
+            const n = new Notification(`${character || 'Agent'} is asking`, {
+                body: preview || 'A question needs your response.',
+                icon: '/static/favicon.png',
+                tag: 'ask-pending',  // dedup
+            });
+            n.onclick = () => { window.focus(); n.close(); };
         }
     });
 
@@ -165,7 +202,15 @@ function clearChatUnread() {
     if (btn) {
         btn.textContent = 'Chat';
         btn.classList.remove('has-unread');
+        btn.classList.remove('ask-pending');
     }
+    // Clear ask-pending state
+    askPending = false;
+    if (titleFlashInterval) {
+        clearInterval(titleFlashInterval);
+        titleFlashInterval = null;
+    }
+    document.title = originalTitle;
 }
 
 function closePanel(id) {
