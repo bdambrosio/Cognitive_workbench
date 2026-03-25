@@ -19,10 +19,11 @@ export function initInspector() {
         if (node) { currentNodeId = node.id; show(node); }
         else { currentNodeId = null; close(); }
     });
-    // Auto-refresh agent details when topology updates and agent is selected
+    // Auto-refresh agent panel when topology updates and agent is selected
     state.on('topology-refresh', () => {
         if (currentNodeId === 'agent' && panel.classList.contains('visible')) {
-            loadAgentDetails();
+            const node = state.nodes.get('agent');
+            if (node) renderers.agent(node);
         }
     });
 }
