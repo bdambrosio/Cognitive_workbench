@@ -227,6 +227,16 @@ html, body {
     color: var(--text-dim);
     font-size: 11px;
 }
+.dock-health {
+    font-size: 10px;
+    margin-left: 8px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: #2a2a40;
+}
+.dock-health.health-ok { color: #6ddb6d; background: #1a2e1a; }
+.dock-health.health-warning { color: #dbb86d; background: #2e2a1a; }
+.dock-health.health-error { color: #db6d6d; background: #2e1a1a; }
 .dock-system { margin-left: auto; }
 
 .dock-btn {

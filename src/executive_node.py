@@ -1121,6 +1121,10 @@ class ZenohExecutiveNode:
         self._last_proactive_remark_at: float = 0.0
         self._proactive_remark_cooldown: float = 180.0  # seconds
 
+        # OODA event feed ring buffer for UI
+        self._ooda_event_feed: List[Dict[str, Any]] = []
+        self._OODA_FEED_MAX = 30
+
         # Track last action outputs for plan_result
         self.last_say_text = ''
         self.last_out_resource_id = None
@@ -1349,6 +1353,11 @@ class ZenohExecutiveNode:
         self.triage_status_queryable = self.session.declare_queryable(
             f"cognitive/{character_name}/triage_status",
             self._triage_status_query_handler
+        )
+
+        self.ooda_feed_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/ooda_feed",
+            self._ooda_feed_query_handler
         )
 
         self.world_state_queryable = self.session.declare_queryable(
@@ -1603,6 +1612,8 @@ class ZenohExecutiveNode:
         except Exception:
             pass
         action = self._ooda_decide(oriented)
+        # Record OODA event for UI feed
+        self._record_ooda_event(event, oriented, action)
         self._ooda_act(action)
         self._ooda_living_state.update_after_act(action)
         self._ooda_living_state.maybe_persist(
@@ -5888,6 +5899,31 @@ class ZenohExecutiveNode:
                         return gid
         return None
 
+    def _record_ooda_event(self, event, oriented, action):
+        """Record an OODA cycle event for the UI feed."""
+        try:
+            assessment = oriented.assessment or {}
+            bumps = self._parse_orient_concern_bumps(assessment)
+            # Compact representation of concern bumps (only non-none)
+            bump_str = ', '.join(
+                f'{k}={v}' for k, v in bumps.items() if v != 'none'
+            ) if bumps else ''
+            action_eval = (assessment.get('action_evaluation') or {})
+            entry = {
+                'timestamp': datetime.now().isoformat(timespec='seconds'),
+                'source': event.source if event else '?',
+                'event_type': event.event_type if event else '?',
+                'classification': event.classification if event else '?',
+                'action_choice': action_eval.get('action_choice', ''),
+                'action_taken': action.type if action else '',
+                'concern_bumps': bump_str,
+            }
+            self._ooda_event_feed.append(entry)
+            if len(self._ooda_event_feed) > self._OODA_FEED_MAX:
+                self._ooda_event_feed = self._ooda_event_feed[-self._OODA_FEED_MAX:]
+        except Exception:
+            pass
+
     def _find_task_for_concern(self, concern_id: str) -> Optional[str]:
         """Find an operational task note name linked to a concern."""
         for t in self._get_all_task_data():
@@ -7584,6 +7620,14 @@ class ZenohExecutiveNode:
             logger.error(f'Error in triage_status query handler: {e}')
             query.reply(query.key_expr, json.dumps({'success': False, 'error': str(e)}).encode('utf-8'))
 
+    def _ooda_feed_query_handler(self, query):
+        """Handle query for recent OODA events."""
+        try:
+            response = {'success': True, 'events': list(self._ooda_event_feed)}
+            query.reply(query.key_expr, json.dumps(response, default=str).encode('utf-8'))
+        except Exception as e:
+            query.reply(query.key_expr, json.dumps({'success': False, 'error': str(e)}).encode('utf-8'))
+
     def _handle_task_approve(self, sample):
         """Handle task approval from task manager UI."""
         try:
@@ -7703,6 +7747,15 @@ class ZenohExecutiveNode:
                             break
                     self.user_concern_model._save()
                     logger.info(f'📋 User concern {concern_id} reopened via Task Manager')
+                elif action == 'set_weight':
+                    weight = data.get('weight')
+                    if weight is not None:
+                        for c in self.user_concern_model.concerns:
+                            if c.get('concern_id') == concern_id:
+                                c['weight'] = max(0.0, min(1.0, float(weight)))
+                                break
+                        self.user_concern_model._save()
+                        logger.info(f'📋 User concern {concern_id} weight set to {weight}')
                 elif action == 'delete':
                     self.user_concern_model.concerns = [
                         c for c in self.user_concern_model.concerns
@@ -7744,6 +7797,15 @@ class ZenohExecutiveNode:
                     self._derived_concern_model._apply_patch(patch, 'ui:reactivate')
                     self._derived_concern_model._save()
                     logger.info(f'📋 Derived concern {concern_id} reactivated via Task Manager')
+                elif action == 'set_weight':
+                    weight = data.get('weight')
+                    if weight is not None:
+                        for c in self._derived_concern_model.concerns:
+                            if c.get('concern_id') == concern_id:
+                                c['weight'] = max(0.0, min(1.0, float(weight)))
+                                break
+                        self._derived_concern_model._save()
+                        logger.info(f'📋 Derived concern {concern_id} weight set to {weight}')
                 elif action == 'delete':
                     self._derived_concern_model.concerns = [
                         c for c in self._derived_concern_model.concerns

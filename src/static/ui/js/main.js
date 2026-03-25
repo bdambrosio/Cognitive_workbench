@@ -66,6 +66,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, 4000);
 
+    // Refresh health indicator in dock
+    setInterval(() => {
+        if (state.character && state.connected) {
+            refreshHealthIndicator();
+        }
+    }, 15000);
+    // Initial health check after character detected
+    state.on('character-detected', () => setTimeout(refreshHealthIndicator, 2000));
+
     // On goal updates from WebSocket, refresh topology
     state.on('goal-update', () => {
         setTimeout(() => refreshTopology(), 500);
@@ -220,6 +229,43 @@ async function buildTopologyFromEndpoints() {
     }
 
     state.setTopology(nodes, edges);
+}
+
+// ── Health Indicator ─────────────────────────────────────
+
+async function refreshHealthIndicator() {
+    if (!state.character) return;
+    const el = document.getElementById('dock-health');
+    if (!el) return;
+    try {
+        const res = await api.getConcerns(state.character);
+        if (!res.success) return;
+        const dc = res.derived_concerns || [];
+        const activations = res.activations || {};
+
+        // Count concern statuses
+        const active = dc.filter(c => c.status === 'active' || c.status === 'surfaced').length;
+        const satisfied = dc.filter(c => c.status === 'satisfied').length;
+        const total = dc.length;
+
+        // Check if any health-related concern is active with high activation
+        const healthConcern = dc.find(c =>
+            c.concern_label && c.concern_label.includes('health') && c.status === 'active');
+        const healthAct = healthConcern ? (activations[healthConcern.concern_id] || {}).activation || 0 : 0;
+
+        if (healthConcern && healthAct > 0.5) {
+            el.textContent = `Health: warning`;
+            el.className = 'dock-health health-warning';
+        } else if (active > 0) {
+            el.textContent = `${active} active, ${satisfied} satisfied`;
+            el.className = 'dock-health health-ok';
+        } else {
+            el.textContent = `${total} concerns`;
+            el.className = 'dock-health';
+        }
+    } catch {
+        // silently ignore
+    }
 }
 
 // ── Bindings Refresh ─────────────────────────────────────

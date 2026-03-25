@@ -96,6 +96,14 @@ export function getCharacters() {
     return get('/api/characters');
 }
 
+export function getOodaFeed(character) {
+    return get(`/api/ooda_feed/${encodeURIComponent(character)}`);
+}
+
+export function getConcerns(character) {
+    return get(`/api/concerns/${encodeURIComponent(character)}`);
+}
+
 // ── System ────────────────────────────────────────────────
 
 export function save() { return post('/api/save'); }

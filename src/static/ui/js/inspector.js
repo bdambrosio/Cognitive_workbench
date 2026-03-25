@@ -40,10 +40,17 @@ const renderers = {
             <h3>OODA State</h3>
             <p class="field-label">Phase: <span class="field-value">${state.oodaPhase || 'idle'}</span></p>
             <p class="field-label">Last tick: <span class="field-value">${state.lastTick ? new Date(state.lastTick).toLocaleTimeString() : 'n/a'}</span></p>
+            <div id="health-indicator"></div>
+            <h3>OODA Feed</h3>
+            <div id="ooda-feed" style="max-height:300px;overflow-y:auto;font-size:11px;font-family:monospace">
+                <p class="field-label">Loading...</p>
+            </div>
             <h3>Recent Actions</h3>
             ${recentActionsHtml()}
         `;
         actionsEl.innerHTML = '';
+        // Load OODA feed and health
+        loadAgentDetails();
     },
 
     goal(node) {
@@ -231,4 +238,75 @@ function escapeHtml(str) {
 function truncate(str, len) {
     if (!str) return '';
     return str.length > len ? str.slice(0, len - 1) + '\u2026' : str;
+}
+
+// ── Agent Detail Loaders ────────────────────────────────
+
+async function loadAgentDetails() {
+    if (!state.character) return;
+
+    // Load OODA feed
+    try {
+        const res = await api.getOodaFeed(state.character);
+        const feedEl = document.getElementById('ooda-feed');
+        if (feedEl && res.success && res.events) {
+            const events = res.events.slice(-20).reverse();
+            if (!events.length) {
+                feedEl.innerHTML = '<p class="field-label">No OODA events yet.</p>';
+            } else {
+                feedEl.innerHTML = events.map(e => {
+                    const time = e.timestamp ? e.timestamp.split('T')[1] || e.timestamp : '';
+                    const bumps = e.concern_bumps || '';
+                    const src = (e.source || '').replace('sensor:', 'S:');
+                    return `<div style="padding:2px 0;border-bottom:1px solid #2a2a2a">` +
+                        `<span style="color:#666">${escapeHtml(time)}</span> ` +
+                        `<span style="color:#4ec9b0">${escapeHtml(src)}</span> ` +
+                        `<span style="color:#dbb86d">${escapeHtml(e.classification || '')}</span>` +
+                        ` \u2192 <span style="color:#6ddb6d">${escapeHtml(e.action_taken || '')}</span>` +
+                        (bumps ? `<div style="color:#888;padding-left:8px">${escapeHtml(bumps)}</div>` : '') +
+                        `</div>`;
+                }).join('');
+            }
+        }
+    } catch (e) {
+        const feedEl = document.getElementById('ooda-feed');
+        if (feedEl) feedEl.innerHTML = '<p class="field-label">Failed to load feed.</p>';
+    }
+
+    // Load health indicator from concerns
+    try {
+        const res = await api.getConcerns(state.character);
+        const healthEl = document.getElementById('health-indicator');
+        if (healthEl && res.success) {
+            // Find system_health_monitoring concern or health-related task
+            const dc = res.derived_concerns || [];
+            const healthConcern = dc.find(c =>
+                c.concern_label && c.concern_label.includes('health'));
+            const activations = res.activations || {};
+
+            // Build health summary
+            const parts = [];
+            if (healthConcern) {
+                const act = activations[healthConcern.concern_id] || {};
+                const status = healthConcern.status || '?';
+                const av = (act.activation || 0).toFixed(2);
+                const statusColor = status === 'active' ? '#dbb86d'
+                    : status === 'satisfied' ? '#6ddba5' : '#888';
+                parts.push(`<span style="color:${statusColor}">${escapeHtml(status)}</span>`);
+                parts.push(`activation: ${av}`);
+            }
+            // Count concern statuses
+            const statuses = {};
+            dc.forEach(c => { statuses[c.status] = (statuses[c.status] || 0) + 1; });
+            const statusSummary = Object.entries(statuses)
+                .map(([s, n]) => `${n} ${s}`).join(', ');
+            if (statusSummary) parts.push(statusSummary);
+
+            if (parts.length) {
+                healthEl.innerHTML = `<h3>Health</h3><p class="field-label">${parts.join(' \u00b7 ')}</p>`;
+            }
+        }
+    } catch (e) {
+        // Silently ignore
+    }
 }

@@ -1545,6 +1545,20 @@ Generated: {generated_at}
                 logger.error(f"Error getting triage status: {e}")
                 return {"success": False, "message": str(e)}
 
+        @self.app.get("/api/ooda_feed/{character}")
+        async def get_ooda_feed(character: str):
+            """Get recent OODA event feed for a character."""
+            try:
+                selector = f"cognitive/{character}/ooda_feed"
+                replies = self.session.get(selector, timeout=2.0)
+                for reply in replies:
+                    if hasattr(reply, 'ok') and reply.ok is not None:
+                        return json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                return {"success": True, "events": []}
+            except Exception as e:
+                logger.error(f"Error getting ooda feed: {e}")
+                return {"success": False, "events": []}
+
         @self.app.get("/api/characters")
         async def get_characters():
             """Get list of active characters that have announced themselves."""

@@ -535,6 +535,14 @@ function renderUserConcernCard(c) {
             <div style="font-size:10px;color:#666;margin-top:4px">
                 stance: ${c.stance || '—'} | touches: ${c.touch_count || 0}
             </div>
+            <div style="font-size:10px;color:#888;margin-top:4px;display:flex;align-items:center;gap:6px">
+                <span>Weight:</span>
+                <input type="range" min="0" max="1" step="0.05" value="${c.weight||0.5}"
+                    style="width:80px;height:14px;accent-color:#4ec9b0"
+                    oninput="this.nextElementSibling.textContent=parseFloat(this.value).toFixed(2)"
+                    onchange="manageConcern('${esc(c.concern_id)}','user','set_weight',undefined,parseFloat(this.value))">
+                <span style="min-width:28px">${(c.weight||0.5).toFixed(2)}</span>
+            </div>
             <div class="task-actions" style="margin-top:6px">
                 ${c.status === 'open'
                     ? `<button class="secondary" style="font-size:10px;padding:2px 8px" onclick="manageConcern('${esc(c.concern_id)}','user','close')">Close</button>`
@@ -585,6 +593,14 @@ function renderDerivedConcernCard(c) {
             ${c.parent_user_concern_id ? `<div style="font-size:10px;color:#666;margin-top:4px">parent: ${esc(c.parent_user_concern_id)}</div>` : ''}
             <div style="font-size:10px;color:#666;margin-top:2px">
                 ${c.seeded ? 'seed concern' : ''} ${c.status_rationale ? '| ' + esc(c.status_rationale) : ''}
+            </div>
+            <div style="font-size:10px;color:#888;margin-top:4px;display:flex;align-items:center;gap:6px">
+                <span>Weight:</span>
+                <input type="range" min="0" max="1" step="0.05" value="${c.weight||0.5}"
+                    style="width:80px;height:14px;accent-color:#4ec9b0"
+                    oninput="this.nextElementSibling.textContent=parseFloat(this.value).toFixed(2)"
+                    onchange="manageConcern('${esc(c.concern_id)}','derived','set_weight',undefined,parseFloat(this.value))">
+                <span style="min-width:28px">${(c.weight||0.5).toFixed(2)}</span>
             </div>
             <div style="font-size:10px;color:#888;margin-top:4px;display:flex;align-items:center;gap:6px">
                 <span>Revisit:</span>
@@ -884,10 +900,11 @@ async function runNowTask(noteName) {
     setTimeout(refresh, 500);
 }
 
-async function manageConcern(concernId, type, action, revisitHours) {
+async function manageConcern(concernId, type, action, revisitHours, weight) {
     if (action === 'delete' && !confirm(`Delete concern ${concernId}? This cannot be undone.`)) return;
     const body = {concern_id: concernId, type: type, action: action};
     if (revisitHours !== undefined) body.revisit_hours = revisitHours;
+    if (weight !== undefined) body.weight = weight;
     await fetch(`/api/concern/${char()}`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
