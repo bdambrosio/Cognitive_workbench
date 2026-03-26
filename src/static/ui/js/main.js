@@ -266,6 +266,18 @@ async function refreshHealthIndicator() {
     } catch {
         // silently ignore
     }
+
+    // Resource footprint from topology state
+    const fpEl = document.getElementById('dock-footprint');
+    if (fpEl) {
+        let notes = 0, goals = 0, bindings = 0;
+        for (const [, n] of state.nodes) {
+            if (n.type === 'note') notes++;
+            else if (n.type === 'goal') goals++;
+            else if (n.type === 'binding') bindings++;
+        }
+        fpEl.textContent = `${notes} notes \u00b7 ${goals} goals \u00b7 ${bindings} bindings`;
+    }
 }
 
 // ── Bindings Refresh ─────────────────────────────────────

@@ -458,6 +458,11 @@ let autoTimer = null;
 function char() { return document.getElementById('char-input').value.trim() || 'jill'; }
 
 async function refresh() {
+    // Skip refresh if user is actively editing (input/textarea/select has focus)
+    const active = document.activeElement;
+    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) {
+        return;
+    }
     try {
         const resp = await fetch(`/api/data/${char()}`);
         data = await resp.json();
