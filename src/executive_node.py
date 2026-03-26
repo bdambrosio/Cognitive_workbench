@@ -6340,6 +6340,142 @@ class ZenohExecutiveNode:
 
         return "\n".join(parts)
 
+    def _build_process_block(self) -> str:
+        """Build a process-oriented narrative of did/doing/will-do.
+
+        Supplements the state block with temporal flow — connects the
+        agent's recent past, current activity, and upcoming work into
+        a compact narrative grounded in the concern→task hierarchy.
+        """
+        parts = ["## CURRENT PROCESS (what I did, am doing, and will do next)"]
+
+        # Gather active operational tasks (used by all sections below)
+        try:
+            tasks = self._get_all_task_data()
+            active_tasks = [t for t in tasks if t.get('status') == 'active'
+                            and t.get('lifecycle') == 'operational']
+        except Exception:
+            active_tasks = []
+
+        # ── WHY: trace current/recent work to its motivating concern ──
+        why = ""
+        try:
+            # Find the most recently executed task
+            if active_tasks:
+                most_recent = max(active_tasks,
+                                  key=lambda t: t.get('last_executed', '') or '')
+                concern_id = most_recent.get('linked_concern_id', '')
+                concern_label = ''
+                if concern_id:
+                    dc = getattr(self, '_derived_concern_model', None)
+                    if dc:
+                        for c in dc.get_concerns():
+                            if c.get('concern_id') == concern_id:
+                                concern_label = c.get('concern_label', concern_id)
+                                break
+                    if not concern_label:
+                        concern_label = concern_id
+                intention = most_recent.get('intention', '')[:100]
+                if concern_label:
+                    why = f"Why: {concern_label} (concern) → {intention} (task)"
+                else:
+                    why = f"Why: {intention} (task)"
+        except Exception:
+            pass
+        if why:
+            parts.append(why)
+
+        # ── DID: most recent completed work ──
+        did = ""
+        try:
+            if active_tasks:
+                most_recent = max(active_tasks,
+                                  key=lambda t: t.get('last_executed', '') or '')
+                history = most_recent.get('execution_history', [])
+                if history:
+                    last_cycle = history[-1]
+                    summary = last_cycle.get('summary', '')[:150]
+                    goals_count = last_cycle.get('goals_count', 0)
+                    achieved = last_cycle.get('goals_achieved', 0)
+                    did = f"Did: {summary} ({achieved}/{goals_count} goals achieved)"
+        except Exception:
+            pass
+        if not did:
+            # Fallback to last action
+            if self.action_history:
+                last = self.action_history[-1]
+                did = f"Did: {last.action.get('type', '?')}: {self._truncate_result(last.result)}"
+        if did:
+            parts.append(did)
+
+        # ── DOING: current activity ──
+        doing = ""
+        if self.current_goal and self.current_goal.name != 'sleep':
+            doing = f"Doing: Executing goal — {self.current_goal.to_string()[:120]}"
+        elif self._operational_goal_waiting:
+            doing = "Doing: Waiting for operational task goal to complete"
+        elif self.active_task_wip:
+            doing = f"Doing: Establishing task {self.active_task_wip}"
+        else:
+            doing = "Doing: Idle — monitoring OODA loop for events and sensor data"
+        parts.append(doing)
+
+        # ── WILL DO: next eligible tasks and upcoming work ──
+        will_do = ""
+        try:
+            if active_tasks:
+                now_ts = time.time()
+                upcoming = []
+                for t in active_tasks:
+                    last = t.get('last_executed')
+                    cooldown = t.get('cooldown_seconds', 3600)
+                    intention = t.get('intention', '')[:80]
+                    if last:
+                        try:
+                            last_ts = datetime.fromisoformat(
+                                last.replace('+00:00', '')).timestamp()
+                            remaining = max(0, cooldown - (now_ts - last_ts))
+                            upcoming.append((remaining, intention))
+                        except (ValueError, TypeError):
+                            upcoming.append((0, intention))
+                    else:
+                        upcoming.append((0, intention))
+                upcoming.sort(key=lambda x: x[0])
+                if upcoming:
+                    items = []
+                    for remaining, intention in upcoming[:3]:
+                        if remaining <= 0:
+                            items.append(f"{intention} (eligible now)")
+                        else:
+                            mins = int(remaining / 60)
+                            items.append(f"{intention} (in {mins}m)")
+                    will_do = "Will do: " + "; ".join(items)
+        except Exception:
+            pass
+
+        # Check for unserviced user concerns
+        try:
+            uc = self.user_concern_model.get_concerns(active_only=True) or []
+            # Find concerns not linked to any active task
+            serviced_ids = set()
+            for t in active_tasks:
+                cid = t.get('linked_concern_id', '')
+                if cid:
+                    serviced_ids.add(cid)
+            unserviced = [c for c in uc
+                          if c.get('concern_id') not in serviced_ids
+                          and c.get('status') == 'open']
+            if unserviced:
+                labels = [c.get('concern_label', '?') for c in unserviced[:3]]
+                will_do += f" | Unserviced user concerns: {', '.join(labels)}"
+        except Exception:
+            pass
+
+        if will_do:
+            parts.append(will_do)
+
+        return "\n".join(parts)
+
     def _character_eval_enabled(self) -> bool:
         cfg = self.character_config.get("character_evaluator") or self.character_config.get("jill_evaluator") or {}
         return bool(cfg.get("enabled", True))
@@ -6409,6 +6545,8 @@ class ZenohExecutiveNode:
 
         # Authoritative agent state — overrides conversation history
         system_prompt += f"\n{self._build_agent_state_block()}\n"
+        # Process narrative — did/doing/will-do temporal flow
+        system_prompt += f"\n{self._build_process_block()}\n"
 
         # Reference to the readable OODA state snapshot
         ooda_note_id = self._resolve_ooda_readable_note_id()
@@ -6536,6 +6674,12 @@ class ZenohExecutiveNode:
                             dc_lines.append(f"  - {label}{w_str} [{origin}]: {desc}")
                         recent_context += "\n# Agent-derived concerns (my current operational priorities):\n"
                         recent_context += "\n".join(dc_lines) + "\n"
+            except Exception:
+                pass
+
+            # Process narrative for planner context
+            try:
+                recent_context += f"\n{self._build_process_block()}\n"
             except Exception:
                 pass
 
