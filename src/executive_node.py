@@ -3684,7 +3684,11 @@ class ZenohExecutiveNode:
     def _say_to_user(self, text: str):
         """Send a message to user via the say action."""
         if self.infospace_executor:
-            self.infospace_executor.execute_action({"type": "say", "target": "user", "value": text})
+            # Strip <think>...</think> reasoning blocks before sending to user
+            import re
+            text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+            if text:
+                self.infospace_executor.execute_action({"type": "say", "target": "user", "value": text})
 
     # ── Task WIP (milestone loop) methods ─────────────────────────────────
 
