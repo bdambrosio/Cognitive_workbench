@@ -3972,7 +3972,7 @@ class ZenohExecutiveNode:
         # Phase milestone cap: auto-advance if too many milestones in one phase.
         # Caps are per-phase — establishment phases are bounded, operational execution is not.
         _PHASE_CAPS = {
-            "specification": 2,
+            "specification": 1,
             "capability_evaluation": 3,
             "infrastructure_setup": 5,
             "activation": 1,
@@ -4024,11 +4024,11 @@ class ZenohExecutiveNode:
         phases_lines = ["PHASES (in required order — you MUST visit each phase before moving to the next):"]
         if not is_autonomous:
             phases_lines.append(
-                "  specification — Clarify requirements with the user via `ask`. What exactly should\n"
-                "    the task do? What parameters, thresholds, or preferences matter? The goal you\n"
-                "    submit should use `ask` to have a conversation with the user and return the\n"
-                "    collected answers as its final result. The answers will be recorded\n"
-                "    automatically in the milestone history.")
+                "  specification — Ask the user ONE round of clarifying questions via `ask`.\n"
+                "    Combine all questions into a single ask. What exactly should the task do?\n"
+                "    What parameters, thresholds, or preferences matter? You get exactly one\n"
+                "    ask — make it count. The user's answers will be recorded automatically\n"
+                "    in the milestone history. Then advance to capability_evaluation.")
         phases_lines.append(
             "  capability_evaluation — Test whether the needed tools/data sources actually work.\n"
             "    E.g., can we fetch the right emails? Can we access the web page? Submit a small\n"
