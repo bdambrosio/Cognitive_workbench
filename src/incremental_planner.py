@@ -3790,7 +3790,7 @@ ALWAYS follow all formatting instructions exactly.
         "  VERIFICATION: <if DONE=YES: list observable facts proving GOAL is met, and any missing outcomes. Write SUCCESS, PARTIAL, or INCONCLUSIVE. If DONE=NO, leave blank.>\n"
         "  NEXT_TASK: <next task description, or blank if DONE=YES>\n"
         "  REQUEST_TOOLS: <json array of tool names needing docs, or []>\n"
-        "  ASK_USER: <optional — if stuck and retrying won't help, a concise question. Include what you tried, why you're stuck, and 2-3 options if possible. Leave blank otherwise.>\n"
+        "  ASK_USER_NEEDED: <YES or NO — do you need to ask the user a question to continue?>\n"
         "\n"
         "#Stage 3 RULES:\n"
         "- DONE=YES only when ALL required actions are complete.\n"
@@ -3799,9 +3799,10 @@ ALWAYS follow all formatting instructions exactly.
         "- Efficiency rule: if prior step used only one tool call and GOAL is not done, set NEXT_TASK to combine adjacent subtasks.\n"
         "- SPIRAL DETECTION: If the same tool has failed 2+ times consecutively,\n"
         "  use a different approach or proceed with available data.\n"
-        "- ASK_USER: Use only when you genuinely lack information the user has — wrong target,\n"
+        "- ASK_USER_NEEDED: Answer YES only when you genuinely lack information the user has — wrong target,\n"
         "  ambiguous goal, repeated failure you cannot diagnose, or a preference you cannot resolve.\n"
-        "  Always try at least once before asking. At most one ASK_USER per goal.\n"
+        "  Always try at least once before asking. At most one ASK per goal.\n"
+        "  Do NOT use ASK_USER_NEEDED to show your next planned code block — just execute it.\n"
         "- REQUEST_TOOLS: Always valid JSON: [] or [\"tool1\", \"tool2\"].\n"
         "\n"
         "Follow these formats exactly."
@@ -3932,8 +3933,9 @@ ALWAYS follow all formatting instructions exactly.
         done_val = _strip_think_tags(_extract_line_value(stage3_block, "DONE:"))
         verification_val = _strip_think_tags(_extract_between_labels(stage3_block, "VERIFICATION:", "NEXT_TASK:"))
         next_task_val = _strip_numbered_prefix(_strip_think_tags(_extract_between_labels(stage3_block, "NEXT_TASK:", "REQUEST_TOOLS:")))
-        request_tools_val = _strip_numbered_prefix(_strip_think_tags(_extract_between_labels(stage3_block, "REQUEST_TOOLS:", "ASK_USER:") or _extract_after_label(stage3_block, "REQUEST_TOOLS:")).strip())
-        ask_user_val = _strip_think_tags(_extract_after_label(stage3_block, "ASK_USER:").strip())
+        request_tools_val = _strip_numbered_prefix(_strip_think_tags(_extract_between_labels(stage3_block, "REQUEST_TOOLS:", "ASK_USER_NEEDED:") or _extract_after_label(stage3_block, "REQUEST_TOOLS:")).strip())
+        ask_user_needed_val = _strip_think_tags(_extract_line_value(stage3_block, "ASK_USER_NEEDED:")).strip().upper()
+        ask_user_val = ""  # Will be populated by follow-up call if needed
 
         # JSON fallback: some models output Stage 3 as JSON instead of label format
         if not done_val:
@@ -3958,7 +3960,11 @@ ALWAYS follow all formatting instructions exactly.
                         request_tools_val = request_tools_val or _json.dumps(rt)
                     else:
                         request_tools_val = request_tools_val or str(rt)
-                    ask_user_val = ask_user_val or str(stage3_json.get("ask_user", ""))
+                    ask_user_needed_raw = stage3_json.get("ask_user_needed", stage3_json.get("ask_user", ""))
+                    if isinstance(ask_user_needed_raw, bool):
+                        ask_user_needed_val = "YES" if ask_user_needed_raw else "NO"
+                    else:
+                        ask_user_needed_val = ask_user_needed_val or str(ask_user_needed_raw).strip().upper()
                     logger.info(f"Step {step}: Stage 3 parsed via JSON fallback (DONE={done_val})")
             except (ValueError, KeyError, TypeError):
                 pass
@@ -3969,6 +3975,7 @@ ALWAYS follow all formatting instructions exactly.
         state[f"verification_{step}"] = verification_val
         state[f"next_task_{step}"] = next_task_val
         state[f"request_tools_{step}"] = _strip_code_fences(request_tools_val)
+        state[f"ask_user_needed_{step}"] = ask_user_needed_val
         state[f"ask_user_{step}"] = ask_user_val
 
         def safe_get(state_dict, key, default='N/A'):
@@ -3984,8 +3991,8 @@ ALWAYS follow all formatting instructions exactly.
             logger.info(f"VERIFICATION: {verification_val}")
         logger.info(f"NEXT_TASK: {safe_get(state, f'next_task_{step}')}")
         logger.info(f"REQUEST_TOOLS: {safe_get(state, f'request_tools_{step}')}")
-        if ask_user_val:
-            logger.info(f"ASK_USER: {ask_user_val[:200]}")
+        if ask_user_needed_val.startswith("YES"):
+            logger.info(f"ASK_USER_NEEDED: YES (will generate question in follow-up call)")
 
         llm_eval_target_raw = state.get(f"eval_target_{step}", "").strip()
         if llm_eval_target_raw and llm_eval_target_raw.upper() != "NONE":
@@ -4036,24 +4043,43 @@ ALWAYS follow all formatting instructions exactly.
         elif requested_tools_raw and requested_tools_raw.lower() not in ["", "[]", "none", "null"]:
             logger.warning(f"Step {step}: Failed to parse REQUEST_TOOLS: {requested_tools_raw[:100]}")
 
-        # Stage 3.6: ASK_USER — pause and ask the user for guidance (at most once per goal)
-        ask_user_raw = state.get(f"ask_user_{step}", "").strip()
-        if ask_user_raw and ask_user_raw.lower() not in ("", "none", "null", "n/a", "blank") and not _asked_user_this_goal:
-            _asked_user_this_goal = True
-            logger.info(f"Step {step}: ASK_USER triggered — pausing for user input")
-            ask_result = executor.execute_action_tracked(
-                {"type": "ask", "value": ask_user_raw, "out": "$_user_guidance"},
-                "codegen"
+        # Stage 3.6: ASK_USER — two-stage: check if needed (YES/NO), then get question text
+        ask_user_needed = state.get(f"ask_user_needed_{step}", "").strip().upper()
+        if ask_user_needed.startswith("YES") and not _asked_user_this_goal:
+            # Stage 2: Follow-up LLM call to get the actual question text
+            ask_gen_prompt = prompt + format_user(
+                "You indicated ASK_USER_NEEDED: YES. Write a concise question for the user.\n"
+                "Include: what you tried, why you're stuck, and 2-3 options if possible.\n"
+                "Respond with ONLY the question text, nothing else."
             )
-            if ask_result.get("status") == "success":
-                user_response = ask_result.get("value", "")
-                prompt += format_user(f"USER_GUIDANCE (response to your question): {user_response}\nIncorporate this guidance into your next step.")
-                prompt += format_assistant("Understood, I will incorporate the user's guidance.\n")
-                logger.info(f"Step {step}: User responded to ASK_USER: {user_response[:200]}")
+            try:
+                ask_messages = _parse_prompt_to_messages(ask_gen_prompt)
+                ask_resp = executor.llm_generate(
+                    messages=ask_messages, max_tokens=200, temperature=0.3)
+                ask_question = _strip_think_tags(ask_resp.text).strip() if ask_resp.success and ask_resp.text else ""
+            except Exception as e:
+                logger.warning(f"Step {step}: ASK_USER question generation failed: {e}")
+                ask_question = ""
+
+            if ask_question and ask_question.lower() not in ("", "none", "null", "n/a"):
+                _asked_user_this_goal = True
+                state[f"ask_user_{step}"] = ask_question
+                logger.info(f"Step {step}: ASK_USER triggered — pausing for user input")
+                ask_result = executor.execute_action_tracked(
+                    {"type": "ask", "value": ask_question, "out": "$_user_guidance"},
+                    "codegen"
+                )
+                if ask_result.get("status") == "success":
+                    user_response = ask_result.get("value", "")
+                    prompt += format_user(f"USER_GUIDANCE (response to your question): {user_response}\nIncorporate this guidance into your next step.")
+                    prompt += format_assistant("Understood, I will incorporate the user's guidance.\n")
+                    logger.info(f"Step {step}: User responded to ASK_USER: {user_response[:200]}")
+                else:
+                    prompt += format_user("ASK_USER timed out or was interrupted. Proceed with your best judgment.")
+                    prompt += format_assistant("Understood, proceeding without user input.\n")
+                    logger.info(f"Step {step}: ASK_USER failed or timed out — continuing")
             else:
-                prompt += format_user("ASK_USER timed out or was interrupted. Proceed with your best judgment.")
-                prompt += format_assistant("Understood, proceeding without user input.\n")
-                logger.info(f"Step {step}: ASK_USER failed or timed out — continuing")
+                logger.info(f"Step {step}: ASK_USER_NEEDED=YES but question generation returned empty — skipping")
 
         # Check if done
         done_raw = _strip_numbered_prefix(state.get(f"done_{step}", "").strip()).upper()
@@ -4127,7 +4153,7 @@ ALWAYS follow all formatting instructions exactly.
                                 ask_nudge = (
                                     "\nIf you lack the information needed to fix these issues (e.g., the source is "
                                     "inaccessible, the goal is ambiguous, or you need the user's input to proceed), "
-                                    "use ASK_USER in your next Stage 3 instead of retrying the same approach."
+                                    "set ASK_USER_NEEDED: YES in your next Stage 3 instead of retrying the same approach."
                                 )
                             prompt += format_user(
                                 f"QUALITY GATE FAILED — you must revise the artifact in {last_eval_target}.\n"
@@ -4185,7 +4211,7 @@ ALWAYS follow all formatting instructions exactly.
             if not stall_guard_state.get("nudged"):
                 prompt += format_user(
                     "STALL DETECTED: You are repeating the same approach without progress. "
-                    "Consider using ASK_USER in your next Stage 3 to get guidance from the user, "
+                    "Consider setting ASK_USER_NEEDED: YES in your next Stage 3 to get guidance from the user, "
                     "or try a fundamentally different approach. One more step allowed."
                 )
                 prompt += format_assistant("Understood, I will reassess.\n")

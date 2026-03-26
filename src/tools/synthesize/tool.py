@@ -132,7 +132,7 @@ def _semantic_filter_direct(text_content: str, focus: str, target_tokens: int, r
                         current_chunk.append(sent)
                         current_len += sent_len
                 if current_chunk:
-                    chunks.append('. '.join(current_chunk) + ('.' if not chunks[-1].endswith('.') else ''))
+                    chunks.append('. '.join(current_chunk) + '.')
 
         if not chunks:
             return text_content
