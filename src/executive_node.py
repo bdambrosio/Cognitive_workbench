@@ -1510,7 +1510,10 @@ class ZenohExecutiveNode:
             self._announce_character()
             time.sleep(0.1)
             time.sleep(1.0)
-            
+
+            # Recover orphaned establishing tasks from prior session
+            self._recover_stalled_establishing_tasks()
+
             # Start main loop
             while not self.shutdown_requested:
                 try:
@@ -1896,6 +1899,45 @@ class ZenohExecutiveNode:
         except Exception as e:
             logger.warning(f'Triage: failed to attach concern {concern_id} to task {task_wip_id}: {e}')
 
+    def _recover_stalled_establishing_tasks(self):
+        """On startup, find task WIPs stuck in establishing (in_progress) and mark interrupted.
+
+        After a restart, active_task_wip is None but task notes may still have
+        status=in_progress from a prior session.  Mark them interrupted so they
+        appear correctly in the UI and don't block new approvals.
+        """
+        if not self.resource_manager:
+            return
+        recovered = 0
+        for name, note_id in list(self.resource_manager.named_notes.items()):
+            if not name.startswith("_task_wip_"):
+                continue
+            try:
+                res = self.resource_manager.get_resource(note_id)
+                content = json.loads(res.get('properties', {}).get('content', '{}'))
+                if content.get('status') == 'in_progress':
+                    content['status'] = 'interrupted'
+                    content['updated'] = datetime.now().isoformat()
+                    content.setdefault('accumulated_findings', []).append(
+                        'Interrupted: task was mid-establishment when system restarted')
+                    self.infospace_executor.execute_action({
+                        "type": "create-note",
+                        "value": json.dumps(content),
+                        "name": name,
+                        "out": f"${name}",
+                    })
+                    self.infospace_executor.execute_action({
+                        "type": "persist",
+                        "target": f"${name}",
+                        "name": name,
+                    })
+                    recovered += 1
+                    logger.info(f'📋 Recovered stalled task {name}: marked interrupted')
+            except Exception as e:
+                logger.warning(f'Task recovery: error processing {name}: {e}')
+        if recovered:
+            logger.info(f'📋 Task recovery: {recovered} stalled establishing task(s) marked interrupted')
+
     def _approve_proposed_task(self, note_name: str, edited_intention: str = ''):
         """Approve a proposed task, transitioning it to establishing.
 
@@ -1921,8 +1963,8 @@ class ZenohExecutiveNode:
         except Exception as e:
             logger.warning(f'Task approve: could not read {note_name}: {e}')
             return
-        if content.get('status') != 'proposed':
-            logger.warning(f'Task approve: {note_name} is not in proposed state (is {content.get("status")})')
+        if content.get('status') not in ('proposed', 'interrupted'):
+            logger.warning(f'Task approve: {note_name} is not in proposed/interrupted state (is {content.get("status")})')
             return
 
         # Allow the user to edit the intention at approval time
@@ -2217,6 +2259,21 @@ class ZenohExecutiveNode:
             logger.info(f"ACTION_LOG {normalized_type}: {log_action}")
             self.action_publisher.put(serialized_action)
             self.action_counter += 1
+
+            # Also record as OODA feed entry so the feed stays populated
+            # even while goals are running (when the OODA pipeline is paused)
+            if hasattr(self, '_ooda_event_feed'):
+                self._ooda_event_feed.append({
+                    'timestamp': timestamp.isoformat(timespec='seconds'),
+                    'source': action_data.get('status', ''),
+                    'event_type': 'action',
+                    'classification': normalized_type,
+                    'action_choice': '',
+                    'action_taken': normalized_type,
+                    'concern_bumps': '',
+                })
+                if len(self._ooda_event_feed) > self._OODA_FEED_MAX:
+                    self._ooda_event_feed = self._ooda_event_feed[-self._OODA_FEED_MAX:]
         except Exception as e:
             logger.error(f'Error publishing action result: {e}')
 
@@ -2641,10 +2698,10 @@ class ZenohExecutiveNode:
                     f"## EXISTING LEARNINGS\n{existing_learnings or '(none yet)'}\n\n"
                     f"## JUST COMPLETED\nGoal: {goal_text}\nOutcome: {status}\n"
                     f"Summary: {summary}\n\n"
-                    "Write the updated learnings list."
+                    "Write the updated learnings list.\n</end>"
                 )
                 response = self.infospace_executor.llm_generate(
-                    prompt, max_tokens=400, temperature=0.2
+                    prompt, max_tokens=912, temperature=0.2, stops=['</end>']
                 )
                 if response.success and response.text and response.text.strip().lower() != 'none':
                     # Clean LLM output: strip leading 'none' lines and keep only bullet lines
@@ -2711,10 +2768,10 @@ class ZenohExecutiveNode:
                 "Output ONLY the bullet list (- item), or 'none' if nothing worth keeping.\n\n"
                 f"## CURRENT LEARNINGS\n{learnings}\n\n"
                 f"Session: {self.plan_counter} goal(s) attempted.\n"
-                "Write the pruned learnings list."
+                "Write the pruned learnings list.\n</end>"
             )
             response = self.infospace_executor.llm_generate(
-                prompt, max_tokens=400, temperature=0.2
+                prompt, max_tokens=912, temperature=0.2, stops=['</end>']
             )
             if response.success and response.text:
                 pruned = response.text.strip()
@@ -3865,6 +3922,7 @@ class ZenohExecutiveNode:
         "ACTION: <SUBMIT_GOAL | FALL_BACK | COMPLETE>\n"
         "PHASE: <which phase this belongs to>\n"
         "GOAL_TEXT: <full goal text if SUBMIT_GOAL, or explanation if FALL_BACK/COMPLETE>\n"
+        "</end>\n"
     )
 
     def _advance_task_wip(self):
@@ -3914,7 +3972,7 @@ class ZenohExecutiveNode:
         # Phase milestone cap: auto-advance if too many milestones in one phase.
         # Caps are per-phase — establishment phases are bounded, operational execution is not.
         _PHASE_CAPS = {
-            "specification": 3,
+            "specification": 2,
             "capability_evaluation": 3,
             "infrastructure_setup": 5,
             "activation": 1,
@@ -3998,8 +4056,20 @@ class ZenohExecutiveNode:
         if spiral_warning:
             prompt += spiral_warning
 
+        # Anti-loop: if specification phase already has completed milestones
+        # with user answers, strongly instruct the LLM to advance
+        if current_phase == "specification" and milestones:
+            spec_completed = sum(1 for m in milestones if m.get("status") == "completed")
+            if spec_completed >= 1:
+                prompt += (
+                    "\n⚠ SPECIFICATION COMPLETE: The user has already answered your questions "
+                    f"({spec_completed} specification milestone(s) completed). Do NOT ask more "
+                    "questions. Use the answers already in ACCUMULATED FINDINGS and advance to "
+                    "capability_evaluation NOW.\n"
+                )
+
         try:
-            resp = self.llm_generate([prompt], max_tokens=500, temperature=0.3)
+            resp = self.llm_generate([prompt], max_tokens=1012, temperature=0.3, stops=['</end>'])
             resp_text = getattr(resp, 'text', '') if hasattr(resp, 'text') else str(resp)
         except Exception as e:
             logger.error(f'Task WIP llm_generate failed: {e}')
@@ -4056,6 +4126,23 @@ class ZenohExecutiveNode:
             # This avoids content loss where the planner returns a status message
             # instead of the user's actual answers.
             if new_phase == "specification" and self._is_ask_only_goal(goal_text):
+                # Anti-loop guard: if spec already has completed milestones,
+                # don't ask again — force-advance to capability_evaluation
+                spec_completed = sum(
+                    1 for m in wip.get("milestones_completed", [])
+                    if m.get("status") == "completed"
+                )
+                if spec_completed >= 1:
+                    logger.info(
+                        f'📋 Task WIP: blocking repeated spec ask '
+                        f'({spec_completed} already completed), '
+                        f'force-advancing to capability_evaluation')
+                    wip["phase"] = "capability_evaluation"
+                    wip["accumulated_findings"].append(
+                        "Specification complete (user already answered) — "
+                        "auto-advanced to capability_evaluation")
+                    self._update_task_wip(wip)
+                    return
                 self._run_direct_ask_milestone(wip, goal_text)
                 return
 
@@ -4099,7 +4186,10 @@ class ZenohExecutiveNode:
 
     def _is_ask_only_goal(self, goal_text: str) -> bool:
         """Detect whether a goal is purely about asking the user questions."""
-        lower = goal_text.lower()
+        lower = goal_text.strip().lower()
+        # Catch goals that start with ask: "..." or ask("...")
+        if re.match(r'^ask\s*[:(\[]', lower):
+            return True
         ask_signals = ["ask the user", "clarify", "clarifying question", "confirm with the user"]
         return any(s in lower for s in ask_signals)
 
@@ -4192,6 +4282,7 @@ class ZenohExecutiveNode:
         "GOAL_TEXT: <the goal — what to accomplish (one sentence)>\n"
         "SUCCESS_CRITERIA: <how to tell if the goal succeeded (one sentence)>\n"
         "TOOLS_HINT: <comma-separated tool names, or 'none'>\n"
+        "</end>\n"
     )
 
     _CYCLE_REFLECTION_PROMPT = (
@@ -4206,6 +4297,7 @@ class ZenohExecutiveNode:
         "PROGRESS: <one sentence — how this advances the overall task intention>\n"
         "NEXT: <CONTINUE | RETRY | PIVOT | CYCLE_DONE>\n"
         "REASON: <one sentence — why this next action>\n"
+        "</end>\n"
     )
 
     _MAX_GOALS_PER_CYCLE = 5  # Safety cap per execution cycle
@@ -4298,6 +4390,29 @@ class ZenohExecutiveNode:
             logger.info(f'📋 Task {task_note_name}: starting new cycle')
             self._write_operational_task(task_note_name, note_id, wip)
 
+        # ── User input preemption: if user has queued text, yield to it ──
+        cycle_goals = wip.get("cycle_goals_completed", [])
+        if cycle_goals and self.text_input_queue:
+            logger.info(
+                f'📋 Task {task_note_name}: user input pending — ending cycle '
+                f'to yield ({len(cycle_goals)} goals completed)')
+            self._complete_task_cycle(task_note_name, note_id, wip,
+                                      "Cycle yielded: user input pending")
+            return
+
+        # ── Awaiting-user-guidance stall: if last goal said it needs user
+        #    action, don't keep looping — end the cycle ──
+        if cycle_goals:
+            last_summary = (cycle_goals[-1].get("result_summary", "") or "").lower()
+            awaiting_signals = ["awaiting user", "manual intervention",
+                                "user guidance", "user action", "move on"]
+            if any(sig in last_summary for sig in awaiting_signals):
+                logger.info(
+                    f'📋 Task {task_note_name}: last goal awaiting user action — ending cycle')
+                self._complete_task_cycle(task_note_name, note_id, wip,
+                                          "Cycle ended: awaiting user guidance")
+                return
+
         # Check if last goal's reflection said RETRY or PIVOT
         last_reflection = wip.get("_last_reflection", {})
         reflection_next = last_reflection.get("next", "")
@@ -4370,7 +4485,7 @@ class ZenohExecutiveNode:
             prompt += pivot_context
 
         try:
-            resp = self.llm_generate([prompt], max_tokens=500, temperature=0.3)
+            resp = self.llm_generate([prompt], max_tokens=1012, temperature=0.3, stops=['</end>'])
             resp_text = getattr(resp, 'text', '') if hasattr(resp, 'text') else str(resp)
         except Exception as e:
             logger.error(f'📋 Task {task_note_name}: advance LLM failed: {e}')
@@ -4396,15 +4511,29 @@ class ZenohExecutiveNode:
         if action == "SUBMIT_GOAL" and goal_text:
             # Stall detection: normalize goal text and compare to previous
             normalized = re.sub(r'[^a-z0-9 ]', '', goal_text.lower())[:200]
-            if normalized == stall_sig and stall_sig:
+            # Check exact match OR high word overlap (fuzzy stall)
+            is_stall = False
+            if stall_sig:
+                if normalized == stall_sig:
+                    is_stall = True
+                else:
+                    # Fuzzy: if >70% of words overlap, count as same goal
+                    prev_words = set(stall_sig.split())
+                    curr_words = set(normalized.split())
+                    if prev_words and curr_words:
+                        overlap = len(prev_words & curr_words)
+                        max_len = max(len(prev_words), len(curr_words))
+                        if max_len > 0 and overlap / max_len > 0.7:
+                            is_stall = True
+            if is_stall:
                 stall_count += 1
                 wip["_cycle_stall_count"] = stall_count
                 if stall_count >= 2:
                     logger.warning(
                         f'📋 Task {task_note_name}: STALL detected — '
-                        f'same goal generated {stall_count + 1} times, ending cycle')
+                        f'similar goal generated {stall_count + 1} times, ending cycle')
                     self._complete_task_cycle(task_note_name, note_id, wip,
-                                              f"Stall: same goal repeated {stall_count + 1} times")
+                                              f"Stall: similar goal repeated {stall_count + 1} times")
                     return
             else:
                 wip["_cycle_stall_sig"] = normalized
@@ -4527,7 +4656,7 @@ class ZenohExecutiveNode:
                 status=status_str,
                 result_summary=clean_response[:400],
             )
-            refl_resp = self.llm_generate([refl_prompt], max_tokens=200, temperature=0.2)
+            refl_resp = self.llm_generate([refl_prompt], max_tokens=712, temperature=0.2, stops=['</end>'])
             refl_text = getattr(refl_resp, 'text', '') if hasattr(refl_resp, 'text') else str(refl_resp)
 
             # Parse reflection fields
@@ -4886,7 +5015,7 @@ class ZenohExecutiveNode:
         system_prompt = self._update_system_prompt()
         user_prompt = (
             f"Sensor alert from {sensor_name}:\n{alert_text}\n\n"
-            f"React briefly in character. This is an internal sensor notification, not a conversation."
+            f"React briefly in character. This is an internal sensor notification, not a conversation.\n</end>"
         )
         try:
             result = self.llm_generate(
@@ -4894,8 +5023,9 @@ class ZenohExecutiveNode:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                max_tokens=300,
+                max_tokens=812,
                 temperature=0.7,
+                stops=['</end>'],
             )
             if result.success and result.text:
                 response = result.text.strip()
@@ -4922,7 +5052,7 @@ class ZenohExecutiveNode:
             f"If this is genuinely interesting or relevant to the user's known interests "
             f"or your active concerns, share a brief, natural observation (1-2 sentences). "
             f"Do not be sycophantic or over-eager. Be concise and in character.\n"
-            f"If on reflection it's not worth mentioning, respond with exactly: [SKIP]"
+            f"If on reflection it's not worth mentioning, respond with exactly: [SKIP]\n</end>"
         )
         try:
             result = self.llm_generate(
@@ -4930,8 +5060,9 @@ class ZenohExecutiveNode:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                max_tokens=150,
+                max_tokens=662,
                 temperature=0.7,
+                stops=['</end>'],
             )
             if result.success and result.text:
                 response = result.text.strip()
@@ -6003,14 +6134,15 @@ class ZenohExecutiveNode:
                     {"role": "system", "content":
                         "You formulate a concise goal statement for an autonomous agent. "
                         "The goal should be a single actionable sentence describing what to accomplish. "
-                        "Respond with ONLY the goal text, nothing else."},
+                        "Respond with ONLY the goal text, nothing else. End with </end>."},
                     {"role": "user", "content":
                         f"Event: {content[:400]}\n"
                         f"Assessment: {rationale}\n\n"
                         f"Formulate a goal for the agent to pursue based on this event."},
                 ],
-                max_tokens=100,
+                max_tokens=612,
                 temperature=0.3,
+                stops=['</end>'],
             )
             if result.success and result.text:
                 return result.text.strip()

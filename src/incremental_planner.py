@@ -4050,12 +4050,12 @@ ALWAYS follow all formatting instructions exactly.
             ask_gen_prompt = prompt + format_user(
                 "You indicated ASK_USER_NEEDED: YES. Write a concise question for the user.\n"
                 "Include: what you tried, why you're stuck, and 2-3 options if possible.\n"
-                "Respond with ONLY the question text, nothing else."
+                "Respond with ONLY the question text, nothing else.\n</end>"
             )
             try:
                 ask_messages = _parse_prompt_to_messages(ask_gen_prompt)
                 ask_resp = executor.llm_generate(
-                    messages=ask_messages, max_tokens=200, temperature=0.3)
+                    messages=ask_messages, max_tokens=712, temperature=0.3, stops=['</end>'])
                 ask_question = _strip_think_tags(ask_resp.text).strip() if ask_resp.success and ask_resp.text else ""
             except Exception as e:
                 logger.warning(f"Step {step}: ASK_USER question generation failed: {e}")
@@ -5307,6 +5307,7 @@ RULES:
 
 OUTPUT SCHEMA (JSON only, no other text):
 {REFLECTION_FRAME_SCHEMA}
+</end>
 """
         world_model_str = json.dumps(world_model, indent=2) if isinstance(world_model, dict) else str(world_model)
         reflection_prompt = reflection_prompt.replace("{world_model}", world_model_str)
@@ -5314,7 +5315,7 @@ OUTPUT SCHEMA (JSON only, no other text):
         reflection_prompt = reflection_prompt.replace("{steps}", str(steps))
         reflection_prompt = reflection_prompt.replace("{REFLECTION_FRAME_SCHEMA}", json.dumps(REFLECTION_FRAME_SCHEMA, indent=2))
         reflection_prompt = reflection_prompt.replace("{trace}", trace)
-        reflection = self.executor.llm_generate(reflection_prompt, max_tokens=1024, is_json=True, temperature=0.0)
+        reflection = self.executor.llm_generate(reflection_prompt, max_tokens=1536, is_json=True, temperature=0.0, stops=['</end>'])
 
         if reflection.text is None:
             logger.warning("Reflection LLM returned None (JSON parse failed or empty response); returning empty frame")

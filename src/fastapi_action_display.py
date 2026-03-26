@@ -1454,8 +1454,8 @@ Generated: {generated_at}
                         payload_bytes = reply.ok.payload.to_bytes()
                         response = json.loads(payload_bytes.decode('utf-8'))
                         if response.get('success'):
-                            return {"success": True, "task_wips": response.get("task_wips", [])}
-                return {"success": True, "task_wips": []}
+                            return {"success": True, "tasks": response.get("tasks", [])}
+                return {"success": True, "tasks": []}
             except Exception as e:
                 logger.error(f"Error getting task wips: {e}")
                 return {"success": False, "message": str(e)}
@@ -1480,6 +1480,17 @@ Generated: {generated_at}
                 return {"success": True}
             except Exception as e:
                 logger.error(f"Error in task_wip_interrupt: {e}")
+                return {"success": False, "message": str(e)}
+
+        @self.app.post("/api/task_run_now/{character}")
+        async def task_run_now(character: str, data: dict = Body(...)):
+            """Trigger immediate execution of an operational task."""
+            try:
+                payload = json.dumps(data).encode()
+                self.session.put(f"cognitive/{character}/control/task_run_now", payload)
+                return {"success": True}
+            except Exception as e:
+                logger.error(f"Error in task_run_now: {e}")
                 return {"success": False, "message": str(e)}
 
         @self.app.post("/api/task_approve/{character}")
@@ -2630,8 +2641,7 @@ Generated: {generated_at}
                     <div class="character-data-tab active" data-tab="plan">Plan</div>
                     <div class="character-data-tab" data-tab="bindings">Bindings</div>
                     <div class="character-data-tab" data-tab="goals">Goals</div>
-                    <div class="character-data-tab" data-tab="plans">Plans</div>
-                    <div class="character-data-tab" data-tab="state">State</div>
+                    <div class="character-data-tab" data-tab="state">OODA</div>
                     <div class="character-data-tab" data-tab="tasks">Schedule</div>
                     <div class="character-data-tab" data-tab="taskwips">Tasks</div>
                 </div>
@@ -2665,20 +2675,11 @@ Generated: {generated_at}
                         </div>
                     </div>
                     
-                    <!-- Plans tab content -->
-                    <div class="character-data-panel" id="plansPanel">
-                        <div id="savedPlansList">
-                            <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
-                                Loading saved plans...
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- State tab content -->
+                    <!-- OODA tab content -->
                     <div class="character-data-panel" id="statePanel">
-                        <div id="worldStateDisplay">
+                        <div id="oodaStateDisplay" style="padding: 8px 10px;">
                             <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
-                                Select a character to view world state
+                                Select a character to view OODA feed
                             </div>
                         </div>
                     </div>
@@ -2961,6 +2962,8 @@ Generated: {generated_at}
                 
                 if (data.type === 'action') {
                     addActionEntry(data);
+                    // Push-refresh OODA feed if OODA tab is active
+                    scheduleOodaRefresh();
                     // Check if this is an announcement to create a character tab
                     if (data.action_type === 'announcement') {
                         createCharacterTab(data.character);
@@ -3026,9 +3029,6 @@ Generated: {generated_at}
                 } else if (data.type === 'turn_state_update') {
                     // Handle unified turn state update (replaces step_complete)
                     handleTurnStateUpdate(data);
-                } else if (data.type === 'world_state_update') {
-                    // Handle world state update
-                    updateWorldStateDisplay(data);
                 } else if (data.type === 'test_files_list') {
                     updateTestFileList(data.files);
                 } else if (data.type === 'test_details') {
@@ -3164,15 +3164,11 @@ Generated: {generated_at}
                 document.getElementById('goalsPanel').classList.add('active');
                 // Load test goals list
                 loadGoalsList();
-            } else if (tabName === 'plans') {
-                document.getElementById('plansPanel').classList.add('active');
-                // Load saved plans list
-                loadSavedPlansList();
             } else if (tabName === 'state') {
                 document.getElementById('statePanel').classList.add('active');
-                // Load world state
+                // Load OODA feed
                 const character = activeCharacter || 'Jill';
-                loadWorldState(character);
+                loadOodaFeed(character);
             } else if (tabName === 'tasks') {
                 document.getElementById('schedulerPanel').classList.add('active');
                 const character = activeCharacter || 'Jill';
@@ -4340,11 +4336,11 @@ Generated: {generated_at}
         function openResourceBrowser() {
             // Open Resource Browser in new tab
             // Just open it - browser will show connection error if not running
-            window.open('http://localhost:3001', '_blank');
+            window.open('http://localhost:3001', 'resource_browser');
         }
 
         function openTaskManager() {
-            window.open('http://localhost:3002', '_blank');
+            window.open('http://localhost:3002', 'task_manager');
         }
 
         // Test Runner Functions
@@ -4903,10 +4899,16 @@ Generated: {generated_at}
                         html += `<div style="margin-top:4px;"><a href="#" style="color:#3498db; font-size:11px; text-decoration:none;" onclick="event.preventDefault(); viewTaskScheduledGoal('${t._scheduled_goal_id}');">→ View scheduled goal: ${t._scheduled_goal_name || t._scheduled_goal_id}</a></div>`;
                     }
 
-                    // Action buttons
+                    // Action buttons — context-dependent + Delete
+                    const isOperational = t.lifecycle === 'operational' && t.status === 'active';
+                    const isInterrupted = t.status === 'interrupted';
                     html += `<div style="margin-top:6px; display:flex; gap:6px;">`;
                     if (isActive) {
                         html += `<button onclick="interruptTaskWip('${character}', '${noteName}')" style="background:#e67e22; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:10px; cursor:pointer;">Interrupt</button>`;
+                    } else if (isOperational) {
+                        html += `<button onclick="runTaskNow('${character}', '${noteName}')" style="background:#27ae60; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:10px; cursor:pointer;">Run Now</button>`;
+                    } else if (isInterrupted) {
+                        html += `<button onclick="resumeTaskWip('${character}', '${noteName}')" style="background:#3498db; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:10px; cursor:pointer;">Resume</button>`;
                     }
                     html += `<button onclick="deleteTaskWip('${character}', '${noteName}')" style="background:#c0392b; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:10px; cursor:pointer;">Delete</button>`;
                     html += `</div>`;
@@ -4940,6 +4942,30 @@ Generated: {generated_at}
                 });
                 setTimeout(() => loadTaskWipsList(character), 500);
             } catch (e) { console.error('Interrupt task failed:', e); }
+        }
+
+        async function runTaskNow(character, noteName) {
+            try {
+                await fetch(`/api/task_run_now/${character}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({note_name: noteName})
+                });
+                showNotification('Task queued for immediate execution', 'info');
+                setTimeout(() => loadTaskWipsList(character), 1000);
+            } catch (e) { console.error('Run task failed:', e); }
+        }
+
+        async function resumeTaskWip(character, noteName) {
+            try {
+                await fetch(`/api/task_approve/${character}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({note_name: noteName})
+                });
+                showNotification('Task resumed — continuing establishment', 'info');
+                setTimeout(() => loadTaskWipsList(character), 1000);
+            } catch (e) { console.error('Resume task failed:', e); }
         }
 
         function viewTaskScheduledGoal(goalId) {
@@ -5222,74 +5248,50 @@ Generated: {generated_at}
             }
         }
 
-        function updateWorldStateDisplay(data) {
-            // Only update if state tab is active and matches current character
-            const activeTab = document.querySelector('.character-data-tab.active');
-            if (!activeTab || activeTab.getAttribute('data-tab') !== 'state') {
-                return;
-            }
-            
-            // Check if this update is for the currently selected character
-            if (data.character !== activeCharacter) {
-                return;
-            }
-            
-            const stateDiv = document.getElementById('worldStateDisplay');
-            if (!stateDiv) {
-                return;
-            }
-            
-            const worldState = data.world_state || {};
-            
-            if (Object.keys(worldState).length === 0) {
-                stateDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No world state data available.</div>';
-                return;
-            }
-            
-            // Use formatted_json if provided, otherwise format it
-            const formattedJson = data.formatted_json || JSON.stringify(worldState, null, 2);
-            
-            stateDiv.innerHTML = `
-                <div style="background: #1e1e1e; border: 1px solid #3e3e42; border-radius: 4px; padding: 15px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; color: #d4d4d4; max-height: 600px; overflow-y: auto;">
-                    ${escapeHtml(formattedJson)}
-                </div>
-            `;
-        }
+        // updateWorldStateDisplay removed — replaced by OODA feed
         
-        async function loadWorldState(character) {
-            const stateDiv = document.getElementById('worldStateDisplay');
-            if (!stateDiv) {
+        async function loadOodaFeed(character) {
+            const stateDiv = document.getElementById('oodaStateDisplay');
+            if (!stateDiv) return;
+            stateDiv.innerHTML = '<div style="color: #f39c12; text-align: center; padding: 20px;">Loading...</div>';
+            try {
+                const response = await fetch(`/api/ooda_feed/${encodeURIComponent(character)}`);
+                const result = await response.json();
+                if (!result.success) {
+                    stateDiv.innerHTML = `<div style="color: #ff4757; padding: 10px;">Error: ${result.message || 'Unknown'}</div>`;
+                    return;
+                }
+                renderOodaFeed(result.events || []);
+            } catch (error) {
+                stateDiv.innerHTML = `<div style="color: #ff4757; padding: 10px;">Error: ${error.message}</div>`;
+            }
+        }
+
+        function renderOodaFeed(events) {
+            const stateDiv = document.getElementById('oodaStateDisplay');
+            if (!stateDiv) return;
+            const recent = events.slice(-30).reverse();
+            if (!recent.length) {
+                stateDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No OODA events yet.</div>';
                 return;
             }
-            stateDiv.innerHTML = '<div style="color: #f39c12; text-align: center; padding: 20px;">⏳ Loading...</div>';
-            
-            try {
-                const response = await fetch(`/api/world_state/${character}`);
-                const result = await response.json();
-                
-                if (!result.success) {
-                    stateDiv.innerHTML = `<div style="color: #ff4757; text-align: center; padding: 20px;">❌ Error: ${result.message}</div>`;
-                    return;
+            let html = '<div style="font-family: monospace; font-size: 11px; max-height: 600px; overflow-y: auto;">';
+            recent.forEach(e => {
+                const time = e.timestamp ? (e.timestamp.split('T')[1] || e.timestamp) : '';
+                const bumps = e.concern_bumps || '';
+                const src = (e.source || '').replace('sensor:', 'S:');
+                html += '<div style="padding:2px 0;border-bottom:1px solid #333">';
+                html += `<span style="color:#666">${escapeHtml(time)}</span> `;
+                html += `<span style="color:#4ec9b0">${escapeHtml(src)}</span> `;
+                html += `<span style="color:#dbb86d">${escapeHtml(e.classification || '')}</span>`;
+                html += ` \\u2192 <span style="color:#6ddb6d">${escapeHtml(e.action_taken || '')}</span>`;
+                if (bumps) {
+                    html += `<div style="color:#888;padding-left:8px;font-size:10px">${escapeHtml(bumps)}</div>`;
                 }
-                
-                const worldState = result.world_state || {};
-                
-                if (Object.keys(worldState).length === 0) {
-                    stateDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No world state data available.</div>';
-                    return;
-                }
-                
-                // Format world_state as JSON with indentation
-                const formattedJson = JSON.stringify(worldState, null, 2);
-                
-                stateDiv.innerHTML = `
-                    <div style="background: #1e1e1e; border: 1px solid #3e3e42; border-radius: 4px; padding: 15px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; color: #d4d4d4; max-height: 600px; overflow-y: auto;">
-                        ${escapeHtml(formattedJson)}
-                    </div>
-                `;
-            } catch (error) {
-                stateDiv.innerHTML = `<div style="color: #ff4757; text-align: center; padding: 20px;">❌ Error: ${error.message}</div>`;
-            }
+                html += '</div>';
+            });
+            html += '</div>';
+            stateDiv.innerHTML = html;
         }
         
         async function executeGoal(goalName) {
@@ -5369,56 +5371,21 @@ Generated: {generated_at}
             }
         }
         
-        async function loadSavedPlansList() {
-            const listDiv = document.getElementById('savedPlansList');
-            listDiv.innerHTML = '<div style="color: #f39c12; text-align: center; padding: 20px;">⏳ Loading...</div>';
-            
-            try {
-                const response = await fetch('/api/saved_plans');
-                const result = await response.json();
-                
-                if (!result.success) {
-                    listDiv.innerHTML = `<div style="color: #ff4757; text-align: center; padding: 20px;">❌ Error: ${result.message}</div>`;
-                    return;
-                }
-                
-                const plans = result.plans || [];
-                
-                if (plans.length === 0) {
-                    listDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No saved plans yet. Execute a goal and click "Save as Tool" to create one.</div>';
-                    return;
-                }
-                
-                let html = '';
-                plans.forEach((plan, idx) => {
-                    const savedDate = plan.saved_at ? new Date(plan.saved_at).toLocaleString() : 'Unknown';
-                    html += `
-                        <div class="character-data-item" style="transition: background 0.2s; cursor: pointer;" 
-                             onmouseover="this.style.background='#333'" 
-                             onmouseout="this.style.background='#1a1a1a'"
-                             onclick="event.target.tagName !== 'BUTTON' && showPlanDetails('${plan.name}')">
-                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 4px;">
-                                <div class="character-data-label" style="flex: 1; margin-bottom: 0;">${plan.name}</div>
-                                <div style="display: flex; gap: 8px; align-items: center;">
-                                    <div style="font-size: 10px; color: #666;">${plan.action_count} actions</div>
-                                    <button onclick="event.stopPropagation(); executeSavedPlan('${plan.name}')" 
-                                            style="background: #00d4ff; color: #1a1a1a; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; font-weight: bold;"
-                                            onmouseover="this.style.background='#00a8cc'" 
-                                            onmouseout="this.style.background='#00d4ff'">
-                                        ▶️ Execute
-                                    </button>
-                                </div>
-                            </div>
-                            <div style="color: #ccc; font-size: 12px; line-height: 1.3; margin-bottom: 4px;">${plan.goal}</div>
-                            <div style="color: #666; font-size: 10px;">${savedDate}</div>
-                        </div>
-                    `;
-                });
-                
-                listDiv.innerHTML = html;
-            } catch (error) {
-                listDiv.innerHTML = `<div style="color: #ff4757; text-align: center; padding: 20px;">❌ Error: ${error.message}</div>`;
-            }
+        // loadSavedPlansList removed — Plans tab removed
+
+        // Debounced OODA feed refresh — triggered by WebSocket action messages
+        let _oodaRefreshTimer = null;
+        function scheduleOodaRefresh() {
+            // Only refresh if OODA tab is active
+            const stateTab = document.querySelector('.character-data-tab[data-tab="state"]');
+            if (!stateTab || !stateTab.classList.contains('active')) return;
+            // Debounce: coalesce rapid actions into one refresh
+            if (_oodaRefreshTimer) clearTimeout(_oodaRefreshTimer);
+            _oodaRefreshTimer = setTimeout(() => {
+                _oodaRefreshTimer = null;
+                const character = activeCharacter || 'Jill';
+                loadOodaFeed(character);
+            }, 2000);
         }
         
         function shutdownWithSave() {

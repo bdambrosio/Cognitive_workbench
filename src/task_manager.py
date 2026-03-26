@@ -78,14 +78,14 @@ class TaskManager:
 
     def _zenoh_get(self, key: str, timeout: float = 2.0) -> Optional[Dict]:
         """Query Zenoh and return parsed JSON response."""
-        from zenoh import QueryTarget, ConsolidationMode
-        for reply in self.session.get(
-            key, target=QueryTarget.BEST_MATCHING,
-            consolidation=ConsolidationMode.NONE, timeout=timeout
-        ):
-            if reply.ok:
-                return json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-        return None
+        try:
+            for reply in self.session.get(key, timeout=timeout):
+                if hasattr(reply, 'ok') and reply.ok is not None:
+                    return json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+            return None
+        except Exception as e:
+            logger.warning(f'Zenoh get failed for {key}: {e}')
+            return None
 
     def _zenoh_put(self, key: str, data: Dict):
         """Publish a JSON payload to Zenoh."""
@@ -133,6 +133,11 @@ class TaskManager:
                 return {'success': True, 'found': True}
             return {'success': True, 'found': False}
 
+        @self.app.get("/api/health")
+        def health_check():
+            """Quick health check to verify the server is running."""
+            return {"status": "ok", "port": self.port}
+
         @self.app.get("/api/data/{character}")
         def get_all_data(character: str):
             """Get all task manager data in one call.
@@ -146,6 +151,12 @@ class TaskManager:
             concerns = self._zenoh_get(f"cognitive/{character}/concerns") or {}
             tasks_resp = self._zenoh_get(f"cognitive/{character}/task_wips") or {}
             triage = self._zenoh_get(f"cognitive/{character}/triage_status") or {}
+            logger.info(
+                f'Data fetch for {character}: '
+                f'concerns={bool(concerns.get("user_concerns"))}, '
+                f'tasks={len(tasks_resp.get("tasks", []))}, '
+                f'triage={bool(triage)}'
+            )
 
             user_concerns = concerns.get('user_concerns', [])
             derived_concerns = concerns.get('derived_concerns', [])
@@ -467,8 +478,12 @@ async function refresh() {
         const resp = await fetch(`/api/data/${char()}`);
         data = await resp.json();
         if (data.success) render();
+        else console.warn('Task Manager: data fetch returned success=false', data);
     } catch (e) {
         console.error('Refresh failed:', e);
+        // Show error in UI so it's visible
+        const el = document.getElementById('proposed-tasks');
+        if (el) el.innerHTML = "<div class='empty' style='color:#e74c3c'>Connection error - try refreshing the page (Ctrl+Shift+R)</div>";
     }
 }
 
@@ -857,6 +872,14 @@ function renderSituation(text) {
 // ── Actions ──────────────────────────────────────────────────────
 
 async function approveTask(noteName) {
+    // Block if another task is currently establishing
+    const tasks = (data && data.tasks) || [];
+    const establishing = tasks.find(t =>
+        t.status === 'in_progress' || t.status === 'establishing');
+    if (establishing) {
+        alert("Cannot approve - another task is currently establishing: " + (establishing.intention || "").substring(0, 100) + ". Interrupt or wait for it to complete first.")
+        return;
+    }
     const editEl = document.getElementById('edit-' + noteName);
     const intention = editEl ? editEl.value.trim() : '';
     await fetch(`/api/approve/${char()}`, {
