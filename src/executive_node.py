@@ -44,21 +44,24 @@ import utils.hash_utils as hash_utils
 from transformers import AutoTokenizer
 import requests
 # Configure logging with unbuffered output
-# Console handler with WARNING level (less verbose)
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO)
+_cli_mode = os.getenv('CWB_CLI_MODE', '') == '1'
 
 # File handler with INFO level (full logging)
 file_handler = logging.FileHandler('logs/executive_node.log', mode='w')
 file_handler.setLevel(logging.INFO)
-if os.getenv('CWB_DEBUG', '') in ('1', 'true', 'yes', 'on'):
-    file_handler.setLevel(logging.INFO)
+
+_handlers = [file_handler]
+if not _cli_mode:
+    # Console handler only when not in CLI mode (CLI owns the terminal)
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.WARNING)
+    _handlers.insert(0, console_handler)
 
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
-    handlers=[console_handler, file_handler],
+    handlers=_handlers,
     force=True
 )
 logger = logging.getLogger('executive_node')
@@ -69,6 +72,7 @@ SCHEDULED_GOALS_COLLECTION = "_scheduled_goals"
 
 
 def _is_goal_cmd(s):
+    """Legacy helper — only referenced by _DEAD_process_text_input_original."""
     return s and s.strip().lower().startswith('goal:')
 
 
@@ -77,11 +81,8 @@ def _is_goal_cmd(s):
 @dataclass
 class EventPacket:
     """Structured event produced by Observe stage."""
-    event_type: str          # 'user_text', 'sensor_event', 'goal_initiation'
-    classification: str      # 'goal', 'proceed', 'reuse', 'terminate', 'clear_cache',
-                             # 'chat', 'alert', 'trigger', 'ask_reply', 'task_cmd',
-                             # 'direct_action', 'agent_message', 'scheduler_cmd',
-                             # 'unblock', 'end_conversation'
+    event_type: str          # 'user_text', 'sensor_event'
+    classification: str      # 'chat', 'alert', 'trigger', 'ask_reply', 'agent_message'
     content: str
     source: str
     raw_sense_data: dict
@@ -101,10 +102,9 @@ class OrientedEvent:
 @dataclass
 class Action:
     """Routing decision produced by Decide stage."""
-    type: str               # 'dispatch_goal', 'proceed_goal', 'reuse_goal',
-                            # 'terminate_goal', 'clear_cache', 'chat_response',
-                            # 'alert_response', 'ask_reply', 'task_command',
-                            # 'direct_action', 'agent_message', 'proactive_remark',
+    type: str               # 'dispatch_goal', 'proceed_goal', 'chat_response',
+                            # 'alert_response', 'ask_reply', 'agent_message',
+                            # 'proactive_remark', 'propose_from_conversation',
                             # 'no_action'
     payload: dict
     assessment: Optional[Dict[str, Any]] = None
@@ -382,7 +382,6 @@ class ZenohExecutiveNode:
         # Debug mode flag - must be set early as it's used throughout initialization
         self.debug = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on')
         if self.debug:
-            console_handler.setLevel(logging.INFO)
             logger.info(f'🔧 Debug mode enabled for {self.character_name}')
         
         # Shutdown flag — must be early since Zenoh callbacks can fire before run()
@@ -1262,6 +1261,18 @@ class ZenohExecutiveNode:
             self._handle_concern_manage
         )
 
+        # ── Command registry ─────────────────────────────────────────────
+        # The single manifest of all imperative operations in the system.
+        # Every /command maps to a handler that accepts a plain dict.
+        self._command_registry = self._build_command_registry()
+
+        # Unified command channel — all clients (CLI, web UI, scheduler)
+        # send structured commands here instead of raw text.
+        self.command_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/command",
+            self._handle_command_message
+        )
+
         # === ZENOH PUBLICATION ===
         # NAME: execution_state_update
         # TOPIC: cognitive/{character}/execution_state
@@ -1416,12 +1427,15 @@ class ZenohExecutiveNode:
         self.shutdown_requested = True
     
     def _handle_save_command(self, sample):
-        """Handle save_all command - save resource_manager state."""
+        """Handle save_all command - save all persistent state."""
         try:
             logger.info(f'💾 {self.character_name} received save_all command')
             if self.resource_manager:
                 self.resource_manager.save_to_file()
                 logger.info(f'💾 Saved resource manager state for {self.map_name}')
+            if hasattr(self, 'world_model') and self.world_model:
+                self.world_model.save()
+                logger.info(f'💾 Saved world model for {self.character_name}')
         except Exception as e:
             logger.error(f'Error handling save command: {e}')
 
@@ -3013,13 +3027,16 @@ class ZenohExecutiveNode:
         goal = self._get_scheduled_goal(goal_id)
         if not goal:
             return
-        # If the goal was already terminated (interrupted) by the user, don't overwrite
-        if goal.get("status") == "interrupted":
-            logger.info(f'Goal {goal_id} already interrupted — skipping result update')
+        # If the goal was already terminated by the user (reset to ready), don't overwrite
+        if goal.get("status") == "ready" and not goal.get("is_running") and self._active_scheduled_goal_id != goal_id:
+            logger.info(f'Goal {goal_id} already reset — skipping result update')
             return
         success = bool(result and result.get("success"))
         primary_product = (result.get("primary_product") if isinstance(result, dict) else "") or ""
         last_result_raw = (result.get("response") if isinstance(result, dict) else "") or (result.get("error") if isinstance(result, dict) else "") or ""
+        # Strip leaked stop-sequence markers from goal results
+        if last_result_raw:
+            last_result_raw = last_result_raw.replace('</end>', '').replace('</end', '').strip()
 
         # Enrich last_result from primary_product content when the LLM
         # response is empty/trivial but an actual artifact was produced.
@@ -3032,7 +3049,7 @@ class ZenohExecutiveNode:
                         props = getattr(res, 'properties', {}) or {}
                         content = str(props.get('text', '') or props.get('content', ''))
                     if content and len(content) > len(last_result_raw):
-                        last_result_raw = content[:1500]
+                        last_result_raw = content[:1500].replace('</end>', '').replace('</end', '').strip()
                         logger.info(f'Enriched last_result from primary_product {primary_product} ({len(content)} chars)')
             except Exception as e:
                 logger.debug(f'Could not load primary_product for last_result enrichment: {e}')
@@ -3227,6 +3244,14 @@ class ZenohExecutiveNode:
             created_ids = now_ids - pre_resource_ids
             keep_ids = {primary_product} if primary_product else set()
             self._cleanup_transient_resources(created_ids, keep_ids, label=goal_id)
+
+        # Announce completion to user (unless this is an internal task milestone)
+        if not task_wip_id:
+            goal_name = goal.get('name') or goal.get('goal_text', '')[:80] or goal_id
+            pp_ref = f' → {primary_product}' if primary_product else ''
+            status_word = 'completed' if success else 'failed'
+            self._say_to_user(f"Goal '{goal_name}' {status_word}.{pp_ref}")
+
         self._publish_execution_state()
 
     def _handle_goal_proceed(self, goal_id: str = None, source: str = "user"):
@@ -3355,7 +3380,8 @@ class ZenohExecutiveNode:
             self.interrupt_requested = True
             if self.infospace_executor:
                 self.infospace_executor.interrupt_requested = True
-            self._update_scheduled_goal(goal_id, status="interrupted", is_running=False)
+            self._update_scheduled_goal(goal_id, status="ready", is_running=False,
+                                        schedule_mode="manual")
             if self._active_scheduled_goal_id == goal_id:
                 self._active_scheduled_goal_id = None
             # If this goal is a task milestone, abort the task WIP
@@ -3385,7 +3411,7 @@ class ZenohExecutiveNode:
             if hasattr(self, "goal_scheduler"):
                 self.goal_scheduler.notify_goal_terminal(goal_id)
             self._publish_execution_state()
-            self._say_to_user(f"Goal '{goal.get('name') or goal_id}' interrupted.")
+            self._say_to_user(f"Goal '{goal.get('name') or goal_id}' stopped (reset to ready/manual).")
             return
         deleted = self._delete_scheduled_goal(goal_id)
         if deleted:
@@ -3466,7 +3492,7 @@ class ZenohExecutiveNode:
         return eligible
 
     def _scheduler_proceed_goal(self, goal_id):
-        """Enqueue a synthetic goal proceed/reuse command (called from scheduler thread)."""
+        """Proceed a goal via the command registry (called from scheduler thread)."""
         from datetime import date
         goal = self._get_scheduled_goal(goal_id)
         self._scheduler_started_goals.add(goal_id)
@@ -3477,244 +3503,73 @@ class ZenohExecutiveNode:
         )
         if goal and goal.get("schedule_mode") == "daily":
             self._update_scheduled_goal(goal_id, last_run_date=date.today().isoformat())
-        # Respect execution_mode: replay uses cached plan, replan (default) replans from scratch
-        exec_mode = goal.get("execution_mode", "replan") if goal else "replan"
-        has_cache = bool(goal and isinstance(goal.get("cached_plan_actions"), list) and goal["cached_plan_actions"])
-        verb = "reuse" if exec_mode == "replay" and has_cache else "proceed"
-        command = json.dumps({"text": f"{verb} {goal_id}", "source": "scheduler"})
-        self.text_input_queue.append({"content": command})
         self.execution_paused = False
         self._publish_execution_state()
+        self._dispatch_command({'cmd': '/goal run', 'goal_id': goal_id, 'source': 'scheduler'})
+
+    # ── Zenoh control subscriber shims ──────────────────────────────
+    # These exist for backward compatibility with the web UI and task manager,
+    # which publish to individual control topics. They all delegate to
+    # _dispatch_command() so there's a single code path.
+
+    def _zenoh_to_command(self, sample, cmd: str, extra_fields: dict = None):
+        """Generic shim: parse Zenoh sample, merge cmd, dispatch."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            data['cmd'] = cmd
+            if extra_fields:
+                data.update(extra_fields)
+            self._dispatch_command(data)
+        except Exception as e:
+            logger.error(f'Zenoh→command shim error ({cmd}): {e}')
 
     def _handle_scheduler_control(self, sample):
         """Zenoh callback for scheduler enable/disable/interval changes."""
         try:
             data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            # Scheduler control has a unique payload format — translate
             if 'enable' in data:
-                self.goal_scheduler.set_enabled(bool(data['enable']))
+                action = 'on' if data['enable'] else 'off'
+                self._dispatch_command({'cmd': '/scheduler', 'action': action})
             if 'interval' in data:
-                self.goal_scheduler.set_interval(float(data['interval']))
-            self._publish_execution_state()
+                self._dispatch_command({'cmd': '/scheduler', 'action': 'interval', 'interval': data['interval']})
         except Exception as e:
             logger.error(f'Error in scheduler control handler: {e}')
 
     def _handle_goal_schedule_mode(self, sample):
-        """Zenoh callback for per-goal schedule mode changes."""
-        try:
-            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            goal_id = data.get("goal_id")
-            mode = data.get("schedule_mode")
-            if not goal_id or mode not in ("manual", "auto", "recurring", "daily"):
-                logger.warning(f"Invalid goal_schedule_mode payload: {data}")
-                return
-            updates = {"schedule_mode": mode}
-            if mode == "daily":
-                updates["run_at"] = data.get("run_at", "")
-            self._update_scheduled_goal(goal_id, **updates)
-            logger.info(f"Goal {goal_id} schedule_mode set to '{mode}'")
-        except Exception as e:
-            logger.error(f"Error in goal_schedule_mode handler: {e}")
+        self._zenoh_to_command(sample, '/goal mode')
 
     def _handle_goal_rename(self, sample):
-        """Zenoh callback for scheduled goal rename."""
-        try:
-            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            goal_id = data.get("goal_id")
-            name = (data.get("name") or "").strip()
-            if not goal_id or not name:
-                logger.warning(f"Invalid goal_rename payload: {data}")
-                return
-            self._update_scheduled_goal(goal_id, name=name[:120], name_customized=True)
-            logger.info(f"Goal {goal_id} renamed to '{name[:120]}'")
-        except Exception as e:
-            logger.error(f"Error in goal_rename handler: {e}")
+        self._zenoh_to_command(sample, '/goal rename')
 
     def _handle_goal_execution_mode(self, sample):
-        """Zenoh callback for per-goal execution mode changes (replan/replay)."""
-        try:
-            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            goal_id = data.get("goal_id")
-            mode = data.get("execution_mode")
-            if not goal_id or mode not in ("replan", "replay"):
-                logger.warning(f"Invalid goal_execution_mode payload: {data}")
-                return
-            self._update_scheduled_goal(goal_id, execution_mode=mode)
-            logger.info(f"Goal {goal_id} execution_mode set to '{mode}'")
-        except Exception as e:
-            logger.error(f"Error in goal_execution_mode handler: {e}")
+        self._zenoh_to_command(sample, '/goal exec')
 
     def _handle_goal_text_update(self, sample):
-        """Zenoh callback for updating a scheduled goal's goal_text."""
-        try:
-            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            goal_id = data.get("goal_id")
-            goal_text = (data.get("goal_text") or "").strip()
-            if not goal_id or not goal_text:
-                logger.warning(f"Invalid goal_text_update payload: {data}")
-                return
-            # Only clear cache if text actually changed
-            goal = self._get_scheduled_goal(goal_id)
-            old_text = (goal.get("goal_text", "") if goal else "").strip()
-            updates = {"goal_text": goal_text}
-            if goal_text != old_text:
-                updates["cached_plan_actions"] = []
-                updates["execution_mode"] = "replan"
-                updates["status"] = "ready"
-                logger.info(f"Goal {goal_id} text changed, cache cleared")
-            self._update_scheduled_goal(goal_id, **updates)
-            logger.info(f"Goal {goal_id} text updated ({len(goal_text)} chars)")
-        except Exception as e:
-            logger.error(f"Error in goal_text_update handler: {e}")
+        self._zenoh_to_command(sample, '/goal edit')
 
     def _handle_goal_cache(self, sample):
-        """Zenoh callback for scheduled goal cache operations."""
         try:
             data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            goal_id = data.get("goal_id")
-            action = data.get("action")
-            if action != "clear" or not goal_id:
-                logger.warning(f"Invalid goal_cache payload: {data}")
-                return
-            self._update_scheduled_goal(goal_id, cached_plan_actions=[], execution_mode="replan", status="ready")
-            logger.info(f"Cleared cached plan_actions for {goal_id}")
+            self._dispatch_command({'cmd': '/goal cache clear', 'goal_id': data.get('goal_id')})
         except Exception as e:
-            logger.error(f"Error in goal_cache handler: {e}")
+            logger.error(f'Error in goal_cache handler: {e}')
 
     def _handle_goal_interrupt(self, sample):
-        """Zenoh callback to interrupt a scheduled goal."""
         try:
             data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            goal_id = data.get("goal_id")
-            if not goal_id:
-                logger.warning(f"Invalid goal_interrupt payload: {data}")
-                return
-            self._handle_goal_terminate(goal_id=goal_id)
+            self._dispatch_command({'cmd': '/goal terminate', 'goal_id': data.get('goal_id')})
         except Exception as e:
-            logger.error(f"Error in goal_interrupt handler: {e}")
+            logger.error(f'Error in goal_interrupt handler: {e}')
 
     def _handle_goal_remove(self, sample):
-        """Zenoh callback to force-remove a scheduled goal."""
-        try:
-            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            goal_id = data.get("goal_id")
-            if not goal_id:
-                logger.warning(f"Invalid goal_remove payload: {data}")
-                return
-            goal = self._get_scheduled_goal(goal_id)
-            if not goal:
-                logger.warning(f"Goal {goal_id} not found for remove")
-                return
-            if goal.get("is_running") or self._active_scheduled_goal_id == goal_id:
-                self.interrupt_requested = True
-                if self.infospace_executor:
-                    self.infospace_executor.interrupt_requested = True
-            # If this goal is a task milestone, abort the task WIP
-            if goal.get("task_wip_id") and self.active_task_wip:
-                logger.info(f'📋 Task WIP {goal.get("task_wip_id")}: milestone removed — aborting task')
-                wip = self._read_task_wip()
-                if wip:
-                    wip["status"] = "interrupted"
-                    wip["current_milestone"] = None
-                    wip["updated"] = datetime.now().isoformat()
-                    wip.setdefault("accumulated_findings", []).append(
-                        "Task interrupted: milestone goal removed by user"
-                    )
-                    self._update_task_wip(wip)
-                self.active_task_wip = None
-                self.active_task_wip_waiting = False
-                self._task_wip_pre_resource_ids = None
-                self._say_to_user("Task establishment interrupted.")
-            deleted = self._delete_scheduled_goal(goal_id)
-            if not deleted:
-                logger.warning(f"Goal {goal_id} could not be removed")
-                return
-            if self._active_scheduled_goal_id == goal_id:
-                self._active_scheduled_goal_id = None
-            if goal_id in self._scheduler_started_goals:
-                self._scheduler_started_goals.discard(goal_id)
-            if hasattr(self, "goal_scheduler"):
-                self.goal_scheduler.notify_goal_terminal(goal_id)
-            self._publish_execution_state()
-            logger.info(f"Goal {goal_id} removed via control endpoint")
-        except Exception as e:
-            logger.error(f"Error in goal_remove handler: {e}")
+        self._zenoh_to_command(sample, '/goal remove')
 
     def _handle_task_wip_delete(self, sample):
-        """Handle request to delete a task WIP and all its associated artifacts."""
-        try:
-            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            note_name = data.get("note_name")
-            if not note_name or not self.resource_manager:
-                return
-
-            # Read WIP content for cross-references
-            note_id = self.resource_manager.named_notes.get(note_name)
-            if not note_id:
-                logger.warning(f"Task WIP note {note_name} not found")
-                return
-            note_data = self.resource_manager.resource_registry.get(note_id)
-            wip = {}
-            if note_data:
-                content = note_data.get("properties", {}).get("content", "")
-                try:
-                    wip = json.loads(content) if isinstance(content, str) else content
-                except (json.JSONDecodeError, TypeError):
-                    pass
-
-            task_wip_id = wip.get("task_wip_id", "")
-            deleted_goals = []
-
-            # Delete associated scheduled goals (milestone + final recurring)
-            for goal in self._all_scheduled_goals():
-                if (goal.get("task_wip_id") == task_wip_id and task_wip_id) or \
-                   goal.get("task_context_note") == note_name:
-                    self._delete_scheduled_goal(goal["goal_id"])
-                    deleted_goals.append(goal["goal_id"])
-
-            # Delete the WIP note itself
-            if self.infospace_executor:
-                self.infospace_executor.delete_resource_and_unbind(note_id)
-
-            # Clear active task WIP if this is the active one
-            if self.active_task_wip == note_name:
-                self.interrupt_requested = True
-                if self.infospace_executor:
-                    self.infospace_executor.interrupt_requested = True
-                self.active_task_wip = None
-                self.active_task_wip_waiting = False
-                self._task_wip_pre_resource_ids = None
-
-            self._publish_execution_state()
-            logger.info(f"Task WIP {note_name} deleted (removed {len(deleted_goals)} goals: {deleted_goals})")
-        except Exception as e:
-            logger.error(f"Error in task_wip_delete handler: {e}")
+        self._zenoh_to_command(sample, '/task delete')
 
     def _handle_task_wip_interrupt(self, sample):
-        """Handle request to interrupt an active task WIP."""
-        try:
-            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            note_name = data.get("note_name")
-            if not note_name or self.active_task_wip != note_name:
-                return
-            # Interrupt any running milestone goal
-            self.interrupt_requested = True
-            if self.infospace_executor:
-                self.infospace_executor.interrupt_requested = True
-            # Update WIP note
-            wip = self._read_task_wip()
-            if wip:
-                wip["status"] = "interrupted"
-                wip["current_milestone"] = None
-                wip.setdefault("accumulated_findings", []).append("Task interrupted by user via UI")
-                self._update_task_wip(wip)
-            self.active_task_wip = None
-            self.active_task_wip_waiting = False
-            self._task_wip_pre_resource_ids = None
-            self._say_to_user("Task establishment interrupted.")
-            self._publish_execution_state()
-            logger.info(f"Task WIP {note_name} interrupted via UI")
-        except Exception as e:
-            logger.error(f"Error in task_wip_interrupt handler: {e}")
+        self._zenoh_to_command(sample, '/task interrupt')
 
     def _cleanup_transient_resources(self, created_ids: set, keep_ids: set = None, label: str = ""):
         """
@@ -4998,7 +4853,8 @@ class ZenohExecutiveNode:
             f"NEVER claim to have run a tool, executed a check, or performed an action that "
             f"you did not actually perform. If the user asks you to do something that requires "
             f"tool execution, tell them you can do it as a goal (e.g., 'I can run that as a "
-            f"goal — would you like me to?').\n</end>"
+            f"goal — would you like me to?').\n"
+            f"End your response with </end>"
         )
 
         try:
@@ -5012,10 +4868,23 @@ class ZenohExecutiveNode:
                 stops=["</end>"],
             )
             if result.success and result.text:
-                response = result.text.replace("</end>", "").strip()
-                self._say_to_user(response)
-                self.conversation_store.record_outgoing(source, response, act_type="chat")
-                logger.info(f'💬 {self.character_name} chat response to {source}: {response[:80]}...')
+                response = result.text
+                # Truncate at </end (with or without >) or prompt-echo markers
+                # (stop sequence sometimes fails or tokenizes </end differently)
+                for marker in ('</end>', '</end', '\nUSER:', '\nASSISTANT:',
+                               '\nTheir move:', '\n## ORIENTATION', '\nRECENT DIALOG:',
+                               '\n#Objectives', '\n#Constraints', '\n#Format',
+                               '\nMessage from '):
+                    idx = response.find(marker)
+                    if idx >= 0:
+                        response = response[:idx]
+                response = response.strip()
+                if not response:
+                    logger.warning('Chat response empty after cleaning')
+                else:
+                    self._say_to_user(response)
+                    self.conversation_store.record_outgoing(source, response, act_type="chat")
+                    logger.info(f'💬 {self.character_name} chat response to {source}: {response[:80]}...')
             else:
                 logger.warning(f'Chat LLM call failed: {getattr(result, "error", "unknown")}')
         except Exception as e:
@@ -5027,7 +4896,8 @@ class ZenohExecutiveNode:
         system_prompt = self._update_system_prompt()
         user_prompt = (
             f"Sensor alert from {sensor_name}:\n{alert_text}\n\n"
-            f"React briefly in character. This is an internal sensor notification, not a conversation.\n</end>"
+            f"React briefly in character. This is an internal sensor notification, not a conversation.\n"
+            f"End your response with </end>"
         )
         try:
             result = self.llm_generate(
@@ -5678,6 +5548,802 @@ class ZenohExecutiveNode:
         # Fallback: generic framing
         return {'turn_intent': f'{source} is communicating', 'my_move': f'Engage with {source} — contribute your own perspective'}
 
+    # ── Command registry ─────────────────────────────────────────────────
+
+    def _build_command_registry(self) -> dict:
+        """Build the command registry — the complete manifest of imperative operations.
+
+        Returns a dict mapping command name to {handler, description, args}.
+        Handler signature: handler(data: dict) -> Optional[str] (response text).
+        """
+        return {
+            # ── Goals ──
+            '/goal add': {
+                'handler': self._cmd_goal_add,
+                'description': 'Create a new goal',
+                'args': ['goal_text'],
+            },
+            '/goal run': {
+                'handler': self._cmd_goal_run,
+                'description': 'Execute a goal',
+                'args': ['goal_id'],
+            },
+            '/goal terminate': {
+                'handler': self._cmd_goal_terminate,
+                'description': 'Stop a running goal',
+                'args': ['goal_id'],
+            },
+            '/goal rename': {
+                'handler': self._cmd_goal_rename,
+                'description': 'Rename a goal',
+                'args': ['goal_id', 'name'],
+            },
+            '/goal edit': {
+                'handler': self._cmd_goal_edit,
+                'description': 'Update goal text',
+                'args': ['goal_id', 'goal_text'],
+            },
+            '/goal remove': {
+                'handler': self._cmd_goal_remove,
+                'description': 'Delete a goal',
+                'args': ['goal_id'],
+            },
+            '/goal mode': {
+                'handler': self._cmd_goal_mode,
+                'description': 'Set schedule mode (manual|auto|recurring|daily)',
+                'args': ['goal_id', 'schedule_mode'],
+            },
+            '/goal exec': {
+                'handler': self._cmd_goal_exec,
+                'description': 'Set execution mode (replan|replay)',
+                'args': ['goal_id', 'execution_mode'],
+            },
+            '/goal cache clear': {
+                'handler': self._cmd_goal_cache_clear,
+                'description': 'Clear cached plan for a goal',
+                'args': ['goal_id'],
+            },
+            # ── Tasks ──
+            '/task add': {
+                'handler': self._cmd_task_add,
+                'description': 'Create a new task',
+                'args': ['intention'],
+            },
+            '/task propose': {
+                'handler': self._cmd_task_propose,
+                'description': 'Propose a task from conversation context',
+                'args': [],
+            },
+            '/task approve': {
+                'handler': self._cmd_task_approve,
+                'description': 'Approve a proposed task',
+                'args': ['note_name'],
+            },
+            '/task edit': {
+                'handler': self._cmd_task_edit,
+                'description': 'Edit task intention',
+                'args': ['note_name', 'intention'],
+            },
+            '/task abandon': {
+                'handler': self._cmd_task_abandon,
+                'description': 'Abandon a task',
+                'args': ['note_name'],
+            },
+            '/task delete': {
+                'handler': self._cmd_task_delete,
+                'description': 'Delete a task and its artifacts',
+                'args': ['note_name'],
+            },
+            '/task interrupt': {
+                'handler': self._cmd_task_interrupt,
+                'description': 'Pause an active task',
+                'args': ['note_name'],
+            },
+            '/task run': {
+                'handler': self._cmd_task_run,
+                'description': 'Run task now (clear cooldown)',
+                'args': ['note_name'],
+            },
+            '/task cooldown': {
+                'handler': self._cmd_task_cooldown,
+                'description': 'Set task cooldown seconds',
+                'args': ['note_name', 'cooldown_seconds'],
+            },
+            # ── Concerns ──
+            '/concern close': {
+                'handler': self._cmd_concern_manage,
+                'description': 'Close a user concern',
+                'args': ['concern_id', 'type'],
+            },
+            '/concern reopen': {
+                'handler': self._cmd_concern_manage,
+                'description': 'Reopen a user concern',
+                'args': ['concern_id', 'type'],
+            },
+            '/concern resolve': {
+                'handler': self._cmd_concern_manage,
+                'description': 'Resolve/satisfy a derived concern',
+                'args': ['concern_id', 'type'],
+            },
+            '/concern delete': {
+                'handler': self._cmd_concern_manage,
+                'description': 'Delete a concern',
+                'args': ['concern_id', 'type'],
+            },
+            '/concern weight': {
+                'handler': self._cmd_concern_manage,
+                'description': 'Set concern weight',
+                'args': ['concern_id', 'type', 'weight'],
+            },
+            '/concern activate': {
+                'handler': self._cmd_concern_manage,
+                'description': 'Reactivate a derived concern',
+                'args': ['concern_id', 'type'],
+            },
+            '/concern revisit': {
+                'handler': self._cmd_concern_manage,
+                'description': 'Set revisit hours for a derived concern',
+                'args': ['concern_id', 'type', 'revisit_hours'],
+            },
+            # ── System ──
+            '/stop': {
+                'handler': self._cmd_stop,
+                'description': 'Halt current execution immediately',
+                'args': [],
+            },
+            '/continuous': {
+                'handler': self._cmd_continuous,
+                'description': 'Toggle continuous execution',
+                'args': [],
+            },
+            '/llm': {
+                'handler': self._cmd_llm_toggle,
+                'description': 'Toggle LLM mode (primary/alt)',
+                'args': [],
+            },
+            '/delay': {
+                'handler': self._cmd_delay,
+                'description': 'Set turn delay seconds',
+                'args': ['delay'],
+            },
+            '/scheduler': {
+                'handler': self._cmd_scheduler,
+                'description': 'Goal scheduler config (on|off|interval N)',
+                'args': [],
+            },
+            '/clear': {
+                'handler': self._cmd_clear,
+                'description': 'Clear (world-model|map|transients|persistents)',
+                'args': ['target'],
+            },
+            '/save': {
+                'handler': self._cmd_save,
+                'description': 'Save all data',
+                'args': [],
+            },
+            '/shutdown': {
+                'handler': self._cmd_shutdown,
+                'description': 'Save and shutdown',
+                'args': [],
+            },
+            '/bye': {
+                'handler': self._cmd_bye,
+                'description': 'End conversation',
+                'args': [],
+            },
+            '/action': {
+                'handler': self._cmd_direct_action,
+                'description': 'Execute a direct JSON action',
+                'args': ['json_text'],
+            },
+        }
+
+    def _dispatch_command(self, data: dict) -> Optional[str]:
+        """Dispatch a structured command dict to the appropriate handler.
+
+        Args:
+            data: Must contain 'cmd' key (e.g. '/goal run'). Other keys are
+                  passed to the handler as kwargs.
+
+        Returns:
+            Response text from the handler, or error message.
+        """
+        cmd = (data.get('cmd') or '').strip().lower()
+        if not cmd:
+            return 'No command specified.'
+
+        # Look up handler — try exact match first, then prefix match for
+        # compound commands like '/goal cache clear'
+        entry = self._command_registry.get(cmd)
+        if not entry:
+            # Try longest prefix match for compound commands
+            candidates = [(k, v) for k, v in self._command_registry.items() if cmd.startswith(k)]
+            if candidates:
+                entry = max(candidates, key=lambda x: len(x[0]))[1]
+
+        if not entry:
+            return f"Unknown command: {cmd}"
+
+        source = data.get('source', 'User')
+        try:
+            return entry['handler'](data)
+        except Exception as e:
+            logger.error(f'Command dispatch error ({cmd}): {e}', exc_info=True)
+            return f'Command failed: {e}'
+
+    def _handle_command_message(self, sample):
+        """Zenoh callback for the unified command channel."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            result = self._dispatch_command(data)
+            if result:
+                logger.info(f"Command result: {result[:120]}")
+        except Exception as e:
+            logger.error(f'Command message handler error: {e}')
+
+    def get_command_list(self) -> list:
+        """Return the command registry for help/discovery."""
+        return [
+            {'cmd': k, 'description': v['description'], 'args': v['args']}
+            for k, v in self._command_registry.items()
+        ]
+
+    # ── Command handlers ─────────────────────────────────────────────────
+    # Each handler accepts a dict and returns an optional response string.
+
+    # -- Goals --
+
+    def _cmd_goal_add(self, data: dict) -> str:
+        goal_text = (data.get('goal_text') or '').strip()
+        if not goal_text:
+            return 'Usage: /goal add <goal text>'
+        self.conversation_store.close_dialog("User")
+        scheduled_goal = self._upsert_scheduled_goal(goal_text)
+        goal_id = scheduled_goal["goal_id"]
+        if self._is_goal_running():
+            self._say_to_user(f"Goal '{goal_id}' created but another goal is already running.")
+            return f"Goal {goal_id} created (queued)"
+        self._active_scheduled_goal_id = goal_id
+        self._update_scheduled_goal(goal_id, is_running=True, status="running")
+        pre = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
+        def _run():
+            result = self.parse_and_set_goal("", goal_text) or {}
+            self._set_scheduled_goal_result(goal_id, result, used_cache=False, pre_resource_ids=pre)
+            return result
+        self._run_goal_on_thread(_run)
+        return f"Goal {goal_id} created and started"
+
+    def _cmd_goal_run(self, data: dict) -> str:
+        goal_id = (data.get('goal_id') or '').strip()
+        if not goal_id:
+            return 'Usage: /goal run <goal_id>'
+        source = data.get('source', 'user')
+        self._handle_goal_proceed(goal_id=goal_id, source=source)
+        return f"Goal {goal_id} proceed requested"
+
+    def _cmd_goal_terminate(self, data: dict) -> str:
+        goal_id = (data.get('goal_id') or '').strip()
+        if not goal_id:
+            return 'Usage: /goal terminate <goal_id>'
+        self._handle_goal_terminate(goal_id=goal_id)
+        return f"Goal {goal_id} terminate requested"
+
+    def _cmd_goal_rename(self, data: dict) -> str:
+        goal_id = (data.get('goal_id') or '').strip()
+        name = (data.get('name') or '').strip()
+        if not goal_id or not name:
+            return 'Usage: /goal rename <goal_id> <name>'
+        self._update_scheduled_goal(goal_id, name=name[:120], name_customized=True)
+        logger.info(f"Goal {goal_id} renamed to '{name[:120]}'")
+        return f"Goal {goal_id} renamed"
+
+    def _cmd_goal_edit(self, data: dict) -> str:
+        goal_id = (data.get('goal_id') or '').strip()
+        goal_text = (data.get('goal_text') or '').strip()
+        if not goal_id or not goal_text:
+            return 'Usage: /goal edit <goal_id> <goal text>'
+        goal = self._get_scheduled_goal(goal_id)
+        old_text = (goal.get("goal_text", "") if goal else "").strip()
+        updates = {"goal_text": goal_text}
+        if goal_text != old_text:
+            updates["cached_plan_actions"] = []
+            updates["execution_mode"] = "replan"
+            updates["status"] = "ready"
+        self._update_scheduled_goal(goal_id, **updates)
+        logger.info(f"Goal {goal_id} text updated ({len(goal_text)} chars)")
+        return f"Goal {goal_id} updated"
+
+    def _cmd_goal_remove(self, data: dict) -> str:
+        goal_id = (data.get('goal_id') or '').strip()
+        if not goal_id:
+            return 'Usage: /goal remove <goal_id>'
+        goal = self._get_scheduled_goal(goal_id)
+        if not goal:
+            return f"Goal '{goal_id}' not found"
+        # Interrupt if running
+        if goal.get("is_running") or self._active_scheduled_goal_id == goal_id:
+            self.interrupt_requested = True
+            if self.infospace_executor:
+                self.infospace_executor.interrupt_requested = True
+        # If this goal is a task milestone, abort the task WIP
+        if goal.get("task_wip_id") and self.active_task_wip:
+            wip = self._read_task_wip()
+            if wip:
+                wip["status"] = "interrupted"
+                wip["current_milestone"] = None
+                wip["updated"] = datetime.now().isoformat()
+                wip.setdefault("accumulated_findings", []).append(
+                    "Task interrupted: milestone goal removed by user"
+                )
+                self._update_task_wip(wip)
+            self.active_task_wip = None
+            self.active_task_wip_waiting = False
+            self._task_wip_pre_resource_ids = None
+            self._say_to_user("Task establishment interrupted.")
+        deleted = self._delete_scheduled_goal(goal_id)
+        if not deleted:
+            return f"Goal '{goal_id}' could not be removed"
+        if self._active_scheduled_goal_id == goal_id:
+            self._active_scheduled_goal_id = None
+        if goal_id in self._scheduler_started_goals:
+            self._scheduler_started_goals.discard(goal_id)
+        if hasattr(self, "goal_scheduler"):
+            self.goal_scheduler.notify_goal_terminal(goal_id)
+        self._publish_execution_state()
+        logger.info(f"Goal {goal_id} removed via command")
+        return f"Goal '{goal.get('name') or goal_id}' removed"
+
+    def _cmd_goal_mode(self, data: dict) -> str:
+        goal_id = (data.get('goal_id') or '').strip()
+        mode = (data.get('schedule_mode') or '').strip()
+        if not goal_id or mode not in ('manual', 'auto', 'recurring', 'daily'):
+            return 'Usage: /goal mode <goal_id> <manual|auto|recurring|daily>'
+        updates = {"schedule_mode": mode}
+        if mode == "daily":
+            updates["run_at"] = data.get("run_at", "")
+        self._update_scheduled_goal(goal_id, **updates)
+        logger.info(f"Goal {goal_id} schedule_mode set to '{mode}'")
+        return f"Goal {goal_id} mode set to {mode}"
+
+    def _cmd_goal_exec(self, data: dict) -> str:
+        goal_id = (data.get('goal_id') or '').strip()
+        mode = (data.get('execution_mode') or '').strip()
+        if not goal_id or mode not in ('replan', 'replay'):
+            return 'Usage: /goal exec <goal_id> <replan|replay>'
+        self._update_scheduled_goal(goal_id, execution_mode=mode)
+        logger.info(f"Goal {goal_id} execution_mode set to '{mode}'")
+        return f"Goal {goal_id} exec mode set to {mode}"
+
+    def _cmd_goal_cache_clear(self, data: dict) -> str:
+        goal_id = (data.get('goal_id') or '').strip()
+        if not goal_id:
+            return 'Usage: /goal cache clear <goal_id>'
+        self._handle_goal_cache_clear(goal_id=goal_id)
+        return f"Goal {goal_id} cache cleared"
+
+    # -- Tasks --
+
+    def _cmd_task_add(self, data: dict) -> str:
+        intention = (data.get('intention') or '').strip()
+        if not intention:
+            return 'Usage: /task add <intention>'
+        if self.active_task_wip:
+            return 'A task is already being established. Wait for it to complete.'
+        if self._is_goal_running():
+            return 'A goal is running. Wait for it to complete before starting a task.'
+        self._begin_task_establishment(intention)
+        return f"Task creation started: {intention[:80]}"
+
+    def _cmd_task_propose(self, data: dict) -> str:
+        source = data.get('source', 'User')
+        text = data.get('text', '')
+        self._propose_task_from_conversation(text, source)
+        return "Task proposal initiated from conversation context"
+
+    def _cmd_task_approve(self, data: dict) -> str:
+        note_name = (data.get('note_name') or '').strip()
+        if not note_name:
+            return 'Usage: /task approve <note_name> [intention]'
+        if not note_name.startswith('_task_wip_'):
+            note_name = f'_task_wip_{note_name}'
+        intention = data.get('intention', '')
+        self._approve_proposed_task(note_name, intention)
+        return f"Task {note_name} approval requested"
+
+    def _cmd_task_edit(self, data: dict) -> str:
+        note_name = (data.get('note_name') or '').strip()
+        intention = (data.get('intention') or '').strip()
+        if not note_name or not intention:
+            return 'Usage: /task edit <note_name> <intention>'
+        if not note_name.startswith('_task_wip_'):
+            note_name = f'_task_wip_{note_name}'
+        # Delegate to existing handler logic (without Zenoh sample)
+        note_id = self.resource_manager.named_notes.get(note_name) if self.resource_manager else None
+        if not note_id:
+            return f"Task {note_name} not found"
+        res = self.resource_manager.get_resource(note_id)
+        content = json.loads(res.get('properties', {}).get('content', '{}'))
+        content['intention'] = intention
+        content['updated'] = datetime.now().isoformat()
+        self.infospace_executor.execute_action({
+            'type': 'update-note', 'note_name': note_name,
+            'value': json.dumps(content),
+        })
+        logger.info(f'📋 Task {note_name} intention edited via command')
+        return f"Task {note_name} edited"
+
+    def _cmd_task_abandon(self, data: dict) -> str:
+        note_name = (data.get('note_name') or '').strip()
+        if not note_name:
+            return 'Usage: /task abandon <note_name> [reason]'
+        if not note_name.startswith('_task_wip_'):
+            note_name = f'_task_wip_{note_name}'
+        reason = data.get('reason', 'abandoned via command')
+        self._abandon_task(note_name, reason)
+        return f"Task {note_name} abandoned"
+
+    def _cmd_task_delete(self, data: dict) -> str:
+        note_name = (data.get('note_name') or '').strip()
+        if not note_name:
+            return 'Usage: /task delete <note_name>'
+        if not note_name.startswith('_task_wip_'):
+            note_name = f'_task_wip_{note_name}'
+        # Build a synthetic dict and reuse existing logic
+        self._cmd_task_delete_impl(note_name)
+        return f"Task {note_name} deleted"
+
+    def _cmd_task_delete_impl(self, note_name: str):
+        """Delete a task WIP and all its associated artifacts."""
+        if not self.resource_manager:
+            return
+        note_id = self.resource_manager.named_notes.get(note_name)
+        if not note_id:
+            logger.warning(f"Task WIP note {note_name} not found")
+            return
+        note_data = self.resource_manager.resource_registry.get(note_id)
+        wip = {}
+        if note_data:
+            content = note_data.get("properties", {}).get("content", "")
+            try:
+                wip = json.loads(content) if isinstance(content, str) else content
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        task_wip_id = wip.get("task_wip_id", "")
+        deleted_goals = []
+
+        # Delete associated scheduled goals (milestone + final recurring)
+        for goal in self._all_scheduled_goals():
+            if (goal.get("task_wip_id") == task_wip_id and task_wip_id) or \
+               goal.get("task_context_note") == note_name:
+                self._delete_scheduled_goal(goal["goal_id"])
+                deleted_goals.append(goal["goal_id"])
+
+        # Delete the WIP note itself
+        if self.infospace_executor:
+            self.infospace_executor.delete_resource_and_unbind(note_id)
+
+        # Clear active task state if this is the active task
+        if self.active_task_wip == note_name:
+            self.interrupt_requested = True
+            if self.infospace_executor:
+                self.infospace_executor.interrupt_requested = True
+            self.active_task_wip = None
+            self.active_task_wip_waiting = False
+            self._task_wip_pre_resource_ids = None
+
+        self._publish_execution_state()
+        logger.info(f'📋 Task WIP {note_name} deleted via command (removed {len(deleted_goals)} goals)')
+
+    def _cmd_task_interrupt(self, data: dict) -> str:
+        note_name = (data.get('note_name') or '').strip()
+        if not note_name:
+            return 'Usage: /task interrupt <note_name>'
+        if not note_name.startswith('_task_wip_'):
+            note_name = f'_task_wip_{note_name}'
+        if self.active_task_wip != note_name:
+            return f"Task {note_name} is not the active task"
+        self.interrupt_requested = True
+        if self.infospace_executor:
+            self.infospace_executor.interrupt_requested = True
+        wip = self._read_task_wip()
+        if wip:
+            wip["status"] = "interrupted"
+            wip["current_milestone"] = None
+            wip["updated"] = datetime.now().isoformat()
+            self._update_task_wip(wip)
+        logger.info(f'📋 Task {note_name} interrupted via command')
+        return f"Task {note_name} interrupted"
+
+    def _cmd_task_run(self, data: dict) -> str:
+        note_name = (data.get('note_name') or '').strip()
+        if not note_name:
+            return 'Usage: /task run <note_name>'
+        if not note_name.startswith('_task_wip_'):
+            note_name = f'_task_wip_{note_name}'
+        if not self.resource_manager:
+            return 'No resource manager'
+        note_id = self.resource_manager.named_notes.get(note_name)
+        if not note_id:
+            return f"Task {note_name} not found"
+        res = self.resource_manager.get_resource(note_id)
+        content = json.loads(res.get('properties', {}).get('content', '{}'))
+        if content.get('status') != 'active' or content.get('lifecycle') != 'operational':
+            return f"Task {note_name} is not an active operational task"
+        content['last_executed'] = None
+        content['cooldown_until'] = None
+        content['updated'] = datetime.now().isoformat()
+        self.infospace_executor.execute_action({
+            'type': 'update-note', 'note_name': note_name,
+            'value': json.dumps(content),
+        })
+        logger.info(f'📋 Task {note_name} run-now via command')
+        return f"Task {note_name} marked for immediate execution"
+
+    def _cmd_task_cooldown(self, data: dict) -> str:
+        note_name = (data.get('note_name') or '').strip()
+        cooldown = data.get('cooldown_seconds')
+        if not note_name or cooldown is None:
+            return 'Usage: /task cooldown <note_name> <seconds>'
+        if not note_name.startswith('_task_wip_'):
+            note_name = f'_task_wip_{note_name}'
+        cooldown = int(cooldown)
+        if not self.resource_manager:
+            return 'No resource manager'
+        note_id = self.resource_manager.named_notes.get(note_name)
+        if not note_id:
+            return f"Task {note_name} not found"
+        res = self.resource_manager.get_resource(note_id)
+        content = json.loads(res.get('properties', {}).get('content', '{}'))
+        content['cooldown_seconds'] = cooldown
+        content['updated'] = datetime.now().isoformat()
+        self.infospace_executor.execute_action({
+            'type': 'update-note', 'note_name': note_name,
+            'value': json.dumps(content),
+        })
+        logger.info(f'📋 Task {note_name} cooldown set to {cooldown}s via command')
+        return f"Task {note_name} cooldown set to {cooldown}s"
+
+    # -- Concerns --
+
+    def _cmd_concern_manage(self, data: dict) -> str:
+        concern_id = (data.get('concern_id') or '').strip()
+        if not concern_id:
+            return 'Usage: /concern <action> <concern_id> [args]'
+        # Extract action from the cmd name: '/concern close' -> 'close'
+        cmd = data.get('cmd', '')
+        action = cmd.split()[-1] if cmd else ''
+        concern_type = (data.get('type') or '').strip()
+        if not concern_type:
+            # Auto-detect type from concern_id prefix
+            if concern_id.startswith('dconcern_'):
+                concern_type = 'derived'
+            else:
+                concern_type = 'user'
+
+        if concern_type == 'user':
+            if action == 'close':
+                for c in self.user_concern_model.concerns:
+                    if c.get('concern_id') == concern_id:
+                        c['status'] = 'closed'
+                        c['end_disposition'] = 'resolved'
+                        break
+                self.user_concern_model._save()
+                logger.info(f'📋 User concern {concern_id} closed via command')
+            elif action == 'reopen':
+                for c in self.user_concern_model.concerns:
+                    if c.get('concern_id') == concern_id:
+                        c['status'] = 'open'
+                        break
+                self.user_concern_model._save()
+                logger.info(f'📋 User concern {concern_id} reopened via command')
+            elif action == 'weight':
+                weight = data.get('weight')
+                if weight is not None:
+                    for c in self.user_concern_model.concerns:
+                        if c.get('concern_id') == concern_id:
+                            c['weight'] = max(0.0, min(1.0, float(weight)))
+                            break
+                    self.user_concern_model._save()
+                    logger.info(f'📋 User concern {concern_id} weight set to {weight}')
+            elif action == 'delete':
+                self.user_concern_model.concerns = [
+                    c for c in self.user_concern_model.concerns
+                    if c.get('concern_id') != concern_id
+                ]
+                self.user_concern_model._save()
+                logger.info(f'📋 User concern {concern_id} deleted via command')
+            else:
+                return f"Unsupported action '{action}' for user concern"
+
+        elif concern_type == 'derived':
+            if action in ('resolve', 'satisfy'):
+                patch = {
+                    'op': 'satisfy_concern',
+                    'concern_id': concern_id,
+                    'field_updates': {'status_rationale': f'{action}d via command'},
+                }
+                revisit = data.get('revisit_hours')
+                if revisit is not None:
+                    patch['field_updates']['revisit_hours'] = float(revisit)
+                self._derived_concern_model._apply_patch(patch, f'cmd:{action}')
+                self._derived_concern_model._save()
+                logger.info(f'📋 Derived concern {concern_id} {action}d via command')
+            elif action == 'abandon':
+                patch = {
+                    'op': 'abandon_concern',
+                    'concern_id': concern_id,
+                    'field_updates': {'status_rationale': 'abandoned via command'},
+                }
+                self._derived_concern_model._apply_patch(patch, 'cmd:abandon')
+                self._derived_concern_model._save()
+                logger.info(f'📋 Derived concern {concern_id} abandoned via command')
+            elif action == 'activate':
+                patch = {
+                    'op': 'activate_concern',
+                    'concern_id': concern_id,
+                    'field_updates': {'status_rationale': 'Reactivated via command'},
+                }
+                self._derived_concern_model._apply_patch(patch, 'cmd:reactivate')
+                self._derived_concern_model._save()
+                logger.info(f'📋 Derived concern {concern_id} reactivated via command')
+            elif action == 'revisit':
+                revisit = data.get('revisit_hours')
+                if revisit is not None:
+                    for c in self._derived_concern_model.concerns:
+                        if c.get('concern_id') == concern_id:
+                            c['revisit_hours'] = float(revisit)
+                            break
+                    self._derived_concern_model._save()
+                    logger.info(f'📋 Derived concern {concern_id} revisit set to {revisit}h')
+            elif action == 'delete':
+                self._derived_concern_model.concerns = [
+                    c for c in self._derived_concern_model.concerns
+                    if c.get('concern_id') != concern_id
+                ]
+                self._derived_concern_model._save()
+                logger.info(f'📋 Derived concern {concern_id} deleted via command')
+            else:
+                return f"Unsupported action '{action}' for derived concern"
+        else:
+            return f"Unknown concern type: {concern_type}"
+
+        return f"Concern {concern_id} {action} done"
+
+    # -- System --
+
+    def _cmd_stop(self, data: dict) -> str:
+        logger.info(f'⏹️ Stop command received by {self.character_name}')
+        self.interrupt_requested = True
+        if self.infospace_executor:
+            self.infospace_executor.interrupt_requested = True
+        self.execution_mode = 'step'
+        self.execution_paused = True
+        self.awaiting_user_input = False
+        if self.awaiting_ask_response:
+            self.awaiting_ask_response = False
+            self._ask_response_queue.put(None)
+        self._publish_execution_state()
+        return "Execution stopped"
+
+    def _cmd_continuous(self, data: dict) -> str:
+        enable = data.get('enable')
+        if enable is None:
+            enable = not self.continuous_mode
+
+        if enable:
+            goal_text = None
+            if self.current_goal:
+                goal_text = self.current_goal.to_string()
+            elif self.last_completed_goal_text:
+                goal_text = self.last_completed_goal_text
+            if goal_text:
+                self.continuous_mode = True
+                self.continuous_goal_text = goal_text
+                if not self.current_goal and self.execution_paused:
+                    goal_text_formatted = f"goal: {self.continuous_goal_text}"
+                    self.parse_and_set_goal("", goal_text_formatted)
+                self._publish_execution_state()
+                return "Continuous mode enabled"
+            else:
+                self._publish_execution_state()
+                return "Continuous mode: no current or last goal to repeat"
+        else:
+            self.continuous_mode = False
+            self.continuous_goal_text = None
+            self._publish_execution_state()
+            return "Continuous mode disabled"
+
+    def _cmd_llm_toggle(self, data: dict) -> str:
+        new_mode = 'alt' if self.llm_mode == 'primary' else 'primary'
+        if self._is_goal_running():
+            self.llm_switch_pending = new_mode
+            logger.info(f'🔄 {self.character_name} LLM switch to {new_mode} queued (goal in progress)')
+            self._publish_execution_state()
+            return f"LLM switch to {new_mode} queued (goal in progress)"
+        else:
+            self.llm_switch_pending = new_mode
+            self._apply_pending_llm_switch()
+            self._publish_execution_state()
+            return f"LLM mode set to {new_mode}"
+
+    def _cmd_delay(self, data: dict) -> str:
+        delay = data.get('delay', 2.0)
+        try:
+            delay = float(delay)
+        except (ValueError, TypeError):
+            return 'Usage: /delay <seconds>'
+        self.time_delay = delay
+        logger.info(f'⏱️ Turn delay set to {delay}s for {self.character_name}')
+        return f"Turn delay set to {delay}s"
+
+    def _cmd_scheduler(self, data: dict) -> str:
+        action = (data.get('action') or '').strip().lower()
+        if action == 'on':
+            self.goal_scheduler.set_enabled(True)
+            self._publish_execution_state()
+            return "Scheduler enabled"
+        elif action == 'off':
+            self.goal_scheduler.set_enabled(False)
+            self._publish_execution_state()
+            return "Scheduler disabled"
+        elif action == 'interval':
+            interval = data.get('interval')
+            if interval is None:
+                return 'Usage: /scheduler interval <seconds>'
+            self.goal_scheduler.set_interval(float(interval))
+            self._publish_execution_state()
+            return f"Scheduler interval set to {interval}s"
+        else:
+            status = self.goal_scheduler.get_status()
+            return (f"Scheduler: {'enabled' if status['enabled'] else 'disabled'}, "
+                    f"interval={status['interval']}s, "
+                    f"budget={status['budget_remaining_seconds']:.0f}s remaining")
+
+    def _cmd_clear(self, data: dict) -> str:
+        target = (data.get('target') or '').strip().lower()
+        if target == 'world-model':
+            self.handle_clear_world_model(None)
+            return "World model cleared"
+        elif target == 'map':
+            self.handle_clear_map(None)
+            return "Map cleared"
+        elif target == 'transients':
+            self.handle_clear_transients(None)
+            return "Transients cleared"
+        elif target == 'persistents':
+            self.handle_clear_persistents(None)
+            return "Persistents cleared"
+        else:
+            return 'Usage: /clear <world-model|map|transients|persistents>'
+
+    def _cmd_save(self, data: dict) -> str:
+        self._handle_save_command(None)
+        return "Save requested"
+
+    def _cmd_shutdown(self, data: dict) -> str:
+        self._handle_save_command(None)
+        self.shutdown_requested = True
+        return "Save and shutdown requested"
+
+    def _cmd_bye(self, data: dict) -> str:
+        self.conversation_store.close_dialog("User")
+        logger.info(f'📥 {self.character_name} User ended conversation via /bye')
+        return "Conversation ended"
+
+    def _cmd_direct_action(self, data: dict) -> str:
+        json_text = (data.get('json_text') or '').strip()
+        if not json_text:
+            return 'Usage: /action <json>'
+        try:
+            action_dict = json.loads(json_text)
+        except json.JSONDecodeError as e:
+            return f'Invalid JSON: {e}'
+        if self.infospace_executor:
+            self.infospace_executor.execute_action(action_dict)
+            return "Action executed"
+        return "No executor available"
+
     # ── OODA pipeline ───────────────────────────────────────────────────
 
     def _ooda_observe(self) -> Optional[EventPacket]:
@@ -5721,9 +6387,6 @@ class ZenohExecutiveNode:
             self.text_input_queue.pop(0)
             return None
 
-        clean = text.strip().strip('"').strip("'")
-        low = clean.lower()
-
         # Ask-reply intercept
         if self.awaiting_ask_response:
             if source == 'User':
@@ -5736,61 +6399,12 @@ class ZenohExecutiveNode:
 
         self.text_input_queue.pop(0)
 
-        # Classify the event
-        is_scheduler = source == 'scheduler'
-        is_goal = _is_goal_cmd(text)
-        is_proceed = low.startswith('proceed') or low == 'next step'
-        is_reuse = low.startswith('reuse')
-        is_terminate = low.startswith('terminate')
-        is_clear_cache = low.startswith('clear-cache')
-        is_unblock = low.startswith('unblock')
-        is_task_cmd = clean.startswith('task:') or low in ('tasks', 'task list', 'list tasks')
-        is_make_it_so = source == 'User' and low.rstrip('.,!') == 'make it so'
-        is_json_action = source == 'User' and clean.startswith('{')
+        # Classify by source — no keyword/intent parsing.
+        # All imperative commands arrive via the /command channel, not here.
         is_agent = source not in ('unknown', 'console', 'User', 'scheduler')
-        end_phrases = ('goodbye', 'bye', 'end conversation')
 
-        # Extract goal_id for commands that target one
-        goal_id = None
-        parts = clean.split()
-        if len(parts) > 1 and parts[1].startswith('goal_'):
-            goal_id = parts[1]
-
-        if is_scheduler:
-            classification = 'scheduler_cmd'
-            event_type = 'goal_initiation'
-        elif is_goal:
-            classification = 'goal'
-            event_type = 'goal_initiation'
-        elif is_proceed:
-            classification = 'proceed'
-            event_type = 'goal_initiation'
-        elif is_reuse:
-            classification = 'reuse'
-            event_type = 'goal_initiation'
-        elif is_terminate:
-            classification = 'terminate'
-            event_type = 'goal_initiation'
-        elif is_clear_cache:
-            classification = 'clear_cache'
-            event_type = 'goal_initiation'
-        elif is_unblock:
-            classification = 'unblock'
-            event_type = 'goal_initiation'
-        elif is_task_cmd:
-            classification = 'task_cmd'
-            event_type = 'goal_initiation'
-        elif is_make_it_so:
-            classification = 'make_it_so'
-            event_type = 'user_text'
-        elif is_json_action:
-            classification = 'direct_action'
-            event_type = 'goal_initiation'
-        elif is_agent:
+        if is_agent:
             classification = 'agent_message'
-            event_type = 'user_text'
-        elif source == 'User' and low.rstrip('.,!') in end_phrases:
-            classification = 'end_conversation'
             event_type = 'user_text'
         elif source == 'User':
             classification = 'chat'
@@ -5802,7 +6416,7 @@ class ZenohExecutiveNode:
         return EventPacket(
             event_type=event_type, classification=classification,
             content=text, source=source, raw_sense_data=sense_data,
-            goal_id=goal_id, goal_name=None, close_flag=close_flag,
+            close_flag=close_flag,
         )
 
     def _ooda_orient(self, event: EventPacket) -> OrientedEvent:
@@ -5830,11 +6444,11 @@ class ZenohExecutiveNode:
                 except Exception:
                     pass
 
-                is_goal_command = event.classification in ('goal', 'proceed', 'reuse', 'terminate',
-                    'clear_cache', 'unblock', 'task_cmd', 'direct_action', 'scheduler_cmd')
-                is_proceed_like = event.classification in ('proceed', 'reuse') or (
-                    event.classification == 'scheduler_cmd' and ('proceed' in event.content.lower() or 'reuse' in event.content.lower())
-                ) or (event.classification == 'trigger')
+                # After the command registry refactor, imperative commands no longer
+                # flow through observe/orient. Only sensor triggers remain as
+                # goal-like events here.
+                is_goal_command = False
+                is_proceed_like = event.classification == 'trigger'
 
                 ev = character_evaluator.build_event_dict(
                     event.event_type, content, nsrc,
@@ -5936,7 +6550,12 @@ class ZenohExecutiveNode:
             break
 
     def _ooda_decide(self, oriented: OrientedEvent) -> Action:
-        """DECIDE: Pure routing — map classification to Action. No LLM calls."""
+        """DECIDE: Pure routing — map classification to Action. No LLM calls.
+
+        After the command registry refactor, only these classifications arrive
+        from observe: ask_reply, alert, trigger, agent_message, chat.
+        All imperative operations go through _dispatch_command() instead.
+        """
         evt = oriented.event
         a = oriented.assessment
 
@@ -5954,58 +6573,12 @@ class ZenohExecutiveNode:
             alert_text, sensor_name = self._format_alert_text(evt.raw_sense_data)
             return Action('alert_response', {'alert_text': alert_text, 'sensor_name': sensor_name}, a)
 
-        if evt.classification == 'goal':
-            goal_text = evt.content.strip().strip('"').strip("'")
-            if goal_text.lower().startswith('goal:'):
-                goal_text = goal_text[5:].strip()
-            return Action('dispatch_goal', {'goal_text': goal_text}, a)
-
-        if evt.classification == 'proceed':
-            return Action('proceed_goal', {'goal_id': evt.goal_id, 'source': evt.source}, a)
-
-        if evt.classification == 'reuse':
-            return Action('reuse_goal', {'goal_id': evt.goal_id}, a)
-
-        if evt.classification == 'terminate':
-            return Action('terminate_goal', {'goal_id': evt.goal_id}, a)
-
-        if evt.classification == 'clear_cache':
-            return Action('clear_cache', {'goal_id': evt.goal_id}, a)
-
-        if evt.classification == 'scheduler_cmd':
-            cmd = evt.content.strip().lower()
-            if cmd.startswith('proceed'):
-                return Action('proceed_goal', {'goal_id': evt.goal_id, 'source': 'scheduler'}, a)
-            elif cmd.startswith('reuse'):
-                return Action('reuse_goal', {'goal_id': evt.goal_id}, a)
-            return Action('no_action', {}, a)
-
-        if evt.classification == 'make_it_so':
-            return Action('propose_from_conversation', {
-                'text': evt.content, 'source': evt.source,
-            }, a)
-
-        if evt.classification == 'task_cmd':
-            return Action('task_command', {'text': evt.content}, a)
-
-        if evt.classification == 'direct_action':
-            return Action('direct_action', {'json_text': evt.content.strip()}, a)
-
         if evt.classification == 'chat':
             return Action('chat_response', {'text': evt.content, 'source': evt.source}, a)
 
         if evt.classification == 'agent_message':
             return Action('agent_message', {'text': evt.content, 'source': evt.source,
                           'close_flag': evt.close_flag}, a)
-
-        if evt.classification == 'end_conversation':
-            self.conversation_store.close_dialog("User")
-            logger.info(f'📥 {self.character_name} User ended conversation')
-            return Action('no_action', {}, a)
-
-        if evt.classification == 'unblock':
-            # Unblock is a no-op signal (interrupt already handled by sense_data_callback)
-            return Action('no_action', {}, a)
 
         # Tier 2: consult Orient's assessment for unrouted events
         if a and (a.get('action_evaluation') or {}).get('action_choice', 'no_action') != 'no_action':
@@ -6228,59 +6801,8 @@ class ZenohExecutiveNode:
             self._handle_goal_proceed(goal_id=p['goal_id'], source=p.get('source', 'user'))
             return
 
-        if t == 'reuse_goal':
-            if not p.get('goal_id'):
-                self._say_to_user("Please specify which goal to reuse, e.g. 'reuse goal_1'.")
-                return
-            self._handle_goal_reuse(goal_id=p['goal_id'])
-            return
-
         if t == 'propose_from_conversation':
             self._propose_task_from_conversation(p.get('text', ''), p.get('source', 'User'))
-            return
-
-        if t == 'terminate_goal':
-            if not p.get('goal_id'):
-                self._say_to_user("Please specify which goal to terminate, e.g. 'terminate goal_1'.")
-                return
-            self._handle_goal_terminate(goal_id=p['goal_id'])
-            return
-
-        if t == 'clear_cache':
-            if p.get('goal_id'):
-                self._handle_goal_cache_clear(goal_id=p['goal_id'])
-            else:
-                self._say_to_user("Please specify which goal cache to clear, e.g. 'clear-cache goal_1'.")
-            return
-
-        if t == 'task_command':
-            task_text = p['text']
-            if task_text.lower().startswith('task:'):
-                task_text = task_text[5:].strip()
-            if not task_text or task_text.lower() in ('tasks', 'task list', 'list tasks'):
-                # List tasks — not a creation command
-                self._say_to_user("Task listing not yet implemented via text input.")
-                return
-            if self.active_task_wip:
-                self._say_to_user("A task is already being established. Please wait for it to complete.")
-                return
-            if self._is_goal_running():
-                self._say_to_user("A goal is currently running. Please wait for it to complete.")
-                return
-            self.conversation_store.close_dialog("User")
-            self._begin_task_establishment(task_text)
-            return
-
-        if t == 'direct_action':
-            try:
-                action_dict = json.loads(p['json_text'])
-                if isinstance(action_dict, dict) and 'type' in action_dict:
-                    result = self.infospace_executor.execute_action(action_dict)
-                    self._publish_action_result(action_dict, result, action_dict.get('type'), datetime.now())
-            except json.JSONDecodeError:
-                pass
-            except Exception as e:
-                logger.error(f'Direct action execution failed: {e}')
             return
 
         if t == 'chat_response':
@@ -6289,7 +6811,24 @@ class ZenohExecutiveNode:
             if self.infospace_executor:
                 self.infospace_executor.interrupt_requested = False
             self._create_character_note()
-            self._handle_chat_response(p['text'], p['source'], assessment=action.assessment)
+
+            # Discourse-managed chat: envision the conversational moment,
+            # then run through the planner so the agent can use tools if needed.
+            source = p['source']
+            user_text = p['text']
+            in_conversation = (self.conversation_store.is_dialog_active(source)
+                               and self.conversation_store.get_turn_count(source) > 0)
+            envision = self._envision_conversation_turn(source, user_text, "")
+            goal_text = "Continue dialog with User" if in_conversation else "Respond to User"
+            context = (
+                f"\n## CONTEXT ##\n"
+                f"Their move: {envision['turn_intent']}\n"
+                f"Your move: {envision['my_move']}\n"
+                f"Message from {source}: {user_text[:500]}"
+            )
+            logger.info(f'📥 {self.character_name} Chat via planner: "{goal_text}"')
+            self.parse_and_set_goal("", f"{goal_text}{context}")
+            self.execution_paused = False
             self._publish_execution_state()
             return
 
@@ -6946,27 +7485,7 @@ class ZenohExecutiveNode:
             logger.error(f'Error processing sense data: {e}')
     
     def handle_llm_toggle(self, sample):
-        """Handle LLM Primary/Alt toggle from UI.
-
-        If no goal is running, applies immediately.
-        If a goal is in progress, queues the switch for the next goal boundary.
-        """
-        try:
-            if not hasattr(self, 'character_name'):
-                logger.warning('🔄 LLM toggle received before initialization complete')
-                return
-            # Toggle: if currently primary, switch to alt; if alt, switch to primary
-            new_mode = 'alt' if self.llm_mode == 'primary' else 'primary'
-            if self._is_goal_running():
-                self.llm_switch_pending = new_mode
-                logger.info(f'🔄 {self.character_name} LLM switch to {new_mode} queued (goal in progress)')
-            else:
-                self.llm_switch_pending = new_mode
-                self._apply_pending_llm_switch()
-            self._publish_execution_state()
-        except Exception as e:
-            logger.error(f'Error handling LLM toggle: {e}')
-            traceback.print_exc()
+        self._dispatch_command({'cmd': '/llm'})
 
     def _apply_pending_llm_switch(self):
         """Apply a pending LLM switch. Called at goal boundaries."""
@@ -6989,47 +7508,12 @@ class ZenohExecutiveNode:
         self._publish_execution_state()
     
     def handle_continuous_toggle(self, sample):
-        """Handle continuous mode toggle - can be enabled/disabled at any time."""
         try:
-            payload_bytes = sample.payload.to_bytes()
-            data = json.loads(payload_bytes.decode('utf-8'))
-            enable = data.get('enable', None)
-            
-            # If enable is None, toggle current state
-            if enable is None:
-                enable = not self.continuous_mode
-            
-            if enable:
-                # Enable continuous mode: store current goal text for resubmission
-                # Use current goal if available, otherwise use last completed goal
-                goal_text = None
-                if self.current_goal:
-                    goal_text = self.current_goal.to_string()
-                elif self.last_completed_goal_text:
-                    goal_text = self.last_completed_goal_text
-                    logger.info(f'🔄 {self.character_name} using last completed goal for continuous mode')
-                
-                if goal_text:
-                    self.continuous_mode = True
-                    self.continuous_goal_text = goal_text
-                    logger.info(f'🔄 {self.character_name} continuous mode enabled, goal: {self.continuous_goal_text[:80]}...')
-                    # If we're using last completed goal and execution is paused, resubmit immediately
-                    if not self.current_goal and self.execution_paused:
-                        logger.info(f'🔄 {self.character_name} resubmitting last completed goal immediately')
-                        goal_text_formatted = f"goal: {self.continuous_goal_text}"
-                        self.parse_and_set_goal("", goal_text_formatted)
-                else:
-                    logger.warning(f'⚠️ {self.character_name} continuous toggle ON but no current or last completed goal')
-            else:
-                # Disable continuous mode
-                self.continuous_mode = False
-                self.continuous_goal_text = None
-                logger.info(f'🔄 {self.character_name} continuous mode disabled')
-            
-            self._publish_execution_state()
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            data['cmd'] = '/continuous'
+            self._dispatch_command(data)
         except Exception as e:
             logger.error(f'Error handling continuous toggle: {e}')
-            traceback.print_exc()
     
     def handle_clear_world_model(self, sample):
         """Handle clear world model command - resets persistent world_model.json to empty and saves."""
@@ -7267,44 +7751,11 @@ class ZenohExecutiveNode:
             traceback.print_exc()
     
     def handle_stop_command(self, sample):
-        """Handle stop command - pause execution."""
-        try:
-            logger.info(f'⏹️ Stop command received by {self.character_name}')
-            # Treat stop as an immediate interrupt signal so blocking waits can exit.
-            self.interrupt_requested = True
-            if self.infospace_executor:
-                self.infospace_executor.interrupt_requested = True
-            self.execution_mode = 'step'
-            self.execution_paused = True
-            # Note: continuous_mode is NOT cleared here - user must toggle it off explicitly
-            self.awaiting_user_input = False  # Clear awaiting flag
-            if self.awaiting_ask_response:
-                self.awaiting_ask_response = False
-                self._ask_response_queue.put(None)  # Sentinel to unblock _execute_ask
-            self._publish_execution_state()
-        except Exception as e:
-            logger.error(f'Error handling stop command: {e}')
-            traceback.print_exc()
+        self._dispatch_command({'cmd': '/stop'})
 
     def handle_interrupt_command(self, sample):
-        """Handle interrupt command - request planner interrupt and pause execution."""
-        try:
-            logger.warning(f'🛑 Interrupt command received by {self.character_name}')
-            self.interrupt_requested = True
-            if self.infospace_executor:
-                self.infospace_executor.interrupt_requested = True
-            # Pause execution immediately; planner will notice interrupt at next step boundary
-            self.execution_mode = 'step'
-            self.execution_paused = True
-            # Note: continuous_mode is NOT cleared here - user must toggle it off explicitly
-            self.awaiting_user_input = False
-            if self.awaiting_ask_response:
-                self.awaiting_ask_response = False
-                self._ask_response_queue.put(None)  # Sentinel to unblock _execute_ask
-            self._publish_execution_state()
-        except Exception as e:
-            logger.error(f'Error handling interrupt command: {e}')
-            traceback.print_exc()
+        # Interrupt is the same as stop — merged into /stop
+        self._dispatch_command({'cmd': '/stop'})
     
     def _publish_execution_state(self):
         """Publish current execution state for UI."""
@@ -7957,221 +8408,35 @@ class ZenohExecutiveNode:
             query.reply(query.key_expr, json.dumps({'success': False, 'error': str(e)}).encode('utf-8'))
 
     def _handle_task_approve(self, sample):
-        """Handle task approval from task manager UI."""
-        try:
-            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            note_name = data.get('note_name', '')
-            edited_intention = data.get('intention', '')
-            if note_name:
-                self._approve_proposed_task(note_name, edited_intention)
-        except Exception as e:
-            logger.warning(f'Task approve control error: {e}')
+        self._zenoh_to_command(sample, '/task approve')
 
     def _handle_task_abandon(self, sample):
-        """Handle task abandonment from task manager UI."""
-        try:
-            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            note_name = data.get('note_name', '')
-            reason = data.get('reason', 'abandoned via task manager')
-            if note_name:
-                self._abandon_task(note_name, reason)
-        except Exception as e:
-            logger.warning(f'Task abandon control error: {e}')
+        self._zenoh_to_command(sample, '/task abandon')
 
     def _handle_task_edit(self, sample):
-        """Handle task intention edit from task manager UI."""
-        try:
-            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            note_name = data.get('note_name', '')
-            new_intention = data.get('intention', '')
-            if not note_name or not new_intention:
-                return
-            note_id = self.resource_manager.named_notes.get(note_name) if self.resource_manager else None
-            if not note_id:
-                return
-            res = self.resource_manager.get_resource(note_id)
-            content = json.loads(res.get('properties', {}).get('content', '{}'))
-            content['intention'] = new_intention
-            content['updated'] = datetime.now().isoformat()
-            self.infospace_executor.execute_action({
-                "type": "create-note",
-                "value": json.dumps(content),
-                "name": note_name,
-                "out": f"${note_name}",
-            })
-            self.infospace_executor.execute_action({
-                "type": "persist",
-                "target": f"${note_name}",
-                "name": note_name,
-            })
-            logger.info(f'📋 Task edited: {note_name} — new intention: "{new_intention[:80]}"')
-        except Exception as e:
-            logger.warning(f'Task edit control error: {e}')
+        self._zenoh_to_command(sample, '/task edit')
 
     def _handle_task_cooldown(self, sample):
-        """Handle cooldown update for an operational task."""
-        try:
-            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            note_name = data.get('note_name', '')
-            cooldown = data.get('cooldown_seconds')
-            if not note_name or cooldown is None or not self.resource_manager:
-                return
-            cooldown = int(cooldown)
-            note_id = self.resource_manager.named_notes.get(note_name)
-            if not note_id:
-                return
-            res = self.resource_manager.get_resource(note_id)
-            content = json.loads(res.get('properties', {}).get('content', '{}'))
-            content['cooldown_seconds'] = cooldown
-            content['updated'] = datetime.now().isoformat()
-            self.infospace_executor.execute_action({
-                "type": "create-note",
-                "value": json.dumps(content),
-                "name": note_name,
-                "out": f"${note_name}",
-            })
-            self.infospace_executor.execute_action({
-                "type": "persist",
-                "target": f"${note_name}",
-                "name": note_name,
-            })
-            logger.info(f'📋 Task cooldown updated: {note_name} -> {cooldown}s')
-        except Exception as e:
-            logger.warning(f'Task cooldown control error: {e}')
+        self._zenoh_to_command(sample, '/task cooldown')
 
     def _handle_task_run_now(self, sample):
-        """Handle 'run now' request — make an active task immediately eligible."""
-        try:
-            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            note_name = data.get('note_name', '')
-            if not note_name or not self.resource_manager:
-                return
-            note_id = self.resource_manager.named_notes.get(note_name)
-            if not note_id:
-                return
-            res = self.resource_manager.get_resource(note_id)
-            content = json.loads(res.get('properties', {}).get('content', '{}'))
-            if content.get('status') != 'active' or content.get('lifecycle') != 'operational':
-                logger.warning(f'📋 Run-now rejected: {note_name} is not an active operational task')
-                return
-            if content.get('cycle_state') == 'running':
-                logger.info(f'📋 Run-now: {note_name} already has a cycle running')
-                return
-            # Zero out last_executed so it becomes immediately eligible
-            content['last_executed'] = None
-            content['updated'] = datetime.now().isoformat()
-            self.infospace_executor.execute_action({
-                "type": "create-note",
-                "value": json.dumps(content),
-                "name": note_name,
-                "out": f"${note_name}",
-            })
-            self.infospace_executor.execute_action({
-                "type": "persist",
-                "target": f"${note_name}",
-                "name": note_name,
-            })
-            logger.info(f'📋 Task run-now: {note_name} — cooldown cleared, eligible on next tick')
-        except Exception as e:
-            logger.warning(f'Task run-now control error: {e}')
+        self._zenoh_to_command(sample, '/task run')
 
     def _handle_concern_manage(self, sample):
-        """Handle concern management from Task Manager UI.
-
-        Supports actions: close (user concerns), resolve/abandon (derived),
-        delete (either). Works through the existing patch system for
-        resolve/abandon, or direct removal for delete/close.
-        """
+        """Zenoh shim for concern management from Task Manager UI."""
         try:
             data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            concern_id = data.get('concern_id', '')
-            action = data.get('action', '')  # close, resolve, abandon, delete
-            concern_type = data.get('type', '')  # user, derived
-            if not concern_id or not action:
-                return
-
-            if concern_type == 'user':
-                if action == 'close':
-                    for c in self.user_concern_model.concerns:
-                        if c.get('concern_id') == concern_id:
-                            c['status'] = 'closed'
-                            c['end_disposition'] = 'resolved'
-                            break
-                    self.user_concern_model._save()
-                    logger.info(f'📋 User concern {concern_id} closed via Task Manager')
-                elif action == 'reopen':
-                    for c in self.user_concern_model.concerns:
-                        if c.get('concern_id') == concern_id:
-                            c['status'] = 'open'
-                            break
-                    self.user_concern_model._save()
-                    logger.info(f'📋 User concern {concern_id} reopened via Task Manager')
-                elif action == 'set_weight':
-                    weight = data.get('weight')
-                    if weight is not None:
-                        for c in self.user_concern_model.concerns:
-                            if c.get('concern_id') == concern_id:
-                                c['weight'] = max(0.0, min(1.0, float(weight)))
-                                break
-                        self.user_concern_model._save()
-                        logger.info(f'📋 User concern {concern_id} weight set to {weight}')
-                elif action == 'delete':
-                    self.user_concern_model.concerns = [
-                        c for c in self.user_concern_model.concerns
-                        if c.get('concern_id') != concern_id
-                    ]
-                    self.user_concern_model._save()
-                    logger.info(f'📋 User concern {concern_id} deleted via Task Manager')
-
-            elif concern_type == 'derived':
-                if action in ('resolve', 'satisfy', 'abandon'):
-                    op = 'abandon_concern' if action == 'abandon' else 'satisfy_concern'
-                    patch = {
-                        'op': op,
-                        'concern_id': concern_id,
-                        'field_updates': {'status_rationale': f'{action}d via Task Manager'},
-                    }
-                    if action in ('resolve', 'satisfy'):
-                        revisit = data.get('revisit_hours')
-                        if revisit is not None:
-                            patch['field_updates']['revisit_hours'] = float(revisit)
-                    self._derived_concern_model._apply_patch(patch, f'ui:{action}')
-                    self._derived_concern_model._save()
-                    logger.info(f'📋 Derived concern {concern_id} {action}d via Task Manager')
-                elif action == 'set_revisit':
-                    revisit = data.get('revisit_hours')
-                    if revisit is not None:
-                        for c in self._derived_concern_model.concerns:
-                            if c.get('concern_id') == concern_id:
-                                c['revisit_hours'] = float(revisit)
-                                break
-                        self._derived_concern_model._save()
-                        logger.info(f'📋 Derived concern {concern_id} revisit set to {revisit}h')
-                elif action == 'activate_concern':
-                    patch = {
-                        'op': 'activate_concern',
-                        'concern_id': concern_id,
-                        'field_updates': {'status_rationale': 'Reactivated via Task Manager'},
-                    }
-                    self._derived_concern_model._apply_patch(patch, 'ui:reactivate')
-                    self._derived_concern_model._save()
-                    logger.info(f'📋 Derived concern {concern_id} reactivated via Task Manager')
-                elif action == 'set_weight':
-                    weight = data.get('weight')
-                    if weight is not None:
-                        for c in self._derived_concern_model.concerns:
-                            if c.get('concern_id') == concern_id:
-                                c['weight'] = max(0.0, min(1.0, float(weight)))
-                                break
-                        self._derived_concern_model._save()
-                        logger.info(f'📋 Derived concern {concern_id} weight set to {weight}')
-                elif action == 'delete':
-                    self._derived_concern_model.concerns = [
-                        c for c in self._derived_concern_model.concerns
-                        if c.get('concern_id') != concern_id
-                    ]
-                    self._derived_concern_model._save()
-                    logger.info(f'📋 Derived concern {concern_id} deleted via Task Manager')
+            action = data.get('action', '')
+            # Map task manager action names to /concern commands
+            action_map = {
+                'close': 'close', 'reopen': 'reopen', 'resolve': 'resolve',
+                'satisfy': 'resolve', 'abandon': 'abandon', 'delete': 'delete',
+                'set_weight': 'weight', 'set_revisit': 'revisit',
+                'activate_concern': 'activate',
+            }
+            cmd_action = action_map.get(action, action)
+            data['cmd'] = f'/concern {cmd_action}'
+            self._dispatch_command(data)
         except Exception as e:
             logger.warning(f'Concern manage error: {e}')
 

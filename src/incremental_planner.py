@@ -5052,10 +5052,9 @@ class IncrementalPlanner:
             compressed_trace = _compress_trace(trace_str)
             reflection_frame = self._reflect(goal, world_model, max_steps, compressed_trace)
 
-            # Update world_model from reflection
+            # Update world_model in memory (persisted on /save or shutdown, not per-cycle)
             if hasattr(self.executor, 'world_model') and self.executor.world_model:
                 self.executor.world_model.update(reflection_frame)
-                self.executor.world_model.save()
                 world_model = self.executor.world_model.get()
             else:
                 logger.warning("WorldModel not available, skipping update")
