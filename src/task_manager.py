@@ -227,6 +227,12 @@ class TaskManager:
             self._zenoh_put(f"cognitive/{character}/control/task_run_now", data)
             return {'success': True}
 
+        @self.app.post("/api/cooldown/{character}")
+        def set_cooldown(character: str, data: dict = Body(...)):
+            character = character.strip().capitalize()
+            self._zenoh_put(f"cognitive/{character}/control/task_cooldown", data)
+            return {'success': True}
+
         @self.app.post("/api/concern/{character}")
         def manage_concern(character: str, data: dict = Body(...)):
             """Manage a concern: close, resolve, abandon, or delete."""
@@ -781,7 +787,7 @@ function renderActiveTask(t) {
             State: <span style="color:${stateColor}">${cycleState}</span>
             &nbsp;|&nbsp; Executions: <span>${t.execution_count || 0}</span>
             &nbsp;|&nbsp; Next: <span>${nextEligible}</span>
-            &nbsp;|&nbsp; Cooldown: <span>${Math.round(cooldown/60)}m</span>
+            &nbsp;|&nbsp; Interval: ${cooldownSelect(noteName, cooldown)}
         </div>
         ${cycleState === 'running' && cycleGoals.length ? `<div style="margin-top:6px;font-size:11px;color:#888">
             <div style="color:#6db1db;margin-bottom:2px">Cycle in progress (${cycleGoals.length} goals):</div>
@@ -926,6 +932,24 @@ async function runNowTask(noteName) {
         body: JSON.stringify({note_name: noteName}),
     });
     setTimeout(refresh, 500);
+}
+
+function cooldownSelect(noteName, current) {
+    const opts = [[3600,'1h'],[7200,'2h'],[14400,'4h'],[28800,'8h'],[86400,'1d'],[604800,'7d']];
+    const name = esc(noteName);
+    let html = '<select data-task="' + name + '" onchange="setCooldown(this)" style="background:#333;color:#ccc;border:1px solid #555;font-size:11px;padding:1px 3px;">';
+    opts.forEach(([v,l]) => { html += '<option value="' + v + '"' + (v===current?' selected':'') + '>' + l + '</option>'; });
+    html += '</select>';
+    return html;
+}
+
+async function setCooldown(selectEl) {
+    const noteName = selectEl.getAttribute('data-task');
+    await fetch('/api/cooldown/' + char(), {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({note_name: noteName, cooldown_seconds: parseInt(selectEl.value)}),
+    });
 }
 
 async function manageConcern(concernId, type, action, revisitHours, weight) {

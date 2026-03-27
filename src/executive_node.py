@@ -385,6 +385,9 @@ class ZenohExecutiveNode:
             console_handler.setLevel(logging.INFO)
             logger.info(f'🔧 Debug mode enabled for {self.character_name}')
         
+        # Shutdown flag — must be early since Zenoh callbacks can fire before run()
+        self.shutdown_requested = False
+
         # Manual control flags
         self.manual = bool(self.character_config.get('manual', False))
         self.manual_response = bool(self.character_config.get('manual_response', False))
@@ -1246,6 +1249,10 @@ class ZenohExecutiveNode:
             f"cognitive/{character_name}/control/task_edit",
             self._handle_task_edit
         )
+        self.control_task_cooldown_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/task_cooldown",
+            self._handle_task_cooldown
+        )
         self.control_task_run_now_subscriber = self.session.declare_subscriber(
             f"cognitive/{character_name}/control/task_run_now",
             self._handle_task_run_now
@@ -1750,9 +1757,14 @@ class ZenohExecutiveNode:
 
     def _handle_triage_decisions(self, decisions):
         """Process triage decisions: create proposed tasks, attach to existing, etc."""
+        # TEMPORARY: concern-initiated task creation disabled while task system is under development
+        _CONCERN_TASK_CREATION_ENABLED = False
         from concern_triage import TriageDecision
         for d in decisions:
             if d.action == 'create_task':
+                if not _CONCERN_TASK_CREATION_ENABLED:
+                    logger.info(f'📋 Skipping concern-initiated task creation (disabled): {d.task_intention[:80]}')
+                    continue
                 self._create_proposed_task(d.concern_id, d.task_intention, d.reason)
             elif d.action == 'attach_to_task':
                 self._attach_concern_to_task(d.concern_id, d.existing_task_id)
@@ -7995,6 +8007,37 @@ class ZenohExecutiveNode:
             logger.info(f'📋 Task edited: {note_name} — new intention: "{new_intention[:80]}"')
         except Exception as e:
             logger.warning(f'Task edit control error: {e}')
+
+    def _handle_task_cooldown(self, sample):
+        """Handle cooldown update for an operational task."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            note_name = data.get('note_name', '')
+            cooldown = data.get('cooldown_seconds')
+            if not note_name or cooldown is None or not self.resource_manager:
+                return
+            cooldown = int(cooldown)
+            note_id = self.resource_manager.named_notes.get(note_name)
+            if not note_id:
+                return
+            res = self.resource_manager.get_resource(note_id)
+            content = json.loads(res.get('properties', {}).get('content', '{}'))
+            content['cooldown_seconds'] = cooldown
+            content['updated'] = datetime.now().isoformat()
+            self.infospace_executor.execute_action({
+                "type": "create-note",
+                "value": json.dumps(content),
+                "name": note_name,
+                "out": f"${note_name}",
+            })
+            self.infospace_executor.execute_action({
+                "type": "persist",
+                "target": f"${note_name}",
+                "name": note_name,
+            })
+            logger.info(f'📋 Task cooldown updated: {note_name} -> {cooldown}s')
+        except Exception as e:
+            logger.warning(f'Task cooldown control error: {e}')
 
     def _handle_task_run_now(self, sample):
         """Handle 'run now' request — make an active task immediately eligible."""

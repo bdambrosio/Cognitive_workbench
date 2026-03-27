@@ -1493,6 +1493,17 @@ Generated: {generated_at}
                 logger.error(f"Error in task_run_now: {e}")
                 return {"success": False, "message": str(e)}
 
+        @self.app.post("/api/task_cooldown/{character}")
+        async def task_cooldown(character: str, data: dict = Body(...)):
+            """Update cooldown for an operational task."""
+            try:
+                payload = json.dumps(data).encode()
+                self.session.put(f"cognitive/{character}/control/task_cooldown", payload)
+                return {"success": True}
+            except Exception as e:
+                logger.error(f"Error in task_cooldown: {e}")
+                return {"success": False, "message": str(e)}
+
         @self.app.post("/api/task_approve/{character}")
         async def task_approve(character: str, data: dict = Body(...)):
             """Approve a proposed task."""
@@ -2640,7 +2651,6 @@ Generated: {generated_at}
                 <div class="character-data-tabs" id="characterDataTabs">
                     <div class="character-data-tab active" data-tab="plan">Plan</div>
                     <div class="character-data-tab" data-tab="bindings">Bindings</div>
-                    <div class="character-data-tab" data-tab="goals">Goals</div>
                     <div class="character-data-tab" data-tab="state">OODA</div>
                     <div class="character-data-tab" data-tab="tasks">Schedule</div>
                     <div class="character-data-tab" data-tab="taskwips">Tasks</div>
@@ -2662,15 +2672,6 @@ Generated: {generated_at}
                         <div id="bindingsList">
                             <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
                                 No bindings available.
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Goals tab content -->
-                    <div class="character-data-panel" id="goalsPanel">
-                        <div id="goalsList">
-                            <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
-                                Loading test goals...
                             </div>
                         </div>
                     </div>
@@ -3160,10 +3161,6 @@ Generated: {generated_at}
                 // Load bindings list
                 const character = activeCharacter || 'Jill';
                 loadBindingsList(character);
-            } else if (tabName === 'goals') {
-                document.getElementById('goalsPanel').classList.add('active');
-                // Load test goals list
-                loadGoalsList();
             } else if (tabName === 'state') {
                 document.getElementById('statePanel').classList.add('active');
                 // Load OODA feed
@@ -4883,6 +4880,20 @@ Generated: {generated_at}
                     html += `<div style="color:#888;">Created: <span style="color:#ccc;">${created}</span></div>`;
                     html += `<div style="color:#888;">ID: <span style="color:#ccc;">${t.task_wip_id || '?'}</span></div>`;
 
+                    // Cooldown selector for operational tasks
+                    if (t.lifecycle === 'operational') {
+                        const cd = t.cooldown_seconds || 3600;
+                        const opts = [
+                            [3600,'1h'],[7200,'2h'],[14400,'4h'],[28800,'8h'],
+                            [86400,'1d'],[604800,'7d']
+                        ];
+                        const selId = 'cd_' + noteName;
+                        let sel = '<select id="' + selId + '" data-task="' + noteName + '" onchange="setTaskCooldown(this)" style="background:#333;color:#ccc;border:1px solid #555;font-size:10px;padding:1px 2px;">';
+                        opts.forEach(([v,l]) => { sel += '<option value="' + v + '"' + (v===cd?' selected':'') + '>' + l + '</option>'; });
+                        sel += '</select>';
+                        html += '<div style="color:#888;">Interval: ' + sel + '</div>';
+                    }
+
                     // Milestones
                     if (milestones.length > 0) {
                         html += `<div style="margin-top:4px; color:#888;">Milestones:</div>`;
@@ -4966,6 +4977,19 @@ Generated: {generated_at}
                 showNotification('Task resumed — continuing establishment', 'info');
                 setTimeout(() => loadTaskWipsList(character), 1000);
             } catch (e) { console.error('Resume task failed:', e); }
+        }
+
+        async function setTaskCooldown(selectEl) {
+            const noteName = selectEl.getAttribute('data-task');
+            const value = selectEl.value;
+            const character = activeCharacter || 'Jill';
+            try {
+                await fetch(`/api/task_cooldown/${character}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({note_name: noteName, cooldown_seconds: parseInt(value)})
+                });
+            } catch (e) { console.error('Set cooldown failed:', e); }
         }
 
         function viewTaskScheduledGoal(goalId) {
