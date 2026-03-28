@@ -585,8 +585,11 @@ _COMMAND_VOCABULARY = """\
 /note <id>                      Show note content"""
 
 
-def _handle_interpret(session, character: str, text: str):
-    """Use LLM to interpret free-form text as /commands or chat."""
+def _interpret_text(session, character: str, text: str) -> Optional[Dict]:
+    """Use LLM to interpret free-form text as /commands or chat.
+
+    Returns the parsed interpretation dict, or None on failure.
+    """
 
     # Gather current state for context
     goals_data = _zenoh_get(session, f"cognitive/{character}/concerns")  # for concern IDs
@@ -697,7 +700,7 @@ JSON response:"""
 
         if not result or not result.get('success'):
             _print_error(f"LLM call failed: {result.get('error', 'no response') if result else 'timeout'}")
-            return
+            return None
 
         llm_text = result.get('text', '')
         # LLM may return pre-parsed dict (when is_json=True) or raw string
@@ -712,39 +715,56 @@ JSON response:"""
                 interpretation = json.loads(llm_text)
             except json.JSONDecodeError:
                 _print_error(f"LLM returned invalid JSON: {llm_text[:200]}")
-            return
+                return None
 
-        interp_type = interpretation.get('interpretation', 'unknown')
-
-        if interp_type == 'chat':
-            orig = interpretation.get('text', text)
-            _print_info(f"  → {C.CYAN}chat{C.RESET}: \"{orig}\"")
-        elif interp_type == 'command':
-            commands = interpretation.get('commands', [])
-            if not commands:
-                _print_info(f"  → {C.CYAN}chat{C.RESET} (no commands extracted)")
-                return
-            _print_info(f"  → {C.GREEN}{len(commands)} command(s):{C.RESET}")
-            for cmd_data in commands:
-                cmd = cmd_data.get('cmd', '?')
-                # Format args
-                args_parts = []
-                for k, v in cmd_data.items():
-                    if k != 'cmd':
-                        args_parts.append(f"{k}={v}")
-                args_str = ' '.join(args_parts)
-                print(f"    {C.BOLD}{cmd}{C.RESET} {args_str}")
-        else:
-            _print_info(f"  → {C.YELLOW}unknown interpretation{C.RESET}: {llm_text[:200]}")
+        return interpretation
 
     except Exception as e:
         _print_error(f"Interpret failed: {e}")
+        return None
+
+
+def _format_commands(commands: List[Dict]) -> str:
+    """Format a list of interpreted commands for display."""
+    parts = []
+    for cmd_data in commands:
+        cmd = cmd_data.get('cmd', '?')
+        args_parts = []
+        for k, v in cmd_data.items():
+            if k != 'cmd':
+                args_parts.append(f"{k}={v}")
+        args_str = ' '.join(args_parts)
+        parts.append(f"  {C.BOLD}{cmd}{C.RESET} {args_str}")
+    return '\n'.join(parts)
+
+
+def _handle_interpret(session, character: str, text: str):
+    """Use LLM to interpret free-form text and display results (for /interpret command)."""
+    interpretation = _interpret_text(session, character, text)
+    if interpretation is None:
+        return
+
+    interp_type = interpretation.get('interpretation', 'unknown')
+
+    if interp_type == 'chat':
+        orig = interpretation.get('text', text)
+        _print_info(f"  → {C.CYAN}chat{C.RESET}: \"{orig}\"")
+    elif interp_type == 'command':
+        commands = interpretation.get('commands', [])
+        if not commands:
+            _print_info(f"  → {C.CYAN}chat{C.RESET} (no commands extracted)")
+            return
+        _print_info(f"  → {C.GREEN}{len(commands)} command(s):{C.RESET}")
+        print(_format_commands(commands))
+    else:
+        _print_info(f"  → {C.YELLOW}unknown interpretation{C.RESET}")
 
 
 def _print_help():
     print(f"""{C.BOLD}Cognitive Workbench CLI{C.RESET}
 
-{C.BOLD}Chat:{C.RESET}  Type anything without / to send to the agent.
+{C.BOLD}Input:{C.RESET}  Type naturally — input is interpreted as commands or chat automatically.
+        Commands are shown for confirmation (Enter to run, anything else to cancel).
 
 {C.BOLD}Tasks:{C.RESET}
   /tasks                         List all tasks
@@ -811,7 +831,10 @@ def _print_help():
   /help                          Show this help
 
 {C.BOLD}Experimental:{C.RESET}
-  /interpret <text>              LLM-parse text into /commands (does not execute)""")
+  /interpret <text>              LLM-parse text into /commands (display only, no execute)
+
+{C.BOLD}Note:{C.RESET} Plain text is auto-interpreted. If commands are detected, confirm with
+Enter to execute or type anything to cancel. Chat is sent directly to the agent.""")
 
 
 # ---------------------------------------------------------------------------
@@ -857,6 +880,7 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
         'verbose': False,
         'agent_state': {},
         'active_character': active_character,
+        'awaiting_ask': False,  # True while agent is blocking on an ask
     }
     state_lock = threading.Lock()
 
@@ -884,6 +908,18 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
                     _print_agent(character, text)
                 return
 
+            if action_type == 'ask':
+                text = data.get('text', '')
+                if text:
+                    with state_lock:
+                        state['awaiting_ask'] = True
+                    print(f"\n{C.YELLOW}{C.BOLD}{character} asks:{C.RESET} {C.DIM}[{_ts()}]{C.RESET}")
+                    for line in text.split('\n'):
+                        print(f"  {line}")
+                    print(f"  {C.DIM}(type your reply and press Enter){C.RESET}")
+                    print()
+                return
+
             with state_lock:
                 if state.get('verbose'):
                     text = data.get('text', data.get('llm_response', ''))
@@ -899,11 +935,17 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
         try:
             data = json.loads(sample.payload.to_bytes().decode('utf-8'))
             with state_lock:
-                prev_goal = state['agent_state'].get('goal_scheduler', {}).get('executing_goal_id')
+                prev = state['agent_state']
+                prev_goal = prev.get('goal_scheduler', {}).get('executing_goal_id')
+                prev_dialog = prev.get('active_dialog', False)
                 state['agent_state'].update(data)
                 curr_goal = (data.get('goal_scheduler') or {}).get('executing_goal_id')
+                curr_dialog = data.get('active_dialog', False)
                 # Detect goal completion: was running, now not
                 if prev_goal and not curr_goal:
+                    _print_system(f"[{_ts()}] Ready.")
+                # Detect dialog completion: was in dialog, now not
+                elif prev_dialog and not curr_dialog and not curr_goal:
                     _print_system(f"[{_ts()}] Ready.")
         except Exception:
             pass
@@ -1080,18 +1122,78 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
                     _print_system("Shutdown requested.")
                 continue
 
-            # Chat message — send as sense_data
-            sense_data = {
-                'timestamp': datetime.now().isoformat(),
-                'sequence_id': 0,
-                'mode': 'text',
-                'content': json.dumps({
-                    'source': 'User',
-                    'text': line
-                })
-            }
-            sense_publisher.put(json.dumps(sense_data))
-            _print_info(f"→ sent to {active_character}")
+            # If agent is waiting for an ask response, send directly — no interpret
+            with state_lock:
+                is_ask_reply = state.get('awaiting_ask')
+            if is_ask_reply:
+                with state_lock:
+                    state['awaiting_ask'] = False
+                sense_data = {
+                    'timestamp': datetime.now().isoformat(),
+                    'sequence_id': 0,
+                    'mode': 'text',
+                    'content': json.dumps({
+                        'source': 'User',
+                        'text': line
+                    })
+                }
+                sense_publisher.put(json.dumps(sense_data))
+                _print_info(f"→ reply sent to {active_character}")
+                continue
+
+            # Plain text — interpret via LLM, then act on result
+            interpretation = _interpret_text(zenoh_session, active_character, line)
+
+            send_as_chat = True  # default: send as chat
+
+            if interpretation:
+                interp_type = interpretation.get('interpretation', 'unknown')
+
+                if interp_type == 'command':
+                    commands = interpretation.get('commands', [])
+                    if commands:
+                        # Show the interpreted commands and prompt for confirmation
+                        _print_info(f"  → {C.GREEN}{len(commands)} command(s):{C.RESET}")
+                        print(_format_commands(commands))
+                        try:
+                            confirm = session.prompt(HTML('<aaa fg="ansiyellow">?</aaa> '))
+                        except (EOFError, KeyboardInterrupt):
+                            confirm = 'n'
+                        if confirm.strip() == '':
+                            # Execute the commands
+                            send_as_chat = False
+                            for cmd_data in commands:
+                                cmd_str = cmd_data.get('cmd', '')
+                                # Build the command line from the interpretation
+                                args_parts = []
+                                for k, v in cmd_data.items():
+                                    if k != 'cmd':
+                                        args_parts.append(str(v))
+                                full_cmd = cmd_str + (' ' + ' '.join(args_parts) if args_parts else '')
+                                # Parse and dispatch through normal command path
+                                parsed = _parse_command(full_cmd)
+                                if parsed:
+                                    parsed['source'] = 'User'
+                                    command_publisher.put(json.dumps(parsed))
+                                    _print_info(f"→ {parsed['cmd']}")
+                        else:
+                            # User typed something — discard interpretation, await new input
+                            send_as_chat = False
+                elif interp_type == 'chat':
+                    _print_info(f"  → {C.CYAN}chat{C.RESET}")
+
+            if send_as_chat:
+                sense_data = {
+                    'timestamp': datetime.now().isoformat(),
+                    'sequence_id': 0,
+                    'mode': 'text',
+                    'content': json.dumps({
+                        'source': 'User',
+                        'text': line
+                    })
+                }
+                sense_publisher.put(json.dumps(sense_data))
+                _print_info(f"→ sent to {active_character}")
 
     except KeyboardInterrupt:
         pass
