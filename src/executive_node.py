@@ -3310,12 +3310,15 @@ class ZenohExecutiveNode:
                 result = {"success": False, "error": str(e)}
             self._set_scheduled_goal_result(goal_id, result, used_cache=False, pre_resource_ids=pre_resource_ids)
             if notify_user:
-                status = "completed" if result.get("success") else "failed"
-                pp = (result.get("primary_product") if isinstance(result, dict) else "") or ""
-                if pp:
-                    self._say_to_user(f"Goal '{goal_name}' {status}. → {pp}")
-                else:
-                    self._say_to_user(f"Goal '{goal_name}' {status}.")
+                # Only say completion if the plan didn't already publish a say
+                already_said = (getattr(self, 'last_say_text', '') or '').strip()
+                if not already_said:
+                    status = "completed" if result.get("success") else "failed"
+                    pp = (result.get("primary_product") if isinstance(result, dict) else "") or ""
+                    if pp:
+                        self._say_to_user(f"Goal '{goal_name}' {status}. → {pp}")
+                    else:
+                        self._say_to_user(f"Goal '{goal_name}' {status}.")
             return result
 
         self._run_goal_on_thread(_run)
