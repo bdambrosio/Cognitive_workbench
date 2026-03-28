@@ -25,19 +25,23 @@ if TYPE_CHECKING:
     from executive_node import ZenohExecutiveNode
 
 # Configure logging with unbuffered output
-# Console handler with WARNING level (less verbose)
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO)
+_cli_mode = os.getenv('CWB_CLI_MODE', '') == '1'
 
 # File handler with INFO level (full logging)
 file_handler = logging.FileHandler('logs/discourse.log', mode='w')
 file_handler.setLevel(logging.INFO)
 
+_handlers = [file_handler]
+if not _cli_mode:
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.WARNING)
+    _handlers.insert(0, console_handler)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
-    handlers=[console_handler, file_handler],
+    handlers=_handlers,
     force=True
 )
 logger = logging.getLogger('discourse')

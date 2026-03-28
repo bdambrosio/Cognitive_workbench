@@ -257,15 +257,16 @@ class UserConcernModel:
             f"## Completed interaction\n{interaction_text}\n\n"
             f"## Schemas\n{ADD_CONCERN_SCHEMA}\n{UPDATE_CONCERN_SCHEMA}\n"
             f"{CLOSE_CONCERN_SCHEMA}\n{NO_CHANGE_SCHEMA}\n\n"
-            f"Analyze the interaction and emit one JSON patch."
+            f"Analyze the interaction and emit one JSON patch.\n</end>"
         )
 
         try:
             result = self.llm_generate(
                 messages=[PATCH_SYSTEM_PROMPT, user_prompt],
-                max_tokens=3000,
+                max_tokens=3512,
                 temperature=0.3,
                 is_json=True,
+                stops=['</end>'],
             )
             if not result.success or not result.text:
                 logger.warning(f'Concern model LLM call failed: {getattr(result, "error", "unknown")}')

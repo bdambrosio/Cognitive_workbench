@@ -29,24 +29,25 @@ import os
 
 # Set up logging
 logger = logging.getLogger(__name__)
-console_handler = logging.StreamHandler()
+_cli_mode = str(os.getenv('CWB_CLI_MODE', '')).lower() == '1'
+
 file_handler = logging.FileHandler('logs/fastapi_action_display.log')
-console_handler.setLevel(logging.WARNING)
 file_handler.setLevel(logging.DEBUG)
 
-# Raise console verbosity when CWB_DEBUG is set
-_debug_env = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on')
-if _debug_env:
-    console_handler.setLevel(logging.INFO)
-
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-console_handler.setFormatter(formatter)
 file_handler.setFormatter(formatter)
+
+_handlers = [file_handler]
+if not _cli_mode:
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.WARNING)
+    console_handler.setFormatter(formatter)
+    _handlers.insert(0, console_handler)
 
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[console_handler, file_handler],
+    handlers=_handlers,
     force=True
 )
 
@@ -341,22 +342,10 @@ class FastAPIActionDisplayNode:
         # Setup FastAPI routes
         self._setup_routes()
 
-        # Mount static files for the activation-field UI (must come after routes)
+        # Mount static files (favicon, etc.) - must come after routes
         static_dir = Path("static")
         if static_dir.exists():
             self.app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-
-        # Disable caching for UI development: force browsers to always fetch fresh JS/CSS
-        from starlette.middleware.base import BaseHTTPMiddleware
-        class NoCacheUIMiddleware(BaseHTTPMiddleware):
-            async def dispatch(self, request, call_next):
-                response = await call_next(request)
-                if request.url.path.startswith('/static/ui/'):
-                    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-                    response.headers['Pragma'] = 'no-cache'
-                    response.headers['Expires'] = '0'
-                return response
-        self.app.add_middleware(NoCacheUIMiddleware)
 
         print(f'🖥️  FastAPI Action Display Node initialized on port {port}')
         print('   - Subscribing to: cognitive/*/action (all characters)')
@@ -537,15 +526,7 @@ class FastAPIActionDisplayNode:
         
         @self.app.get("/", response_class=HTMLResponse)
         async def get_main_page():
-            """Serve the new activation-field UI if available, else fall back to classic."""
-            ui_path = Path("static/ui/index.html")
-            if ui_path.exists():
-                return HTMLResponse(content=ui_path.read_text())
-            return self._get_html_template()
-
-        @self.app.get("/classic", response_class=HTMLResponse)
-        async def get_classic_page():
-            """Serve the original panel-based UI."""
+            """Serve the classic panel-based UI."""
             return self._get_html_template()
         
         @self.app.websocket("/ws")

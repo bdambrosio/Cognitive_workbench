@@ -28,9 +28,18 @@ from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
+_console_handler = logging.StreamHandler()
+_console_handler.setLevel(logging.WARNING)
+_file_handler = logging.FileHandler('logs/task_manager.log', mode='w')
+_file_handler.setLevel(logging.INFO)
+_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+_console_handler.setFormatter(_formatter)
+_file_handler.setFormatter(_formatter)
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[_console_handler, _file_handler],
+    force=True
 )
 logger = logging.getLogger(__name__)
 

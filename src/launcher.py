@@ -28,7 +28,7 @@ from typing import Dict, List, Any, Optional
 _debug_env = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on')
 
 console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO if _debug_env else logging.WARNING)
+console_handler.setLevel(logging.WARNING)
 
 file_handler = logging.FileHandler('logs/character_launcher.log', mode='w')
 file_handler.setLevel(logging.INFO)
@@ -164,6 +164,11 @@ def create_sglang_runtime(llm_config: dict):
         return None, None
 
     try:
+        # Temporarily ignore SIGINT so SGLang child processes (scheduler,
+        # detokenizer) inherit SIG_IGN and don't crash on Ctrl+C.
+        # The launcher's own signal handler (installed later) handles shutdown.
+        prev_sigint = signal.signal(signal.SIGINT, signal.SIG_IGN)
+
         logger.info(f"Initializing SGLang Runtime with model: {sgl_model_path}")
         tokenizer = AutoTokenizer.from_pretrained(sgl_model_path)
 
@@ -207,15 +212,18 @@ def create_sglang_runtime(llm_config: dict):
                           dtype="auto", tp_size=1, mem_fraction_static=0.85, attention_backend="triton", fp8_gemm_runner_backend="cutlass")
         else:
             if chat_template:
-                runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, dtype="auto", tp_size=1, mem_fraction_static=0.9, attention_backend="flashinfer", chat_template=chat_template)
+                runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, dtype="auto", tp_size=1, mem_fraction_static=0.9, attention_backend="triton", chat_template=chat_template)
             else:
                 runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, dtype="auto", tp_size=1, mem_fraction_static=0.9, attention_backend="triton")
 
         sgl.set_default_backend(runtime)
         logger.info(f"SGLang Runtime initialized (model={sgl_model_path})" + (f", chat_template={chat_template}" if chat_template else ""))
+        # Restore SIGINT handler now that child processes have been spawned
+        signal.signal(signal.SIGINT, prev_sigint)
         return runtime, tokenizer
     except Exception as e:
         logger.error(f"Failed to initialize SGLang Runtime: {e}")
+        signal.signal(signal.SIGINT, prev_sigint)
         return None, None
 
 
@@ -315,6 +323,7 @@ def main():
     parser.add_argument('--ui-port', type=int, default=3000, help='Port for web UI (default: 3000)')
     parser.add_argument('--resource-browser', action='store_true', help='Launch Resource Browser (port 3001)')
     parser.add_argument('--task-manager', action='store_true', help='Launch Task & Concern Manager (port 3002)')
+    parser.add_argument('--cli', action='store_true', help='Launch interactive CLI chat interface')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     args = parser.parse_args()
 
@@ -459,6 +468,10 @@ def main():
                 })
             _config['_sensor_configs'] = sensor_summaries
 
+    # ---- Set CLI mode env var before agent threads import their logging configs ----
+    if args.cli:
+        os.environ['CWB_CLI_MODE'] = '1'
+
     # ---- Launch agent threads ----
     shutdown_event = threading.Event()
     threads: List[threading.Thread] = []
@@ -534,9 +547,16 @@ def main():
         logger.info(f"Started {len(sensor_threads)} sensor threads")
 
     # ---- Wait for shutdown ----
+    _interrupt_count = [0]
+
     def _signal_handler(signum, frame):
+        _interrupt_count[0] += 1
         logger.info(f"Received signal {signum}, shutting down...")
         shutdown_event.set()
+        if _interrupt_count[0] >= 2:
+            # Second interrupt — force exit immediately
+            print("\nForce exit.")
+            os._exit(1)
 
     signal.signal(signal.SIGTERM, _signal_handler)
     signal.signal(signal.SIGINT, _signal_handler)
@@ -549,16 +569,37 @@ def main():
             shutdown_event.set()
         launcher_shutdown_sub = zenoh_session.declare_subscriber("cognitive/launcher/shutdown", _zenoh_shutdown)
 
-    try:
-        # Block until shutdown requested
-        while not shutdown_event.is_set():
-            # Check if all agent threads have exited on their own
-            if all(not t.is_alive() for t in threads):
-                logger.info("All agent threads have exited")
-                break
-            time.sleep(1)
-    except KeyboardInterrupt:
-        shutdown_event.set()
+    if args.cli:
+        # Suppress ALL console logging so only CLI output reaches the terminal.
+        # File handlers continue logging at INFO+.
+        root = logging.getLogger()
+        for h in root.handlers[:]:
+            if isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler):
+                root.removeHandler(h)
+        # Also suppress console handlers on any named loggers already created
+        for name in list(logging.Logger.manager.loggerDict):
+            lg = logging.getLogger(name)
+            for h in lg.handlers[:]:
+                if isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler):
+                    lg.removeHandler(h)
+
+        from cli import run_cli
+        character_names = [n for n, _ in characters]
+        try:
+            run_cli(zenoh_session, character_names, shutdown_event)
+        except KeyboardInterrupt:
+            shutdown_event.set()
+    else:
+        try:
+            # Block until shutdown requested
+            while not shutdown_event.is_set():
+                # Check if all agent threads have exited on their own
+                if all(not t.is_alive() for t in threads):
+                    logger.info("All agent threads have exited")
+                    break
+                time.sleep(1)
+        except KeyboardInterrupt:
+            shutdown_event.set()
 
     # ---- Graceful shutdown ----
     logger.info("Shutting down...")

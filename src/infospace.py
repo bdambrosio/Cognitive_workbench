@@ -12,7 +12,7 @@ from enum import Enum
 from infospace_types import InfospaceResources, InfospaceTerrain, ResourceTypeRegistry
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 

@@ -4,7 +4,7 @@ world_config:
   world_name: "infolab"
 
 llm_config:
-  sgl_model_path: "Qwen/Qwen3.5-27B"#"unsloth/Qwen3-Coder-Next-FP8"#"txn545/Qwen3.5-122B-A10B-NVFP4"#"unsloth/Qwen3-Coder-Next-FP8"#"Qwen/Qwen3.5-27B"  
+  sgl_model_path: "unsloth/Qwen3-Coder-Next-FP8"#"Qwen/Qwen3.5-27B"#"txn545/Qwen3.5-122B-A10B-NVFP4"#"unsloth/Qwen3-Coder-Next-FP8"#"Qwen/Qwen3.5-27B"  
   chat_template: "/home/bruce/sglang/qwen3_nonthinking.jinja"  
   grobid: "http://localhost:8070/"
 
