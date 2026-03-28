@@ -393,15 +393,16 @@ class DerivedConcernModel:
             f"## Trigger context\n{interaction_text}\n\n"
             f"## Schemas\n{SURFACE_CONCERN_SCHEMA}\n{ACTIVATE_CONCERN_SCHEMA}\n"
             f"{SATISFY_CONCERN_SCHEMA}\n{ABANDON_CONCERN_SCHEMA}\n{NO_CHANGE_SCHEMA}\n\n"
-            f"Analyze the context and emit one JSON patch."
+            f"Analyze the context and emit one JSON patch.\n</end>"
         )
 
         try:
             result = self.llm_generate(
                 messages=[PATCH_SYSTEM_PROMPT, user_prompt],
-                max_tokens=1000,
+                max_tokens=1512,
                 temperature=0.3,
                 is_json=True,
+                stops=['</end>'],
             )
             if not result.success or not result.text:
                 logger.warning(f'Derived concern LLM call failed: {getattr(result, "error", "unknown")}')
@@ -409,6 +410,11 @@ class DerivedConcernModel:
 
             patch = self._parse_patch(result.text)
             if not patch:
+                return
+
+            # Skip save for no-op patches
+            if patch['op'] == 'no_change':
+                self._apply_patch(patch, evidence_ref)
                 return
 
             self._apply_patch(patch, evidence_ref)

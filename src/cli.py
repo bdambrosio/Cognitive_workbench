@@ -319,6 +319,13 @@ def _parse_command(line: str) -> Optional[dict]:
         # /note <id> as shorthand for /note show <id>
         return {'cmd': '_query', 'query': 'note_show', 'resource_id': args[0]}
 
+    # -- Interpret (experimental LLM command parsing) --
+    if cmd == 'interpret':
+        if not args:
+            _print_error("Usage: /interpret <text to interpret>")
+            return None
+        return {'cmd': '_interpret', 'text': ' '.join(args)}
+
     # -- Read-only queries (handled locally, not sent to command channel) --
     if cmd == 'tasks':
         return {'cmd': '_query', 'query': 'tasks'}
@@ -537,6 +544,201 @@ def _handle_query(session, character: str, data: dict, state: dict):
         _print_help()
 
 
+# ---------------------------------------------------------------------------
+# /interpret — experimental LLM command parsing
+# ---------------------------------------------------------------------------
+
+# Command vocabulary for the LLM prompt (static — matches the registry)
+_COMMAND_VOCABULARY = """\
+/goal add <goal_text>          Create and run a new goal
+/goal run <goal_id>            Execute an existing goal
+/goal terminate <goal_id>      Stop a running goal
+/goal rename <goal_id> <name>  Rename a goal
+/goal edit <goal_id> <text>    Update goal text
+/goal remove <goal_id>         Delete a goal
+/goal mode <goal_id> <mode>    Set schedule: manual|auto|recurring|daily
+/goal cache clear <goal_id>    Clear cached plan
+/task add <intention>           Create a new task
+/task propose                   Propose task from conversation context
+/task approve <note_name>       Approve a proposed task
+/task edit <note_name> <text>   Edit task intention
+/task abandon <note_name>       Abandon a task
+/task delete <note_name>        Delete task
+/task interrupt <note_name>     Pause active task
+/task run <note_name>           Run task now (clear cooldown)
+/task cooldown <name> <secs>    Set cooldown seconds
+/concern close <id>             Close a user concern
+/concern reopen <id>            Reopen a user concern
+/concern resolve <id>           Satisfy a derived concern
+/concern delete <id>            Delete a concern
+/concern activate <id>          Reactivate a derived concern
+/stop                           Halt current execution
+/continuous                     Toggle continuous mode
+/llm                            Toggle LLM (primary/alt)
+/delay <seconds>                Set turn delay
+/scheduler on|off               Enable/disable goal scheduler
+/scheduler interval <secs>      Set scheduler check interval
+/clear <target>                 Clear: world-model|map|transients|persistents
+/save                           Save all data
+/shutdown                       Save and shutdown
+/bye                            End conversation
+/note <id>                      Show note content"""
+
+
+def _handle_interpret(session, character: str, text: str):
+    """Use LLM to interpret free-form text as /commands or chat."""
+
+    # Gather current state for context
+    goals_data = _zenoh_get(session, f"cognitive/{character}/concerns")  # for concern IDs
+    goals_result = _zenoh_get(session, f"cognitive/{character}/scheduled_goals")
+    tasks_result = _zenoh_get(session, f"cognitive/{character}/task_wips")
+
+    # Build goals context
+    goals_ctx = "None"
+    if goals_result and goals_result.get('success'):
+        lines = []
+        for g in goals_result.get('goals', []):
+            gid = g.get('goal_id', '?')
+            name = g.get('name', '')[:60]
+            status = g.get('status', '?')
+            running = ' [RUNNING]' if g.get('is_running') else ''
+            lines.append(f"  {gid} [{status}]{running} \"{name}\"")
+        if lines:
+            goals_ctx = '\n'.join(lines)
+
+    # Build tasks context
+    tasks_ctx = "None"
+    if tasks_result and tasks_result.get('success'):
+        lines = []
+        for t in tasks_result.get('tasks', []):
+            name = t.get('_note_name', '?')
+            status = t.get('status', '?')
+            lifecycle = t.get('lifecycle', '')
+            intention = (t.get('intention', '') or '')[:60]
+            active = ' [ACTIVE]' if t.get('_is_active') else ''
+            lines.append(f"  {name} [{status}/{lifecycle}]{active} \"{intention}\"")
+        if lines:
+            tasks_ctx = '\n'.join(lines)
+
+    # Build concerns context
+    concerns_ctx = "None"
+    if goals_data and goals_data.get('success'):
+        lines = []
+        for c in goals_data.get('user_concerns', []):
+            cid = c.get('concern_id', '')
+            label = c.get('label', '')
+            status = c.get('status', '')
+            lines.append(f"  {cid} [user, {status}] \"{label}\"")
+        for c in goals_data.get('derived_concerns', []):
+            cid = c.get('concern_id', '')
+            label = c.get('concern_label', '')
+            status = c.get('status', '')
+            lines.append(f"  {cid} [derived, {status}] \"{label}\"")
+        if lines:
+            concerns_ctx = '\n'.join(lines)
+
+    prompt = f"""\
+You are a command interpreter for a cognitive agent system. Given user text,
+determine if it contains one or more system commands, or if it is conversational
+chat directed at the agent.
+
+RULES:
+- Only emit commands from the vocabulary below. Do not invent commands.
+- Resolve references like "the weather goal" or "goal 1" to actual goal_ids from
+  the current state. If you cannot resolve a reference, treat the text as chat.
+- Default to chat when uncertain. False command detection is worse than missed detection.
+- A single input may map to multiple commands (e.g., "stop and save" → two commands).
+- Requests like "tell me about X" or "what do you think about X" are chat, not commands.
+- Requests like "check email" or "run the health check" are /goal run if a matching goal exists,
+  or /goal add if the user seems to want something new done.
+- "make it so" or "do it" with no prior conversational context suggesting a specific action is chat.
+
+COMMAND VOCABULARY:
+{_COMMAND_VOCABULARY}
+
+CURRENT GOALS:
+{goals_ctx}
+
+CURRENT TASKS:
+{tasks_ctx}
+
+CURRENT CONCERNS:
+{concerns_ctx}
+
+USER TEXT: "{text}"
+
+Respond with a JSON object. Examples:
+{{"interpretation": "command", "commands": [{{"cmd": "/goal run", "goal_id": "goal_2"}}]}}
+{{"interpretation": "command", "commands": [{{"cmd": "/stop"}}, {{"cmd": "/save"}}]}}
+{{"interpretation": "chat", "text": "How are you feeling today?"}}
+{{"interpretation": "command", "commands": [{{"cmd": "/goal add", "goal_text": "research quantum computing breakthroughs"}}]}}
+
+JSON response:"""
+
+    # Call LLM via Zenoh queryable
+    messages = [
+        {'role': 'user', 'content': prompt},
+    ]
+    payload = json.dumps({
+        'messages': messages,
+        'max_tokens': 500,
+        'temperature': 0.1,
+        'is_json': True,
+    })
+
+    _print_info(f"Interpreting: \"{text}\"")
+    try:
+        result = None
+        for reply in session.get(f"cognitive/{character}/llm/generate",
+                                  payload=payload.encode('utf-8'), timeout=30.0):
+            if hasattr(reply, 'ok') and reply.ok is not None:
+                result = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                break
+
+        if not result or not result.get('success'):
+            _print_error(f"LLM call failed: {result.get('error', 'no response') if result else 'timeout'}")
+            return
+
+        llm_text = result.get('text', '').strip()
+
+        # Parse JSON from LLM response
+        # Handle cases where LLM wraps in markdown code blocks
+        if llm_text.startswith('```'):
+            llm_text = llm_text.split('\n', 1)[-1].rsplit('```', 1)[0].strip()
+
+        try:
+            interpretation = json.loads(llm_text)
+        except json.JSONDecodeError:
+            _print_error(f"LLM returned invalid JSON: {llm_text[:200]}")
+            return
+
+        interp_type = interpretation.get('interpretation', 'unknown')
+
+        if interp_type == 'chat':
+            orig = interpretation.get('text', text)
+            _print_info(f"  → {C.CYAN}chat{C.RESET}: \"{orig}\"")
+        elif interp_type == 'command':
+            commands = interpretation.get('commands', [])
+            if not commands:
+                _print_info(f"  → {C.CYAN}chat{C.RESET} (no commands extracted)")
+                return
+            _print_info(f"  → {C.GREEN}{len(commands)} command(s):{C.RESET}")
+            for cmd_data in commands:
+                cmd = cmd_data.get('cmd', '?')
+                # Format args
+                args_parts = []
+                for k, v in cmd_data.items():
+                    if k != 'cmd':
+                        args_parts.append(f"{k}={v}")
+                args_str = ' '.join(args_parts)
+                print(f"    {C.BOLD}{cmd}{C.RESET} {args_str}")
+        else:
+            _print_info(f"  → {C.YELLOW}unknown interpretation{C.RESET}: {llm_text[:200]}")
+
+    except Exception as e:
+        _print_error(f"Interpret failed: {e}")
+
+
 def _print_help():
     print(f"""{C.BOLD}Cognitive Workbench CLI{C.RESET}
 
@@ -604,7 +806,10 @@ def _print_help():
   /tasks-ui                      Open task manager in browser
   /resources                     Open resource browser in browser
   /verbose                       Toggle verbose mode
-  /help                          Show this help""")
+  /help                          Show this help
+
+{C.BOLD}Experimental:{C.RESET}
+  /interpret <text>              LLM-parse text into /commands (does not execute)""")
 
 
 # ---------------------------------------------------------------------------
@@ -746,6 +951,11 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
                 # Local queries
                 if cmd == '_query':
                     _handle_query(zenoh_session, active_character, parsed, state)
+                    continue
+
+                # LLM-based command interpretation (experimental)
+                if cmd == '_interpret':
+                    _handle_interpret(zenoh_session, active_character, parsed['text'])
                     continue
 
                 # Interactive commands (fetch current value, prompt to edit)
