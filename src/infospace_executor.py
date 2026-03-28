@@ -1388,26 +1388,29 @@ Only provide the result, followed by the </end> tag.""")
             if total_length > 100000:
                 logger.warning(f"⚠️  Attempting to send {total_length} chars to sglang")
 
+            # Build stop parameter before the SGLang function (avoid closure issues)
+            stop_param = None
+            if stops:
+                if isinstance(stops, list) and len(stops) > 0:
+                    stop_param = stops  # SGLang gen() accepts List[str]
+                elif isinstance(stops, str):
+                    stop_param = stops
+
             # Create generation function with proper role separation
             @function
-            def generate_text(s, system_text, user_text, is_json=False):
+            def generate_text(s, system_text, user_text, stop_seq=None):
                 if system_text:
                     s += sgl_system(system_text)
                 s += user(user_text)
-                # Convert stops list to string (SGLang uses stop as string, take first if list)
-                stop_str = None
-                if stops:
-                    if isinstance(stops, list) and len(stops) > 0:
-                        stop_str = stops[0]  # SGLang gen() uses single stop string
-                    elif isinstance(stops, str):
-                        stop_str = stops
                 gen_kwargs = {"max_tokens": max_tokens, "temperature": temperature}
-                if stop_str:
-                    gen_kwargs["stop"] = stop_str
+                if stop_seq is not None:
+                    gen_kwargs["stop"] = stop_seq
                 s += assistant(gen("output", **gen_kwargs))
 
-            # Run the function
-            state = generate_text.run(system_text=system_text, user_text=user_text)
+            # Run the function — pass stop as explicit parameter, not closure
+            state = generate_text.run(
+                system_text=system_text, user_text=user_text, stop_seq=stop_param
+            )
             result_text = state["output"].strip()
 
             # Strip <think>...</think> blocks (reasoning models like Qwen3)
@@ -2949,12 +2952,12 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             prefixed_content = "\n".join(preview_lines)
             
             if out_var:
-                collection_id = self._create_collection(sliced_ids, f'load_slice')
-                if not collection_id:
-                    return self._create_uniform_return('failed', reason='Failed to create Collection from slice')
-                self._bind_variable(out_var, collection_id)
-                logger.info(f"Loaded {target_arg} → {display_var} = {collection_id} (Collection, {len(sliced_ids)}/{total} items)")
-                return self._create_uniform_return('success', value=prefixed_content, resource_id=collection_id,
+                # Bind to the ORIGINAL collection — tools must operate on the
+                # full resource, not a truncated slice.  The sliced preview in
+                # `value` is only for planner reasoning context.
+                self._bind_variable(out_var, resource_id)
+                logger.info(f"Loaded {target_arg} → {display_var} = {resource_id} (Collection, {len(sliced_ids)}/{total} items)")
+                return self._create_uniform_return('success', value=prefixed_content, resource_id=resource_id,
                                                    extra={"item_count": len(sliced_ids), "total_items": total})
             logger.info(f"Loaded {target_arg} → {display_var} (Collection preview, {len(sliced_ids)}/{total} items)")
             return self._create_uniform_return('success', value=prefixed_content, resource_id=resource_id,
