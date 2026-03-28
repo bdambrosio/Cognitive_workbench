@@ -1,12 +1,12 @@
 ---
 name: search-web
 type: python
-description: "Search web using Claude Sonnet with web_search tool. Returns a single text Note with synthesized findings."
+description: "Search web using LLM with web_search tool. Returns a single text Note with synthesized findings."
 ---
 
 # search-web
 
-Search the web using Claude Sonnet's built-in web_search tool. Claude performs multiple searches with varied phrasings, reads and evaluates the results, and returns a single synthesized research note with source attribution.
+Search the web using an LLM with built-in web search (OpenAI GPT-5.4-mini primary, Claude Sonnet fallback). The LLM performs searches, reads and evaluates the results, and returns a single synthesized research note with source attribution.
 
 ## Input
 
@@ -39,11 +39,12 @@ Failure (`status: "failed"`):
 
 ## Behavior
 
-- Makes a single Claude Sonnet API call with `web_search` tool enabled (up to 10 searches)
-- Claude searches with multiple phrasings, reads pages, filters for relevance, and synthesizes
+- Makes a single LLM API call with `web_search` tool enabled
+- Primary: OpenAI GPT-5.4-mini via Responses API (cheaper, location-aware for Berkeley, CA)
+- Fallback: Claude Sonnet if OPENAI_API_KEY is not set or call fails
 - Returns one Note (not a Collection) — the synthesis is immediately usable by the agent
 - Sources are preserved for citation, follow-up, or credibility assessment
-- Requires `CLAUDE_API_KEY` environment variable
+- Requires `OPENAI_API_KEY` or `CLAUDE_API_KEY` environment variable
 
 ## Metadata Access
 
@@ -51,7 +52,7 @@ Tool metadata (`query`, `source_count`, `sources`, `model`, `elapsed_ms`) is acc
 
 Metadata Note content shape:
 ```json
-{"query":"original search query","source_count":7,"sources":[{"url":"https://example.com/article","domain":"example.com","title":"Article Title","excerpt":"..."}],"model":"claude-sonnet-4-5-20250929","elapsed_ms":12500}
+{"query":"original search query","source_count":7,"sources":[{"url":"https://example.com/article","domain":"example.com","title":"Article Title","excerpt":"..."}],"model":"gpt-5.4-mini","elapsed_ms":5200}
 ```
 
 ## Common Workflows
