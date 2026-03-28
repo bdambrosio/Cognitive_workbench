@@ -2246,26 +2246,72 @@ def _resolve_eval_target_text(eval_target: str, executor) -> str:
 
 
 
+def _count_eval_verdicts(eval_text: str) -> dict:
+    """Parse per-criterion PASS/FAIL/INAPPLICABLE counts from eval text.
+
+    Looks for lines matching: criterion_name: PASS|FAIL|INAPPLICABLE [- reason]
+    Returns {'pass': N, 'fail': N, 'inapplicable': N, 'total': N, 'applicable': N, 'pass_ratio': float}.
+    """
+    counts = {'pass': 0, 'fail': 0, 'inapplicable': 0}
+    for line in eval_text.splitlines():
+        line = line.strip()
+        if not line or line.startswith('RECOMMENDATION') or line.startswith('STATUS'):
+            continue
+        lo = line.lower()
+        if ': pass' in lo or lo.endswith(': pass'):
+            counts['pass'] += 1
+        elif ': fail' in lo:
+            counts['fail'] += 1
+        elif ': inapplicable' in lo:
+            counts['inapplicable'] += 1
+    total = counts['pass'] + counts['fail'] + counts['inapplicable']
+    applicable = counts['pass'] + counts['fail']
+    counts['total'] = total
+    counts['applicable'] = applicable
+    counts['pass_ratio'] = counts['pass'] / applicable if applicable > 0 else 1.0
+    return counts
+
+
+# Threshold: if this fraction of applicable criteria pass, treat as satisfied
+# even if the LLM said NEEDS_REVISION (handles hallucinated criteria)
+_VISION_PASS_RATIO_THRESHOLD = 0.75
+
+
 def _parse_deep_eval_status(deep_text: str) -> str:
     """
     Parse deep-eval status robustly.
     Returns one of: "satisfied", "needs_revision", "unknown".
-    When NEEDS_REVISION is returned but the RECOMMENDATION says to remove/reframe a criterion
-    (i.e., the criterion was inapplicable), treat as satisfied.
+
+    Override rules (checked in order):
+    1. If RECOMMENDATION says to remove/reframe a criterion → satisfied
+    2. If pass ratio among applicable criteria >= threshold → satisfied
+    3. Otherwise respect the LLM's STATUS line
     """
     if not deep_text:
         return "unknown"
     text = str(deep_text).strip()
+
+    # Count actual verdicts for ratio-based override
+    verdicts = _count_eval_verdicts(text)
+
     m = re.search(r"^\s*STATUS:\s*(SATISFIED|NEEDS_REVISION)\s*$", text, flags=re.IGNORECASE | re.MULTILINE)
     if m:
         status = m.group(1).strip().upper()
         raw = "satisfied" if status == "SATISFIED" else "needs_revision"
         if raw == "needs_revision":
+            # Override 1: recommendation says criterion is inapplicable
             rec_m = re.search(r"RECOMMENDATION[:\s]+(.+?)(?:\n|$)", text, flags=re.IGNORECASE | re.DOTALL)
             if rec_m:
                 rec = rec_m.group(1).lower()
                 if ("remove" in rec or "reframe" in rec) and "criterion" in rec:
+                    logger.info(f"Vision eval: overriding NEEDS_REVISION → satisfied (recommendation: remove/reframe criterion)")
                     return "satisfied"
+            # Override 2: pass ratio above threshold
+            if verdicts['applicable'] > 0 and verdicts['pass_ratio'] >= _VISION_PASS_RATIO_THRESHOLD:
+                logger.info(f"Vision eval: overriding NEEDS_REVISION → satisfied "
+                            f"(pass ratio {verdicts['pass']}/{verdicts['applicable']} = {verdicts['pass_ratio']:.0%} "
+                            f">= {_VISION_PASS_RATIO_THRESHOLD:.0%} threshold)")
+                return "satisfied"
         return raw
     lo = text.lower()
     if any(k in lo for k in ["needs_revision", "needs revision", "revision needed", "any fail", "criterion_"]):
@@ -2275,6 +2321,10 @@ def _parse_deep_eval_status(deep_text: str) -> str:
                 rec = rec_m.group(1).lower()
                 if ("remove" in rec or "reframe" in rec) and "criterion" in rec:
                     return "satisfied"
+            # Pass-ratio override for fallback parsing path too
+            if verdicts['applicable'] > 0 and verdicts['pass_ratio'] >= _VISION_PASS_RATIO_THRESHOLD:
+                logger.info(f"Vision eval: overriding needs_revision → satisfied (pass ratio {verdicts['pass_ratio']:.0%})")
+                return "satisfied"
             return "needs_revision"
     if any(k in lo for k in ["no revision needed", "all criteria pass", "all criteria are pass", "status: satisfied"]):
         return "satisfied"
@@ -2707,6 +2757,8 @@ ALWAYS follow all formatting instructions exactly.
         deep_eval_prev_artifact = None
         plan_local_bindings = set()
         _asked_user_this_goal = False
+        _mid_vision_eval_counts = {}  # {eval_target_id: count} — suppress after cap
+        _MID_VISION_EVAL_CAP = 2     # max evals per artifact before suppressing
         for step in range(max_steps):
             if _interrupt_requested(executor):
                 _clear_interrupt(executor)
@@ -2804,13 +2856,19 @@ ALWAYS follow all formatting instructions exactly.
                         run_mid_vision = True
                         break
             if run_mid_vision:
-                logger.info(f"Step {step}: Vision eval target (declared artifact): {last_eval_target}")
-                compressed_ctx = _compress_trace(str(s))
-                vision_eval_text = _vision_eval_check(vision_criteria, last_eval_target, executor, compressed_context=compressed_ctx)
-                if vision_eval_text:
-                    s += user(f"VISION EVALUATION:\n{vision_eval_text}\nFAILs are advisory — attempt to address if easy, do NOT loop repeatedly. Proceed after at most three retries.\n")
-                    s += assistant("Noted.\n")
-            
+                # Enforce per-artifact eval cap to prevent loops on unfixable criteria
+                mid_key = _resolve_eval_target_id(last_eval_target, executor) or last_eval_target
+                _mid_vision_eval_counts[mid_key] = _mid_vision_eval_counts.get(mid_key, 0) + 1
+                if _mid_vision_eval_counts[mid_key] <= _MID_VISION_EVAL_CAP:
+                    logger.info(f"Step {step}: Vision eval target (declared artifact): {last_eval_target} (eval #{_mid_vision_eval_counts[mid_key]})")
+                    compressed_ctx = _compress_trace(str(s))
+                    vision_eval_text = _vision_eval_check(vision_criteria, last_eval_target, executor, compressed_context=compressed_ctx)
+                    if vision_eval_text:
+                        s += user(f"VISION EVALUATION:\n{vision_eval_text}\nFAILs are advisory — attempt to address if easy, do NOT loop on unfixable criteria.\n")
+                        s += assistant("Noted.\n")
+                else:
+                    logger.info(f"Step {step}: Vision eval suppressed for {last_eval_target} (eval cap {_MID_VISION_EVAL_CAP} reached)")
+
             # Stage 3: Structured reflection (6 fields, select() for categorical decisions)
             s += assistant(
                 "THOUGHTS: "
@@ -3831,6 +3889,8 @@ ALWAYS follow all formatting instructions exactly.
     deep_eval_prev_artifact = None
     plan_local_bindings = set()
     _asked_user_this_goal = False
+    _mid_vision_eval_counts = {}  # {eval_target_id: count} — suppress after cap
+    _MID_VISION_EVAL_CAP = 2     # max evals per artifact before suppressing
     for step in range(max_steps):
         if _interrupt_requested(executor):
             _clear_interrupt(executor)
@@ -3915,12 +3975,18 @@ ALWAYS follow all formatting instructions exactly.
             last_eval_target = side_effect_content
             logger.info(f"Step {step}: Eval target updated to side-effect content source: {side_effect_content}")
         if eval_target and vision_criteria:
-            logger.info(f"Step {step}: Vision eval target: {last_eval_target}")
-            compressed_ctx = _compress_trace(prompt)
-            vision_eval_text = _vision_eval_check(vision_criteria, last_eval_target, executor, compressed_context=compressed_ctx)
-            if vision_eval_text:
-                prompt += format_user(f"VISION EVALUATION:\n{vision_eval_text}\nFAILs are advisory — attempt to address if easy, do NOT loop repeatedly. Proceed after at most three retries.\n")
-                prompt += format_assistant("Noted.\n")
+            # Enforce per-artifact eval cap to prevent loops on unfixable criteria
+            mid_key = _resolve_eval_target_id(last_eval_target, executor) or last_eval_target
+            _mid_vision_eval_counts[mid_key] = _mid_vision_eval_counts.get(mid_key, 0) + 1
+            if _mid_vision_eval_counts[mid_key] <= _MID_VISION_EVAL_CAP:
+                logger.info(f"Step {step}: Vision eval target: {last_eval_target} (eval #{_mid_vision_eval_counts[mid_key]})")
+                compressed_ctx = _compress_trace(prompt)
+                vision_eval_text = _vision_eval_check(vision_criteria, last_eval_target, executor, compressed_context=compressed_ctx)
+                if vision_eval_text:
+                    prompt += format_user(f"VISION EVALUATION:\n{vision_eval_text}\nFAILs are advisory — attempt to address if easy, do NOT loop on unfixable criteria.\n")
+                    prompt += format_assistant("Noted.\n")
+            else:
+                logger.info(f"Step {step}: Vision eval suppressed for {last_eval_target} (eval cap {_MID_VISION_EVAL_CAP} reached)")
 
         # Stage 3: simplified reflection (5 fields + inline verification when DONE)
         prompt += format_assistant("")

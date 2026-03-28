@@ -699,17 +699,19 @@ JSON response:"""
             _print_error(f"LLM call failed: {result.get('error', 'no response') if result else 'timeout'}")
             return
 
-        llm_text = result.get('text', '').strip()
-
-        # Parse JSON from LLM response
-        # Handle cases where LLM wraps in markdown code blocks
-        if llm_text.startswith('```'):
-            llm_text = llm_text.split('\n', 1)[-1].rsplit('```', 1)[0].strip()
-
-        try:
-            interpretation = json.loads(llm_text)
-        except json.JSONDecodeError:
-            _print_error(f"LLM returned invalid JSON: {llm_text[:200]}")
+        llm_text = result.get('text', '')
+        # LLM may return pre-parsed dict (when is_json=True) or raw string
+        if isinstance(llm_text, dict):
+            interpretation = llm_text
+        else:
+            llm_text = str(llm_text).strip()
+            # Handle cases where LLM wraps in markdown code blocks
+            if llm_text.startswith('```'):
+                llm_text = llm_text.split('\n', 1)[-1].rsplit('```', 1)[0].strip()
+            try:
+                interpretation = json.loads(llm_text)
+            except json.JSONDecodeError:
+                _print_error(f"LLM returned invalid JSON: {llm_text[:200]}")
             return
 
         interp_type = interpretation.get('interpretation', 'unknown')
