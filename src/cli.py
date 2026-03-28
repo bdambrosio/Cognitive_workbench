@@ -941,11 +941,13 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
                 state['agent_state'].update(data)
                 curr_goal = (data.get('goal_scheduler') or {}).get('executing_goal_id')
                 curr_dialog = data.get('active_dialog', False)
+                curr_paused = data.get('paused', False)
                 # Detect goal completion: was running, now not
                 if prev_goal and not curr_goal:
                     _print_system(f"[{_ts()}] Ready.")
-                # Detect dialog completion: was in dialog, now not
-                elif prev_dialog and not curr_dialog and not curr_goal:
+                # Detect dialog completion: was in dialog, now idle
+                # (only when paused — avoids false Ready when a goal is about to start)
+                elif prev_dialog and not curr_dialog and not curr_goal and curr_paused:
                     _print_system(f"[{_ts()}] Ready.")
         except Exception:
             pass

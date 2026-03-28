@@ -3273,6 +3273,9 @@ class ZenohExecutiveNode:
         self._apply_pending_llm_switch()
         self._active_scheduled_goal_id = goal_id
         self._update_scheduled_goal(goal_id, is_running=True, status="running")
+        if hasattr(self, 'goal_scheduler'):
+            self.goal_scheduler._executing_goal_id = goal_id
+            self.goal_scheduler._executing_is_autonomous = False
         # Attach evaluator assessment if available (from the eval that ran when input was received)
         if self._last_character_eval:
             self._update_scheduled_goal(goal_id, initial_assessment=self._last_character_eval)
@@ -3341,6 +3344,9 @@ class ZenohExecutiveNode:
         # Execute the cached plan via execute_plan_sync
         self._active_scheduled_goal_id = goal_id
         self._update_scheduled_goal(goal_id, is_running=True, status="running")
+        if hasattr(self, 'goal_scheduler'):
+            self.goal_scheduler._executing_goal_id = goal_id
+            self.goal_scheduler._executing_is_autonomous = False
         self._record_scheduler_event(
             "start",
             goal_id=goal_id,
@@ -4025,6 +4031,9 @@ class ZenohExecutiveNode:
 
             self._active_scheduled_goal_id = goal_id
             self._update_scheduled_goal(goal_id, is_running=True, status="running")
+            if hasattr(self, 'goal_scheduler'):
+                self.goal_scheduler._executing_goal_id = goal_id
+                self.goal_scheduler._executing_is_autonomous = False
             pre_resource_ids = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
 
             def _run_milestone_goal():
@@ -4449,9 +4458,11 @@ class ZenohExecutiveNode:
             self._operational_task_note = task_note_name
             self._operational_goal_waiting = True
 
-            if hasattr(self, 'goal_scheduler') and wip.get('linked_concern_id'):
-                self.goal_scheduler._executing_is_autonomous = True
-                self.goal_scheduler._autonomous_start_time = time.monotonic()
+            if hasattr(self, 'goal_scheduler'):
+                self.goal_scheduler._executing_goal_id = f"op_{task_note_name}"
+                if wip.get('linked_concern_id'):
+                    self.goal_scheduler._executing_is_autonomous = True
+                    self.goal_scheduler._autonomous_start_time = time.monotonic()
 
             self._run_goal_on_thread(_run_operational_goal)
 
@@ -5354,6 +5365,9 @@ class ZenohExecutiveNode:
                         return
                     self._active_scheduled_goal_id = goal_id
                     self._update_scheduled_goal(goal_id, is_running=True, status="running")
+                    if hasattr(self, 'goal_scheduler'):
+                        self.goal_scheduler._executing_goal_id = goal_id
+                        self.goal_scheduler._executing_is_autonomous = False
                     if self._last_character_eval:
                         self._update_scheduled_goal(goal_id, initial_assessment=self._last_character_eval)
                     pre_resource_ids = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
@@ -5809,6 +5823,9 @@ class ZenohExecutiveNode:
             return f"Goal {goal_id} created (queued)"
         self._active_scheduled_goal_id = goal_id
         self._update_scheduled_goal(goal_id, is_running=True, status="running")
+        if hasattr(self, 'goal_scheduler'):
+            self.goal_scheduler._executing_goal_id = goal_id
+            self.goal_scheduler._executing_is_autonomous = False
         pre = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
         def _run():
             result = self.parse_and_set_goal("", goal_text) or {}
@@ -5969,10 +5986,9 @@ class ZenohExecutiveNode:
         content = json.loads(res.get('properties', {}).get('content', '{}'))
         content['intention'] = intention
         content['updated'] = datetime.now().isoformat()
-        self.infospace_executor.execute_action({
-            'type': 'update-note', 'note_name': note_name,
-            'value': json.dumps(content),
-        })
+        success, err = self.resource_manager.update_note_content(note_id, json.dumps(content))
+        if not success:
+            return f"Failed to update {note_name}: {err}"
         logger.info(f'📋 Task {note_name} intention edited via command')
         return f"Task {note_name} edited"
 
@@ -6077,10 +6093,9 @@ class ZenohExecutiveNode:
         content['last_executed'] = None
         content['cooldown_until'] = None
         content['updated'] = datetime.now().isoformat()
-        self.infospace_executor.execute_action({
-            'type': 'update-note', 'note_name': note_name,
-            'value': json.dumps(content),
-        })
+        success, err = self.resource_manager.update_note_content(note_id, json.dumps(content))
+        if not success:
+            return f"Failed to update {note_name}: {err}"
         logger.info(f'📋 Task {note_name} run-now via command')
         return f"Task {note_name} marked for immediate execution"
 
@@ -6101,10 +6116,9 @@ class ZenohExecutiveNode:
         content = json.loads(res.get('properties', {}).get('content', '{}'))
         content['cooldown_seconds'] = cooldown
         content['updated'] = datetime.now().isoformat()
-        self.infospace_executor.execute_action({
-            'type': 'update-note', 'note_name': note_name,
-            'value': json.dumps(content),
-        })
+        success, err = self.resource_manager.update_note_content(note_id, json.dumps(content))
+        if not success:
+            return f"Failed to update {note_name}: {err}"
         logger.info(f'📋 Task {note_name} cooldown set to {cooldown}s via command')
         return f"Task {note_name} cooldown set to {cooldown}s"
 
