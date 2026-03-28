@@ -4,6 +4,9 @@ requests>=2.31.0
 sympy>=1.12.0
 PyYAML>=6.0
 
+# CLI
+prompt_toolkit>=3.0.0
+
 # Web framework and server
 fastapi>=0.116.0
 uvicorn[standard]>=0.35.0
