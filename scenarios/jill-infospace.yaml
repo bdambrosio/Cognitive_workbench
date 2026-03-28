@@ -5,7 +5,7 @@ world_config:
 
 llm_config:
   sgl_model_path: "unsloth/Qwen3-Coder-Next-FP8"#"Qwen/Qwen3.5-27B"#"txn545/Qwen3.5-122B-A10B-NVFP4"#"unsloth/Qwen3-Coder-Next-FP8"#"Qwen/Qwen3.5-27B"  
-  chat_template: "/home/bruce/sglang/qwen3_nonthinking.jinja"  
+  #chat_template: "/home/bruce/sglang/qwen3_nonthinking.jinja"  
   grobid: "http://localhost:8070/"
 
 alt_llm_config:
