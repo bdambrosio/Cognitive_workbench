@@ -403,7 +403,13 @@ class ZenohExecutiveNode:
         # LLM toggle state (Primary/Alt, switched between goals)
         self.llm_mode = 'primary'  # 'primary' or 'alt'
         self.llm_switch_pending = None  # Set to 'primary'/'alt' by UI, applied at next goal start
-        
+
+        # Sensor priority queues — must be initialized before the sense_data
+        # subscriber is declared, because sensor callbacks can fire immediately.
+        self._sensor_alert_queue: list = []    # disposition='alert' — high priority
+        self._sensor_trigger_queue: list = []  # disposition='trigger:X' — goal dispatch
+        self._sensor_inform_queue: list = []   # disposition='inform' — rolling context (last 10)
+
         # Subscriber for sense data (character-specific)
         self.sense_subscriber = self.session.declare_subscriber(
             f"cognitive/{character_name}/sense_data",
@@ -1106,11 +1112,6 @@ class ZenohExecutiveNode:
         self._goal_thread: Optional[threading.Thread] = None
         self._goal_thread_result: Optional[Dict[str, Any]] = None
         self._goal_done_event = threading.Event()
-
-        # Sensor priority queues (observed while goal runs, drained on completion)
-        self._sensor_alert_queue: list = []    # disposition='alert' — high priority
-        self._sensor_trigger_queue: list = []  # disposition='trigger:X' — goal dispatch
-        self._sensor_inform_queue: list = []   # disposition='inform' — rolling context (last 10)
 
         # Sensor configuration summary (enriched by launcher before agent start)
         self.sensor_configs: list = self.character_config.get('_sensor_configs', [])
