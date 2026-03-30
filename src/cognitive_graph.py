@@ -784,7 +784,7 @@ class GraphRenderer:
             action = attrs.get("action_choice", "")
             return f"{indent}{arrow}Assessment: {content}" + (f" → {action}" if action else "")
         elif ntype == "decision":
-            return f"{indent}{arrow}Decided: {attrs.get('action_type', '')} — {content}"
+            return f"{indent}{arrow}Decided: {content}"
         elif ntype == "action_result":
             ok = "success" if attrs.get("success") else "failed"
             return f"{indent}{arrow}Result: {ok}"

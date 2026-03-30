@@ -6853,9 +6853,15 @@ class ZenohExecutiveNode:
             payload_summary = ''
             if action.payload:
                 payload_summary = str(action.payload)[:200]
-            content = f"Decided: {action.type}"
-            if action.payload and action.payload.get('text'):
-                content += f" — {action.payload['text'][:100]}"
+            # Build human-readable content (renderer prefixes with "Decided:")
+            content = action.type
+            if action.type in ('chat_response', 'agent_message'):
+                source = (action.payload or {}).get('source', '')
+                content = f"{action.type} to {source}" if source else action.type
+            elif action.type == 'dispatch_goal':
+                content = f"dispatch goal: {(action.payload or {}).get('goal_text', '')[:100]}"
+            elif action.type == 'proceed_goal':
+                content = f"proceed goal {(action.payload or {}).get('goal_id', '')}"
             nid = g.add_node("decision", content[:500],
                 attrs={"action_type": action.type,
                        "payload_summary": payload_summary})
@@ -7089,8 +7095,8 @@ class ZenohExecutiveNode:
             return
 
         if t == 'chat_response':
-            # ── Graph: action result ──
-            self._graph_emit_action_result(t, True)
+            # No graph action_result here — the planner hasn't run yet.
+            # Goal outcome will be emitted by _set_scheduled_goal_result.
             # Clear stale interrupt from prior End/Stop
             self.interrupt_requested = False
             if self.infospace_executor:
@@ -7118,8 +7124,7 @@ class ZenohExecutiveNode:
             return
 
         if t == 'agent_message':
-            # ── Graph: action result ──
-            self._graph_emit_action_result(t, True)
+            # No graph action_result here — planner handles the actual response.
             self._create_character_note()
             self._handle_agent_message(p['text'], p['source'], p.get('close_flag', False), action.assessment)
             return
@@ -7569,12 +7574,11 @@ class ZenohExecutiveNode:
             self.observations = {'static': system_prompt, 'dynamic': user_prompt}
             return self.observations
         except Exception as e:
-            logger.error(f'Error in _observe: {e}')  
+            logger.error(f'Error in _refresh_observations: {e}')
             traceback.print_exc()
-            # Fallback: build minimal observations
-            system_prompt = self._update_system_prompt()
-            user_prompt = self.format_situation()
-            self.observations = {'static': system_prompt, 'dynamic': user_prompt}
+            # Fallback: reuse existing observations if available, else minimal
+            if not self.observations:
+                self.observations = {'static': '', 'dynamic': self.format_situation()}
             return self.observations
 
     def _plan(self, template, goal: Goal):
@@ -7586,7 +7590,10 @@ class ZenohExecutiveNode:
         if not self.current_goal or self.current_goal.name == 'sleep':
             single_action = None
         else:
-            system_prompt = self._update_system_prompt()
+            # Reuse cached system prompt from _refresh_observations() rather
+            # than rebuilding (avoids redundant _build_process_block / graph
+            # context assembly).
+            system_prompt = self.observations.get('static') or self._update_system_prompt()
             user_prompt = self.observations['dynamic']
             goal_prompt = f"\n\nYour current goal is: {goal.to_string()}"
             entity_context = None
@@ -7669,11 +7676,8 @@ class ZenohExecutiveNode:
             except Exception:
                 pass
 
-            # Process narrative for planner context
-            try:
-                recent_context += f"\n{self._build_process_block()}\n"
-            except Exception:
-                pass
+            # Process narrative already included in system_prompt via
+            # _update_system_prompt() → _build_process_block(). Not duplicated here.
 
             # Compute output size guidance from evaluator assessment + concerns
             output_guidance = None
