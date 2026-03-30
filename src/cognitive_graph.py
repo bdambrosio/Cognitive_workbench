@@ -69,6 +69,9 @@ class CognitiveGraph:
         # Session tracking
         self._session_id = str(uuid.uuid4())
 
+        # Dirty flag — set when graph is mutated, cleared on save
+        self._dirty = False
+
         # Thread safety
         self._lock = threading.Lock()
 
@@ -96,6 +99,7 @@ class CognitiveGraph:
             self._edges_to.setdefault(node_id, [])
             # Index in FAISS
             self._index_node(node_id, content)
+            self._dirty = True
         return node_id
 
     def add_edge(self, source: str, target: str, type: str,
@@ -118,6 +122,7 @@ class CognitiveGraph:
             self._edges[edge_id] = edge
             self._edges_from[source].append(edge_id)
             self._edges_to[target].append(edge_id)
+            self._dirty = True
         return edge_id
 
     def get_node(self, node_id: str) -> dict | None:
@@ -133,6 +138,7 @@ class CognitiveGraph:
             if node is None:
                 raise KeyError(f"Node {node_id} not found")
             node["attrs"].update(attrs)
+            self._dirty = True
 
     def get_edges_from(self, node_id: str, edge_type: str = None) -> list[dict]:
         """Return outgoing edges from node, optionally filtered by type."""
@@ -300,8 +306,10 @@ class CognitiveGraph:
     # Persistence (§11)
     # ------------------------------------------------------------------
 
-    def save(self, path: str) -> None:
-        """Persist graph + FAISS index to disk."""
+    def save(self, path: str, force: bool = False) -> None:
+        """Persist graph + FAISS index to disk.  Skips write when nothing changed."""
+        if not force and not self._dirty:
+            return
         path = Path(path)
         with self._lock:
             # Graph structure as JSON
@@ -326,6 +334,8 @@ class CognitiveGraph:
 
             # Write FAISS index
             faiss.write_index(self._faiss_index, faiss_path)
+
+            self._dirty = False
 
         logger.info("CognitiveGraph saved: %d nodes, %d edges → %s",
                      len(self._nodes), len(self._edges), path)
@@ -362,6 +372,7 @@ class CognitiveGraph:
 
             # New session
             self._session_id = str(uuid.uuid4())
+            self._dirty = False
 
         logger.info("CognitiveGraph loaded: %d nodes, %d edges from %s",
                      len(self._nodes), len(self._edges), path)
@@ -447,6 +458,7 @@ class CognitiveGraph:
         self._edges_from.pop(node_id, None)
         self._edges_to.pop(node_id, None)
         self._nodes.pop(node_id, None)
+        self._dirty = True
 
     def _rebuild_faiss_locked(self) -> None:
         """Rebuild FAISS index from scratch. Caller must hold _lock."""
