@@ -1694,12 +1694,14 @@ class ZenohExecutiveNode:
         self._ooda_living_state.maybe_persist(
             self._write_named_note, dc,
             planner_summary=self._get_planner_summary())
-        # ── Graph: periodic save ──
+        # ── Graph: consolidation + periodic save ──
         try:
+            if not self._is_goal_running():
+                self._cognitive_graph.consolidate()
             if self._cognitive_graph_path:
                 self._cognitive_graph.save(self._cognitive_graph_path)
         except Exception as e:
-            logger.debug(f"Cognitive graph save failed: {e}")
+            logger.debug(f"Cognitive graph maintenance failed: {e}")
 
     def _resync_task_wip_counter(self):
         """Scan existing _task_wip_N named notes and set counter to max N found."""
@@ -7445,6 +7447,24 @@ class ZenohExecutiveNode:
 
         if will_do:
             parts.append(will_do)
+
+        # ── Graph-derived cognitive context ──
+        try:
+            goal_text = ""
+            if self.current_goal and self.current_goal.name != 'sleep':
+                goal_text = self.current_goal.to_string()
+            elif active_tasks:
+                goal_text = active_tasks[0].get('intention', '')
+            if goal_text:
+                graph_ctx = self._cognitive_graph.assemble_context(
+                    goal_text,
+                    concern_activations=dict(self._character_concern_activations),
+                    k=10, max_hops=1)
+                if graph_ctx:
+                    parts.append("\n## COGNITIVE CONTEXT (relevant history)")
+                    parts.append(graph_ctx)
+        except Exception as e:
+            logger.debug(f"Graph context assembly failed: {e}")
 
         return "\n".join(parts)
 

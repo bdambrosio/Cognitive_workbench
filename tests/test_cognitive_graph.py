@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from src.cognitive_graph import CognitiveGraph
+from src.cognitive_graph import CognitiveGraph, GraphRenderer
 
 
 # ---------------------------------------------------------------------------
@@ -435,3 +435,198 @@ class TestThreadSafety:
         t_write.join()
         t_read.join()
         assert not errors
+
+
+# ---------------------------------------------------------------------------
+# GraphRenderer
+# ---------------------------------------------------------------------------
+
+class TestGraphRenderer:
+    def _build_ooda_chain(self):
+        """Build a small OODA chain: event → assessment → decision → action_result."""
+        g = _make_graph()
+        t = 1000.0
+        n1 = g.add_node("event", "User asked about cats", ts=t,
+                          attrs={"event_type": "user_text", "source": "User",
+                                 "classification": "chat"})
+        n2 = g.add_node("assessment", "Strong attend_to_user, novel request", ts=t + 1,
+                          attrs={"action_choice": "chat_response",
+                                 "salience": {"novelty": "high"}})
+        n3 = g.add_node("decision", "Decided: chat_response", ts=t + 2,
+                          attrs={"action_type": "chat_response",
+                                 "payload_summary": "text about cats"})
+        n4 = g.add_node("action_result", "Executed chat_response: success", ts=t + 3,
+                          attrs={"action_type": "chat_response", "success": True})
+        g.add_edge(n1, n2, "observed")
+        g.add_edge(n2, n3, "decided_from")
+        g.add_edge(n3, n4, "executed")
+        return g, [n1, n2, n3, n4]
+
+    def test_render_chain(self):
+        g, nids = self._build_ooda_chain()
+        nodes = [g.get_node(nid) for nid in nids]
+        edges = []
+        for nid in nids:
+            edges.extend(g.get_edges_from(nid))
+        text = GraphRenderer.render(nodes, edges)
+        assert "Event (User)" in text
+        assert "Assessment:" in text
+        assert "Decided:" in text
+        assert "Result: success" in text
+
+    def test_render_preserves_order(self):
+        g = _make_graph()
+        n1 = g.add_node("event", "First event", ts=100.0,
+                          attrs={"source": "sensor"})
+        n2 = g.add_node("event", "Second event", ts=200.0,
+                          attrs={"source": "User"})
+        nodes = [g.get_node(n2), g.get_node(n1)]  # reversed
+        text = GraphRenderer.render(nodes, [])
+        # First event should appear before second
+        pos1 = text.find("First event")
+        pos2 = text.find("Second event")
+        assert pos1 < pos2
+
+    def test_render_snapshot(self):
+        g = _make_graph()
+        g.add_node("concern_change", "attend bumped",
+                    attrs={"concern_id": "attend", "concern_label": "attend_to_user",
+                           "new_activation": 0.72}, ts=100.0)
+        g.add_node("event", "User said hello",
+                    attrs={"source": "User"}, ts=200.0)
+        g.add_node("goal_launch", "Respond to User",
+                    attrs={"goal_id": "g1", "status": "active"}, ts=300.0)
+
+        concerns = g.latest_per_key("concern_change", "concern_id")
+        events = g.query_nodes(type="event", limit=10)
+        goals = g.query_nodes(type="goal_launch",
+                               attrs_filter={"status": "active"})
+        text = GraphRenderer.render_snapshot(concerns, events, goals)
+        assert "attend_to_user" in text
+        assert "0.72" in text
+        assert "Respond to User" in text
+        assert "User said hello" in text
+
+    def test_render_empty(self):
+        assert GraphRenderer.render([], []) == ""
+
+
+# ---------------------------------------------------------------------------
+# Consolidation
+# ---------------------------------------------------------------------------
+
+class TestConsolidation:
+    def test_basic_consolidation(self):
+        g = _make_graph(config={
+            "consolidation_threshold_hours": 0,  # consolidate everything
+            "consolidation_window_hours": 1,
+            "consolidation_min_nodes": 3,
+        })
+        # Create 5 nodes in the same 1-hour window
+        base_ts = 1000.0
+        for i in range(5):
+            g.add_node("event", f"Event {i}", ts=base_ts + i * 60,
+                        attrs={"source": "test"})
+
+        initial_count = g.node_count()
+        consolidated = g.consolidate()
+        assert consolidated == 5
+        # Should have 1 consolidation node
+        cons_nodes = g.query_nodes(type="consolidation")
+        assert len(cons_nodes) == 1
+        assert "5 events" in cons_nodes[0]["content"]
+
+    def test_exempt_types_preserved(self):
+        g = _make_graph(config={
+            "consolidation_threshold_hours": 0,
+            "consolidation_window_hours": 1,
+            "consolidation_min_nodes": 3,
+        })
+        base_ts = 1000.0
+        for i in range(5):
+            g.add_node("event", f"Event {i}", ts=base_ts + i * 60)
+        g.add_node("concern_created", "Important concern", ts=base_ts + 10)
+        g.add_node("task_created", "Important task", ts=base_ts + 20)
+
+        g.consolidate()
+        # Exempt nodes should survive
+        assert len(g.query_nodes(type="concern_created")) == 1
+        assert len(g.query_nodes(type="task_created")) == 1
+
+    def test_below_min_nodes_not_consolidated(self):
+        g = _make_graph(config={
+            "consolidation_threshold_hours": 0,
+            "consolidation_window_hours": 1,
+            "consolidation_min_nodes": 10,
+        })
+        for i in range(3):
+            g.add_node("event", f"Event {i}", ts=1000.0 + i * 60)
+
+        consolidated = g.consolidate()
+        assert consolidated == 0
+        assert g.node_count() == 3
+
+    def test_recent_nodes_not_consolidated(self):
+        g = _make_graph(config={
+            "consolidation_threshold_hours": 4,
+            "consolidation_window_hours": 1,
+            "consolidation_min_nodes": 3,
+        })
+        # Create recent nodes (within threshold)
+        now = time.time()
+        for i in range(5):
+            g.add_node("event", f"Event {i}", ts=now - 60 + i)
+
+        consolidated = g.consolidate()
+        assert consolidated == 0
+
+    def test_consolidation_preserves_salience_content(self):
+        g = _make_graph(config={
+            "consolidation_threshold_hours": 0,
+            "consolidation_window_hours": 1,
+            "consolidation_min_nodes": 3,
+        })
+        base_ts = 1000.0
+        g.add_node("event", "Boring event", ts=base_ts)
+        g.add_node("assessment", "Important assessment about quantum computing",
+                    ts=base_ts + 60,
+                    attrs={"salience": {"novelty": "high"}})
+        g.add_node("event", "Another event", ts=base_ts + 120)
+        g.add_node("event", "Third event", ts=base_ts + 180)
+        g.add_node("event", "Fourth event", ts=base_ts + 240)
+
+        g.consolidate()
+        cons = g.query_nodes(type="consolidation")
+        assert len(cons) == 1
+        # High-salience content should be preserved in summary
+        assert "quantum computing" in cons[0]["content"]
+
+
+# ---------------------------------------------------------------------------
+# Context Assembly
+# ---------------------------------------------------------------------------
+
+class TestContextAssembly:
+    def test_assemble_context(self):
+        g = _make_graph()
+        t = 1000.0
+        n1 = g.add_node("event", "User asked about machine learning", ts=t,
+                          attrs={"source": "User"})
+        n2 = g.add_node("assessment", "Novel ML question, strong attend", ts=t + 1,
+                          attrs={"action_choice": "chat_response"})
+        g.add_edge(n1, n2, "observed")
+
+        ctx = g.assemble_context("machine learning")
+        assert ctx  # non-empty
+        assert "machine learning" in ctx.lower() or "ML" in ctx
+
+    def test_assemble_empty_graph(self):
+        g = _make_graph()
+        ctx = g.assemble_context("anything")
+        assert ctx == ""
+
+    def test_assemble_no_embedder(self):
+        g = CognitiveGraph()  # no embedder
+        g.add_node("event", "test")
+        ctx = g.assemble_context("test")
+        assert ctx == ""

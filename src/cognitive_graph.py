@@ -478,3 +478,338 @@ class CognitiveGraph:
         self._node_to_faiss_id = new_node_to_fid
         self._faiss_id_counter = fid_counter
         logger.info("FAISS index rebuilt: %d vectors", fid_counter)
+
+    # ------------------------------------------------------------------
+    # Consolidation (§8)
+    # ------------------------------------------------------------------
+
+    CONSOLIDATION_EXEMPT_TYPES = {
+        "consolidation", "concern_created", "task_created", "situation_update",
+    }
+
+    def consolidate(self) -> int:
+        """Compress old graph regions into summary nodes.
+
+        Groups nodes older than consolidation_threshold_hours into 1-hour
+        windows and replaces each window (with > min_nodes) with a single
+        consolidation summary node. Returns the number of nodes consolidated.
+        """
+        threshold_s = self._config["consolidation_threshold_hours"] * 3600
+        window_s = self._config["consolidation_window_hours"] * 3600
+        min_nodes = self._config["consolidation_min_nodes"]
+        cutoff = time.time() - threshold_s
+
+        # Gather eligible nodes
+        with self._lock:
+            eligible = [
+                (nid, node) for nid, node in self._nodes.items()
+                if node["ts"] < cutoff
+                and node["type"] not in self.CONSOLIDATION_EXEMPT_TYPES
+            ]
+        if not eligible:
+            return 0
+
+        # Group by window
+        windows: dict[int, list[tuple[str, dict]]] = {}
+        for nid, node in eligible:
+            bucket = int(node["ts"] // window_s)
+            windows.setdefault(bucket, []).append((nid, node))
+
+        total_consolidated = 0
+        for bucket, entries in sorted(windows.items()):
+            if len(entries) < min_nodes:
+                continue
+            entries.sort(key=lambda x: x[1]["ts"])
+            t_start = entries[0][1]["ts"]
+            t_end = entries[-1][1]["ts"]
+
+            # Count by type
+            type_counts: dict[str, int] = {}
+            concern_ids: set[str] = set()
+            goal_count = 0
+            goal_succeeded = 0
+            salience_nodes: list[tuple[float, str]] = []
+
+            for nid, node in entries:
+                ntype = node["type"]
+                type_counts[ntype] = type_counts.get(ntype, 0) + 1
+                attrs = node.get("attrs", {})
+                if ntype == "concern_change":
+                    concern_ids.add(attrs.get("concern_id", ""))
+                elif ntype == "goal_launch":
+                    goal_count += 1
+                elif ntype == "goal_outcome":
+                    if attrs.get("success"):
+                        goal_succeeded += 1
+                # Estimate salience from assessment nodes
+                if ntype == "assessment":
+                    sal = attrs.get("salience", {})
+                    novelty_score = {"high": 3, "moderate": 2, "low": 1, "none": 0}
+                    score = novelty_score.get(
+                        sal.get("novelty", "none") if isinstance(sal, dict) else "none", 0)
+                    salience_nodes.append((score, node.get("content", "")))
+
+            # Build template summary
+            t_start_str = time.strftime("%H:%M", time.localtime(t_start))
+            t_end_str = time.strftime("%H:%M", time.localtime(t_end))
+            time_range = f"{t_start_str}–{t_end_str}"
+            n_events = type_counts.get("event", 0)
+            concern_list = ", ".join(sorted(concern_ids - {""})) or "none"
+
+            summary = (
+                f"[{time_range}] {n_events} events, {goal_count} goals "
+                f"({goal_succeeded} succeeded), concerns active: {concern_list}."
+            )
+
+            # Append top-3 highest-salience content for better embedding
+            salience_nodes.sort(key=lambda x: x[0], reverse=True)
+            top_content = [c for _, c in salience_nodes[:3] if c]
+            if top_content:
+                summary += " Key: " + " | ".join(top_content)
+            summary = summary[:self._max_content]
+
+            # Create consolidation node
+            con_nid = self.add_node("consolidation", summary,
+                attrs={
+                    "time_range_start": t_start,
+                    "time_range_end": t_end,
+                    "node_count_consolidated": len(entries),
+                    "node_types_summary": type_counts,
+                })
+
+            # Prune original nodes
+            node_ids_to_remove = [nid for nid, _ in entries]
+            with self._lock:
+                for nid in node_ids_to_remove:
+                    self._remove_node_locked(nid)
+            total_consolidated += len(entries)
+
+        if total_consolidated:
+            logger.info("Consolidated %d nodes into summary nodes", total_consolidated)
+        return total_consolidated
+
+    # ------------------------------------------------------------------
+    # Context Assembly (§9.2)
+    # ------------------------------------------------------------------
+
+    def assemble_context(self, query_text: str, concern_activations: dict[str, float] = None,
+                         k: int = 20, max_hops: int = 2) -> str:
+        """Assemble a rendered context block for LLM prompts.
+
+        1. Semantic search for relevant nodes
+        2. Boost nodes connected to active concerns
+        3. Expand subgraph for provenance
+        4. Render as linearized narrative
+
+        Args:
+            query_text: the goal/question text to search for
+            concern_activations: {concern_id: activation} for boosting
+            k: number of seed nodes from semantic search
+            max_hops: BFS expansion depth
+
+        Returns:
+            Rendered text block suitable for LLM prompt injection.
+        """
+        if not self._embedder or self.node_count() == 0:
+            return ""
+
+        # Step 1: seed selection
+        try:
+            raw_results = self.semantic_search(query_text, k=k)
+        except Exception:
+            return ""
+        if not raw_results:
+            return ""
+
+        # Step 2: concern weighting — boost nodes connected to active concerns
+        scored: list[tuple[str, float]] = []
+        activations = concern_activations or {}
+        for node_id, sim_score in raw_results:
+            boost = 1.0
+            if activations:
+                # Check if node is connected to an active concern
+                edges_out = self.get_edges_from(node_id, edge_type="bumped")
+                edges_in = self.get_edges_to(node_id, edge_type="bumped")
+                for edge in edges_out + edges_in:
+                    # Look at the concern_change node's concern_id
+                    other_id = edge["target"] if edge["source"] == node_id else edge["source"]
+                    other = self.get_node(other_id)
+                    if other and other["type"] == "concern_change":
+                        cid = other["attrs"].get("concern_id", "")
+                        if cid in activations:
+                            boost = max(boost, 1.0 + activations[cid])
+            scored.append((node_id, sim_score * boost))
+
+        scored.sort(key=lambda x: x[1], reverse=True)
+        seed_ids = [nid for nid, _ in scored[:k]]
+
+        # Step 3: subgraph expansion
+        nodes, edges = self.expand_subgraph(seed_ids, max_hops=max_hops)
+
+        # Step 4: render
+        return GraphRenderer.render(nodes, edges)
+
+
+class GraphRenderer:
+    """Serializes cognitive graph subgraphs into text for LLM context windows."""
+
+    @staticmethod
+    def render(nodes: list[dict], edges: list[dict]) -> str:
+        """Render a subgraph as a linearized narrative with provenance markers.
+
+        Organizes nodes into OODA chains (event → assessment → decision → result)
+        and renders them chronologically with indented provenance.
+        """
+        if not nodes:
+            return ""
+
+        # Build lookup structures
+        node_map = {n["node_id"]: n for n in nodes}
+        edge_map: dict[str, list[dict]] = {}  # source -> [edges]
+        for e in edges:
+            edge_map.setdefault(e["source"], []).append(e)
+
+        # Find chain roots: events and conversation_turns that start chains
+        root_types = {"event", "conversation_turn", "consolidation",
+                      "goal_launch", "concern_created"}
+        roots = [n for n in nodes if n["type"] in root_types]
+        roots.sort(key=lambda n: n["ts"])
+
+        # Track which nodes have been rendered to avoid duplicates
+        rendered: set[str] = set()
+        lines: list[str] = []
+
+        for root in roots:
+            chain = GraphRenderer._render_chain(root, node_map, edge_map, rendered, depth=0)
+            if chain:
+                lines.append(chain)
+
+        # Render any orphan nodes not part of a chain
+        for n in sorted(nodes, key=lambda n: n["ts"]):
+            if n["node_id"] not in rendered:
+                rendered.add(n["node_id"])
+                lines.append(GraphRenderer._render_node(n, depth=0))
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def render_snapshot(concern_states: list[dict], recent_events: list[dict],
+                        active_goals: list[dict]) -> str:
+        """Render a living-state-style snapshot from graph queries.
+
+        Provides a quick summary of current concern activations,
+        recent events, and active goals.
+        """
+        parts = []
+
+        # Concerns
+        if concern_states:
+            parts.append("Concern activations:")
+            for n in sorted(concern_states, key=lambda x: x["attrs"].get("new_activation", 0), reverse=True):
+                attrs = n["attrs"]
+                parts.append(
+                    f"  {attrs.get('concern_label', attrs.get('concern_id', '?'))}: "
+                    f"{attrs.get('new_activation', 0):.2f}")
+
+        # Active goals
+        if active_goals:
+            parts.append("Active goals:")
+            for g in active_goals:
+                parts.append(f"  - {g['content'][:120]} [{g['attrs'].get('goal_id', '?')}]")
+
+        # Recent events
+        if recent_events:
+            parts.append("Recent events:")
+            for ev in recent_events[:10]:
+                ts_str = time.strftime("%H:%M", time.localtime(ev["ts"]))
+                source = ev["attrs"].get("source", "")
+                parts.append(f"  [{ts_str}] ({source}) {ev['content'][:150]}")
+
+        return "\n".join(parts)
+
+    # ------------------------------------------------------------------
+    # Internal rendering helpers
+    # ------------------------------------------------------------------
+
+    # Edge types that form provenance chains (source_type → target_type)
+    _CHAIN_EDGES = {
+        "observed", "decided_from", "executed", "spawned_goal",
+        "produced", "bumped", "triggered_by", "nominated", "triaged",
+        "spawned_task", "updated_concern",
+    }
+
+    @staticmethod
+    def _render_chain(node: dict, node_map: dict, edge_map: dict,
+                      rendered: set, depth: int) -> str:
+        """Recursively render a node and its downstream chain."""
+        nid = node["node_id"]
+        if nid in rendered:
+            return ""
+        rendered.add(nid)
+
+        lines = [GraphRenderer._render_node(node, depth)]
+
+        # Follow outgoing chain edges
+        for edge in edge_map.get(nid, []):
+            if edge["type"] not in GraphRenderer._CHAIN_EDGES:
+                continue
+            target = node_map.get(edge["target"])
+            if target and target["node_id"] not in rendered:
+                child = GraphRenderer._render_chain(
+                    target, node_map, edge_map, rendered, depth + 1)
+                if child:
+                    lines.append(child)
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def _render_node(node: dict, depth: int) -> str:
+        """Render a single node as a text line."""
+        ts_str = time.strftime("%H:%M", time.localtime(node["ts"]))
+        indent = "  " * depth
+        arrow = "→ " if depth > 0 else ""
+        ntype = node["type"]
+        content = node["content"][:200]
+        attrs = node.get("attrs", {})
+
+        if ntype == "event":
+            source = attrs.get("source", "")
+            return f"{indent}[{ts_str}] {arrow}Event ({source}): {content}"
+        elif ntype == "conversation_turn":
+            entity = attrs.get("entity", "")
+            direction = attrs.get("direction", "")
+            arrow_char = "←" if direction == "in" else "→"
+            return f"{indent}[{ts_str}] {arrow}{arrow_char} {entity}: {content}"
+        elif ntype == "assessment":
+            action = attrs.get("action_choice", "")
+            return f"{indent}{arrow}Assessment: {content}" + (f" → {action}" if action else "")
+        elif ntype == "decision":
+            return f"{indent}{arrow}Decided: {attrs.get('action_type', '')} — {content}"
+        elif ntype == "action_result":
+            ok = "success" if attrs.get("success") else "failed"
+            return f"{indent}{arrow}Result: {ok}"
+        elif ntype == "goal_launch":
+            gid = attrs.get("goal_id", "")
+            status = attrs.get("status", "active")
+            return f"{indent}{arrow}Goal [{gid}] ({status}): {content}"
+        elif ntype == "goal_outcome":
+            ok = "success" if attrs.get("success") else "failed"
+            pp = attrs.get("primary_product", "")
+            extra = f", produced {pp}" if pp else ""
+            return f"{indent}{arrow}Goal outcome: {ok}{extra} — {content}"
+        elif ntype == "concern_change":
+            return f"{indent}{arrow}Concern: {content}"
+        elif ntype == "concern_created":
+            return f"{indent}{arrow}New concern: {content}"
+        elif ntype == "triage_nomination":
+            return f"{indent}{arrow}Triage nominated: {content}"
+        elif ntype == "triage_decision":
+            action = attrs.get("action", "")
+            return f"{indent}{arrow}Triage decided: {action} — {content}"
+        elif ntype == "task_created":
+            wip = attrs.get("task_wip_id", "")
+            return f"{indent}{arrow}Task created [{wip}]: {content}"
+        elif ntype == "consolidation":
+            return f"{indent}[{ts_str}] {arrow}Summary: {content}"
+        else:
+            return f"{indent}[{ts_str}] {arrow}{ntype}: {content}"
