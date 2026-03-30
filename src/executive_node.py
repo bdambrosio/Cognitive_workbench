@@ -978,6 +978,28 @@ class ZenohExecutiveNode:
         from concern_triage import ConcernTriage
         self._concern_triage = ConcernTriage()
 
+        # ── Cognitive Memory Graph ──────────────────────────────────────
+        from cognitive_graph import CognitiveGraph
+        self._cognitive_graph = CognitiveGraph(
+            embedder=self.resource_manager._generate_embedding if self.resource_manager else None,
+        )
+        self._graph_node_by_key: Dict[str, str] = {}  # "goal:<id>" / "concern_change:<id>" etc.
+        # Option B stash for tight OODA chain (same tick)
+        self._last_event_node: Optional[str] = None
+        self._last_assessment_node: Optional[str] = None
+        self._last_decision_node: Optional[str] = None
+        # Load persisted graph if available
+        try:
+            base = self.resource_manager.base_dir if self.resource_manager else None
+            if base:
+                self._cognitive_graph_path = str(Path(base) / "cognitive_graph")
+                self._cognitive_graph.load(self._cognitive_graph_path)
+            else:
+                self._cognitive_graph_path = None
+        except Exception as e:
+            logger.warning(f"Failed to load cognitive graph: {e}")
+            self._cognitive_graph_path = None
+
         self._scheduled_goal_counter = 0
         self._active_scheduled_goal_id = None
         self._initialize_scheduled_goals()
@@ -1613,6 +1635,8 @@ class ZenohExecutiveNode:
         if event is None:
             self._ooda_idle_tick()
             return
+        # ── Graph: observe ──
+        self._graph_emit_observe(event)
         self._ooda_living_state.update_after_observe(event)
         oriented = self._ooda_orient(event)
         # Build concern descriptions map for living state content
@@ -1637,6 +1661,8 @@ class ZenohExecutiveNode:
         except Exception:
             pass
         action = self._ooda_decide(oriented)
+        # ── Graph: decide ──
+        self._graph_emit_decide(action)
         # Record OODA event for UI feed
         self._record_ooda_event(event, oriented, action)
         self._ooda_act(action)
@@ -1668,6 +1694,12 @@ class ZenohExecutiveNode:
         self._ooda_living_state.maybe_persist(
             self._write_named_note, dc,
             planner_summary=self._get_planner_summary())
+        # ── Graph: periodic save ──
+        try:
+            if self._cognitive_graph_path:
+                self._cognitive_graph.save(self._cognitive_graph_path)
+        except Exception as e:
+            logger.debug(f"Cognitive graph save failed: {e}")
 
     def _resync_task_wip_counter(self):
         """Scan existing _task_wip_N named notes and set counter to max N found."""
@@ -1716,13 +1748,17 @@ class ZenohExecutiveNode:
                 concern = next((c for c in active_concerns if c.get('concern_id') == cid), None)
                 if not concern:
                     continue
+                _act = ca.get('activation', 0.0)
+                _lbl = concern.get('concern_label', cid)
                 self._concern_triage.nominate_from_activation(
                     concern_id=cid,
-                    concern_label=concern.get('concern_label', cid),
+                    concern_label=_lbl,
                     concern_description=concern.get('concern_description', ''),
-                    activation=ca.get('activation', 0.0),
+                    activation=_act,
                     trend=ca.get('trend', 'stable'),
                 )
+                # ── Graph: idle triage nomination ──
+                self._graph_emit_triage_nomination(cid, _lbl, _act, ca.get('trend', 'stable'), "idle")
         except Exception as e:
             logger.debug(f'Triage activation nomination skipped: {e}')
 
@@ -1776,6 +1812,8 @@ class ZenohExecutiveNode:
         _CONCERN_TASK_CREATION_ENABLED = False
         from concern_triage import TriageDecision
         for d in decisions:
+            # ── Graph: triage decision ──
+            self._graph_emit_triage_decision(d)
             if d.action == 'create_task':
                 if not _CONCERN_TASK_CREATION_ENABLED:
                     logger.info(f'📋 Skipping concern-initiated task creation (disabled): {d.task_intention[:80]}')
@@ -1815,6 +1853,8 @@ class ZenohExecutiveNode:
             "target": f"${note_name}",
             "name": note_name,
         })
+        # ── Graph: task created ──
+        self._graph_emit_task_created(wip_id, intention, concern_id)
         logger.info(f'📋 Proposed task created: {note_name} — "{intention[:80]}" (concern: {concern_id})')
         self._say_to_user(
             f"Task proposed: {intention[:200]}\n"
@@ -3066,6 +3106,8 @@ class ZenohExecutiveNode:
             if isinstance(plan_actions, list):
                 updates["cached_plan_actions"] = plan_actions
         self._update_scheduled_goal(goal_id, **updates)
+        # ── Graph: goal outcome ──
+        self._graph_emit_goal_outcome(goal_id, success, last_result_raw, primary_product, result)
         if goal_id in self._scheduler_started_goals:
             self._scheduler_started_goals.discard(goal_id)
         self._record_scheduler_event(
@@ -6501,6 +6543,9 @@ class ZenohExecutiveNode:
             # Orient-stage triage nomination: strong bump on a cold concern
             self._triage_orient_nominations(assessment)
 
+        # ── Graph: orient ──
+        self._graph_emit_orient(event, assessment)
+
         return OrientedEvent(event=event, assessment=assessment)
 
     def _update_character_concern_activations(self, assessment: Dict[str, Any]):
@@ -6525,7 +6570,11 @@ class ZenohExecutiveNode:
                         cid = cid.strip()
                         level = level.strip()
                         old = self._character_concern_activations.get(cid, 0.0)
-                        self._character_concern_activations[cid] = old * DECAY + BUMP.get(level, 0.0)
+                        new_val = old * DECAY + BUMP.get(level, 0.0)
+                        self._character_concern_activations[cid] = new_val
+                        # ── Graph: concern change ──
+                        if abs(new_val - old) >= self._cognitive_graph._config.get("concern_change_threshold", 0.05):
+                            self._graph_emit_concern_change(cid, old, new_val, level)
                 break
 
     def _triage_orient_nominations(self, assessment: Dict[str, Any]):
@@ -6565,6 +6614,8 @@ class ZenohExecutiveNode:
                     activation=activation,
                     bump_level=level,
                 )
+                # ── Graph: triage nomination ──
+                self._graph_emit_triage_nomination(cid, label, activation, level, "orient")
             break
 
     def _ooda_decide(self, oriented: OrientedEvent) -> Action:
@@ -6686,6 +6737,202 @@ class ZenohExecutiveNode:
             return False
         return True
 
+    # ── Cognitive Graph Emission Helpers ──────────────────────────────
+
+    def _graph_emit_observe(self, event):
+        """Emit event node + conversation_turn for incoming messages."""
+        try:
+            g = self._cognitive_graph
+            nid = g.add_node("event", event.content[:500],
+                attrs={"event_type": event.event_type,
+                       "classification": event.classification,
+                       "source": event.source})
+            self._last_event_node = nid
+            # Conversation turn for user/agent messages
+            if event.event_type == 'user_text':
+                turn_nid = g.add_node("conversation_turn", event.content[:500],
+                    attrs={"source": event.source, "direction": "in",
+                           "entity": event.source})
+                g.add_edge(turn_nid, nid, "triggered_by")
+        except Exception as e:
+            logger.debug(f"Graph observe emit failed: {e}")
+
+    def _graph_emit_orient(self, event, assessment):
+        """Emit assessment node linked to event node."""
+        try:
+            if not assessment:
+                return
+            g = self._cognitive_graph
+            rationale = assessment.get('overall_rationale', '')
+            action_eval = assessment.get('action_evaluation', {}) or {}
+            action_choice = action_eval.get('action_choice', 'no_action')
+            salience = assessment.get('salience_factors', {}) or {}
+            # Build concern bumps dict from notes
+            bumps = {}
+            notes = assessment.get('notes', '')
+            for seg in notes.split(';'):
+                seg = seg.strip()
+                if seg.startswith('concerns:'):
+                    for pair in seg[len('concerns:'):].strip().split(','):
+                        if '=' in pair:
+                            k, v = pair.rsplit('=', 1)
+                            bumps[k.strip()] = v.strip()
+            nid = g.add_node("assessment", rationale[:500],
+                attrs={"concern_bumps": bumps,
+                       "action_choice": action_choice,
+                       "salience": salience})
+            self._last_assessment_node = nid
+            if self._last_event_node:
+                g.add_edge(self._last_event_node, nid, "observed")
+        except Exception as e:
+            logger.debug(f"Graph orient emit failed: {e}")
+
+    def _graph_emit_concern_change(self, cid, old_val, new_val, level):
+        """Emit concern_change node linked to assessment."""
+        try:
+            g = self._cognitive_graph
+            # Look up label
+            label = cid
+            try:
+                for c in self._derived_concern_model.get_concerns(active_only=True):
+                    if c.get('concern_id') == cid:
+                        label = c.get('concern_label', cid)
+                        break
+            except Exception:
+                pass
+            nid = g.add_node("concern_change",
+                f"Concern '{label}' activation {old_val:.2f} → {new_val:.2f} ({level} bump)",
+                attrs={"concern_id": cid, "concern_label": label,
+                       "old_activation": round(old_val, 4),
+                       "new_activation": round(new_val, 4),
+                       "trigger": level})
+            self._graph_node_by_key[f"concern_change:{cid}"] = nid
+            if self._last_assessment_node:
+                g.add_edge(self._last_assessment_node, nid, "bumped")
+        except Exception as e:
+            logger.debug(f"Graph concern_change emit failed: {e}")
+
+    def _graph_emit_triage_nomination(self, cid, label, activation, bump_or_trend, source):
+        """Emit triage_nomination node."""
+        try:
+            g = self._cognitive_graph
+            nid = g.add_node("triage_nomination",
+                f"Concern '{label}' nominated: activation={activation:.2f}, {source}",
+                attrs={"concern_id": cid, "concern_label": label,
+                       "activation": round(activation, 4),
+                       "trend": str(bump_or_trend),
+                       "nomination_source": source})
+            self._graph_node_by_key[f"triage_nom:{cid}"] = nid
+            # Link to concern_change if available
+            cc_node = self._graph_node_by_key.get(f"concern_change:{cid}")
+            if cc_node:
+                g.add_edge(cc_node, nid, "nominated")
+        except Exception as e:
+            logger.debug(f"Graph triage nomination emit failed: {e}")
+
+    def _graph_emit_triage_decision(self, d):
+        """Emit triage_decision node linked to nomination."""
+        try:
+            g = self._cognitive_graph
+            nid = g.add_node("triage_decision", getattr(d, 'reason', '')[:500],
+                attrs={"concern_id": getattr(d, 'concern_id', ''),
+                       "action": getattr(d, 'action', ''),
+                       "task_intention": getattr(d, 'task_intention', '') or ''})
+            nom_node = self._graph_node_by_key.get(f"triage_nom:{d.concern_id}")
+            if nom_node:
+                g.add_edge(nom_node, nid, "triaged")
+        except Exception as e:
+            logger.debug(f"Graph triage decision emit failed: {e}")
+
+    def _graph_emit_decide(self, action):
+        """Emit decision node linked to assessment."""
+        try:
+            g = self._cognitive_graph
+            payload_summary = ''
+            if action.payload:
+                payload_summary = str(action.payload)[:200]
+            content = f"Decided: {action.type}"
+            if action.payload and action.payload.get('text'):
+                content += f" — {action.payload['text'][:100]}"
+            nid = g.add_node("decision", content[:500],
+                attrs={"action_type": action.type,
+                       "payload_summary": payload_summary})
+            self._last_decision_node = nid
+            if self._last_assessment_node:
+                g.add_edge(self._last_assessment_node, nid, "decided_from")
+        except Exception as e:
+            logger.debug(f"Graph decide emit failed: {e}")
+
+    def _graph_emit_action_result(self, action_type, success):
+        """Emit action_result node linked to decision."""
+        try:
+            g = self._cognitive_graph
+            nid = g.add_node("action_result",
+                f"Executed {action_type}: {'success' if success else 'failed'}",
+                attrs={"action_type": action_type, "success": success})
+            if self._last_decision_node:
+                g.add_edge(self._last_decision_node, nid, "executed")
+        except Exception as e:
+            logger.debug(f"Graph action_result emit failed: {e}")
+
+    def _graph_emit_goal_launch(self, goal_id, goal_text, source):
+        """Emit goal_launch node linked to decision."""
+        try:
+            g = self._cognitive_graph
+            nid = g.add_node("goal_launch", (goal_text or '')[:500],
+                attrs={"goal_id": goal_id, "source": source, "status": "active"})
+            self._graph_node_by_key[f"goal:{goal_id}"] = nid
+            if self._last_decision_node:
+                g.add_edge(self._last_decision_node, nid, "spawned_goal")
+        except Exception as e:
+            logger.debug(f"Graph goal_launch emit failed: {e}")
+
+    def _graph_emit_goal_outcome(self, goal_id, success, last_result, primary_product, result):
+        """Emit goal_outcome node and update goal_launch status."""
+        try:
+            g = self._cognitive_graph
+            nid = g.add_node("goal_outcome", (last_result or '')[:500],
+                attrs={"goal_id": goal_id, "success": success,
+                       "primary_product": primary_product or '',
+                       "quality_status": (result or {}).get("quality_status", ""),
+                       "verification_answer": (result or {}).get("verification_answer", "")})
+            launch_node = self._graph_node_by_key.get(f"goal:{goal_id}")
+            if launch_node:
+                g.add_edge(launch_node, nid, "produced")
+                g.update_attrs(launch_node, {"status": "completed" if success else "failed"})
+        except Exception as e:
+            logger.debug(f"Graph goal_outcome emit failed: {e}")
+
+    def _graph_emit_task_created(self, wip_id, intention, concern_id):
+        """Emit task_created node."""
+        try:
+            g = self._cognitive_graph
+            nid = g.add_node("task_created", intention[:500],
+                attrs={"task_wip_id": wip_id,
+                       "linked_concern_id": concern_id,
+                       "phase": "proposed"})
+            self._graph_node_by_key[f"task:{wip_id}"] = nid
+        except Exception as e:
+            logger.debug(f"Graph task_created emit failed: {e}")
+
+    def _graph_emit_concern_created(self, concern):
+        """Emit concern_created node for a newly derived concern."""
+        try:
+            g = self._cognitive_graph
+            cid = concern.get('concern_id', '')
+            label = concern.get('concern_label', cid)
+            desc = concern.get('concern_description', '')
+            nid = g.add_node("concern_created", f"{label}: {desc}"[:500],
+                attrs={"concern_id": cid, "concern_label": label,
+                       "origin": concern.get('origin', ''),
+                       "weight": concern.get('weight', 1.0)})
+            self._graph_node_by_key[f"concern_change:{cid}"] = nid
+            # Link to assessment that triggered creation
+            if self._last_assessment_node:
+                g.add_edge(nid, self._last_assessment_node, "concern_for")
+        except Exception as e:
+            logger.debug(f"Graph concern_created emit failed: {e}")
+
     def _record_ooda_event(self, event, oriented, action):
         """Record an OODA cycle event for the UI feed."""
         try:
@@ -6723,7 +6970,17 @@ class ZenohExecutiveNode:
             )
             evidence_ref = f"orient_event:{datetime.now().isoformat()}"
             uc = self.user_concern_model.get_concerns(active_only=False) or []
+            # Snapshot concern IDs before update to detect new ones
+            _pre_ids = {c.get('concern_id') for c in self._derived_concern_model.get_concerns()}
             self._derived_concern_model.update_from_event(interaction_text, uc, evidence_ref)
+            # ── Graph: concern created ──
+            try:
+                for c in self._derived_concern_model.get_concerns():
+                    cid = c.get('concern_id', '')
+                    if cid and cid not in _pre_ids:
+                        self._graph_emit_concern_created(c)
+            except Exception:
+                pass
         except Exception as e:
             logger.debug(f'Tier 2 concern trigger failed: {e}')
 
@@ -6796,6 +7053,8 @@ class ZenohExecutiveNode:
             self.conversation_store.close_dialog("User")
             scheduled_goal = self._upsert_scheduled_goal(p['goal_text'])
             goal_id = scheduled_goal["goal_id"]
+            # ── Graph: goal launch ──
+            self._graph_emit_goal_launch(goal_id, p['goal_text'], "user")
             if self._is_goal_running():
                 self._say_to_user("A goal is already running. Please wait for it to complete.")
                 return
@@ -6816,6 +7075,10 @@ class ZenohExecutiveNode:
             if not p.get('goal_id'):
                 self._say_to_user("Please specify which goal to proceed, e.g. 'proceed goal_1'.")
                 return
+            # ── Graph: goal launch (proceed) ──
+            goal = self._get_scheduled_goal(p['goal_id'])
+            self._graph_emit_goal_launch(
+                p['goal_id'], (goal or {}).get('goal_text', ''), p.get('source', 'user'))
             self._handle_goal_proceed(goal_id=p['goal_id'], source=p.get('source', 'user'))
             return
 
@@ -6824,6 +7087,8 @@ class ZenohExecutiveNode:
             return
 
         if t == 'chat_response':
+            # ── Graph: action result ──
+            self._graph_emit_action_result(t, True)
             # Clear stale interrupt from prior End/Stop
             self.interrupt_requested = False
             if self.infospace_executor:
@@ -6851,6 +7116,8 @@ class ZenohExecutiveNode:
             return
 
         if t == 'agent_message':
+            # ── Graph: action result ──
+            self._graph_emit_action_result(t, True)
             self._create_character_note()
             self._handle_agent_message(p['text'], p['source'], p.get('close_flag', False), action.assessment)
             return
