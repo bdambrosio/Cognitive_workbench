@@ -36,7 +36,7 @@ characters:
     sensors:
       - name: rss-watcher
         schedule: "90m"
-        disposition: "trigger:rssAIFilter"
+        disposition: "inform"
         parameters:
           feeds:
             - https://rss.nytimes.com/services/xml/rss/nyt/World.xml
