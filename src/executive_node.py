@@ -6493,10 +6493,6 @@ class ZenohExecutiveNode:
                     disposition = event.raw_sense_data.get('disposition', '')
 
                 nsrc = self._character_eval_normalize_source(source, sensor_name)
-                afford = None
-                if self.available_tools:
-                    aff = character_evaluator.filter_relevant_affordances(content, list(self.available_tools.keys()))
-                    afford = aff or None
 
                 uc: List[Dict[str, Any]] = []
                 try:
@@ -6527,7 +6523,7 @@ class ZenohExecutiveNode:
                     self._character_eval_build_goals_compact(),
                     self._character_eval_build_recent_context(),
                     self._character_eval_build_activity_state(),
-                    afford,
+                    None,
                     llm_generate=self.llm_generate,
                     target_goal_id=target_goal_id,
                 )

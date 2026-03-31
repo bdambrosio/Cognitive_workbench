@@ -680,35 +680,3 @@ def build_event_dict(
     return ev
 
 
-def filter_relevant_affordances(text: str, available_tool_names: Sequence[str]) -> List[str]:
-    """Return a small subset of tool names plausibly relevant to text (simple heuristic)."""
-    t = re.sub(r"\s+", " ", (text or "").lower()).strip()
-    candidates: List[str] = []
-    if any(x in t for x in ("health", "heartbeat", "cpu", "disk", "latency", "service", "functioning", "status")):
-        candidates.extend(["check-health", "check_health", "manage-goals"])
-    if any(x in t for x in ("rss", "feed", "headline", "news")):
-        candidates.extend(["read-rss", "read_rss"])
-    if any(x in t for x in ("web", "search", "url")):
-        candidates.extend(["search-web", "search_web"])
-    if any(x in t for x in ("goal", "schedule", "proceed")):
-        candidates.extend(["manage-goals"])
-    if any(x in t for x in ("task", "work", "milestone", "establish")):
-        candidates.extend(["manage-tasks"])
-    if any(x in t for x in ("code", "script", "program", "debug", "implement",
-                             "how do i work", "how do you work", "how i work", "how you work",
-                             "my source", "my code", "your source", "your code",
-                             "your architecture", "my architecture",
-                             "your ooda", "my ooda", "your cognitive", "my cognitive",
-                             "explain your", "explain my", "how does my", "how does your",
-                             "your concern", "your planner", "your executor")):
-        candidates.extend(["claude-code"])
-    out: List[str] = []
-    for c in candidates:
-        key = c.lower().replace("_", "-")
-        for n in available_tool_names:
-            nk = n.replace("_", "-").lower()
-            if nk == key or nk == c.lower():
-                if n not in out:
-                    out.append(n)
-                break
-    return out[:8]
