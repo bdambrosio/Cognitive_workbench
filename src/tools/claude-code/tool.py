@@ -1,11 +1,11 @@
 """
 Claude Code integration tool — delegate coding and research tasks to Claude Code CLI.
 
-Supports two targets:
+Supports two scopes via target:
   - "sandbox" (default): read-write access to the agent's own fs/src/ repo
   - "self": read-only access to the Cognitive Workbench source code
 
-Each target maintains its own persistent session via --resume.
+Each scope maintains its own persistent session via --resume.
 """
 
 import json
@@ -18,7 +18,7 @@ from infospace_executor import InfospaceExecutor
 
 logger = logging.getLogger(__name__)
 
-# Session note names per target
+# Session note names per scope
 _SESSION_NOTES = {
     "sandbox": "_claude_code_session_sandbox",
     "self": "_claude_code_session_self",
@@ -82,9 +82,9 @@ def _ensure_git_repo(directory: Path) -> None:
         logger.info(f"claude-code: Initialized git repo at {directory}")
 
 
-def _get_session_id(executive_node, target: str) -> Optional[str]:
+def _get_session_id(executive_node, scope: str) -> Optional[str]:
     """Read stored session ID from named note."""
-    note_name = _SESSION_NOTES[target]
+    note_name = _SESSION_NOTES[scope]
     rm = executive_node.resource_manager
     if not rm:
         return None
@@ -100,10 +100,10 @@ def _get_session_id(executive_node, target: str) -> Optional[str]:
         return None
 
 
-def _save_session_id(executive_node, executor, target: str, session_id: str):
+def _save_session_id(executive_node, executor, scope: str, session_id: str):
     """Store session ID in a named note."""
-    note_name = _SESSION_NOTES[target]
-    content = json.dumps({"session_id": session_id, "target": target})
+    note_name = _SESSION_NOTES[scope]
+    content = json.dumps({"session_id": session_id, "scope": scope})
     executor.execute_action({
         "type": "create-note",
         "value": content,
@@ -117,17 +117,16 @@ def _save_session_id(executive_node, executor, target: str, session_id: str):
     })
 
 
-def _action_ask(executive_node, executor, **kwargs) -> Dict:
-    prompt = (kwargs.get("value") or kwargs.get("prompt") or "").strip()
+def _action_ask(executive_node, executor, scope, **kwargs) -> Dict:
+    prompt = (kwargs.get("prompt") or "").strip()
     if not prompt:
-        return _fail(executor, "prompt/value is required")
+        return _fail(executor, "prompt is required")
 
-    target = (kwargs.get("target") or "sandbox").strip().lower()
-    if target not in ("sandbox", "self"):
-        return _fail(executor, f"Invalid target '{target}'. Must be 'sandbox' or 'self'.")
+    if scope not in ("sandbox", "self"):
+        return _fail(executor, f"Invalid target '{scope}'. Must be 'sandbox' or 'self'.")
 
     # Determine working directory
-    if target == "sandbox":
+    if scope == "sandbox":
         work_dir = _get_sandbox_dir(executive_node)
         _ensure_git_repo(work_dir)
         allowed_tools = kwargs.get("allowed_tools") or _SANDBOX_TOOLS
@@ -155,11 +154,11 @@ def _action_ask(executive_node, executor, **kwargs) -> Dict:
     ]
 
     # Resume existing session if available
-    session_id = _get_session_id(executive_node, target)
+    session_id = _get_session_id(executive_node, scope)
     if session_id:
         cmd.extend(["--resume", session_id])
 
-    logger.info(f"claude-code: asking ({target}) in {work_dir}: {prompt[:100]}...")
+    logger.info(f"claude-code: asking ({scope}) in {work_dir}: {prompt[:100]}...")
 
     try:
         result = subprocess.run(
@@ -219,14 +218,14 @@ def _action_ask(executive_node, executor, **kwargs) -> Dict:
     # Save session ID for future resume
     new_session_id = response.get("session_id")
     if new_session_id:
-        _save_session_id(executive_node, executor, target, new_session_id)
+        _save_session_id(executive_node, executor, scope, new_session_id)
 
     # Extract the response text
     answer = response.get("result", "")
     cost = response.get("cost", 0)
     usage = response.get("usage", {})
 
-    logger.info(f"claude-code: response ({target}), "
+    logger.info(f"claude-code: response ({scope}), "
                 f"cost=${cost:.4f}, "
                 f"tokens={usage.get('output', '?')}")
 
@@ -235,24 +234,23 @@ def _action_ask(executive_node, executor, **kwargs) -> Dict:
         "result": answer,
         "session_id": new_session_id,
         "cost": cost,
-        "target": target,
+        "scope": scope,
     })
 
 
-def _action_reset(executive_node, executor, **kwargs) -> Dict:
+def _action_reset(executive_node, executor, scope, **kwargs) -> Dict:
     """Reset (clear) a session so the next ask starts fresh."""
-    target = (kwargs.get("target") or "sandbox").strip().lower()
-    if target not in ("sandbox", "self"):
-        return _fail(executor, f"Invalid target '{target}'.")
+    if scope not in ("sandbox", "self"):
+        return _fail(executor, f"Invalid target '{scope}'.")
 
-    note_name = _SESSION_NOTES[target]
+    note_name = _SESSION_NOTES[scope]
     rm = executive_node.resource_manager
     if rm:
         note_id = rm.named_notes.get(note_name)
         if note_id:
             executor.execute_action({
                 "type": "create-note",
-                "value": json.dumps({"session_id": None, "target": target}),
+                "value": json.dumps({"session_id": None, "scope": scope}),
                 "name": note_name,
                 "out": f"${note_name}",
             })
@@ -262,7 +260,7 @@ def _action_reset(executive_node, executor, **kwargs) -> Dict:
                 "name": note_name,
             })
 
-    return _success(executor, value=f"Claude Code session reset for target '{target}'")
+    return _success(executor, value=f"Claude Code session reset for '{scope}'")
 
 
 # ---------------------------------------------------------------------------
@@ -276,7 +274,11 @@ _ACTIONS = {
 
 
 def tool(input_value=None, runtime=None, **kwargs):
-    """Delegate tasks to Claude Code CLI."""
+    """Delegate tasks to Claude Code CLI.
+
+    target (resolved by executor as input_value): "sandbox" or "self"
+    prompt: the instruction to send to Claude Code
+    """
     executor: InfospaceExecutor = kwargs.get("executor")
     if not executor:
         return {"status": "failed", "reason": "executor not available",
@@ -286,6 +288,9 @@ def tool(input_value=None, runtime=None, **kwargs):
     if not executive_node:
         return _fail(executor, "executive_node not available")
 
+    # target arrives as input_value, default to sandbox
+    scope = (input_value or "sandbox").strip().lower()
+
     # Default action is "ask" — most common use
     action = (kwargs.get("action") or "ask").strip().lower()
     if action not in _ACTIONS:
@@ -293,12 +298,9 @@ def tool(input_value=None, runtime=None, **kwargs):
                      f"Unknown action '{action}'. Must be one of: {', '.join(_ACTIONS)}")
 
     try:
-        # Pass input_value as "value" for the ask action
         action_kwargs = {k: v for k, v in kwargs.items()
                         if k not in ("executive_node", "executor", "action")}
-        if input_value and "value" not in action_kwargs:
-            action_kwargs["value"] = input_value
-        return _ACTIONS[action](executive_node, executor, **action_kwargs)
+        return _ACTIONS[action](executive_node, executor, scope, **action_kwargs)
     except Exception as e:
         logger.error(f"claude-code {action} failed: {e}", exc_info=True)
         return _fail(executor, f"{action} failed: {e}")
