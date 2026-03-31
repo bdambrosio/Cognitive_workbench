@@ -1759,8 +1759,6 @@ class ZenohExecutiveNode:
                     activation=_act,
                     trend=ca.get('trend', 'stable'),
                 )
-                # ── Graph: idle triage nomination ──
-                self._graph_emit_triage_nomination(cid, _lbl, _act, ca.get('trend', 'stable'), "idle")
         except Exception as e:
             logger.debug(f'Triage activation nomination skipped: {e}')
 

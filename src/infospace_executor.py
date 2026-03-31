@@ -1397,24 +1397,29 @@ Only provide the result, followed by the </end> tag.""")
                     stop_param = stops
 
             # Create generation function with proper role separation
+            json_schema_str = json.dumps({"type": "object"}) if is_json else None
             @function
-            def generate_text(s, system_text, user_text, stop_seq=None):
+            def generate_text(s, system_text, user_text, stop_seq=None, json_constraint=None):
                 if system_text:
                     s += sgl_system(system_text)
                 s += user(user_text)
                 gen_kwargs = {"max_tokens": max_tokens, "temperature": temperature}
                 if stop_seq is not None:
                     gen_kwargs["stop"] = stop_seq
+                if json_constraint is not None:
+                    gen_kwargs["json_schema"] = json_constraint
                 s += assistant(gen("output", **gen_kwargs))
 
             # Run the function — pass stop as explicit parameter, not closure
             state = generate_text.run(
-                system_text=system_text, user_text=user_text, stop_seq=stop_param
+                system_text=system_text, user_text=user_text, stop_seq=stop_param,
+                json_constraint=json_schema_str
             )
             result_text = state["output"].strip()
 
             # Strip <think>...</think> blocks (reasoning models like Qwen3)
             result_text = re.sub(r'<think>.*?</think>\s*', '', result_text, flags=re.DOTALL)
+            result_text = re.sub(r'</think>\s*', '', result_text)
 
             # Post-process JSON if requested
             if is_json:
@@ -1496,6 +1501,8 @@ Only provide the result, followed by the </end> tag.""")
                         payload.update(v)
                     else:
                         payload[k] = v
+            if is_json:
+                payload["response_format"] = {"type": "json_object"}
             if stops:
                 if isinstance(stops, list):
                     payload["stop"] = stops
@@ -1818,6 +1825,8 @@ Only provide the result, followed by the </end> tag.""")
                         payload.update(v)
                     else:
                         payload[k] = v
+            if is_json:
+                payload["response_format"] = {"type": "json_object"}
             if stops:
                 if isinstance(stops, list):
                     payload["stop"] = stops
@@ -1971,6 +1980,7 @@ Only provide the result, followed by the </end> tag.""")
 
         # Strip <think>...</think> blocks (Qwen3 thinking mode) before parsing
         response = re.sub(r'<think>.*?</think>\s*', '', response, flags=re.DOTALL)
+        response = re.sub(r'</think>\s*', '', response)
 
         # Remove markdown code fences if present
         response = response.replace("```json", "").replace("```", "").strip()
@@ -1979,6 +1989,13 @@ Only provide the result, followed by the </end> tag.""")
         try:
             return json.loads(response)
         except json.JSONDecodeError as e:
+            # Handle "Extra data" — valid JSON followed by LLM run-on junk
+            if 'Extra data' in str(e):
+                try:
+                    obj, _ = json.JSONDecoder().raw_decode(response)
+                    return obj
+                except json.JSONDecodeError:
+                    pass
             logger.error(f'Simple JSON repair failed: {e}')
             logger.debug(f'Failed to parse JSON from: {response_text[:200]}...')
         

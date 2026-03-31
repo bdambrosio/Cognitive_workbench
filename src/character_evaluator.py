@@ -692,6 +692,8 @@ def filter_relevant_affordances(text: str, available_tool_names: Sequence[str]) 
         candidates.extend(["search-web", "search_web"])
     if any(x in t for x in ("goal", "schedule", "proceed")):
         candidates.extend(["manage-goals"])
+    if any(x in t for x in ("task", "work", "milestone", "establish")):
+        candidates.extend(["manage-tasks"])
     out: List[str] = []
     for c in candidates:
         key = c.lower().replace("_", "-")
