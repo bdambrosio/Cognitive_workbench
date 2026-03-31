@@ -694,7 +694,13 @@ def filter_relevant_affordances(text: str, available_tool_names: Sequence[str]) 
         candidates.extend(["manage-goals"])
     if any(x in t for x in ("task", "work", "milestone", "establish")):
         candidates.extend(["manage-tasks"])
-    if any(x in t for x in ("code", "script", "program", "debug", "implement", "how do i work", "my source", "my code")):
+    if any(x in t for x in ("code", "script", "program", "debug", "implement",
+                             "how do i work", "how do you work", "how i work", "how you work",
+                             "my source", "my code", "your source", "your code",
+                             "your architecture", "my architecture",
+                             "your ooda", "my ooda", "your cognitive", "my cognitive",
+                             "explain your", "explain my", "how does my", "how does your",
+                             "your concern", "your planner", "your executor")):
         candidates.extend(["claude-code"])
     out: List[str] = []
     for c in candidates:
