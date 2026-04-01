@@ -1198,6 +1198,42 @@ def format_result_text(result: Dict, action: Dict) -> str:
         return f"ERROR | {action_type} failed: {error_reason}"
 
 
+def _get_exemplar_hint_for_failure(tool_result: str, executor) -> str:
+    """If tool_result indicates a failure, retrieve successful exemplars for the failed tool.
+
+    Returns a hint string to inject into the Stage 3 prompt, or empty string if
+    no failure or no exemplars available.
+    """
+    if "ERROR |" not in tool_result:
+        return ""
+    # Extract tool name from "ERROR | tool_name failed: reason"
+    # or from "_code_block_ failed: reason" (code block wraps tool calls)
+    import re
+    m = re.search(r'ERROR \| (\S+) failed:', tool_result)
+    if not m:
+        return ""
+    failed_tool = m.group(1)
+    # _code_block_ failures: scan the error for a tool name
+    if failed_tool == "_code_block_":
+        # Look for tool name in the error text
+        for candidate in re.findall(r'tool\("([^"]+)"', tool_result):
+            failed_tool = candidate
+            break
+        else:
+            return ""
+
+    wm = getattr(executor, 'world_model', None)
+    if not wm or not hasattr(wm, 'get_tool_exemplars'):
+        return ""
+    exemplars = wm.get_tool_exemplars(failed_tool)
+    if not exemplars:
+        return ""
+    lines = [f"HINT: Previous successful calls to '{failed_tool}':"]
+    for ex in exemplars[-3:]:  # Show at most 3 most recent
+        lines.append(f"  {ex['call_line']}")
+    return "\n".join(lines) + "\n\n"
+
+
 def execute_infospace_action(action: Dict, executor: InfospaceExecutor, agent_name: str) -> str:
     """
     Execute single action via infospace_executor, return result text.
@@ -2792,6 +2828,9 @@ ALWAYS follow all formatting instructions exactly.
                 s["final_answer"] = "Interrupted by user."
                 break
 
+            # Set task context for tool exemplar recording
+            executor._current_task_context = current_task
+
             result_dict, new_bindings, tool_result, code_block_output_created = _execute_and_record_code_block(code_text, executor, step)
             
             logger.info(f"Step {step}: -> {tool_result[:100]}")
@@ -2812,6 +2851,7 @@ ALWAYS follow all formatting instructions exactly.
             
             # Stage 3: Evaluate result
             bindings_summary = ", ".join(f"${k}={v}" for k, v in new_bindings.items() if not str(k).startswith("_")) if new_bindings else "none"
+            exemplar_hint = _get_exemplar_hint_for_failure(tool_result, executor)
             s += user(
                 f"=====\n"
                 f"STAGE 3 (step {step + 1}/{max_steps})\n"
@@ -2821,6 +2861,7 @@ ALWAYS follow all formatting instructions exactly.
                 f">> RESULT (ground truth) <<\n"
                 f"{tool_result}\n"
                 f">> END RESULT <<\n\n"
+                f"{exemplar_hint}"
                 f"Evaluate: Is the GOAL fully achieved? Use ONLY the result above as ground truth.\n"
                 f"Respond using Stage 3 FORMAT.\n"
             )
@@ -3918,9 +3959,12 @@ ALWAYS follow all formatting instructions exactly.
             _clear_interrupt(executor)
             state["final_answer"] = "Interrupted by user."
             break
-        
+
+        # Set task context for tool exemplar recording
+        executor._current_task_context = current_task
+
         result_dict, new_bindings, tool_result, code_block_output_created = _execute_and_record_code_block(code_text, executor, step)
-        
+
         logger.info(f"Step {step}: -> {tool_result[:100]}")
         if new_bindings:
             plan_local_bindings.update(new_bindings.keys())
@@ -3938,6 +3982,7 @@ ALWAYS follow all formatting instructions exactly.
             break
         
         # Stage 3: Evaluate result
+        exemplar_hint = _get_exemplar_hint_for_failure(tool_result, executor)
         prompt += format_user(
             f"=====\n"
             f"STAGE 3 (step {step + 1}/{max_steps})\n"
@@ -3945,6 +3990,7 @@ ALWAYS follow all formatting instructions exactly.
             f">> RESULT (ground truth) <<\n"
             f"{tool_result}\n"
             f">> END RESULT <<\n\n"
+            f"{exemplar_hint}"
             f"Evaluate: Is the GOAL fully achieved? Use ONLY the result above as ground truth.\n"
             f"Respond using Stage 3 FORMAT.\n"
         )

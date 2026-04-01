@@ -88,7 +88,7 @@ def empty_world_model_raw() -> WorldModel:
         "version": RAW_WORLD_MODEL_VERSION,
         "created_at": now,
         "updated_at": now,
-        "raw_data": {"facts": [], "tool_contracts": []},
+        "raw_data": {"facts": [], "tool_contracts": [], "tool_exemplars": {}},
     }
 
 
@@ -323,6 +323,39 @@ class WorldModel:
         self.world_model = wm
         self._beliefs_cache = self._derive_beliefs(self.world_model)
 
+
+    # ------------------------------------------------------------------
+    # Tool exemplars — successful call examples for retry assistance
+    # ------------------------------------------------------------------
+
+    _MAX_EXEMPLARS_PER_TOOL = 5
+
+    def record_tool_exemplar(self, tool_name: str, call_line: str, task_context: str = ""):
+        """Record a successful tool call as an exemplar for future retry assistance.
+
+        Keeps the most recent N exemplars per tool name. No embedding,
+        no similarity — just a bounded queue per tool.
+        """
+        raw_data = self.world_model.get("raw_data", {})
+        exemplars = raw_data.get("tool_exemplars", {})
+        queue = exemplars.get(tool_name, [])
+        entry = {
+            "call_line": call_line,
+            "task_context": task_context,
+            "recorded_at": _now_iso(),
+        }
+        queue.append(entry)
+        # Keep only the most recent N
+        if len(queue) > self._MAX_EXEMPLARS_PER_TOOL:
+            queue = queue[-self._MAX_EXEMPLARS_PER_TOOL:]
+        exemplars[tool_name] = queue
+        raw_data["tool_exemplars"] = exemplars
+        self.world_model["raw_data"] = raw_data
+
+    def get_tool_exemplars(self, tool_name: str) -> list:
+        """Return stored exemplars for a tool, or empty list."""
+        raw_data = self.world_model.get("raw_data", {})
+        return raw_data.get("tool_exemplars", {}).get(tool_name, [])
 
     def get(self) -> WorldModel:
         return self._beliefs_cache

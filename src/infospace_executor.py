@@ -945,7 +945,21 @@ class InfospaceExecutor:
         if result.get('status') != 'success':
             if hasattr(self, '_plan_error_count'):
                 self._plan_error_count += 1
-        
+
+        # Record successful tool calls as exemplars for retry assistance
+        if result.get('status') == 'success' and hasattr(self, 'world_model') and self.world_model:
+            tool_name = action.get('type', '')
+            if tool_name and tool_name in (self.available_tools or {}):
+                try:
+                    # Reconstruct call line from action dict
+                    args = {k: v for k, v in action.items() if k not in ('type',)}
+                    args_str = ", ".join(f'{k}="{v}"' if isinstance(v, str) else f'{k}={v}' for k, v in args.items())
+                    call_line = f'tool("{tool_name}", {args_str})'
+                    task_context = getattr(self, '_current_task_context', '')
+                    self.world_model.record_tool_exemplar(tool_name, call_line, task_context)
+                except Exception:
+                    pass  # Never let exemplar recording break execution
+
         return result
     
     def execute_action_with_log(self, action: Dict, method_name: str) -> Dict:
