@@ -4,12 +4,12 @@ world_config:
   world_name: "infolab"
 
 llm_config:
-  sgl_model_path: "unsloth/Qwen3-Coder-Next-FP8"#"Qwen/Qwen3.5-27B"#"txn545/Qwen3.5-122B-A10B-NVFP4"#"unsloth/Qwen3-Coder-Next-FP8"#"Qwen/Qwen3.5-27B"  
+  sgl_model_path: "unsloth/Qwen3-Coder-Next-FP8"#"Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled-v2"#"unsloth/Qwen3-Coder-Next-FP8"#"Qwen/Qwen3.5-27B"#"txn545/Qwen3.5-122B-A10B-NVFP4"#"unsloth/Qwen3-Coder-Next-FP8"#"Qwen/Qwen3.5-27B"  
   #chat_template: "/home/bruce/sglang/qwen3_nonthinking.jinja"  
   grobid: "http://localhost:8070/"
 
-alt_llm_config:
-  openrouter_model_path: "openai/gpt-5.4-mini"#"google/gemini-3-flash-preview"
+#alt_llm_config:
+#  openrouter_model_path: "openai/gpt-5.4-mini"#"google/gemini-3-flash-preview"
   
 setting: |
   Cognitive Workbench, a research framework for building and operating autonomous agents with persistent memory, 

@@ -51,7 +51,7 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Jill - Infospace OpenRouter",
+            "name": "Jill - Infospace OpenRouter CLI",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/launcher.py",
@@ -60,7 +60,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["jill-infospace-openrouter.yaml", "--ui", "--resource-browser", "--task-manager"],
+            "args": ["jill-infospace-openrouter.yaml", "--cli", "--resource-browser"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
