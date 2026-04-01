@@ -230,12 +230,7 @@ def _action_ask(executive_node, executor, scope, **kwargs) -> Dict:
                 f"tokens={usage.get('output', '?')}")
 
     summary = answer if answer else "(empty response)"
-    return _success(executor, value=summary, data={
-        "result": answer,
-        "session_id": new_session_id,
-        "cost": cost,
-        "scope": scope,
-    })
+    return _success(executor, value=summary)
 
 
 def _action_reset(executive_node, executor, scope, **kwargs) -> Dict:
