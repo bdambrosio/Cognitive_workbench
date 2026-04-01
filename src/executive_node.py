@@ -918,21 +918,12 @@ class ZenohExecutiveNode:
         )
         logger.info(f'🌍 WorldModel initialized for {character_name} in {world_name}')
         
-        # Create ToolModel instance (with executor)
-        from tool_model import ToolModel
-        self.tool_model = ToolModel(
-            world_name=world_name,
-            agent_name=character_name,
-            resource_manager=self.resource_manager,
-            executor=self.infospace_executor,
-            available_tools=available_for_models
-        )
-        self.tool_model.build_task_tool_index()
-        logger.info(f'🔧 ToolModel initialized for {character_name} in {world_name}')
-        
+        # ToolModel disabled — tool contracts in WorldModel serve this role
+        self.tool_model = None
+
         # Attach models to executor for access by planner
         self.infospace_executor.world_model = self.world_model
-        self.infospace_executor.tool_model = self.tool_model
+        self.infospace_executor.tool_model = None
         
         # World initialization removed - worlds are assumed to run as separate servers
         
@@ -2759,7 +2750,7 @@ class ZenohExecutiveNode:
                     "(e.g., user preferences, working data sources, useful resource names, "
                     "things that failed and shouldn't be retried the same way).\n\n"
                     "Do NOT include: goal status, project narratives, what to do next, "
-                    "or anything already tracked by world_model/tool_model.\n"
+                    "or anything already tracked by world_model.\n"
                     "Keep max 10 entries. Drop stale or redundant ones.\n"
                     "Output ONLY the bullet list (- item), or 'none' if nothing to retain.\n\n"
                     f"## EXISTING LEARNINGS\n{existing_learnings or '(none yet)'}\n\n"
@@ -2803,8 +2794,40 @@ class ZenohExecutiveNode:
             self._write_named_note('_situation', new_content)
             self.situation_context = new_content
             logger.info(f'✓ Updated situation note ({len(new_content)} chars)')
+
+            # Feed learnings into world_model as durable facts
+            if new_learnings and hasattr(self, 'world_model') and self.world_model:
+                try:
+                    self._feed_learnings_to_world_model(new_learnings, goal_text, status)
+                except Exception as e:
+                    logger.debug(f'Learnings→world_model feed skipped: {e}')
         except Exception as e:
             logger.warning(f'Error updating situation note: {e}')
+
+    def _feed_learnings_to_world_model(self, learnings_text: str, goal_text: str, status: str):
+        """Feed situation learnings into world_model as candidate facts.
+
+        Each bullet is submitted as a world_model_update. The world_model's
+        own generalization check filters out episodic or session-specific items.
+        """
+        updates = []
+        for line in learnings_text.split('\n'):
+            line = line.strip()
+            if line.startswith('- '):
+                fact = line[2:].strip()
+                if len(fact) > 10:
+                    updates.append({
+                        "fact": fact,
+                        "polarity": "support",
+                        "confidence": "medium",
+                        "source": "learning",
+                    })
+        if updates:
+            self.world_model.update({
+                "world_model_updates": updates,
+                "tool_insights": [],
+            })
+            logger.info(f'🌍 Fed {len(updates)} learnings to world_model for generalization check')
 
     def _consolidate_situation_note(self):
         """Final situation note consolidation at shutdown.
@@ -9219,6 +9242,14 @@ class ZenohExecutiveNode:
                 import traceback
                 traceback.print_exc()
             
+            # Save world model
+            if hasattr(self, 'world_model') and self.world_model:
+                try:
+                    self.world_model.save()
+                    logger.info(f'🌍 Saved world_model for {self.character_name}')
+                except Exception as e:
+                    logger.error(f'Error saving world_model during shutdown: {e}')
+
             # Save resource manager
             if self.resource_manager:
                 try:

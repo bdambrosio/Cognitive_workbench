@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 from infospace_executor import InfospaceExecutor
 from plan_guidance import PlanGuidance
-from tool_model import ToolModel
+# ToolModel disabled — tool contracts in WorldModel serve this role
 from world_model import WORLD_MODEL_SCHEMA, empty_world_model
 # Per-stage temperature settings for gen() calls
 GEN_TEMPERATURE = 0.5          # Default / fallback
@@ -2521,12 +2521,6 @@ if HAS_SGLANG:
         wm_slim = {k: world_model.get(k, []) for k in ("facts", "tool_contracts")}
         system_parts.append(f"WORLD_MODEL: {json.dumps(wm_slim, indent=2)}\n")
 
-        # Tool model experience hints (Thompson-sampled, only when sufficient data)
-        if executor and hasattr(executor, 'tool_model') and executor.tool_model:
-            tool_hints = executor.tool_model.sample_tool_hints(goal)
-            if tool_hints:
-                system_parts.append(f"{tool_hints}\n")
-
         system_parts.append(f"CURRENT_TIME: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n")
         system_parts.append(f"\n#GOAL:\n{goal}\n")
         system_parts.append("""Follow this process to achieve the goal:
@@ -3678,12 +3672,6 @@ def tool_planner_infospace_vllm(template, goal: str, world_model: Dict, characte
     
     wm_slim = {k: world_model.get(k, []) for k in ("facts", "tool_contracts")}
     system_parts.append(f"WORLD_MODEL: {json.dumps(wm_slim, indent=2)}\n")
-
-    # Tool model experience hints (Thompson-sampled, only when sufficient data)
-    if executor and hasattr(executor, 'tool_model') and executor.tool_model:
-        tool_hints = executor.tool_model.sample_tool_hints(goal)
-        if tool_hints:
-            system_parts.append(f"{tool_hints}\n")
 
     system_parts.append(f"CURRENT_TIME: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
     system_parts.append("""Follow this process to achieve the goal:
@@ -4933,8 +4921,7 @@ class IncrementalPlanner:
             else:
                 logger.info(f"Last step: {step}, done_{step}: (not found - may be interrupted)")
             trace_str = str(state)
-            tool_model: ToolModel = self.executor.tool_model
-             
+
             # Extract final_answer from ProgramState (use bracket notation)
             try:
                 final_answer = state['final_answer']
@@ -5112,9 +5099,6 @@ class IncrementalPlanner:
             else:
                 logger.info(f"Last step: {step}, done_{step}: (not found - may be interrupted)")
             trace_str = str(state)
-            tool_model: ToolModel = self.executor.tool_model
-            tool_model.update_from_trace(trace_str=trace_str)
-            tool_model.build_task_tool_index()  # Rebuild so next plan sees fresh experience
             compressed_trace = _compress_trace(trace_str)
             reflection_frame = self._reflect(goal, world_model, max_steps, compressed_trace)
 
