@@ -1,7 +1,7 @@
 ---
 name: claude-code
 type: python
-description: "Delegate coding, research, and analysis tasks to Claude Code CLI. Supports read-write work in the sandbox repo and read-only inspection of the agent's own source code."
+description: "Delegate coding, research, and analysis tasks to Claude Code CLI. Use target=self to ground any claims about your own architecture, capabilities, or behavior in actual source code rather than generating from general knowledge."
 schema_hint:
   action: "string: ask | reset (default: ask)"
   target: "string: sandbox | self (default: sandbox)"
@@ -16,6 +16,13 @@ schema_hint:
 
 Delegate tasks to Claude Code, a powerful coding agent that can read, write, and execute code. Use this when you need capabilities beyond your own tools — writing scripts, debugging code, running shell commands, or researching codebases.
 
+**IMPORTANT — self-knowledge rule:** Whenever you need to explain, reason about, or make claims about your own architecture, behavior, capabilities, or implementation, use `target: "self"` to inspect your actual source code first. Do NOT generate explanations about yourself from general knowledge — your answers must be grounded in your real codebase. This applies to:
+- Explaining how you work to users
+- Answering questions about your cognitive architecture (OODA loop, concerns, planning, etc.)
+- Debugging your own behavior or errors
+- Assessing what you can or cannot do
+- Making claims about your own capabilities or limitations
+
 ## Targets
 
 ### sandbox (default)
@@ -28,11 +35,23 @@ Your own workspace at `fs/src/`. Claude Code has full read-write access here. Us
 
 ### self
 
-Read-only access to the Cognitive Workbench source code — your own implementation. Claude Code can read, search, and analyze the codebase but cannot modify it. Use `target: "self"` to:
-- Understand how you work ("How does my concern triage decide what to act on?")
-- Debug your own behavior ("Why am I getting this error in the planner?")
-- Learn about your capabilities ("What tools do I have for web search?")
-- Answer questions about your architecture
+Read-only access to the Cognitive Workbench source code — your own implementation. Claude Code can read, search, and analyze the codebase but cannot modify it. Use `target: "self"` whenever you need to:
+- **Explain yourself**: "How does my OODA loop work?" — query the code, don't guess
+- **Verify your capabilities**: "Can I search the web?" — check what tools actually exist
+- **Debug your behavior**: "Why did my planner choose that tool?" — trace the actual logic
+- **Ground your claims**: Before telling a user "I work by doing X", confirm X is true in the code
+- **Understand your limits**: "What happens when my JSON parsing fails?" — read the repair logic
+
+### When to use self vs generating from memory
+
+| Situation | Use self | Generate directly |
+|---|---|---|
+| "Explain your OODA loop" | Yes — query code | No |
+| "How do you select tools?" | Yes — query code | No |
+| "What's 2+2?" | No | Yes — general knowledge |
+| "Summarize this article" | No | Yes — use other tools |
+| "What concerns do you have?" | No | Yes — check living state |
+| "How does your planner work?" | Yes — query code | No |
 
 ## Actions
 
@@ -52,30 +71,27 @@ Clear a session so the next ask starts a fresh conversation.
 ## Output
 
 - `value`: Claude Code's text response.
-- `data.result`: Full response text.
-- `data.session_id`: Session ID (managed automatically).
-- `data.cost`: Cost of the call in USD.
 
 ## Examples
 
-**Write a script in the sandbox:**
+**Explain your own architecture (ALWAYS use self for this):**
 ```json
-{"type": "claude-code", "prompt": "Write a Python script that fetches RSS feeds from a list of URLs and extracts article titles. Save it as rss_reader.py", "out": "$cc_result"}
+{"type": "claude-code", "target": "self", "prompt": "Explain how the OODA loop cognitive control works in this codebase. Cover the main phases, key components, and control flow.", "out": "$explanation"}
 ```
 
-**Inspect your own source code:**
+**Verify a capability claim before making it:**
 ```json
-{"type": "claude-code", "target": "self", "prompt": "How does the derived concern model decide when to satisfy vs abandon a concern? Show me the key logic.", "out": "$answer"}
-```
-
-**Follow up on previous work:**
-```json
-{"type": "claude-code", "prompt": "Now add error handling for network timeouts to the script you just wrote", "out": "$cc_result2"}
+{"type": "claude-code", "target": "self", "prompt": "What tools do I have for web search? What are their capabilities and limitations?", "out": "$capabilities"}
 ```
 
 **Debug your own behavior:**
 ```json
 {"type": "claude-code", "target": "self", "prompt": "Look at infospace_executor.py — what happens when _parse_json_response encounters invalid JSON? Trace the repair logic.", "out": "$debug_info"}
+```
+
+**Write a script in the sandbox:**
+```json
+{"type": "claude-code", "prompt": "Write a Python script that fetches RSS feeds from a list of URLs and extracts article titles. Save it as rss_reader.py", "out": "$cc_result"}
 ```
 
 **Reset a stale session:**
