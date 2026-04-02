@@ -2377,6 +2377,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                         note_ids.append(note_id)
                     else:
                         logger.warning(f"Variable {item} is not a Note/Collection, skipping")
+                elif isinstance(item, str) and (item.startswith('Note_') or item.startswith('Collection_')):
+                    # Bare resource ID — treat as reference, not content
+                    note_ids.append(item)
                 else:
                     note_id = self._persist_note(item, f'createCollection_item_{i}')
                     if note_id:
