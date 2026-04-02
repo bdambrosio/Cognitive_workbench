@@ -3477,7 +3477,22 @@ Make sure the string is in a format that can be parsed by the json.loads functio
 
         target = action.get('target', 'User')
 
-        # Publish question to UI
+        # --- Signal BEFORE publishing ---
+        # Set awaiting_ask_response BEFORE publishing the ask action to prevent
+        # a race where the reply arrives (via Zenoh → sense_data → text_input_queue)
+        # before the flag is set, causing the main loop to misclassify it as chat.
+        self.executive_node.awaiting_ask_response = True
+        self.executive_node.execution_paused = True
+        self.executive_node._publish_execution_state()
+
+        # Drain any stale items from a previous interrupted ask
+        while not self.executive_node._ask_response_queue.empty():
+            try:
+                self.executive_node._ask_response_queue.get_nowait()
+            except queue.Empty:
+                break
+
+        # NOW publish the ask action (after flag is set and queue is drained)
         action_data = {
             'type': 'ask',
             'action_type': 'ask',
@@ -3507,19 +3522,6 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 'content': json.dumps({'source': self.agent_name, 'text': str(question_text)})
             }
             self.session.put(f"cognitive/{target}/sense_data", json.dumps(sense_data))
-
-        # --- Blocking wait for response ---
-        # Signal main loop that we are waiting for a reply.
-        self.executive_node.awaiting_ask_response = True
-        self.executive_node.execution_paused = True
-        self.executive_node._publish_execution_state()
-
-        # Drain any stale items from a previous interrupted ask
-        while not self.executive_node._ask_response_queue.empty():
-            try:
-                self.executive_node._ask_response_queue.get_nowait()
-            except queue.Empty:
-                break
 
         display_var = self._normalize_var_for_log(out_var) if out_var else None
         logger.info(f"❓ Ask: '{question_text}' → blocking for response (timeout={self._ASK_TIMEOUT_SECONDS}s)")
