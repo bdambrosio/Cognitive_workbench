@@ -7,6 +7,7 @@ Sends chat as sense_data. Uses prompt_toolkit for non-blocking input.
 """
 
 import json
+import re
 import sys
 import threading
 import time
@@ -827,6 +828,7 @@ def _print_help():
   /ooda                          Show recent OODA events
 
 {C.BOLD}Navigation:{C.RESET}
+  @<agent> /<command>             Send command to a specific agent (e.g. @offline /stop)
   /char <name>                   Switch active character
   /ui                            Open web UI in browser
   /tasks-ui                      Open task manager in browser
@@ -1001,9 +1003,31 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
             if not line:
                 continue
 
-            # Slash-command
+            # Slash-command (with optional @agent targeting)
             if line.startswith('/'):
-                parsed = _parse_command(line)
+                # Check for @agent prefix: /@agent /command or @agent /command
+                target_agent = None
+                cmd_line = line
+                if line.startswith('/@') or line.startswith('@'):
+                    # Extract @agent and the rest
+                    stripped = line.lstrip('/')
+                    at_match = re.match(r'@([\w-]+)\s+(/.+)', stripped)
+                    if at_match:
+                        target_name = at_match.group(1)
+                        cmd_line = at_match.group(2)
+                        # Resolve agent name (case-insensitive, prefix match)
+                        for cn in character_names:
+                            if cn.lower() == target_name.lower() or cn.lower().startswith(target_name.lower()):
+                                target_agent = cn
+                                break
+                        if not target_agent:
+                            _print_error(f"Unknown agent: @{target_name}. Available: {', '.join(character_names)}")
+                            continue
+                    else:
+                        # Malformed @agent prefix — treat as normal command
+                        pass
+
+                parsed = _parse_command(cmd_line)
                 if parsed is None:
                     continue
 
@@ -1126,10 +1150,17 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
                     _print_system(f"Opened {parsed['url']}")
                     continue
 
-                # Send command to the command channel
+                # Send command to the command channel (or targeted agent)
                 parsed['source'] = 'User'
-                command_publisher.put(json.dumps(parsed))
-                _print_info(f"→ {parsed['cmd']}")
+                if target_agent:
+                    zenoh_session.put(
+                        f"cognitive/{target_agent}/command",
+                        json.dumps(parsed).encode('utf-8'),
+                    )
+                    _print_info(f"→ @{target_agent} {parsed['cmd']}")
+                else:
+                    command_publisher.put(json.dumps(parsed))
+                    _print_info(f"→ {parsed['cmd']}")
 
                 # Handle shutdown locally too
                 if cmd == '/shutdown':

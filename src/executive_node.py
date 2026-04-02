@@ -1798,22 +1798,62 @@ class ZenohExecutiveNode:
             pass
         return ' '.join(parts)
 
+    # Name of the background agent that receives delegated concern tasks.
+    # Set to None to disable delegation and fall back to local task creation.
+    DELEGATE_AGENT = 'jill-offline'
+
     def _handle_triage_decisions(self, decisions):
-        """Process triage decisions: create proposed tasks, attach to existing, etc."""
-        # TEMPORARY: concern-initiated task creation disabled while task system is under development
-        _CONCERN_TASK_CREATION_ENABLED = False
+        """Process triage decisions: dispatch to background agent or attach to existing task."""
         from concern_triage import TriageDecision
         for d in decisions:
             # ── Graph: triage decision ──
             self._graph_emit_triage_decision(d)
             if d.action == 'create_task':
-                if not _CONCERN_TASK_CREATION_ENABLED:
-                    logger.info(f'📋 Skipping concern-initiated task creation (disabled): {d.task_intention[:80]}')
-                    continue
-                self._create_proposed_task(d.concern_id, d.task_intention, d.reason)
+                if self.DELEGATE_AGENT:
+                    self._dispatch_to_delegate(d.concern_id, d.task_intention, d.reason)
+                else:
+                    self._create_proposed_task(d.concern_id, d.task_intention, d.reason)
             elif d.action == 'attach_to_task':
                 self._attach_concern_to_task(d.concern_id, d.existing_task_id)
             # defer and dismiss are handled by ConcernTriage internally
+
+    def _dispatch_to_delegate(self, concern_id: str, intention: str, reason: str):
+        """Dispatch a concern-initiated task to the background agent."""
+        delegate = self.DELEGATE_AGENT
+        # Mark the concern as delegated (prevents triage re-dispatch)
+        self._derived_concern_model.mark_delegated(concern_id, delegate)
+
+        # Send /goal add command to the delegate agent's command channel
+        callback_topic = f"cognitive/{self.character_name}/sense_data"
+        command = {
+            "cmd": "/goal add",
+            "goal_text": intention,
+            "source": self.character_name,
+            "source_agent": self.character_name,
+            "callback_topic": callback_topic,
+            "callback_concern_id": concern_id,
+        }
+        try:
+            self.session.put(
+                f"cognitive/{delegate}/command",
+                json.dumps(command).encode('utf-8'),
+            )
+            logger.info(f'📋 Dispatched concern task to {delegate}: "{intention[:80]}" (concern: {concern_id})')
+        except Exception as e:
+            logger.error(f'Failed to dispatch to {delegate}: {e}')
+            # Revert concern to active so triage can retry
+            concern = next((c for c in self._derived_concern_model.concerns
+                            if c.get('concern_id') == concern_id), None)
+            if concern:
+                concern['status'] = 'active'
+                concern['status_rationale'] = f'Delegation to {delegate} failed: {e}'
+                self._derived_concern_model._save()
+            return
+
+        self._say_to_user(
+            f"Delegated to {delegate}: {intention[:200]}\n"
+            f"Reason: {reason}"
+        )
 
     def _create_proposed_task(self, concern_id: str, intention: str, reason: str):
         """Create a proposed task from a triage decision. Awaits user approval."""
@@ -3339,7 +3379,65 @@ class ZenohExecutiveNode:
             status_word = 'completed' if success else 'failed'
             self._say_to_user(f"Goal '{goal_name}' {status_word}.{pp_ref}")
 
+        # Fire callback if this was a delegated task from another agent
+        self._fire_delegation_callback(goal, success, last_result_raw, primary_product)
+
         self._publish_execution_state()
+
+    def _fire_delegation_callback(self, goal: Dict, success: bool,
+                                   last_result: str, primary_product: str):
+        """If this goal was delegated from another agent, notify the source agent."""
+        callback_topic = goal.get('callback_topic')
+        if not callback_topic:
+            return
+        concern_id = goal.get('callback_concern_id', '')
+        source_agent = goal.get('source_agent', '')
+        goal_name = goal.get('name') or goal.get('goal_text', '')[:120]
+        status_word = 'completed' if success else 'failed'
+
+        # Build a result summary
+        summary = last_result[:500] if last_result else status_word
+        if primary_product:
+            summary += f'\nPrimary product: {primary_product}'
+
+        # 1. Notify the source agent via its sense_data channel
+        sense_payload = {
+            'timestamp': datetime.now().isoformat(),
+            'sequence_id': 0,
+            'mode': 'text',
+            'content': json.dumps({
+                'source': self.character_name,
+                'text': (
+                    f"[Delegation result] Goal '{goal_name}' {status_word}.\n"
+                    f"Concern: {concern_id}\n"
+                    f"Summary: {summary}"
+                ),
+            }),
+        }
+        try:
+            self.session.put(
+                callback_topic,
+                json.dumps(sense_payload).encode('utf-8'),
+            )
+            logger.info(f'📬 Sent delegation callback to {callback_topic} for concern {concern_id}')
+        except Exception as e:
+            logger.warning(f'Failed to send delegation callback: {e}')
+
+        # 2. Resolve the delegated concern on the source agent via its command channel
+        if concern_id and source_agent:
+            resolve_cmd = {
+                'cmd': '/concern resolve',
+                'concern_id': concern_id,
+                'source': self.character_name,
+            }
+            try:
+                self.session.put(
+                    f"cognitive/{source_agent}/command",
+                    json.dumps(resolve_cmd).encode('utf-8'),
+                )
+                logger.info(f'📬 Sent concern resolve to {source_agent} for {concern_id}')
+            except Exception as e:
+                logger.warning(f'Failed to send concern resolve command: {e}')
 
     def _handle_goal_proceed(self, goal_id: str = None, source: str = "user"):
         if not goal_id:
@@ -6049,6 +6147,15 @@ class ZenohExecutiveNode:
         self.conversation_store.close_dialog("User")
         scheduled_goal = self._upsert_scheduled_goal(goal_text)
         goal_id = scheduled_goal["goal_id"]
+        # Store callback metadata if present (for delegated concern tasks)
+        if data.get('callback_topic'):
+            scheduled_goal['callback_topic'] = data['callback_topic']
+        if data.get('callback_concern_id'):
+            scheduled_goal['callback_concern_id'] = data['callback_concern_id']
+        if data.get('source_agent'):
+            scheduled_goal['source_agent'] = data['source_agent']
+        if any(k in data for k in ('callback_topic', 'callback_concern_id', 'source_agent')):
+            self._save_scheduled_goal(scheduled_goal)
         if self._is_goal_running():
             self._say_to_user(f"Goal '{goal_id}' created but another goal is already running.")
             return f"Goal {goal_id} created (queued)"

@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 # Controlled vocabularies
 ORIGIN_VALUES = ('user_concern_derived', 'orientation_derived', 'goal_reflection', 'seed')
-STATUS_VALUES = ('surfaced', 'active', 'satisfied', 'abandoned')
+STATUS_VALUES = ('surfaced', 'active', 'satisfied', 'abandoned', 'delegated')
 
 NOTE_NAME = '_derived_concerns'
 IDLE_COOLDOWN_SECS = 60.0
@@ -56,7 +56,8 @@ revisit period expires. Use satisfy_concern when a task has adequately addressed
 
 Controlled vocabularies:
   origin: user_concern_derived, orientation_derived, goal_reflection, seed
-  status: surfaced, active, satisfied, abandoned
+  status: surfaced, active, satisfied, abandoned, delegated
+  (delegated = dispatched to background agent; do not activate, satisfy, or abandon)
 
 Respond with ONLY a JSON object. No markdown fences, no commentary."""
 
@@ -545,6 +546,43 @@ class DerivedConcernModel:
         refs = target.get('evidence_refs', [])
         refs.append(evidence_ref)
         target['evidence_refs'] = refs[-10:]
+
+    # ── Delegation ────────────────────────────────────────────────────
+
+    def mark_delegated(self, concern_id: str, delegate_agent: str) -> bool:
+        """Mark a concern as delegated to a background agent.
+
+        Delegated concerns are suppressed from triage and evaluation until
+        explicitly resolved (via resolve_delegated) or manually reactivated.
+        """
+        target = next((c for c in self.concerns if c.get('concern_id') == concern_id), None)
+        if not target:
+            logger.warning(f'Cannot delegate unknown concern {concern_id}')
+            return False
+        target['status'] = 'delegated'
+        target['status_rationale'] = f'Delegated to {delegate_agent}'
+        target['delegated_to'] = delegate_agent
+        target['delegated_at'] = datetime.now().isoformat()
+        target['recency'] = datetime.now().isoformat()
+        self._save()
+        logger.info(f'📋 Concern {concern_id} delegated to {delegate_agent}')
+        return True
+
+    def resolve_delegated(self, concern_id: str, result_summary: str = '') -> bool:
+        """Resolve a delegated concern back to satisfied (with revisit period)."""
+        target = next((c for c in self.concerns if c.get('concern_id') == concern_id), None)
+        if not target:
+            logger.warning(f'Cannot resolve unknown concern {concern_id}')
+            return False
+        target['status'] = 'satisfied'
+        target['status_rationale'] = f'Resolved by delegate: {result_summary[:200]}' if result_summary else 'Resolved by delegate'
+        target['satisfied_at'] = datetime.now().isoformat()
+        if not target.get('revisit_hours'):
+            target['revisit_hours'] = 4.0 if target.get('seeded') else 24.0
+        target['recency'] = datetime.now().isoformat()
+        self._save()
+        logger.info(f'✅ Delegated concern {concern_id} resolved → satisfied')
+        return True
 
     # ── Read access ───────────────────────────────────────────────────
 
