@@ -2581,52 +2581,25 @@ if HAS_SGLANG:
                 logger.debug("Stage 0: No relevant resources found (indexes may be empty)")
                 return ""
             
-            # Format results for prompt injection with descriptions
-            lines = ["#Available Notes / Collections that may be relevant)\n"]
-            
+            # Format results for prompt injection — compact table format
+            lines = ["# Available Resources\n"]
+
             if notes:
-                lines.append("## Notes:")
+                lines.append("Notes:")
                 for note in notes:
                     name = note.get('name', note.get('resource_id', ''))
                     resource_id = note.get('resource_id', '')
-                    props = note.get('properties', {})  # Properties extracted separately, no ResourceType
-                    
-                    # Build description from metadata
-                    desc_parts = []
-                    
-                    # Add commentary if available
-                    commentary = props.get('embedding_text', '').split('\n')
-                    # Commentary is usually after source_skill line, extract relevant part
-                    if len(commentary) > 2:
-                        commentary_text = '\n'.join(commentary[2:]).strip()[:150]  # Skip name and source lines
-                        if commentary_text:
-                            desc_parts.append(commentary_text)
-                    
-                    description = ". ".join(desc_parts) if desc_parts else "No description available"
-                    lines.append(f"- {resource_id} (\"{name}\"): {description}")
-            
+                    lines.append(f"  {resource_id} \"{name}\"")
+
             if collections:
-                lines.append("\n## Collections:")
+                lines.append("Collections:")
                 for coll in collections:
                     name = coll.get('name', coll.get('resource_id', ''))
                     resource_id = coll.get('resource_id', '')
                     item_count = coll.get('item_count', 0)
-                    props = coll.get('properties', {})  # Properties extracted separately, no ResourceType
-                    
-                    # Build description from metadata
-                    desc_parts = [f"{item_count} items"]
-                    
-                    # Add commentary if available
-                    commentary = props.get('embedding_text', '').split('\n')
-                    if len(commentary) > 3:  # Skip name, source, item_count lines
-                        commentary_text = '\n'.join(commentary[3:]).strip()[:150]
-                        if commentary_text:
-                            desc_parts.append(commentary_text)
-                    
-                    description = ". ".join(desc_parts)
-                    lines.append(f"- {resource_id} (\"{name}\"): {description}")
-            
-            lines.append("\nTo use these resources, reference by name (e.g., \"my-note\") or ID (e.g., \"Note_42\") in `load` actions.")
+                    lines.append(f"  {resource_id} \"{name}\" ({item_count} items)")
+
+            lines.append("\nUse `load` by name or ID to access these resources.")
             
             result_text = "\n".join(lines)
             logger.info(f"Stage 0: Found {len(notes)} Notes and {len(collections)} Collections")
