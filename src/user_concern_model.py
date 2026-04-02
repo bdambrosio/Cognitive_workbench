@@ -157,6 +157,11 @@ class UserConcernModel:
                             self._concern_counter = num
                     except (ValueError, IndexError):
                         pass
+            # Ensure history_note_ids field exists on all concerns
+            for c in self.concerns:
+                if 'history_note_ids' not in c:
+                    c['history_note_ids'] = []
+
             # Migrate old statuses to simplified 2-value model
             migrated = 0
             for c in self.concerns:
@@ -210,10 +215,10 @@ class UserConcernModel:
     # ── Trigger: conversation end ─────────────────────────────────────
 
     def update_from_conversation(self, conversation_summary: str,
-                                  dialog_id: str, entity: str):
-        """Update concern model after a conversation ends."""
+                                  dialog_id: str, entity: str) -> Optional[str]:
+        """Update concern model after a conversation ends. Returns affected concern_id or None."""
         if not conversation_summary or not conversation_summary.strip():
-            return
+            return None
         timestamp = datetime.now().isoformat()
         interaction_text = (
             f"Completed conversation with {entity} (dialog {dialog_id}):\n"
@@ -221,17 +226,17 @@ class UserConcernModel:
             f"Timestamp: {timestamp}"
         )
         evidence_ref = f"conversation:{dialog_id}:{timestamp}"
-        self._run_patch(interaction_text, evidence_ref)
+        return self._run_patch(interaction_text, evidence_ref)
 
     # ── Trigger: goal completion ──────────────────────────────────────
 
     def update_from_goal_completion(self, goal_statement: str,
                                      outcome_summary: str, goal_id: str,
                                      success: bool,
-                                     result_artifact: str = ''):
-        """Update concern model after a goal completes."""
+                                     result_artifact: str = '') -> Optional[str]:
+        """Update concern model after a goal completes. Returns affected concern_id or None."""
         if not goal_statement:
-            return
+            return None
         timestamp = datetime.now().isoformat()
         status_word = "succeeded" if success else "failed"
         parts = [
@@ -244,12 +249,12 @@ class UserConcernModel:
         parts.append(f"Timestamp: {timestamp}")
         interaction_text = "\n".join(parts)
         evidence_ref = f"goal:{goal_id}:{timestamp}"
-        self._run_patch(interaction_text, evidence_ref)
+        return self._run_patch(interaction_text, evidence_ref)
 
     # ── Core patch logic ──────────────────────────────────────────────
 
-    def _run_patch(self, interaction_text: str, evidence_ref: str):
-        """Run one LLM call to produce a patch, then apply it."""
+    def _run_patch(self, interaction_text: str, evidence_ref: str) -> Optional[str]:
+        """Run one LLM call to produce a patch, then apply it. Returns affected concern_id or None."""
         concerns_json = json.dumps(self.concerns, indent=2, ensure_ascii=False) if self.concerns else "[]"
 
         user_prompt = (
@@ -270,17 +275,19 @@ class UserConcernModel:
             )
             if not result.success or not result.text:
                 logger.warning(f'Concern model LLM call failed: {getattr(result, "error", "unknown")}')
-                return
+                return None
 
             patch = self._parse_patch(result.text)
             if not patch:
-                return
+                return None
 
-            self._apply_patch(patch, evidence_ref)
+            concern_id = self._apply_patch(patch, evidence_ref)
             self._save()
+            return concern_id
 
         except Exception as e:
             logger.error(f'Error in concern model patch: {e}')
+            return None
 
     def _parse_patch(self, text) -> Optional[Dict[str, Any]]:
         """Parse LLM response into a patch dict. Accepts str or already-parsed dict."""
@@ -308,19 +315,19 @@ class UserConcernModel:
             return None
         return patch
 
-    def _apply_patch(self, patch: Dict[str, Any], evidence_ref: str):
-        """Apply a single patch to the concern list."""
+    def _apply_patch(self, patch: Dict[str, Any], evidence_ref: str) -> Optional[str]:
+        """Apply a single patch to the concern list. Returns affected concern_id or None."""
         op = patch['op']
 
         if op == 'no_change':
             logger.info(f'Concern model: no_change — {patch.get("why_no_change", "")}')
-            return
+            return None
 
         if op == 'add_concern':
             new_concern = patch.get('new_concern', {})
             if not new_concern or not new_concern.get('concern_label'):
                 logger.warning('add_concern patch missing new_concern or concern_label')
-                return
+                return None
             self._concern_counter += 1
             concern_id = f'concern_{self._concern_counter}'
             entry = {
@@ -338,10 +345,11 @@ class UserConcernModel:
                 'status_rationale': new_concern.get('status_rationale', ''),
                 'evidence_refs': [evidence_ref],
                 'history_summary': new_concern.get('history_summary', ''),
+                'history_note_ids': [],
             }
             self.concerns.append(entry)
             logger.info(f'Concern model: +{concern_id} "{entry["concern_label"]}" — {patch.get("why_this_add", "")}')
-            return
+            return concern_id
 
         # update_concern or close_concern — find the target
         concern_id = patch.get('concern_id', '')
@@ -358,12 +366,16 @@ class UserConcernModel:
             updates = patch.get('field_updates', {})
             self._merge_updates(target, updates, evidence_ref)
             logger.info(f'Concern model: ~{concern_id} — {patch.get("why_this_update", "")}')
+            return concern_id
 
         elif op == 'close_concern':
             updates = patch.get('closing_updates', {})
             updates.setdefault('status', 'closed')
             self._merge_updates(target, updates, evidence_ref)
             logger.info(f'Concern model: x{concern_id} closed — {patch.get("why_this_close", "")}')
+            return concern_id
+
+        return None
 
     def _merge_updates(self, target: Dict[str, Any], updates: Dict[str, Any],
                        evidence_ref: str):
@@ -395,7 +407,44 @@ class UserConcernModel:
         # Keep last 10 refs
         target['evidence_refs'] = refs[-10:]
 
+    # ── History note tracking ────────────────────────────────────────
+
+    def add_history_note_id(self, concern_id: str, note_id: str):
+        """Associate a conversation_history note with a concern."""
+        for c in self.concerns:
+            if c.get('concern_id') == concern_id:
+                if 'history_note_ids' not in c:
+                    c['history_note_ids'] = []
+                if note_id not in c['history_note_ids']:
+                    c['history_note_ids'].append(note_id)
+                    self._save()
+                return
+
+    def clear_history_note_ids(self, concern_id: str, note_ids_to_remove: List[str]):
+        """Remove rolled-up note IDs from a concern's history_note_ids."""
+        for c in self.concerns:
+            if c.get('concern_id') == concern_id:
+                current = c.get('history_note_ids', [])
+                c['history_note_ids'] = [nid for nid in current if nid not in set(note_ids_to_remove)]
+                self._save()
+                return
+
+    def update_history_summary(self, concern_id: str, summary: str):
+        """Replace a concern's history_summary with a new rolled-up summary."""
+        for c in self.concerns:
+            if c.get('concern_id') == concern_id:
+                c['history_summary'] = summary
+                self._save()
+                return
+
     # ── Read access ───────────────────────────────────────────────────
+
+    def get_concern(self, concern_id: str) -> Optional[Dict[str, Any]]:
+        """Return a single concern by ID, or None."""
+        for c in self.concerns:
+            if c.get('concern_id') == concern_id:
+                return c
+        return None
 
     def get_concerns(self, active_only: bool = False) -> List[Dict[str, Any]]:
         """Return current concern list, optionally filtered to active concerns."""

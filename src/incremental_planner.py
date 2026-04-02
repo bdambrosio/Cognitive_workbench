@@ -2367,25 +2367,149 @@ def _parse_deep_eval_status(deep_text: str) -> str:
     return "unknown"
 
 
+ENVISIONMENT_PROMPT = """\
+You are generating a retrieval plan for an agent's memory system.
+Given the goal, the orient assessment, and active user concerns, produce hypothetical \
+answer statements that describe what relevant memory entries would look like if they \
+existed. These will be used as search queries against an embedding index.
+
+Rules:
+- Each envisionment is a declarative statement, not a question.
+- Prefer compound statements capturing relationships between entities over decomposed \
+single-entity queries.
+- Use the orient rationale and concerns to resolve ambiguous references.
+- Do not invent specific values (numbers, dates, names not in the input). Use hedging: \
+"approximately," "around," "related to."
+- If no memory retrieval would help, set retrieval_needed to false.
+- Generate 0-4 envisionments. Most goals need 1-2.
+
+Goal: {goal}
+
+Orient assessment:
+  Action choice: {action_choice}
+  Rationale: {rationale}
+
+Active concerns:
+{concerns_text}
+
+Respond with JSON only. Schema:
+{{"retrieval_needed": bool, "envisionments": ["statement 1", "statement 2", ...]}}"""
+
+# Orient action choices that skip envisionment generation (reactive, no retrieval needed)
+_SKIP_ENVISIONMENT_ACTIONS = {'no_action', 'inform_user'}
+
+
+def generate_envisionments(goal: str, orient_assessment, active_concerns, executor) -> List[str]:
+    """Generate HyDE-style envisionment strings for memory retrieval.
+
+    Returns a list of declarative statements suitable as FAISS queries,
+    or an empty list if retrieval is not needed or generation fails.
+    """
+    # Check trigger: skip for reactive action choices
+    if orient_assessment:
+        action_eval = orient_assessment.get('action_evaluation') or {}
+        action_choice = action_eval.get('action_choice', 'no_action')
+        rationale = (orient_assessment.get('action_evaluation') or {}).get('rationale', '')
+        if not rationale:
+            rationale = orient_assessment.get('overall_rationale', '')
+    else:
+        action_choice = 'unknown'
+        rationale = ''
+
+    if action_choice in _SKIP_ENVISIONMENT_ACTIONS:
+        logger.debug(f"Envisionment skipped: action_choice={action_choice}")
+        return []
+
+    # Format concerns
+    concern_lines = []
+    for c in (active_concerns or [])[:8]:
+        label = c.get('concern_label', '?')
+        desc = c.get('concern_description', '')
+        concern_lines.append(f"  - {label}: {desc}")
+    concerns_text = "\n".join(concern_lines) if concern_lines else "  (none)"
+
+    prompt = ENVISIONMENT_PROMPT.format(
+        goal=goal,
+        action_choice=action_choice,
+        rationale=rationale[:300],
+        concerns_text=concerns_text,
+    )
+
+    try:
+        result = executor.llm_generate(
+            prompt, max_tokens=256, temperature=0.3,
+            is_json=True, stops=["\n\n"]
+        )
+        if not result.success or not result.text:
+            logger.warning(f"Envisionment LLM call failed: {getattr(result, 'error', 'unknown')}")
+            return []
+
+        # Parse response
+        text = result.text
+        if isinstance(text, dict):
+            data = text
+        else:
+            text = str(text).strip()
+            if text.startswith('```'):
+                lines = text.split('\n')
+                lines = [l for l in lines if not l.strip().startswith('```')]
+                text = '\n'.join(lines).strip()
+            data = json.loads(text)
+
+        if not data.get('retrieval_needed', True):
+            logger.info("Envisionment: retrieval not needed (LLM second gate)")
+            return []
+
+        envisionments = data.get('envisionments', [])
+        if not isinstance(envisionments, list):
+            return []
+        # Filter to strings, cap at 4
+        envisionments = [str(e) for e in envisionments if e and str(e).strip()][:4]
+        if envisionments:
+            logger.info(f"Envisionment: generated {len(envisionments)} queries: {[e[:80] for e in envisionments]}")
+        return envisionments
+
+    except (json.JSONDecodeError, KeyError, TypeError) as e:
+        logger.warning(f"Envisionment parse error: {e}")
+        return []
+    except Exception as e:
+        logger.warning(f"Envisionment generation error: {e}")
+        return []
+
+
 if HAS_SGLANG:
     #@function
-    def stage0_resource_retrieval(goal: str, executor):
+    def stage0_resource_retrieval(goal: str, executor, orient_assessment=None, active_concerns=None):
         """
-        Stage 0: Generate search queries from goal and retrieve relevant resources.
-        
+        Stage 0: Generate envisionment queries and retrieve relevant resources.
+
+        Uses HyDE-style envisionments when orient context is available,
+        falling back to the raw goal text as query.
+
         Args:
             goal: Goal text
             executor: InfospaceExecutor instance
-            
+            orient_assessment: Orient output dict (optional)
+            active_concerns: List of active user concern dicts (optional)
+
         Returns:
             Formatted string with available resources to inject into Stage 1 prompt
         """
-        
+
         try:
-            queries = [goal]
-            
+            # Generate envisionment queries (HyDE-style hypothetical answers)
+            envisionments = generate_envisionments(goal, orient_assessment, active_concerns, executor)
+
+            # Use envisionments as primary queries, keep raw goal as fallback
+            if envisionments:
+                queries = envisionments + [goal]  # envisionments first, raw goal as broad fallback
+                k_notes = min(3 + len(envisionments), 8)  # slightly more candidates with multiple queries
+            else:
+                queries = [goal]
+                k_notes = 3
+
             # Search for resources
-            search_result = executor.search_resources(queries, k_notes=3, k_collections=2, threshold=0.3)
+            search_result = executor.search_resources(queries, k_notes=k_notes, k_collections=2, threshold=0.3)
             
             if search_result.get('status') != 'success':
                 reason = search_result.get('reason', 'Unknown error')
@@ -2512,14 +2636,18 @@ if HAS_SGLANG:
             if _m:
                 _output_guidance_line = f"OUTPUT SIZING: pass target_tokens={_m.group(1)} to the tool call that produces the FINAL output artifact.\n"          
         
-        # Stage 0: Resource retrieval (if executor available)
+        # Stage 0: Resource retrieval with envisionment-driven queries
         available_resources_text = ""
         if executor:
             try:
-                available_resources_text = stage0_resource_retrieval(goal=goal, executor=executor)  
+                available_resources_text = stage0_resource_retrieval(
+                    goal=goal, executor=executor,
+                    orient_assessment=getattr(executor, '_orient_assessment', None),
+                    active_concerns=getattr(executor, '_user_concerns_snapshot', None),
+                )
             except Exception as e:
                 logger.warning(f"Stage 0: Failed to retrieve resources: {e}")
-        
+
         # Stage 1: Analysis + tool selection
         # Goal is placed at the end of the system prompt (high-attention zone)
         system_parts = ["You can write code blocks to achieve the goal, including using tools/primitives (aka actions), if and as needed,"]
@@ -3673,14 +3801,18 @@ def tool_planner_infospace_vllm(template, goal: str, world_model: Dict, characte
         if _m:
             _output_guidance_line = f"OUTPUT SIZING: pass target_tokens={_m.group(1)} to the tool call that produces the FINAL output artifact.\n"
 
-    # Stage 0: Resource retrieval (if executor available)
+    # Stage 0: Resource retrieval with envisionment-driven queries
     available_resources_text = ""
     if executor:
         try:
-            available_resources_text = stage0_resource_retrieval(goal=goal, executor=executor)
+            available_resources_text = stage0_resource_retrieval(
+                goal=goal, executor=executor,
+                orient_assessment=getattr(executor, '_orient_assessment', None),
+                active_concerns=getattr(executor, '_user_concerns_snapshot', None),
+            )
         except Exception as e:
             logger.warning(f"Stage 0: Failed to retrieve resources: {e}")
-    
+
     # Stage 1: Analysis + tool selection
     system_parts = [f"Your task is to achieve\n#GOAL:\n{goal}\n\n"]
     system_parts.append("You can write code blocks to achieve the goal, including using tools/primitives (aka actions), if and as needed,")

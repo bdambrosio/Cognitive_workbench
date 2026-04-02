@@ -176,9 +176,20 @@ class ConversationStore:
                 matched.append(note_id)
         return matched
 
-    def _remove_notes_from_collection(self, note_ids_to_remove: List[str]) -> bool:
-        """Remove specific note IDs from the conversation collection."""
-        collection_id = self._ensure_conversation_collection()
+    def _remove_notes_from_collection(self, note_ids_to_remove: List[str],
+                                      collection_name: str = "conversation",
+                                      delete_notes: bool = False) -> bool:
+        """Remove specific note IDs from a named collection, optionally deleting the notes.
+
+        Args:
+            note_ids_to_remove: Note IDs to remove from the collection.
+            collection_name: Name of the collection to remove from (default: conversation).
+            delete_notes: If True, also delete the underlying Note resources.
+        """
+        if collection_name == "conversation":
+            collection_id = self._ensure_conversation_collection()
+        else:
+            collection_id = self.resource_manager.named_collections.get(collection_name)
         if not collection_id:
             return False
         collection = self.resource_manager.get_resource(collection_id)
@@ -193,8 +204,16 @@ class ConversationStore:
             collection_id, None, self.character_name, operation='update', content=remaining
         )
         if not success:
-            self.logger.warning(f'Failed to remove archived turns from conversation: {err}')
-        return bool(success)
+            self.logger.warning(f'Failed to remove notes from {collection_name}: {err}')
+            return False
+
+        if delete_notes:
+            for note_id in note_ids_to_remove:
+                ok, del_err = self.resource_manager.delete_resource(note_id)
+                if not ok:
+                    self.logger.warning(f'Failed to delete note {note_id}: {del_err}')
+
+        return True
 
     def has_active_dialogs(self) -> bool:
         return any(self._active_dialogs.values())
@@ -280,6 +299,125 @@ class ConversationStore:
         if limit <= 0:
             return []
         return turns[-limit:]
+
+    # ── Conversation history (archived summaries) ──────────────────
+
+    def get_history_notes(self) -> List[Dict[str, Any]]:
+        """Return all notes in conversation_history with their IDs and properties.
+
+        Each returned dict has keys: note_id, content, concern_id, timestamp.
+        """
+        collection_id = self.resource_manager.named_collections.get("conversation_history")
+        if not collection_id:
+            return []
+        collection = self.resource_manager.get_resource(collection_id)
+        if not collection:
+            return []
+        note_ids = collection.get("properties", {}).get("content", [])
+        if not isinstance(note_ids, list):
+            return []
+
+        entries = []
+        for note_id in note_ids:
+            if not isinstance(note_id, str) or not note_id.startswith("Note_"):
+                continue
+            resource = self.resource_manager.get_resource(note_id)
+            if not resource:
+                continue
+            props = resource.get("properties", {})
+            content = props.get("content", "")
+            entries.append({
+                "note_id": note_id,
+                "content": content if isinstance(content, str) else str(content),
+                "concern_id": props.get("concern_id"),
+                "timestamp": props.get("timestamp", props.get("created_at", "")),
+            })
+        return entries
+
+    def tag_note_concern(self, note_id: str, concern_id: str) -> bool:
+        """Tag a note with a concern_id in its properties."""
+        resource = self.resource_manager.get_resource(note_id)
+        if not resource:
+            return False
+        resource.get("properties", {})["concern_id"] = concern_id
+        return True
+
+    def get_themed_context(self, concerns: List[Dict], max_total_chars: int = 3000) -> str:
+        """Build conversation context organized by concern themes.
+
+        Args:
+            concerns: List of concern dicts from the concern model (must have
+                      concern_id, concern_label, weight, status, history_summary,
+                      history_note_ids).
+            max_total_chars: Budget for the entire themed context block.
+
+        Returns:
+            Formatted string ready for inclusion in a prompt.
+        """
+        history_notes = self.get_history_notes()
+
+        # Index history notes by note_id for quick lookup
+        notes_by_id = {n["note_id"]: n for n in history_notes}
+
+        # --- Pool C: last 2 history entries for recency (any theme) ---
+        last_two = history_notes[-2:] if len(history_notes) >= 2 else list(history_notes)
+        last_two_ids = {n["note_id"] for n in last_two}
+
+        # --- Pool A+B: concern-based entries ---
+        # Score and rank open concerns
+        active_concerns = [c for c in concerns if c.get("status") == "open"]
+        active_concerns.sort(key=lambda c: float(c.get("weight", 0)), reverse=True)
+        top_concerns = active_concerns[:5]
+
+        # Budget allocation
+        recency_budget = min(800, max_total_chars // 3)
+        theme_budget = max_total_chars - recency_budget
+
+        parts = []
+
+        # Recency section
+        if last_two:
+            parts.append("## RECENT CONVERSATIONS (for continuity)")
+            for entry in last_two:
+                text = entry["content"][:recency_budget // max(len(last_two), 1)]
+                parts.append(f"  {text}")
+
+        # Theme section
+        if top_concerns:
+            per_concern_budget = theme_budget // max(len(top_concerns), 1)
+            parts.append("\n## CONVERSATION THEMES")
+            for concern in top_concerns:
+                cid = concern.get("concern_id", "")
+                label = concern.get("concern_label", "unknown")
+                weight = concern.get("weight", 0)
+                history_summary = concern.get("history_summary", "")
+                history_note_ids = concern.get("history_note_ids", [])
+
+                section_parts = []
+                section_parts.append(f"### {label} (weight: {weight:.1f})")
+
+                chars_used = 0
+
+                # Pool A: rolled-up history_summary
+                if history_summary:
+                    truncated = history_summary[:per_concern_budget // 2]
+                    section_parts.append(f"  {truncated}")
+                    chars_used += len(truncated)
+
+                # Pool B: unconsolidated entries for this concern
+                remaining = per_concern_budget - chars_used
+                for nid in history_note_ids:
+                    if nid in last_two_ids:
+                        continue  # already in recency section
+                    note = notes_by_id.get(nid)
+                    if note and remaining > 0:
+                        text = note["content"][:remaining]
+                        section_parts.append(f"  {text}")
+                        remaining -= len(text)
+
+                parts.append("\n".join(section_parts))
+
+        return "\n".join(parts) if parts else ""
 
     def get_entity_context(self, entity_name: str, limit: int = 20, scope: str = "all") -> Dict[str, Any]:
         entity = self._normalize_entity(entity_name)

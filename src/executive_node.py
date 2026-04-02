@@ -941,6 +941,7 @@ class ZenohExecutiveNode:
         )
         self.conversation_store.initialize()
         self.conversation_store._archive_callback = self._archive_dialog
+        self._purge_untagged_history_notes()
 
         from user_concern_model import UserConcernModel
         self.user_concern_model = UserConcernModel(
@@ -2595,7 +2596,7 @@ class ZenohExecutiveNode:
                     logger.warning(f'Failed to create conversation_history: {result.get("reason", "unknown")}')
             else:
                 logger.info(f'✓ conversation_history collection already exists')
-            
+
             # Check if conversation exists, create if not
             load_action = {
                 "type": "load",
@@ -2623,6 +2624,20 @@ class ZenohExecutiveNode:
             logger.error(f'Error initializing conversation collections: {e}')
             import traceback
             traceback.print_exc()
+
+    def _purge_untagged_history_notes(self):
+        """Remove conversation_history entries that have no concern_id tag (legacy pre-rollup notes)."""
+        history_notes = self.conversation_store.get_history_notes()
+        if not history_notes:
+            return
+        untagged = [n for n in history_notes if not n.get("concern_id")]
+        if not untagged:
+            return
+        untagged_ids = [n["note_id"] for n in untagged]
+        logger.info(f'🧹 Purging {len(untagged_ids)} untagged conversation_history entries (of {len(history_notes)} total)')
+        self.conversation_store._remove_notes_from_collection(
+            untagged_ids, collection_name="conversation_history", delete_notes=True
+        )
 
     def _load_situation_note(self):
         """Load the living context (_situation) note at startup."""
@@ -3371,6 +3386,8 @@ class ZenohExecutiveNode:
                 logger.warning(f'Error loading task context note {task_ctx_note}: {e}')
 
         def _run():
+            # Clear last_say_text so we can detect whether *this* goal said anything
+            self.last_say_text = ''
             result: Dict[str, Any] = {}
             try:
                 result = self.parse_and_set_goal("", effective_goal_text) or {}
@@ -3378,7 +3395,7 @@ class ZenohExecutiveNode:
                 result = {"success": False, "error": str(e)}
             self._set_scheduled_goal_result(goal_id, result, used_cache=False, pre_resource_ids=pre_resource_ids)
             if notify_user:
-                # Only say completion if the plan didn't already publish a say
+                # Only say completion if *this* goal's plan didn't already publish a say
                 already_said = (getattr(self, 'last_say_text', '') or '').strip()
                 if not already_said:
                     status = "completed" if result.get("success") else "failed"
@@ -5060,6 +5077,7 @@ class ZenohExecutiveNode:
             dc = getattr(self, '_derived_concern_model', None)
             self.infospace_executor._derived_concerns_snapshot = dc.get_concerns() if dc else []
             self.infospace_executor._user_concerns_snapshot = self.user_concern_model.get_concerns() or []
+            self.infospace_executor._orient_assessment = self._last_character_eval
         except Exception:
             pass
 
@@ -5144,9 +5162,10 @@ class ZenohExecutiveNode:
             self.infospace_executor.plan_bindings[0][binding_name] = tmp_coll_id
 
             # Update user concern model from raw dialog turns (before summarization)
+            affected_concern_id = None
             if raw_transcript:
                 try:
-                    self.user_concern_model.update_from_conversation(
+                    affected_concern_id = self.user_concern_model.update_from_conversation(
                         raw_transcript, dialog_id, entity
                     )
                 except Exception as e:
@@ -5190,8 +5209,23 @@ class ZenohExecutiveNode:
 
             if add_result.get('status') == 'success':
                 logger.info(f'✓ Archived dialog {dialog_id} ({len(note_ids)} turns) to conversation_history')
+
+                # Tag the summary note with concern_id and register with concern model
+                if affected_concern_id and summary_note_id:
+                    self.conversation_store.tag_note_concern(summary_note_id, affected_concern_id)
+                    self.user_concern_model.add_history_note_id(affected_concern_id, summary_note_id)
+                    logger.info(f'  Tagged {summary_note_id} with concern {affected_concern_id}')
+
+                    # Check if this concern needs second-level rollup
+                    self._maybe_rollup_concern_history(affected_concern_id)
             else:
                 logger.warning(f'Failed to add dialog summary to conversation_history: {add_result.get("reason", "unknown")}')
+
+            # Delete the original turn notes (they've been synthesized)
+            for nid in note_ids:
+                ok, del_err = self.resource_manager.delete_resource(nid)
+                if not ok:
+                    logger.warning(f'Failed to delete archived turn note {nid}: {del_err}')
 
             # Clean up temp collection and bindings
             if tmp_coll_id and self.resource_manager:
@@ -5205,6 +5239,132 @@ class ZenohExecutiveNode:
             logger.error(f'Error archiving dialog {dialog_id}: {e}')
             import traceback
             traceback.print_exc()
+
+    def _maybe_rollup_concern_history(self, concern_id: str):
+        """If a concern has accumulated enough history entries, roll them up into history_summary."""
+        ROLLUP_THRESHOLD = 3  # Number of unconsolidated entries before triggering rollup
+
+        concern = self.user_concern_model.get_concern(concern_id)
+        if not concern:
+            return
+        history_note_ids = concern.get('history_note_ids', [])
+
+        # Prune stale IDs (notes deleted elsewhere) before checking threshold
+        live_ids = []
+        stale_ids = []
+        for nid in history_note_ids:
+            if self.resource_manager and self.resource_manager.get_resource(nid):
+                live_ids.append(nid)
+            else:
+                stale_ids.append(nid)
+        if stale_ids:
+            self.user_concern_model.clear_history_note_ids(concern_id, stale_ids)
+            logger.info(f'Pruned {len(stale_ids)} stale history_note_ids from {concern_id}')
+
+        if len(live_ids) < ROLLUP_THRESHOLD:
+            return
+        history_note_ids = live_ids
+
+        logger.info(f'📝 Rolling up {len(history_note_ids)} history entries for concern {concern_id}')
+
+        # Gather the content of all unconsolidated entries
+        entry_texts = []
+        for nid in history_note_ids:
+            resource = self.resource_manager.get_resource(nid)
+            if resource:
+                content = resource.get('properties', {}).get('content', '')
+                if content:
+                    entry_texts.append(str(content))
+
+        if not entry_texts:
+            return
+
+        # Build input for synthesis: existing summary + new entries
+        existing_summary = concern.get('history_summary', '')
+        label = concern.get('concern_label', 'unknown concern')
+
+        synth_input = ''
+        if existing_summary:
+            synth_input += f"Previous summary:\n{existing_summary}\n\n"
+        synth_input += "Recent conversations:\n" + "\n---\n".join(entry_texts)
+
+        tmp_note_id = None
+        tmp_coll_id = None
+        result_id = None
+        try:
+            # Create a temporary note with the combined content for synthesis
+            success, tmp_note_id, err, _ = self.resource_manager.create_note(
+                self.character_name, synth_input, "text", "rollup",
+                f"rollup input for {concern_id}", "", {}
+            )
+            if not success or not tmp_note_id:
+                logger.warning(f'Failed to create rollup input note: {err}')
+                return
+
+            # Create temp collection for synthesize
+            success, tmp_coll_id, err, _ = self.resource_manager.create_collection(
+                self.character_name, [tmp_note_id], "list", "rollup",
+                f"rollup for {concern_id}", f"_tmp_rollup_{concern_id}", {}
+            )
+            if not success or not tmp_coll_id:
+                logger.warning(f'Failed to create rollup collection: {err}')
+                return
+
+            binding_name = '_rollup_src'
+            self.infospace_executor.plan_bindings[0][binding_name] = tmp_coll_id
+
+            synth_action = {
+                "type": "synthesize",
+                "target": f"${binding_name}",
+                "focus": f"consolidated history of user concern: {label}",
+                "out": "$_rollup_result"
+            }
+            synth_result = self.infospace_executor.execute_action(synth_action)
+
+            if synth_result.get('status') != 'success':
+                logger.warning(f'Failed to synthesize rollup for {concern_id}: {synth_result.get("reason")}')
+                return
+
+            result_id = synth_result.get('resource_id') or self.infospace_executor._get_binding('_rollup_result')
+            if not result_id:
+                logger.warning(f'Rollup synthesis returned no result for {concern_id}')
+                return
+
+            new_summary = self.infospace_executor._get_content(result_id)
+            if not new_summary or not str(new_summary).strip():
+                logger.warning(f'Rollup synthesis returned empty result for {concern_id}')
+                return
+
+            # Update the concern's history_summary
+            self.user_concern_model.update_history_summary(concern_id, str(new_summary))
+
+            # Remove the rolled-up entries from conversation_history and delete them
+            self.conversation_store._remove_notes_from_collection(
+                history_note_ids, collection_name="conversation_history", delete_notes=True
+            )
+
+            # Clear the note IDs from the concern
+            self.user_concern_model.clear_history_note_ids(concern_id, history_note_ids)
+
+            logger.info(f'✓ Rolled up {len(history_note_ids)} entries into history_summary for {concern_id}')
+
+        except Exception as e:
+            logger.error(f'Error during concern history rollup for {concern_id}: {e}')
+            import traceback
+            traceback.print_exc()
+        finally:
+            # Clean up temp resources and bindings
+            if self.resource_manager:
+                if tmp_coll_id:
+                    self.resource_manager.resource_registry.pop(tmp_coll_id, None)
+                self.resource_manager.named_collections.pop(f"_tmp_rollup_{concern_id}", None)
+                if tmp_note_id:
+                    self.resource_manager.delete_resource(tmp_note_id)
+                if result_id:
+                    self.resource_manager.delete_resource(result_id)
+            for scope in self.infospace_executor.plan_bindings:
+                scope.pop('_rollup_src', None)
+                scope.pop('_rollup_result', None)
 
     def _archive_conversation(self):
         """Shutdown fallback: archive any remaining unarchived turns in the conversation collection."""
@@ -7581,12 +7741,11 @@ class ZenohExecutiveNode:
             # Build dynamic user prompt from situation, entity context, and action history
             user_prompt = self.format_situation()
             
-            entity_context = self.get_entity_context(self.character_name, 10)
-            if entity_context:
-                user_prompt += '\n## CONVERSATION HISTORY (for tone and continuity only — do NOT infer task state from this)'
-                for i, memory in enumerate(entity_context['conversation_history']):
-                    user_prompt += f"\n\t{memory['source']}: {memory['text'][:600]}..."
-                user_prompt += '\n'
+            # Theme-based conversation context from concern model
+            concerns = self.user_concern_model.get_concerns() if self.user_concern_model else []
+            themed_context = self.conversation_store.get_themed_context(concerns)
+            if themed_context:
+                user_prompt += '\n' + themed_context + '\n'
 
             self.observations = {'static': system_prompt, 'dynamic': user_prompt}
             return self.observations
@@ -7658,6 +7817,7 @@ class ZenohExecutiveNode:
                 recent_context += f"\n# Last action:\n  {last_action.action.get('type')}: {last_action.action.get('target')} - {result_str}\n"
 
             # Add active user concerns for planner framing
+            active_concerns = []
             try:
                 active_concerns = self.user_concern_model.get_concerns(active_only=True) or []
                 if active_concerns:
@@ -7716,6 +7876,8 @@ class ZenohExecutiveNode:
                 'executor': self.infospace_executor,  # Pass executor for incremental planner
                 'vision_goal': goal_text,
                 'output_guidance': output_guidance,
+                'orient_assessment': self._last_character_eval,
+                'active_concerns': active_concerns,
             }
             
             # Initialize plan identifiers before plan generation (needed for incremental planner action tracking)
