@@ -2502,20 +2502,26 @@ class ZenohExecutiveNode:
                 self.conversation_store.record_outgoing("User", conv_text, act_type="response")
         
         # Publish result to action log for UI display.
-        # Three cases:
-        #   A) In-plan say already addressed user → skip (already visible)
-        #   B) No in-plan say, but primary_product exists → show product reference
-        #   C) No in-plan say, no product → show FINAL_ANSWER text
+        # Always deliver the primary_product content when available (err on the
+        # side of duplication — the CLI deduplicates).  Fall back to
+        # FINAL_ANSWER text when there is no product.
         primary_product = plan_result.get('primary_product', '')
-        if last_say:
-            # Case A: user was already addressed during plan execution
-            if primary_product and primary_product != last_say:
-                logger.debug(f'In-plan say covered response; primary product: {primary_product}')
-        elif not interrupted_final and not is_scheduled_goal:
-            if primary_product:
-                # Case B: show the primary product as a clickable reference
-                display_text = final_thoughts_clean or "Done."
-                display_text = f"{display_text}\n→ {primary_product}"
+        if not interrupted_final:
+            product_content = ''
+            if primary_product and self.resource_manager:
+                try:
+                    res = self.resource_manager.get_resource(primary_product)
+                    if res:
+                        product_content = str(getattr(res, 'content', '') or getattr(res, 'text', '') or '')
+                        if not product_content:
+                            props = getattr(res, 'properties', {}) or {}
+                            product_content = str(props.get('text', '') or props.get('content', ''))
+                except Exception as e:
+                    logger.debug(f'Could not load primary_product content for delivery: {e}')
+
+            if product_content and len(product_content) >= 20:
+                # Deliver the actual artifact content
+                display_text = product_content[:3000]
                 result_action = {
                     'type': 'say',
                     'action_type': 'say',
@@ -2527,9 +2533,9 @@ class ZenohExecutiveNode:
                     'is_text_only': True
                 }
                 self.action_publisher.put(json.dumps(result_action))
-                logger.info(f'📤 Published result with primary product: {primary_product}')
+                logger.info(f'📤 Published primary product content ({len(product_content)} chars) from {primary_product}')
             elif final_thoughts_clean and len(final_thoughts_clean) >= 20 and final_thoughts_clean.replace(' ', '').replace('.', '').replace(',', '').replace('!', '').replace('?', '').strip():
-                # Case C: no product, show FINAL_ANSWER text
+                # No product content — show FINAL_ANSWER text
                 final_answer_action = {
                     'type': 'say',
                     'action_type': 'say',

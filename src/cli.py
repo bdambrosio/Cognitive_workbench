@@ -909,6 +909,17 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
                     return
                 text = data.get('text', '')
                 if text:
+                    # Dedup: skip if this text was recently displayed (auto-delivery
+                    # may duplicate an in-plan say — suppress the repeat).
+                    text_key = text[:500].strip()
+                    with state_lock:
+                        recent = state.setdefault('_recent_say', [])
+                        if text_key in recent:
+                            return
+                        recent.append(text_key)
+                        # Keep only last 5 to bound memory
+                        if len(recent) > 5:
+                            del recent[0]
                     _print_agent(character, text)
                 return
 
