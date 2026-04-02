@@ -7437,39 +7437,25 @@ class ZenohExecutiveNode:
         else:
             parts.append("Last action: none")
 
-        # Scheduled goals — full view for conversational grounding
+        # Scheduled goals — only upcoming/pending (completed goals are in Situation Awareness)
         try:
             scheduled = self._all_scheduled_goals()
             if scheduled:
-                def _goal_line(g):
-                    name = g.get('name') or g.get('goal_text', '?')
-                    status = g.get('status', '?')
-                    result = g.get('last_result', '')
-                    line = f"  - {name} [{status}]"
-                    if result:
-                        line += f" — {result}"
-                    return line
-
                 pending = [g for g in scheduled if g.get('status') in ('ready', 'pending', 'scheduled')]
-                recent = [g for g in scheduled if g.get('status') in ('completed', 'failed', 'interrupted')]
-                # Show most recently updated first for completed/failed
-                recent.sort(key=lambda g: g.get('updated', ''), reverse=True)
-
-                lines = []
                 if pending:
-                    lines.append("Upcoming/ready:")
-                    lines.extend(_goal_line(g) for g in pending[:5])
-                if recent:
-                    lines.append("Recently completed/failed:")
-                    lines.extend(_goal_line(g) for g in recent[:5])
-                if lines:
-                    parts.append("Scheduled goals:\n" + "\n".join(lines))
+                    lines = []
+                    for g in pending[:5]:
+                        name = g.get('name') or g.get('goal_text', '?')
+                        if len(name) > 100:
+                            name = name[:97] + '...'
+                        lines.append(f"  - {name}")
+                    parts.append("Upcoming goals:\n" + "\n".join(lines))
                 else:
-                    parts.append("Scheduled goals: none active or recent")
+                    parts.append("Upcoming goals: none")
             else:
-                parts.append("Scheduled goals: none")
+                parts.append("Upcoming goals: none")
         except Exception:
-            parts.append("Scheduled goals: unavailable")
+            parts.append("Upcoming goals: unavailable")
 
         # Recent sensor observations (inform disposition — rolling context)
         if self._sensor_inform_queue:

@@ -15,6 +15,7 @@ import re
 import os
 import sys
 import datetime
+import difflib
 import textwrap
 from pathlib import Path
 from typing import Dict, List, Any, Optional
@@ -773,26 +774,63 @@ def tool_catalog_text(tools: Dict[str, Dict]) -> str:
     return "\n".join(lines)
 
 
+def _resolve_tool_name(tool_name: str, available_tools: Dict[str, Dict],
+                       primitives_dir: Path,
+                       executor_action_names: Optional[set] = None) -> str:
+    """
+    Resolve a tool name to its canonical form, handling hyphen/underscore variants.
+
+    LLMs frequently swap hyphens and underscores in tool names (e.g. 'get_text'
+    instead of 'get-text'). This tries the exact name first, then the alternate
+    separator form.
+
+    Returns the canonical name if found, otherwise the original name unchanged.
+    """
+    # Exact match — fast path
+    if (tool_name in available_tools
+            or (primitives_dir / tool_name).exists()
+            or (executor_action_names and tool_name in executor_action_names)):
+        return tool_name
+
+    # Try swapping hyphens ↔ underscores
+    if '-' in tool_name:
+        alt = tool_name.replace('-', '_')
+    elif '_' in tool_name:
+        alt = tool_name.replace('_', '-')
+    else:
+        return tool_name  # no separator to swap
+
+    if (alt in available_tools
+            or (primitives_dir / alt).exists()
+            or (executor_action_names and alt in executor_action_names)):
+        logger.info(f"Resolved tool name '{tool_name}' → '{alt}' (separator normalization)")
+        return alt
+
+    return tool_name
+
+
 def load_skill_docs(tool_names: List[str], available_tools: Dict[str, Dict],
                     executor_action_names: Optional[set] = None) -> str:
     """
     Load full SKILL.md documentation for selected tools and primitives.
-    
+
     Args:
         tool_names: List of tool names to load docs for
         available_tools: Dict mapping tool_name -> metadata (includes 'tool_path')
-        
+
     Returns:
         Formatted string with full tool documentation
     """
     lines = []
     lines.append("# DETAILED TOOL DOCUMENTATION")
     lines.append("Full documentation for selected tools with examples, patterns, and output schemas:\n")
-    
+
     # Get primitives directory path
     primitives_dir = Path(__file__).parent / 'primitives'
-    
+
     for tool_name in tool_names:
+        # Normalize hyphen/underscore variants before lookup
+        tool_name = _resolve_tool_name(tool_name, available_tools, primitives_dir, executor_action_names)
         logger.debug(f"Stage 1.5: Processing {tool_name}")
         
         skill_file = None
@@ -816,10 +854,11 @@ def load_skill_docs(tool_names: List[str], available_tools: Dict[str, Dict],
                         skill_file = candidate
                         logger.debug(f"Stage 1.5: {tool_name} found {variant} at {skill_file}")
                         break
-        else:
+        # Always define primitive_dir for the "is_known" check below
+        primitive_dir = primitives_dir / tool_name
+        if tool_name not in available_tools:
             # Check if it's a primitive with Skill.md
             logger.debug(f"Stage 1.5: {tool_name} not in available_tools, checking primitives")
-            primitive_dir = primitives_dir / tool_name
             if primitive_dir.exists():
                 for variant in ['SKILL.md', 'Skill.md', 'skill.md']:
                     candidate = primitive_dir / variant
@@ -834,10 +873,20 @@ def load_skill_docs(tool_names: List[str], available_tools: Dict[str, Dict],
                         or primitive_dir.exists()
                         or (executor_action_names and tool_name in executor_action_names))
             if not is_known:
-                logger.warning(f"Stage 1.5: No tool named '{tool_name}' exists")
+                # Suggest closest matching tool names
+                all_names = list(available_tools.keys())
+                if executor_action_names:
+                    all_names.extend(executor_action_names)
+                # Also include primitive directory names
+                if primitives_dir.exists():
+                    all_names.extend(d.name for d in primitives_dir.iterdir() if d.is_dir())
+                suggestions = difflib.get_close_matches(tool_name, all_names, n=3, cutoff=0.5)
+                suggest_str = f" Did you mean: {', '.join(suggestions)}?" if suggestions else ""
+                logger.warning(f"Stage 1.5: No tool named '{tool_name}' exists.{suggest_str}")
                 lines.append(f"\n## {tool_name.upper()}")
                 lines.append(f"⚠ ERROR: No tool named '{tool_name}' exists. Do NOT use this tool. "
-                             f"Check the tool catalog above for the correct tool name.")
+                             f"Check the tool catalog above for the correct tool name."
+                             f"{suggest_str}")
             else:
                 logger.debug(f"Stage 1.5: No SKILL.md found for {tool_name} (tool exists, no docs)")
             continue
@@ -1058,6 +1107,10 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
     Returns:
         Infospace action dict
     """
+    # Normalize hyphen/underscore variants (LLMs frequently swap them)
+    primitives_dir = Path(__file__).parent / 'primitives'
+    tool_name = _resolve_tool_name(tool_name, available_tools, primitives_dir)
+
     try:
         parsed = json.loads(args_json) if args_json else {}
         # Ensure args is always a dict (handle case where JSON parses to int/str/etc)
