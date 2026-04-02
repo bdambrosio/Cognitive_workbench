@@ -2735,8 +2735,18 @@ if HAS_SGLANG:
         
         # Add current date and time
 
-        wm_slim = {k: world_model.get(k, []) for k in ("facts", "tool_contracts")}
-        system_parts.append(f"WORLD_MODEL: {json.dumps(wm_slim, indent=2)}\n")
+        # Compact world model: only fact text + confidence (booking fields are noise)
+        wm_facts = [{"fact": f["fact"], "confidence": f.get("confidence", "?")}
+                     for f in world_model.get("facts", []) if f.get("fact")]
+        wm_contracts = world_model.get("tool_contracts", [])
+        wm_lines = ["WORLD_MODEL:"]
+        if wm_facts:
+            wm_lines.append("Facts:")
+            for f in wm_facts:
+                wm_lines.append(f"- [{f['confidence']}] {f['fact']}")
+        if wm_contracts:
+            wm_lines.append(f"Tool contracts: {json.dumps(wm_contracts)}")
+        system_parts.append("\n".join(wm_lines) + "\n")
 
         system_parts.append(f"CURRENT_TIME: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n")
         system_parts.append(f"\n#GOAL:\n{goal}\n")
@@ -3897,8 +3907,18 @@ def tool_planner_infospace_vllm(template, goal: str, world_model: Dict, characte
             for section_name, context_text in world_prompt_context.items():
                 system_parts.append(f"\n# {section_name.upper().replace('_', ' ')}\n{context_text}\n")
     
-    wm_slim = {k: world_model.get(k, []) for k in ("facts", "tool_contracts")}
-    system_parts.append(f"WORLD_MODEL: {json.dumps(wm_slim, indent=2)}\n")
+    # Compact world model: only fact text + confidence (booking fields are noise)
+    wm_facts = [{"fact": f["fact"], "confidence": f.get("confidence", "?")}
+                 for f in world_model.get("facts", []) if f.get("fact")]
+    wm_contracts = world_model.get("tool_contracts", [])
+    wm_lines = ["WORLD_MODEL:"]
+    if wm_facts:
+        wm_lines.append("Facts:")
+        for f in wm_facts:
+            wm_lines.append(f"- [{f['confidence']}] {f['fact']}")
+    if wm_contracts:
+        wm_lines.append(f"Tool contracts: {json.dumps(wm_contracts)}")
+    system_parts.append("\n".join(wm_lines) + "\n")
 
     system_parts.append(f"CURRENT_TIME: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
     system_parts.append("""Follow this process to achieve the goal:
