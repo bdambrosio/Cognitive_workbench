@@ -3382,6 +3382,15 @@ class ZenohExecutiveNode:
         # Fire callback if this was a delegated task from another agent
         self._fire_delegation_callback(goal, success, last_result_raw, primary_product)
 
+        # Delete ephemeral goals (CLI/interpreted) on completion — they have no
+        # persistent schedule value.  Task-linked goals are never ephemeral.
+        if goal.get('ephemeral') and not task_wip_id and not goal.get('task_context_note'):
+            try:
+                self._delete_scheduled_goal(goal_id)
+                logger.info(f'🗑 Deleted ephemeral goal {goal_id} after completion')
+            except Exception as e:
+                logger.debug(f'Failed to delete ephemeral goal {goal_id}: {e}')
+
         self._publish_execution_state()
 
     def _fire_delegation_callback(self, goal: Dict, success: bool,
@@ -6147,6 +6156,8 @@ class ZenohExecutiveNode:
         self.conversation_store.close_dialog("User")
         scheduled_goal = self._upsert_scheduled_goal(goal_text)
         goal_id = scheduled_goal["goal_id"]
+        # Mark CLI/interpreted goals as ephemeral (deleted on completion)
+        scheduled_goal['ephemeral'] = True
         # Store callback metadata if present (for delegated concern tasks)
         if data.get('callback_topic'):
             scheduled_goal['callback_topic'] = data['callback_topic']
@@ -6154,8 +6165,7 @@ class ZenohExecutiveNode:
             scheduled_goal['callback_concern_id'] = data['callback_concern_id']
         if data.get('source_agent'):
             scheduled_goal['source_agent'] = data['source_agent']
-        if any(k in data for k in ('callback_topic', 'callback_concern_id', 'source_agent')):
-            self._save_scheduled_goal(scheduled_goal)
+        self._save_scheduled_goal(scheduled_goal)
         if self._is_goal_running():
             self._say_to_user(f"Goal '{goal_id}' created but another goal is already running.")
             return f"Goal {goal_id} created (queued)"
