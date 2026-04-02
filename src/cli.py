@@ -725,14 +725,18 @@ JSON response:"""
 
 
 def _format_commands(commands: List[Dict]) -> str:
-    """Format a list of interpreted commands for display."""
+    """Format a list of interpreted commands for display.
+
+    Shows commands as they would actually be executed (positional args),
+    not as keyword=value pairs.
+    """
     parts = []
     for cmd_data in commands:
         cmd = cmd_data.get('cmd', '?')
         args_parts = []
         for k, v in cmd_data.items():
             if k != 'cmd':
-                args_parts.append(f"{k}={v}")
+                args_parts.append(str(v))
         args_str = ' '.join(args_parts)
         parts.append(f"  {C.BOLD}{cmd}{C.RESET} {args_str}")
     return '\n'.join(parts)
@@ -1158,7 +1162,7 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
                         _print_info(f"  → {C.GREEN}{len(commands)} command(s):{C.RESET}")
                         print(_format_commands(commands))
                         try:
-                            confirm = session.prompt(HTML('<aaa fg="ansiyellow">?</aaa> '))
+                            confirm = session.prompt(HTML('<aaa fg="ansiyellow">Enter to run, or type to cancel: </aaa>'))
                         except (EOFError, KeyboardInterrupt):
                             confirm = 'n'
                         if confirm.strip() == '':
