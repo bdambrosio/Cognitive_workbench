@@ -261,7 +261,8 @@ def launch_ui(scenario_name: str, port: int) -> Optional[subprocess.Popen]:
 
 def launch_resource_browser(world_label: str) -> Optional[subprocess.Popen]:
     try:
-        proc = subprocess.Popen([sys.executable, 'resource_browser.py', '--map', world_label, '--port', '3001', '--no-browser'])
+        proc = subprocess.Popen([sys.executable, 'resource_browser.py', '--map', world_label, '--port', '3001', '--no-browser'],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         logger.info("Resource Browser launched on port 3001")
         return proc
     except Exception as e:
@@ -271,7 +272,8 @@ def launch_resource_browser(world_label: str) -> Optional[subprocess.Popen]:
 
 def launch_task_manager() -> Optional[subprocess.Popen]:
     try:
-        proc = subprocess.Popen([sys.executable, 'task_manager.py', '--port', '3002', '--no-browser'])
+        proc = subprocess.Popen([sys.executable, 'task_manager.py', '--port', '3002', '--no-browser'],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         logger.info("Task Manager launched on port 3002")
         return proc
     except Exception as e:
