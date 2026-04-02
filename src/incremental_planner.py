@@ -1553,6 +1553,20 @@ def _execute_and_record_code_block(code_text: str, executor, step: int) -> tuple
     if hasattr(executor, "_done_gate_retry_active"):
         executor._done_gate_retry_active = False
 
+    # Capture the last tool action before replacing individual actions.
+    # The last out= binding is the code block's primary artifact.
+    last_tool_action = None
+    if hasattr(executor, '_plan_actions') and len(executor._plan_actions) > _pa_start:
+        # Walk backwards to find the last action with an 'out' param
+        for i in range(len(executor._plan_actions) - 1, _pa_start - 1, -1):
+            act = executor._plan_actions[i]
+            if act.get('out'):
+                last_tool_action = act
+                break
+        # If no out= action, just take the very last action
+        if not last_tool_action:
+            last_tool_action = executor._plan_actions[-1]
+
     # Replace individual actions recorded during the code block with a single
     # _code_block_ action containing the source, making cached plans replayable.
     if hasattr(executor, '_plan_actions'):
@@ -1563,10 +1577,36 @@ def _execute_and_record_code_block(code_text: str, executor, step: int) -> tuple
 
     logger.info(f"Step {step}: plan_actions count: {len(getattr(executor, '_plan_actions', []))}")
 
-    action = {"type": "_code_block_", "source": code_text}
-    tool_result = format_result_text(result_dict, action)
-
     new_bindings = {k: v for k, v in executor.plan_bindings_flat.items() if bindings_before.get(k) != v}
+
+    # Build Stage 3 result text from the last tool's binding (deterministic)
+    # rather than the code block's return value (LLM-chosen, often wrong).
+    # The code block return is still used for status (success/failed/reason).
+    action = {"type": "_code_block_", "source": code_text}
+    status = result_dict.get('status', 'failed')
+    if status == 'success' and new_bindings:
+        # Use the last binding as the primary result
+        last_var, last_rid = list(new_bindings.items())[-1]
+        # Try to get a content preview from the bound resource
+        content_preview = ''
+        if isinstance(last_rid, str) and last_rid.startswith('Note_'):
+            try:
+                content = executor._get_content(last_rid)
+                if content and isinstance(content, str):
+                    content_preview = content[:800].replace('\n', ' | ')
+                elif content:
+                    content_preview = str(content)[:800]
+            except Exception:
+                pass
+        if content_preview:
+            tool_result = f"SUCCESS | {content_preview} | _code_block_ completed | Bound: ${last_var} → {last_rid}"
+        else:
+            tool_result = f"SUCCESS | _code_block_ completed | Bound: ${last_var} → {last_rid}"
+        if last_tool_action:
+            tool_name = last_tool_action.get('type', 'unknown')
+            tool_result = tool_result.replace('_code_block_ completed', f'{tool_name} → _code_block_ completed')
+    else:
+        tool_result = format_result_text(result_dict, action)
 
     # Persist code block return value as Note when substantial, but only if the
     # code block didn't already create Note bindings (avoids duplicate content).
@@ -3042,6 +3082,13 @@ ALWAYS follow all formatting instructions exactly.
                 output_artifact_names=_output_artifact_names,
                 code_block_output_created=code_block_output_created,
             )
+            # Fallback: if no declared/resolved artifact, use the last out= binding
+            # from the code block. The last binding is almost always the primary result.
+            if not eval_target and new_bindings:
+                last_var, last_rid = list(new_bindings.items())[-1]
+                if isinstance(last_rid, str) and (last_rid.startswith('Note_') or last_rid.startswith('Collection_')):
+                    eval_target = last_rid
+                    logger.info(f"Step {step}: Eval target from last binding: ${last_var} → {last_rid}")
             if eval_target:
                 last_eval_target = eval_target
             # If a side-effect tool ran, prefer its input content as eval target
@@ -4185,6 +4232,12 @@ ALWAYS follow all formatting instructions exactly.
             output_artifact_names=_output_artifact_names,
             code_block_output_created=code_block_output_created,
         )
+        # Fallback: if no declared/resolved artifact, use the last out= binding
+        if not eval_target and new_bindings:
+            last_var, last_rid = list(new_bindings.items())[-1]
+            if isinstance(last_rid, str) and (last_rid.startswith('Note_') or last_rid.startswith('Collection_')):
+                eval_target = last_rid
+                logger.info(f"Step {step}: Eval target from last binding: ${last_var} → {last_rid}")
         if eval_target:
             last_eval_target = eval_target
         # If a side-effect tool ran, prefer its input content as eval target
