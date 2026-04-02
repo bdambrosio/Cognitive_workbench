@@ -4831,7 +4831,9 @@ class ZenohExecutiveNode:
         intention = wip.get("intention", "")
 
         # Determine cooldown based on task origin
-        cooldown = 3600  # default 1 hour
+        # User-initiated tasks (no linked concern) get a short cooldown;
+        # concern-delegated tasks get longer cooldowns for background work.
+        cooldown = 30  # default 30s for user-initiated tasks
         if wip.get("linked_concern_id"):
             # Check if it's a seed concern (longer cooldown)
             try:
