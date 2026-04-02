@@ -8,6 +8,7 @@ Extracts resource management logic from map_node to improve modularity and maint
 import json
 import logging
 import hashlib
+import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -862,23 +863,33 @@ class InfospaceResourceManager:
             if resource_id in self.resource_indexer.collection_id_to_index:
                 del self.resource_indexer.collection_id_to_index[resource_id]
     
+    # Shared embedder instance across all ResourceManager instances (thread-safe).
+    # SentenceTransformer is not safe to initialize concurrently from multiple
+    # threads — use a class-level lock and singleton to prevent races.
+    _shared_embedder = None
+    _embedder_lock = threading.Lock()
+
     def _init_embedder(self):
-        """Lazy init embedding model"""
-        # Recommended: BGE-Small (33MB, much smarter than MiniLM, 512 context)
-        # OR: 'BAAI/bge-base-en-v1.5' for a middle ground.
-        model_name = 'BAAI/bge-small-en-v1.5' 
-        
-        if self.embedder is None:
+        """Lazy init embedding model (shared singleton across all agents)."""
+        if self.embedder is not None:
+            return
+        with InfospaceResourceManager._embedder_lock:
+            # Double-check after acquiring lock
+            if InfospaceResourceManager._shared_embedder is not None:
+                self.embedder = InfospaceResourceManager._shared_embedder
+                return
+            # Recommended: BGE-Small (33MB, much smarter than MiniLM, 512 context)
+            model_name = 'BAAI/bge-small-en-v1.5'
             from sentence_transformers import SentenceTransformer
             try:
-                # Try offline first; force CPU to avoid CUDA arch mismatches
-                self.embedder = SentenceTransformer(model_name, local_files_only=True, device='cpu')
+                embedder = SentenceTransformer(model_name, local_files_only=True, device='cpu')
                 logger.info(f"Initialized embedding model: {model_name} (from cache)")
             except Exception:
-                # Fallback to download
                 logger.info(f"Cache miss, downloading embedding model: {model_name}")
-                self.embedder = SentenceTransformer(model_name, device='cpu')
+                embedder = SentenceTransformer(model_name, device='cpu')
                 logger.info(f"Initialized embedding model: {model_name} (downloaded)")
+            InfospaceResourceManager._shared_embedder = embedder
+            self.embedder = embedder
     
     # ==================== Note Creation ====================
     
