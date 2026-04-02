@@ -2585,6 +2585,10 @@ if HAS_SGLANG:
             lines = ["# Available Resources\n"]
 
             if notes:
+                # Filter out internal notes (underscore-prefixed names are bookkeeping)
+                notes = [n for n in notes
+                         if not (n.get('name', '') or '').startswith('_')]
+            if notes:
                 lines.append("Notes:")
                 for note in notes:
                     name = note.get('name', note.get('resource_id', ''))
