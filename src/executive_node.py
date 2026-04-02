@@ -1903,10 +1903,10 @@ class ZenohExecutiveNode:
         """
         try:
             # Gather recent conversation for context
-            entity_data = self.conversation_store.get_entity_context(source, limit=6, scope='current')
+            entity_data = self.conversation_store.get_entity_context(source, limit=20, scope='current')
             recent_turns = ""
             if entity_data and 'conversation_history' in entity_data:
-                for entry in entity_data['conversation_history'][-6:]:
+                for entry in entity_data['conversation_history'][-20:]:
                     if isinstance(entry, dict) and 'source' in entry and 'text' in entry:
                         recent_turns += f"{entry['source']}: {str(entry['text'])[:300]}\n"
 
@@ -5004,9 +5004,9 @@ class ZenohExecutiveNode:
 
         # Build user prompt with dialog history + envision guidance + orientation + user message
         recent_turns = ""
-        entity_data = self.conversation_store.get_entity_context(source, limit=6, scope='current')
+        entity_data = self.conversation_store.get_entity_context(source, limit=20, scope='current')
         if entity_data and 'conversation_history' in entity_data:
-            for entry in entity_data['conversation_history'][-6:]:
+            for entry in entity_data['conversation_history'][-20:]:
                 if isinstance(entry, dict) and 'source' in entry and 'text' in entry:
                     text_preview = str(entry['text'])[:200]
                     recent_turns += f"{entry['source']}: {text_preview}\n"
@@ -5849,9 +5849,9 @@ class ZenohExecutiveNode:
         """Lightweight LLM call to characterize the conversational moment."""
         # Gather recent dialog turns for context
         recent_turns = ""
-        entity_data = self.conversation_store.get_entity_context(source, limit=6, scope='current')
+        entity_data = self.conversation_store.get_entity_context(source, limit=20, scope='current')
         if entity_data and 'conversation_history' in entity_data:
-            for entry in entity_data['conversation_history'][-6:]:
+            for entry in entity_data['conversation_history'][-20:]:
                 if isinstance(entry, dict) and 'source' in entry and 'text' in entry:
                     text_preview = str(entry['text'])[:200]
                     recent_turns += f"{entry['source']}: {text_preview}\n"
@@ -7395,30 +7395,12 @@ class ZenohExecutiveNode:
             return
 
         if t == 'chat_response':
-            # No graph action_result here — the planner hasn't run yet.
-            # Goal outcome will be emitted by _set_scheduled_goal_result.
-            # Clear stale interrupt from prior End/Stop
-            self.interrupt_requested = False
-            if self.infospace_executor:
-                self.infospace_executor.interrupt_requested = False
-            self._create_character_note()
-
-            # Discourse-managed chat: envision the conversational moment,
-            # then run through the planner so the agent can use tools if needed.
+            # Direct LLM chat — no planner, no goal machinery.
+            # The planner is only invoked for explicit /commands or interpreted goals.
             source = p['source']
             user_text = p['text']
-            in_conversation = (self.conversation_store.is_dialog_active(source)
-                               and self.conversation_store.get_turn_count(source) > 0)
-            envision = self._envision_conversation_turn(source, user_text, "")
-            goal_text = "Continue dialog with User" if in_conversation else "Respond to User"
-            context = (
-                f"\n## CONTEXT ##\n"
-                f"Their move: {envision['turn_intent']}\n"
-                f"Your move: {envision['my_move']}\n"
-                f"Message from {source}: {user_text[:500]}"
-            )
-            logger.info(f'📥 {self.character_name} Chat via planner: "{goal_text}"')
-            self.parse_and_set_goal("", f"{goal_text}{context}")
+            logger.info(f'📥 {self.character_name} Direct chat response to {source}')
+            self._handle_chat_response(user_text, source, assessment=self._last_character_eval)
             self.execution_paused = False
             self._publish_execution_state()
             return
@@ -7790,9 +7772,9 @@ class ZenohExecutiveNode:
     def _character_eval_build_recent_context(self, entity_for_dialog: str = "User") -> str:
         parts: List[str] = []
         try:
-            entity_data = self.conversation_store.get_entity_context(entity_for_dialog, limit=6, scope="current")
+            entity_data = self.conversation_store.get_entity_context(entity_for_dialog, limit=20, scope="current")
             if entity_data and "conversation_history" in entity_data:
-                for entry in entity_data["conversation_history"][-6:]:
+                for entry in entity_data["conversation_history"][-20:]:
                     if isinstance(entry, dict) and "source" in entry and "text" in entry:
                         parts.append(f"{entry['source']}: {str(entry['text'])[:200]}")
         except Exception:
