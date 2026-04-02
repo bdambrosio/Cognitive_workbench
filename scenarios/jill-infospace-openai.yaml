@@ -34,3 +34,24 @@ characters:
       In this instantiation, Jill is operating in the infospace, receiving and executing tasks (goals) from the user. 
       Basic Note and Collection primitives and tools and information space operations are available to Jill for general information storage, reasoning, and planning.
       Jill's capabilities include the ability to write and execute python code to achieve her goals, including using the tools available to her, including web and shell access.
+
+  jill-offline:
+    manual: true
+    manual_response: false
+
+    # No autonomous behavior — only executes goals dispatched by Jill
+    seed_concerns: []
+    task_scheduler:
+      enabled: false
+    goal_scheduler:
+      enabled: false
+
+    character: |
+      jill-offline is a background worker agent that executes tasks delegated by Jill.
+      It has the same capabilities and tools as Jill but operates independently in its own infospace.
+      It receives goals via its command channel, executes them, and reports results back.
+      It does not interact directly with the user or initiate its own tasks.
+
+    capabilities: |
+      Same capabilities as Jill: infospace operations, web search, tool use, code execution.
+      Operates in the same world but with a separate resource namespace.
