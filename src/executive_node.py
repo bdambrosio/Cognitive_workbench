@@ -1606,6 +1606,7 @@ class ZenohExecutiveNode:
 
         # ── 4. Route ask replies while goal thread is blocked on _execute_ask
         if self.awaiting_ask_response and self.text_input_queue:
+            logger.debug(f'Ask routing: {len(self.text_input_queue)} items in queue, scanning for User reply')
             for i, sense_data in enumerate(self.text_input_queue):
                 content = sense_data.get('content', '')
                 try:
@@ -1613,10 +1614,14 @@ class ZenohExecutiveNode:
                     text, source = d.get('text', ''), d.get('source', 'unknown')
                 except (json.JSONDecodeError, TypeError):
                     text, source = content, 'console'
+                logger.debug(f'Ask routing: item {i} source={source} text={text[:60] if text else ""}')
                 if text and text.strip() and source == 'User':
                     self.text_input_queue.pop(i)
                     self._ask_response_queue.put(text)
+                    logger.info(f'✅ Ask reply routed: "{text[:60]}"')
                     break
+        elif self.awaiting_ask_response:
+            logger.debug(f'Ask routing: awaiting response but queue empty')
 
         # ── 5. Skip event processing while goal is running ──────────────
         if self._is_goal_running():
