@@ -992,6 +992,27 @@ class ZenohExecutiveNode:
             logger.warning(f"Failed to load cognitive graph: {e}")
             self._cognitive_graph_path = None
 
+        # ── Entity Index (NER-backed entity tracking) ─────────────────
+        from entity_index import EntityIndex
+        self._entity_index = EntityIndex(cognitive_graph=self._cognitive_graph)
+        # Seed common aliases
+        self._entity_index.add_aliases({
+            "the user": "user", "bruce": "user", "bdambrosio": "user",
+            self.character_name.lower(): self.character_name.lower(),
+        })
+        # Load persisted entity index if available
+        try:
+            if self._cognitive_graph_path:
+                ei_path = str(Path(self._cognitive_graph_path).parent / "entity_index.json")
+                import json as _json
+                with open(ei_path) as f:
+                    self._entity_index.load_dict(_json.load(f))
+                logger.info(f"✓ Loaded entity index ({len(self._entity_index.get_all_entities())} entities)")
+        except FileNotFoundError:
+            pass
+        except Exception as e:
+            logger.debug(f"Entity index load skipped: {e}")
+
         self._scheduled_goal_counter = 0
         self._active_scheduled_goal_id = None
         self._initialize_scheduled_goals()
@@ -1699,6 +1720,13 @@ class ZenohExecutiveNode:
                 self._cognitive_graph.save(self._cognitive_graph_path)
         except Exception as e:
             logger.debug(f"Cognitive graph maintenance failed: {e}")
+        # ── Entity index: process unextracted persistent notes ──
+        try:
+            if not self._is_goal_running():
+                self._entity_index_process_persistent_notes()
+                self._save_entity_index()
+        except Exception as e:
+            logger.debug(f"Entity index maintenance failed: {e}")
 
     def _resync_task_wip_counter(self):
         """Scan existing _task_wip_N named notes and set counter to max N found."""
@@ -7166,6 +7194,8 @@ class ZenohExecutiveNode:
                     attrs={"source": event.source, "direction": "in",
                            "entity": event.source})
                 g.add_edge(turn_nid, nid, "triggered_by")
+                # NER: extract entities from user input and link to graph
+                self._extract_and_index_entities(event.content, "", turn_nid)
         except Exception as e:
             logger.debug(f"Graph observe emit failed: {e}")
 
@@ -7302,6 +7332,9 @@ class ZenohExecutiveNode:
             self._graph_node_by_key[f"goal:{goal_id}"] = nid
             if self._last_decision_node:
                 g.add_edge(self._last_decision_node, nid, "spawned_goal")
+            # NER: extract entities from goal text and link to graph
+            if goal_text:
+                self._extract_and_index_entities(goal_text, "", nid)
         except Exception as e:
             logger.debug(f"Graph goal_launch emit failed: {e}")
 
@@ -7350,6 +7383,66 @@ class ZenohExecutiveNode:
                 g.add_edge(nid, self._last_assessment_node, "concern_for")
         except Exception as e:
             logger.debug(f"Graph concern_created emit failed: {e}")
+
+    # ── Entity Extraction (NER Pipeline) ────────────────────────────
+
+    def _extract_and_index_entities(self, text: str, resource_id: str,
+                                     graph_node: str = ""):
+        """Extract entities from text and add to entity index + cognitive graph.
+
+        Called from graph emit helpers (observe, goal_launch) and idle-tick
+        persistent-note processing.  Runs synchronously but is lightweight
+        (~256 max_tokens, temperature 0.1).
+        """
+        try:
+            entities = self._entity_index.extract_entities(text, self.llm_generate)
+            if any(entities.get(k) for k in ("people", "organizations", "locations", "topics")):
+                self._entity_index.index_entities(entities, resource_id, graph_node)
+        except Exception as e:
+            logger.debug(f"Entity extraction failed: {e}")
+
+    def _entity_index_process_persistent_notes(self):
+        """Batch-extract entities from persistent Notes not yet processed.
+
+        Called from idle tick.  Processes at most 3 notes per tick to avoid
+        blocking the main loop.
+        """
+        if not self.resource_manager:
+            return
+        processed = 0
+        for note_id, note_data in self.resource_manager.resource_registry.items():
+            if processed >= 3:
+                break
+            if not note_id.startswith('Note_'):
+                continue
+            props = note_data.get('properties', {})
+            if not props.get('persistent', False):
+                continue
+            if props.get('entities_extracted', False):
+                continue
+            # Skip internal notes
+            name = props.get('note_name', '')
+            if name.startswith('_'):
+                continue
+            content = str(props.get('content', ''))
+            if len(content) < 30:
+                continue
+            self._extract_and_index_entities(content, note_id)
+            props['entities_extracted'] = True
+            processed += 1
+        if processed:
+            logger.info(f"🏷 Entity extraction: processed {processed} persistent notes")
+
+    def _save_entity_index(self):
+        """Persist entity index to disk alongside cognitive graph."""
+        try:
+            if self._cognitive_graph_path:
+                import json as _json
+                ei_path = str(Path(self._cognitive_graph_path).parent / "entity_index.json")
+                with open(ei_path, 'w') as f:
+                    _json.dump(self._entity_index.to_dict(), f)
+        except Exception as e:
+            logger.debug(f"Entity index save failed: {e}")
 
     def _record_ooda_event(self, event, oriented, action):
         """Record an OODA cycle event for the UI feed."""
@@ -9621,6 +9714,13 @@ class ZenohExecutiveNode:
                     logger.info(f'🌍 Saved world_model for {self.character_name}')
                 except Exception as e:
                     logger.error(f'Error saving world_model during shutdown: {e}')
+
+            # Save entity index
+            try:
+                self._save_entity_index()
+                logger.info(f'🏷 Saved entity index for {self.character_name}')
+            except Exception as e:
+                logger.debug(f'Entity index save during shutdown failed: {e}')
 
             # Save resource manager
             if self.resource_manager:

@@ -497,6 +497,7 @@ class CognitiveGraph:
 
     CONSOLIDATION_EXEMPT_TYPES = {
         "consolidation", "concern_created", "task_created", "situation_update",
+        "entity",
     }
 
     def consolidate(self) -> int:
