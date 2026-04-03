@@ -6327,6 +6327,16 @@ class ZenohExecutiveNode:
                 'description': 'End conversation',
                 'args': [],
             },
+            '/done': {
+                'handler': self._cmd_bye,
+                'description': 'Done with current topic (archives conversation)',
+                'args': [],
+            },
+            '/next': {
+                'handler': self._cmd_bye,
+                'description': 'Move on to next topic (archives conversation)',
+                'args': [],
+            },
             '/action': {
                 'handler': self._cmd_direct_action,
                 'description': 'Execute a direct JSON action',

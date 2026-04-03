@@ -309,6 +309,10 @@ def _parse_command(line: str) -> Optional[dict]:
         return {'cmd': '/shutdown'}
     if cmd == 'bye':
         return {'cmd': '/bye'}
+    if cmd == 'done':
+        return {'cmd': '/done'}
+    if cmd == 'next':
+        return {'cmd': '/next'}
     if cmd == 'action' and args:
         return {'cmd': '/action', 'json_text': ' '.join(args)}
 
