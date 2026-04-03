@@ -3509,9 +3509,8 @@ class ZenohExecutiveNode:
         if self._is_goal_running():
             self._say_to_user(f"A goal is already running. Please wait for it to complete.")
             return
-        # Close any active User conversation when starting a goal
-        if source != "scheduler" and source != "sensor_trigger":
-            self.conversation_store.close_dialog("User")
+        # Goal execution is part of the ongoing conversation — don't close dialog.
+        # Dialog is closed by /bye, shutdown, or UI end-conversation button.
         # Apply any pending LLM switch before starting a new goal
         self._apply_pending_llm_switch()
         self._active_scheduled_goal_id = goal_id
@@ -6394,7 +6393,8 @@ class ZenohExecutiveNode:
         goal_text = (data.get('goal_text') or '').strip()
         if not goal_text:
             return 'Usage: /goal add <goal text>'
-        self.conversation_store.close_dialog("User")
+        # Don't close dialog — the goal is part of the ongoing conversation.
+        # Dialog is closed by /bye, shutdown, or UI end-conversation button.
         scheduled_goal = self._upsert_scheduled_goal(goal_text)
         goal_id = scheduled_goal["goal_id"]
         # Mark CLI/interpreted goals as ephemeral (deleted on completion)
@@ -7673,7 +7673,6 @@ class ZenohExecutiveNode:
             return
 
         if t == 'dispatch_goal':
-            self.conversation_store.close_dialog("User")
             scheduled_goal = self._upsert_scheduled_goal(p['goal_text'])
             goal_id = scheduled_goal["goal_id"]
             # ── Graph: goal launch ──
