@@ -259,11 +259,13 @@ def launch_ui(scenario_name: str, port: int) -> Optional[subprocess.Popen]:
         return None
 
 
-def launch_resource_browser(world_label: str) -> Optional[subprocess.Popen]:
+def launch_resource_browser(world_label: str, character: str = "") -> Optional[subprocess.Popen]:
     try:
-        proc = subprocess.Popen([sys.executable, 'resource_browser.py', '--map', world_label, '--port', '3001', '--no-browser'],
-                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        logger.info("Resource Browser launched on port 3001")
+        cmd = [sys.executable, 'resource_browser.py', '--map', world_label, '--port', '3001', '--no-browser']
+        if character:
+            cmd += ['--character', character]
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        logger.info(f"Resource Browser launched on port 3001 (character={character or '*'})")
         return proc
     except Exception as e:
         logger.error(f"Failed to launch Resource Browser: {e}")
@@ -387,7 +389,8 @@ def main():
         if proc:
             service_procs.append(proc)
     if args.resource_browser:
-        proc = launch_resource_browser(world_name)
+        primary_character = characters[0][0] if characters else ""
+        proc = launch_resource_browser(world_name, character=primary_character)
         if proc:
             service_procs.append(proc)
     if args.task_manager:

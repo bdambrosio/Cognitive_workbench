@@ -38,11 +38,12 @@ logger = logging.getLogger(__name__)
 
 class ResourceBrowser:
     """Browse Notes and Collections from map_node."""
-    
-    def __init__(self, map_name: str = "infolab", port: int = 3001, open_browser: bool = True):
+
+    def __init__(self, map_name: str = "infolab", port: int = 3001, open_browser: bool = True, character: str = ""):
         self.map_name = map_name
         self.port = port
         self.open_browser = open_browser
+        self.character_name = character
         self.app = FastAPI(title="Resource Browser")
         self.shutdown_requested = False
         
@@ -105,18 +106,22 @@ class ResourceBrowser:
             content = body.get('content', '')
             return self.update_resource_via_zenoh(resource_id, content)
     
+    def _key_prefix(self) -> str:
+        """Return Zenoh key prefix for the target character (or wildcard fallback)."""
+        if self.character_name:
+            return f"cognitive/{self.character_name}"
+        return "cognitive/*"
+
     def query_resources(self) -> Dict:
         """Query executive_node for resource list."""
-        # Use wildcard to find any character's resources.
-        # With multiple agents (Jill + jill-offline), collect ALL replies
-        # and return the one with the most resources (the primary agent).
-        key = "cognitive/*/resources"
+        key = f"{self._key_prefix()}/resources"
         logger.info(f"Querying: {key}")
 
         from zenoh import QueryTarget, ConsolidationMode
+        target = QueryTarget.BEST_MATCHING if self.character_name else QueryTarget.ALL
         best = None
         best_count = -1
-        for reply in self.session.get(key, target=QueryTarget.ALL, consolidation=ConsolidationMode.NONE, timeout=2.0):
+        for reply in self.session.get(key, target=target, consolidation=ConsolidationMode.NONE, timeout=2.0):
             if reply.ok:
                 try:
                     data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
@@ -143,22 +148,20 @@ class ResourceBrowser:
     
     def query_resource(self, resource_id: str) -> Dict:
         """Query executive_node for specific resource."""
-        # Use wildcard to find any character's resource
-        key = f"cognitive/*/resource/{resource_id}"
+        key = f"{self._key_prefix()}/resource/{resource_id}"
         logger.info(f"Querying: {key}")
-        
+
         from zenoh import QueryTarget, ConsolidationMode
         for reply in self.session.get(key, target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=2.0):
             if reply.ok:
                 data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 return data
-        
+
         return {'success': False, 'error': f'Resource {resource_id} not found'}
     
     def delete_resource_via_zenoh(self, resource_id: str) -> Dict:
         """Delete resource via Zenoh query to executive_node."""
-        # Use wildcard to find any character's resource
-        key = f"cognitive/*/resource/remove/{resource_id}"
+        key = f"{self._key_prefix()}/resource/remove/{resource_id}"
         logger.info(f"Deleting resource: {key}")
         
         from zenoh import QueryTarget, ConsolidationMode
@@ -171,7 +174,7 @@ class ResourceBrowser:
 
     def update_resource_via_zenoh(self, resource_id: str, content: str) -> Dict:
         """Update Note content via Zenoh query to executive_node."""
-        key = f"cognitive/*/resource/update/{resource_id}"
+        key = f"{self._key_prefix()}/resource/update/{resource_id}"
         logger.info(f"Updating resource: {key}")
 
         payload = json.dumps({'content': content}).encode('utf-8')
@@ -715,11 +718,12 @@ def main():
     parser = argparse.ArgumentParser(description="Browse Notes and Collections from running map_node")
     parser.add_argument('--map', type=str, default='infolab', help='Map name (default: infolab)')
     parser.add_argument('--port', type=int, default=3001, help='Web server port (default: 3001)')
+    parser.add_argument('--character', type=str, default='', help='Character name to browse (avoids multi-agent ambiguity)')
     parser.add_argument('--no-browser', action='store_true', help='Do not open browser automatically')
-    
+
     args = parser.parse_args()
-    
-    browser = ResourceBrowser(map_name=args.map, port=args.port, open_browser=not args.no_browser)
+
+    browser = ResourceBrowser(map_name=args.map, port=args.port, open_browser=not args.no_browser, character=args.character)
     browser.run()
 
 
