@@ -5402,10 +5402,25 @@ class ZenohExecutiveNode:
             if len(dialog) < 2:
                 return
 
+            # Build discourse state context including active user concerns
+            discourse_ctx = ""
+            try:
+                active_uc = self.user_concern_model.get_concerns(active_only=True) or []
+                if active_uc:
+                    lines = [f"Active user concerns (what {entity} currently cares about):"]
+                    for c in active_uc[:8]:
+                        label = c.get("concern_label", "?")
+                        weight = c.get("weight", "")
+                        desc = c.get("concern_description", "")
+                        lines.append(f"  - {label} (weight={weight}): {desc}")
+                    discourse_ctx = "\n".join(lines)
+            except Exception:
+                pass
+
             # Run ToM update (single LLM call)
             tom_text = dt.update_tom_from_discourse_segment(
                 dialog, entity, start=0, end=len(dialog) - 1,
-                discourse_state="", previous_tom_state=previous_tom)
+                discourse_state=discourse_ctx, previous_tom_state=previous_tom)
 
             if tom_text and len(tom_text.strip()) > 20:
                 self._write_named_note(tom_note_name, tom_text.strip())
