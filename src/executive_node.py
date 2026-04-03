@@ -2547,11 +2547,10 @@ class ZenohExecutiveNode:
                 self.conversation_store.record_outgoing("User", conv_text, act_type="response")
         
         # Publish result to action log for UI display.
-        # Always deliver the primary_product content when available (err on the
-        # side of duplication — the CLI deduplicates).  Fall back to
-        # FINAL_ANSWER text when there is no product.
+        # Skip if the plan already communicated via say — avoids duplicate messages.
+        # Fall back to primary_product content or FINAL_ANSWER when no say occurred.
         primary_product = plan_result.get('primary_product', '')
-        if not interrupted_final:
+        if not interrupted_final and not last_say:
             product_content = ''
             if primary_product and self.resource_manager:
                 try:
@@ -5000,16 +4999,13 @@ class ZenohExecutiveNode:
     # ── Chat-mode response (lightweight, no planning pipeline) ────────────
 
     def _handle_chat_response(self, text: str, source: str = 'User', assessment: Optional[Dict[str, Any]] = None):
-        """Respond to user via direct LLM call, bypassing the planning pipeline.
+        """Unified handler: respond to user text as chat, goal, or system command.
 
-        Used when no goal: prefix is present.  Read-only — no resource mutations.
+        Single LLM call that decides the response type (replaces the former
+        interpret → envision → chat three-call pipeline).
         Assessment is provided by the Orient stage of the OODA pipeline.
         """
-        # Record the incoming turn so envision sees full history
         self.conversation_store.record_incoming(source, text)
-
-        # Characterise the conversational moment (cheap LLM call)
-        envision = self._envision_conversation_turn(source, text, "")
 
         # Build system prompt (character + setting + capabilities + drives + agent state)
         system_prompt = self._update_system_prompt()
@@ -5017,7 +5013,7 @@ class ZenohExecutiveNode:
         # Build orientation summary from evaluator assessment
         orientation = character_evaluator.build_orientation_summary(assessment, text)
 
-        # Build user prompt with dialog history + envision guidance + orientation + user message
+        # Recent dialog history
         recent_turns = ""
         entity_data = self.conversation_store.get_entity_context(source, limit=20, scope='current')
         if entity_data and 'conversation_history' in entity_data:
@@ -5026,7 +5022,7 @@ class ZenohExecutiveNode:
                     text_preview = str(entry['text'])[:200]
                     recent_turns += f"{entry['source']}: {text_preview}\n"
 
-        # Render operational self-model for self-aware chat responses
+        # Render operational self-model for self-aware responses
         self_model_block = ""
         try:
             from ooda_snapshot_renderer import render_self_model_section
@@ -5043,7 +5039,7 @@ class ZenohExecutiveNode:
         except Exception:
             pass
 
-        # Add user concerns for grounding
+        # User concerns for grounding
         user_concerns_block = ""
         try:
             active_uc = self.user_concern_model.get_concerns(active_only=True) or []
@@ -5060,29 +5056,38 @@ class ZenohExecutiveNode:
         except Exception:
             pass
 
+        # Compact goals/tasks context for command resolution
+        command_context = self._build_command_resolution_context()
+
         orientation_block = f"\n{orientation}\n\n" if orientation else "\n"
         self_model_insert = f"\n{self_model_block}\n\n" if self_model_block else ""
         concerns_insert = f"\n{user_concerns_block}\n\n" if user_concerns_block else ""
         user_prompt = (
             f"RECENT DIALOG:\n{recent_turns}\n"
-            f"Their move: {envision['turn_intent']}\n"
-            f"Your move: {envision['my_move']}\n"
             f"{orientation_block}"
             f"{self_model_insert}"
             f"{concerns_insert}"
+            f"{command_context}\n"
             f"Message from {source}: {text}\n\n"
             f"Respond directly to what {source} said. Ground your response in your "
             f"actual operational state (concerns, tasks, recent goals, self-model) "
             f"rather than generic descriptions. Be concise and in character.\n"
             f"IMPORTANT: You CANNOT execute tools or run actions in this conversational turn. "
             f"NEVER claim to have run a tool, executed a check, or performed an action that "
-            f"you did not actually perform.\n"
-            f"If the user's request requires tool execution (web search, file access, email, "
-            f"code execution, etc.), respond ONLY with:\n"
-            f"[GOAL_NEEDED: <concise goal description>]\n"
-            f"Do NOT ask the user for confirmation — just emit the marker. The system will "
-            f"automatically create and run the goal. Include enough detail in the description "
-            f"for the goal to execute independently.\n"
+            f"you did not actually perform.\n\n"
+            f"RESPONSE MODES — choose exactly one:\n"
+            f"1. CHAT: If the message is conversational, respond naturally.\n"
+            f"2. GOAL: If the request requires tool execution (web search, file access, "
+            f"email, code execution, etc.), respond ONLY with:\n"
+            f"   [GOAL_NEEDED: <concise goal description>]\n"
+            f"   Do NOT ask for confirmation — the system runs the goal automatically. "
+            f"   Include enough detail for independent execution.\n"
+            f"3. COMMAND: If the message maps to a system command (e.g., 'stop', 'run the "
+            f"weather goal', 'save'), respond ONLY with:\n"
+            f"   [COMMAND: <exact /command with args>]\n"
+            f"   Resolve references ('the weather goal') to actual IDs from the state above. "
+            f"   If you cannot resolve a reference, treat as chat.\n"
+            f"You may include a brief conversational preamble before a GOAL or COMMAND marker.\n"
             f"End your response with </end>"
         )
 
@@ -5098,10 +5103,9 @@ class ZenohExecutiveNode:
             )
             if result.success and result.text:
                 response = result.text
-                # Truncate at </end (with or without >) or prompt-echo markers
-                # (stop sequence sometimes fails or tokenizes </end differently)
+                # Truncate at </end or prompt-echo markers
                 for marker in ('</end>', '</end', '\nUSER:', '\nASSISTANT:',
-                               '\nTheir move:', '\n## ORIENTATION', '\nRECENT DIALOG:',
+                               '\n## ORIENTATION', '\nRECENT DIALOG:',
                                '\n#Objectives', '\n#Constraints', '\n#Format',
                                '\nMessage from '):
                     idx = response.find(marker)
@@ -5111,29 +5115,95 @@ class ZenohExecutiveNode:
                 if not response:
                     logger.warning('Chat response empty after cleaning')
                 else:
-                    # Check for [GOAL_NEEDED: ...] marker — auto-escalate to goal
-                    import re as _re
-                    goal_match = _re.search(r'\[GOAL_NEEDED:\s*(.+?)\]', response)
-                    if goal_match:
-                        goal_text = goal_match.group(1).strip()
-                        # Strip the marker from the response (show any surrounding text)
-                        clean_response = response[:goal_match.start()].strip()
-                        if clean_response:
-                            self._say_to_user(clean_response)
-                            self.conversation_store.record_outgoing(source, clean_response, act_type="chat")
-                        # Dispatch as ephemeral goal
-                        logger.info(f'🎯 Chat auto-escalated to goal: "{goal_text[:80]}"')
-                        cmd_data = {'cmd': '/goal add', 'goal_text': goal_text, 'source': 'User'}
-                        self._dispatch_command(cmd_data)
-                    else:
-                        self._say_to_user(response)
-                        self.conversation_store.record_outgoing(source, response, act_type="chat")
-                        logger.info(f'💬 {self.character_name} chat response to {source}: {response[:80]}...')
+                    self._route_chat_response(response, source)
             else:
                 logger.warning(f'Chat LLM call failed: {getattr(result, "error", "unknown")}')
         except Exception as e:
             logger.error(f'Error in chat response: {e}')
             traceback.print_exc()
+
+    def _route_chat_response(self, response: str, source: str):
+        """Route LLM response: extract GOAL_NEEDED/COMMAND markers or deliver as chat."""
+        import re as _re
+
+        # Check for [COMMAND: ...] marker
+        cmd_match = _re.search(r'\[COMMAND:\s*(.+?)\]', response)
+        if cmd_match:
+            cmd_line = cmd_match.group(1).strip()
+            clean_response = response[:cmd_match.start()].strip()
+            if clean_response:
+                self._say_to_user(clean_response)
+                self.conversation_store.record_outgoing(source, clean_response, act_type="chat")
+            from cli import _parse_command
+            parsed = _parse_command(cmd_line)
+            if parsed:
+                parsed['source'] = 'User'
+                self._say_to_user(f'[command: {cmd_line}]')
+                logger.info(f'🔧 Chat dispatched command: {cmd_line}')
+                self._dispatch_command(parsed)
+            else:
+                logger.warning(f'Chat emitted unparseable command: {cmd_line}')
+                self._say_to_user(f'Could not parse command: {cmd_line}')
+            return
+
+        # Check for [GOAL_NEEDED: ...] marker
+        goal_match = _re.search(r'\[GOAL_NEEDED:\s*(.+?)\]', response)
+        if goal_match:
+            goal_text = goal_match.group(1).strip()
+            clean_response = response[:goal_match.start()].strip()
+            if clean_response:
+                self._say_to_user(clean_response)
+                self.conversation_store.record_outgoing(source, clean_response, act_type="chat")
+            self._say_to_user(f'[using tools: {goal_text[:120]}]')
+            logger.info(f'🎯 Chat auto-escalated to goal: "{goal_text[:80]}"')
+            cmd_data = {'cmd': '/goal add', 'goal_text': goal_text, 'source': 'User'}
+            self._dispatch_command(cmd_data)
+            return
+
+        # Plain chat response
+        self._say_to_user(response)
+        self.conversation_store.record_outgoing(source, response, act_type="chat")
+        logger.info(f'💬 {self.character_name} chat response to {source}: {response[:80]}...')
+
+    def _build_command_resolution_context(self) -> str:
+        """Build compact goals/tasks/concerns context for command resolution."""
+        lines = ["## SYSTEM COMMANDS"]
+        lines.append("Available commands (use with [COMMAND: ...] marker):")
+        lines.append("  /goal add <text>, /goal run <goal_id>, /goal terminate <goal_id>")
+        lines.append("  /goal remove <goal_id>, /goal mode <goal_id> manual|auto|recurring|daily")
+        lines.append("  /task approve <name>, /task abandon <name>, /task run <name>")
+        lines.append("  /concern close <id>, /concern reopen <id>")
+        lines.append("  /stop, /continuous, /save, /shutdown, /bye")
+
+        # Current goals for ID resolution
+        try:
+            scheduled = list(self._all_scheduled_goals())
+            if scheduled:
+                lines.append("Current goals:")
+                for g in scheduled[:8]:
+                    gid = g.get('goal_id', '?')
+                    name = (g.get('name') or g.get('goal_text', '?'))[:60]
+                    status = g.get('status', '?')
+                    running = ' [RUNNING]' if g.get('is_running') else ''
+                    lines.append(f"  {gid} [{status}]{running} \"{name}\"")
+        except Exception:
+            pass
+
+        # Current tasks for name resolution
+        try:
+            tasks = self._get_all_task_data()
+            active_tasks = [t for t in tasks if t.get('status') not in ('abandoned', 'archived')]
+            if active_tasks:
+                lines.append("Current tasks:")
+                for t in active_tasks[:6]:
+                    name = t.get('_note_name', '?')
+                    status = t.get('status', '?')
+                    intention = (t.get('intention', '') or '')[:60]
+                    lines.append(f"  {name} [{status}] \"{intention}\"")
+        except Exception:
+            pass
+
+        return "\n".join(lines)
 
     def _handle_sensor_alert_response(self, alert_text: str, sensor_name: str):
         """Respond to a sensor alert in character, without recording conversation turns."""

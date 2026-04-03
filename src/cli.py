@@ -1189,59 +1189,20 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
                 _print_info(f"→ reply sent to {active_character}")
                 continue
 
-            # Plain text — interpret via LLM, then act on result
-            interpretation = _interpret_text(zenoh_session, active_character, line)
-
-            send_as_chat = True  # default: send as chat
-
-            if interpretation:
-                interp_type = interpretation.get('interpretation', 'unknown')
-
-                if interp_type == 'command':
-                    commands = interpretation.get('commands', [])
-                    if commands:
-                        # Show the interpreted commands and prompt for confirmation
-                        _print_info(f"  → {C.GREEN}{len(commands)} command(s):{C.RESET}")
-                        print(_format_commands(commands))
-                        try:
-                            confirm = session.prompt(HTML('<aaa fg="ansiyellow">Enter to run, or type to cancel: </aaa>'))
-                        except (EOFError, KeyboardInterrupt):
-                            confirm = 'n'
-                        if confirm.strip() == '':
-                            # Execute the commands
-                            send_as_chat = False
-                            for cmd_data in commands:
-                                cmd_str = cmd_data.get('cmd', '')
-                                # Build the command line from the interpretation
-                                args_parts = []
-                                for k, v in cmd_data.items():
-                                    if k != 'cmd':
-                                        args_parts.append(str(v))
-                                full_cmd = cmd_str + (' ' + ' '.join(args_parts) if args_parts else '')
-                                # Parse and dispatch through normal command path
-                                parsed = _parse_command(full_cmd)
-                                if parsed:
-                                    parsed['source'] = 'User'
-                                    command_publisher.put(json.dumps(parsed))
-                                    _print_info(f"→ {parsed['cmd']}")
-                        else:
-                            # User typed something — discard interpretation, await new input
-                            send_as_chat = False
-                elif interp_type == 'chat':
-                    _print_info(f"  → {C.CYAN}chat{C.RESET}")
-
-            if send_as_chat:
-                sense_data = {
-                    'timestamp': datetime.now().isoformat(),
-                    'sequence_id': 0,
-                    'mode': 'text',
-                    'content': json.dumps({
-                        'source': 'User',
-                        'text': line
-                    })
-                }
-                sense_publisher.put(json.dumps(sense_data))
-                _print_info(f"→ sent to {active_character}")
+            # Plain text — send directly to agent (chat handler decides
+            # whether to respond conversationally, escalate to a goal, or
+            # dispatch a system command).
+            sense_data = {
+                'timestamp': datetime.now().isoformat(),
+                'sequence_id': 0,
+                'mode': 'text',
+                'content': json.dumps({
+                    'source': 'User',
+                    'text': line
+                })
+            }
+            sense_publisher.put(json.dumps(sense_data))
+            _print_info(f"→ sent to {active_character}")
 
     except KeyboardInterrupt:
         pass
