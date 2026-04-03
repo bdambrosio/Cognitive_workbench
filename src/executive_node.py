@@ -4297,13 +4297,10 @@ class ZenohExecutiveNode:
                 if result.get("status") == "success":
                     # Load the response content from the bound note
                     rid = result.get("resource_id", "")
-                    if rid and self.resource_manager:
-                        res = self.resource_manager.get_resource(rid)
-                        if res:
-                            response_text = str(getattr(res, 'content', '') or getattr(res, 'text', '') or '')
-                            if not response_text:
-                                props = getattr(res, 'properties', {}) or {}
-                                response_text = str(props.get('text', '') or props.get('content', ''))
+                    if rid and self.infospace_executor:
+                        response_text = self.infospace_executor._get_content(rid) or ""
+                        if not isinstance(response_text, str):
+                            response_text = str(response_text)
 
                 success = bool(response_text)
                 summary_text = response_text[:1500] if response_text else "No response received"
