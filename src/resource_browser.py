@@ -107,30 +107,38 @@ class ResourceBrowser:
     
     def query_resources(self) -> Dict:
         """Query executive_node for resource list."""
-        # Try to find active character by querying for resources
-        # Use wildcard to find any character's resources
+        # Use wildcard to find any character's resources.
+        # With multiple agents (Jill + jill-offline), collect ALL replies
+        # and return the one with the most resources (the primary agent).
         key = "cognitive/*/resources"
         logger.info(f"Querying: {key}")
-        
+
         from zenoh import QueryTarget, ConsolidationMode
-        for reply in self.session.get(key, target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=2.0):
+        best = None
+        best_count = -1
+        for reply in self.session.get(key, target=QueryTarget.ALL, consolidation=ConsolidationMode.NONE, timeout=2.0):
             if reply.ok:
-                data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                try:
+                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    continue
                 if data.get('success'):
                     resources = data.get('resources', [])
-                    
-                    # Separate Notes and Collections
-                    notes = [r for r in resources if r.get('id', '').startswith('Note_')]
-                    collections = [r for r in resources if r.get('id', '').startswith('Collection_')]
-                    
-                    logger.info(f"Found {len(notes)} Notes, {len(collections)} Collections")
-                    return {
-                        'success': True,
-                        'notes': notes,
-                        'collections': collections
-                    }
-                return data
-        
+                    if len(resources) > best_count:
+                        best = data
+                        best_count = len(resources)
+
+        if best:
+            resources = best.get('resources', [])
+            notes = [r for r in resources if r.get('id', '').startswith('Note_')]
+            collections = [r for r in resources if r.get('id', '').startswith('Collection_')]
+            logger.info(f"Found {len(notes)} Notes, {len(collections)} Collections (from {best_count} total resources)")
+            return {
+                'success': True,
+                'notes': notes,
+                'collections': collections
+            }
+
         return {'success': False, 'error': 'No response from executive_node'}
     
     def query_resource(self, resource_id: str) -> Dict:
