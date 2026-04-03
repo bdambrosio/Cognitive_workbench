@@ -5368,6 +5368,61 @@ class ZenohExecutiveNode:
             self.infospace_executor._remove_bindings_for_resource(resource_id)
         return success, error_msg
 
+    def _update_tom_from_turns(self, entity: str, raw_transcript: str):
+        """Update Theory of Mind model for an entity from conversation turns.
+
+        Loads the existing ToM note (_tom_{entity}), runs the discourse
+        ToM update template, and persists the result.  Skips gracefully
+        if the transcript is trivial.
+        """
+        if not raw_transcript or len(raw_transcript) < 40:
+            return
+        try:
+            from discourse import DiscourseTracker
+            dt = DiscourseTracker(self.llm_generate, self.character_name, entity)
+
+            # Load previous ToM state from named Note (if any)
+            tom_note_name = f"_tom_{entity.lower()}"
+            previous_tom = ""
+            try:
+                load_result = self.infospace_executor.execute_action(
+                    {"type": "load", "target": tom_note_name, "out": "$_tom_tmp"})
+                if load_result.get('status') == 'success' and load_result.get('resource_id'):
+                    previous_tom = self.infospace_executor._get_content(load_result['resource_id']) or ""
+            except Exception:
+                pass
+
+            # Format dialog as list-of-dicts for DiscourseTracker
+            dialog = []
+            for line in raw_transcript.split('\n'):
+                if ':' in line:
+                    speaker, text = line.split(':', 1)
+                    dialog.append({'source': speaker.strip(), 'text': text.strip()})
+
+            if len(dialog) < 2:
+                return
+
+            # Run ToM update (single LLM call)
+            tom_text = dt.update_tom_from_discourse_segment(
+                dialog, entity, start=0, end=len(dialog) - 1,
+                discourse_state="", previous_tom_state=previous_tom)
+
+            if tom_text and len(tom_text.strip()) > 20:
+                self._write_named_note(tom_note_name, tom_text.strip())
+                logger.info(f'🧠 ToM updated for {entity} ({len(tom_text)} chars)')
+                # Emit to cognitive graph
+                try:
+                    nid = self._cognitive_graph.add_node(
+                        "tom_update", f"ToM update for {entity}",
+                        attrs={"entity": entity, "length": len(tom_text)})
+                    # Link to most recent conversation turn node if available
+                    if self._last_event_node:
+                        self._cognitive_graph.add_edge(self._last_event_node, nid, "triggered_by")
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.warning(f'ToM update for {entity} failed: {e}')
+
     def _archive_dialog(self, entity: str, dialog_id: str, note_ids: list):
         """Archive a single completed dialog: synthesize its turns into conversation_history.
 
@@ -5398,6 +5453,9 @@ class ZenohExecutiveNode:
                 text = turn.get('text', '')
                 raw_turn_lines.append(f"{speaker}: {text}")
         raw_transcript = "\n".join(raw_turn_lines)
+
+        # Update Theory of Mind for this entity
+        self._update_tom_from_turns(entity, raw_transcript)
 
         try:
             # Build a temporary collection binding for synthesize
@@ -5665,6 +5723,22 @@ class ZenohExecutiveNode:
                 return
 
             logger.info(f'📝 Shutdown fallback: archiving {conv_size} remaining turns...')
+
+            # Build raw transcript for ToM update before summarization
+            try:
+                conv_coll_id = self.resource_manager.named_collections.get("conversation")
+                if conv_coll_id:
+                    coll_data = self.resource_manager.get_resource(conv_coll_id)
+                    turn_ids = (coll_data or {}).get('properties', {}).get('content', [])
+                    raw_lines = []
+                    for nid in turn_ids:
+                        turn = self.conversation_store._parse_turn_note(nid)
+                        if turn:
+                            raw_lines.append(f"{turn.get('source', '?')}: {turn.get('text', '')}")
+                    if raw_lines:
+                        self._update_tom_from_turns("User", "\n".join(raw_lines))
+            except Exception as e:
+                logger.debug(f"Shutdown ToM update failed: {e}")
 
             # Synthesize whatever remains
             summarize_action = {"type": "synthesize", "target": "$conv", "focus": "concise conversation summary", "out": "$summary"}
@@ -7731,6 +7805,20 @@ class ZenohExecutiveNode:
             pass
         return ''
 
+    def _get_tom_content(self, entity: str) -> str:
+        """Return persisted Theory of Mind content for an entity, or '' if unavailable."""
+        try:
+            tom_note_name = f"_tom_{entity.lower()}"
+            if self.resource_manager:
+                rid = self.resource_manager.named_notes.get(tom_note_name, '')
+                if rid:
+                    res = self.resource_manager.get_resource(rid)
+                    if res:
+                        return res.get('properties', {}).get('content', '')
+        except Exception:
+            pass
+        return ''
+
     def _get_ooda_readable_content(self) -> str:
         """Return the rendered readable OODA state content, or '' if unavailable."""
         try:
@@ -8048,6 +8136,11 @@ class ZenohExecutiveNode:
         ooda_content = self._get_ooda_readable_content()
         if ooda_content:
             system_prompt += f"\n{ooda_content}\n"
+
+        # Inline Theory of Mind for User (if available)
+        tom_content = self._get_tom_content("User")
+        if tom_content:
+            system_prompt += f"\n## Theory of Mind (your model of the User)\n{tom_content}\n"
 
         return system_prompt
 
