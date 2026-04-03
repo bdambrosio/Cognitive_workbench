@@ -4000,6 +4000,7 @@ class ZenohExecutiveNode:
         "- A test that passed does not need to be re-run. A note that was created\n"
         "  and verified does not need re-verification.\n"
         "- When in doubt, advance. Over-verification wastes resources.\n\n"
+        "{pre_context}"
         "Determine what to do next. Your options are:\n"
         "1. SUBMIT_GOAL: Submit a SHORT, FOCUSED milestone goal (one establishment step).\n"
         "   Keep goal text concise — one clear objective, not a multi-step execution plan.\n"
@@ -4130,6 +4131,26 @@ class ZenohExecutiveNode:
         phases_lines.append("  complete — The task is fully established and ready to be scheduled.")
         phases_text = "\n".join(phases_lines)
 
+        # Insert concerns, spiral warning, and anti-loop nudges before the
+        # format template so structured output instructions remain at the end.
+        pre_context = ""
+        if concerns_text:
+            pre_context += f"\nUSER CONCERNS (relevant context — what the user currently cares about):\n{concerns_text}\n"
+        if spiral_warning:
+            pre_context += spiral_warning
+
+        # Anti-loop: if specification phase already has completed milestones
+        # with user answers, strongly instruct the LLM to advance
+        if current_phase == "specification" and milestones:
+            spec_completed = sum(1 for m in milestones if m.get("status") == "completed")
+            if spec_completed >= 1:
+                pre_context += (
+                    "\n⚠ SPECIFICATION COMPLETE: The user has already answered your questions "
+                    f"({spec_completed} specification milestone(s) completed). Do NOT ask more "
+                    "questions. Use the answers already in ACCUMULATED FINDINGS and advance to "
+                    "capability_evaluation NOW.\n"
+                )
+
         prompt = self._ADVANCE_TASK_PROMPT.format(
             intention=wip.get("intention", ""),
             phase=wip.get("phase", "specification"),
@@ -4137,23 +4158,8 @@ class ZenohExecutiveNode:
             findings=findings_text,
             last_result=last_result,
             phases=phases_text,
+            pre_context=pre_context,
         )
-        if concerns_text:
-            prompt += f"\nUSER CONCERNS (relevant context — what the user currently cares about):\n{concerns_text}\n"
-        if spiral_warning:
-            prompt += spiral_warning
-
-        # Anti-loop: if specification phase already has completed milestones
-        # with user answers, strongly instruct the LLM to advance
-        if current_phase == "specification" and milestones:
-            spec_completed = sum(1 for m in milestones if m.get("status") == "completed")
-            if spec_completed >= 1:
-                prompt += (
-                    "\n⚠ SPECIFICATION COMPLETE: The user has already answered your questions "
-                    f"({spec_completed} specification milestone(s) completed). Do NOT ask more "
-                    "questions. Use the answers already in ACCUMULATED FINDINGS and advance to "
-                    "capability_evaluation NOW.\n"
-                )
 
         try:
             resp = self.llm_generate([prompt], max_tokens=1012, temperature=0.3, stops=['</end>'])

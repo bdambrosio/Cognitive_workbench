@@ -46,6 +46,7 @@ from pathlib import Path
 import json
 import logging
 import hashlib
+import math
 import random
 import re
 
@@ -64,6 +65,25 @@ BELIEFS_WORLD_MODEL_VERSION = "1.0"
 
 def _now_iso() -> str:
     return datetime.utcnow().isoformat()
+
+
+_RECENCY_HALF_LIFE_DAYS = 30.0  # evidence weight halves every 30 days
+_STALENESS_THRESHOLD_DAYS = 90  # facts older than this with weak support are "stale"
+
+
+def _recency_weight(last_observed_iso: str) -> float:
+    """Exponential decay weight based on age of last observation.
+
+    Returns 1.0 for today, 0.5 after half-life days, approaching 0 for old facts.
+    """
+    try:
+        last_dt = datetime.fromisoformat(last_observed_iso)
+        age_days = (datetime.utcnow() - last_dt).total_seconds() / 86400.0
+        if age_days < 0:
+            age_days = 0
+        return math.pow(0.5, age_days / _RECENCY_HALF_LIFE_DAYS)
+    except (ValueError, TypeError):
+        return 1.0  # unparseable timestamp — don't penalize
 
 
 def _norm_text(s: str) -> str:
@@ -410,9 +430,15 @@ class WorldModel:
             if not fact_text or n <= 0:
                 continue
 
-            # Beta(1,1) prior; evidence: support vs contradiction
-            alpha = 1.0 + float(support)
-            beta = 1.0 + float(contradiction)
+            # Recency-weighted evidence: recent observations count more
+            last_obs = rf.get("last_observed_at", "")
+            rw = _recency_weight(last_obs)
+            weighted_support = float(support) * rw
+            weighted_contradiction = float(contradiction) * rw
+
+            # Beta(1,1) prior with recency-weighted evidence
+            alpha = 1.0 + weighted_support
+            beta = 1.0 + weighted_contradiction
             p_true = self._beta_prob_gt(alpha, beta, 0.5, key=key)
 
             # Error probability thresholds: 10% / 5% / 2%  => p_true >= 0.90 / 0.95 / 0.98
@@ -427,6 +453,14 @@ class WorldModel:
                 confidence = "low" if p_true < 0.95 else "medium"
             else:
                 continue
+
+            # Staleness: old facts with weak support are flagged
+            try:
+                age_days = (datetime.utcnow() - datetime.fromisoformat(last_obs)).total_seconds() / 86400.0
+            except (ValueError, TypeError):
+                age_days = 0
+            if age_days > _STALENESS_THRESHOLD_DAYS and support < 3:
+                confidence = "stale"
 
             source_counts = rf.get("source_counts") or {}
             source = "observation"
