@@ -5054,7 +5054,7 @@ class ZenohExecutiveNode:
         # Build orientation summary from evaluator assessment
         orientation = character_evaluator.build_orientation_summary(assessment, text)
 
-        # Recent dialog history
+        # Recent dialog history + prior session backfill
         recent_turns = ""
         entity_data = self.conversation_store.get_entity_context(source, limit=20, scope='current')
         if entity_data and 'conversation_history' in entity_data:
@@ -5062,6 +5062,13 @@ class ZenohExecutiveNode:
                 if isinstance(entry, dict) and 'source' in entry and 'text' in entry:
                     text_preview = str(entry['text'])[:200]
                     recent_turns += f"{entry['source']}: {text_preview}\n"
+        # Prepend prior session summaries if available (oldest first for chronological order)
+        prior_summaries = entity_data.get('prior_session_summaries', []) if entity_data else []
+        if prior_summaries:
+            prior_block = "PRIOR SESSIONS:\n"
+            for ps in reversed(prior_summaries):
+                prior_block += f"  [session summary] {ps['text'][:300]}\n"
+            recent_turns = prior_block + "\n" + recent_turns
 
         # Render operational self-model for self-aware responses
         self_model_block = ""

@@ -426,9 +426,34 @@ class ConversationStore:
         dialog_ids = [str(t.get("dialog_id", "")) for t in all_turns if t.get("dialog_id")]
         unique_dialog_ids = set(dialog_ids)
 
+        # Backfill with prior session summaries when current conversation is short.
+        # Proportional: fewer current turns → more backfill, capped at 5.
+        prior_summaries = []
+        available_slots = limit - len(turns)
+        if available_slots > 3:
+            backfill_count = min(available_slots // 3, 5)
+            try:
+                history_notes = self.get_history_notes()
+                if history_notes:
+                    # Most recent summaries first
+                    history_notes.sort(
+                        key=lambda h: h.get("timestamp", ""), reverse=True)
+                    for h in history_notes[:backfill_count]:
+                        content = h.get("content", "")
+                        if content and len(content) > 20:
+                            prior_summaries.append({
+                                "source": "prior_session",
+                                "text": content[:500],
+                                "timestamp": h.get("timestamp", ""),
+                                "note_id": h.get("note_id", ""),
+                            })
+            except Exception:
+                pass
+
         return {
             "entity_name": entity,
             "conversation_history": turns,
+            "prior_session_summaries": prior_summaries,
             "full_history_count": len(all_turns),
             "dialog_count": len(unique_dialog_ids),
             "active_dialog": bool(self._active_dialogs.get(entity, False)),
