@@ -2810,6 +2810,7 @@ class ZenohExecutiveNode:
             # LLM pass: extract new learnings from the just-completed goal, prune stale ones
             new_learnings = existing_learnings
             if summary and len(summary) > 20:
+                _MAX_LEARNINGS = 20
                 prompt = (
                     "You maintain a short list of cross-goal learnings for a planning agent. "
                     "Each entry is a one-line fact useful across future goals "
@@ -2817,7 +2818,8 @@ class ZenohExecutiveNode:
                     "things that failed and shouldn't be retried the same way).\n\n"
                     "Do NOT include: goal status, project narratives, what to do next, "
                     "or anything already tracked by world_model.\n"
-                    "Keep max 10 entries. Drop stale or redundant ones.\n"
+                    f"Keep max {_MAX_LEARNINGS} entries. Merge near-duplicates into a single entry. "
+                    "Drop stale or redundant ones.\n"
                     "Output ONLY the bullet list (- item), or 'none' if nothing to retain.\n\n"
                     f"## EXISTING LEARNINGS\n{existing_learnings or '(none yet)'}\n\n"
                     f"## JUST COMPLETED\nGoal: {goal_text}\nOutcome: {status}\n"
@@ -2828,18 +2830,20 @@ class ZenohExecutiveNode:
                     prompt, max_tokens=912, temperature=0.2, stops=['</end>']
                 )
                 if response.success and response.text and response.text.strip().lower() != 'none':
-                    # Clean LLM output: strip leading 'none' lines and keep only bullet lines
+                    # Clean LLM output: keep only bullet lines, enforce hard cap
                     raw = response.text.strip()
                     cleaned_lines = []
                     for ln in raw.split('\n'):
                         stripped = ln.strip()
-                        if stripped.lower() == 'none' or stripped == '':
-                            # Skip bare 'none' and blank lines between bullets
-                            if cleaned_lines:
-                                continue  # drop mid-list noise
-                            else:
-                                continue  # drop leading noise
-                        cleaned_lines.append(ln)
+                        if not stripped or stripped.lower() == 'none':
+                            continue
+                        if stripped.startswith('- '):
+                            cleaned_lines.append(stripped)
+                        elif cleaned_lines:
+                            # Continuation line — skip non-bullet noise
+                            continue
+                    # Hard cap: keep only first _MAX_LEARNINGS entries
+                    cleaned_lines = cleaned_lines[:_MAX_LEARNINGS]
                     cleaned = '\n'.join(cleaned_lines).strip()
                     if cleaned:
                         new_learnings = cleaned
@@ -2917,10 +2921,12 @@ class ZenohExecutiveNode:
             if not learnings:
                 return
 
+            _MAX_LEARNINGS = 20
             prompt = (
                 "You maintain a short list of cross-goal learnings for a planning agent. "
                 "A session is ending. Prune entries that are stale, redundant, or too specific "
-                "to a single past goal. Keep only durable, reusable facts.\n"
+                "to a single past goal. Merge near-duplicates into a single entry. "
+                f"Keep max {_MAX_LEARNINGS} durable, reusable facts.\n"
                 "Output ONLY the bullet list (- item), or 'none' if nothing worth keeping.\n\n"
                 f"## CURRENT LEARNINGS\n{learnings}\n\n"
                 f"Session: {self.plan_counter} goal(s) attempted.\n"
@@ -2933,6 +2939,11 @@ class ZenohExecutiveNode:
                 pruned = response.text.strip()
                 if pruned.lower() == 'none':
                     pruned = ""
+                else:
+                    # Hard cap: keep only bullet lines, max _MAX_LEARNINGS
+                    pruned_lines = [ln.strip() for ln in pruned.split('\n')
+                                    if ln.strip().startswith('- ')]
+                    pruned = '\n'.join(pruned_lines[:_MAX_LEARNINGS])
                 # Rebuild note with pruned learnings — data sections will refresh on next goal
                 new_content = current[:current.index(marker)].rstrip()
                 if pruned:
@@ -7535,6 +7546,18 @@ class ZenohExecutiveNode:
             pass
         return ''
 
+    def _get_ooda_readable_content(self) -> str:
+        """Return the rendered readable OODA state content, or '' if unavailable."""
+        try:
+            rid = self._resolve_ooda_readable_note_id()
+            if rid and self.resource_manager:
+                res = self.resource_manager.get_resource(rid)
+                if res:
+                    return res.get('properties', {}).get('content', '')
+        except Exception:
+            pass
+        return ''
+
     def _build_agent_state_block(self) -> str:
         """Build the authoritative agent state block.
 
@@ -7836,13 +7859,10 @@ class ZenohExecutiveNode:
         # Process narrative — did/doing/will-do temporal flow
         system_prompt += f"\n{self._build_process_block()}\n"
 
-        # Reference to the readable OODA state snapshot
-        ooda_note_id = self._resolve_ooda_readable_note_id()
-        if ooda_note_id:
-            system_prompt += (
-                f"\nA snapshot of {self.character_name}'s current state of mind "
-                f"can be found in OODA_STATE ({ooda_note_id}).\n"
-            )
+        # Inline the readable OODA state snapshot
+        ooda_content = self._get_ooda_readable_content()
+        if ooda_content:
+            system_prompt += f"\n{ooda_content}\n"
 
         return system_prompt
 
