@@ -1012,6 +1012,9 @@ class ZenohExecutiveNode:
             pass
         except Exception as e:
             logger.debug(f"Entity index load skipped: {e}")
+        # Expose entity index to executor for search_resources augmentation
+        if self.infospace_executor:
+            self.infospace_executor._entity_index = self._entity_index
 
         self._scheduled_goal_counter = 0
         self._active_scheduled_goal_id = None
@@ -2490,7 +2493,11 @@ class ZenohExecutiveNode:
         """Publish plan result for external consumers (e.g., MMLU eval)."""
         if not self.current_plan:
             return
-        
+
+        # Clear cached goal entities so next goal gets fresh extraction
+        if self.infospace_executor:
+            self.infospace_executor._goal_entities = None
+
         # Get bindings as Note IDs
         bindings = {}
         if self.infospace_executor:
@@ -7332,9 +7339,12 @@ class ZenohExecutiveNode:
             self._graph_node_by_key[f"goal:{goal_id}"] = nid
             if self._last_decision_node:
                 g.add_edge(self._last_decision_node, nid, "spawned_goal")
-            # NER: extract entities from goal text and link to graph
+            # NER: extract entities from goal text, link to graph, and cache
+            # on executor so search_resources can use them without re-extracting
             if goal_text:
-                self._extract_and_index_entities(goal_text, "", nid)
+                entities = self._extract_and_index_entities(goal_text, "", nid)
+                if self.infospace_executor and entities:
+                    self.infospace_executor._goal_entities = entities
         except Exception as e:
             logger.debug(f"Graph goal_launch emit failed: {e}")
 
@@ -7387,19 +7397,23 @@ class ZenohExecutiveNode:
     # ── Entity Extraction (NER Pipeline) ────────────────────────────
 
     def _extract_and_index_entities(self, text: str, resource_id: str,
-                                     graph_node: str = ""):
+                                     graph_node: str = "") -> Optional[Dict]:
         """Extract entities from text and add to entity index + cognitive graph.
 
         Called from graph emit helpers (observe, goal_launch) and idle-tick
         persistent-note processing.  Runs synchronously but is lightweight
         (~256 max_tokens, temperature 0.1).
+
+        Returns the extracted entities dict, or None on failure.
         """
         try:
             entities = self._entity_index.extract_entities(text, self.llm_generate)
             if any(entities.get(k) for k in ("people", "organizations", "locations", "topics")):
                 self._entity_index.index_entities(entities, resource_id, graph_node)
+                return entities
         except Exception as e:
             logger.debug(f"Entity extraction failed: {e}")
+        return None
 
     def _entity_index_process_persistent_notes(self):
         """Batch-extract entities from persistent Notes not yet processed.

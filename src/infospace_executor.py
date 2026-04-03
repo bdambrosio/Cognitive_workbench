@@ -2865,10 +2865,42 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                     if resource_id not in all_collections or result['score'] > all_collections[resource_id]['score']:
                         all_collections[resource_id] = result
             
+            # Entity index augmentation: find notes that share entities with queries.
+            # Uses _goal_entities (set by executive_node at goal launch) to avoid
+            # an extra LLM call.  Falls back to raw query word matching against
+            # existing entity index keys.
+            entity_index = getattr(self, '_entity_index', None)
+            if entity_index:
+                try:
+                    # Prefer pre-extracted goal entities (no LLM call)
+                    goal_entities = getattr(self, '_goal_entities', None) or {}
+                    entity_names = []
+                    for cat in ("people", "organizations", "locations", "topics"):
+                        entity_names.extend(goal_entities.get(cat, []))
+                    # Look up notes mentioning these entities
+                    for ename in entity_names:
+                        for rid in entity_index.lookup(ename):
+                            if rid.startswith('Note_') and rid not in all_notes:
+                                res = self.resource_manager.get_resource(rid)
+                                if not res:
+                                    continue
+                                props = res.get('properties', {})
+                                name = props.get('note_name', '')
+                                if name.startswith('_'):
+                                    continue
+                                all_notes[rid] = {
+                                    'resource_id': rid,
+                                    'name': name or rid,
+                                    'score': 0.25,  # entity-match base score
+                                    'match_type': 'entity',
+                                }
+                except Exception as e:
+                    logger.debug(f"Entity index augmentation failed: {e}")
+
             # Sort by score and take top k
             notes_list = sorted(all_notes.values(), key=lambda x: x['score'], reverse=True)[:k_notes]
             collections_list = sorted(all_collections.values(), key=lambda x: x['score'], reverse=True)[:k_collections]
-            
+
             return {
                 'status': 'success',
                 'notes': notes_list,
