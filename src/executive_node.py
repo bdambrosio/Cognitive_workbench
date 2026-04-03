@@ -5063,9 +5063,13 @@ class ZenohExecutiveNode:
             f"rather than generic descriptions. Be concise and in character.\n"
             f"IMPORTANT: You CANNOT execute tools or run actions in this conversational turn. "
             f"NEVER claim to have run a tool, executed a check, or performed an action that "
-            f"you did not actually perform. If the user asks you to do something that requires "
-            f"tool execution, tell them you can do it as a goal (e.g., 'I can run that as a "
-            f"goal — would you like me to?').\n"
+            f"you did not actually perform.\n"
+            f"If the user's request requires tool execution (web search, file access, email, "
+            f"code execution, etc.), respond ONLY with:\n"
+            f"[GOAL_NEEDED: <concise goal description>]\n"
+            f"Do NOT ask the user for confirmation — just emit the marker. The system will "
+            f"automatically create and run the goal. Include enough detail in the description "
+            f"for the goal to execute independently.\n"
             f"End your response with </end>"
         )
 
@@ -5094,9 +5098,24 @@ class ZenohExecutiveNode:
                 if not response:
                     logger.warning('Chat response empty after cleaning')
                 else:
-                    self._say_to_user(response)
-                    self.conversation_store.record_outgoing(source, response, act_type="chat")
-                    logger.info(f'💬 {self.character_name} chat response to {source}: {response[:80]}...')
+                    # Check for [GOAL_NEEDED: ...] marker — auto-escalate to goal
+                    import re as _re
+                    goal_match = _re.search(r'\[GOAL_NEEDED:\s*(.+?)\]', response)
+                    if goal_match:
+                        goal_text = goal_match.group(1).strip()
+                        # Strip the marker from the response (show any surrounding text)
+                        clean_response = response[:goal_match.start()].strip()
+                        if clean_response:
+                            self._say_to_user(clean_response)
+                            self.conversation_store.record_outgoing(source, clean_response, act_type="chat")
+                        # Dispatch as ephemeral goal
+                        logger.info(f'🎯 Chat auto-escalated to goal: "{goal_text[:80]}"')
+                        cmd_data = {'cmd': '/goal add', 'goal_text': goal_text, 'source': 'User'}
+                        self._dispatch_command(cmd_data)
+                    else:
+                        self._say_to_user(response)
+                        self.conversation_store.record_outgoing(source, response, act_type="chat")
+                        logger.info(f'💬 {self.character_name} chat response to {source}: {response[:80]}...')
             else:
                 logger.warning(f'Chat LLM call failed: {getattr(result, "error", "unknown")}')
         except Exception as e:
