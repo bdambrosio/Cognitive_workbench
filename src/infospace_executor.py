@@ -2897,6 +2897,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 except Exception as e:
                     logger.debug(f"Entity index augmentation failed: {e}")
 
+            # Log entity augmentation results
+            entity_hits = [v['name'] or v['resource_id'] for v in all_notes.values() if v.get('match_type') == 'entity']
+            if entity_hits:
+                logger.info(f"🏷 Entity augmentation: +{len(entity_hits)} notes ({', '.join(entity_hits[:5])})")
+
             # Sort by score and take top k
             notes_list = sorted(all_notes.values(), key=lambda x: x['score'], reverse=True)[:k_notes]
             collections_list = sorted(all_collections.values(), key=lambda x: x['score'], reverse=True)[:k_collections]

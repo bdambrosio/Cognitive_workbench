@@ -7410,6 +7410,8 @@ class ZenohExecutiveNode:
             entities = self._entity_index.extract_entities(text, self.llm_generate)
             if any(entities.get(k) for k in ("people", "organizations", "locations", "topics")):
                 self._entity_index.index_entities(entities, resource_id, graph_node)
+                flat = [e for k in ("people", "organizations", "locations", "topics") for e in entities.get(k, [])]
+                logger.info(f'🏷 NER: {flat}')
                 return entities
         except Exception as e:
             logger.debug(f"Entity extraction failed: {e}")
