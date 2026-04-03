@@ -44,7 +44,10 @@ User: "goal: Find recent papers on multi-agent coordination"
 - **[Goal Scheduling](docs/goals-and-scheduling.md)** — submit goals with `goal:` prefix; schedule them for manual, automatic, recurring, or daily-at-time execution
 - **[Concern Model](docs/user_concern_model.md)** — user concerns and agent-derived concerns with activation-based triage into actionable tasks
 - **[Envisioning & Quality Control](docs/envisioning-and-quality-control.md)** — lightweight LLM framing for coherent dialog; post-execution reflection for failure recovery and learning
-- **[Infospace Memory](docs/architecture.md#infospace-memory-model)** — Notes, Collections, and Relations as structured working memory with FAISS semantic search
+- **[Infospace Memory](docs/architecture.md#infospace-memory-model)** — Notes, Collections, and Relations as structured working memory with FAISS semantic search + entity-augmented retrieval
+- **[NER & Entity Graph](docs/architecture.md#named-entity-recognition-ner-pipeline)** — automatic entity extraction from user input, goals, and notes; cognitive graph integration with entity nodes and mentions edges
+- **[Theory of Mind](docs/architecture.md#theory-of-mind-tom)** — persistent per-peer models of trust, competence, goals, and emotional state, updated from conversation evidence
+- **[World Model](docs/architecture.md#world-model-bayesian-recency-weighted)** — Bayesian cross-goal knowledge with recency-weighted evidence decay and staleness detection
 - **[Extensible Tools](docs/tools-and-primitives.md)** — 24 built-in tools (web search, email, Bluesky, academic papers, shell scripts) plus world-specific integrations
 - **[Sensors](docs/ui-guide.md#sensors)** — autonomous data collectors (browser visit tracking, RSS feeds) that feed real-world context to the agent
 - **[Web UI](docs/ui-guide.md)** — real-time activation field visualization, chat, goal management, resource browser, and task/concern manager
@@ -128,16 +131,17 @@ A Chrome extension that captures page visits and feeds them to the agent via the
 
 ## How It Works (In Brief)
 
-1. **You submit a goal**: `goal: Monitor stock prices and alert on changes > 5%`
-2. **The Executive Node** queues it and invokes the Incremental Planner
-3. **The Planner** retrieves relevant context (FAISS), selects tools, then enters a generate-execute-evaluate loop:
+1. **You type a message**: the unified chat handler decides whether to respond conversationally, escalate to a goal (tool use needed), or dispatch a system command — all in a single LLM call
+2. **The Executive Node** queues goals and invokes the Incremental Planner
+3. **The Planner** retrieves relevant context (FAISS semantic search + entity-augmented retrieval), selects tools, then enters a generate-execute-evaluate loop:
    - LLM writes a code block calling tools (`search-web`, `stock-price`, `create-note`, etc.)
    - Executor runs it, returns structured results
    - LLM evaluates: done? next step? error recovery?
-4. **Reflection** analyzes the full execution trace — updates task state, world model, tool insights
-5. **If it failed** with a missing capability, the gap is logged for future tool development
-6. **Scheduled goals** can repeat daily at a set time, or auto-proceed through multi-step workflows
-7. **Sensors** (browser visits, RSS feeds) run on timers and feed real-world context back into the agent's concern model
+4. **Reflection** analyzes the full execution trace — updates world model (recency-weighted Bayesian facts), tool insights, and cross-goal learnings
+5. **Named entities** are extracted from user input, goals, and persistent notes — building a cognitive graph of entities and mentions that improves retrieval over time
+6. **Theory of Mind** models are updated when conversations are archived (`/done`, `/next`, `/bye`), tracking trust, competence, goals, and emotional state per peer
+7. **Scheduled goals** can repeat daily at a set time, or auto-proceed through multi-step workflows
+8. **Sensors** (browser visits, RSS feeds) run on timers and feed real-world context back into the agent's concern model
 
 ## Available Scenarios
 
@@ -173,6 +177,11 @@ Cognitive_workbench/
     ├── incremental_planner.py         # Core planner (the heart of the system)
     ├── infospace_executor.py           # Primitives + tool execution
     ├── infospace_resource_manager.py   # Notes/Collections/Relations + FAISS
+    ├── entity_index.py                # NER extraction, entity index, graph integration
+    ├── cognitive_graph.py             # OODA event graph + entity/ToM nodes
+    ├── conversation_store.py          # Dialog lifecycle, archival, session backfill
+    ├── discourse.py                   # Theory of Mind templates + discourse analysis
+    ├── world_model.py                 # Bayesian recency-weighted knowledge
     ├── fastapi_action_display.py      # Web UI (Activation Field + Classic)
     ├── resource_browser.py            # Resource Browser UI
     ├── task_manager.py                # Task & Concern Manager UI

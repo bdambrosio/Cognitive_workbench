@@ -160,12 +160,60 @@ A **Relation** is a typed directed edge between any two resources:
 
 Relations persist when either endpoint is persistent, and are automatically removed when either endpoint is deleted.
 
-### Semantic Search (FAISS)
+### Semantic Search (FAISS) + Entity-Augmented Retrieval
 
-The Resource Manager maintains FAISS vector indexes over Notes and Collections. This enables:
-- **Stage 0 resource retrieval**: finding relevant context before planning
+The Resource Manager maintains FAISS vector indexes over Notes and Collections. An **Entity Index** (`entity_index.py`) supplements embedding search with structured entity lookups. Together, these enable:
+- **Stage 0 resource retrieval**: FAISS embedding similarity finds semantically relevant notes; entity augmentation adds notes that share named entities with the goal even when surface-form similarity is low
 - **`discover-notes`** / **`discover-collections`** primitives: semantic search during execution
 - Automatic re-indexing when resources change
+
+### Named Entity Recognition (NER) Pipeline
+
+The system extracts named entities (people, organizations, locations, topics) from three ingestion points:
+
+- **User input**: entities extracted during OODA observe, linked to conversation_turn graph nodes
+- **Goal text**: entities extracted at goal launch, cached for retrieval augmentation
+- **Persistent notes**: batch-extracted during idle ticks, tracked via `entities_extracted` flag
+
+Extracted entities are stored in an in-memory index (entity name → set of resource IDs) and emitted as persistent `entity` nodes in the cognitive graph with `mentions` edges linking them to content nodes. An alias map resolves variant names to canonical forms (e.g., "Bruce" → "user").
+
+### Cognitive Graph
+
+A graph of OODA-cycle events, goals, concerns, tasks, entities, and their relationships (`cognitive_graph.py`). Node types include `event`, `conversation_turn`, `assessment`, `decision`, `goal_launch`, `goal_outcome`, `concern_change`, `entity`, `tom_update`, and more. The graph supports:
+
+- **Semantic search**: FAISS-indexed node content
+- **Subgraph expansion**: BFS traversal from seed nodes with edge-type filtering
+- **Concern-weighted boosting**: prioritize nodes related to active concerns
+- **Consolidation**: old nodes compressed into hourly summaries; entity and ToM nodes are exempt
+
+### World Model (Bayesian, Recency-Weighted)
+
+The world model (`world_model.py`) accumulates cross-goal facts with Bayesian confidence estimation. Key features:
+
+- **Recency-weighted evidence**: observations decay with a 30-day half-life — recent evidence weighs more than old
+- **Staleness detection**: facts older than 90 days with fewer than 3 observations are flagged as "stale"
+- **Generalization guard**: LLM checks whether a fact is reusable across contexts before promotion
+- **Tool contracts**: Dirichlet posterior over tool reliability votes (reliable/unreliable/constrained)
+
+### Theory of Mind (ToM)
+
+The system maintains a persistent **Theory of Mind** model for each peer entity (e.g., `_tom_user`). The ToM captures:
+
+- **Trust assessment**: competence, intentionality, reliability, transparency
+- **Goals & alignment**: what the entity wants and how aligned it is with the agent
+- **Emotional state**: current affect
+- **Concerns/uncertainties**: open questions about the entity
+
+ToM updates are triggered by conversation archival (`/done`, `/next`, `/bye`, or shutdown). The update prompt receives the raw conversation transcript plus active user concerns as evidence. Updated ToM is persisted as a named Note and injected into the system prompt for chat and planner contexts. ToM update events are emitted as consolidation-exempt `tom_update` nodes in the cognitive graph.
+
+### Conversation Management
+
+Conversations are tracked by `conversation_store.py` with per-entity dialog management. Key features:
+
+- **Dialog lifecycle**: turns accumulate in a "conversation" Collection until closed by `/done`, `/next`, `/bye`, or shutdown
+- **Archival**: on close, turns are synthesized into a summary, added to `conversation_history`, and original turn notes are deleted
+- **Prior session backfill**: when the current session has few turns, `get_entity_context()` backfills with prior session summaries (proportional to empty slots, capped at 5)
+- **Concern-weighted context**: `get_themed_context()` retrieves conversation history organized by user concern weights
 
 ## Reflection and Learning
 
@@ -184,6 +232,7 @@ The reflection analyst LLM examines the execution trace and produces:
 **world_model updates** — conservative, reusable cross-goal knowledge:
 - Only facts that remain true under different goals and times are promoted
 - Excludes: current agent state, one-time observations, trivial details
+- Evidence is recency-weighted with a 30-day half-life
 
 **tool_insights** — discovered tool behaviors:
 - Tool name, insight text, reliability status (reliable / unreliable / constrained)
@@ -193,6 +242,10 @@ The reflection analyst LLM examines the execution trace and produces:
 
 **quality_status** — overall assessment:
 - `passed` / `failed` / `needs_revision` / `interrupted`
+
+### Learnings
+
+A short list of cross-goal learnings maintained in the situation note. Updated after each goal completion via LLM, with a hard cap of 20 entries. Near-duplicates are merged, and a consolidation pass prunes stale entries at shutdown.
 
 See [Envisioning & Quality Control](envisioning-and-quality-control.md) for details on how reflection feeds failure recovery and missing affordance detection.
 
@@ -216,14 +269,17 @@ Zenoh enables multi-character scenarios where agents communicate via pub/sub, an
 | File | Role |
 |------|------|
 | `src/launcher.py` | Entry point; sets up SGLang runtime, launches characters |
-| `src/executive_node.py` | OODA loop, goal handling, scheduling, envisioning |
+| `src/executive_node.py` | OODA loop, goal handling, scheduling, ToM, conversation lifecycle |
 | `src/incremental_planner.py` | Multi-stage iterative planner, reflection |
-| `src/infospace_executor.py` | Tool execution engine, primitives, uniform_return |
+| `src/infospace_executor.py` | Tool execution engine, primitives, entity-augmented search |
 | `src/infospace_resource_manager.py` | Notes/Collections/Relations persistence, FAISS indexing |
-| `src/conversation_store.py` | Dialog persistence and tracking |
+| `src/entity_index.py` | NER extraction, entity index, cognitive graph entity nodes |
+| `src/cognitive_graph.py` | OODA event graph, entity/ToM nodes, semantic search + BFS |
+| `src/conversation_store.py` | Dialog persistence, archival, prior-session backfill |
+| `src/discourse.py` | Theory of Mind templates and discourse analysis |
+| `src/world_model.py` | Bayesian recency-weighted cross-goal knowledge |
 | `src/goal_scheduler.py` | Autonomous goal scheduling daemon |
 | `src/tool_model.py` | Tool success tracking, embedding-based recommendations |
-| `src/world_model.py` | Cross-goal persistent knowledge |
 | `src/fastapi_action_display.py` | Web UI (FastAPI + WebSockets) |
 
 ## Design Principles
