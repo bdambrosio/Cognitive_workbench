@@ -7564,7 +7564,14 @@ class ZenohExecutiveNode:
             content = str(props.get('content', ''))
             if len(content) < 30:
                 continue
-            self._extract_and_index_entities(content, note_id)
+            # Create a graph node for the persistent note so entity edges can link to it
+            try:
+                note_nid = self._cognitive_graph.add_node(
+                    "note", (name or note_id)[:200],
+                    attrs={"resource_id": note_id, "note_name": name})
+            except Exception:
+                note_nid = ""
+            self._extract_and_index_entities(content, note_id, note_nid)
             props['entities_extracted'] = True
             processed += 1
         if processed:
