@@ -204,8 +204,8 @@ def _parse_command(line: str) -> Optional[dict]:
             if len(rest) >= 2:
                 return {'cmd': '/goal edit', 'goal_id': rest[0], 'goal_text': ' '.join(rest[1:])}
             return {'cmd': '_interactive', 'type': 'goal_edit', 'goal_id': rest[0]}
-        if sub == 'remove' and rest:
-            return {'cmd': '/goal remove', 'goal_id': rest[0]}
+        if sub in ('delete', 'remove') and rest:
+            return {'cmd': '/goal delete', 'goal_id': rest[0]}
         if sub == 'mode' and len(rest) >= 2:
             d = {'cmd': '/goal mode', 'goal_id': rest[0], 'schedule_mode': rest[1]}
             if len(rest) > 2:
@@ -220,7 +220,7 @@ def _parse_command(line: str) -> Optional[dict]:
             return {'cmd': '/goal cache clear', 'goal_id': rest[0]}
         if sub == 'show' and rest:
             return {'cmd': '_query', 'query': 'goal_show', 'goal_id': rest[0]}
-        _print_error(f"Usage: /goal <add|run|terminate|rename|edit|remove|mode|exec|cache|show> ...")
+        _print_error(f"Usage: /goal <add|run|terminate|rename|edit|delete|mode|exec|cache|show> ...")
         return None
 
     # -- Tasks --
@@ -560,7 +560,7 @@ _COMMAND_VOCABULARY = """\
 /goal terminate <goal_id>      Stop a running goal
 /goal rename <goal_id> <name>  Rename a goal
 /goal edit <goal_id> <text>    Update goal text
-/goal remove <goal_id>         Delete a goal
+/goal delete <goal_id>         Delete a goal
 /goal mode <goal_id> <mode>    Set schedule: manual|auto|recurring|daily
 /goal cache clear <goal_id>    Clear cached plan
 /task add <intention>           Create a new task
@@ -796,7 +796,7 @@ def _print_help():
   /goal terminate <id>           Stop a running goal
   /goal rename <id> <name>       Rename goal
   /goal edit <id> <text>         Update goal text
-  /goal remove <id>              Delete goal
+  /goal delete <id>              Delete goal
   /goal mode <id> <mode> [time]  Set schedule mode (manual|auto|recurring|daily)
   /goal exec <id> <mode>         Set execution mode (replan|replay)
   /goal cache clear <id>         Clear cached plan
@@ -873,6 +873,7 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
 
     # Use prompt_toolkit for non-blocking, safe terminal input
     from prompt_toolkit import PromptSession
+    from prompt_toolkit.history import FileHistory
     from prompt_toolkit.formatted_text import HTML
 
     active_character = character_names[0]
@@ -983,7 +984,9 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
     print(f"Character: {C.CYAN}{active_character}{C.RESET}  |  Type /help for commands  |  Ctrl+D to exit")
     print()
 
-    session = PromptSession()
+    import os
+    history_path = os.path.expanduser('~/.cognitive_workbench_history')
+    session = PromptSession(history=FileHistory(str(history_path)))
     last_ctrl_c = 0.0
 
     try:

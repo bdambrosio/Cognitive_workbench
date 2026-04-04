@@ -3847,7 +3847,7 @@ class ZenohExecutiveNode:
             logger.error(f'Error in goal_interrupt handler: {e}')
 
     def _handle_goal_remove(self, sample):
-        self._zenoh_to_command(sample, '/goal remove')
+        self._zenoh_to_command(sample, '/goal delete')
 
     def _handle_task_wip_delete(self, sample):
         self._zenoh_to_command(sample, '/task delete')
@@ -5251,7 +5251,7 @@ class ZenohExecutiveNode:
         lines = ["## SYSTEM COMMANDS"]
         lines.append("Available commands (use with [COMMAND: ...] marker):")
         lines.append("  /goal add <text>, /goal run <goal_id>, /goal terminate <goal_id>")
-        lines.append("  /goal remove <goal_id>, /goal mode <goal_id> manual|auto|recurring|daily")
+        lines.append("  /goal delete <goal_id>, /goal mode <goal_id> manual|auto|recurring|daily")
         lines.append("  /task approve <name>, /task abandon <name>, /task run <name>")
         lines.append("  /concern close <id>, /concern reopen <id>")
         lines.append("  /stop, /continuous, /save, /shutdown, /bye")
@@ -6213,9 +6213,14 @@ class ZenohExecutiveNode:
                 'description': 'Update goal text',
                 'args': ['goal_id', 'goal_text'],
             },
-            '/goal remove': {
+            '/goal delete': {
                 'handler': self._cmd_goal_remove,
                 'description': 'Delete a goal',
+                'args': ['goal_id'],
+            },
+            '/goal remove': {
+                'handler': self._cmd_goal_remove,
+                'description': 'Delete a goal (alias for /goal delete)',
                 'args': ['goal_id'],
             },
             '/goal mode': {
@@ -6510,7 +6515,7 @@ class ZenohExecutiveNode:
     def _cmd_goal_remove(self, data: dict) -> str:
         goal_id = (data.get('goal_id') or '').strip()
         if not goal_id:
-            return 'Usage: /goal remove <goal_id>'
+            return 'Usage: /goal delete <goal_id>'
         goal = self._get_scheduled_goal(goal_id)
         if not goal:
             return f"Goal '{goal_id}' not found"
@@ -7642,7 +7647,7 @@ class ZenohExecutiveNode:
                 k = payload.get('k', 10)
                 type_filter = payload.get('type_filter')
                 results = g.semantic_search(query_text, k=k, type_filter=type_filter)
-                seed_ids = [nid for nid, _score in results]
+                seed_ids = [nid for nid, score in results if score >= 0.3]
                 if seed_ids:
                     nodes, edges = g.expand_subgraph(seed_ids, max_hops=1)
                     nodes = nodes[:MAX_NODES]

@@ -461,7 +461,8 @@ class ResourceBrowser:
         #graph-svg { flex: 1; background: #1a1a1a; }
         .graph-node { cursor: pointer; }
         .graph-node:hover { filter: brightness(1.3); }
-        .graph-edge { stroke: #444; stroke-opacity: 0.6; }
+        .graph-edge { stroke: #888; stroke-opacity: 0.8; marker-end: url(#arrowhead); }
+        .graph-edge-label { fill: #999; font-size: 8px; pointer-events: none; text-anchor: middle; }
         .graph-tooltip { position: absolute; background: #333; color: #d4d4d4; padding: 6px 10px; border-radius: 3px; font-size: 12px; pointer-events: none; max-width: 300px; z-index: 100; border: 1px solid #555; }
     </style>
     <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -821,12 +822,23 @@ class ResourceBrowser:
 
             graphZoom = d3.zoom().scaleExtent([0.1, 5]).on('zoom', e => graphG.attr('transform', e.transform));
             svg.call(graphZoom);
+
+            // Arrowhead marker for directed edges
+            const defs = svg.append('defs');
+            defs.append('marker')
+                .attr('id', 'arrowhead')
+                .attr('viewBox', '0 -4 8 8')
+                .attr('refX', 16).attr('refY', 0)
+                .attr('markerWidth', 6).attr('markerHeight', 6)
+                .attr('orient', 'auto')
+                .append('path').attr('d', 'M0,-4L8,0L0,4').attr('fill', '#888');
+
             graphG = svg.append('g');
             graphSvg = svg;
 
             graphSim = d3.forceSimulation()
                 .force('charge', d3.forceManyBody().strength(-80))
-                .force('link', d3.forceLink().id(d => d.node_id).distance(60))
+                .force('link', d3.forceLink().id(d => d.node_id).distance(80))
                 .force('center', d3.forceCenter(width / 2, height / 2))
                 .force('collision', d3.forceCollide().radius(15))
                 .on('tick', graphTick);
@@ -837,6 +849,16 @@ class ResourceBrowser:
             graphG.selectAll('.graph-edge')
                 .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
                 .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+            graphG.selectAll('.graph-edge-label')
+                .attr('x', d => (d.source.x + d.target.x) / 2)
+                .attr('y', d => (d.source.y + d.target.y) / 2)
+                .attr('transform', d => {
+                    const mx = (d.source.x + d.target.x) / 2;
+                    const my = (d.source.y + d.target.y) / 2;
+                    let angle = Math.atan2(d.target.y - d.source.y, d.target.x - d.source.x) * 180 / Math.PI;
+                    if (angle > 90 || angle < -90) angle += 180;
+                    return `rotate(${angle},${mx},${my})`;
+                });
             graphG.selectAll('.graph-node')
                 .attr('transform', d => `translate(${d.x},${d.y})`)
                 .style('display', d => hiddenTypes.has(d.type) ? 'none' : '');
@@ -865,6 +887,12 @@ class ResourceBrowser:
             const edgeSel = graphG.selectAll('.graph-edge').data(graphEdges, edgeKey);
             edgeSel.exit().remove();
             edgeSel.enter().append('line').attr('class', 'graph-edge');
+
+            // Render edge labels
+            const labelSel = graphG.selectAll('.graph-edge-label').data(graphEdges, edgeKey);
+            labelSel.exit().remove();
+            labelSel.enter().append('text').attr('class', 'graph-edge-label')
+                .text(d => d.type || '');
 
             // Render nodes
             const nodeSel = graphG.selectAll('.graph-node').data(graphNodes, d => d.node_id);
@@ -962,6 +990,8 @@ class ResourceBrowser:
         async function expandEntity(graphNodeId, name) {
             if (!graphNodeId) { alert('Entity has no graph node yet'); return; }
             try {
+                graphNodes = []; graphEdges = [];
+                graphG.selectAll('*').remove();
                 const resp = await fetch('/api/graph/subgraph', {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({seed_ids: [graphNodeId], max_hops: 1})

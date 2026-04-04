@@ -45,7 +45,7 @@ User: "goal: Find recent papers on multi-agent coordination"
 - **[Concern Model](docs/user_concern_model.md)** — user concerns and agent-derived concerns with activation-based triage into actionable tasks
 - **[Envisioning & Quality Control](docs/envisioning-and-quality-control.md)** — lightweight LLM framing for coherent dialog; post-execution reflection for failure recovery and learning
 - **[Infospace Memory](docs/architecture.md#infospace-memory-model)** — Notes, Collections, and Relations as structured working memory with FAISS semantic search + entity-augmented retrieval
-- **[NER & Entity Graph](docs/architecture.md#named-entity-recognition-ner-pipeline)** — automatic entity extraction from user input, goals, and notes; cognitive graph integration with entity nodes and mentions edges
+- **[NER & Entity Graph](docs/architecture.md#named-entity-recognition-ner-pipeline)** — automatic entity extraction from user input, goals, and notes; cognitive graph integration with entity nodes and mentions edges ([explorer guide](docs/cognitive_graph_explorer.md))
 - **[Theory of Mind](docs/architecture.md#theory-of-mind-tom)** — persistent per-peer models of trust, competence, goals, and emotional state, updated from conversation evidence
 - **[World Model](docs/architecture.md#world-model-bayesian-recency-weighted)** — Bayesian cross-goal knowledge with recency-weighted evidence decay and staleness detection
 - **[Extensible Tools](docs/tools-and-primitives.md)** — 24 built-in tools (web search, email, Bluesky, academic papers, shell scripts) plus world-specific integrations
