@@ -79,9 +79,24 @@ Respond with a JSON array. Each element:
 
 Rules:
 - Prefer attaching to existing tasks over creating duplicates.
-- Task intentions should be concrete and actionable, not vague aspirations.
 - Defer is fine — not everything needs immediate action.
 - Keep reasons to one sentence.
+
+CRITICAL — task_intention scope:
+Tasks go through an establishment phase (setting up tools, sensors, infrastructure) \
+and then run as RECURRING operational cycles on a cooldown. The task_intention you \
+write becomes the fixed anchor for all future cycles — it must describe a REPEATABLE \
+activity, not a one-shot action.
+
+Good task_intention examples:
+- "Monitor the user's Substack RSS feed for new posts and summarize notable ones"
+- "Periodically check Berkeley weather forecast and report significant changes"
+- "Track ArXiv papers on constitutional AI, filter for relevance, update reading list"
+
+Bad task_intention examples (DO NOT write these):
+- "Tell the user about today's weather" — one-shot, not recurring
+- "Attend to user needs" — too vague, cannot be established or evaluated
+- "Search the web for X and report" — describes a single goal, not a recurring task
 """
 
 
