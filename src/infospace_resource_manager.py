@@ -579,6 +579,10 @@ class InfospaceResourceManager:
         
         # Embedding model (lazy loaded)
         self.embedder = None
+
+        # When True, skip embedding on note/collection creation (batch-index after goal cleanup)
+        self.indexing_deferred = False
+        self._deferred_note_ids: list = []
         
         # Determine base directory for resources and indexes
         # If world_config.world_name is set, use scenarios/<world_name>/resources/
@@ -881,13 +885,16 @@ class InfospaceResourceManager:
             # Recommended: BGE-Small (33MB, much smarter than MiniLM, 512 context)
             model_name = 'BAAI/bge-small-en-v1.5'
             from sentence_transformers import SentenceTransformer
+            # Use GPU if available for ~10x faster embedding
+            import torch
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
             try:
-                embedder = SentenceTransformer(model_name, local_files_only=True, device='cpu')
-                logger.info(f"Initialized embedding model: {model_name} (from cache)")
+                embedder = SentenceTransformer(model_name, local_files_only=True, device=device)
+                logger.info(f"Initialized embedding model: {model_name} (from cache, device={device})")
             except Exception:
                 logger.info(f"Cache miss, downloading embedding model: {model_name}")
-                embedder = SentenceTransformer(model_name, device='cpu')
-                logger.info(f"Initialized embedding model: {model_name} (downloaded)")
+                embedder = SentenceTransformer(model_name, device=device)
+                logger.info(f"Initialized embedding model: {model_name} (downloaded, device={device})")
             InfospaceResourceManager._shared_embedder = embedder
             self.embedder = embedder
     
@@ -982,9 +989,12 @@ class InfospaceResourceManager:
         else:
             logger.info(f"📝 Created Note instance: {note_id} by {canonical_character_name}")
         
-        # Index the Note immediately (for Stage 0 retrieval) unless excluded
+        # Index the Note immediately (for Stage 0 retrieval) unless excluded or deferred
         if not note_data['properties'].get('exclude_from_index', False):
-            self.resource_indexer.index_note(note_id, commentary="")
+            if self.indexing_deferred:
+                self._deferred_note_ids.append(note_id)
+            else:
+                self.resource_indexer.index_note(note_id, commentary="")
 
         # Metadata reification: tool_metadata is stored as a separate metadata Note
         # linked by a typed Relation (note -> metadata note, relation_type='meta').
@@ -993,7 +1003,27 @@ class InfospaceResourceManager:
             self._upsert_note_tool_metadata_relation(note_id, tool_metadata, canonical_character_name)
         
         return True, note_id, None, location
-    
+
+    def flush_deferred_indexes(self):
+        """Index deferred notes that survived goal cleanup. Call after _cleanup_transient_resources."""
+        if not self._deferred_note_ids:
+            self.indexing_deferred = False
+            return
+        import time as _time
+        _t0 = _time.monotonic()
+        indexed = 0
+        for note_id in self._deferred_note_ids:
+            if note_id in self.resource_registry:
+                self.resource_indexer.index_note(note_id, commentary="")
+                indexed += 1
+        total = len(self._deferred_note_ids)
+        elapsed = _time.monotonic() - _t0
+        self._deferred_note_ids.clear()
+        self.indexing_deferred = False
+        msg = f"INDEX | batch-indexed {indexed}/{total} surviving notes in {elapsed:.1f}s"
+        logger.info(msg)
+        print(msg, flush=True)
+
     def update_note_content(self, note_id: str, new_content: Any, reindex: bool = True,
                            tool_metadata: Optional[Dict] = None) -> Tuple[bool, Optional[str]]:
         """

@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Union, Optional, Tuple
 from dataclasses import dataclass, asdict
 from weakref import WeakValueDictionary
+from turn_metrics import TurnMetrics
 
 # Ensure src/ is on sys.path before local imports (needed for multiprocessing spawn)
 _src_dir = os.path.dirname(os.path.abspath(__file__))
@@ -785,7 +786,11 @@ class ZenohExecutiveNode:
                 
                 # Use infospace_executor's _sglang_generate method via temporary executor instance
                 if self.infospace_executor:
-                    return self.infospace_executor._sglang_generate(messages, max_tokens, temperature, stops, is_json)
+                    _t0 = time.monotonic()
+                    try:
+                        return self.infospace_executor._sglang_generate(messages, max_tokens, temperature, stops, is_json)
+                    finally:
+                        self.infospace_executor.turn_metrics.record_llm("sglang", time.monotonic() - _t0)
                 else:
                     logger.error("SGLang Runtime available but no infospace_executor to use it")
                     return type('Response', (), {'success': False, 'error': 'No executor', 'text': ''})()
@@ -1665,6 +1670,11 @@ class ZenohExecutiveNode:
         if event is None:
             self._ooda_idle_tick()
             return
+
+        # Reset per-turn metrics for this OODA cycle
+        if self.infospace_executor:
+            self.infospace_executor.turn_metrics = TurnMetrics()
+
         # ── Graph: observe ──
         self._graph_emit_observe(event)
         self._ooda_living_state.update_after_observe(event)
@@ -1697,6 +1707,13 @@ class ZenohExecutiveNode:
         self._record_ooda_event(event, oriented, action)
         self._ooda_act(action)
         self._ooda_living_state.update_after_act(action)
+
+        # Emit per-turn latency summary (non-goal turns; goal turns emit in parse_and_set_goal)
+        if self.infospace_executor and action.type != 'dispatch_goal':
+            if self.infospace_executor.turn_metrics.llm_calls:
+                _perf = self.infospace_executor.turn_metrics.summary()
+                logger.info(_perf)
+                print(_perf, flush=True)
         self._ooda_living_state.maybe_persist(
             self._write_named_note, self._derived_concern_model.get_concerns(),
             planner_summary=self._get_planner_summary())
@@ -1968,12 +1985,13 @@ class ZenohExecutiveNode:
                 f'{{"intention": "", "reason": "no clear task found"}}'
             )
 
-            result = self.llm_generate(
-                messages=[prompt],
-                max_tokens=300,
-                temperature=0.2,
-                is_json=True,
-            )
+            with self.infospace_executor.turn_metrics.perf_phase("propose_task"):
+                result = self.llm_generate(
+                    messages=[prompt],
+                    max_tokens=300,
+                    temperature=0.2,
+                    is_json=True,
+                )
             if not result.success or not result.text:
                 logger.warning('propose_from_conversation: LLM call failed')
                 return
@@ -2869,9 +2887,10 @@ class ZenohExecutiveNode:
                     f"Summary: {summary}\n\n"
                     "Write the updated learnings list.\n</end>"
                 )
-                response = self.infospace_executor.llm_generate(
-                    prompt, max_tokens=912, temperature=0.2, stops=['</end>']
-                )
+                with self.infospace_executor.turn_metrics.perf_phase("post_plan"):
+                    response = self.infospace_executor.llm_generate(
+                        prompt, max_tokens=912, temperature=0.2, stops=['</end>']
+                    )
                 if response.success and response.text and response.text.strip().lower() != 'none':
                     # Clean LLM output: keep only bullet lines, enforce hard cap
                     raw = response.text.strip()
@@ -3430,6 +3449,8 @@ class ZenohExecutiveNode:
             created_ids = now_ids - pre_resource_ids
             keep_ids = {primary_product} if primary_product else set()
             self._cleanup_transient_resources(created_ids, keep_ids, label=goal_id)
+            # Batch-index only the notes that survived cleanup
+            self.resource_manager.flush_deferred_indexes()
 
         # Announce completion to user (unless this is an internal task milestone)
         if not task_wip_id:
@@ -4205,7 +4226,8 @@ class ZenohExecutiveNode:
         )
 
         try:
-            resp = self.llm_generate([prompt], max_tokens=1012, temperature=0.3, stops=['</end>'])
+            with self.infospace_executor.turn_metrics.perf_phase("task_wip"):
+                resp = self.llm_generate([prompt], max_tokens=1012, temperature=0.3, stops=['</end>'])
             resp_text = getattr(resp, 'text', '') if hasattr(resp, 'text') else str(resp)
         except Exception as e:
             logger.error(f'Task WIP llm_generate failed: {e}')
@@ -4621,7 +4643,8 @@ class ZenohExecutiveNode:
             prompt += pivot_context
 
         try:
-            resp = self.llm_generate([prompt], max_tokens=1012, temperature=0.3, stops=['</end>'])
+            with self.infospace_executor.turn_metrics.perf_phase("task_exec"):
+                resp = self.llm_generate([prompt], max_tokens=1012, temperature=0.3, stops=['</end>'])
             resp_text = getattr(resp, 'text', '') if hasattr(resp, 'text') else str(resp)
         except Exception as e:
             logger.error(f'📋 Task {task_note_name}: advance LLM failed: {e}')
@@ -4709,6 +4732,7 @@ class ZenohExecutiveNode:
                     keep = {primary} if primary else set()
                     self._cleanup_transient_resources(created_ids, keep,
                                                       label=f'op_{task_note_name}')
+                    self.resource_manager.flush_deferred_indexes()
                 return result
 
             self._operational_task_note = task_note_name
@@ -4794,7 +4818,8 @@ class ZenohExecutiveNode:
                 status=status_str,
                 result_summary=clean_response[:400],
             )
-            refl_resp = self.llm_generate([refl_prompt], max_tokens=712, temperature=0.2, stops=['</end>'])
+            with self.infospace_executor.turn_metrics.perf_phase("task_reflect"):
+                refl_resp = self.llm_generate([refl_prompt], max_tokens=712, temperature=0.2, stops=['</end>'])
             refl_text = getattr(refl_resp, 'text', '') if hasattr(refl_resp, 'text') else str(refl_resp)
 
             # Parse reflection fields
@@ -7084,15 +7109,16 @@ class ZenohExecutiveNode:
                     all_concerns += self._derived_concern_model.get_concerns_for_evaluator()
                 except Exception:
                     pass
-                assessment = character_evaluator.evaluate(
-                    ev, all_concerns, uc,
-                    self._character_eval_build_goals_compact(),
-                    self._character_eval_build_recent_context(),
-                    self._character_eval_build_activity_state(),
-                    None,
-                    llm_generate=self.llm_generate,
-                    target_goal_id=target_goal_id,
-                )
+                with self.infospace_executor.turn_metrics.perf_phase("orient"):
+                    assessment = character_evaluator.evaluate(
+                        ev, all_concerns, uc,
+                        self._character_eval_build_goals_compact(),
+                        self._character_eval_build_recent_context(),
+                        self._character_eval_build_activity_state(),
+                        None,
+                        llm_generate=self.llm_generate,
+                        target_goal_id=target_goal_id,
+                    )
                 character_evaluator.log_assessment(assessment)
             except Exception as e:
                 logger.warning(f"Orient: character evaluation skipped: {e}")
@@ -7817,7 +7843,8 @@ class ZenohExecutiveNode:
             source = p['source']
             user_text = p['text']
             logger.info(f'📥 {self.character_name} Direct chat response to {source}')
-            self._handle_chat_response(user_text, source, assessment=self._last_character_eval)
+            with self.infospace_executor.turn_metrics.perf_phase("chat"):
+                self._handle_chat_response(user_text, source, assessment=self._last_character_eval)
             self.execution_paused = False
             self._publish_execution_state()
             return
@@ -7825,7 +7852,8 @@ class ZenohExecutiveNode:
         if t == 'agent_message':
             # No graph action_result here — planner handles the actual response.
             self._create_character_note()
-            self._handle_agent_message(p['text'], p['source'], p.get('close_flag', False), action.assessment)
+            with self.infospace_executor.turn_metrics.perf_phase("goal"):
+                self._handle_agent_message(p['text'], p['source'], p.get('close_flag', False), action.assessment)
             return
 
         if t == 'proactive_remark':
@@ -9737,9 +9765,17 @@ class ZenohExecutiveNode:
 
     def parse_and_set_goal(self, template, goal_text):
         """Parse goal input from UI and set current goal."""
+        # Reset per-turn metrics for this goal (may run on goal thread)
+        if self.infospace_executor:
+            self.infospace_executor.turn_metrics = TurnMetrics()
+
+        # Defer note indexing during goal execution; batch-index survivors after cleanup
+        if self.resource_manager:
+            self.resource_manager.indexing_deferred = True
+
         try:
             parsed_goal = goal_text.strip().strip('"').strip("'").replace('goal:', '').strip()
-            
+
             # Immediately clear existing plan to interrupt execution
             self.current_plan = None
             # Note: plan_bindings are NOT cleared here - they persist across plans unless explicitly cleared
@@ -9759,17 +9795,18 @@ class ZenohExecutiveNode:
             if not self.observations:
                 self._refresh_observations()
             self.current_goal = Goal(parsed_goal, [self.character_name], description='', termination='')
-            
+
             # If continuous mode is active, update goal text for resubmission
             if self.continuous_mode:
                 self.continuous_goal_text = self.current_goal.to_string()
                 self.last_completed_goal_text = self.current_goal.to_string()  # Also update last completed
                 logger.info(f'🔄 {self.character_name} continuous mode goal updated: {self.continuous_goal_text[:80]}...')
-            
+
             # Skip goal rewriting and plan immediately (infospace mode)
             self._publish_goal(self.current_goal)
             logger.info(f'🧩 {self.character_name} infospace planning for goal: {parsed_goal}')
-            result = self._plan(template, self.current_goal)
+            with self.infospace_executor.turn_metrics.perf_phase("goal"):
+                result = self._plan(template, self.current_goal)
             # Publish complete goal result for external consumers (e.g., eval scripts)
             self._publish_goal_result(result)
 
@@ -9792,11 +9829,20 @@ class ZenohExecutiveNode:
                 else:
                     logger.error(f"Error in _plan: {result.get('error', 'Unknown error')}")
             return result
-            
+
         except Exception as e:
             logger.error(f"Goal parsing failed for {self.character_name}: {e}")
             traceback.print_exc()
             return {"success": False, "error": str(e)}
+        finally:
+            # Ensure indexing is re-enabled even if goal failed or was interrupted
+            if self.resource_manager and self.resource_manager.indexing_deferred:
+                self.resource_manager.flush_deferred_indexes()
+            # Emit per-turn latency summary for goal turns
+            if self.infospace_executor and self.infospace_executor.turn_metrics.llm_calls:
+                _perf = self.infospace_executor.turn_metrics.summary()
+                logger.info(_perf)
+                print(_perf, flush=True)
 
     def _get_recent_chat_memories(self, num_entries: int) -> List[Dict[str, Any]]:
         """Get recent memory entries from memory module."""

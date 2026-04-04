@@ -5306,8 +5306,10 @@ class IncrementalPlanner:
             self.executor._side_effect_cache = {}  # Reset dedup cache per planner session
             self.goal = goal
 
-            preplan = self._preplan(goal)
-            vision_criteria = self._generate_vision(context.get('vision_goal', goal) if context else goal)
+            with self.executor.turn_metrics.perf_phase("preplan"):
+                preplan = self._preplan(goal)
+            with self.executor.turn_metrics.perf_phase("vision"):
+                vision_criteria = self._generate_vision(context.get('vision_goal', goal) if context else goal)
             # Extract context components
             character_context = ""
             recent_context = ""
@@ -5355,20 +5357,21 @@ class IncrementalPlanner:
                     logger.error(line.rstrip())
             
             world_model = initial_world_model
-            state = self._run_tool_planner_backend(
-                template=template,
-                goal=goal,
-                world_model=world_model,
-                character_context=character_context,
-                recent_context=recent_context,
-                max_steps=max_steps,
-                preplan=preplan,
-                similar_plan=similar_plans[0] if similar_plans else None,
-                vision_criteria=vision_criteria,
-                output_artifacts=output_artifacts,
-                resolved_output_artifacts=resolved_output_artifacts,
-                output_artifact_names=output_artifact_names,
-            )
+            with self.executor.turn_metrics.perf_phase("plan"):
+                state = self._run_tool_planner_backend(
+                    template=template,
+                    goal=goal,
+                    world_model=world_model,
+                    character_context=character_context,
+                    recent_context=recent_context,
+                    max_steps=max_steps,
+                    preplan=preplan,
+                    similar_plan=similar_plans[0] if similar_plans else None,
+                    vision_criteria=vision_criteria,
+                    output_artifacts=output_artifacts,
+                    resolved_output_artifacts=resolved_output_artifacts,
+                    output_artifact_names=output_artifact_names,
+                )
 
             step = self._find_last_step(state, max_steps)
             # Safely check if done_<step> exists (may not exist if interrupted)
@@ -5383,7 +5386,8 @@ class IncrementalPlanner:
                 logger.info(f"Last step: {step}, done_{step}: (not found - may be interrupted)")
             trace_str = str(state)
             compressed_trace = _compress_trace(trace_str)
-            reflection_frame = self._reflect(goal, world_model, max_steps, compressed_trace)
+            with self.executor.turn_metrics.perf_phase("reflect"):
+                reflection_frame = self._reflect(goal, world_model, max_steps, compressed_trace)
 
             # Update world_model in memory (persisted on /save or shutdown, not per-cycle)
             if hasattr(self.executor, 'world_model') and self.executor.world_model:

@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
 from infospace_resource_manager import InfospaceResourceManager
+from turn_metrics import TurnMetrics
 
 # Try to import SGLang for runtime support
 try:
@@ -125,6 +126,9 @@ class InfospaceExecutor:
 
         # Active LLM selector: 'primary' or 'alt' (toggled between goals via UI)
         self.active_llm = 'primary'
+
+        # Per-turn latency metrics (reset at each turn start by executive_node)
+        self.turn_metrics = TurnMetrics()
 
         # Global interrupt flag (can be set by UI via executive_node control channel)
         self.interrupt_requested: bool = False
@@ -1365,10 +1369,11 @@ Only provide the result, followed by the </end> tag.""")
             return type('Response', (), {'success': False, 'error': 'SGLang not available', 'text': ''})()
 
         class Response:
-            def __init__(self, success, text='', error=None):
+            def __init__(self, success, text='', error=None, out_tokens=0):
                 self.success = success
                 self.text = text
                 self.error = error
+                self.out_tokens = out_tokens
 
         try:
             # Parse messages into (system_text, user_text) for proper role separation
@@ -1467,10 +1472,11 @@ Only provide the result, followed by the </end> tag.""")
         url = self.alt_vllm_url if use_alt else self.vllm_url
         
         class Response:
-            def __init__(self, success, text='', error=None):
+            def __init__(self, success, text='', error=None, out_tokens=0):
                 self.success = success
                 self.text = text
                 self.error = error
+                self.out_tokens = out_tokens
 
         try:
             # Convert messages to chat format
@@ -1550,8 +1556,9 @@ Only provide the result, followed by the </end> tag.""")
             # Post-process JSON if requested
             if is_json:
                 result_text = self._parse_json_response(result_text, str(messages))
-            
-            return Response(success=True, text=result_text)
+
+            out_tokens = (result.get("usage") or {}).get("completion_tokens", 0) or 0
+            return Response(success=True, text=result_text, out_tokens=out_tokens)
         except requests.exceptions.RequestException as e:
             logger.exception(f"vLLM API error: {e}")
             return Response(success=False, error=str(e))
@@ -1581,10 +1588,11 @@ Only provide the result, followed by the </end> tag.""")
         api_key = self.alt_anthropic_api_key if use_alt else self.anthropic_api_key
         
         class Response:
-            def __init__(self, success, text='', error=None):
+            def __init__(self, success, text='', error=None, out_tokens=0):
                 self.success = success
                 self.text = text
                 self.error = error
+                self.out_tokens = out_tokens
 
         try:
             from anthropic import Anthropic
@@ -1651,7 +1659,8 @@ Only provide the result, followed by the </end> tag.""")
             if is_json:
                 result_text = self._parse_json_response(result_text, str(messages))
 
-            return Response(success=True, text=result_text)
+            out_tokens = getattr(getattr(response, 'usage', None), 'output_tokens', 0) or 0
+            return Response(success=True, text=result_text, out_tokens=out_tokens)
         except Exception as e:
             logger.exception(f"Anthropic API error: {e}")
             return Response(success=False, error=str(e))
@@ -1675,10 +1684,11 @@ Only provide the result, followed by the </end> tag.""")
         api_key = self.alt_openai_api_key if use_alt else self.openai_api_key
 
         class Response:
-            def __init__(self, success, text='', error=None):
+            def __init__(self, success, text='', error=None, out_tokens=0):
                 self.success = success
                 self.text = text
                 self.error = error
+                self.out_tokens = out_tokens
 
         try:
             from openai import OpenAI
@@ -1761,7 +1771,8 @@ Only provide the result, followed by the </end> tag.""")
             if is_json:
                 result_text = self._parse_json_response(result_text, str(messages))
 
-            return Response(success=True, text=result_text)
+            out_tokens = getattr(getattr(response, 'usage', None), 'output_tokens', 0) or 0
+            return Response(success=True, text=result_text, out_tokens=out_tokens)
         except Exception as e:
             logger.exception(f"OpenAI API error: {e}")
             return Response(success=False, error=str(e))
@@ -1790,10 +1801,11 @@ Only provide the result, followed by the </end> tag.""")
         provider = self.alt_openrouter_provider if use_alt else self.openrouter_provider
         
         class Response:
-            def __init__(self, success, text='', error=None):
+            def __init__(self, success, text='', error=None, out_tokens=0):
                 self.success = success
                 self.text = text
                 self.error = error
+                self.out_tokens = out_tokens
 
         try:
             # Convert messages to chat format (same as vLLM)
@@ -1904,8 +1916,9 @@ Only provide the result, followed by the </end> tag.""")
             # Post-process JSON if requested
             if is_json:
                 result_text = self._parse_json_response(result_text, str(messages))
-            
-            return Response(success=True, text=result_text)
+
+            out_tokens = (result.get("usage") or {}).get("completion_tokens", 0) or 0
+            return Response(success=True, text=result_text, out_tokens=out_tokens)
         except requests.exceptions.RequestException as e:
             logger.exception(f"OpenRouter API error: {e}")
             return Response(success=False, error=str(e))
@@ -1935,31 +1948,57 @@ Only provide the result, followed by the </end> tag.""")
                     processed_messages.append(msg)
             messages = processed_messages
 
-        # If alt mode is active and an alt backend is configured, use it
-        if self.active_llm == 'alt':
-            if self.alt_anthropic_model and self.alt_anthropic_api_key:
-                return self._anthropic_generate(messages, max_tokens, temperature, stops, is_json=is_json, use_alt=True)
-            elif self.alt_openai_model and self.alt_openai_api_key:
-                return self._openai_generate(messages, max_tokens, temperature, stops, is_json=is_json, use_alt=True, reasoning_effort=reasoning_effort)
-            elif self.alt_openrouter_model and self.alt_openrouter_api_key:
-                return self._openrouter_generate(messages, max_tokens, temperature, stops, is_json=is_json, use_alt=True)
-            elif self.alt_vllm_model and self.alt_vllm_url:
-                return self._vllm_generate(messages, max_tokens, temperature, stops, is_json=is_json, use_alt=True)
-            # No alt configured — fall through to primary
+        # Determine backend and dispatch
+        _t0 = time.monotonic()
+        _backend = "unknown"
+        _resp = None
+        try:
+            # If alt mode is active and an alt backend is configured, use it
+            if self.active_llm == 'alt':
+                if self.alt_anthropic_model and self.alt_anthropic_api_key:
+                    _backend = "alt_anthropic"
+                    _resp = self._anthropic_generate(messages, max_tokens, temperature, stops, is_json=is_json, use_alt=True)
+                    return _resp
+                elif self.alt_openai_model and self.alt_openai_api_key:
+                    _backend = "alt_openai"
+                    _resp = self._openai_generate(messages, max_tokens, temperature, stops, is_json=is_json, use_alt=True, reasoning_effort=reasoning_effort)
+                    return _resp
+                elif self.alt_openrouter_model and self.alt_openrouter_api_key:
+                    _backend = "alt_openrouter"
+                    _resp = self._openrouter_generate(messages, max_tokens, temperature, stops, is_json=is_json, use_alt=True)
+                    return _resp
+                elif self.alt_vllm_model and self.alt_vllm_url:
+                    _backend = "alt_vllm"
+                    _resp = self._vllm_generate(messages, max_tokens, temperature, stops, is_json=is_json, use_alt=True)
+                    return _resp
+                # No alt configured — fall through to primary
 
-        # Primary backend: Anthropic → OpenAI → OpenRouter → vLLM → SGLang
-        if self.anthropic_model and self.anthropic_api_key:
-            return self._anthropic_generate(messages, max_tokens, temperature, stops, is_json=is_json)
-        elif self.openai_model and self.openai_api_key:
-            return self._openai_generate(messages, max_tokens, temperature, stops, is_json=is_json, reasoning_effort=reasoning_effort)
-        elif self.openrouter_model and self.openrouter_api_key:
-            return self._openrouter_generate(messages, max_tokens, temperature, stops, is_json=is_json)
-        elif self.vllm_model and self.vllm_url:
-            return self._vllm_generate(messages, max_tokens, temperature, stops, is_json=is_json)
-        elif self.runtime:
-            return self._sglang_generate(messages, max_tokens, temperature, stops, is_json=is_json)
-        else:
-            raise RuntimeError("No LLM backend available - ensure executive_node is started with sgl_model_path, vllm_model_path, anthropic_model_path, openai_model_path, or openrouter_model_path")
+            # Primary backend: Anthropic → OpenAI → OpenRouter → vLLM → SGLang
+            if self.anthropic_model and self.anthropic_api_key:
+                _backend = "anthropic"
+                _resp = self._anthropic_generate(messages, max_tokens, temperature, stops, is_json=is_json)
+                return _resp
+            elif self.openai_model and self.openai_api_key:
+                _backend = "openai"
+                _resp = self._openai_generate(messages, max_tokens, temperature, stops, is_json=is_json, reasoning_effort=reasoning_effort)
+                return _resp
+            elif self.openrouter_model and self.openrouter_api_key:
+                _backend = "openrouter"
+                _resp = self._openrouter_generate(messages, max_tokens, temperature, stops, is_json=is_json)
+                return _resp
+            elif self.vllm_model and self.vllm_url:
+                _backend = "vllm"
+                _resp = self._vllm_generate(messages, max_tokens, temperature, stops, is_json=is_json)
+                return _resp
+            elif self.runtime:
+                _backend = "sglang"
+                _resp = self._sglang_generate(messages, max_tokens, temperature, stops, is_json=is_json)
+                return _resp
+            else:
+                raise RuntimeError("No LLM backend available - ensure executive_node is started with sgl_model_path, vllm_model_path, anthropic_model_path, openai_model_path, or openrouter_model_path")
+        finally:
+            _out_tok = getattr(_resp, 'out_tokens', 0) if _resp else 0
+            self.turn_metrics.record_llm(_backend, time.monotonic() - _t0, out_tokens=_out_tok)
     
     def switch_llm(self, mode: str):
         """Switch active LLM between 'primary' and 'alt'.
@@ -2117,7 +2156,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 input_note_id = self._persist_note(input_value, f'{tool_name}_input')
                 if input_note_id:
                     self._bind_variable('input', input_note_id)
-            
+
             # Bind args dict values to named variables
             for key, val in additional_args.items():
                 resolved_val = self._resolve_value(val)
@@ -2256,8 +2295,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # Execute tool
         try:
             logger.debug(f"Calling tool '{tool_name}' with input_value type: {type(input_value)}, length: {len(str(input_value)) if isinstance(input_value, str) else 'N/A'}")
+            _tool_t0 = time.monotonic()
             result = tool_func(input_value, **resolved_args)
+            self.turn_metrics.record_tool(tool_name, time.monotonic() - _tool_t0)
         except Exception as e:
+            self.turn_metrics.record_tool(tool_name, time.monotonic() - _tool_t0)
             logger.error(f"Python tool '{tool_name}' execution error: {e}", exc_info=True)
             return self._create_uniform_return('failed', reason=f'Tool execution error: {str(e)}', value=None, resource_id=None)
         
@@ -2709,13 +2751,13 @@ Make sure the string is in a format that can be parsed by the json.loads functio
     def _persist_note(self, value: Any, source_context: str, properties: Optional[Dict] = None, note_name: str = '') -> Optional[str]:
         """
         Helper to persist a Note as a resource.
-        
+
         Args:
             value: Content to persist (string, or dict with 'text' for search results)
             source_context: Description for logging (e.g., 'save_primitive', 'apply_result')
             properties: Optional dict of extra properties to attach
             note_name: Optional stable name for referencing
-            
+
         Returns:
             Note ID if successful, None if failed
         """
