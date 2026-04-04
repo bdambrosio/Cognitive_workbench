@@ -155,12 +155,33 @@ def _do_get(kwargs, env, executor):
     return _success(executor, result.stdout.strip())
 
 
+def _do_text(kwargs, env, executor, agent_name, resource_manager):
+    """Get visible page text as a Note. Optional selector to scope."""
+    selector = kwargs.get('selector', 'body')
+    result = _run(["get", "text", selector], env)
+    if result.returncode != 0:
+        return _fail(executor, f"text failed: {(result.stderr or result.stdout)[:500]}")
+    content = result.stdout.strip()
+    if not content:
+        return _fail(executor, "page text is empty")
+    note_id = _create_note(content, agent_name, resource_manager,
+                           tool_metadata={"action": "text", "selector": selector})
+    if not note_id:
+        return _fail(executor, "Failed to create Note from page text")
+    preview = content[:200] + "..." if len(content) > 200 else content
+    return _success(executor, preview, resource_id=note_id)
+
+
 def _do_eval(kwargs, env, executor):
     expression = kwargs.get('expression', '')
     if not expression:
         return _fail(executor, "eval requires 'expression' parameter")
-    # Wrap in IIFE to avoid const redeclaration errors across persistent sessions
+    # Wrap in IIFE to avoid const redeclaration errors across persistent sessions.
+    # Auto-add return to last expression statement if no explicit return exists.
     if 'const ' in expression or 'let ' in expression:
+        lines = expression.strip().rstrip(';').rsplit('\n', 1)
+        if len(lines) > 1 and 'return ' not in lines[-1]:
+            expression = lines[0] + '\nreturn ' + lines[-1].strip().rstrip(';') + ';'
         expression = f"(() => {{ {expression} }})()"
     result = _run(["eval", expression], env)
     if result.returncode != 0:
@@ -232,6 +253,8 @@ def tool(input_value=None, **kwargs):
         return _do_open(kwargs, env, executor)
     elif action == 'snapshot':
         return _do_snapshot(kwargs, env, executor, agent_name, resource_manager)
+    elif action == 'text':
+        return _do_text(kwargs, env, executor, agent_name, resource_manager)
     elif action == 'click':
         return _do_click(kwargs, env, executor)
     elif action in ('type', 'fill'):

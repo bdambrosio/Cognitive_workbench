@@ -3,7 +3,7 @@ name: browse
 type: python
 description: "Browser automation via agent-browser CLI. Navigate, snapshot accessibility tree, interact by element ref."
 schema_hint:
-  action: "string (required): open|snapshot|click|type|fill|press|scroll|get|eval|close|batch"
+  action: "string (required): open|snapshot|text|click|type|fill|press|scroll|get|eval|close|batch"
   url: "string (for open)"
   selector: "string (CSS selector or @ref from snapshot, for click/type/fill/press/scroll/get)"
   text: "string (for type/fill)"
@@ -37,7 +37,13 @@ Control a persistent browser session via [agent-browser](https://github.com/nich
 ```json
 {"type":"browse","action":"snapshot","out":"$page"}
 ```
-Returns interactive elements only (buttons, links, inputs). Use `extract` on the resulting Note to find specific content. Supports optional `selector` to scope to a CSS subtree.
+Returns interactive elements only (buttons, links, inputs) with element refs (`@e1`, `@e2`, ...). Use for finding clickable elements. Supports optional `selector` to scope.
+
+### text — Get visible page text as Note
+```json
+{"type":"browse","action":"text","out":"$page_text"}
+```
+Returns the readable text content of the page (not HTML, not accessibility tree). Use this for content extraction — then apply `extract` to pull out specific information. Supports optional `selector` to scope (e.g., `"selector": "#mw-content-text"` for Wikipedia article body). **Prefer `text` over `eval` for extracting page content.**
 
 ### click — Click an element
 ```json
@@ -90,34 +96,43 @@ Each inner array is `[command, arg1, arg2, ...]`. Commands run sequentially; sto
 Success: `resource_id` for snapshot (Note with accessibility tree), `value` for everything else.
 Failure: `reason` with error details.
 
-## Complete Example: Extract data from a web page
+## Complete Example: Extract content from a web page
 
-Step 1 — Open and snapshot (one code block):
+Step 1 — Open and get page text (one code block):
 ```python
-r1 = tool("browse", action="open", url="https://news.ycombinator.com", out="$status")
+r1 = tool("browse", action="open", url="https://en.wikipedia.org/wiki/Cognitive_architecture", out="$status")
+r2 = tool("browse", action="text", out="$page_text")
+```
+
+Step 2 — Extract specific content using the `extract` tool (separate code block):
+```python
+r = tool("extract", target="$page_text", instruction="Extract the first paragraph of the article", out="$para")
+r2 = tool("create-note", value=get_text("$para"), name="my_result", out="$note")
+```
+
+## Example: Interactive workflow (click, fill, navigate)
+
+Step 1 — Open and snapshot to find interactive elements:
+```python
+r1 = tool("browse", action="open", url="https://example.com/search", out="$status")
 r2 = tool("browse", action="snapshot", out="$page")
 ```
 
-Step 2 — Read the snapshot, then extract using refs or eval (separate code block):
+Step 2 — Read snapshot, interact by ref (separate code block):
 ```python
-# ALWAYS read the snapshot first to understand the page structure
-page = get_text("$page")
-# Now use eval with JavaScript based on what you see in the accessibility tree
-r = tool("browse", action="eval", expression='JSON.stringify([...document.querySelectorAll(".athing")].slice(0,5).map(el => ({title: el.querySelector(".titleline a")?.textContent, score: el.nextElementSibling?.querySelector(".score")?.textContent})))', out="$data")
-```
-
-Step 3 — Create output from extracted data:
-```python
-r = tool("create-note", value=get_text("$data"), name="my_results", out="$note")
+page = get_text("$page")  # Read accessibility tree to find element refs
+r1 = tool("browse", action="fill", selector="@e5", text="search query", out="$r")
+r2 = tool("browse", action="click", selector="@e7", out="$r")
+r3 = tool("browse", action="text", out="$results")
 ```
 
 ## Planning Notes
 
-- **ALWAYS read the snapshot before interacting.** Do NOT guess CSS selectors or DOM structure. The snapshot shows you the actual page structure with element refs.
+- **For content extraction, use `text` + `extract`, NOT `eval` with JavaScript.** The `text` action gets readable page text; the `extract` tool pulls out what you need. No JS required.
+- **Use `snapshot` only when you need to interact** (click, fill, press). It shows interactive elements with refs.
 - Element refs (`@e1`, `@e2`) are only valid until the next snapshot — page changes invalidate them.
 - Always snapshot after navigation or clicks that change page state.
 - Batch deterministic sequences (open+wait+snapshot) to save steps. Keep interactive decisions as separate steps.
-- Use `get text @ref` for targeted extraction instead of re-snapshotting the whole page.
 - For `eval`, the tool auto-wraps in an IIFE if you use `const`/`let`, so variable redeclaration across steps is safe.
 - The browser session persists across steps within a goal. Call `close` when done if the page won't be needed again.
 - Requires `agent-browser` CLI installed and on PATH.
