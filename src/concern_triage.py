@@ -27,6 +27,7 @@ ORIENT_BUMP_THRESHOLD = 'strong'     # Orient bump level that bypasses activatio
 ORIENT_COLD_CEILING = 0.35           # Concern must be below this to count as "cold"
 TRIAGE_COOLDOWN_SECS = 120.0         # Min seconds between triage LLM calls
 DEFER_TICKS = 30                     # How many idle ticks a deferred concern is suppressed
+MAX_DEFER_STREAK = 5                 # Auto-dismiss after this many consecutive defers
 MAX_CANDIDATES = 6                   # Cap candidates per triage call
 
 
@@ -258,8 +259,17 @@ class ConcernTriage:
         # Apply defer decisions
         for d in decisions:
             if d.action == 'defer':
-                self._defer_streak[d.concern_id] = self._defer_streak.get(d.concern_id, 0) + 1
-                self._deferred[d.concern_id] = DEFER_TICKS
+                streak = self._defer_streak.get(d.concern_id, 0) + 1
+                self._defer_streak[d.concern_id] = streak
+                if streak >= MAX_DEFER_STREAK:
+                    # M2: Auto-dismiss after too many consecutive defers
+                    self._deferred[d.concern_id] = DEFER_TICKS * 10
+                    self._defer_streak.pop(d.concern_id, None)
+                    d.action = 'dismiss'
+                    d.reason = f'auto-dismissed after {streak} consecutive defers'
+                    logger.warning(f'🎯 Concern {d.concern_id} auto-dismissed (defer streak={streak})')
+                else:
+                    self._deferred[d.concern_id] = DEFER_TICKS
             elif d.action == 'dismiss':
                 self._deferred[d.concern_id] = DEFER_TICKS * 3
                 self._defer_streak.pop(d.concern_id, None)

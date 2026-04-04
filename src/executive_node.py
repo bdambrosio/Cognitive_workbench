@@ -1791,6 +1791,26 @@ class ZenohExecutiveNode:
         """Concern triage integration: nominate from activations, tick deferrals, run triage."""
         self._concern_triage.tick_deferred()
 
+        # H3: Timeout delegated concerns that never received a callback
+        try:
+            _DELEGATION_TIMEOUT_HOURS = 4
+            _now = datetime.now()
+            for c in self._derived_concern_model.get_concerns():
+                if c.get('status') != 'delegated':
+                    continue
+                delegated_at = c.get('delegated_at')
+                if not delegated_at:
+                    continue
+                elapsed_h = (_now - datetime.fromisoformat(delegated_at)).total_seconds() / 3600
+                if elapsed_h >= _DELEGATION_TIMEOUT_HOURS:
+                    c['status'] = 'active'
+                    c['status_rationale'] = f'Delegation timed out after {elapsed_h:.0f}h — reactivated'
+                    c['recency'] = _now.isoformat()
+                    self._derived_concern_model._save()
+                    logger.info(f'📋 Concern {c.get("concern_id")} delegation timed out, reactivated')
+        except Exception as e:
+            logger.debug(f'Delegation timeout check skipped: {e}')
+
         serviced_ids = self._build_serviced_concern_ids()
 
         # Activation-monitor nominations: check living state concern activations
@@ -1856,6 +1876,25 @@ class ZenohExecutiveNode:
                     desc = c.get('concern_description', '')
                     concern_details.append(f'- {label}: {desc}' if desc else f'- {label}')
                 parts.append('Active user concerns:\n' + '\n'.join(concern_details))
+        except Exception:
+            pass
+        # M1: Include derived concern state so triage can see delegated/satisfied concerns
+        try:
+            dc = self._derived_concern_model.get_concerns() or []
+            if dc:
+                dc_lines = []
+                for c in dc[:8]:
+                    cid = c.get('concern_id', '?')
+                    label = c.get('concern_label', '?')
+                    status = c.get('status', '?')
+                    linked = c.get('linked_task', '')
+                    line = f'- {cid} [{status}] {label}'
+                    if linked:
+                        line += f' (task: {linked})'
+                    if status == 'delegated':
+                        line += f' (delegated to {c.get("delegated_to", "?")})'
+                    dc_lines.append(line)
+                parts.append('Derived concerns:\n' + '\n'.join(dc_lines))
         except Exception:
             pass
         return ' '.join(parts)
@@ -4945,12 +4984,33 @@ class ZenohExecutiveNode:
         wip["execution_count"] = wip.get("execution_count", 0) + 1
         wip["last_executed"] = datetime.now().isoformat()
         wip["cycle_state"] = "idle"
+        # H2: Promote durable cycle findings to establishment_findings before clearing
+        cycle_findings = wip.get("cycle_findings", [])
+        if cycle_findings:
+            est = wip.setdefault("establishment_findings", [])
+            est.extend(f"[cycle] {f}" for f in cycle_findings)
+            wip["establishment_findings"] = est[-20:]  # cap at 20, oldest evicted
         wip["cycle_goals_completed"] = []
         wip["cycle_findings"] = []
         wip["current_milestone"] = None
         wip["_last_reflection"] = {}
         wip["_cycle_stall_sig"] = ""
         wip["_cycle_stall_count"] = 0
+        # H1: Satisfy driving concern when cycle succeeds
+        if achieved_count > 0 and wip.get("linked_concern_id"):
+            try:
+                cooldown_h = max(1, wip.get("cooldown_seconds", 3600) / 3600)
+                self._derived_concern_model._apply_patch({
+                    "op": "satisfy_concern",
+                    "concern_id": wip["linked_concern_id"],
+                    "field_updates": {
+                        "status_rationale": f"Task cycle completed ({achieved_count} goals achieved)",
+                        "revisit_hours": cooldown_h,
+                    },
+                }, f"task_cycle:{note_name}")
+                self._derived_concern_model._save()
+            except Exception as e:
+                logger.debug(f"Concern satisfaction after task cycle failed: {e}")
         self._write_operational_task(note_name, note_id, wip)
         self._operational_task_note = None
         self._operational_goal_waiting = False
