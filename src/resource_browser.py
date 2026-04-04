@@ -938,15 +938,23 @@ class ResourceBrowser:
                     .sort((a, b) => b.mention_count - a.mention_count)
                     .map(e => `<div class="resource-item" onclick="expandEntity('${e.graph_node_id}','${escapeHtml(e.name)}')" style="color:#4ec9b0;">${escapeHtml(e.name)} <span style="color:#888;font-size:10px;">(${e.mention_count})</span></div>`)
                     .join('');
-                // Build entity-only graph nodes (no edges yet — click to expand)
-                if (data.entities.length > 0) {
-                    const nodes = data.entities.filter(e => e.graph_node_id).map(e => ({
-                        node_id: e.graph_node_id, type: 'entity',
-                        content: e.name, attrs: {display: e.name, mention_count: e.mention_count, canonical: e.name}
-                    }));
-                    graphNodes = []; graphEdges = [];
-                    graphG.selectAll('*').remove();
-                    renderGraph(nodes, []);
+                // Fetch subgraph seeded from all entity nodes to show edges
+                const entityNodeIds = data.entities
+                    .filter(e => e.graph_node_id)
+                    .map(e => e.graph_node_id);
+                graphNodes = []; graphEdges = [];
+                graphG.selectAll('*').remove();
+                if (entityNodeIds.length > 0) {
+                    try {
+                        const sgResp = await fetch('/api/graph/subgraph', {
+                            method: 'POST', headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({seed_ids: entityNodeIds, max_hops: 1})
+                        });
+                        const sgData = await sgResp.json();
+                        if (sgData.success) {
+                            renderGraph(sgData.nodes, sgData.edges);
+                        }
+                    } catch (e2) { console.error('Entity subgraph load failed:', e2); }
                 }
             } catch (e) { console.error('Entity load failed:', e); }
         }
