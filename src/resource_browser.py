@@ -105,6 +105,17 @@ class ResourceBrowser:
             body = await request.json()
             content = body.get('content', '')
             return self.update_resource_via_zenoh(resource_id, content)
+
+        @self.app.get("/api/graph/entities")
+        async def graph_entities():
+            """Get entity index summary for graph explorer."""
+            return self.query_graph_entities()
+
+        @self.app.post("/api/graph/subgraph")
+        async def graph_subgraph(request: Request):
+            """Get subgraph expansion or search results."""
+            body = await request.json()
+            return self.query_graph_subgraph(body)
     
     def _key_prefix(self) -> str:
         """Return Zenoh key prefix for the target character (or wildcard fallback)."""
@@ -186,6 +197,31 @@ class ResourceBrowser:
                 return data
 
         return {'success': False, 'error': f'No response from executive_node for update'}
+
+    def query_graph_entities(self) -> Dict:
+        """Query executive_node for entity index summary."""
+        key = f"{self._key_prefix()}/graph/entities"
+        logger.info(f"Querying graph entities: {key}")
+
+        from zenoh import QueryTarget, ConsolidationMode
+        for reply in self.session.get(key, target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=5.0):
+            if reply.ok:
+                return json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+
+        return {'success': False, 'error': 'No response from executive_node for graph entities'}
+
+    def query_graph_subgraph(self, params: Dict) -> Dict:
+        """Query executive_node for cognitive graph subgraph."""
+        key = f"{self._key_prefix()}/graph/subgraph"
+        logger.info(f"Querying graph subgraph: {key}")
+        payload = json.dumps(params).encode('utf-8')
+
+        from zenoh import QueryTarget, ConsolidationMode
+        for reply in self.session.get(key, payload=payload, target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=5.0):
+            if reply.ok:
+                return json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+
+        return {'success': False, 'error': 'No response from executive_node for graph subgraph'}
 
     def get_html(self) -> str:
         """Generate HTML UI."""
@@ -406,7 +442,29 @@ class ResourceBrowser:
         ::-webkit-scrollbar-track { background: #1e1e1e; }
         ::-webkit-scrollbar-thumb { background: #424242; border-radius: 5px; }
         ::-webkit-scrollbar-thumb:hover { background: #4e4e4e; }
+
+        /* Tab switcher */
+        .tab-bar { display: flex; gap: 2px; margin-bottom: 10px; }
+        .tab-btn { background: #2d2d2d; color: #888; border: none; padding: 5px 12px; cursor: pointer; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-radius: 2px; }
+        .tab-btn.active { background: #094771; color: #d4d4d4; }
+        .tab-btn:hover { background: #3e3e42; color: #d4d4d4; }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* Graph explorer */
+        #graph-panel { display: none; position: relative; width: 100%; height: 100%; }
+        #graph-panel.active { display: flex; flex-direction: column; }
+        #graph-controls { padding: 8px; background: #252526; border-bottom: 1px solid #3e3e42; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        #graph-search { background: #3c3c3c; border: 1px solid #3e3e42; color: #d4d4d4; padding: 4px 8px; font-size: 12px; border-radius: 2px; width: 180px; }
+        .filter-label { font-size: 10px; color: #888; cursor: pointer; display: flex; align-items: center; gap: 2px; }
+        .filter-label input { cursor: pointer; }
+        #graph-svg { flex: 1; background: #1a1a1a; }
+        .graph-node { cursor: pointer; }
+        .graph-node:hover { filter: brightness(1.3); }
+        .graph-edge { stroke: #444; stroke-opacity: 0.6; }
+        .graph-tooltip { position: absolute; background: #333; color: #d4d4d4; padding: 6px 10px; border-radius: 3px; font-size: 12px; pointer-events: none; max-width: 300px; z-index: 100; border: 1px solid #555; }
     </style>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
     <header>
@@ -416,21 +474,46 @@ class ResourceBrowser:
     
     <div class="container">
         <div class="sidebar">
-            <div class="section">
-                <div class="section-title">Notes (<span id="notes-count">0</span>)</div>
-                <div id="notes-list"></div>
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchTab('resources')">Resources</button>
+                <button class="tab-btn" onclick="switchTab('graph')">Graph</button>
             </div>
-            
-            <div class="section">
-                <div class="section-title">Collections (<span id="collections-count">0</span>)</div>
-                <div id="collections-list"></div>
+            <div id="resources-tab" class="tab-panel active">
+                <div class="section">
+                    <div class="section-title">Notes (<span id="notes-count">0</span>)</div>
+                    <div id="notes-list"></div>
+                </div>
+                <div class="section">
+                    <div class="section-title">Collections (<span id="collections-count">0</span>)</div>
+                    <div id="collections-list"></div>
+                </div>
+            </div>
+            <div id="graph-sidebar" class="tab-panel">
+                <div class="section">
+                    <div class="section-title">Entities (<span id="entity-count">0</span>)</div>
+                    <div id="entity-list"></div>
+                </div>
             </div>
         </div>
-        
-        <div class="content-area">
+
+        <div class="content-area" id="resource-content">
             <div id="content-display" class="empty-state">
                 <p>← Select a resource to view its content</p>
             </div>
+        </div>
+        <div id="graph-panel">
+            <div id="graph-controls">
+                <input type="text" id="graph-search" placeholder="Search entities/nodes..." onkeydown="if(event.key==='Enter')graphSearch()">
+                <button onclick="graphSearch()" style="font-size:11px;padding:4px 8px;">Search</button>
+                <button onclick="loadEntityOverview()" style="font-size:11px;padding:4px 8px;background:#2d6b3f;">Entities</button>
+                <span class="filter-label"><input type="checkbox" checked onchange="toggleNodeType('entity')"> entities</span>
+                <span class="filter-label"><input type="checkbox" checked onchange="toggleNodeType('goal_launch')"> goals</span>
+                <span class="filter-label"><input type="checkbox" checked onchange="toggleNodeType('concern_created')"> concerns</span>
+                <span class="filter-label"><input type="checkbox" checked onchange="toggleNodeType('conversation_turn')"> turns</span>
+                <span class="filter-label"><input type="checkbox" checked onchange="toggleNodeType('tom_update')"> ToM</span>
+            </div>
+            <svg id="graph-svg"></svg>
+            <div id="graph-tooltip" class="graph-tooltip" style="display:none;"></div>
         </div>
     </div>
     
@@ -692,6 +775,217 @@ class ResourceBrowser:
             return String(value);
         }
         
+        // ── Tab switching ──────────────────────────────────────────
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('resources-tab').classList.toggle('active', tab === 'resources');
+            document.getElementById('graph-sidebar').classList.toggle('active', tab === 'graph');
+            document.getElementById('resource-content').style.display = tab === 'resources' ? '' : 'none';
+            const gp = document.getElementById('graph-panel');
+            if (tab === 'graph') {
+                gp.classList.add('active');
+                if (!graphInitialized) initGraph();
+                loadEntityOverview();
+            } else {
+                gp.classList.remove('active');
+            }
+        }
+
+        // ── Graph explorer ───────────────────────────────────────────
+        let graphInitialized = false;
+        let graphSim = null;
+        let graphSvg, graphG, graphZoom;
+        let graphNodes = [], graphEdges = [];
+        let hiddenTypes = new Set();
+        const NODE_COLORS = {
+            entity: '#4ec9b0', goal_launch: '#569cd6', goal_outcome: '#569cd6',
+            conversation_turn: '#888', concern_created: '#ce9178', concern_change: '#ce9178',
+            assessment: '#dcdcaa', decision: '#dcdcaa', tom_update: '#c586c0',
+            task_created: '#6a9955', consolidation: '#555', event: '#666',
+        };
+        const NODE_RADIUS = {
+            entity: d => 6 + Math.min((d.attrs?.mention_count || 1) * 2, 18),
+            goal_launch: () => 10, goal_outcome: () => 10,
+            conversation_turn: () => 4, concern_created: () => 8, concern_change: () => 8,
+            assessment: () => 5, decision: () => 5, tom_update: () => 7,
+            task_created: () => 8, consolidation: () => 4, event: () => 4,
+        };
+
+        function initGraph() {
+            graphInitialized = true;
+            const svg = d3.select('#graph-svg');
+            const width = svg.node().parentElement.clientWidth;
+            const height = svg.node().parentElement.clientHeight - 40;
+            svg.attr('width', width).attr('height', height);
+
+            graphZoom = d3.zoom().scaleExtent([0.1, 5]).on('zoom', e => graphG.attr('transform', e.transform));
+            svg.call(graphZoom);
+            graphG = svg.append('g');
+            graphSvg = svg;
+
+            graphSim = d3.forceSimulation()
+                .force('charge', d3.forceManyBody().strength(-80))
+                .force('link', d3.forceLink().id(d => d.node_id).distance(60))
+                .force('center', d3.forceCenter(width / 2, height / 2))
+                .force('collision', d3.forceCollide().radius(15))
+                .on('tick', graphTick);
+            graphSim.stop();
+        }
+
+        function graphTick() {
+            graphG.selectAll('.graph-edge')
+                .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+            graphG.selectAll('.graph-node')
+                .attr('transform', d => `translate(${d.x},${d.y})`)
+                .style('display', d => hiddenTypes.has(d.type) ? 'none' : '');
+        }
+
+        function renderGraph(nodes, edges) {
+            // Merge with existing (keep positions for nodes already rendered)
+            const existingMap = {};
+            graphNodes.forEach(n => { existingMap[n.node_id] = n; });
+            nodes.forEach(n => {
+                if (existingMap[n.node_id]) {
+                    Object.assign(existingMap[n.node_id], n);
+                } else {
+                    graphNodes.push(n);
+                }
+            });
+            // Deduplicate edges
+            const edgeKey = e => `${e.source?.node_id||e.source}-${e.target?.node_id||e.target}-${e.type}`;
+            const existingEdges = new Set(graphEdges.map(edgeKey));
+            edges.forEach(e => {
+                const k = edgeKey(e);
+                if (!existingEdges.has(k)) { graphEdges.push(e); existingEdges.add(k); }
+            });
+
+            // Render edges
+            const edgeSel = graphG.selectAll('.graph-edge').data(graphEdges, edgeKey);
+            edgeSel.exit().remove();
+            edgeSel.enter().append('line').attr('class', 'graph-edge');
+
+            // Render nodes
+            const nodeSel = graphG.selectAll('.graph-node').data(graphNodes, d => d.node_id);
+            nodeSel.exit().remove();
+            const nodeEnter = nodeSel.enter().append('g').attr('class', 'graph-node')
+                .call(d3.drag()
+                    .on('start', (e, d) => { if (!e.active) graphSim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+                    .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y; })
+                    .on('end', (e, d) => { if (!e.active) graphSim.alphaTarget(0); d.fx = null; d.fy = null; })
+                )
+                .on('click', (e, d) => expandFromNode(d))
+                .on('dblclick', (e, d) => {
+                    if (d.type === 'entity') return;
+                    // Try to navigate to resource
+                    const rid = d.attrs?.resource_id || d.attrs?.primary_product || '';
+                    if (rid && rid.startsWith('Note_')) { switchTab('resources'); selectResource(rid); }
+                })
+                .on('mouseover', (e, d) => showTooltip(e, d))
+                .on('mouseout', () => { document.getElementById('graph-tooltip').style.display = 'none'; });
+
+            nodeEnter.append('circle')
+                .attr('r', d => (NODE_RADIUS[d.type] || (() => 5))(d))
+                .attr('fill', d => NODE_COLORS[d.type] || '#666');
+            // Label for entity nodes
+            nodeEnter.filter(d => d.type === 'entity')
+                .append('text')
+                .attr('dy', d => -(NODE_RADIUS.entity(d) + 3))
+                .attr('text-anchor', 'middle')
+                .attr('fill', '#aaa').attr('font-size', '9px')
+                .text(d => (d.content || d.attrs?.display || d.node_id).slice(0, 20));
+
+            // Update simulation
+            graphSim.nodes(graphNodes);
+            graphSim.force('link').links(graphEdges);
+            graphSim.alpha(0.5).restart();
+        }
+
+        function showTooltip(event, d) {
+            const tip = document.getElementById('graph-tooltip');
+            const label = d.content || d.attrs?.display || d.node_id;
+            let html = `<strong>${d.type}</strong>: ${escapeHtml(label.slice(0, 120))}`;
+            if (d.attrs?.goal_id) html += `<br>Goal: ${d.attrs.goal_id}`;
+            if (d.attrs?.concern_id) html += `<br>Concern: ${d.attrs.concern_id}`;
+            if (d.attrs?.entity) html += `<br>Entity: ${d.attrs.entity}`;
+            tip.innerHTML = html;
+            tip.style.display = 'block';
+            tip.style.left = (event.pageX + 12) + 'px';
+            tip.style.top = (event.pageY - 10) + 'px';
+        }
+
+        async function expandFromNode(d) {
+            try {
+                const resp = await fetch('/api/graph/subgraph', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({seed_ids: [d.node_id], max_hops: 1})
+                });
+                const data = await resp.json();
+                if (data.success) renderGraph(data.nodes, data.edges);
+            } catch (e) { console.error('Expand failed:', e); }
+        }
+
+        async function loadEntityOverview() {
+            try {
+                const resp = await fetch('/api/graph/entities');
+                const data = await resp.json();
+                if (!data.success) return;
+                document.getElementById('entity-count').textContent = data.entities.length;
+                // Render entity sidebar list
+                const list = document.getElementById('entity-list');
+                list.innerHTML = data.entities
+                    .sort((a, b) => b.mention_count - a.mention_count)
+                    .map(e => `<div class="resource-item" onclick="expandEntity('${e.graph_node_id}','${escapeHtml(e.name)}')" style="color:#4ec9b0;">${escapeHtml(e.name)} <span style="color:#888;font-size:10px;">(${e.mention_count})</span></div>`)
+                    .join('');
+                // Build entity-only graph nodes (no edges yet — click to expand)
+                if (data.entities.length > 0) {
+                    const nodes = data.entities.filter(e => e.graph_node_id).map(e => ({
+                        node_id: e.graph_node_id, type: 'entity',
+                        content: e.name, attrs: {display: e.name, mention_count: e.mention_count, canonical: e.name}
+                    }));
+                    graphNodes = []; graphEdges = [];
+                    graphG.selectAll('*').remove();
+                    renderGraph(nodes, []);
+                }
+            } catch (e) { console.error('Entity load failed:', e); }
+        }
+
+        async function expandEntity(graphNodeId, name) {
+            if (!graphNodeId) { alert('Entity has no graph node yet'); return; }
+            try {
+                const resp = await fetch('/api/graph/subgraph', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({seed_ids: [graphNodeId], max_hops: 1})
+                });
+                const data = await resp.json();
+                if (data.success) renderGraph(data.nodes, data.edges);
+            } catch (e) { console.error('Expand entity failed:', e); }
+        }
+
+        async function graphSearch() {
+            const q = document.getElementById('graph-search').value.trim();
+            if (!q) return;
+            try {
+                const resp = await fetch('/api/graph/subgraph', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({query: q, k: 10})
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    graphNodes = []; graphEdges = [];
+                    graphG.selectAll('*').remove();
+                    renderGraph(data.nodes, data.edges);
+                }
+            } catch (e) { console.error('Search failed:', e); }
+        }
+
+        function toggleNodeType(type) {
+            if (hiddenTypes.has(type)) hiddenTypes.delete(type);
+            else hiddenTypes.add(type);
+            graphG.selectAll('.graph-node').style('display', d => hiddenTypes.has(d.type) ? 'none' : '');
+        }
+
         // Auto-load on page load
         refreshResources();
     </script>

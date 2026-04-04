@@ -1433,7 +1433,16 @@ class ZenohExecutiveNode:
             f"cognitive/{character_name}/planner/feedback",
             self._planner_feedback_handler
         )
-        
+        # Queryables for cognitive graph exploration (for resource_browser graph tab)
+        self.graph_subgraph_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/graph/subgraph",
+            self._handle_graph_subgraph_query
+        )
+        self.graph_entities_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/graph/entities",
+            self._handle_graph_entities_query
+        )
+
         # Shutdown flags
         self.shutdown_requested = False
         self._shutting_down = False
@@ -7467,6 +7476,9 @@ class ZenohExecutiveNode:
             if launch_node:
                 g.add_edge(launch_node, nid, "produced")
                 g.update_attrs(launch_node, {"status": "completed" if success else "failed"})
+            # NER: extract entities from goal outcome
+            if last_result:
+                self._extract_and_index_entities((last_result or '')[:500], primary_product or '', nid)
         except Exception as e:
             logger.debug(f"Graph goal_outcome emit failed: {e}")
 
@@ -7497,6 +7509,9 @@ class ZenohExecutiveNode:
             # Link to assessment that triggered creation
             if self._last_assessment_node:
                 g.add_edge(nid, self._last_assessment_node, "concern_for")
+            # NER: extract entities from concern label+description
+            if label or desc:
+                self._extract_and_index_entities(f"{label}: {desc}", "", nid)
         except Exception as e:
             logger.debug(f"Graph concern_created emit failed: {e}")
 
@@ -7565,6 +7580,77 @@ class ZenohExecutiveNode:
                     _json.dump(self._entity_index.to_dict(), f)
         except Exception as e:
             logger.debug(f"Entity index save failed: {e}")
+
+    # ── Cognitive Graph Query Handlers (for resource browser graph tab) ──
+
+    def _handle_graph_subgraph_query(self, query):
+        """Handle subgraph expansion or semantic search over the cognitive graph."""
+        try:
+            payload = {}
+            if query.payload:
+                payload = json.loads(query.payload.to_bytes().decode('utf-8'))
+
+            g = self._cognitive_graph
+            MAX_NODES = 200
+
+            if 'seed_ids' in payload:
+                # Expand mode
+                seed_ids = payload['seed_ids']
+                max_hops = payload.get('max_hops', 2)
+                edge_types = payload.get('edge_types')
+                nodes, edges = g.expand_subgraph(seed_ids, max_hops, edge_types)
+                nodes = nodes[:MAX_NODES]
+                # Filter edges to only include nodes in the result set
+                node_ids = {n['node_id'] for n in nodes}
+                edges = [e for e in edges if e['source'] in node_ids and e['target'] in node_ids]
+            elif 'query' in payload:
+                # Search mode — semantic search then auto-expand 1 hop
+                query_text = payload['query']
+                k = payload.get('k', 10)
+                type_filter = payload.get('type_filter')
+                results = g.semantic_search(query_text, k=k, type_filter=type_filter)
+                seed_ids = [nid for nid, _score in results]
+                if seed_ids:
+                    nodes, edges = g.expand_subgraph(seed_ids, max_hops=1)
+                    nodes = nodes[:MAX_NODES]
+                    node_ids = {n['node_id'] for n in nodes}
+                    edges = [e for e in edges if e['source'] in node_ids and e['target'] in node_ids]
+                else:
+                    nodes, edges = [], []
+            else:
+                nodes, edges = [], []
+
+            response = {'success': True, 'nodes': nodes, 'edges': edges}
+            query.reply(query.key_expr, json.dumps(response, default=str).encode('utf-8'))
+        except Exception as e:
+            logger.warning(f"Graph subgraph query failed: {e}")
+            query.reply(query.key_expr, json.dumps(
+                {'success': False, 'error': str(e)}).encode('utf-8'))
+
+    def _handle_graph_entities_query(self, query):
+        """Return entity index summary for the graph explorer."""
+        try:
+            ei_data = self._entity_index.to_dict()
+            # Add mention counts for sizing
+            entity_summary = []
+            for name, resource_ids in ei_data.get('index', {}).items():
+                graph_nid = ei_data.get('entity_nodes', {}).get(name, '')
+                entity_summary.append({
+                    'name': name,
+                    'mention_count': len(resource_ids),
+                    'graph_node_id': graph_nid,
+                    'resource_ids': list(resource_ids)[:20],  # cap for payload size
+                })
+            response = {
+                'success': True,
+                'entities': entity_summary,
+                'aliases': ei_data.get('aliases', {}),
+            }
+            query.reply(query.key_expr, json.dumps(response, default=str).encode('utf-8'))
+        except Exception as e:
+            logger.warning(f"Graph entities query failed: {e}")
+            query.reply(query.key_expr, json.dumps(
+                {'success': False, 'error': str(e)}).encode('utf-8'))
 
     def _record_ooda_event(self, event, oriented, action):
         """Record an OODA cycle event for the UI feed."""
