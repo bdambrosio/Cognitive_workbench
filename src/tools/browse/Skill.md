@@ -90,11 +90,34 @@ Each inner array is `[command, arg1, arg2, ...]`. Commands run sequentially; sto
 Success: `resource_id` for snapshot (Note with accessibility tree), `value` for everything else.
 Failure: `reason` with error details.
 
+## Complete Example: Extract data from a web page
+
+Step 1 — Open and snapshot (one code block):
+```python
+r1 = tool("browse", action="open", url="https://news.ycombinator.com", out="$status")
+r2 = tool("browse", action="snapshot", out="$page")
+```
+
+Step 2 — Read the snapshot, then extract using refs or eval (separate code block):
+```python
+# ALWAYS read the snapshot first to understand the page structure
+page = get_text("$page")
+# Now use eval with JavaScript based on what you see in the accessibility tree
+r = tool("browse", action="eval", expression='JSON.stringify([...document.querySelectorAll(".athing")].slice(0,5).map(el => ({title: el.querySelector(".titleline a")?.textContent, score: el.nextElementSibling?.querySelector(".score")?.textContent})))', out="$data")
+```
+
+Step 3 — Create output from extracted data:
+```python
+r = tool("create-note", value=get_text("$data"), name="my_results", out="$note")
+```
+
 ## Planning Notes
 
+- **ALWAYS read the snapshot before interacting.** Do NOT guess CSS selectors or DOM structure. The snapshot shows you the actual page structure with element refs.
 - Element refs (`@e1`, `@e2`) are only valid until the next snapshot — page changes invalidate them.
 - Always snapshot after navigation or clicks that change page state.
 - Batch deterministic sequences (open+wait+snapshot) to save steps. Keep interactive decisions as separate steps.
 - Use `get text @ref` for targeted extraction instead of re-snapshotting the whole page.
+- For `eval`, the tool auto-wraps in an IIFE if you use `const`/`let`, so variable redeclaration across steps is safe.
 - The browser session persists across steps within a goal. Call `close` when done if the page won't be needed again.
 - Requires `agent-browser` CLI installed and on PATH.

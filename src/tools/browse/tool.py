@@ -159,6 +159,9 @@ def _do_eval(kwargs, env, executor):
     expression = kwargs.get('expression', '')
     if not expression:
         return _fail(executor, "eval requires 'expression' parameter")
+    # Wrap in IIFE to avoid const redeclaration errors across persistent sessions
+    if 'const ' in expression or 'let ' in expression:
+        expression = f"(() => {{ {expression} }})()"
     result = _run(["eval", expression], env)
     if result.returncode != 0:
         return _fail(executor, f"eval failed: {(result.stderr or result.stdout)[:500]}")
