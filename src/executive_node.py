@@ -3377,10 +3377,28 @@ class ZenohExecutiveNode:
                     # Sanitize Note IDs → named references to prevent stale ID leakage
                     clean_summary = self._sanitize_note_ids(result_summary)
                     clean_goal_text = self._sanitize_note_ids(goal.get("goal_text", ""))
+                    # Derive error_class from planner signals for structured recovery
+                    error_class = ""
+                    if not success:
+                        qa = (result.get("quality_status") or "").lower()
+                        va = (result.get("verification_answer") or "").lower()
+                        if "interrupt" in (result.get("response") or "").lower():
+                            error_class = "interrupted"
+                        elif "inconclusive" in va or "partial" in va:
+                            error_class = "partial"
+                        elif qa in ("fail", "failed"):
+                            error_class = "quality_fail"
+                        elif any(w in clean_summary.lower() for w in ("timeout", "timed out")):
+                            error_class = "timeout"
+                        elif any(w in clean_summary.lower() for w in ("no results", "not found", "no relevant")):
+                            error_class = "no_results"
+                        else:
+                            error_class = "tool_failure"
                     milestone_record = {
                         "goal_text": clean_goal_text,
                         "result_summary": clean_summary,
                         "status": "completed" if success else "failed",
+                        "error_class": error_class,
                         "timestamp": datetime.now().isoformat(),
                     }
                     if wip:
@@ -3953,6 +3971,18 @@ class ZenohExecutiveNode:
                 s = s[:-3]
         return s.strip()
 
+    def _lookup_concern_context(self, concern_id: str) -> str:
+        """Return 'label — description' for a derived concern, or '' if not found."""
+        try:
+            for c in self._derived_concern_model.get_concerns():
+                if c.get("concern_id") == concern_id:
+                    label = c.get("concern_label", "")
+                    desc = c.get("concern_description", "")
+                    return f"{label} — {desc}" if desc else label
+        except Exception:
+            pass
+        return ""
+
     def _read_task_wip(self) -> Optional[Dict[str, Any]]:
         """Read the current task WIP Note content as a dict."""
         if not self.active_task_wip or not self.resource_manager:
@@ -4088,9 +4118,13 @@ class ZenohExecutiveNode:
 
         # Format milestones and findings for prompt
         milestones = wip.get("milestones_completed", [])
+        def _fmt_milestone(m):
+            status = m.get('status', '?')
+            err = m.get('error_class', '')
+            tag = f"{status}/{err}" if err else status
+            return f"- [{tag}] {m.get('goal_text', '')[:120]}: {m.get('result_summary', '')[:200]}"
         milestones_text = "None yet" if not milestones else "\n".join(
-            f"- [{m.get('status', '?')}] {m.get('goal_text', '')[:120]}: {m.get('result_summary', '')[:200]}"
-            for m in milestones
+            _fmt_milestone(m) for m in milestones
         )
         findings = wip.get("accumulated_findings", [])
         findings_text = "None yet" if not findings else "\n".join(f"- {f}" for f in findings)
@@ -4278,6 +4312,22 @@ class ZenohExecutiveNode:
             wip["current_milestone"] = goal_text[:500]
             self._update_task_wip(wip)
 
+            # 8.1: Enrich goal_text with task context for the planner
+            # (mirrors operational ## CONTEXT ## pattern)
+            context_lines = [f"Task intention: {wip.get('intention', '')[:200]}"]
+            if wip.get("linked_concern_id"):
+                # 8.2: Include concern context so planner knows *why*
+                concern_ctx = self._lookup_concern_context(wip["linked_concern_id"])
+                if concern_ctx:
+                    context_lines.append(f"Driving concern: {concern_ctx}")
+            for f in (wip.get("accumulated_findings") or [])[-5:]:
+                context_lines.append(f"- {f[:200]}")
+            for m in milestones[-3:]:
+                status = m.get("status", "?")
+                summary = m.get("result_summary", "")[:150]
+                context_lines.append(f"- [{status}] {m.get('goal_text', '')[:100]}: {summary}")
+            goal_text = f"{goal_text}\n\n## CONTEXT ##\n" + "\n".join(context_lines)
+
             # --- Fix A: Direct ask for specification phase ---
             # If the goal is purely "ask the user clarifying questions" during
             # specification, skip the full planner and issue the ask directly.
@@ -4326,9 +4376,9 @@ class ZenohExecutiveNode:
             self._run_goal_on_thread(_run_milestone_goal)
 
         elif action == "FALL_BACK":
-            # Remove last milestone and revert phase
+            # Mark last milestone as fell_back (preserve it for context) and revert phase
             if milestones:
-                wip["milestones_completed"] = milestones[:-1]
+                milestones[-1]["status"] = "fell_back"
             wip["phase"] = new_phase
             wip["accumulated_findings"].append(f"Fell back: {goal_text[:200]}")
             self._update_task_wip(wip)
@@ -4801,8 +4851,8 @@ class ZenohExecutiveNode:
         success = result.get('success', False)
         response = result.get('response', '') or result.get('text', '') or ''
         if not response and isinstance(result, dict):
-            response = result.get('primary_product', '') or str(result)[:500]
-        clean_response = self._sanitize_note_ids(str(response)[:500])
+            response = result.get('primary_product', '') or str(result)[:1200]
+        clean_response = self._sanitize_note_ids(str(response)[:1200])
 
         goal_text = wip.get("current_milestone", "")
         success_criteria = wip.get("_current_success_criteria", "")
@@ -4816,7 +4866,7 @@ class ZenohExecutiveNode:
                 goal_text=goal_text[:300],
                 success_criteria=success_criteria[:200],
                 status=status_str,
-                result_summary=clean_response[:400],
+                result_summary=clean_response[:800],
             )
             with self.infospace_executor.turn_metrics.perf_phase("task_reflect"):
                 refl_resp = self.llm_generate([refl_prompt], max_tokens=712, temperature=0.2, stops=['</end>'])
