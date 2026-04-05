@@ -82,21 +82,32 @@ Rules:
 - Defer is fine — not everything needs immediate action.
 - Keep reasons to one sentence.
 
-CRITICAL — task_intention scope:
-Tasks go through an establishment phase (setting up tools, sensors, infrastructure) \
-and then run as RECURRING operational cycles on a cooldown. The task_intention you \
-write becomes the fixed anchor for all future cycles — it must describe a REPEATABLE \
-activity, not a one-shot action.
+CRITICAL — task_intention as comprehensive spec:
+The task_intention you write is the COMPLETE specification for the task. There is no \
+acquisition or refinement phase — the task goes directly to execution. The intention \
+must be detailed enough that an agent can execute it without asking clarifying questions.
+
+Include in the task_intention:
+- WHAT to do (concrete actions, not vague descriptions)
+- WHERE to look (specific sources, URLs, tools to use)
+- WHAT to produce (expected output format — a Note, a summary, a report)
+- HOW to evaluate success (what constitutes a useful result)
+
+The task is ONE-SHOT — it addresses the concern's current state. If the concern \
+resurfaces later, a fresh task will be created with updated context.
 
 Good task_intention examples:
-- "Monitor the user's Substack RSS feed for new posts and summarize notable ones"
-- "Periodically check Berkeley weather forecast and report significant changes"
-- "Track ArXiv papers on constitutional AI, filter for relevance, update reading list"
+- "Search the web for the latest status of [specific topic], extract key developments \
+since [date], and create a Note summarizing findings with source URLs"
+- "Check Berkeley weather forecast for the next 3 days using search-web, create a Note \
+with temperature ranges and precipitation probability, flag any severe weather alerts"
+- "Review the RSS feed sensor data for new ArXiv papers mentioning 'constitutional AI', \
+extract titles and abstracts, and add a summary Note to the reading_list collection"
 
 Bad task_intention examples (DO NOT write these):
-- "Tell the user about today's weather" — one-shot, not recurring
-- "Attend to user needs" — too vague, cannot be established or evaluated
-- "Search the web for X and report" — describes a single goal, not a recurring task
+- "Monitor weather" — too vague, no specific actions or outputs
+- "Attend to user needs" — not actionable
+- "Check on things" — meaningless without specifics
 """
 
 

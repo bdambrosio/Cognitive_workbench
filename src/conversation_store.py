@@ -330,6 +330,7 @@ class ConversationStore:
                 "note_id": note_id,
                 "content": content if isinstance(content, str) else str(content),
                 "concern_id": props.get("concern_id"),
+                "goal_id": props.get("goal_id"),
                 "timestamp": props.get("timestamp", props.get("created_at", "")),
             })
         return entries
@@ -340,6 +341,14 @@ class ConversationStore:
         if not resource:
             return False
         resource.get("properties", {})["concern_id"] = concern_id
+        return True
+
+    def tag_note_goal(self, note_id: str, goal_id: str) -> bool:
+        """Tag a note with a goal_id in its properties."""
+        resource = self.resource_manager.get_resource(note_id)
+        if not resource:
+            return False
+        resource.get("properties", {})["goal_id"] = goal_id
         return True
 
     def get_themed_context(self, concerns: List[Dict], max_total_chars: int = 3000) -> str:
@@ -441,12 +450,15 @@ class ConversationStore:
                     for h in history_notes[:backfill_count]:
                         content = h.get("content", "")
                         if content and len(content) > 20:
-                            prior_summaries.append({
+                            entry = {
                                 "source": "prior_session",
                                 "text": content[:500],
                                 "timestamp": h.get("timestamp", ""),
                                 "note_id": h.get("note_id", ""),
-                            })
+                            }
+                            if h.get("goal_id"):
+                                entry["goal_id"] = h["goal_id"]
+                            prior_summaries.append(entry)
             except Exception:
                 pass
 

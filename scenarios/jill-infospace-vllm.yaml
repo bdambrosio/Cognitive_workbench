@@ -4,7 +4,7 @@ world_config:
   world_name: "infolab"
 
 llm_config:
-  vllm_model_path: "txn545/Qwen3.5-122B-A10B-NVFP4" #unsloth/Qwen3-Coder-Next-FP8" #Qwen/Qwen3-Next-80B-A3B-Instruct-FP8"
+  vllm_model_path: "google/gemma-4-31B-it" #unsloth/Qwen3-Coder-Next-FP8" #Qwen/Qwen3-Next-80B-A3B-Instruct-FP8"
   #vllm_url: "http://192.168.1.100:5000"  # remote vLLM server (default: http://localhost:5000)
   extra_request_params:
     #reasoning:

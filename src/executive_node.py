@@ -82,8 +82,8 @@ def _is_goal_cmd(s):
 @dataclass
 class EventPacket:
     """Structured event produced by Observe stage."""
-    event_type: str          # 'user_text', 'sensor_event'
-    classification: str      # 'chat', 'alert', 'trigger', 'ask_reply', 'agent_message'
+    event_type: str          # 'user_text', 'sensor_event', 'timer'
+    classification: str      # 'chat', 'alert', 'trigger', 'inform', 'timer', 'ask_reply', 'agent_message'
     content: str
     source: str
     raw_sense_data: dict
@@ -1163,6 +1163,10 @@ class ZenohExecutiveNode:
         self._last_character_eval: Optional[Dict[str, Any]] = None
         self._character_concern_activations: Dict[str, float] = {}
 
+        # Periodic orientation timer (30s wall-clock)
+        self._orient_timer_interval: float = 30.0
+        self._last_orient_timer: float = time.monotonic()
+
         # Tier 2 Decide: proactive remark suppression
         self._last_proactive_remark_at: float = 0.0
         self._proactive_remark_cooldown: float = 180.0  # seconds
@@ -1709,11 +1713,13 @@ class ZenohExecutiveNode:
         self._ooda_living_state.update_after_act(action)
 
         # Emit per-turn latency summary (non-goal turns; goal turns emit in parse_and_set_goal)
+        # Suppress CLI echo for timer ticks — log only.
         if self.infospace_executor and action.type != 'dispatch_goal':
             if self.infospace_executor.turn_metrics.llm_calls:
                 _perf = self.infospace_executor.turn_metrics.summary()
                 logger.info(_perf)
-                print(_perf, flush=True)
+                if event.classification != 'timer':
+                    print(_perf, flush=True)
         self._ooda_living_state.maybe_persist(
             self._write_named_note, self._derived_concern_model.get_concerns(),
             planner_summary=self._get_planner_summary())
@@ -2140,18 +2146,12 @@ class ZenohExecutiveNode:
             logger.info(f'📋 Task recovery: {recovered} stalled establishing task(s) marked interrupted')
 
     def _approve_proposed_task(self, note_name: str, edited_intention: str = ''):
-        """Approve a proposed task, transitioning it to establishing.
+        """Approve a proposed task, transitioning it directly to operational state.
 
+        Acquisition and establishment phases are skipped — the task intention
+        (from triage or user edit) serves as the comprehensive spec.
         Called from the task manager UI via Zenoh control endpoint.
         """
-        # Guard: don't approve while another task is actively establishing
-        if self.active_task_wip:
-            logger.warning(f'Task approve: cannot approve {note_name} — '
-                           f'{self.active_task_wip} is currently establishing')
-            self._say_to_user(
-                f"Cannot approve task now — another task is currently establishing. "
-                f"Wait for it to complete or abandon it first.")
-            return
         if not self.resource_manager:
             return
         note_id = self.resource_manager.named_notes.get(note_name)
@@ -2172,31 +2172,42 @@ class ZenohExecutiveNode:
         if edited_intention:
             content['intention'] = edited_intention
 
-        # Triage-originated tasks skip specification — the triage already
-        # provided a concrete intention, there's nothing to ask the user.
-        # We inject a synthetic completed milestone so the advance LLM sees
-        # specification as done and doesn't try to ask questions.
-        if content.get('linked_concern_id'):
-            start_phase = 'capability_evaluation'
-            content['milestones_completed'] = [{
-                'goal_text': 'Specification pre-satisfied by triage (autonomous task)',
-                'result_summary': (
-                    f'Task intention provided by concern triage: {content.get("intention", "")[:200]}. '
-                    f'No user clarification needed — proceed with capability evaluation.'
-                ),
-                'status': 'completed',
-                'timestamp': datetime.now().isoformat(),
-            }]
-            content['accumulated_findings'] = [
-                f'Specification: {content.get("intention", "")[:300]} (from triage, no user input needed)',
-            ]
-        else:
-            start_phase = 'specification'
+        now = datetime.now().isoformat()
 
-        # Transition to establishing — the main loop will pick it up
-        content['status'] = 'in_progress'
-        content['phase'] = start_phase
-        content['updated'] = datetime.now().isoformat()
+        # Determine cooldown based on task origin
+        cooldown = 10  # default for user-initiated
+        if content.get("linked_concern_id"):
+            try:
+                for c in self._derived_concern_model.get_concerns():
+                    if c.get("concern_id") == content.get("linked_concern_id"):
+                        if c.get("seeded"):
+                            label = c.get("concern_label", "")
+                            if "knowledge" in label.lower() or "improvement" in label.lower():
+                                cooldown = 7200
+                            else:
+                                cooldown = 3600
+                        else:
+                            cooldown = 1800
+                        break
+            except Exception:
+                pass
+
+        # Transition directly to operational state — skip establishment
+        content['status'] = 'active'
+        content['phase'] = 'complete'
+        content['updated'] = now
+        content['lifecycle'] = 'operational'
+        content['completion_summary'] = 'Direct to operational — no establishment phase'
+        content['establishment_milestones'] = []
+        content['establishment_findings'] = []
+        content['execution_history'] = []
+        content['last_executed'] = None
+        content['execution_count'] = 0
+        content['cooldown_seconds'] = cooldown
+        content['cycle_state'] = 'idle'
+        content['cycle_goals_completed'] = []
+        content['cycle_findings'] = []
+
         self.infospace_executor.execute_action({
             "type": "create-note",
             "value": json.dumps(content),
@@ -2208,14 +2219,8 @@ class ZenohExecutiveNode:
             "target": f"${note_name}",
             "name": note_name,
         })
-        # Activate the WIP so the main loop picks it up
-        self.active_task_wip = note_name
-        self.active_task_wip_waiting = False
-        self._task_wip_pre_resource_ids = set(
-            self.resource_manager.resource_registry.keys()
-        ) if self.resource_manager else set()
-        logger.info(f'📋 Task approved: {note_name} — "{content["intention"][:80]}"')
-        self._say_to_user(f'Task approved and establishing: {content["intention"][:200]}')
+        logger.info(f'📋 Task approved (operational): {note_name} — "{content["intention"][:80]}"')
+        self._say_to_user(f'Task approved: {content["intention"][:200]}\nReady for execution.')
 
     def _abandon_task(self, note_name: str, reason: str = ''):
         """Abandon a task at any lifecycle stage. Triggers distillation if there's work to learn from."""
@@ -3960,7 +3965,12 @@ class ZenohExecutiveNode:
     _TASK_EXECUTION_HISTORY_MAX = 20  # ring buffer size for operational task execution history
 
     def _begin_task_establishment(self, user_text: str):
-        """Create a task WIP Note and start the milestone loop."""
+        """Create a task WIP Note and transition directly to operational state.
+
+        Acquisition and establishment phases are skipped — the task intention
+        serves as the comprehensive spec.  The operational tick loop manages
+        multi-goal execution from here.
+        """
         self._task_wip_counter += 1
         wip_id = f"twip_{self._task_wip_counter}"
         note_name = f"_task_wip_{self._task_wip_counter}"
@@ -3968,13 +3978,25 @@ class ZenohExecutiveNode:
         wip_content = {
             "task_wip_id": wip_id,
             "intention": user_text,
-            "status": "in_progress",
-            "phase": "specification",
+            "status": "active",
+            "phase": "complete",
             "milestones_completed": [],
             "current_milestone": None,
             "accumulated_findings": [],
             "created": now,
             "updated": now,
+            # Operational lifecycle fields
+            "lifecycle": "operational",
+            "completion_summary": "Direct to operational — no establishment phase",
+            "establishment_milestones": [],
+            "establishment_findings": [],
+            "execution_history": [],
+            "last_executed": None,
+            "execution_count": 0,
+            "cooldown_seconds": 10,  # immediate first run
+            "cycle_state": "idle",
+            "cycle_goals_completed": [],
+            "cycle_findings": [],
         }
         # Create and persist the WIP Note
         self.infospace_executor.execute_action({
@@ -3988,14 +4010,11 @@ class ZenohExecutiveNode:
             "target": f"${note_name}",
             "name": note_name,
         })
-        self.active_task_wip = note_name
+        # No active_task_wip — we're not establishing, the tick loop handles it
+        self.active_task_wip = None
         self.active_task_wip_waiting = False
-        # Snapshot resource IDs so we can clean up establishment artifacts later
-        self._task_wip_pre_resource_ids = set(
-            self.resource_manager.resource_registry.keys()
-        ) if self.resource_manager else set()
-        logger.info(f'📋 Task WIP created: {note_name} — "{user_text[:80]}"')
-        self._say_to_user(f"Task received. Beginning establishment for: {user_text[:200]}")
+        logger.info(f'📋 Task created (operational): {note_name} — "{user_text[:80]}"')
+        self._say_to_user(f"Task created: {user_text[:200]}\nReady for execution.")
 
     @staticmethod
     def _extract_json(text: str) -> str:
@@ -4503,12 +4522,11 @@ class ZenohExecutiveNode:
     # ── Operational task execution (round-robin dispatch) ────────────────
 
     _OPERATIONAL_TASK_PROMPT = (
-        "You are executing one cycle of a RECURRING autonomous task.\n"
-        "This task runs periodically. Even if prior cycles completed successfully,\n"
-        "you MUST perform the work again — conditions change between runs.\n"
-        "Prior success does NOT mean the task is done; it means it was done THEN.\n\n"
+        "You are executing an autonomous task. The task intention is your complete spec.\n"
+        "Break the work into focused goals, executing them one at a time.\n"
+        "When the task objective is fully achieved, respond with CYCLE_DONE.\n\n"
         "TASK INTENTION:\n{intention}\n\n"
-        "ESTABLISHMENT CONTEXT (what was learned during setup):\n{establishment_findings}\n\n"
+        "PRIOR FINDINGS (from earlier goals in this task):\n{establishment_findings}\n\n"
         "CURRENT TIME: {current_time}\n"
         "LAST ACTUAL WORK: {last_work_time}\n\n"
         "THIS CYCLE — GOALS COMPLETED:\n{cycle_goals}\n\n"
@@ -4552,11 +4570,6 @@ class ZenohExecutiveNode:
     def _select_next_task(self) -> Optional[Dict[str, Any]]:
         """Select the next eligible operational task for execution (round-robin by staleness)."""
         try:
-            # Check autonomy budget
-            if hasattr(self, 'goal_scheduler') and self.goal_scheduler.budget_remaining() <= 0:
-                logger.debug('Task selection: autonomy budget exhausted')
-                return None
-
             active_tasks = [
                 t for t in self._get_all_task_data()
                 if t.get("status") == "active"
@@ -4565,9 +4578,18 @@ class ZenohExecutiveNode:
             if not active_tasks:
                 return None
 
+            # Check autonomy budget — only applies to concern-initiated tasks.
+            # User-initiated tasks (no linked_concern_id) bypass the budget.
+            budget_exhausted = (
+                hasattr(self, 'goal_scheduler')
+                and self.goal_scheduler.budget_remaining() <= 0
+            )
+
             now_ts = time.time()
             eligible = []
             for t in active_tasks:
+                if budget_exhausted and t.get("linked_concern_id"):
+                    continue  # Skip autonomous tasks when budget is exhausted
                 cycle_state = t.get("cycle_state", "idle")
                 if cycle_state == "running":
                     eligible.append(t)
@@ -4996,26 +5018,33 @@ class ZenohExecutiveNode:
         wip["_last_reflection"] = {}
         wip["_cycle_stall_sig"] = ""
         wip["_cycle_stall_count"] = 0
-        # H1: Satisfy driving concern when cycle succeeds
-        if achieved_count > 0 and wip.get("linked_concern_id"):
+
+        # Tasks are one-shot: mark completed after cycle finishes.
+        # The concern's revisit mechanism handles recurrence — when the
+        # concern reactivates, triage will create a fresh task.
+        wip["status"] = "completed"
+        wip["cycle_state"] = "done"
+
+        # Satisfy driving concern when cycle succeeds
+        if wip.get("linked_concern_id"):
             try:
-                cooldown_h = max(1, wip.get("cooldown_seconds", 3600) / 3600)
                 self._derived_concern_model._apply_patch({
                     "op": "satisfy_concern",
                     "concern_id": wip["linked_concern_id"],
                     "field_updates": {
-                        "status_rationale": f"Task cycle completed ({achieved_count} goals achieved)",
-                        "revisit_hours": cooldown_h,
+                        "status_rationale": f"Task completed ({achieved_count} goals achieved): {summary[:100]}",
+                        "revisit_hours": 24,  # default revisit; concern model decides when to resurface
                     },
                 }, f"task_cycle:{note_name}")
                 self._derived_concern_model._save()
             except Exception as e:
-                logger.debug(f"Concern satisfaction after task cycle failed: {e}")
+                logger.debug(f"Concern satisfaction after task completion failed: {e}")
+
         self._write_operational_task(note_name, note_id, wip)
         self._operational_task_note = None
         self._operational_goal_waiting = False
         logger.info(
-            f'📋 Task {note_name}: cycle #{wip["execution_count"]} complete '
+            f'📋 Task {note_name}: completed '
             f'({achieved_count}/{len(cycle_goals)} goals achieved) — {summary[:80]}')
 
     def _complete_task_wip(self, wip: Dict[str, Any], summary: str):
@@ -5206,10 +5235,21 @@ class ZenohExecutiveNode:
                     text_preview = str(entry['text'])[:200]
                     recent_turns += f"{entry['source']}: {text_preview}\n"
         # Prepend prior session summaries if available (oldest first for chronological order)
+        # Filter out summaries tagged with goal_ids of completed/failed goals
         prior_summaries = entity_data.get('prior_session_summaries', []) if entity_data else []
         if prior_summaries:
+            done_goal_ids = set()
+            try:
+                for g in self._all_scheduled_goals():
+                    if g.get('status') in ('completed', 'failed'):
+                        done_goal_ids.add(g.get('goal_id', ''))
+                done_goal_ids.discard('')
+            except Exception:
+                pass
             prior_block = "PRIOR SESSIONS:\n"
             for ps in reversed(prior_summaries):
+                if ps.get('goal_id') and ps['goal_id'] in done_goal_ids:
+                    continue  # Skip summaries from completed goals
                 prior_block += f"  [session summary] {ps['text'][:300]}\n"
             recent_turns = prior_block + "\n" + recent_turns
 
@@ -5699,6 +5739,12 @@ class ZenohExecutiveNode:
 
                     # Check if this concern needs second-level rollup
                     self._maybe_rollup_concern_history(affected_concern_id)
+
+                # Tag with goal_id if a goal was active during this dialog
+                active_goal_id = getattr(self, '_active_scheduled_goal_id', None)
+                if active_goal_id and summary_note_id:
+                    self.conversation_store.tag_note_goal(summary_note_id, active_goal_id)
+                    logger.info(f'  Tagged {summary_note_id} with goal {active_goal_id}')
             else:
                 logger.warning(f'Failed to add dialog summary to conversation_history: {add_result.get("reason", "unknown")}')
 
@@ -6696,12 +6742,10 @@ class ZenohExecutiveNode:
         intention = (data.get('intention') or '').strip()
         if not intention:
             return 'Usage: /task add <intention>'
-        if self.active_task_wip:
-            return 'A task is already being established. Wait for it to complete.'
         if self._is_goal_running():
             return 'A goal is running. Wait for it to complete before starting a task.'
         self._begin_task_establishment(intention)
-        return f"Task creation started: {intention[:80]}"
+        return f"Task created: {intention[:80]}"
 
     def _cmd_task_propose(self, data: dict) -> str:
         source = data.get('source', 'User')
@@ -7143,8 +7187,29 @@ class ZenohExecutiveNode:
                 is_reaction=True,
             )
 
-        # Priority 3: text input queue
+        # Priority 3: sensor inform (context that Orient should assess)
+        if self._sensor_inform_queue:
+            entry = self._sensor_inform_queue.pop(0)
+            return EventPacket(
+                event_type='sensor_event', classification='inform',
+                content=entry.get('content', ''), source=f"sensor:{entry.get('sensor_name', 'unknown')}",
+                raw_sense_data=entry,
+            )
+
+        # Priority 4: text input queue
         if not self.text_input_queue:
+            # Priority 5: periodic orientation timer — only when truly idle
+            # (no goal running, no queued input). During goals or chat,
+            # Orient gets events through the normal paths.
+            if not self._is_goal_running():
+                now = time.monotonic()
+                if (now - self._last_orient_timer) >= self._orient_timer_interval:
+                    self._last_orient_timer = now
+                    return EventPacket(
+                        event_type='timer', classification='timer',
+                        content='periodic orientation tick',
+                        source='internal', raw_sense_data={},
+                    )
             return None
 
         sense_data = self.text_input_queue[0]
@@ -7251,8 +7316,24 @@ class ZenohExecutiveNode:
 
         return OrientedEvent(event=event, assessment=assessment)
 
+    def _get_concern_weight(self, concern_id: str) -> float:
+        """Look up a concern's weight. Derived concerns use their stored weight;
+        fixed character concerns default to 0.5."""
+        try:
+            for c in self._derived_concern_model.get_concerns():
+                if c.get('concern_id') == concern_id:
+                    return float(c.get('weight', 0.5))
+        except Exception:
+            pass
+        # Fixed character concerns (homeostasis, attend_to_user, etc.)
+        return 0.5
+
     def _update_character_concern_activations(self, assessment: Dict[str, Any]):
-        """Update running character concern activation levels from assessment."""
+        """Update running character concern activation levels from assessment.
+
+        Bump magnitude is scaled by concern weight: bump * (1 + weight).
+        A weight=1.0 concern gets 2x the bump; weight=0 gets 1x.
+        """
         DECAY = 0.9
         BUMP = {'strong': 0.3, 'moderate': 0.15, 'weak': 0.05, 'none': 0.0}
         notes = assessment.get('notes', '')
@@ -7273,7 +7354,8 @@ class ZenohExecutiveNode:
                         cid = cid.strip()
                         level = level.strip()
                         old = self._character_concern_activations.get(cid, 0.0)
-                        new_val = old * DECAY + BUMP.get(level, 0.0)
+                        weight = self._get_concern_weight(cid)
+                        new_val = old * DECAY + BUMP.get(level, 0.0) * (1.0 + weight)
                         self._character_concern_activations[cid] = new_val
                         # ── Graph: concern change ──
                         if abs(new_val - old) >= self._cognitive_graph._config.get("concern_change_threshold", 0.05):
@@ -7325,7 +7407,8 @@ class ZenohExecutiveNode:
         """DECIDE: Pure routing — map classification to Action. No LLM calls.
 
         After the command registry refactor, only these classifications arrive
-        from observe: ask_reply, alert, trigger, agent_message, chat.
+        from observe: ask_reply, alert, trigger, inform, timer, agent_message, chat.
+        inform and timer fall through Tier 1 to Tier 2 (Orient-driven decision).
         All imperative operations go through _dispatch_command() instead.
         """
         evt = oriented.event
@@ -8478,6 +8561,37 @@ class ZenohExecutiveNode:
             character_context = system_prompt  # Character description + drives
             self_entity_context = self.get_entity_context(self.character_name, 10)
             recent_context = ""
+
+            # Authoritative goal state — overrides any stale references in
+            # conversation history below.
+            recent_context += "\n# CURRENT GOAL STATE (authoritative — supersedes conversation history):\n"
+            try:
+                all_goals = list(self._all_scheduled_goals())
+                active = [g for g in all_goals if g.get('status') in ('ready', 'running')]
+                done = [g for g in all_goals if g.get('status') in ('completed', 'failed')]
+                if active:
+                    for g in active:
+                        recent_context += f"  ACTIVE: {g.get('name', g.get('goal_text', '?'))} [{g.get('status')}]\n"
+                else:
+                    recent_context += "  No active goals.\n"
+                if done:
+                    for g in done[-3:]:
+                        name = g.get('name', g.get('goal_text', '?'))
+                        recent_context += f"  DONE: {name} [{g.get('status')}]\n"
+            except Exception:
+                recent_context += "  (goal state unavailable)\n"
+
+            # Build set of done goal names for filtering stale history entries
+            _done_goal_names = set()
+            try:
+                for g in self._all_scheduled_goals():
+                    if g.get('status') in ('completed', 'failed'):
+                        _done_goal_names.add(g.get('name', ''))
+                        _done_goal_names.add(g.get('goal_text', ''))
+                _done_goal_names.discard('')
+            except Exception:
+                pass
+
             if self_entity_context and self_entity_context.get('conversation_history'):
                 recent_context += "\n# Recent thoughts:\n"
                 for memory in self_entity_context['conversation_history'][:3]:  # Last 3
