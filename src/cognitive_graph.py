@@ -581,6 +581,19 @@ class CognitiveGraph:
                 summary += " Key: " + " | ".join(top_content)
             summary = summary[:self._max_content]
 
+            # Collect entity nodes linked from nodes about to be removed,
+            # so we can conditionally re-link them to the consolidation node.
+            entity_targets = set()
+            with self._lock:
+                for nid, _ in entries:
+                    for eid in self._edges_from.get(nid, []):
+                        edge = self._edges.get(eid)
+                        if edge and edge.get("type") == "mentions":
+                            target = edge["target"]
+                            target_node = self._nodes.get(target)
+                            if target_node and target_node.get("type") == "entity":
+                                entity_targets.add(target)
+
             # Create consolidation node
             con_nid = self.add_node("consolidation", summary,
                 attrs={
@@ -590,15 +603,51 @@ class CognitiveGraph:
                     "node_types_summary": type_counts,
                 })
 
-            # Prune original nodes
+            # Prune original nodes (this deletes their edges to entities)
             node_ids_to_remove = [nid for nid, _ in entries]
             with self._lock:
                 for nid in node_ids_to_remove:
                     self._remove_node_locked(nid)
             total_consolidated += len(entries)
 
+            # Transfer entity edges: only if the entity name appears in the
+            # consolidation summary. Entities not mentioned in the summary
+            # weren't significant enough to survive compression.
+            summary_lower = summary.lower()
+            for entity_nid in entity_targets:
+                entity_node = self.get_node(entity_nid)
+                if not entity_node:
+                    continue
+                # Check entity content (display name) and canonical name
+                entity_content = (entity_node.get("content") or "").lower()
+                entity_canonical = (entity_node.get("attrs", {}).get("canonical") or "").lower()
+                if entity_content in summary_lower or entity_canonical in summary_lower:
+                    try:
+                        self.add_edge(con_nid, entity_nid, "mentions")
+                    except (KeyError, Exception):
+                        pass
+
+        # Sweep orphaned entity nodes — no incoming or outgoing edges.
+        # These entities were not significant enough to be mentioned in any
+        # consolidation summary and have lost all connections.
+        orphaned_entities = []  # [(node_id, canonical_name)]
         if total_consolidated:
+            with self._lock:
+                for nid, node in list(self._nodes.items()):
+                    if node.get("type") != "entity":
+                        continue
+                    has_edges = (
+                        bool(self._edges_from.get(nid))
+                        or bool(self._edges_to.get(nid))
+                    )
+                    if not has_edges:
+                        canonical = node.get("attrs", {}).get("canonical", "")
+                        orphaned_entities.append((nid, canonical))
+                        self._remove_node_locked(nid)
+            if orphaned_entities:
+                logger.info("Removed %d orphaned entity nodes after consolidation", len(orphaned_entities))
             logger.info("Consolidated %d nodes into summary nodes", total_consolidated)
+        self._orphaned_entities = orphaned_entities  # Expose for caller cleanup
         return total_consolidated
 
     # ------------------------------------------------------------------

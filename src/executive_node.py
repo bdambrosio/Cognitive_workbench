@@ -1751,6 +1751,13 @@ class ZenohExecutiveNode:
         try:
             if not self._is_goal_running():
                 self._cognitive_graph.consolidate()
+                # Clean up entity index for orphaned entities removed during consolidation
+                orphaned = getattr(self._cognitive_graph, '_orphaned_entities', [])
+                if orphaned:
+                    for _, canonical in orphaned:
+                        if canonical:
+                            self._entity_index._entity_nodes.pop(canonical, None)
+                    logger.info(f"🏷 Cleaned {len(orphaned)} orphaned entities from entity index")
             if self._cognitive_graph_path:
                 self._cognitive_graph.save(self._cognitive_graph_path)
         except Exception as e:
