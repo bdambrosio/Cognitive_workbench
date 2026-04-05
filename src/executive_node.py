@@ -4535,7 +4535,9 @@ class ZenohExecutiveNode:
         "RULES:\n"
         "- Each goal should be a single, focused operation.\n"
         "- Reference notes by NAME, never by Note ID.\n"
-        "- When a prior goal produced a named note, mention it by name so the next goal can load it.\n"
+        "- When a prior goal produced a named Note, reference it by name in the next goal\n"
+        "  so the planner can load it. DO NOT re-search or re-fetch data that is already\n"
+        "  available in a prior goal's result summary or named artifact.\n"
         "- Do not repeat work already done in THIS cycle.\n"
         "- You MUST submit at least one goal per cycle. CYCLE_DONE is only valid AFTER\n"
         "  at least one goal has been completed in this cycle.\n"
@@ -4705,11 +4707,18 @@ class ZenohExecutiveNode:
         stall_sig = wip.get("_cycle_stall_sig", "")
         stall_count = wip.get("_cycle_stall_count", 0)
 
-        # Format prompt context — include reflection verdict if available
+        # Format prompt context — include result summaries and artifact refs
+        def _fmt_cycle_goal(g):
+            line = f"- [{g.get('status', '?')}] {g.get('goal_text', '')[:150]}"
+            if g.get('reflection_achieved'):
+                line += f" (ACHIEVED: {g['reflection_achieved']})"
+            if g.get('primary_product_name'):
+                line += f"\n  → Created persistent Note \"{g['primary_product_name']}\" (available via load)"
+            if g.get('result_summary'):
+                line += f"\n  Result: {g['result_summary'][:400]}"
+            return line
         cycle_goals_text = "None yet" if not cycle_goals else "\n".join(
-            f"- [{g.get('status', '?')}] {g.get('goal_text', '')[:150]}"
-            f"{' (ACHIEVED: ' + g.get('reflection_achieved', '?') + ')' if g.get('reflection_achieved') else ''}"
-            for g in cycle_goals
+            _fmt_cycle_goal(g) for g in cycle_goals
         )
         cycle_findings = wip.get("cycle_findings", [])
         cycle_findings_text = "None yet" if not cycle_findings else "\n".join(
@@ -4817,19 +4826,28 @@ class ZenohExecutiveNode:
             self._write_operational_task(task_note_name, note_id, wip)
 
             # Append cycle context so the planner knows what prior goals produced
+            # and can reference persistent artifacts by name instead of re-doing work.
             if cycle_goals:
                 context_lines = []
+                artifact_lines = []
                 for g in cycle_goals:
-                    summary = g.get('result_summary', '')[:200]
+                    summary = g.get('result_summary', '')[:400]
                     g_text = g.get('goal_text', '')[:100]
                     if summary:
                         context_lines.append(f"- [{g.get('status', '?')}] {g_text}\n  Result: {summary}")
+                    if g.get('primary_product_name'):
+                        artifact_lines.append(
+                            f"- \"{g['primary_product_name']}\" — created by prior goal, load with: "
+                            f"tool(\"load\", target=\"{g['primary_product_name']}\")")
+                ctx_parts = []
                 if context_lines:
-                    goal_text = (
-                        f"{goal_text}\n\n## CONTEXT ##\n"
-                        f"Prior goals completed in this cycle:\n"
-                        + "\n".join(context_lines)
-                    )
+                    ctx_parts.append("Prior goals completed in this cycle:\n" + "\n".join(context_lines))
+                if artifact_lines:
+                    ctx_parts.append(
+                        "AVAILABLE ARTIFACTS (persistent Notes from prior goals — use these, do NOT redo the work):\n"
+                        + "\n".join(artifact_lines))
+                if ctx_parts:
+                    goal_text = f"{goal_text}\n\n## CONTEXT ##\n" + "\n\n".join(ctx_parts)
 
             # Run goal on thread
             pre_resource_ids = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
@@ -4955,15 +4973,26 @@ class ZenohExecutiveNode:
             f'evidence="{reflection["evidence"][:60]}"')
 
         # ── Record goal with reflection ──────────────────────────────────
+        # Resolve primary_product to a persistent named Note if possible
+        primary_product_id = result.get('primary_product', '')
+        primary_product_name = ''
+        if primary_product_id and self.resource_manager:
+            for name, nid in self.resource_manager.named_notes.items():
+                if nid == primary_product_id and not name.startswith('_'):
+                    primary_product_name = name
+                    break
+
         goal_record = {
             "goal_text": goal_text[:200],
-            "result_summary": clean_response[:300],
+            "result_summary": clean_response[:800],
             "status": status_str,
             "timestamp": datetime.now().isoformat(),
             "success_criteria": success_criteria[:200],
             "reflection_achieved": reflection["achieved"],
             "reflection_next": reflection["next"],
         }
+        if primary_product_name:
+            goal_record["primary_product_name"] = primary_product_name
         wip.setdefault("cycle_goals_completed", []).append(goal_record)
 
         # Add reflection evidence as a finding (more useful than raw summary)
