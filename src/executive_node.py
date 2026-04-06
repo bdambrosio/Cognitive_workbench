@@ -83,12 +83,13 @@ def _is_goal_cmd(s):
 class EventPacket:
     """Structured event produced by Observe stage."""
     event_type: str          # 'user_text', 'sensor_event', 'timer'
-    classification: str      # 'chat', 'alert', 'trigger', 'inform', 'timer', 'ask_reply', 'agent_message'
+    classification: str      # 'chat', 'alert', 'trigger', 'trigger_task', 'inform', 'timer', 'ask_reply', 'agent_message'
     content: str
     source: str
     raw_sense_data: dict
     goal_id: Optional[str] = None
     goal_name: Optional[str] = None
+    task_template: Optional[str] = None
     close_flag: bool = False
     is_reaction: bool = False
 
@@ -409,6 +410,7 @@ class ZenohExecutiveNode:
         # subscriber is declared, because sensor callbacks can fire immediately.
         self._sensor_alert_queue: list = []    # disposition='alert' — high priority
         self._sensor_trigger_queue: list = []  # disposition='trigger:X' — goal dispatch
+        self._sensor_trigger_task_queue: list = []  # disposition='trigger-task:X' — task dispatch
         self._sensor_inform_queue: list = []   # disposition='inform' — rolling context (last 10)
 
         # Subscriber for sense data (character-specific)
@@ -1625,6 +1627,9 @@ class ZenohExecutiveNode:
             if self._operational_goal_waiting and self._operational_task_note:
                 self._record_operational_goal_result()
                 self._operational_goal_waiting = False
+            # Clear scheduler executing_goal_id so /status doesn't show a phantom goal
+            if hasattr(self, 'goal_scheduler') and self.goal_scheduler._executing_goal_id is not None:
+                self.goal_scheduler._executing_goal_id = None
             self.execution_paused = True
             self.execution_mode = 'step'
             self._publish_execution_state()
@@ -1862,7 +1867,7 @@ class ZenohExecutiveNode:
                     agent_context=context,
                     llm_generate=self.llm_generate,
                 )
-                self._handle_triage_decisions(decisions)
+                # self._handle_triage_decisions(decisions)  # disabled: concern→task initiation
             except Exception as e:
                 logger.warning(f'Triage execution failed: {e}', exc_info=True)
 
@@ -2263,6 +2268,10 @@ class ZenohExecutiveNode:
             self.active_task_wip = None
             self.active_task_wip_waiting = False
             self._task_wip_pre_resource_ids = None
+        # Clear operational goal state if this task's goal is running
+        if self._operational_task_note == note_name:
+            self._operational_task_note = None
+            self._operational_goal_waiting = False
         logger.info(f'📋 Task abandoned: {note_name} (was {old_status})')
         self._say_to_user(f'Task abandoned: {content.get("intention", "")[:200]}')
 
@@ -3281,16 +3290,14 @@ class ZenohExecutiveNode:
         goal = self._get_scheduled_goal(goal_id)
         if not goal:
             return
-        # If the goal was already terminated by the user (reset to ready), don't overwrite
-        if goal.get("status") == "ready" and not goal.get("is_running") and self._active_scheduled_goal_id != goal_id:
-            logger.info(f'Goal {goal_id} already reset — skipping result update')
-            return
         success = bool(result and result.get("success"))
         primary_product = (result.get("primary_product") if isinstance(result, dict) else "") or ""
         last_result_raw = (result.get("response") if isinstance(result, dict) else "") or (result.get("error") if isinstance(result, dict) else "") or ""
         # Strip leaked stop-sequence markers from goal results
         if last_result_raw:
             last_result_raw = last_result_raw.replace('</end>', '').replace('</end', '').strip()
+
+        user_interrupted = bool(last_result_raw and "Interrupted by user" in last_result_raw)
 
         # Enrich last_result from primary_product content when the LLM
         # response is empty/trivial but an actual artifact was produced.
@@ -3308,11 +3315,19 @@ class ZenohExecutiveNode:
             except Exception as e:
                 logger.debug(f'Could not load primary_product for last_result enrichment: {e}')
 
+        if user_interrupted:
+            goal_status = "ready"
+            schedule_updates: Dict[str, Any] = {"schedule_mode": "manual"}
+        else:
+            goal_status = "completed" if success else "failed"
+            schedule_updates = {}
+
         updates: Dict[str, Any] = {
             "is_running": False,
-            "status": "completed" if success else "failed",
+            "status": goal_status,
             "last_result": last_result_raw,
             "primary_product": primary_product,
+            **schedule_updates,
         }
         if not used_cache and success:
             plan_actions = result.get("plan") if isinstance(result, dict) else None
@@ -3320,14 +3335,16 @@ class ZenohExecutiveNode:
                 updates["cached_plan_actions"] = plan_actions
         self._update_scheduled_goal(goal_id, **updates)
         # ── Graph: goal outcome ──
-        self._graph_emit_goal_outcome(goal_id, success, last_result_raw, primary_product, result)
+        graph_success = False if user_interrupted else bool(success)
+        self._graph_emit_goal_outcome(goal_id, graph_success, last_result_raw, primary_product, result)
         if goal_id in self._scheduler_started_goals:
             self._scheduler_started_goals.discard(goal_id)
+        scheduler_end_status = "interrupted" if user_interrupted else updates["status"]
         self._record_scheduler_event(
             "end",
             goal_id=goal_id,
             goal_name=goal.get("name", "") or goal.get("goal_text", "")[:80],
-            status=updates["status"],
+            status=scheduler_end_status,
             result=updates["last_result"],
         )
         # Update concern models from goal completion.
@@ -3335,6 +3352,7 @@ class ZenohExecutiveNode:
         # derived concern model — they are agent-internal activity, not user interactions.
         # User-initiated goals update both models.
         is_autonomous_goal = bool(goal.get("task_wip_id"))
+        concern_success = False if user_interrupted else bool(success)
         try:
             full_goal_text = goal.get("goal_text", "") or goal.get("name", "")
             outcome = updates.get("last_result", "")[:800]
@@ -3354,7 +3372,7 @@ class ZenohExecutiveNode:
                     goal_statement=full_goal_text,
                     outcome_summary=outcome,
                     goal_id=goal_id,
-                    success=bool(success),
+                    success=concern_success,
                     result_artifact=artifact_content,
                 )
             else:
@@ -3367,7 +3385,7 @@ class ZenohExecutiveNode:
                 goal_statement=full_goal_text,
                 outcome_summary=outcome,
                 goal_id=goal_id,
-                success=bool(success),
+                success=concern_success,
                 user_concerns=self.user_concern_model.get_concerns(),
                 living_state=self._ooda_living_state,
             )
@@ -3525,15 +3543,18 @@ class ZenohExecutiveNode:
         if not task_wip_id:
             goal_name = goal.get('name') or goal.get('goal_text', '')[:80] or goal_id
             pp_ref = f' → {primary_product}' if primary_product else ''
-            status_word = 'completed' if success else 'failed'
-            self._say_to_user(f"Goal '{goal_name}' {status_word}.{pp_ref}")
+            if user_interrupted:
+                self._say_to_user(f"Goal '{goal_name}' stopped (interrupted). Reset to ready.{pp_ref}")
+            else:
+                status_word = 'completed' if success else 'failed'
+                self._say_to_user(f"Goal '{goal_name}' {status_word}.{pp_ref}")
 
         # Fire callback if this was a delegated task from another agent
-        self._fire_delegation_callback(goal, success, last_result_raw, primary_product)
+        self._fire_delegation_callback(goal, False if user_interrupted else success, last_result_raw, primary_product)
 
         # Delete ephemeral goals (CLI/interpreted) on completion — they have no
         # persistent schedule value.  Task-linked goals are never ephemeral.
-        if goal.get('ephemeral') and not task_wip_id and not goal.get('task_context_note'):
+        if goal.get('ephemeral') and not task_wip_id and not goal.get('task_context_note') and not user_interrupted:
             try:
                 self._delete_scheduled_goal(goal_id)
                 logger.info(f'🗑 Deleted ephemeral goal {goal_id} after completion')
@@ -3725,19 +3746,34 @@ class ZenohExecutiveNode:
         if not goal_id:
             self._say_to_user("Please specify which goal to terminate, e.g. 'terminate goal_1'.")
             return
+        # Handle operational task goals (op__task_wip_N)
+        if goal_id.startswith('op_'):
+            # Force-clear all goal state regardless of which tracker thinks it's running
+            self.interrupt_requested = True
+            if self.infospace_executor:
+                self.infospace_executor.interrupt_requested = True
+            task_note = goal_id[3:]  # strip 'op_' prefix
+            if self._operational_task_note == task_note:
+                self._operational_task_note = None
+                self._operational_goal_waiting = False
+            # Clear scheduler state if it matches
+            if hasattr(self, 'goal_scheduler') and self.goal_scheduler._executing_goal_id == goal_id:
+                self.goal_scheduler._executing_goal_id = None
+            self._publish_execution_state()
+            self._say_to_user(f"Goal '{goal_id}' terminated.")
+            logger.info(f'📋 Operational goal {goal_id} terminated by user')
+            return
         goal = self._get_scheduled_goal(goal_id)
         if not goal:
             self._say_to_user(f"Goal '{goal_id}' not found.")
             return
         if goal.get("is_running") or self._active_scheduled_goal_id == goal_id:
+            # Cooperative interrupt only: goal note + scheduler end + cleanup run in
+            # _set_scheduled_goal_result when the goal thread finishes.
             self.interrupt_requested = True
             if self.infospace_executor:
                 self.infospace_executor.interrupt_requested = True
-            self._update_scheduled_goal(goal_id, status="ready", is_running=False,
-                                        schedule_mode="manual")
-            if self._active_scheduled_goal_id == goal_id:
-                self._active_scheduled_goal_id = None
-            # If this goal is a task milestone, abort the task WIP
+            # Immediate task WIP abort so establishment state does not stall while the planner unwinds.
             if goal.get("task_wip_id") and self.active_task_wip:
                 logger.info(f'📋 Task WIP {goal.get("task_wip_id")}: milestone interrupted — aborting task')
                 wip = self._read_task_wip()
@@ -3753,18 +3789,9 @@ class ZenohExecutiveNode:
                 self.active_task_wip_waiting = False
                 self._task_wip_pre_resource_ids = None
                 self._say_to_user("Task establishment interrupted.")
-            if goal_id in self._scheduler_started_goals:
-                self._scheduler_started_goals.discard(goal_id)
-                self._record_scheduler_event(
-                    "end",
-                    goal_id=goal_id,
-                    goal_name=goal.get("name", "") or goal.get("goal_text", "")[:80],
-                    status="interrupted",
-                )
-            if hasattr(self, "goal_scheduler"):
-                self.goal_scheduler.notify_goal_terminal(goal_id)
+            else:
+                self._say_to_user(f"Stopping '{goal.get('name') or goal_id}'…")
             self._publish_execution_state()
-            self._say_to_user(f"Goal '{goal.get('name') or goal_id}' stopped (reset to ready/manual).")
             return
         deleted = self._delete_scheduled_goal(goal_id)
         if deleted:
@@ -3970,6 +3997,97 @@ class ZenohExecutiveNode:
     # ── Task WIP (milestone loop) methods ─────────────────────────────────
 
     _TASK_EXECUTION_HISTORY_MAX = 20  # ring buffer size for operational task execution history
+
+    def _handle_trigger_task(self, template_name: str, sensor_content: str, sensor_data: dict):
+        """Handle a sensor trigger-task event: create a task from a template if none in progress.
+
+        Guards:
+        - If a task matching this template is already active, drop the trigger.
+        - Template must exist in character config task_templates.
+        """
+        # Look up task template from character config
+        templates = self.character_config.get('task_templates', [])
+        template = None
+        for t in templates:
+            if t.get('name') == template_name:
+                template = t
+                break
+        if not template:
+            logger.warning(f"trigger-task: template '{template_name}' not found in task_templates config")
+            return
+
+        # Task-in-progress guard: check if a task with this template is already active
+        if self.resource_manager:
+            for res_id, res_data in self.resource_manager.resource_registry.items():
+                if not res_id.startswith('Note_'):
+                    continue
+                props = res_data.get('properties', {})
+                name = props.get('name', '')
+                if not name or not name.startswith('_task_wip_'):
+                    continue
+                try:
+                    content = props.get('content', '{}')
+                    wip = json.loads(content) if isinstance(content, str) else content
+                    if (wip.get('status') == 'active'
+                            and wip.get('_trigger_template') == template_name):
+                        logger.info(f"trigger-task: task for '{template_name}' already active — dropping trigger")
+                        return
+                except (json.JSONDecodeError, TypeError):
+                    continue
+
+        # Build task intention from template + sensor context
+        intention = template.get('intention', '')
+        if sensor_content:
+            intention = f"SENSOR CONTEXT:\n{sensor_content}\n\nTASK:\n{intention}"
+
+        logger.info(f"trigger-task: creating task from template '{template_name}'")
+        self._begin_task_from_template(intention, template_name, template)
+
+    def _begin_task_from_template(self, intention: str, template_name: str, template: dict):
+        """Create a task WIP Note from a sensor-triggered template."""
+        self._task_wip_counter += 1
+        wip_id = f"twip_{self._task_wip_counter}"
+        note_name = f"_task_wip_{self._task_wip_counter}"
+        now = datetime.now().isoformat()
+        cooldown = template.get('cooldown_seconds', 300)
+        wip_content = {
+            "task_wip_id": wip_id,
+            "intention": intention,
+            "status": "active",
+            "phase": "complete",
+            "milestones_completed": [],
+            "current_milestone": None,
+            "accumulated_findings": [],
+            "created": now,
+            "updated": now,
+            "lifecycle": "operational",
+            "completion_summary": f"Sensor-triggered from template: {template_name}",
+            "establishment_milestones": [],
+            "establishment_findings": [],
+            "execution_history": [],
+            "last_executed": None,
+            "execution_count": 0,
+            "cooldown_seconds": cooldown,
+            "cycle_state": "idle",
+            "cycle_goals_completed": [],
+            "cycle_findings": [],
+            "_trigger_template": template_name,
+        }
+        self.infospace_executor.execute_action({
+            "type": "create-note",
+            "value": json.dumps(wip_content),
+            "name": note_name,
+            "out": f"${note_name}",
+        })
+        self.infospace_executor.execute_action({
+            "type": "persist",
+            "target": f"${note_name}",
+            "name": note_name,
+        })
+        self.active_task_wip = None
+        self.active_task_wip_waiting = False
+        logger.info(f'📋 Sensor-triggered task created: {note_name} (template: {template_name})')
+        self._say_to_user(f"[sensor-triggered task: {template_name}]")
 
     def _begin_task_establishment(self, user_text: str):
         """Create a task WIP Note and transition directly to operational state.
@@ -4832,8 +4950,12 @@ class ZenohExecutiveNode:
             wip["_last_reflection"] = {}
             self._write_operational_task(task_note_name, note_id, wip)
 
-            # Append cycle context so the planner knows what prior goals produced
-            # and can reference persistent artifacts by name instead of re-doing work.
+            # Append task intention + cycle context so the planner knows the
+            # overarching task directives and what prior goals produced.
+            intention = wip.get('intention', '')
+            ctx_parts = []
+            if intention:
+                ctx_parts.append(f"TASK INTENTION (follow these directives):\n{intention[:2000]}")
             if cycle_goals:
                 context_lines = []
                 artifact_lines = []
@@ -4846,21 +4968,25 @@ class ZenohExecutiveNode:
                         artifact_lines.append(
                             f"- \"{g['primary_product_name']}\" — created by prior goal, load with: "
                             f"tool(\"load\", target=\"{g['primary_product_name']}\")")
-                ctx_parts = []
                 if context_lines:
                     ctx_parts.append("Prior goals completed in this cycle:\n" + "\n".join(context_lines))
                 if artifact_lines:
                     ctx_parts.append(
                         "AVAILABLE ARTIFACTS (persistent Notes from prior goals — use these, do NOT redo the work):\n"
                         + "\n".join(artifact_lines))
-                if ctx_parts:
-                    goal_text = f"{goal_text}\n\n## CONTEXT ##\n" + "\n\n".join(ctx_parts)
+            if ctx_parts:
+                goal_text = f"{goal_text}\n\n## CONTEXT ##\n" + "\n\n".join(ctx_parts)
 
             # Run goal on thread
             pre_resource_ids = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
 
             def _run_operational_goal():
+                logger.info(f'📋 {task_note_name} → launching goal: {goal_text[:200]}')
                 result = self.parse_and_set_goal("", goal_text) or {}
+                success = result.get('success', False)
+                pp = result.get('primary_product', '')
+                resp = (result.get('response', '') or '')[:200]
+                logger.info(f'📋 {task_note_name} → goal result: success={success} product={pp} response={resp}')
                 if pre_resource_ids is not None and self.resource_manager:
                     now_ids = set(self.resource_manager.resource_registry.keys())
                     created_ids = now_ids - pre_resource_ids
@@ -6658,6 +6784,8 @@ class ZenohExecutiveNode:
             self.goal_scheduler._executing_is_autonomous = False
         pre = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
         def _run():
+            # Clear last_say_text so we can detect whether *this* goal said anything
+            self.last_say_text = ''
             result = self.parse_and_set_goal("", goal_text) or {}
             self._set_scheduled_goal_result(goal_id, result, used_cache=False, pre_resource_ids=pre)
             return result
@@ -6879,6 +7007,10 @@ class ZenohExecutiveNode:
             self.active_task_wip = None
             self.active_task_wip_waiting = False
             self._task_wip_pre_resource_ids = None
+        # Clear operational goal state if this task's goal is running
+        if self._operational_task_note == note_name:
+            self._operational_task_note = None
+            self._operational_goal_waiting = False
 
         self._publish_execution_state()
         logger.info(f'📋 Task WIP {note_name} deleted via command (removed {len(deleted_goals)} goals)')
@@ -7223,6 +7355,16 @@ class ZenohExecutiveNode:
                 is_reaction=True,
             )
 
+        # Priority 2b: sensor trigger-task (task creation path)
+        if self._sensor_trigger_task_queue:
+            entry = self._sensor_trigger_task_queue.pop(0)
+            return EventPacket(
+                event_type='sensor_event', classification='trigger_task',
+                content=entry.get('content', ''), source=f"sensor:{entry.get('sensor_name', 'unknown')}",
+                raw_sense_data=entry, task_template=entry.get('task_template'),
+                is_reaction=True,
+            )
+
         # Priority 3: sensor inform (context that Orient should assess)
         if self._sensor_inform_queue:
             entry = self._sensor_inform_queue.pop(0)
@@ -7460,6 +7602,13 @@ class ZenohExecutiveNode:
             logger.warning(f"Decide: triggered goal '{evt.goal_name}' not found")
             return Action('no_action', {}, a)
 
+        if evt.classification == 'trigger_task':
+            return Action('trigger_task', {
+                'task_template': evt.task_template,
+                'sensor_content': evt.content,
+                'sensor_data': evt.raw_sense_data,
+            }, a)
+
         if evt.classification == 'alert':
             alert_text, sensor_name = self._format_alert_text(evt.raw_sense_data)
             return Action('alert_response', {'alert_text': alert_text, 'sensor_name': sensor_name}, a)
@@ -7510,6 +7659,10 @@ class ZenohExecutiveNode:
                     'source': evt.source,
                     'rationale': a.get('overall_rationale', ''),
                 }, a)
+            return Action('no_action', {}, a)
+
+        # Internal timer events should never trigger task proposals or goal formulation
+        if evt.classification == 'timer':
             return Action('no_action', {}, a)
 
         # Instantiation: user wants existing work to advance — propose a task from conversation
@@ -7858,9 +8011,24 @@ class ZenohExecutiveNode:
                 payload = json.loads(query.payload.to_bytes().decode('utf-8'))
 
             g = self._cognitive_graph
-            MAX_NODES = 200
+            MAX_NODES = 400
 
-            if 'seed_ids' in payload:
+            if 'seed_types' in payload:
+                # Seed by node type — return most recent nodes of those types
+                # (no BFS needed; we're selecting directly by type)
+                seed_types = set(payload['seed_types'])
+                with g._lock:
+                    type_nodes = [dict(n) for n in g._nodes.values()
+                                  if n.get('type') in seed_types]
+                # Sort by timestamp descending, take most recent up to MAX_NODES
+                type_nodes.sort(key=lambda n: n.get('timestamp', ''), reverse=True)
+                nodes = type_nodes[:MAX_NODES]
+                node_ids = {n['node_id'] for n in nodes}
+                # Include all edges between the selected nodes
+                with g._lock:
+                    edges = [dict(e) for e in g._edges.values()
+                             if e['source'] in node_ids and e['target'] in node_ids]
+            elif 'seed_ids' in payload:
                 # Expand mode
                 seed_ids = payload['seed_ids']
                 max_hops = payload.get('max_hops', 2)
@@ -8054,6 +8222,11 @@ class ZenohExecutiveNode:
                 self._set_scheduled_goal_result(goal_id, result, used_cache=False, pre_resource_ids=pre)
                 return result
             self._run_goal_on_thread(_run)
+            return
+
+        if t == 'trigger_task':
+            template_name = p.get('task_template', '')
+            self._handle_trigger_task(template_name, p.get('sensor_content', ''), p.get('sensor_data', {}))
             return
 
         if t == 'proceed_goal':
@@ -8775,6 +8948,11 @@ class ZenohExecutiveNode:
                 if disposition == 'alert':
                     self._sensor_alert_queue.append(sensor_entry)
                     logger.info(f'🚨 {self.character_name} sensor ALERT queued from {sensor_name}: {sensor_content[:80]}')
+                elif disposition.startswith('trigger-task:'):
+                    task_template = disposition.split(':', 1)[1]
+                    sensor_entry['task_template'] = task_template
+                    self._sensor_trigger_task_queue.append(sensor_entry)
+                    logger.info(f'⚡ {self.character_name} sensor TRIGGER-TASK queued: {task_template} (from {sensor_name})')
                 elif disposition.startswith('trigger:'):
                     goal_name = disposition.split(':', 1)[1]
                     sensor_entry['goal_name'] = goal_name
@@ -9616,9 +9794,24 @@ class ZenohExecutiveNode:
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
     
     def _scheduled_goals_query_handler(self, query):
-        """Handle query for scheduled goals."""
+        """Handle query for scheduled goals (includes active operational task goal)."""
         try:
             goals = self._all_scheduled_goals()
+            # Include the active operational task goal so it's visible in /goals
+            if self._operational_task_note and self._operational_goal_waiting:
+                op_goal_id = f"op_{self._operational_task_note}"
+                # Don't duplicate if somehow already in the list
+                if not any(g.get('goal_id') == op_goal_id for g in goals):
+                    op_goal = {
+                        "goal_id": op_goal_id,
+                        "name": f"task: {self._operational_task_note}",
+                        "goal_text": getattr(self, '_operational_task_note', ''),
+                        "status": "running",
+                        "is_running": True,
+                        "mode": "task",
+                        "source": "task",
+                    }
+                    goals.append(op_goal)
             response = {"success": True, "goals": goals}
             query.reply(query.key_expr, json.dumps(response).encode("utf-8"))
         except Exception as e:

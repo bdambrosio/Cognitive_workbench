@@ -336,6 +336,7 @@ Primitive Type Compatibility (world/skill tools have their own contracts):
 Key Semantics:
 - load: ONLY for (a) binding named persistent notes, or (b) slicing Collections. To read content, use get_text/get_json/get_items.
   slice=":" for full content; default "0:4096" (Notes) or "0:5" (Collections).
+- fs-list (filesystem sandbox): returns a **single Note** whose body is a **text listing** (path header + lines like `file.md  (size)` or `subdir/`). Use **get_text($binding)** to read it — **not** get_items (Collections only).
 - persist: Mark resource as persistent (saved to filesystem).
 - discover-*: No target needed. search-within-collection: requires indexed target Collection.
 - Slice a Collection for first N items: tool("load", target="$coll", slice="0:5", out="$top")
@@ -2938,8 +2939,10 @@ ALWAYS follow all formatting instructions exactly.
             "- Max 16 tool() calls per code block.\n"
             "- Prefer longer cohesive blocks: if CURRENT_TASK has connected subtasks, combine them in one block.\n"
             "- out=\"$name\" binds the result resource. Chain via target=\"$name\" in the next call.\n"
+            "- Binding names must be valid identifiers: use $clip_body, $item_0_url — never spaces or raw filenames in $vars (e.g. avoid \"$Trading Agents.md_content\").\n"
             "- Read content: get_text(\"$var\") → string, get_json(\"$var\") → dict or None, get_items(\"$var\") → list of Note IDs.\n"
             "  These work on any $var that has been bound. No need to call load first.\n"
+            "- fs-list returns a Note listing string — use get_text on its out= binding, not get_items.\n"
             "- load: ONLY for (a) binding a named persistent note, or (b) slicing a Collection.\n"
             "- Pass dicts/lists directly as value — do not pre-serialize with json.dumps().\n"
             "- CODE BLOCK SCOPE: each step executes in a fresh function. Python locals do NOT persist across steps.\n"
@@ -4087,8 +4090,10 @@ ALWAYS follow all formatting instructions exactly.
         "- Max 16 tool() calls per code block.\n"
         "- Prefer longer cohesive blocks: if CURRENT_TASK has connected subtasks, combine them in one block.\n"
         "- out=\"$name\" binds the result resource. Chain via target=\"$name\" in the next call.\n"
+        "- Binding names must be valid identifiers: use $clip_body, $item_0_url — never spaces or raw filenames in $vars.\n"
         "- Read content: get_text(\"$var\") → string, get_json(\"$var\") → dict or None, get_items(\"$var\") → list of Note IDs.\n"
         "  These work on any $var that has been bound. No need to call load first.\n"
+        "- fs-list returns a Note listing string — use get_text on its out= binding, not get_items.\n"
         "- load: ONLY for (a) binding a named persistent note, or (b) slicing a Collection.\n"
         "- Pass dicts/lists directly as value — do not pre-serialize with json.dumps().\n"
         "- CODE BLOCK SCOPE: each step executes in a fresh function. Python locals do NOT persist across steps.\n"

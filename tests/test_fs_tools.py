@@ -3,7 +3,7 @@
 Test suite for filesystem (fs) tools.
 
 Validates that:
-- fs-list returns a Collection of files/dirs
+- fs-list returns a single Note with a text directory listing
 - fs-read reads text and JSON files
 - fs-head returns line slices
 - fs-grep returns matches
@@ -129,14 +129,13 @@ def test_fs_list(session: zenoh.Session, character: str) -> Tuple[bool, str]:
     result = execute_action(session, character, {"type": "fs-list", "path": ".", "out": "$root"})
     if result.get("status") != "success":
         return False, f"fs-list failed: {result.get('reason', 'unknown')}"
-    if not str(result.get("resource_id", "")).startswith("Collection_"):
-        return False, f"fs-list returned unexpected resource_id: {result.get('resource_id')}"
+    rid = str(result.get("resource_id", ""))
+    if not rid.startswith("Note_"):
+        return False, f"fs-list returned unexpected resource_id (expected Note): {result.get('resource_id')}"
     value = result.get("value", "")
     print(f"  ✓ fs-list: {value}")
-    # If 0 items, that's a problem since we created files
-    if "0 items" in str(value):
-        print(f"  ⚠ Warning: fs-list returned 0 items, but {len(files)} files exist in fixture")
-        return False, f"fs-list: expected files but got 0 items (files exist: {[f.name for f in files]})"
+    if "sample.txt" not in str(value) or "data.json" not in str(value):
+        return False, f"fs-list listing missing expected fixture files (value preview): {str(value)[:500]}"
     return True, "fs-list: OK"
 
 

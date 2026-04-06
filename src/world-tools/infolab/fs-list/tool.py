@@ -1,12 +1,13 @@
 """
 Filesystem list tool.
 Lists files and directories under scenarios/<world_name>/fs.
+Returns a single Note with a text listing (like ls).
 """
 from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -34,66 +35,63 @@ except ImportError:
     )
 
 
-def _detect_file_format(abs_path: Path) -> str:
-    """
-    Detect file format from extension and sample.
-    Returns: 'text', 'json', 'binary', or 'pdf'
-    """
-    suffix_lower = abs_path.suffix.lower()
-    if suffix_lower == ".pdf":
-        return "pdf"
-    elif suffix_lower == ".json":
-        return "json"
-    elif is_binary_file(abs_path):
-        return "binary"
+def _format_size(size_bytes: int) -> str:
+    """Format file size for display."""
+    if size_bytes < 1024:
+        return f"{size_bytes}B"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.1f}K"
     else:
-        return "text"
+        return f"{size_bytes / (1024 * 1024):.1f}M"
 
 
-def _create_placeholder_note(resource_manager, agent_name: str, abs_path: Path, rel_path: str, meta: Dict[str, Any]) -> Optional[str]:
-    """Create a placeholder Note. Content is string; filled by fs-read."""
-    if not resource_manager:
-        return None
-    file_format = _detect_file_format(abs_path)
-    tool_meta = {**meta, "format": file_format}
-    success, note_id, error_msg, _ = resource_manager.create_note(
-        agent_name,
-        "(placeholder)",
-        "text",
-        "fs-list",
-        rel_path,
-        rel_path,
-        {"kind": "fs-file", "placeholder": True, "tool_metadata": tool_meta}
-    )
-    if not success:
-        logger.error(f"fs-list: failed to create placeholder Note for {rel_path}: {error_msg}")
-        return None
-    return note_id
+def _build_listing(dir_path: Path, dir_rel: str, recursive: bool,
+                   include_files: bool, include_dirs: bool,
+                   max_entries: int) -> List[str]:
+    """Build text listing lines for a directory."""
+    lines = []
+    count = 0
+    entries = list(list_dir_entries(dir_path))
 
+    for entry in entries:
+        if count >= max_entries:
+            lines.append(f"... (truncated at {max_entries} entries)")
+            break
 
-def _create_collection(resource_manager, agent_name: str, items: List[str], rel_path: str, meta: Dict[str, Any]) -> Optional[str]:
-    if not resource_manager:
-        return None
-    collection_name = rel_path or "/"
-    success, collection_id, error_msg, _ = resource_manager.create_collection(
-        agent_name,
-        items,
-        "list",
-        "fs-list",
-        rel_path or "/",
-        collection_name,
-        {"kind": "fs-dir", "doc_meta": meta}
-    )
-    if not success:
-        logger.error(f"fs-list: failed to create Collection for {rel_path}: {error_msg}")
-        return None
-    return collection_id
+        if entry.is_file() and is_documentation_file(entry):
+            continue
+
+        entry_rel = f"{dir_rel}/{entry.name}" if dir_rel else entry.name
+
+        if entry.is_dir():
+            if not include_dirs:
+                continue
+            lines.append(f"{entry.name}/")
+            count += 1
+            if recursive:
+                sub_lines = _build_listing(entry, entry_rel, recursive,
+                                           include_files, include_dirs,
+                                           max_entries - count)
+                for sl in sub_lines:
+                    lines.append(f"  {sl}")
+                    count += 1
+                    if count >= max_entries:
+                        break
+        else:
+            if not include_files:
+                continue
+            meta = file_metadata(entry, entry_rel)
+            size_str = _format_size(meta["size_bytes"])
+            lines.append(f"{entry.name}  ({size_str})")
+            count += 1
+
+    return lines
 
 
 def tool(input_value=None, **kwargs):
     """
     List files and directories under scenarios/<world_name>/fs.
-    Returns a Collection containing Notes (files) and Collections (subdirectories).
+    Returns a Note with a text listing.
     """
     executor = kwargs.get("executor")
     if not executor:
@@ -107,63 +105,34 @@ def tool(input_value=None, **kwargs):
     recursive = bool(kwargs.get("recursive", False))
     include_files = kwargs.get("include_files", True)
     include_dirs = kwargs.get("include_dirs", True)
-    max_entries = kwargs.get("max_entries", 200)
+    max_entries = int(kwargs.get("max_entries", 200))
 
     abs_path, rel_path = resolve_fs_path(path_arg, world_name, Path(__file__))
     if abs_path is None:
         fs_root = get_fs_root(world_name, Path(__file__))
         project_root = _find_project_root(Path(__file__))
-        logger.error(f"fs-list: resolve_fs_path failed - world_name='{world_name}', fs_root={fs_root}, project_root={project_root}, tool_file={Path(__file__)}")
+        logger.error(f"fs-list: resolve_fs_path failed - world_name='{world_name}', fs_root={fs_root}, project_root={project_root}")
         return executor._create_uniform_return("failed", reason=f"fs root not available (world_name='{world_name}', fs_root={fs_root})")
     if not abs_path.exists():
         return executor._create_uniform_return("failed", reason="path not found")
     if not abs_path.is_dir():
         return executor._create_uniform_return("failed", reason="fs-list requires a directory path")
 
-    entry_counter = {"count": 0}
+    lines = _build_listing(abs_path, rel_path, recursive,
+                           include_files, include_dirs, max_entries)
 
-    def build_dir(dir_path: Path, dir_rel: str) -> Tuple[Optional[str], int]:
-        items: List[str] = []
-        entries = list(list_dir_entries(dir_path))
-        
-        # Performance warning for large directories
-        if len(entries) > 16:
-            logger.warning(f"fs-list: Directory {dir_rel or '/'} has {len(entries)} entries (>16), this may be slow")
-        
-        for entry in entries:
-            if max_entries is not None and entry_counter["count"] >= int(max_entries):
-                break
-            # Skip documentation files (metadata for planner, not content)
-            if entry.is_file() and is_documentation_file(entry):
-                continue
-            entry_rel = f"{dir_rel}/{entry.name}" if dir_rel else entry.name
-            meta = file_metadata(entry, entry_rel)
-            if entry.is_dir():
-                if not include_dirs:
-                    continue
-                if recursive:
-                    child_id, _ = build_dir(entry, entry_rel)
-                else:
-                    child_id = _create_collection(resource_manager, agent_name, [], entry_rel, meta)
-                if child_id:
-                    items.append(child_id)
-                    entry_counter["count"] += 1
-            else:
-                if not include_files:
-                    continue
-                # Create placeholder Note with full metadata structure
-                note_id = _create_placeholder_note(resource_manager, agent_name, entry, entry_rel, meta)
-                if note_id:
-                    items.append(note_id)
-                    entry_counter["count"] += 1
+    display_path = rel_path or "/"
+    listing_text = f"{display_path}\n" + "\n".join(lines) if lines else f"{display_path}\n(empty)"
 
-        meta = file_metadata(dir_path, dir_rel or "/")
-        collection_id = _create_collection(resource_manager, agent_name, items, dir_rel, meta)
-        return collection_id, len(items)
+    # Create a single Note with the listing
+    if not resource_manager:
+        return executor._create_uniform_return("success", value=listing_text)
 
-    collection_id, _ = build_dir(abs_path, rel_path)
-    if not collection_id:
-        return executor._create_uniform_return("failed", reason="fs-list failed to create collection")
+    success, note_id, error_msg, _ = resource_manager.create_note(
+        agent_name, listing_text, "text", "fs-list",
+        display_path, display_path, {}
+    )
+    if not success:
+        return executor._create_uniform_return("failed", reason=f"Failed to create listing Note: {error_msg}")
 
-    summary = executor._format_collection_value(collection_id)
-    return executor._create_uniform_return("success", value=summary, resource_id=collection_id)
+    return executor._create_uniform_return("success", value=listing_text, resource_id=note_id)

@@ -37,7 +37,7 @@ setting: |
   ## Tools (fs-*)
 
   - `fs-stat`: metadata for a file/dir at a path (existence check; shows `is_dir`/`is_file`)
-  - `fs-list`: list a directory → Collection of child Notes/Collections
+  - `fs-list`: list a directory → one Note whose text body is a directory listing (use get_text)
   - `fs-find`: find files by **filename glob** (not content) → Collection of matching file Notes
   - `fs-read`: read full file (text/json/pdf) → Note with contents
   - `fs-head`: read first N lines of a text file → Note with slice

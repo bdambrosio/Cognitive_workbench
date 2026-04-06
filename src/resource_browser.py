@@ -503,15 +503,22 @@ class ResourceBrowser:
             </div>
         </div>
         <div id="graph-panel">
-            <div id="graph-controls">
+            <div id="graph-controls" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;">
                 <input type="text" id="graph-search" placeholder="Search entities/nodes..." onkeydown="if(event.key==='Enter')graphSearch()">
                 <button onclick="graphSearch()" style="font-size:11px;padding:4px 8px;">Search</button>
-                <button onclick="loadEntityOverview()" style="font-size:11px;padding:4px 8px;background:#2d6b3f;">Entities</button>
-                <span class="filter-label"><input type="checkbox" checked onchange="toggleNodeType('entity')"> entities</span>
-                <span class="filter-label"><input type="checkbox" checked onchange="toggleNodeType('goal_launch')"> goals</span>
-                <span class="filter-label"><input type="checkbox" checked onchange="toggleNodeType('concern_created')"> concerns</span>
-                <span class="filter-label"><input type="checkbox" checked onchange="toggleNodeType('conversation_turn')"> turns</span>
-                <span class="filter-label"><input type="checkbox" checked onchange="toggleNodeType('tom_update')"> ToM</span>
+                <button onclick="loadGraphByTypes()" style="font-size:11px;padding:4px 8px;background:#2d6b3f;">Load</button>
+                <span style="color:#666;font-size:11px;">show:</span>
+                <span class="filter-label"><input type="checkbox" class="seed-type" value="entity" checked onchange="applyTypeFilter()"> entities</span>
+                <span class="filter-label"><input type="checkbox" class="seed-type" value="goal_launch,goal_outcome" onchange="applyTypeFilter()"> goals</span>
+                <span class="filter-label"><input type="checkbox" class="seed-type" value="concern_created,concern_change" onchange="applyTypeFilter()"> concerns</span>
+                <span class="filter-label"><input type="checkbox" class="seed-type" value="conversation_turn" onchange="applyTypeFilter()"> turns</span>
+                <span class="filter-label"><input type="checkbox" class="seed-type" value="tom_update" onchange="applyTypeFilter()"> ToM</span>
+                <span class="filter-label"><input type="checkbox" class="seed-type" value="task_created" onchange="applyTypeFilter()"> tasks</span>
+                <span class="filter-label"><input type="checkbox" class="seed-type" value="decision,action_result" onchange="applyTypeFilter()"> decisions</span>
+                <span class="filter-label"><input type="checkbox" class="seed-type" value="event" onchange="applyTypeFilter()"> events</span>
+                <span class="filter-label"><input type="checkbox" class="seed-type" value="assessment" onchange="applyTypeFilter()"> assessments</span>
+                <span class="filter-label"><input type="checkbox" class="seed-type" value="note" onchange="applyTypeFilter()"> notes</span>
+                <span class="filter-label"><input type="checkbox" class="seed-type" value="consolidation" onchange="applyTypeFilter()"> consolidations</span>
             </div>
             <svg id="graph-svg"></svg>
             <div id="graph-tooltip" class="graph-tooltip" style="display:none;"></div>
@@ -798,7 +805,6 @@ class ResourceBrowser:
         let graphSim = null;
         let graphSvg, graphG, graphZoom;
         let graphNodes = [], graphEdges = [];
-        let hiddenTypes = new Set();
         const NODE_COLORS = {
             entity: '#4ec9b0', goal_launch: '#569cd6', goal_outcome: '#569cd6',
             conversation_turn: '#888', concern_created: '#ce9178', concern_change: '#ce9178',
@@ -861,7 +867,7 @@ class ResourceBrowser:
                 });
             graphG.selectAll('.graph-node')
                 .attr('transform', d => `translate(${d.x},${d.y})`)
-                .style('display', d => hiddenTypes.has(d.type) ? 'none' : '');
+                .style('display', d => getHiddenTypes().has(d.type) ? 'none' : '');
         }
 
         function renderGraph(nodes, edges) {
@@ -954,38 +960,46 @@ class ResourceBrowser:
             } catch (e) { console.error('Expand failed:', e); }
         }
 
-        async function loadEntityOverview() {
+        async function loadGraphByTypes() {
+            // Collect all checked seed types
+            const seedTypes = [];
+            document.querySelectorAll('.seed-type:checked').forEach(cb => {
+                cb.value.split(',').forEach(t => seedTypes.push(t.trim()));
+            });
+            if (seedTypes.length === 0) return;
+
+            // Also load entity sidebar if entities are among the checked types
+            if (seedTypes.includes('entity')) {
+                try {
+                    const resp = await fetch('/api/graph/entities');
+                    const data = await resp.json();
+                    if (data.success) {
+                        const linked = data.entities.filter(e => e.graph_node_id);
+                        document.getElementById('entity-count').textContent = linked.length;
+                        const list = document.getElementById('entity-list');
+                        list.innerHTML = linked
+                            .sort((a, b) => b.mention_count - a.mention_count)
+                            .map(e => `<div class="resource-item" onclick="expandEntity('${e.graph_node_id}','${escapeHtml(e.name)}')" style="color:#4ec9b0;">${escapeHtml(e.name)} <span style="color:#888;font-size:10px;">(${e.mention_count})</span></div>`)
+                            .join('');
+                    }
+                } catch (e) { console.error('Entity sidebar load failed:', e); }
+            }
+
+            // Fetch subgraph seeded by selected node types
+            graphNodes = []; graphEdges = [];
+            graphG.selectAll('*').remove();
             try {
-                const resp = await fetch('/api/graph/entities');
-                const data = await resp.json();
-                if (!data.success) return;
-                document.getElementById('entity-count').textContent = data.entities.length;
-                // Render entity sidebar list
-                const list = document.getElementById('entity-list');
-                list.innerHTML = data.entities
-                    .sort((a, b) => b.mention_count - a.mention_count)
-                    .map(e => `<div class="resource-item" onclick="expandEntity('${e.graph_node_id}','${escapeHtml(e.name)}')" style="color:#4ec9b0;">${escapeHtml(e.name)} <span style="color:#888;font-size:10px;">(${e.mention_count})</span></div>`)
-                    .join('');
-                // Fetch subgraph seeded from all entity nodes to show edges
-                const entityNodeIds = data.entities
-                    .filter(e => e.graph_node_id)
-                    .map(e => e.graph_node_id);
-                graphNodes = []; graphEdges = [];
-                graphG.selectAll('*').remove();
-                if (entityNodeIds.length > 0) {
-                    try {
-                        const sgResp = await fetch('/api/graph/subgraph', {
-                            method: 'POST', headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({seed_ids: entityNodeIds, max_hops: 1})
-                        });
-                        const sgData = await sgResp.json();
-                        if (sgData.success) {
-                            renderGraph(sgData.nodes, sgData.edges);
-                        }
-                    } catch (e2) { console.error('Entity subgraph load failed:', e2); }
-                }
-            } catch (e) { console.error('Entity load failed:', e); }
+                const sgResp = await fetch('/api/graph/subgraph', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({seed_types: seedTypes, max_hops: 1})
+                });
+                const sgData = await sgResp.json();
+                if (sgData.success) renderGraph(sgData.nodes, sgData.edges);
+            } catch (e) { console.error('Type-seeded subgraph load failed:', e); }
         }
+
+        // Backward compat alias
+        async function loadEntityOverview() { return loadGraphByTypes(); }
 
         async function expandEntity(graphNodeId, name) {
             if (!graphNodeId) { alert('Entity has no graph node yet'); return; }
@@ -1018,10 +1032,26 @@ class ResourceBrowser:
             } catch (e) { console.error('Search failed:', e); }
         }
 
-        function toggleNodeType(type) {
-            if (hiddenTypes.has(type)) hiddenTypes.delete(type);
-            else hiddenTypes.add(type);
-            graphG.selectAll('.graph-node').style('display', d => hiddenTypes.has(d.type) ? 'none' : '');
+        function getHiddenTypes() {
+            // Build set of all unchecked types for display filtering
+            const hidden = new Set();
+            document.querySelectorAll('.seed-type').forEach(cb => {
+                if (!cb.checked) {
+                    cb.value.split(',').forEach(t => hidden.add(t.trim()));
+                }
+            });
+            return hidden;
+        }
+
+        function applyTypeFilter() {
+            const hidden = getHiddenTypes();
+            graphG.selectAll('.graph-node').style('display', d => hidden.has(d.type) ? 'none' : '');
+            // Also hide edges where both endpoints are hidden
+            graphG.selectAll('.graph-edge').style('display', function(d) {
+                const srcHidden = hidden.has((graphNodes.find(n => n.node_id === d.source?.node_id || n.node_id === d.source) || {}).type);
+                const tgtHidden = hidden.has((graphNodes.find(n => n.node_id === d.target?.node_id || n.node_id === d.target) || {}).type);
+                return (srcHidden && tgtHidden) ? 'none' : '';
+            });
         }
 
         // Auto-load on page load
