@@ -39,7 +39,7 @@ Failure (`status: "failed"`):
 
 ## Planning Notes
 
-For **small, predictable structure** embedded in Note text (e.g. YAML frontmatter between `---` lines, key: value blocks with a fixed layout), **prefer parsing in Python** in the planner code step (`get_text`, `split`, `strip`, regex, or `yaml.safe_load` on the frontmatter slice) before calling `extract`. Use **`extract`** when the layout is unknown, messy, or you need semantic judgment over free-form prose.
+For **small, predictable structure** embedded in Note text (e.g. YAML frontmatter between `---` lines, key: value blocks with a fixed layout), **prefer handling it in Python** in the planner code step before calling **`extract`**. Use **`extract`** when the layout is unknown, messy, or you need semantic judgment over free-form prose.
 
 **Use `extract` when:**
 - Pulling specific facts or fields from a document

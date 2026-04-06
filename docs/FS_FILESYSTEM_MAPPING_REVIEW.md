@@ -17,7 +17,7 @@ This document reviews how filesystem operations map to the infospace Collection/
 - **Input:** `path` (relative under `scenarios/<world_name>/fs`), `recursive`, `include_files`, `include_dirs`, `max_entries`.
 - **Output:** `resource_id` is a **`Note_*`**, not a Collection.
 - **Body:** Multi-line string: first line is the listed path; **directories** end with `/`; **files** look like `name  (2.1K)` / `name  (219B)`; optional truncation line when `max_entries` is hit.
-- **Agent pattern:** After `tool("fs-list", ..., out="$dir_list")`, use **`get_text("$dir_list")`**, split lines, parse (dirs vs files). Do **not** call `get_items` on the result.
+- **Agent pattern:** After `tool("fs-list", ..., out="$dir_list")`, read the body with **`get_text("$dir_list")`**. Do **not** call `get_items` on the result. Interpreting that text is up to the planner.
 
 ### `fs-find`
 
@@ -89,7 +89,7 @@ The agent failed at steps 2–4 when IDs were opaque and summaries omitted paths
 
 ### Tool limitations (updated)
 
-- **`fs-grep`:** Searches **file contents**, not paths/filenames—misuse if the goal is “find file named X” (use **`fs-find`** or parse **`fs-list`** text).
+- **`fs-grep`:** Searches **file contents**, not paths/filenames—misuse if the goal is “find file named X” (use **`fs-find`** or the **`fs-list`** listing text).
 - **`fs-find`:** Now exists (glob on basename under a path); returns a **Collection** of placeholders—agents still need a clear pattern: list IDs → `fs-read` or follow docs for binding chain.
 
 ---
@@ -101,12 +101,12 @@ The agent failed at steps 2–4 when IDs were opaque and summaries omitted paths
 **Strengths:**
 
 - **Self-describing text:** Filenames and directory names appear directly in the Note body.
-- **No per-entry ID hop** for “what files are here?”—parse one string.
+- **No per-entry ID hop** for “what files are here?”—one string holds the listing.
 - **Aligned with planner guidance:** `get_text` on the bound variable.
 
 **Weaknesses:**
 
-- **Unstructured text:** Parsing is ad hoc (contrast with JSON); edge cases in filenames are theoretically possible.
+- **Unstructured text:** Interpretation is planner-dependent (contrast with JSON); edge cases in filenames are theoretically possible.
 - **Not a Collection:** Per-file infospace operations (map, filter on items) require **`fs-find`** + placeholders or **`fs-read`** paths, not `get_items` on `fs-list` output.
 
 ### Collection of placeholders (`fs-find`)
@@ -151,7 +151,7 @@ Ideas in the original doc (directory as JSON Note, richer Collection summaries, 
 
 2. **Display and docs:** When a tool returns a **Collection** of file Notes, make it obvious that items are placeholders until **`fs-read`** (and how bindings work).
 3. **`fs-find`:** Treat as the primary **filename pattern** path; pair with **`fs-read`** for content.
-4. **Agent training / planner rules:** Valid **`out=` names** (identifiers only); parse **structured snippets** (e.g. YAML frontmatter) in code when layout is fixed before defaulting to LLM **`extract`**.
+4. **Agent training / planner rules:** Valid **`out=` names** (identifiers only); handle **structured snippets** (e.g. YAML frontmatter) in code when layout is fixed before defaulting to LLM **`extract`**.
 
 ---
 
@@ -161,6 +161,6 @@ The filesystem stack is **no longer** “directory as Collection” for **`fs-li
 
 **Recommended path for agents:**
 
-1. **List dir:** `fs-list` → **`get_text`** → parse lines.
+1. **List dir:** `fs-list` → **`get_text`** — use the text as appropriate to the goal.
 2. **Find by pattern:** **`fs-find`** → iterate Collection → **`fs-read`** as needed.
 3. **Avoid** assuming every filesystem tool returns a Collection; check each tool’s Skill.md / catalog entry.

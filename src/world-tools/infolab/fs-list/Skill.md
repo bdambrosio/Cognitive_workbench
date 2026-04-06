@@ -30,7 +30,7 @@ Success returns:
 
 **Read the listing with `get_text("$your_out_var")`.** Do **not** use `get_items` — that is only for Collections.
 
-Parse lines in Python: skip empty lines, lines ending in `/` are dirs; for files, strip the `  (size)` suffix or split on `(` and take the first segment for the basename.
+How to interpret the text for a given goal is left to the planner.
 
 ## Examples
 
@@ -39,4 +39,4 @@ Parse lines in Python: skip empty lines, lines ending in `/` are dirs; for files
 {"type":"fs-list","path":"docs","recursive":true,"out":"$docs_tree"}
 ```
 
-After `out="$root"`, use `text = get_text("$root")` and split into lines.
+After `out="$root"`, read the body with `get_text("$root")`.
