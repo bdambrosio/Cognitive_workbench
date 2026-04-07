@@ -213,6 +213,18 @@ def _parse_command(line: str) -> Optional[dict]:
             return d
         if sub == 'exec' and len(rest) >= 2:
             return {'cmd': '/goal exec', 'goal_id': rest[0], 'execution_mode': rest[1]}
+        if sub == 'plan':
+            # /goal plan <id>, /goal plan show <id>, /goal plan edit <id>, /goal plan approve <id>
+            if not rest:
+                _print_error("Usage: /goal plan [show|edit|approve] <goal_id>")
+                return None
+            if rest[0] in ('show', 'edit', 'load', 'approve'):
+                if len(rest) < 2:
+                    _print_error(f"Usage: /goal plan {rest[0]} <goal_id>")
+                    return None
+                return {'cmd': f'/goal plan {rest[0]}', 'goal_id': rest[1]}
+            # /goal plan <id>  →  shorthand for show
+            return {'cmd': '/goal plan', 'goal_id': rest[0]}
         if sub == 'cache' and rest:
             # /goal cache clear <id> or /goal cache <id>
             if rest[0] == 'clear' and len(rest) > 1:
@@ -220,7 +232,7 @@ def _parse_command(line: str) -> Optional[dict]:
             return {'cmd': '/goal cache clear', 'goal_id': rest[0]}
         if sub == 'show' and rest:
             return {'cmd': '_query', 'query': 'goal_show', 'goal_id': rest[0]}
-        _print_error(f"Usage: /goal <add|run|terminate|rename|edit|delete|mode|exec|cache|show> ...")
+        _print_error(f"Usage: /goal <add|run|terminate|rename|edit|delete|mode|exec|cache|plan|show> ...")
         return None
 
     # -- Tasks --
@@ -964,6 +976,9 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
                 curr_goal = (data.get('goal_scheduler') or {}).get('executing_goal_id')
                 curr_dialog = data.get('active_dialog', False)
                 curr_paused = data.get('paused', False)
+                # Detect goal start: clear say dedup so replayed plans can re-display
+                if not prev_goal and curr_goal:
+                    state.pop('_recent_say', None)
                 # Detect goal completion: was running, now not
                 if prev_goal and not curr_goal:
                     _print_system(f"[{_ts()}] Ready.")

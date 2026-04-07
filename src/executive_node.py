@@ -106,7 +106,7 @@ class Action:
     """Routing decision produced by Decide stage."""
     type: str               # 'dispatch_goal', 'proceed_goal', 'chat_response',
                             # 'alert_response', 'ask_reply', 'agent_message',
-                            # 'proactive_remark', 'propose_from_conversation',
+                            # 'proactive_remark', 'trigger_existing_goal',
                             # 'no_action'
     payload: dict
     assessment: Optional[Dict[str, Any]] = None
@@ -2013,65 +2013,6 @@ class ZenohExecutiveNode:
             f"Awaiting approval in Task Manager."
         )
 
-    def _propose_task_from_conversation(self, user_text: str, source: str):
-        """Extract a task intention from recent conversation and create a proposed task.
-
-        Called when the evaluator thinks the user wants existing work to advance
-        (e.g., confirming a proposed action). Uses an LLM call to extract what
-        the agent proposed and the user confirmed.
-        """
-        try:
-            # Gather recent conversation for context
-            entity_data = self.conversation_store.get_entity_context(source, limit=20, scope='current')
-            recent_turns = ""
-            if entity_data and 'conversation_history' in entity_data:
-                for entry in entity_data['conversation_history'][-20:]:
-                    if isinstance(entry, dict) and 'source' in entry and 'text' in entry:
-                        recent_turns += f"{entry['source']}: {str(entry['text'])[:300]}\n"
-
-            prompt = (
-                f"Recent conversation:\n{recent_turns}\n"
-                f"Latest message from {source}: {user_text}\n\n"
-                f"The user appears to be confirming or requesting that the agent proceed with "
-                f"something discussed in the conversation. Extract the specific task intention "
-                f"the user wants done.\n\n"
-                f"Respond with ONLY a JSON object:\n"
-                f'{{"intention": "one-sentence description of what to do", '
-                f'"reason": "why this was extracted from the conversation"}}\n'
-                f"If the conversation doesn't contain a clear actionable request, respond:\n"
-                f'{{"intention": "", "reason": "no clear task found"}}'
-            )
-
-            with self.infospace_executor.turn_metrics.perf_phase("propose_task"):
-                result = self.llm_generate(
-                    messages=[prompt],
-                    max_tokens=300,
-                    temperature=0.2,
-                    is_json=True,
-                )
-            if not result.success or not result.text:
-                logger.warning('propose_from_conversation: LLM call failed')
-                return
-
-            # Parse response
-            resp = result.text if isinstance(result.text, dict) else json.loads(str(result.text))
-            intention = resp.get('intention', '').strip()
-            reason = resp.get('reason', '')
-
-            if not intention:
-                logger.info(f'propose_from_conversation: no actionable task found — {reason}')
-                # Fall back to chat response
-                self._handle_chat_response(user_text, source, assessment=None)
-                return
-
-            # Create proposed task (reuse existing mechanism)
-            self._create_proposed_task('', intention, f"From conversation: {reason}")
-
-        except Exception as e:
-            logger.warning(f'propose_from_conversation failed: {e}')
-            # Fall back to chat response
-            self._handle_chat_response(user_text, source, assessment=None)
-
     def _attach_concern_to_task(self, concern_id: str, task_wip_id: str):
         """Link a concern to an existing task."""
         if not self.resource_manager:
@@ -3810,6 +3751,220 @@ class ZenohExecutiveNode:
             self._say_to_user(f"Goal '{goal_id}' not found.")
             return
         self._say_to_user(f"Goal '{goal.get('name') or goal_id}' cache cleared.")
+
+    # ── Plan view / edit / approve ──────────────────────────────────
+
+    @staticmethod
+    def _format_plan_for_display(actions: list) -> str:
+        """Pretty-print cached_plan_actions for human review."""
+        import textwrap
+        if not actions:
+            return "(no cached plan)"
+        parts = []
+        for i, action in enumerate(actions):
+            atype = action.get("type", "unknown")
+            header = f"─── Step {i + 1}  [{atype}] ───"
+            if atype == "_code_block_":
+                source = action.get("source", "")
+                # Normalize indentation and add line numbers
+                lines = textwrap.dedent(source).strip().splitlines()
+                numbered = [f"  {n + 1:3d} │ {line}" for n, line in enumerate(lines)]
+                parts.append(f"{header}\n" + "\n".join(numbered))
+            elif atype == "ask":
+                parts.append(f"{header}\n  ask: {action.get('value', '')}")
+            else:
+                # Generic action: show key=value pairs
+                detail = ", ".join(f"{k}={v!r}" for k, v in action.items() if k != "type")
+                parts.append(f"{header}\n  {detail}")
+        return "\n\n".join(parts)
+
+    @staticmethod
+    def _format_plan_for_editor(actions: list, goal: dict) -> str:
+        """Serialize cached_plan_actions to a human-editable temp-file format.
+
+        Format:
+          # Goal: <goal_id> — <name>
+          # execution_mode: <current>
+          # Delete a step by removing its entire block (header through next header).
+          # Reorder steps by moving blocks. Edit code freely.
+
+          ### STEP 1 [_code_block_]
+          <source code>
+
+          ### STEP 2 [ask]
+          <ask value>
+        """
+        import textwrap
+        lines = [
+            f"# Goal: {goal.get('goal_id', '?')} — {goal.get('name', '')}",
+            f"# execution_mode: {goal.get('execution_mode', 'replan')}",
+            "#",
+            "# Instructions:",
+            "#   - Delete a step by removing its entire block (### STEP header through next header).",
+            "#   - Reorder steps by moving blocks.",
+            "#   - Edit code freely within a step.",
+            "#   - To set execution_mode, change the value on the execution_mode line above.",
+            "#   - Lines starting with # outside of step blocks are comments (ignored).",
+            "",
+        ]
+        for i, action in enumerate(actions):
+            atype = action.get("type", "unknown")
+            lines.append(f"### STEP {i + 1} [{atype}]")
+            if atype == "_code_block_":
+                source = textwrap.dedent(action.get("source", "")).strip()
+                lines.append(source)
+            elif atype == "ask":
+                lines.append(action.get("value", ""))
+            else:
+                for k, v in action.items():
+                    if k != "type":
+                        lines.append(f"{k}: {v}")
+            lines.append("")  # blank separator
+        return "\n".join(lines)
+
+    @staticmethod
+    def _parse_plan_from_editor(text: str):
+        """Parse the temp-file format back into (actions_list, execution_mode_or_None)."""
+        import re
+        execution_mode = None
+        # Extract execution_mode from header comment
+        for line in text.splitlines():
+            m = re.match(r'^#\s*execution_mode:\s*(\S+)', line)
+            if m:
+                val = m.group(1).strip()
+                if val in ("replan", "replay"):
+                    execution_mode = val
+                break
+
+        # Split into step blocks
+        step_pattern = re.compile(r'^###\s+STEP\s+\d+\s+\[(\w+)\]\s*$', re.MULTILINE)
+        matches = list(step_pattern.finditer(text))
+        actions = []
+        for idx, match in enumerate(matches):
+            atype = match.group(1)
+            start = match.end()
+            end = matches[idx + 1].start() if idx + 1 < len(matches) else len(text)
+            body = text[start:end].strip()
+            # Strip trailing comment lines that belong to next section
+            body_lines = body.splitlines()
+            while body_lines and body_lines[-1].startswith("#"):
+                body_lines.pop()
+            body = "\n".join(body_lines).strip()
+            if atype == "_code_block_":
+                actions.append({"type": "_code_block_", "source": body})
+            elif atype == "ask":
+                actions.append({"type": "ask", "value": body})
+            else:
+                action = {"type": atype}
+                for line in body.splitlines():
+                    if ":" in line:
+                        k, v = line.split(":", 1)
+                        action[k.strip()] = v.strip()
+                actions.append(action)
+        return actions, execution_mode
+
+    def _cmd_goal_plan_show(self, data: dict) -> str:
+        goal_id = (data.get('goal_id') or '').strip()
+        if not goal_id:
+            return 'Usage: /goal plan <goal_id>'
+        goal = self._get_scheduled_goal(goal_id)
+        if not goal:
+            return f"Goal '{goal_id}' not found."
+        actions = goal.get("cached_plan_actions") or []
+        if not actions:
+            return f"Goal '{goal_id}' has no cached plan."
+        header = (
+            f"Goal {goal_id}: {goal.get('name', '')}\n"
+            f"execution_mode: {goal.get('execution_mode', 'replan')}  |  "
+            f"{len(actions)} step(s)\n"
+        )
+        self._say_to_user(header + "\n" + self._format_plan_for_display(actions))
+        return f"Displayed {len(actions)} cached plan step(s) for {goal_id}"
+
+    def _goal_plan_path(self, goal_id: str) -> str:
+        """Return the standard edit file path for a goal plan."""
+        return os.path.expanduser(f"~/goal_plan_{goal_id}.py")
+
+    def _cmd_goal_plan_edit(self, data: dict) -> str:
+        goal_id = (data.get('goal_id') or '').strip()
+        if not goal_id:
+            return 'Usage: /goal plan edit <goal_id>'
+        goal = self._get_scheduled_goal(goal_id)
+        if not goal:
+            return f"Goal '{goal_id}' not found."
+        actions = goal.get("cached_plan_actions") or []
+        if not actions:
+            return f"Goal '{goal_id}' has no cached plan to edit."
+
+        content = self._format_plan_for_editor(actions, goal)
+        plan_path = self._goal_plan_path(goal_id)
+
+        try:
+            with open(plan_path, 'w') as f:
+                f.write(content)
+        except Exception as e:
+            return f"Error writing plan file: {e}"
+
+        self._say_to_user(
+            f"Plan for goal '{goal_id}' written to:\n  {plan_path}\n\n"
+            f"Edit the file in your editor, then run:\n  /goal plan load {goal_id}"
+        )
+        return f"Plan written to {plan_path}"
+
+    def _cmd_goal_plan_load(self, data: dict) -> str:
+        goal_id = (data.get('goal_id') or '').strip()
+        if not goal_id:
+            return 'Usage: /goal plan load <goal_id>'
+        goal = self._get_scheduled_goal(goal_id)
+        if not goal:
+            return f"Goal '{goal_id}' not found."
+
+        plan_path = self._goal_plan_path(goal_id)
+        if not os.path.exists(plan_path):
+            return f"No plan file found at {plan_path}. Run /goal plan edit {goal_id} first."
+
+        try:
+            with open(plan_path, 'r') as f:
+                edited = f.read()
+        except Exception as e:
+            return f"Error reading plan file: {e}"
+
+        new_actions, new_mode = self._parse_plan_from_editor(edited)
+        if not new_actions:
+            return "No steps found in file — plan unchanged."
+
+        updates = {"cached_plan_actions": new_actions}
+        if new_mode:
+            updates["execution_mode"] = new_mode
+        self._update_scheduled_goal(goal_id, **updates)
+
+        # Clean up the edit file
+        try:
+            os.unlink(plan_path)
+        except OSError:
+            pass
+
+        mode_msg = f", execution_mode set to '{new_mode}'" if new_mode else ""
+        self._say_to_user(
+            f"Goal '{goal_id}' plan loaded: {len(new_actions)} step(s){mode_msg}."
+        )
+        return f"Plan loaded: {len(new_actions)} step(s){mode_msg}"
+
+    def _cmd_goal_plan_approve(self, data: dict) -> str:
+        goal_id = (data.get('goal_id') or '').strip()
+        if not goal_id:
+            return 'Usage: /goal plan approve <goal_id>'
+        goal = self._get_scheduled_goal(goal_id)
+        if not goal:
+            return f"Goal '{goal_id}' not found."
+        if not goal.get("cached_plan_actions"):
+            return f"Goal '{goal_id}' has no cached plan to approve."
+        self._update_scheduled_goal(goal_id, execution_mode="replay")
+        self._say_to_user(
+            f"Goal '{goal_id}' plan approved — execution_mode set to 'replay'. "
+            f"Next /goal run {goal_id} will execute the cached plan."
+        )
+        return f"Goal {goal_id} plan approved (replay mode)"
 
 
     # ── Goal scheduler callbacks ────────────────────────────────────
@@ -6556,16 +6711,36 @@ class ZenohExecutiveNode:
                 'description': 'Clear cached plan for a goal',
                 'args': ['goal_id'],
             },
+            '/goal plan': {
+                'handler': self._cmd_goal_plan_show,
+                'description': 'Show cached plan steps for a goal',
+                'args': ['goal_id'],
+            },
+            '/goal plan show': {
+                'handler': self._cmd_goal_plan_show,
+                'description': 'Show cached plan steps for a goal',
+                'args': ['goal_id'],
+            },
+            '/goal plan edit': {
+                'handler': self._cmd_goal_plan_edit,
+                'description': 'Write cached plan to file for editing',
+                'args': ['goal_id'],
+            },
+            '/goal plan load': {
+                'handler': self._cmd_goal_plan_load,
+                'description': 'Load edited plan from file',
+                'args': ['goal_id'],
+            },
+            '/goal plan approve': {
+                'handler': self._cmd_goal_plan_approve,
+                'description': 'Approve cached plan (set execution_mode to replay)',
+                'args': ['goal_id'],
+            },
             # ── Tasks ──
             '/task add': {
                 'handler': self._cmd_task_add,
                 'description': 'Create a new task',
                 'args': ['intention'],
-            },
-            '/task propose': {
-                'handler': self._cmd_task_propose,
-                'description': 'Propose a task from conversation context',
-                'args': [],
             },
             '/task approve': {
                 'handler': self._cmd_task_approve,
@@ -6764,8 +6939,8 @@ class ZenohExecutiveNode:
         # Dialog is closed by /bye, shutdown, or UI end-conversation button.
         scheduled_goal = self._upsert_scheduled_goal(goal_text)
         goal_id = scheduled_goal["goal_id"]
-        # Mark CLI/interpreted goals as ephemeral (deleted on completion)
-        scheduled_goal['ephemeral'] = True
+        # User-created goals persist so they can be reused in goal chains.
+        scheduled_goal['ephemeral'] = False
         # Store callback metadata if present (for delegated concern tasks)
         if data.get('callback_topic'):
             scheduled_goal['callback_topic'] = data['callback_topic']
@@ -6797,6 +6972,10 @@ class ZenohExecutiveNode:
         if not goal_id:
             return 'Usage: /goal run <goal_id>'
         source = data.get('source', 'user')
+        goal = self._get_scheduled_goal(goal_id)
+        if goal and goal.get("execution_mode") == "replay" and goal.get("cached_plan_actions"):
+            self._handle_goal_reuse(goal_id=goal_id)
+            return f"Goal {goal_id} replay requested"
         self._handle_goal_proceed(goal_id=goal_id, source=source)
         return f"Goal {goal_id} proceed requested"
 
@@ -6910,12 +7089,6 @@ class ZenohExecutiveNode:
             return 'A goal is running. Wait for it to complete before starting a task.'
         self._begin_task_establishment(intention)
         return f"Task created: {intention[:80]}"
-
-    def _cmd_task_propose(self, data: dict) -> str:
-        source = data.get('source', 'User')
-        text = data.get('text', '')
-        self._propose_task_from_conversation(text, source)
-        return "Task proposal initiated from conversation context"
 
     def _cmd_task_approve(self, data: dict) -> str:
         note_name = (data.get('note_name') or '').strip()
@@ -7665,13 +7838,15 @@ class ZenohExecutiveNode:
         if evt.classification == 'timer':
             return Action('no_action', {}, a)
 
-        # Instantiation: user wants existing work to advance — propose a task from conversation
+        # Instantiation: trigger an existing scheduled goal
         if action_choice == 'trigger_existing_goal':
             if not self._is_goal_running() and not self.active_task_wip:
-                return Action('propose_from_conversation', {
-                    'text': evt.content,
-                    'source': evt.source,
-                }, a)
+                target_goal_id = getattr(evt, 'goal_id', None)
+                if target_goal_id:
+                    return Action('trigger_existing_goal', {
+                        'goal_id': target_goal_id,
+                        'source': evt.source,
+                    }, a)
             return Action('no_action', {}, a)
 
         # Instantiation: formulate new goal
@@ -8206,6 +8381,9 @@ class ZenohExecutiveNode:
         if t == 'dispatch_goal':
             scheduled_goal = self._upsert_scheduled_goal(p['goal_text'])
             goal_id = scheduled_goal["goal_id"]
+            # Auto-created goals are ephemeral (deleted on completion)
+            scheduled_goal['ephemeral'] = True
+            self._save_scheduled_goal(scheduled_goal)
             # ── Graph: goal launch ──
             self._graph_emit_goal_launch(goal_id, p['goal_text'], "user")
             if self._is_goal_running():
@@ -8224,6 +8402,10 @@ class ZenohExecutiveNode:
             self._run_goal_on_thread(_run)
             return
 
+        if t == 'trigger_existing_goal':
+            self._handle_goal_proceed(goal_id=p['goal_id'], source=p.get('source', 'user'))
+            return
+
         if t == 'trigger_task':
             template_name = p.get('task_template', '')
             self._handle_trigger_task(template_name, p.get('sensor_content', ''), p.get('sensor_data', {}))
@@ -8238,10 +8420,6 @@ class ZenohExecutiveNode:
             self._graph_emit_goal_launch(
                 p['goal_id'], (goal or {}).get('goal_text', ''), p.get('source', 'user'))
             self._handle_goal_proceed(goal_id=p['goal_id'], source=p.get('source', 'user'))
-            return
-
-        if t == 'propose_from_conversation':
-            self._propose_task_from_conversation(p.get('text', ''), p.get('source', 'User'))
             return
 
         if t == 'chat_response':
