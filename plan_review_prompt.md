@@ -72,6 +72,30 @@ Common failures:
 - Conditional updates (like appending to a skip-list) must only include items
   that were actually processed successfully, not all items that were attempted.
 
+### 7. Preserving Generality
+
+The plan is instantiated for a specific goal with specific inputs. When
+rewriting, distinguish between:
+
+- **Instance parameters** (file paths, note names from the goal text) — keep
+  as-is. These match the goal text and are correct for this goal.
+- **Strategy logic** (the approach to solving the problem) — keep general.
+  Ask: "Would this plan still work if the goal text named a different file?"
+- **Fallback strategies** (alternative approaches the planner tried) — don't
+  discard these. Consolidate them as fallback branches within a single step
+  (try approach A; if that fails, try approach B) rather than removing them.
+  The planner tried multiple strategies for a reason — the first one failed.
+- **Hardcoded values from a specific run** (literal strings from one document,
+  magic numbers like character counts) — replace with computed values or
+  parameterize them.
+- **Structural exploration** (e.g., parsing YAML frontmatter, checking for
+  metadata fields) — preserve as a fast path even if it didn't help on this
+  particular input. It may be the right approach for a different input.
+
+Example: if the planner tried (1) frontmatter parsing, (2) extract on full
+content, and (3) extract on a preview, don't collapse to just (3). Instead,
+write a single step that tries (1) first, falls back to (3) if no frontmatter.
+
 ### 6. Structural Checks (Automated)
 
 The `/goal plan review` command runs these automatically:
@@ -142,3 +166,5 @@ results.
   Key findings: retry steps masquerading as pipeline; hardcoded keyword
   matching when extract fails; passing large Notes to extract produces
   unreliable output.
+- 2026-04-07: Added "Preserving Generality" checklist item. Reviewer should
+  consolidate fallback strategies as branches within a step, not discard them.
