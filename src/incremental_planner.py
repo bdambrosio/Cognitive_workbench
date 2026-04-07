@@ -334,6 +334,7 @@ Primitive Type Compatibility (world/skill tools have their own contracts):
  - search-within-collection: search indexed Collection, returns Collection
 
 Key Semantics:
+- name: Any tool that accepts `out=` also accepts an optional `name=` parameter to assign a persistent name to the output resource. Named resources survive post-goal cleanup and can be retrieved later via `load(target="the_name")`.
 - load: ONLY for (a) binding named persistent notes, or (b) slicing Collections. To read content, use get_text/get_json/get_items.
   slice=":" for full content; default "0:4096" (Notes) or "0:5" (Collections).
 - fs-list (filesystem sandbox): returns a **single Note** whose body is a **text listing** (path header + lines like `file.md  (size)` or `subdir/`). Use **get_text($binding)** to read it — **not** get_items (Collections only).
@@ -5400,6 +5401,25 @@ class IncrementalPlanner:
                 world_model = self.executor.world_model.get()
             else:
                 logger.warning("WorldModel not available, skipping update")
+
+            # Write per-goal trace file for plan review workflow
+            try:
+                en = getattr(self.executor, 'executive_node', None)
+                active_goal_id = getattr(en, '_active_scheduled_goal_id', None) if en else None
+                if active_goal_id:
+                    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    goal_trace_path = os.path.join(repo_root, f"goal_trace_{active_goal_id}.txt")
+                    with open(goal_trace_path, 'w', encoding='utf-8') as gtf:
+                        gtf.write(f"# Goal trace: {active_goal_id}\n")
+                        gtf.write(f"# Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                        gtf.write(f"# Goal: {goal}\n")
+                        gtf.write(f"{'='*80}\n\n")
+                        gtf.write(f"## Compressed Trace\n\n{compressed_trace}\n\n")
+                        gtf.write(f"{'='*80}\n\n")
+                        gtf.write(f"## Reflection Frame\n\n{reflection_frame}\n")
+                    logger.info(f"Per-goal trace written: {goal_trace_path}")
+            except Exception as e:
+                logger.warning(f"Failed to write per-goal trace: {e}")
 
             # Append authoritative planner history records (JSONL)
             seq = self._next_planner_seq()

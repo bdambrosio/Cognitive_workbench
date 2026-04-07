@@ -218,7 +218,7 @@ def _parse_command(line: str) -> Optional[dict]:
             if not rest:
                 _print_error("Usage: /goal plan [show|edit|approve] <goal_id>")
                 return None
-            if rest[0] in ('show', 'edit', 'load', 'approve'):
+            if rest[0] in ('show', 'edit', 'load', 'approve', 'review'):
                 if len(rest) < 2:
                     _print_error(f"Usage: /goal plan {rest[0]} <goal_id>")
                     return None

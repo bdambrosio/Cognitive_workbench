@@ -999,6 +999,9 @@ class ZenohExecutiveNode:
             logger.warning(f"Failed to load cognitive graph: {e}")
             self._cognitive_graph_path = None
 
+        self._last_graph_maintenance: float = 0.0
+        self._graph_maintenance_interval: float = 300.0  # 5 minutes
+
         # ── Entity Index (NER-backed entity tracking) ─────────────────
         from entity_index import EntityIndex
         self._entity_index = EntityIndex(cognitive_graph=self._cognitive_graph)
@@ -1753,19 +1756,22 @@ class ZenohExecutiveNode:
         self._ooda_living_state.maybe_persist(
             self._write_named_note, dc,
             planner_summary=self._get_planner_summary())
-        # ── Graph: consolidation + periodic save ──
+        # ── Graph: consolidation + periodic save (throttled) ──
+        now = time.monotonic()
         try:
-            if not self._is_goal_running():
-                self._cognitive_graph.consolidate()
-                # Clean up entity index for orphaned entities removed during consolidation
-                orphaned = getattr(self._cognitive_graph, '_orphaned_entities', [])
-                if orphaned:
-                    for _, canonical in orphaned:
-                        if canonical:
-                            self._entity_index._entity_nodes.pop(canonical, None)
-                    logger.info(f"🏷 Cleaned {len(orphaned)} orphaned entities from entity index")
-            if self._cognitive_graph_path:
-                self._cognitive_graph.save(self._cognitive_graph_path)
+            if (now - self._last_graph_maintenance) >= self._graph_maintenance_interval:
+                self._last_graph_maintenance = now
+                if not self._is_goal_running():
+                    self._cognitive_graph.consolidate()
+                    # Clean up entity index for orphaned entities removed during consolidation
+                    orphaned = getattr(self._cognitive_graph, '_orphaned_entities', [])
+                    if orphaned:
+                        for _, canonical in orphaned:
+                            if canonical:
+                                self._entity_index._entity_nodes.pop(canonical, None)
+                        logger.info(f"🏷 Cleaned {len(orphaned)} orphaned entities from entity index")
+                if self._cognitive_graph_path:
+                    self._cognitive_graph.save(self._cognitive_graph_path)
         except Exception as e:
             logger.debug(f"Cognitive graph maintenance failed: {e}")
         # ── Entity index: process unextracted persistent notes ──
@@ -3884,7 +3890,8 @@ class ZenohExecutiveNode:
 
     def _goal_plan_path(self, goal_id: str) -> str:
         """Return the standard edit file path for a goal plan."""
-        return os.path.join(os.getcwd(), f"goal_plan_{goal_id}.py")
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        return os.path.join(repo_root, f"goal_plan_{goal_id}.py")
 
     def _cmd_goal_plan_edit(self, data: dict) -> str:
         goal_id = (data.get('goal_id') or '').strip()
@@ -3950,6 +3957,207 @@ class ZenohExecutiveNode:
             f"Goal '{goal_id}' plan loaded: {len(new_actions)} step(s){mode_msg}."
         )
         return f"Plan loaded: {len(new_actions)} step(s){mode_msg}"
+
+    def _cmd_goal_plan_review(self, data: dict) -> str:
+        """Generate a review bundle for a goal's cached plan and last execution."""
+        goal_id = (data.get('goal_id') or '').strip()
+        if not goal_id:
+            return 'Usage: /goal plan review <goal_id>'
+        goal = self._get_scheduled_goal(goal_id)
+        if not goal:
+            return f"Goal '{goal_id}' not found."
+
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        review_path = os.path.join(repo_root, f"goal_review_{goal_id}.md")
+        plan_path = self._goal_plan_path(goal_id)
+        trace_path = os.path.join(repo_root, f"goal_trace_{goal_id}.txt")
+
+        sections = []
+
+        # ── Header ──
+        sections.append(f"# Plan Review: {goal_id}")
+        sections.append(f"Generated: {datetime.now().isoformat(timespec='seconds')}")
+        sections.append(f"Character: {self.character_name}")
+        sections.append("")
+
+        # ── Goal ──
+        sections.append("## Goal")
+        sections.append(f"**Name:** {goal.get('name', '')}")
+        sections.append(f"**Text:** {goal.get('goal_text', '')}")
+        sections.append(f"**Status:** {goal.get('status', '')}")
+        sections.append(f"**Execution mode:** {goal.get('execution_mode', 'replan')}")
+        sections.append(f"**Last result:** {goal.get('last_result', '(none)')}")
+        sections.append(f"**Primary product:** {goal.get('primary_product', '(none)')}")
+        sections.append(f"**Created:** {goal.get('created', '')}")
+        sections.append(f"**Updated:** {goal.get('updated', '')}")
+        sections.append("")
+
+        # ── Plan ──
+        actions = goal.get("cached_plan_actions") or []
+        sections.append(f"## Cached Plan ({len(actions)} steps)")
+        if actions:
+            sections.append(f"See: `{plan_path}`")
+            sections.append("")
+            sections.append("```")
+            sections.append(self._format_plan_for_display(actions))
+            sections.append("```")
+        else:
+            sections.append("(no cached plan)")
+        sections.append("")
+
+        # ── Scheduler Events ──
+        sections.append("## Scheduler Events")
+        with self._scheduler_event_lock:
+            goal_events = [e for e in self._scheduler_events if e.get("goal_id") == goal_id]
+        if goal_events:
+            for ev in goal_events[-10:]:
+                sections.append(f"- [{ev.get('ts', '')}] {ev.get('event', '')} — {ev.get('status', '')} {ev.get('result', '')}")
+        else:
+            sections.append("(no scheduler events found for this goal)")
+        sections.append("")
+
+        # ── Execution Log (filtered) ──
+        sections.append("## Execution Log (last run)")
+        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs', 'executive_node.log')
+        log_lines = self._extract_goal_log(log_path, goal_id)
+        if log_lines:
+            sections.append(f"({len(log_lines)} lines)")
+            sections.append("```")
+            sections.extend(log_lines[-200:])  # cap at 200 lines
+            sections.append("```")
+        else:
+            sections.append("(no log entries found — log may have been rotated or goal not yet run)")
+        sections.append("")
+
+        # ── Level 1 Structural Checks ──
+        sections.append("## Structural Checks")
+        checks = self._run_plan_structural_checks(actions, log_lines)
+        if checks:
+            for check in checks:
+                sections.append(f"- {check}")
+        else:
+            sections.append("(no issues found)")
+        sections.append("")
+
+        # ── Trace Reference ──
+        sections.append("## Planner Trace")
+        if os.path.exists(trace_path):
+            trace_size = os.path.getsize(trace_path)
+            trace_line_count = sum(1 for _ in open(trace_path, encoding='utf-8'))
+            sections.append(f"See: `{trace_path}` ({trace_line_count} lines, {trace_size:,} bytes)")
+        else:
+            sections.append("(no trace file — goal may not have been run in replan mode yet)")
+        sections.append("")
+
+        # ── Review Prompt Reference ──
+        prompt_path = os.path.join(repo_root, "plan_review_prompt.md")
+        sections.append("## Review Guidelines")
+        if os.path.exists(prompt_path):
+            sections.append(f"See: `{prompt_path}`")
+        else:
+            sections.append("(plan_review_prompt.md not found in repo root)")
+        sections.append("")
+
+        # Write bundle
+        try:
+            with open(review_path, 'w', encoding='utf-8') as f:
+                f.write("\n".join(sections))
+        except Exception as e:
+            return f"Error writing review bundle: {e}"
+
+        # Also write the plan file if it doesn't exist
+        if actions and not os.path.exists(plan_path):
+            try:
+                with open(plan_path, 'w', encoding='utf-8') as f:
+                    f.write(self._format_plan_for_editor(actions, goal))
+            except Exception:
+                pass
+
+        self._say_to_user(
+            f"Review bundle for '{goal_id}' written to:\n"
+            f"  {review_path}\n\n"
+            f"Plan: {plan_path}\n"
+            f"Trace: {trace_path if os.path.exists(trace_path) else '(not available)'}\n"
+            f"Prompt: {prompt_path}"
+        )
+        return f"Review bundle written to {review_path}"
+
+    @staticmethod
+    def _extract_goal_log(log_path: str, goal_id: str) -> list:
+        """Extract log lines bracketed by goal start/completion markers."""
+        if not os.path.exists(log_path):
+            return []
+        try:
+            with open(log_path, 'r', encoding='utf-8', errors='replace') as f:
+                all_lines = f.readlines()
+        except Exception:
+            return []
+
+        # Find the LAST occurrence of goal start and its matching completion
+        start_idx = None
+        end_idx = None
+        for i, line in enumerate(all_lines):
+            if goal_id in line and ('replay requested' in line or 'proceed requested' in line or 'created and started' in line):
+                start_idx = i
+                end_idx = None  # reset end for this new start
+            elif start_idx is not None and 'goal thread completed' in line:
+                end_idx = i
+        if start_idx is not None:
+            end_idx = end_idx or len(all_lines) - 1
+            return [line.rstrip() for line in all_lines[start_idx:end_idx + 1]]
+        return []
+
+    @staticmethod
+    def _run_plan_structural_checks(actions: list, log_lines: list) -> list:
+        """Run Level 1 structural checks on a plan and its execution log."""
+        issues = []
+        if not actions:
+            return ["No cached plan to check."]
+
+        # Check for failed steps in log
+        failed_steps = [l for l in log_lines if 'failed' in l.lower() and ('Code block' in l or 'step' in l.lower())]
+        for line in failed_steps:
+            issues.append(f"FAILED STEP: {line.strip()[-120:]}")
+
+        # Check for unknown action types in log
+        unknown = [l for l in log_lines if 'Unknown action type' in l]
+        for line in unknown:
+            issues.append(f"UNKNOWN ACTION: {line.strip()[-120:]}")
+
+        # Check for empty notes created
+        empty_notes = [l for l in log_lines if 'create-note' in l.lower() and ('value": ""' in l or "value\": ''" in l)]
+        for line in empty_notes:
+            issues.append(f"EMPTY NOTE CREATED: {line.strip()[-120:]}")
+
+        # Check for HTTP errors in fetch
+        http_errors = [l for l in log_lines if 'HTTP' in l and ('403' in l or '404' in l or '500' in l)]
+        for line in http_errors:
+            issues.append(f"HTTP ERROR: {line.strip()[-120:]}")
+
+        # Static analysis of plan code
+        all_bindings_written = set()
+        all_bindings_read = set()
+        import re
+        for i, action in enumerate(actions):
+            if action.get("type") == "_code_block_":
+                source = action.get("source", "")
+                # Find out= bindings
+                for m in re.finditer(r'out\s*=\s*["\'](\$\w+)["\']', source):
+                    all_bindings_written.add(m.group(1))
+                # Find get_text/get_json reads
+                for m in re.finditer(r'get_(?:text|json)\s*\(\s*["\'](\$\w+)["\']', source):
+                    all_bindings_read.add(m.group(1))
+                # Check for say with raw content (debug leftovers)
+                if re.search(r'tool\s*\(\s*["\']say["\'].*(?:str\(|content|paper_text)', source):
+                    issues.append(f"Step {i+1}: possible debug 'say' dumping raw content")
+
+        # Check for written-but-never-read bindings (excluding common sinks)
+        sinks = {'$obs_result', '$kb_written', '$kb_write', '$updated_processed'}
+        orphaned = all_bindings_written - all_bindings_read - sinks
+        for var in sorted(orphaned):
+            issues.append(f"UNUSED BINDING: {var} is written but never read in a subsequent step")
+
+        return issues
 
     def _cmd_goal_plan_approve(self, data: dict) -> str:
         goal_id = (data.get('goal_id') or '').strip()
@@ -6735,6 +6943,11 @@ class ZenohExecutiveNode:
             '/goal plan approve': {
                 'handler': self._cmd_goal_plan_approve,
                 'description': 'Approve cached plan (set execution_mode to replay)',
+                'args': ['goal_id'],
+            },
+            '/goal plan review': {
+                'handler': self._cmd_goal_plan_review,
+                'description': 'Generate review bundle for plan analysis',
                 'args': ['goal_id'],
             },
             # ── Tasks ──
@@ -10640,6 +10853,15 @@ class ZenohExecutiveNode:
                     logger.info(f'🌍 Saved world_model for {self.character_name}')
                 except Exception as e:
                     logger.error(f'Error saving world_model during shutdown: {e}')
+
+            # Save cognitive graph
+            try:
+                if self._cognitive_graph_path:
+                    self._cognitive_graph.consolidate()
+                    self._cognitive_graph.save(self._cognitive_graph_path, force=True)
+                    logger.info(f'🧠 Saved cognitive graph for {self.character_name}')
+            except Exception as e:
+                logger.error(f'Error saving cognitive graph during shutdown: {e}')
 
             # Save entity index
             try:

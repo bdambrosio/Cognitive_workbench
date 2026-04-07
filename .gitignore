@@ -74,8 +74,10 @@ README.old
 \#scratch\#
 .wiki
 
-# Goal plan edit files
+# Goal plan edit and review files
 goal_plan_*.py
+goal_trace_*.txt
+goal_review_*.md
 
 # Runtime/temp state files
 current_display.txt
