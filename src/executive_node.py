@@ -1168,6 +1168,7 @@ class ZenohExecutiveNode:
         # Periodic orientation timer (30s wall-clock)
         self._orient_timer_interval: float = 30.0
         self._last_orient_timer: float = time.monotonic()
+        self._non_timer_event_since_last_orient: bool = True  # True initially to force first eval
 
         # Tier 2 Decide: proactive remark suppression
         self._last_proactive_remark_at: float = 0.0
@@ -7556,6 +7557,11 @@ class ZenohExecutiveNode:
                 now = time.monotonic()
                 if (now - self._last_orient_timer) >= self._orient_timer_interval:
                     self._last_orient_timer = now
+                    # Skip timer event entirely when nothing has changed since
+                    # last timer — avoids LLM call, state saves, and graph writes.
+                    if not self._non_timer_event_since_last_orient:
+                        return None
+                    self._non_timer_event_since_last_orient = False
                     return EventPacket(
                         event_type='timer', classification='timer',
                         content='periodic orientation tick',
@@ -7604,6 +7610,11 @@ class ZenohExecutiveNode:
     def _ooda_orient(self, event: EventPacket) -> OrientedEvent:
         """ORIENT: Evaluate event significance via character evaluator. Single eval site."""
         assessment = None
+
+        # Track non-timer events so _ooda_observe can skip idle timer ticks.
+        if event.event_type != 'timer':
+            self._non_timer_event_since_last_orient = True
+
         if self._character_eval_enabled():
             try:
                 content = event.content
