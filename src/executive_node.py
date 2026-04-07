@@ -3884,7 +3884,7 @@ class ZenohExecutiveNode:
 
     def _goal_plan_path(self, goal_id: str) -> str:
         """Return the standard edit file path for a goal plan."""
-        return os.path.expanduser(f"~/goal_plan_{goal_id}.py")
+        return os.path.join(os.getcwd(), f"goal_plan_{goal_id}.py")
 
     def _cmd_goal_plan_edit(self, data: dict) -> str:
         goal_id = (data.get('goal_id') or '').strip()

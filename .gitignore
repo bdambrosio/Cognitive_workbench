@@ -74,6 +74,9 @@ README.old
 \#scratch\#
 .wiki
 
+# Goal plan edit files
+goal_plan_*.py
+
 # Runtime/temp state files
 current_display.txt
 current_subplanner.txt
