@@ -812,6 +812,11 @@ def _print_help():
   /goal mode <id> <mode> [time]  Set schedule mode (manual|auto|recurring|daily)
   /goal exec <id> <mode>         Set execution mode (replan|replay)
   /goal cache clear <id>         Clear cached plan
+  /goal plan <id>                Show cached plan steps
+  /goal plan edit <id>           Write plan to file for editing
+  /goal plan load <id>           Load edited plan from file
+  /goal plan approve <id>        Approve plan (set replay mode)
+  /goal plan review <id>         Generate review bundle for analysis
 
 {C.BOLD}Concerns:{C.RESET}
   /concerns [owner]              List concerns (owner: User, <character>, or all)
