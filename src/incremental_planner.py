@@ -5165,6 +5165,7 @@ class IncrementalPlanner:
             # Attach plan_actions list to executor for tracking
             self.executor._plan_actions = []
             self.executor._plan_error_count = 0  # Initialize error counter for this plan
+            self.executor._consecutive_tool_failures = {}  # Reset spiral guard per plan
             self.executor._side_effect_cache = {}  # Reset dedup cache per planner session
             self.executor._successful_side_effect_results = {}
             self.executor._done_gate_retry_active = False
@@ -5309,6 +5310,7 @@ class IncrementalPlanner:
             # Attach plan_actions list to executor for tracking
             self.executor._plan_actions = []
             self.executor._plan_error_count = 0  # Initialize error counter for this plan
+            self.executor._consecutive_tool_failures = {}  # Reset spiral guard per plan
             self.executor._side_effect_cache = {}  # Reset dedup cache per planner session
             self.goal = goal
 

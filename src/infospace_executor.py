@@ -886,9 +886,47 @@ class InfospaceExecutor:
                 logger.warning(f"Dedup: skipping duplicate {action_type} within planner session (returning cached result)")
                 return _bind_cached_result(cached)
 
+        # Consecutive-failure guard: block a tool after N consecutive failures
+        # during planning, forcing the planner to try a different approach.
+        _CONSECUTIVE_FAIL_LIMIT = 2
+        if not hasattr(self, '_consecutive_tool_failures'):
+            self._consecutive_tool_failures = {}  # tool_name → count
+        if action_type and action_type not in _SIDE_EFFECT_TOOLS:
+            fail_count = self._consecutive_tool_failures.get(action_type, 0)
+            if fail_count >= _CONSECUTIVE_FAIL_LIMIT:
+                logger.warning(
+                    f"Spiral guard: blocking '{action_type}' after {fail_count} consecutive failures. "
+                    f"Use a different tool or approach."
+                )
+                result = self._create_uniform_return(
+                    "failed",
+                    reason=f"Tool '{action_type}' blocked: {fail_count} consecutive failures. "
+                           f"Use a different tool or approach."
+                )
+                # Still track, publish, etc. below — skip straight to post-processing
+                if hasattr(self, '_plan_error_count'):
+                    self._plan_error_count += 1
+                return result
+
         # Execute the action
         result = self.execute_action(action)
-        
+
+        # Centralized name= handling: if the action has a name= arg and produced
+        # a resource, name it.  Handlers that already process name= (create-note,
+        # create-collection, persist) will have set the name already; the check
+        # below is a no-op in that case because the resource already has a name.
+        name_arg = action.get('name')
+        if (name_arg and isinstance(name_arg, str) and name_arg.strip()
+                and result.get('status') == 'success' and self.resource_manager):
+            rid = result.get('resource_id')
+            if rid:
+                res = self.resource_manager.get_resource(rid)
+                if res:
+                    props = res.get('properties', {})
+                    existing = props.get('note_name') or props.get('collection_name') or ''
+                    if not existing:
+                        self.resource_manager.set_resource_name(rid, name_arg.strip())
+
         # Ensure result is in uniform_return format
         if result.get('type') != 'uniform_return':
             result = self._create_uniform_return(
@@ -945,6 +983,13 @@ class InfospaceExecutor:
         if hasattr(self, '_compliance_tracker') and self._compliance_tracker:
             self._compliance_tracker.check_action(action, result, self.plan_bindings_flat)
         
+        # Track consecutive failures per tool for spiral guard
+        if hasattr(self, '_consecutive_tool_failures'):
+            if result.get('status') != 'success':
+                self._consecutive_tool_failures[action_type] = self._consecutive_tool_failures.get(action_type, 0) + 1
+            else:
+                self._consecutive_tool_failures[action_type] = 0
+
         # Increment error counter on failure
         if result.get('status') != 'success':
             if hasattr(self, '_plan_error_count'):
