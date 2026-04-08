@@ -166,9 +166,11 @@ def _action_write(executor, agent_name, resource_manager, **kwargs):
     except Exception as e:
         return _fail(executor, f'Write error: {e}')
 
-    logger.info(f"obsidian write: {path} ({len(body)} chars)")
-    return _success(executor, f'Wrote {path} ({len(body)} chars)',
-                    extra={"path": path, "char_count": len(body)})
+    # Report the normalized path (after sanitization) so callers see the actual filename
+    written_path = norm.lstrip('/')
+    logger.info(f"obsidian write: {written_path} ({len(body)} chars)")
+    return _success(executor, f'Wrote {written_path} ({len(body)} chars)',
+                    extra={"path": written_path, "char_count": len(body)})
 
 # ------------------------------
 # Action: list

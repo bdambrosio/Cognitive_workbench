@@ -1581,32 +1581,41 @@ def _execute_and_record_code_block(code_text: str, executor, step: int) -> tuple
 
     new_bindings = {k: v for k, v in executor.plan_bindings_flat.items() if bindings_before.get(k) != v}
 
-    # Build Stage 3 result text from the last tool's binding (deterministic)
-    # rather than the code block's return value (LLM-chosen, often wrong).
+    # Build Stage 3 result text showing all bindings (compact summary per binding)
+    # so the LLM can see what each tool call produced, not just the last one.
     # The code block return is still used for status (success/failed/reason).
     action = {"type": "_code_block_", "source": code_text}
     status = result_dict.get('status', 'failed')
     if status == 'success' and new_bindings:
-        # Use the last binding as the primary result
-        last_var, last_rid = list(new_bindings.items())[-1]
-        # Try to get a content preview from the bound resource
-        content_preview = ''
-        if isinstance(last_rid, str) and last_rid.startswith('Note_'):
-            try:
-                content = executor._get_content(last_rid)
-                if content and isinstance(content, str):
-                    content_preview = content[:800].replace('\n', ' | ')
-                elif content:
-                    content_preview = str(content)[:800]
-            except Exception:
-                pass
-        if content_preview:
-            tool_result = f"SUCCESS | {content_preview} | _code_block_ completed | Bound: ${last_var} → {last_rid}"
+        # Build per-binding summaries: "$var → NoteID (preview)"
+        binding_lines = []
+        for var_name, rid in new_bindings.items():
+            if var_name.startswith('_'):
+                continue
+            preview = ''
+            if isinstance(rid, str) and rid.startswith('Note_'):
+                try:
+                    content = executor._get_content(rid)
+                    if content and isinstance(content, str):
+                        preview = content[:200].replace('\n', ' | ')
+                    elif content:
+                        preview = str(content)[:200]
+                except Exception:
+                    pass
+            if preview:
+                binding_lines.append(f"${var_name} → {rid}: {preview}")
+            else:
+                binding_lines.append(f"${var_name} → {rid}")
+
+        # Compose result: header + per-binding lines
+        tool_name = last_tool_action.get('type', 'unknown') if last_tool_action else '_code_block_'
+        last_var = list(new_bindings.keys())[-1]
+        header = f"SUCCESS | {tool_name} → _code_block_ completed ({len(new_bindings)} bindings)"
+        if len(binding_lines) <= 4:
+            tool_result = header + "\n" + "\n".join(binding_lines)
         else:
-            tool_result = f"SUCCESS | _code_block_ completed | Bound: ${last_var} → {last_rid}"
-        if last_tool_action:
-            tool_name = last_tool_action.get('type', 'unknown')
-            tool_result = tool_result.replace('_code_block_ completed', f'{tool_name} → _code_block_ completed')
+            # Too many bindings — show first 2 and last 2
+            tool_result = header + "\n" + "\n".join(binding_lines[:2] + ["..."] + binding_lines[-2:])
     else:
         tool_result = format_result_text(result_dict, action)
 
