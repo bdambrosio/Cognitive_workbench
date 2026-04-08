@@ -8,14 +8,17 @@ replay. Update this file after each review cycle with new patterns discovered.
 
 1. Run `/goal plan review <goal_id>` in Jill's CLI to generate a review bundle.
 2. Open the review bundle (`goal_review_<goal_id>.md`) alongside this prompt.
-3. If a trace exists (`goal_trace_<goal_id>.txt`), use it to understand planner
+3. Check the **Available Tools** section in the review bundle to verify that
+   every tool call in the plan actually exists. This is the authoritative list
+   of primitives and world/external tools for the current configuration.
+4. If a trace exists (`goal_trace_<goal_id>.txt`), use it to understand planner
    reasoning — grep for specific tool calls or variable names rather than
    reading the whole trace.
-4. Review the plan in `goal_plan_<goal_id>.py` (run `/goal plan edit <goal_id>`
+5. Review the plan in `goal_plan_<goal_id>.py` (run `/goal plan edit <goal_id>`
    if the file doesn't exist).
-5. Apply the checks below. Fix issues directly in the plan file.
-6. Run `/goal plan commit <goal_id>` to load the plan, set replay mode, and inject learnings.
-7. Add any new failure patterns you discover to this file.
+6. Apply the checks below. Fix issues directly in the plan file.
+7. Run `/goal plan commit <goal_id>` to load the plan, set replay mode, and inject learnings.
+8. Add any new failure patterns you discover to this file.
 
 ---
 
@@ -44,9 +47,9 @@ Common failures:
 
 ### 3. Tool API Correctness
 
-- `fs-write` does NOT exist. Use `tool("obsidian", action="write", ...)` for
-  writing files to obsidian vaults, or `tool("fs-append", ...)` for filesystem
-  append.
+- `fs-write` and `fs-append` do NOT exist. Use `tool("obsidian", action="write", ...)`
+  for writing files. To append, read with `fs-read`, concatenate in Python, then
+  write back with `obsidian write`.
 - `get_json("$var")` returns parsed JSON. `get_text("$var")` returns raw text.
   Know which the tool produces — `fetch-text` returns a Note whose content may
   be JSON with a `"text"` key, or may be plain text.
@@ -234,6 +237,35 @@ paths like `KnowledgeBases/Untitled.md`. The planner often tries this, gets a
 the output to extract filenames, then construct explicit paths for `fs-head` or
 `fs-read`.
 
+### "Verification looks for wrong filename after title extraction"
+The planner writes a note using an extracted title (e.g., `KnowledgeBases/Paper_Title.md`),
+then verifies by reading the original name (e.g., `KnowledgeBases/Untitled.md`). The read
+fails, and the planner concludes the write failed — triggering a reprocess spiral.
+
+**Fix:** If the step writes a file under a dynamically computed name, verify by listing
+the parent directory (not by reading a hardcoded path). Or skip verification entirely —
+if `obsidian write` returned success, trust it.
+
+### "Bookkeeping file format destroyed by verbose logging"
+The planner overwrites a simple bookkeeping file (e.g., `_processed.md` containing one
+filename per line) with a verbose "processing log" to pass the `output_truncated` quality
+gate. Future runs can't parse the file, permanently breaking the pipeline.
+
+**Fix:** Never overwrite bookkeeping files with summaries. To append filenames,
+read with `fs-read`, concatenate in Python, write back with `obsidian write`.
+(`fs-append` does not exist.) Set `$eval_target` to the real deliverable, not
+the bookkeeping artifact.
+
+### "Regex \\S+ breaks on filenames with spaces"
+`fs-list` output lines look like `Untitled 1.md  (219B)`. A regex like
+`r'^(\S+\.md)\s+\('` stops at the first space, capturing `1.md` instead of
+`Untitled 1.md`. The planner then silently drops filenames with spaces from
+the list, producing an empty unprocessed set and spiraling.
+
+**Fix:** Parse `fs-list` output by finding the size suffix with
+`line.rfind('  (')` and taking everything before it as the filename. Do not
+use `\S+` for filenames — Obsidian and many filesystems allow spaces.
+
 ### "Spiral guard triggered across steps"
 The spiral guard counts consecutive failures per tool globally, not per step.
 If step 1 fails `fs-read` twice, step 2's first `fs-read` call is immediately
@@ -275,3 +307,11 @@ cross-step failure counts. Also, if a step uses `fs-list` for discovery, skip
   fs-list instead); spiral guard triggers across steps causing cascading blocks.
   Reinforced: extract truncation, quoted exec-script paths, preview over full
   content for classification.
+- 2026-04-08: Fifth review of goal_11 (gemma-4-31B replan). Spiraled 8 steps
+  on discovery — regex \S+ couldn't match filenames with spaces ("Untitled 1.md").
+  Planner never progressed past step 1. New pattern: regex filename parsing.
+- 2026-04-08: Fourth review of goal_11 after replan with new goal text. 8 steps
+  collapsed to 3. New patterns: verification reads wrong filename after title
+  extraction (triggers reprocess spiral); bookkeeping file format destroyed by
+  verbose logging to pass quality gate. Title had colons — need filename
+  sanitization beyond just spaces.

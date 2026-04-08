@@ -4043,6 +4043,34 @@ class ZenohExecutiveNode:
             sections.append("(no issues found)")
         sections.append("")
 
+        # ── Available Tools ──
+        sections.append("## Available Tools")
+        sections.append("Tools the planner can use (verify plan tool calls against this list):")
+        sections.append("")
+        # Infospace primitives
+        from infospace_executor import INFOSPACE_PRIMITIVES
+        sections.append(f"**Primitives:** {', '.join(sorted(INFOSPACE_PRIMITIVES))}")
+        sections.append("")
+        # World + external tools
+        if hasattr(self, 'infospace_executor') and self.infospace_executor:
+            ext_tools = getattr(self.infospace_executor, 'available_tools', {}) or {}
+            if ext_tools:
+                tool_lines = []
+                for tname in sorted(ext_tools.keys()):
+                    tmeta = ext_tools[tname]
+                    desc = ''
+                    if isinstance(tmeta, dict):
+                        desc = tmeta.get('description', '')
+                    if desc:
+                        tool_lines.append(f"- **{tname}**: {desc[:120]}")
+                    else:
+                        tool_lines.append(f"- **{tname}**")
+                sections.append("**World/external tools:**")
+                sections.extend(tool_lines)
+            else:
+                sections.append("(no external tools loaded)")
+        sections.append("")
+
         # ── Trace Reference ──
         sections.append("## Planner Trace")
         if os.path.exists(trace_path):
