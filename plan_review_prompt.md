@@ -148,6 +148,21 @@ may return repeated phrases, partial content, or ignore length constraints.
 **Fix:** Create a `$preview` Note from the first ~500 chars of the content and
 pass that to `extract` instead of the full Note.
 
+### "Unquoted paths in exec-script"
+Shell commands built with f-strings don't quote paths. Filenames with spaces
+(e.g., "Trading Agents.md") cause the shell to split arguments incorrectly.
+
+**Fix:** Always single-quote paths in exec-script targets:
+`tool("exec-script", target=f"mv '{source}' '{dest}/'")`.
+
+### "Classification without truncation before use"
+The `extract` tool often returns more than N words even when instructed to
+limit output. If the raw classification is used directly in a directory name
+or filename, it creates absurdly long paths.
+
+**Fix:** Always truncate to the required word count in Python *before* using
+the classification for normalization, directory creation, or file operations.
+
 ### "Fragile line parsing"
 Parsing `fs-list` output by splitting on whitespace or specific delimiters.
 The output format may change or contain filenames with spaces.
@@ -168,3 +183,7 @@ results.
   unreliable output.
 - 2026-04-07: Added "Preserving Generality" checklist item. Reviewer should
   consolidate fallback strategies as branches within a step, not discard them.
+- 2026-04-07: Added patterns from goal_12 multi-file classify+move review.
+  New: unquoted paths in exec-script; classification used without truncation
+  creating absurd directory names. Also reinforced: fs-find placeholder Notes
+  can't be passed to fs-read (use fs-list + path instead).

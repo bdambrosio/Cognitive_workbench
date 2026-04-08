@@ -4065,20 +4065,34 @@ class ZenohExecutiveNode:
         except Exception as e:
             return f"Error writing review bundle: {e}"
 
-        # Also write the plan file if it doesn't exist
-        if actions and not os.path.exists(plan_path):
+        # Always write the plan file (overwrite with current cached plan)
+        if actions:
             try:
                 with open(plan_path, 'w', encoding='utf-8') as f:
                     f.write(self._format_plan_for_editor(actions, goal))
             except Exception:
                 pass
 
+        # Build the Claude prompt for copy/paste
+        claude_prompt = (
+            f"review goal_review_{goal_id}.md, check the trace in "
+            f"goal_trace_{goal_id}.txt, and fix the plan in "
+            f"goal_plan_{goal_id}.py. Use plan_review_prompt.md for "
+            f"review guidelines. Update the prompt file with any new patterns. "
+            f"Add a ### LEARNINGS block at the end of the plan file with "
+            f"actionable insights for the world model."
+        )
+
         self._say_to_user(
             f"Review bundle for '{goal_id}' written to:\n"
-            f"  {review_path}\n\n"
-            f"Plan: {plan_path}\n"
-            f"Trace: {trace_path if os.path.exists(trace_path) else '(not available)'}\n"
-            f"Prompt: {prompt_path}"
+            f"  {review_path}\n"
+            f"  {plan_path}\n"
+            f"  {trace_path if os.path.exists(trace_path) else '(trace not available)'}\n\n"
+            f"Claude prompt (copy/paste):\n"
+            f"  {claude_prompt}\n\n"
+            f"After review:\n"
+            f"  /goal plan commit {goal_id}\n"
+            f"  /goal run {goal_id}"
         )
         return f"Review bundle written to {review_path}"
 
@@ -4175,6 +4189,160 @@ class ZenohExecutiveNode:
         )
         return f"Goal {goal_id} plan approved (replay mode)"
 
+
+    def _cmd_goal_plan_commit(self, data: dict) -> str:
+        """Load reviewed plan, set replay mode, inject learnings into world model."""
+        import re as _re
+        goal_id = (data.get('goal_id') or '').strip()
+        if not goal_id:
+            return 'Usage: /goal plan commit <goal_id>'
+        goal = self._get_scheduled_goal(goal_id)
+        if not goal:
+            return f"Goal '{goal_id}' not found."
+
+        plan_path = self._goal_plan_path(goal_id)
+        if not os.path.exists(plan_path):
+            return f"No plan file found at {plan_path}. Run /goal plan review {goal_id} first."
+
+        try:
+            with open(plan_path, 'r') as f:
+                content = f.read()
+        except Exception as e:
+            return f"Error reading plan file: {e}"
+
+        # ── Parse plan actions ──
+        new_actions, new_mode = self._parse_plan_from_editor(content)
+        if not new_actions:
+            return "No steps found in plan file."
+
+        # ── Extract ### LEARNINGS block ──
+        learnings = []
+        learnings_match = _re.search(r'^###\s+LEARNINGS\s*$(.+)', content,
+                                      _re.MULTILINE | _re.DOTALL)
+        if learnings_match:
+            for line in learnings_match.group(1).strip().splitlines():
+                line = line.strip()
+                if line.startswith('- '):
+                    learnings.append(line[2:].strip())
+                elif line and not line.startswith('#'):
+                    learnings.append(line)
+
+        # ── Load plan + set replay mode ──
+        updates = {
+            "cached_plan_actions": new_actions,
+            "execution_mode": new_mode or "replay",
+        }
+        self._update_scheduled_goal(goal_id, **updates)
+
+        # ── Inject learnings into world model ──
+        wm_injected = 0
+        ti_injected = 0
+        if learnings and hasattr(self, 'world_model') and self.world_model:
+            # Separate tool-specific insights from general facts
+            # Lines mentioning a known tool name become tool_insights
+            tool_names = set()
+            if hasattr(self, 'infospace_executor') and self.infospace_executor:
+                tool_names = set((self.infospace_executor.available_tools or {}).keys())
+            world_model_updates = []
+            tool_insights = []
+            for learning in learnings:
+                # Check if learning starts with a tool name followed by colon
+                tool_match = None
+                for tn in tool_names:
+                    if learning.lower().startswith(f"{tn}:") or learning.lower().startswith(f"{tn} tool:"):
+                        tool_match = tn
+                        break
+                if tool_match:
+                    insight_text = learning.split(':', 1)[1].strip() if ':' in learning else learning
+                    tool_insights.append({
+                        "tool": tool_match,
+                        "insight": insight_text,
+                        "status": "constrained",
+                    })
+                    ti_injected += 1
+                else:
+                    world_model_updates.append({
+                        "fact": learning,
+                        "polarity": "support",
+                        "source": "plan_review",
+                        "confidence": "high",
+                    })
+                    wm_injected += 1
+
+            if world_model_updates or tool_insights:
+                reflection_frame = {
+                    "world_model_updates": world_model_updates,
+                    "tool_insights": tool_insights,
+                }
+                self.world_model.update(reflection_frame)
+
+            # ── Auto-consolidate if planner-facing belief count exceeds threshold ──
+            beliefs = self.world_model.get()
+            belief_facts = beliefs.get("facts", [])
+            if len(belief_facts) > 30:
+                # Consolidate the raw facts that produced these beliefs
+                raw = self.world_model.get_raw()
+                raw_facts = raw.get("raw_data", {}).get("facts", [])
+                self._consolidate_world_model_facts(raw_facts)
+
+            self.world_model.save()
+
+        # ── Clean up plan file ──
+        try:
+            os.unlink(plan_path)
+        except OSError:
+            pass
+
+        parts = [f"Goal '{goal_id}' committed: {len(new_actions)} step(s), replay mode."]
+        if wm_injected or ti_injected:
+            parts.append(f"Injected {wm_injected} facts + {ti_injected} tool insights into world model.")
+        if not learnings:
+            parts.append("No ### LEARNINGS block found in plan file.")
+        self._say_to_user("\n".join(parts))
+        return f"Goal {goal_id} committed"
+
+    def _consolidate_world_model_facts(self, raw_facts: list):
+        """Batch-consolidate world model facts using a single LLM call."""
+        if not raw_facts or len(raw_facts) <= 20:
+            return
+        fact_texts = [f.get("fact", "") for f in raw_facts if f.get("fact")]
+        if not fact_texts:
+            return
+        numbered = "\n".join(f"{i+1}. {t}" for i, t in enumerate(fact_texts))
+        prompt = (
+            "Below is a numbered list of world-model facts. Some may be duplicates, "
+            "near-duplicates, or subsumed by more specific facts.\n\n"
+            "Return ONLY the line numbers to REMOVE (duplicates or subsumed entries), "
+            "as a comma-separated list of integers. Keep the more specific or more "
+            "recent version when two facts overlap. If nothing should be removed, "
+            "respond with: NONE\n\n"
+            f"{numbered}"
+        )
+        try:
+            result = self.llm_generate(
+                messages=[prompt],
+                max_tokens=200,
+                temperature=0.0,
+            )
+            if not result.success or not result.text:
+                return
+            response = result.text.strip()
+            if response.upper() == "NONE":
+                return
+            import re as _re
+            indices_to_remove = set()
+            for token in _re.findall(r'\d+', response):
+                idx = int(token) - 1  # 1-based to 0-based
+                if 0 <= idx < len(raw_facts):
+                    indices_to_remove.add(idx)
+            if indices_to_remove:
+                new_facts = [f for i, f in enumerate(raw_facts) if i not in indices_to_remove]
+                raw_data = self.world_model.get_raw().get("raw_data", {})
+                raw_data["facts"] = new_facts
+                logger.info(f"World model consolidated: removed {len(indices_to_remove)} duplicate/subsumed facts "
+                            f"({len(raw_facts)} → {len(new_facts)})")
+        except Exception as e:
+            logger.warning(f"World model consolidation failed: {e}")
 
     # ── Goal scheduler callbacks ────────────────────────────────────
 
@@ -6948,6 +7116,11 @@ class ZenohExecutiveNode:
             '/goal plan review': {
                 'handler': self._cmd_goal_plan_review,
                 'description': 'Generate review bundle for plan analysis',
+                'args': ['goal_id'],
+            },
+            '/goal plan commit': {
+                'handler': self._cmd_goal_plan_commit,
+                'description': 'Load plan, set replay, inject learnings into world model',
                 'args': ['goal_id'],
             },
             # ── Tasks ──

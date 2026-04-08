@@ -218,7 +218,7 @@ def _parse_command(line: str) -> Optional[dict]:
             if not rest:
                 _print_error("Usage: /goal plan [show|edit|approve] <goal_id>")
                 return None
-            if rest[0] in ('show', 'edit', 'load', 'approve', 'review'):
+            if rest[0] in ('show', 'edit', 'load', 'approve', 'review', 'commit'):
                 if len(rest) < 2:
                     _print_error(f"Usage: /goal plan {rest[0]} <goal_id>")
                     return None
@@ -817,6 +817,7 @@ def _print_help():
   /goal plan load <id>           Load edited plan from file
   /goal plan approve <id>        Approve plan (set replay mode)
   /goal plan review <id>         Generate review bundle for analysis
+  /goal plan commit <id>         Load plan + approve + inject learnings
 
 {C.BOLD}Concerns:{C.RESET}
   /concerns [owner]              List concerns (owner: User, <character>, or all)
