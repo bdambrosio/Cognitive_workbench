@@ -4302,7 +4302,11 @@ class ZenohExecutiveNode:
         return f"Goal {goal_id} committed"
 
     def _consolidate_world_model_facts(self, raw_facts: list):
-        """Batch-consolidate world model facts using a single LLM call."""
+        """Batch-consolidate world model facts using a single LLM call.
+
+        The LLM returns merge pairs (remove→keep) so evidence counts can be
+        absorbed by the surviving fact rather than silently discarded.
+        """
         if not raw_facts or len(raw_facts) <= 20:
             return
         fact_texts = [f.get("fact", "") for f in raw_facts if f.get("fact")]
@@ -4312,16 +4316,16 @@ class ZenohExecutiveNode:
         prompt = (
             "Below is a numbered list of world-model facts. Some may be duplicates, "
             "near-duplicates, or subsumed by more specific facts.\n\n"
-            "Return ONLY the line numbers to REMOVE (duplicates or subsumed entries), "
-            "as a comma-separated list of integers. Keep the more specific or more "
-            "recent version when two facts overlap. If nothing should be removed, "
-            "respond with: NONE\n\n"
+            "For each duplicate or subsumed entry, output a line:\n"
+            "  REMOVE <n> INTO <m>\n"
+            "meaning fact n is a duplicate/subset of fact m and should be merged into m.\n"
+            "If nothing should be removed, respond with: NONE\n\n"
             f"{numbered}"
         )
         try:
             result = self.llm_generate(
                 messages=[prompt],
-                max_tokens=200,
+                max_tokens=300,
                 temperature=0.0,
             )
             if not result.success or not result.text:
@@ -4330,16 +4334,51 @@ class ZenohExecutiveNode:
             if response.upper() == "NONE":
                 return
             import re as _re
+            # Parse "REMOVE <n> INTO <m>" lines
+            merge_pairs = []  # (remove_idx, keep_idx)
+            for match in _re.finditer(r'REMOVE\s+(\d+)\s+INTO\s+(\d+)', response, _re.IGNORECASE):
+                remove_idx = int(match.group(1)) - 1  # 1-based to 0-based
+                keep_idx = int(match.group(2)) - 1
+                if (0 <= remove_idx < len(raw_facts) and 0 <= keep_idx < len(raw_facts)
+                        and remove_idx != keep_idx):
+                    merge_pairs.append((remove_idx, keep_idx))
+
+            if not merge_pairs:
+                return
+
+            # Absorb evidence from removed facts into their survivors
             indices_to_remove = set()
-            for token in _re.findall(r'\d+', response):
-                idx = int(token) - 1  # 1-based to 0-based
-                if 0 <= idx < len(raw_facts):
-                    indices_to_remove.add(idx)
+            for remove_idx, keep_idx in merge_pairs:
+                if remove_idx in indices_to_remove:
+                    continue  # already removed by an earlier merge
+                removed = raw_facts[remove_idx]
+                survivor = raw_facts[keep_idx]
+                survivor["support_count"] = (
+                    int(survivor.get("support_count", 0)) +
+                    int(removed.get("support_count", 0))
+                )
+                survivor["contradiction_count"] = (
+                    int(survivor.get("contradiction_count", 0)) +
+                    int(removed.get("contradiction_count", 0))
+                )
+                # Merge source_counts
+                s_sc = survivor.get("source_counts") or {}
+                r_sc = removed.get("source_counts") or {}
+                for src, cnt in r_sc.items():
+                    s_sc[src] = int(s_sc.get(src, 0)) + int(cnt)
+                survivor["source_counts"] = s_sc
+                # Keep earliest first_observed and latest last_observed
+                if removed.get("first_observed_at", "z") < survivor.get("first_observed_at", "z"):
+                    survivor["first_observed_at"] = removed["first_observed_at"]
+                if removed.get("last_observed_at", "") > survivor.get("last_observed_at", ""):
+                    survivor["last_observed_at"] = removed["last_observed_at"]
+                indices_to_remove.add(remove_idx)
+
             if indices_to_remove:
                 new_facts = [f for i, f in enumerate(raw_facts) if i not in indices_to_remove]
                 raw_data = self.world_model.get_raw().get("raw_data", {})
                 raw_data["facts"] = new_facts
-                logger.info(f"World model consolidated: removed {len(indices_to_remove)} duplicate/subsumed facts "
+                logger.info(f"World model consolidated: merged {len(indices_to_remove)} facts into survivors "
                             f"({len(raw_facts)} → {len(new_facts)})")
         except Exception as e:
             logger.warning(f"World model consolidation failed: {e}")
