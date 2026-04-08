@@ -23,7 +23,7 @@ characters:
     manual_response: false
 
     task_scheduler:
-      enabled: true
+      enabled: false
       interval: 15   # minutes
 
     character: |

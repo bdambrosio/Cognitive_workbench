@@ -100,10 +100,12 @@ def _format_goal_row(g: dict) -> str:
     name = g.get('name', '')[:40]
     status = g.get('status', '?')
     mode = g.get('schedule_mode', '?')
+    exec_mode = g.get('execution_mode', '')
     running = g.get('is_running', False)
     sc = {'ready': C.GREEN, 'running': C.CYAN, 'paused': C.YELLOW, 'completed': C.DIM}.get(status, '')
     run_mark = f' {C.CYAN}[running]{C.RESET}' if running else ''
-    return f"  {C.BOLD}{gid}{C.RESET}  {sc}{status}{C.RESET}  {mode}{run_mark}  {name}"
+    exec_tag = f' {exec_mode}' if exec_mode else ''
+    return f"  {C.BOLD}{gid}{C.RESET}  {sc}{status}{C.RESET}  {mode}{exec_tag}{run_mark}  {name}"
 
 
 def _format_concern_row(concern: dict, activation: dict = None) -> str:
@@ -193,7 +195,10 @@ def _parse_command(line: str) -> Optional[dict]:
         if sub == 'add' and rest:
             return {'cmd': '/goal add', 'goal_text': ' '.join(rest)}
         if sub == 'run' and rest:
-            return {'cmd': '/goal run', 'goal_id': rest[0]}
+            d = {'cmd': '/goal run', 'goal_id': rest[0]}
+            if len(rest) > 1 and rest[1] in ('replan', 'replay'):
+                d['execution_mode'] = rest[1]
+            return d
         if sub == 'terminate' and rest:
             return {'cmd': '/goal terminate', 'goal_id': rest[0]}
         if sub == 'rename' and rest:
@@ -568,7 +573,7 @@ def _handle_query(session, character: str, data: dict, state: dict):
 # Command vocabulary for the LLM prompt (static — matches the registry)
 _COMMAND_VOCABULARY = """\
 /goal add <goal_text>          Create and run a new goal
-/goal run <goal_id>            Execute an existing goal
+/goal run <goal_id> [replan|replay]  Execute goal (override mode)
 /goal terminate <goal_id>      Stop a running goal
 /goal rename <goal_id> <name>  Rename a goal
 /goal edit <goal_id> <text>    Update goal text
@@ -804,7 +809,7 @@ def _print_help():
   /goals                         List all goals
   /goal show <id>                Show goal detail
   /goal add <text>               Create and run new goal
-  /goal run <id>                 Execute goal now
+  /goal run <id> [replan|replay]  Execute goal now (override mode)
   /goal terminate <id>           Stop a running goal
   /goal rename <id> <name>       Rename goal
   /goal edit <id> <text>         Update goal text
@@ -817,7 +822,7 @@ def _print_help():
   /goal plan load <id>           Load edited plan from file
   /goal plan approve <id>        Approve plan (set replay mode)
   /goal plan review <id>         Generate review bundle for analysis
-  /goal plan commit <id>         Load plan + approve + inject learnings
+  /goal plan commit <id>         Load + approve + inject learnings + run
 
 {C.BOLD}Concerns:{C.RESET}
   /concerns [owner]              List concerns (owner: User, <character>, or all)

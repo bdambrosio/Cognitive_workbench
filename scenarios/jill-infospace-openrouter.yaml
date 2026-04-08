@@ -23,7 +23,6 @@ characters:
     manual_response: false
 
     task_scheduler:
-      enabled: true
       interval: 15   # minutes
 
     character: |
@@ -57,15 +56,6 @@ characters:
           When issues are detected, diagnose and report to the user or attempt
           self-recovery. The check-health tool is the primary diagnostic instrument.
         weight: 0.4
-        category: homeostatic
-
-      - label: "workspace_maintenance"
-        description: >
-          Keep my information space organized: consolidate stale or redundant notes,
-          archive completed goal artifacts, maintain collection coherence, clean up
-          transient resources from past executions. Workspace entropy accumulates
-          gradually and should be addressed periodically before it impedes work.
-        weight: 0.3
         category: homeostatic
 
       - label: "user_concern_responsiveness"
@@ -104,54 +94,8 @@ characters:
         disposition: "inform"
       - name: obsidian-clipper
         schedule: "30s"
-        disposition: "trigger-task:process-obsidian-clips"
+        disposition: "inform"
 
-    task_templates:
-      - name: process-obsidian-clips
-        cooldown_seconds: 10
-        intention: >
-          Process new web clippings from the Obsidian Clippings/ folder into
-          knowledge bases.
-
-          The Clippings/ and KnowledgeBases/ directories are in the local
-          filesystem and accessible via fs-list, fs-read, etc. Use the
-          'obsidian' tool (action: write) for writing files to the vault.
-
-          WORKFLOW:
-
-          1. DISCOVER: List Clippings/ and read Clippings/_processed.md.
-             Compare to identify unprocessed .md files (ignore _processed.md
-             itself). If all clips are already processed, report "nothing to
-             process" and stop.
-
-          2. TRIAGE: List KnowledgeBases/ to discover existing topic folders.
-             For each unprocessed clip, read it to extract the source URL
-             from the YAML frontmatter 'source' field. Then use the browse
-             tool to open the source URL and extract the page text (action:
-             open, then action: text). Use the page content and title to
-             determine which existing knowledge base it best fits — strongly
-             prefer routing to an existing KB over creating a new one. Only
-             create a new KB directory with an _index.md when the clip
-             clearly does not fit any existing topic.
-
-          3. COMPILE: For each clip, read the target KB's _index.md to
-             understand existing coverage. Decide whether this clip warrants
-             a new wiki article or updates to existing articles. Write the
-             compiled article(s) to the KB directory using the obsidian tool
-             (action: write). Articles should synthesize the fetched page
-             content with existing knowledge, not merely summarize. All
-             writes must include frontmatter with 'generated-by: jill'.
-
-          4. INDEX: Update each affected KB's _index.md with new or updated
-             article entries using the obsidian tool (action: write). Include
-             article title, one-line summary, and relationships to other
-             articles.
-
-          5. RECORD: After successfully compiling each clip, append its
-             filename to Clippings/_processed.md using the obsidian tool
-             (action: write) so it is skipped on future runs.
-
-          Each milestone should handle one clip — keep goals bounded.
 
   jill-offline:
     manual: true

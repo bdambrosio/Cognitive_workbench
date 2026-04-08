@@ -14,7 +14,7 @@ replay. Update this file after each review cycle with new patterns discovered.
 4. Review the plan in `goal_plan_<goal_id>.py` (run `/goal plan edit <goal_id>`
    if the file doesn't exist).
 5. Apply the checks below. Fix issues directly in the plan file.
-6. Run `/goal plan load <goal_id>` to load the fixed plan.
+6. Run `/goal plan commit <goal_id>` to load the plan, set replay mode, and inject learnings.
 7. Add any new failure patterns you discover to this file.
 
 ---
@@ -170,6 +170,81 @@ The output format may change or contain filenames with spaces.
 **Fix:** Use more robust parsing, or prefer `fs-find` which returns structured
 results.
 
+### "Missing reason on failed return"
+`_create_uniform_return("failed", value=..., extra=...)` without an explicit
+`reason=` kwarg. The executor fills in `'Unknown error'`, which masks the real
+cause in execution logs and review bundles.
+
+**Fix:** Always pass `reason=` when returning `"failed"`. Split the return into
+explicit success/failure branches rather than using a ternary for the status.
+
+### "Unguarded cross-step variable read"
+Step N calls `get_text("$var")` for a variable that step N-1 was supposed to
+create. If step N-1 failed or crashed, the variable doesn't exist and step N
+throws an unhandled exception (or reads stale data from a prior run).
+
+**Fix:** Wrap `get_text("$var")` in a try/except for variables created by a
+prior step. Check for empty content before proceeding. This is especially
+important for the bookkeeping step that updates tracking files.
+
+### "Verification spiral"
+The planner generates a step that verifies the previous step's output, then
+generates the same verification step again and again because the eval target
+doesn't reflect the change. Symptoms: 3+ consecutive steps with identical code
+or near-identical NEXT_TASK text in the trace.
+
+**Fix:** Collapse all verification/retry steps into a single step. If the plan
+needs to confirm success, do it at the end of the processing step itself (check
+the Note content inline) rather than as a separate step. Steps 3+ that are
+copies of step 3 should be deleted entirely.
+
+### "Literal variable name passed as tool argument"
+`tool("obsidian", action="write", content="$new_paper")` passes the literal
+string `"$new_paper"` — NOT the Note's content. Variable bindings (`$var`) are
+only resolved by `get_text("$var")` or `get_json("$var")`, not by string
+interpolation in tool kwargs.
+
+**Fix:** Always dereference: `content=get_text("$new_paper")` or assign to a
+local first: `paper_text = get_text("$new_paper")` then pass `content=paper_text`.
+
+### "Hardcoded single-file processing instead of loop"
+The planner processes one specific file by name in a step that should iterate
+over a dynamic list. This produces a plan that only works for the exact files
+present during the planning run.
+
+**Fix:** Read the unprocessed list from the Note created in the discovery step
+and loop over it. The loop body should handle each file identically.
+
+### "Paywalled/403 URLs treated as permanent failures"
+`fetch-text` returns HTTP 403 for paywalled or bot-blocked sites. If the plan
+marks these files as processed (via optimistic bookkeeping), they are
+permanently skipped and never retried.
+
+**Fix:** Only append successfully fetched files to the processed list. Log the
+domain and HTTP status for world-model learning. Consider adding domain-level
+skip lists if the same domain consistently 403s.
+
+### "fs-find IDs passed to fs-read"
+`fs-find` returns Collection Notes containing placeholder Note IDs. These IDs
+cannot be passed to `fs-read` as paths — `fs-read` expects filesystem-relative
+paths like `KnowledgeBases/Untitled.md`. The planner often tries this, gets a
+"path not found" error, then burns steps discovering the issue.
+
+**Fix:** Use `fs-list` for discovery (returns human-readable filenames), parse
+the output to extract filenames, then construct explicit paths for `fs-head` or
+`fs-read`.
+
+### "Spiral guard triggered across steps"
+The spiral guard counts consecutive failures per tool globally, not per step.
+If step 1 fails `fs-read` twice, step 2's first `fs-read` call is immediately
+blocked — even though step 2 might use a correct path. This causes cascading
+failures across retry steps.
+
+**Fix:** Collapse retry steps into one step with fallback branches (try
+`fs-read`, catch failure, fall back to `fs-head`). This avoids accumulating
+cross-step failure counts. Also, if a step uses `fs-list` for discovery, skip
+`fs-read` entirely and go straight to `fs-head` for previews.
+
 ---
 
 ## Revision History
@@ -187,3 +262,16 @@ results.
   New: unquoted paths in exec-script; classification used without truncation
   creating absurd directory names. Also reinforced: fs-find placeholder Notes
   can't be passed to fs-read (use fs-list + path instead).
+- 2026-04-08: Second review of goal_11 after replay failure. New patterns:
+  missing reason= on failed return causes "Unknown error"; unguarded cross-step
+  variable reads crash when prior step fails; paywalled URLs (HTTP 403) need
+  domain-level tracking, not permanent skip.
+- 2026-04-08: Third review of goal_11 after replan run. Planner spiraled badly
+  (12 steps, 10 identical verification retries). New patterns: verification
+  spiral; literal $var passed as tool content; hardcoded single-file processing
+  instead of loop. Also: bare say() crash, planner reasoning leaked into ask.
+- 2026-04-08: Review of goal_12 (KnowledgeBases classify+move). 6 steps
+  collapsed to 2. New patterns: fs-find IDs can't be passed to fs-read (use
+  fs-list instead); spiral guard triggers across steps causing cascading blocks.
+  Reinforced: extract truncation, quoted exec-script paths, preview over full
+  content for classification.

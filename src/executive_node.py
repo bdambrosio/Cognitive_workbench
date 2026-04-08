@@ -3846,11 +3846,15 @@ class ZenohExecutiveNode:
         # Split into step blocks
         step_pattern = re.compile(r'^###\s+STEP\s+\d+\s+\[(\w+)\]\s*$', re.MULTILINE)
         matches = list(step_pattern.finditer(text))
+        # Find ### LEARNINGS header after the last step to delimit code body
+        last_step_end = matches[-1].end() if matches else 0
+        learnings_header = re.search(r'^###\s+LEARNINGS\s*$', text[last_step_end:], re.MULTILINE)
+        text_end = last_step_end + learnings_header.start() if learnings_header else len(text)
         actions = []
         for idx, match in enumerate(matches):
             atype = match.group(1)
             start = match.end()
-            end = matches[idx + 1].start() if idx + 1 < len(matches) else len(text)
+            end = matches[idx + 1].start() if idx + 1 < len(matches) else text_end
             body = text[start:end].strip()
             # Strip trailing comment lines that belong to next section
             body_lines = body.splitlines()
@@ -4091,8 +4095,7 @@ class ZenohExecutiveNode:
             f"Claude prompt (copy/paste):\n"
             f"  {claude_prompt}\n\n"
             f"After review:\n"
-            f"  /goal plan commit {goal_id}\n"
-            f"  /goal run {goal_id}"
+            f"  /goal plan commit {goal_id}"
         )
         return f"Review bundle written to {review_path}"
 
@@ -4298,8 +4301,9 @@ class ZenohExecutiveNode:
             parts.append(f"Injected {wm_injected} facts + {ti_injected} tool insights into world model.")
         if not learnings:
             parts.append("No ### LEARNINGS block found in plan file.")
+
         self._say_to_user("\n".join(parts))
-        return f"Goal {goal_id} committed"
+        return f"Goal {goal_id} committed: plan loaded, replay mode set"
 
     def _consolidate_world_model_facts(self, raw_facts: list):
         """Batch-consolidate world model facts using a single LLM call.
@@ -7159,7 +7163,7 @@ class ZenohExecutiveNode:
             },
             '/goal plan commit': {
                 'handler': self._cmd_goal_plan_commit,
-                'description': 'Load plan, set replay, inject learnings into world model',
+                'description': 'Load plan, set replay, inject learnings',
                 'args': ['goal_id'],
             },
             # ── Tasks ──
@@ -7396,10 +7400,19 @@ class ZenohExecutiveNode:
     def _cmd_goal_run(self, data: dict) -> str:
         goal_id = (data.get('goal_id') or '').strip()
         if not goal_id:
-            return 'Usage: /goal run <goal_id>'
+            return 'Usage: /goal run <goal_id> [replan|replay]'
         source = data.get('source', 'user')
         goal = self._get_scheduled_goal(goal_id)
-        if goal and goal.get("execution_mode") == "replay" and goal.get("cached_plan_actions"):
+        if not goal:
+            return f"Goal '{goal_id}' not found."
+
+        # Honor explicit execution_mode override from the command
+        mode_override = data.get('execution_mode')
+        if mode_override:
+            self._update_scheduled_goal(goal_id, execution_mode=mode_override)
+            goal['execution_mode'] = mode_override
+
+        if goal.get("execution_mode") == "replay" and goal.get("cached_plan_actions"):
             self._handle_goal_reuse(goal_id=goal_id)
             return f"Goal {goal_id} replay requested"
         self._handle_goal_proceed(goal_id=goal_id, source=source)
