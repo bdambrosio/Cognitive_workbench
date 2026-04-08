@@ -47,12 +47,24 @@ def _headers() -> Dict[str, str]:
     return h
 
 
+def _sanitize_filename(name: str) -> str:
+    """Replace spaces with underscores in a filename (no extension change)."""
+    return name.replace(' ', '_')
+
+
 def _normalize_path(file_path: str) -> str:
-    """Normalize a vault-relative path for the REST API (ensure leading /)."""
+    """Normalize a vault-relative path for the REST API (ensure leading /).
+    Also sanitizes the filename component (spaces → underscores)."""
     if file_path.startswith("/vault/"):
         file_path = file_path[7:]
     elif file_path.startswith("vault/"):
         file_path = file_path[6:]
+    # Sanitize only the filename, not directory components
+    if '/' in file_path:
+        parts = file_path.rsplit('/', 1)
+        file_path = parts[0] + '/' + _sanitize_filename(parts[1])
+    else:
+        file_path = _sanitize_filename(file_path)
     if not file_path.startswith("/"):
         file_path = "/" + file_path
     return file_path

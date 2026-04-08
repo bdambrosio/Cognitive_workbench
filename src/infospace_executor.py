@@ -2406,7 +2406,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         value_arg = action.get('value')
         out_var = action.get('out')
-        note_name = action.get('name', '')
+        note_name = (action.get('name') or '').replace(' ', '_')
         extra_props = action.get('properties')
         
         if not out_var:

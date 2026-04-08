@@ -423,13 +423,17 @@ def _extract_pdf_text(content: bytes, url: str, grobid_url: str = None, pdf_pars
                 else:
                     full_text = ""
                 
+                pdf_title = (grobid_result.get("title") or "").strip()
+                if pdf_title:
+                    full_text = f"# {pdf_title}\n\n{full_text}"
+
                 result = {
                     "text": full_text,
                     "format": "pdf",
                     "metadata": {
                         "source_url": url,
                         "pdf_metadata": {
-                            "title": grobid_result.get("title", ""),
+                            "title": pdf_title,
                             "author": grobid_result.get("authors", ""),
                             "subject": "",
                             "creator": ""
@@ -438,7 +442,7 @@ def _extract_pdf_text(content: bytes, url: str, grobid_url: str = None, pdf_pars
                     "page_count": len(chunks) if chunks else 0,
                     "char_count": len(full_text)
                 }
-                
+
                 logger.info(f"Extracted {len(full_text)} chars from PDF using GROBID ({len(chunks)} chunks)")
                 return json.dumps(result, indent=2)
         except Exception as e:
@@ -458,14 +462,18 @@ def _extract_pdf_text(content: bytes, url: str, grobid_url: str = None, pdf_pars
         metadata = doc.metadata or {}
         page_count = len(doc)
         doc.close()
-        
+
+        pdf_title = (metadata.get("title") or "").strip()
+        if pdf_title:
+            full_text = f"# {pdf_title}\n\n{full_text}"
+
         result = {
             "text": full_text,
             "format": "pdf",
             "metadata": {
                 "source_url": url,
                 "pdf_metadata": {
-                    "title": metadata.get("title", ""),
+                    "title": pdf_title,
                     "author": metadata.get("author", ""),
                     "subject": metadata.get("subject", ""),
                     "creator": metadata.get("creator", "")
@@ -474,7 +482,7 @@ def _extract_pdf_text(content: bytes, url: str, grobid_url: str = None, pdf_pars
             "page_count": page_count,
             "char_count": len(full_text)
         }
-        
+
         logger.info(f"Extracted {len(full_text)} chars from {page_count} page PDF using pymupdf")
         return json.dumps(result, indent=2)
     except Exception as e:

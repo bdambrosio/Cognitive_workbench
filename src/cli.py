@@ -145,7 +145,7 @@ def _format_goal_detail(g: dict) -> str:
                 'run_at', 'last_run_date'):
         val = g.get(key)
         if val is not None and val != '':
-            display = str(val)[:200] if key in ('goal_text', 'last_result', 'primary_product') else val
+            display = str(val)[:200] if key in ('last_result', 'primary_product') else val
             lines.append(f"  {key}: {display}")
     return '\n'.join(lines)
 
