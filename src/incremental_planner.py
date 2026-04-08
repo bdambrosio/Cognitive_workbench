@@ -2960,6 +2960,10 @@ ALWAYS follow all formatting instructions exactly.
             "- if/else control flow and loops are allowed.\n"
             "- Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
             "- LOOP PATTERN: tool() never raises — do NOT use try/except. Track ok/errors counts explicitly.\n"
+            "- EVAL TARGET: If your code block produces the goal's primary output artifact\n"
+            "  (the deliverable — e.g. the written note, the synthesized report), bind it to out=\"$eval_target\".\n"
+            "  The quality gate evaluates this artifact. If you don't set $eval_target, no quality check runs.\n"
+            "  Only set it on the step that creates or updates the real output, not on bookkeeping or verification steps.\n"
             "- OUTPUT SIZING: If OUTPUT GUIDANCE appears in the context with a target_tokens value,\n"
             "  pass target_tokens=<N> to the tool call that produces the FINAL output artifact of the goal\n"
             "  (the primary product — e.g. the last synthesize, generate-note, or extract call).\n"
@@ -2967,7 +2971,6 @@ ALWAYS follow all formatting instructions exactly.
             "\n"
             "#Stage 3 FORMAT:\n"
             "  THOUGHTS: <brief assessment of result and progress>\n"
-            "  EVAL_TARGET: <single $variable (e.g. $report) of the key output artifact from this step, or NONE if no significant artifact>\n"
             "  DONE: YES or NO — is the entire GOAL satisfied?\n"
             "  NEXT_TASK: <next task description, or blank if DONE=YES>\n"
             "  REQUEST_TOOLS: YES or NO — do you need detailed docs for tools not yet loaded?\n"
@@ -2996,21 +2999,12 @@ ALWAYS follow all formatting instructions exactly.
         _declared_output_artifacts = _normalize_artifact_refs(output_artifacts)
         _resolved_output_artifacts = _normalize_artifact_refs(resolved_output_artifacts)
         _output_artifact_names = _normalize_artifact_name_map(output_artifact_names)
-        last_eval_target = _select_primary_artifact_id(
-            executor,
-            declared_output_artifacts=_declared_output_artifacts,
-            resolved_output_artifacts=_resolved_output_artifacts,
-            output_artifact_names=_output_artifact_names,
-        )
-        if last_eval_target:
-            logger.info(f"Eval target seeded from explicit artifact context: {last_eval_target}")
+        last_eval_target = ""  # Set only when code block binds $eval_target
         stall_guard_state = {"prev_signature": None, "repeat_count": 0}
         deep_eval_retried = False
         deep_eval_prev_artifact = None
         plan_local_bindings = set()
         _asked_user_this_goal = False
-        _mid_vision_eval_counts = {}  # {eval_target_id: count} — suppress after cap
-        _MID_VISION_EVAL_CAP = 2     # max evals per artifact before suppressing
         for step in range(max_steps):
             if _interrupt_requested(executor):
                 _clear_interrupt(executor)
@@ -3087,58 +3081,25 @@ ALWAYS follow all formatting instructions exactly.
                 f"Respond using Stage 3 FORMAT.\n"
             )
             
-            # Vision evaluation before planner reflects — resolve to concrete resource ID
-            eval_target = _select_primary_artifact_id(
-                executor,
-                declared_output_artifacts=_declared_output_artifacts,
-                resolved_output_artifacts=_resolved_output_artifacts,
-                output_artifact_names=_output_artifact_names,
-                code_block_output_created=code_block_output_created,
-            )
-            # Fallback: if no declared/resolved artifact, use the last out= binding
-            # from the code block. The last binding is almost always the primary result.
-            if not eval_target and new_bindings:
-                last_var, last_rid = list(new_bindings.items())[-1]
-                if isinstance(last_rid, str) and (last_rid.startswith('Note_') or last_rid.startswith('Collection_')):
-                    eval_target = last_rid
-                    logger.info(f"Step {step}: Eval target from last binding: ${last_var} → {last_rid}")
-            if eval_target:
-                last_eval_target = eval_target
-            # If a side-effect tool ran, prefer its input content as eval target
-            # (e.g. the report that was emailed, not the email confirmation)
-            side_effect_content = _find_side_effect_content_source(executor)
-            if side_effect_content:
-                last_eval_target = side_effect_content
-                logger.info(f"Step {step}: Eval target updated to side-effect content source: {side_effect_content}")
-            # Mid-loop vision eval: only run on declared output artifacts (not every intermediate binding)
-            run_mid_vision = False
-            if eval_target and vision_criteria and _declared_output_artifacts and executor:
-                for oa in _declared_output_artifacts:
-                    oa_key = oa.strip().lstrip("$")
-                    oa_rid = executor.plan_bindings_flat.get(oa_key) or executor.plan_bindings_flat.get("$" + oa_key)
-                    if oa_rid and oa_rid == eval_target:
-                        run_mid_vision = True
-                        break
-            if run_mid_vision:
-                # Enforce per-artifact eval cap to prevent loops on unfixable criteria
-                mid_key = _resolve_eval_target_id(last_eval_target, executor) or last_eval_target
-                _mid_vision_eval_counts[mid_key] = _mid_vision_eval_counts.get(mid_key, 0) + 1
-                if _mid_vision_eval_counts[mid_key] <= _MID_VISION_EVAL_CAP:
-                    logger.info(f"Step {step}: Vision eval target (declared artifact): {last_eval_target} (eval #{_mid_vision_eval_counts[mid_key]})")
+            # Eval target: only from explicit $eval_target binding in code block
+            eval_target_rid = new_bindings.get('eval_target', '')
+            if eval_target_rid and isinstance(eval_target_rid, str) and (eval_target_rid.startswith('Note_') or eval_target_rid.startswith('Collection_')):
+                eval_target_changed = (eval_target_rid != last_eval_target)
+                last_eval_target = eval_target_rid
+                if eval_target_changed and vision_criteria:
+                    logger.info(f"Step {step}: $eval_target bound → {eval_target_rid}, running vision eval")
                     compressed_ctx = _compress_trace(str(s))
                     vision_eval_text = _vision_eval_check(vision_criteria, last_eval_target, executor, compressed_context=compressed_ctx)
                     if vision_eval_text:
                         s += user(f"VISION EVALUATION:\n{vision_eval_text}\nFAILs are advisory — attempt to address if easy, do NOT loop on unfixable criteria.\n")
                         s += assistant("Noted.\n")
-                else:
-                    logger.info(f"Step {step}: Vision eval suppressed for {last_eval_target} (eval cap {_MID_VISION_EVAL_CAP} reached)")
+                elif not eval_target_changed:
+                    logger.info(f"Step {step}: $eval_target unchanged ({eval_target_rid}), skipping vision eval")
 
-            # Stage 3: Structured reflection (6 fields, select() for categorical decisions)
+            # Stage 3: Structured reflection (5 fields, select() for categorical decisions)
             s += assistant(
                 "THOUGHTS: "
-                + gen(f"thoughts_{step}", max_tokens=128, temperature=REFLECT_TEMPERATURE, stop="\nEVAL_TARGET:")
-                + "\nEVAL_TARGET: "
-                + gen(f"eval_target_{step}", max_tokens=32, temperature=SELECT_TEMPERATURE, stop="\nDONE:")
+                + gen(f"thoughts_{step}", max_tokens=128, temperature=REFLECT_TEMPERATURE, stop="\nDONE:")
                 + "\nDONE: "
                 + select(f"done_{step}", ["YES", "NO"])
                 + "\nNEXT_TASK: "
@@ -3171,32 +3132,12 @@ ALWAYS follow all formatting instructions exactly.
                     return default
             
             logger.info(f"THOUGHTS: {safe_get(s, f'thoughts_{step}')}")
-            logger.info(f"EVAL_TARGET: {safe_get(s, f'eval_target_{step}')}")
             logger.info(f"DONE: {safe_get(s, f'done_{step}')}")
             logger.info(f"NEXT_TASK: {safe_get(s, f'next_task_{step}')}")
             if s[f"request_tools_{step}"] == "YES":
                 logger.info(f"REQUEST_TOOLS: YES — {safe_get(s, f'request_tools_list_{step}', '')[:200]}")
             if s[f"ask_user_{step}"] == "YES":
                 logger.info(f"ASK_USER: YES — {safe_get(s, f'ask_user_question_{step}', '')[:200]}")
-
-            # Update last_eval_target from LLM-declared EVAL_TARGET (overrides heuristic)
-            llm_eval_target_raw = safe_get(s, f"eval_target_{step}", "").strip()
-            if llm_eval_target_raw and llm_eval_target_raw.upper() != "NONE":
-                llm_rid = _resolve_artifact_reference_id(
-                    llm_eval_target_raw,
-                    executor,
-                    output_artifact_names=_output_artifact_names,
-                )
-                if llm_rid and _allow_llm_eval_target_override(
-                    llm_eval_target_raw,
-                    llm_rid,
-                    executor,
-                    declared_output_artifacts=_declared_output_artifacts,
-                    resolved_output_artifacts=_resolved_output_artifacts,
-                    output_artifact_names=_output_artifact_names,
-                ):
-                    last_eval_target = llm_rid
-                    logger.info(f"Step {step}: LLM-declared eval target resolved: {last_eval_target}")
             
             # Stage 3.1: Update resource indexes with commentary
             thoughts_text = s[f'thoughts_{step}'].strip()
@@ -3234,7 +3175,7 @@ ALWAYS follow all formatting instructions exactly.
             
             # Strip <think> tags from model outputs (Qwen3 thinking mode / OpenRouter provider variance)
             # Note: done_{step}, request_tools_{step}, and ask_user_{step} use select(), not gen(), so they're immune.
-            for _key in [f"thoughts_{step}", f"eval_target_{step}", f"next_task_{step}", f"request_tools_list_{step}", f"ask_user_question_{step}"]:
+            for _key in [f"thoughts_{step}", f"next_task_{step}", f"request_tools_list_{step}", f"ask_user_question_{step}"]:
                 if _key in s:
                     s[_key] = _strip_think_tags(s[_key])
 
@@ -4111,6 +4052,10 @@ ALWAYS follow all formatting instructions exactly.
         "- if/else control flow and loops are allowed.\n"
         "- Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
         "- LOOP PATTERN: tool() never raises — do NOT use try/except. Track ok/errors counts explicitly.\n"
+        "- EVAL TARGET: If your code block produces the goal's primary output artifact\n"
+        "  (the deliverable — e.g. the written note, the synthesized report), bind it to out=\"$eval_target\".\n"
+        "  The quality gate evaluates this artifact. If you don't set $eval_target, no quality check runs.\n"
+        "  Only set it on the step that creates or updates the real output, not on bookkeeping or verification steps.\n"
         "- OUTPUT SIZING: If OUTPUT GUIDANCE appears in the context with a target_tokens value,\n"
         "  pass target_tokens=<N> to the tool call that produces the FINAL output artifact of the goal\n"
         "  (the primary product — e.g. the last synthesize, generate-note, or extract call).\n"
@@ -4118,7 +4063,6 @@ ALWAYS follow all formatting instructions exactly.
         "\n"
         "#Stage 3 FORMAT:\n"
         "  THOUGHTS: <brief assessment of result and progress>\n"
-        "  EVAL_TARGET: <single $variable (e.g. $report) of the key output artifact from this step, or NONE if no significant artifact>\n"
         "  DONE: <YES or NO — is the entire GOAL satisfied?>\n"
         "  VERIFICATION: <if DONE=YES: list observable facts proving GOAL is met, and any missing outcomes. Write SUCCESS, PARTIAL, or INCONCLUSIVE. If DONE=NO, leave blank.>\n"
         "  NEXT_TASK: <next task description, or blank if DONE=YES>\n"
@@ -4151,21 +4095,12 @@ ALWAYS follow all formatting instructions exactly.
     _declared_output_artifacts = _normalize_artifact_refs(output_artifacts)
     _resolved_output_artifacts = _normalize_artifact_refs(resolved_output_artifacts)
     _output_artifact_names = _normalize_artifact_name_map(output_artifact_names)
-    last_eval_target = _select_primary_artifact_id(
-        executor,
-        declared_output_artifacts=_declared_output_artifacts,
-        resolved_output_artifacts=_resolved_output_artifacts,
-        output_artifact_names=_output_artifact_names,
-    )
-    if last_eval_target:
-        logger.info(f"Eval target seeded from explicit artifact context: {last_eval_target}")
+    last_eval_target = ""  # Set only when code block binds $eval_target
     stall_guard_state = {"prev_signature": None, "repeat_count": 0}
     deep_eval_retried = False
     deep_eval_prev_artifact = None
     plan_local_bindings = set()
     _asked_user_this_goal = False
-    _mid_vision_eval_counts = {}  # {eval_target_id: count} — suppress after cap
-    _MID_VISION_EVAL_CAP = 2     # max evals per artifact before suppressing
     for step in range(max_steps):
         if _interrupt_requested(executor):
             _clear_interrupt(executor)
@@ -4239,40 +4174,20 @@ ALWAYS follow all formatting instructions exactly.
             f"Respond using Stage 3 FORMAT.\n"
         )
         
-        # Vision evaluation before planner reflects — resolve to concrete resource ID
-        eval_target = _select_primary_artifact_id(
-            executor,
-            declared_output_artifacts=_declared_output_artifacts,
-            resolved_output_artifacts=_resolved_output_artifacts,
-            output_artifact_names=_output_artifact_names,
-            code_block_output_created=code_block_output_created,
-        )
-        # Fallback: if no declared/resolved artifact, use the last out= binding
-        if not eval_target and new_bindings:
-            last_var, last_rid = list(new_bindings.items())[-1]
-            if isinstance(last_rid, str) and (last_rid.startswith('Note_') or last_rid.startswith('Collection_')):
-                eval_target = last_rid
-                logger.info(f"Step {step}: Eval target from last binding: ${last_var} → {last_rid}")
-        if eval_target:
-            last_eval_target = eval_target
-        # If a side-effect tool ran, prefer its input content as eval target
-        side_effect_content = _find_side_effect_content_source(executor)
-        if side_effect_content:
-            last_eval_target = side_effect_content
-            logger.info(f"Step {step}: Eval target updated to side-effect content source: {side_effect_content}")
-        if eval_target and vision_criteria:
-            # Enforce per-artifact eval cap to prevent loops on unfixable criteria
-            mid_key = _resolve_eval_target_id(last_eval_target, executor) or last_eval_target
-            _mid_vision_eval_counts[mid_key] = _mid_vision_eval_counts.get(mid_key, 0) + 1
-            if _mid_vision_eval_counts[mid_key] <= _MID_VISION_EVAL_CAP:
-                logger.info(f"Step {step}: Vision eval target: {last_eval_target} (eval #{_mid_vision_eval_counts[mid_key]})")
+        # Eval target: only from explicit $eval_target binding in code block
+        eval_target_rid = new_bindings.get('eval_target', '')
+        if eval_target_rid and isinstance(eval_target_rid, str) and (eval_target_rid.startswith('Note_') or eval_target_rid.startswith('Collection_')):
+            eval_target_changed = (eval_target_rid != last_eval_target)
+            last_eval_target = eval_target_rid
+            if eval_target_changed and vision_criteria:
+                logger.info(f"Step {step}: $eval_target bound → {eval_target_rid}, running vision eval")
                 compressed_ctx = _compress_trace(prompt)
                 vision_eval_text = _vision_eval_check(vision_criteria, last_eval_target, executor, compressed_context=compressed_ctx)
                 if vision_eval_text:
                     prompt += format_user(f"VISION EVALUATION:\n{vision_eval_text}\nFAILs are advisory — attempt to address if easy, do NOT loop on unfixable criteria.\n")
                     prompt += format_assistant("Noted.\n")
-            else:
-                logger.info(f"Step {step}: Vision eval suppressed for {last_eval_target} (eval cap {_MID_VISION_EVAL_CAP} reached)")
+            elif not eval_target_changed:
+                logger.info(f"Step {step}: $eval_target unchanged ({eval_target_rid}), skipping vision eval")
 
         # Stage 3: simplified reflection (5 fields + inline verification when DONE)
         prompt += format_assistant("")
@@ -4280,8 +4195,7 @@ ALWAYS follow all formatting instructions exactly.
         stage3_block = vllm_gen(f"stage3_block_{step}", prompt, state, max_tokens=384, temperature=GEN_TEMPERATURE, executor=executor, llm_prompt=compressed_for_llm)
         prompt += stage3_block + "\n"
 
-        thoughts_val = _strip_think_tags(_extract_between_labels(stage3_block, "THOUGHTS:", "EVAL_TARGET:"))
-        eval_target_val = _strip_think_tags(_extract_line_value(stage3_block, "EVAL_TARGET:"))
+        thoughts_val = _strip_think_tags(_extract_between_labels(stage3_block, "THOUGHTS:", "DONE:"))
         done_val = _strip_think_tags(_extract_line_value(stage3_block, "DONE:"))
         verification_val = _strip_think_tags(_extract_between_labels(stage3_block, "VERIFICATION:", "NEXT_TASK:"))
         next_task_val = _strip_numbered_prefix(_strip_think_tags(_extract_between_labels(stage3_block, "NEXT_TASK:", "REQUEST_TOOLS:")))
@@ -4296,7 +4210,6 @@ ALWAYS follow all formatting instructions exactly.
                 stage3_json = _json.loads(_extract_braced_json_object(stage3_block))
                 if isinstance(stage3_json, dict):
                     thoughts_val = thoughts_val or str(stage3_json.get("thoughts", ""))
-                    eval_target_val = eval_target_val or str(stage3_json.get("eval_target", ""))
                     done_raw_json = stage3_json.get("done", "")
                     # Normalize JSON booleans: true → "YES", false → "NO"
                     if done_raw_json is True:
@@ -4322,7 +4235,6 @@ ALWAYS follow all formatting instructions exactly.
                 pass
 
         state[f"thoughts_{step}"] = thoughts_val
-        state[f"eval_target_{step}"] = eval_target_val
         state[f"done_{step}"] = done_val
         state[f"verification_{step}"] = verification_val
         state[f"next_task_{step}"] = next_task_val
@@ -4337,7 +4249,6 @@ ALWAYS follow all formatting instructions exactly.
                 return default
         
         logger.info(f"THOUGHTS: {safe_get(state, f'thoughts_{step}')}")
-        logger.info(f"EVAL_TARGET: {safe_get(state, f'eval_target_{step}')}")
         logger.info(f"DONE: {safe_get(state, f'done_{step}')}")
         if verification_val:
             logger.info(f"VERIFICATION: {verification_val}")
@@ -4346,23 +4257,6 @@ ALWAYS follow all formatting instructions exactly.
         if ask_user_needed_val.startswith("YES"):
             logger.info(f"ASK_USER_NEEDED: YES (will generate question in follow-up call)")
 
-        llm_eval_target_raw = state.get(f"eval_target_{step}", "").strip()
-        if llm_eval_target_raw and llm_eval_target_raw.upper() != "NONE":
-            llm_rid = _resolve_artifact_reference_id(
-                llm_eval_target_raw,
-                executor,
-                output_artifact_names=_output_artifact_names,
-            )
-            if llm_rid and _allow_llm_eval_target_override(
-                llm_eval_target_raw,
-                llm_rid,
-                executor,
-                declared_output_artifacts=_declared_output_artifacts,
-                resolved_output_artifacts=_resolved_output_artifacts,
-                output_artifact_names=_output_artifact_names,
-            ):
-                last_eval_target = llm_rid
-                logger.info(f"Step {step}: LLM-declared eval target resolved: {last_eval_target}")
         
         # Stage 3.1: Update resource indexes with commentary
         thoughts_text = state.get(f'thoughts_{step}', '').strip()
