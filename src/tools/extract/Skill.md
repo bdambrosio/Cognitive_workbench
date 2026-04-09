@@ -59,6 +59,7 @@ For **small, predictable structure** embedded in Note text (e.g. YAML frontmatte
 - The task is reformatting, not integrating across multiple documents
 
 **Do NOT use `extract` when:**
+- Extracting bibliography/references from a paper → use `extract-references` (GROBID-based, structured, deterministic). It accepts a Note ID from `semantic-scholar` and returns structured citation data (title, authors, year, venue). Far more reliable than LLM extraction for reference lists.
 - Integrating across multiple documents → use `synthesize`
 - Creating content from scratch → use `generate-note`
 - Filtering items in a Collection → use `filter-structured` or `filter-semantic`
@@ -67,6 +68,7 @@ For **small, predictable structure** embedded in Note text (e.g. YAML frontmatte
 ## Anti-Patterns
 
 - ❌ `extract(target=$collection)` — Must be a single Note. Use `map(extract)` for Collections.
+- ❌ `extract(target=$paper, instruction="extract citations/references")` — Use `extract-references` instead. It uses GROBID for structural parsing and returns structured data per citation.
 - ❌ `extract(target=$note, instruction="add a conclusion")` — Adds new content. Use `generate-note`.
 - ❌ `extract(target=$note, instruction="compare with other papers")` — Cross-document. Use `synthesize`.
 

@@ -331,6 +331,60 @@ correctly.
 a text listing with filenames visible, parseable in Python without extra tool
 calls.
 
+### "Missing $eval_target binding"
+The plan returns `extra={"eval_target": output}` in the return dict, but the
+system requires an explicit `out="$eval_target"` binding on a tool call (e.g.,
+`create-note`). Without the binding, no primary product is identified, the
+quality gate doesn't run, and post-completion cleanup may delete all outputs.
+
+**Fix:** Create the deliverable as a Note bound to `$eval_target`:
+`tool("create-note", content=report_text, out="$eval_target")`. The return
+dict's `extra` field is for metadata, not for declaring the primary product.
+
+### "Re-fetching content that's already loaded"
+`semantic-scholar` returns a Collection with full paper text (via GROBID). The
+planner then tries to extract `pdf_url` from metadata and pass it to
+`extract-references` or `fetch-text` to re-fetch the same content. This wastes
+steps, introduces failure points (URL extraction, HTTP fetches), and often
+spirals when the URL plumbing doesn't work.
+
+**Fix:** Use `map(extract)` or `synthesize` directly on the Collection that
+already contains the text. Check each tool's Skill.md for what its output
+already includes before adding fetch steps.
+
+### "pluck on tool_metadata fields"
+`pluck(target="$paper", field="metadata.pdf_url")` always fails because `pluck`
+operates on Note **content**, not on the separate `tool_metadata` property.
+semantic-scholar stores metadata (title, authors, pdf_url, etc.) in a relation
+Note, not in the content field. The planner tries `pluck` on various
+`metadata.*` field paths, gets empty results, and spirals.
+
+**Fix:** To access tool_metadata fields: `get-metadata` on the Note →
+`get_text("$metadata")` → `json.loads()` in Python. But often the metadata
+isn't needed at all — if the goal is content extraction, the Note body already
+has the full text (when GROBID is available).
+
+### "Synthesize for structured extraction"
+The planner uses `synthesize` expecting a structured list (e.g., citation list,
+file inventory) but gets a narrative overview ("the literature reveals a clear
+trajectory..."). Symptoms: repeated synthesize calls with increasingly specific
+`focus` instructions, all returning prose instead of lists.
+
+**Fix:** `synthesize` produces narratives by design. For structured extraction,
+use `map(extract)` on the Collection to get per-item structured output, then
+`flatten` into a single Note. Report the flattened text directly — do not pipe
+it through `synthesize` again.
+
+### "Repeated extract-on-Collection"
+The planner calls `extract(target="$collection_var")`, gets an error that
+extract requires a Note not a Collection, then retries the same call 2-3 steps
+later. The type error is deterministic — retrying can't help.
+
+**Fix:** When the target is a Collection, use `map(extract)` (processes each
+item) or index into it with `get_items("$var")[0]` to get a single Note.
+If the reviewer sees `extract` called on a known Collection binding, fix it
+on first occurrence — don't leave it for the spiral guard to catch.
+
 ---
 
 ## Revision History
@@ -370,6 +424,18 @@ calls.
   Hardcoded Note IDs. Passed "$var" literal to obsidian content. Duplicate entries
   in _processed.md. New patterns: infinite comment loop on tool gap; fs-find Note
   IDs vs filenames.
+- 2026-04-09: Review of goal_15 (paper citation fetch). 13 steps, massive retry
+  spiral. Planner forgot extract can't operate on Collections 3 times; used
+  synthesize expecting structured lists but got narratives; hit spiral guard.
+  Collapsed to 2 steps: semantic-scholar → map(extract) + flatten + say.
+  New patterns: synthesize for structured extraction; repeated extract-on-Collection.
+- 2026-04-09: Second review of goal_15 (replan run after file edit). 17 steps,
+  loop guard triggered. Planner used extract-references on Collection (needs PDF
+  URL), then spiraled reading JSON Notes with pluck(field="text"). No $eval_target
+  binding so cleanup deleted all output. Collapsed to 2 steps: semantic-scholar →
+  map(extract) + flatten + create-note($eval_target) + say. New patterns: missing
+  $eval_target binding; re-fetching content already loaded by semantic-scholar;
+  pluck on tool_metadata fields (must use get-metadata + json.loads instead).
 - 2026-04-08: Review of goal_14 (3-hop citation chain). 20 steps, hit step
   limit. Planner spiraled 13 steps on "truncation" that was actually the
   200-char binding preview. Built chain via synthesize (LLM-generated, lossy)

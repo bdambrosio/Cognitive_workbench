@@ -630,7 +630,8 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
     # Enhanced descriptions to prevent common confusions
     TOOL_DISAMBIGUATION = {
         "search-web": "Search web and return a single Note with synthesized text. Use extract/synthesize for further processing.",
-        "semantic-scholar": "Search academic papers and return Collection of Notes with text content (full paper via GROBID or abstract). Use extract/synthesize directly on the Collection.",
+        "semantic-scholar": "Search academic papers and return Collection of Notes with text content (full paper via GROBID or abstract). For bibliography/citation extraction, use extract-references (pass the Note ID). For content analysis, use extract/synthesize on the Collection.",
+        "extract-references": "Extract bibliography/references from a PDF or a semantic-scholar Note ID (reads pdf_url from tool_metadata). Returns structured Collection (title, authors, year, venue per reference). Prefer over extract/map(extract) for citation lists.",
         "fetch-text": "Fetch text from a SINGLE specific URL. Use ONLY when you have one URL to fetch directly and do not already have the text.",
         "discover-notes": "Global discovery across all Notes. Returns Collection of Notes with text content.",
         "discover-collections": "Global discovery across all Collections. Returns Collection of Notes with text content.",
