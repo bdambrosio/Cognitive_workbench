@@ -217,6 +217,10 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
         
         # Extract schema_hint from frontmatter if present
         schema_hint = metadata.get('schema_hint', {})
+
+        # Extract resolve hints from frontmatter if present
+        # Maps parameter names to resolution modes: "content" (default), "resource_id", "literal"
+        resolve_hints = metadata.get('resolve', {})
         
         # Optional situational hint for context builders
         situational = bool(metadata.get('situational', False))
@@ -233,6 +237,7 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
             'workflows': workflows,
             'examples': examples,
             'schema_hint': schema_hint,
+            'resolve': resolve_hints,
             'situational': situational,
             'hidden': hidden,
             'path': str(tool_dir.absolute()),

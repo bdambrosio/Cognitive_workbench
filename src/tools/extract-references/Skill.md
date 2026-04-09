@@ -3,6 +3,8 @@ name: extract-references
 type: python
 description: "Extract bibliography/references from PDF files using GROBID and return a Collection of Notes (one per reference)."
 schema_hint: {"path": "string (PDF file path or Note ID)", "grobid_url": "string"}
+resolve:
+  path: resource_id
 ---
 
 # extract-references

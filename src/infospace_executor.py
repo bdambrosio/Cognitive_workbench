@@ -1158,11 +1158,25 @@ class InfospaceExecutor:
             # Input data: use 'target' if present, otherwise fall back to 'value'
             target_field = action.get('target')
             value_field = action.get('value')
-            
+
+            # Check tool resolve hints for target/value fields
+            tool_resolve = self.available_tools[action_type].get('resolve', {})
+            target_hint = tool_resolve.get('target', 'content')
+            value_hint = tool_resolve.get('value', 'content')
+
+            # Select resolver based on hint
+            def _pick_resolver(hint):
+                if hint == 'resource_id':
+                    return self._resolve_to_resource_id
+                elif hint == 'literal':
+                    return lambda v: v
+                return self._resolve_value
+
             if target_field:
                 try:
-                    value = self._resolve_value(target_field)
-                    logger.debug(f"_execute_apply: resolved target '{target_field}' -> value type={type(value)}, is_none={value is None}, is_empty={value == ''}, truthy={bool(value)}")
+                    resolver = _pick_resolver(target_hint)
+                    value = resolver(target_field)
+                    logger.debug(f"_execute_apply: resolved target '{target_field}' (hint={target_hint}) -> value type={type(value)}, is_none={value is None}, is_empty={value == ''}, truthy={bool(value)}")
                     # Check if target resolved to None or empty (unbound variable, Note not found, or empty content)
                     if value is None:
                         return self._create_uniform_return('failed', reason=f'target "{target_field}" resolved to None (variable unbound or resource not found)')
@@ -1182,8 +1196,9 @@ class InfospaceExecutor:
                         return self._create_uniform_return('failed', reason=str(e))
             elif value_field is not None:
                 # Use 'value' field as input (for tools like calculate that don't use target)
-                value = self._resolve_value(value_field)
-                logger.debug(f"_execute_apply: resolved value '{value_field}' -> value type={type(value)}, is_none={value is None}, is_empty={value == ''}, truthy={bool(value)}")
+                resolver = _pick_resolver(value_hint)
+                value = resolver(value_field)
+                logger.debug(f"_execute_apply: resolved value '{value_field}' (hint={value_hint}) -> value type={type(value)}, is_none={value is None}, is_empty={value == ''}, truthy={bool(value)}")
                 if value is None:
                     return self._create_uniform_return('failed', reason=f'value "{value_field}" resolved to None (variable unbound or resource not found)')
             else:
@@ -2267,11 +2282,23 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         tool_func = tool_module.tool
         
         # Resolve any variables in additional args (per-call, cannot be cached)
+        # Per-parameter resolution: tools can declare resolve hints in Skill.md
+        # frontmatter to control how each kwarg is resolved:
+        #   "content"     — default, dereference $var/Note_ID to content
+        #   "resource_id" — resolve $var to resource ID, pass Note_ID as-is
+        #   "literal"     — no resolution, pass raw string through
+        resolve_hints = tool_info.get('resolve', {}) if tool_info else {}
         resolved_args = {}
         if additional_args:
             for key, val in additional_args.items():
+                hint = resolve_hints.get(key, 'content')
                 try:
-                    resolved_args[key] = self._resolve_value(val)
+                    if hint == 'resource_id':
+                        resolved_args[key] = self._resolve_to_resource_id(val)
+                    elif hint == 'literal':
+                        resolved_args[key] = val
+                    else:
+                        resolved_args[key] = self._resolve_value(val)
                 except ValueError as e:
                     # If resolution fails (unbound variable), for 'target' parameter of certain tools,
                     # treat as literal string (strip $ prefix if present)
@@ -5943,14 +5970,47 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # Otherwise return as-is (could be a name for load operation)
         return value
     
+    def _resolve_to_resource_id(self, value: Any) -> Any:
+        """
+        Resolve $variable to its resource ID (Note_N / Collection_N) WITHOUT
+        dereferencing to content.  Literal resource IDs are returned as-is.
+
+        Use this for tool parameters that need the resource ID itself (e.g.
+        extract-references 'path', which does its own Note lookup).
+
+        Args:
+            value: "$variable" string, literal resource ID, or plain string
+
+        Returns:
+            Resource ID string, or the original value unchanged for plain strings.
+        """
+        if not isinstance(value, str):
+            return value
+
+        # Single $variable reference → return the binding (resource ID)
+        if value.startswith('$'):
+            var_name = value.lstrip('$')
+            resource_id = self._get_binding(var_name)
+            if resource_id is None:
+                logger.warning(f"Unbound variable {value} in resource_id resolution, returning literal")
+                return var_name
+            return resource_id
+
+        # Literal resource ID → pass through (do NOT dereference to content)
+        if value.startswith('Note_') or value.startswith('Collection_') or value.startswith('Relation_'):
+            return value
+
+        # Plain string (URL, file path, etc.) → pass through
+        return value
+
     def _resolve_value(self, value: Any) -> Any:
         """
         Resolve $variable to its content value.
         Supports both entire variable references and template strings with embedded variables.
-        
+
         Args:
             value: Can be a literal value, "$variable" string, or template string with embedded "$variable" patterns
-            
+
         Returns:
             Resolved content value (fetches from resource manager if resource ID)
         """

@@ -2,6 +2,8 @@
 name: fetch-text
 type: python
 description: "Fetch all text from URL or base64 PDF. Collection-aware (extracts first item if given Collection). Auto-detects format (PDF/HTML/MD/TXT) and extracts complete text content"
+resolve:
+  target: resource_id
 ---
 
 # fetch-text
