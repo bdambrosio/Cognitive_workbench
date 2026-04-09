@@ -4112,7 +4112,8 @@ class ZenohExecutiveNode:
             f"goal_plan_{goal_id}.py. Use plan_review_prompt.md for "
             f"review guidelines. Update the prompt file with any new patterns. "
             f"Add a ### LEARNINGS block at the end of the plan file with "
-            f"actionable insights for the world model."
+            f"actionable insights for the world model. Note that you are not "
+            f"*required* to rewrite the plan unless failures are found."
         )
 
         self._say_to_user(
@@ -6080,7 +6081,7 @@ class ZenohExecutiveNode:
             f"   Include enough detail for independent execution.\n"
             f"3. COMMAND: If the message maps to a system command (e.g., 'stop', 'run the "
             f"weather goal', 'save'), respond ONLY with:\n"
-            f"   [COMMAND: <exact /command with args>]\n"
+            f"   [COMMAND: </command with args>]\n"
             f"   Resolve references ('the weather goal') to actual IDs from the state above. "
             f"   If you cannot resolve a reference, treat as chat.\n"
             f"You may include a brief conversational preamble before a GOAL or COMMAND marker.\n"

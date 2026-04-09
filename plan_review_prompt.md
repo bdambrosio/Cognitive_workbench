@@ -24,6 +24,22 @@ replay. Update this file after each review cycle with new patterns discovered.
 
 ## Review Checklist
 
+### 0. Triage: Fix or Rewrite?
+
+Before reviewing individual steps, assess whether the plan is worth fixing:
+
+- Check **last_result** and **status** in the review bundle header. If the
+  result says "step limit reached", "loop guard", or the status is
+  "completed" with no primary product, the plan likely failed entirely.
+- Scan the plan steps: if 3+ steps are near-identical (retry spiral), or
+  the plan never progressed past discovery/verification, **rewrite from
+  the goal text** rather than patching the cached steps.
+- The goal text is the specification. The cached plan is one failed
+  implementation attempt — don't be anchored by its approach. A different
+  strategy may be simpler and more robust.
+- If the plan succeeded and produced correct output, minor issues can be
+  fixed in place. Only rewrite when the approach is fundamentally broken.
+
 ### 1. Goal Alignment
 
 - Read the goal text in the review bundle header.
@@ -277,6 +293,44 @@ failures across retry steps.
 cross-step failure counts. Also, if a step uses `fs-list` for discovery, skip
 `fs-read` entirely and go straight to `fs-head` for previews.
 
+### "Binding preview mistaken for truncated content"
+The RESULT text shown to the planner after each code block includes a
+200-char preview of each binding's content. Smaller models interpret this
+preview as the *actual* Note content, conclude it's "truncated", and
+spiral trying to fix a non-existent problem. Symptoms: repeated steps
+trying `create-note`, `obsidian write`, chunking, and `synthesize` to
+"fix truncation", all producing the same 200-char preview.
+
+**Fix:** For plans that create long-form content, build the text in Python
+(f-strings, list join) and pass it to `create-note` directly. Do NOT
+verify the Note content by reading the RESULT preview — trust that
+`create-note` stores the full value. If verification is needed, use
+`get_text("$var")` inside the code block before returning, not as a
+separate step that reads the binding preview.
+
+### "Infinite comment loop on tool gap"
+When the LLM can't find a tool to accomplish a subtask (e.g., no `fs-write`),
+it sometimes enters an infinite loop of comments reasoning about the problem
+instead of generating executable code. The code block fills with dozens of
+lines like `# Actually, fs-read is read-only. To write, need to use fs-read?
+No.` and never returns.
+
+**Fix:** The reviewer must verify every tool call in the plan against the
+Available Tools section of the review bundle. If the plan needs to write a
+file and no `fs-write` exists, use `obsidian write` (for vault files) or
+`exec-script` with the correct relative path.
+
+### "fs-find Note IDs vs filenames"
+`fs-find` returns a Collection of Note IDs (e.g., `Note_5052`). To get the
+actual filename, you must call `get-metadata` on each Note and extract the
+`path` field. This is expensive (one tool call per file) and fragile. The
+planner often hardcodes specific Note IDs or fails to extract metadata
+correctly.
+
+**Fix:** Use `fs-list` instead of `fs-find` for discovery. `fs-list` returns
+a text listing with filenames visible, parseable in Python without extra tool
+calls.
+
 ---
 
 ## Revision History
@@ -310,6 +364,17 @@ cross-step failure counts. Also, if a step uses `fs-list` for discovery, skip
 - 2026-04-08: Fifth review of goal_11 (gemma-4-31B replan). Spiraled 8 steps
   on discovery — regex \S+ couldn't match filenames with spaces ("Untitled 1.md").
   Planner never progressed past step 1. New pattern: regex filename parsing.
+- 2026-04-08: Sixth review of goal_11 (gemma-4-31B replan). 11 steps, mostly
+  spiraling. Step 4 had infinite comment loop (~50 lines "fs-read is read-only")
+  when LLM couldn't find fs-write. Used fs-find+get-metadata instead of fs-list.
+  Hardcoded Note IDs. Passed "$var" literal to obsidian content. Duplicate entries
+  in _processed.md. New patterns: infinite comment loop on tool gap; fs-find Note
+  IDs vs filenames.
+- 2026-04-08: Review of goal_14 (3-hop citation chain). 20 steps, hit step
+  limit. Planner spiraled 13 steps on "truncation" that was actually the
+  200-char binding preview. Built chain via synthesize (LLM-generated, lossy)
+  instead of Python f-strings (deterministic). New pattern: binding preview
+  mistaken for truncated content.
 - 2026-04-08: Fourth review of goal_11 after replan with new goal text. 8 steps
   collapsed to 3. New patterns: verification reads wrong filename after title
   extraction (triggers reprocess spiral); bookkeeping file format destroyed by
