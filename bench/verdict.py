@@ -130,10 +130,38 @@ Rules:
 - "criteria_alignment" maps each system criterion label to PASS / FAIL / N/A. N/A means the criterion's condition didn't apply (e.g. "if matches exist" when there were no matches).
 - If PRIMARY PRODUCT is "(no primary product bound)", grade against LAST RESULT alone, lower confidence accordingly.
 
-Output ONLY a single JSON object matching the schema below, then end with </end>. No prose before or after.
+OUTPUT FORMAT (CRITICAL):
+- Respond with the raw JSON object ONLY. No prose before. No prose after.
+- Do NOT wrap the JSON in markdown code fences (no ```json, no ```).
+- Do NOT add any explanation or commentary outside the JSON.
+- Start your response with the opening { character. End the JSON with }.
+- After the closing }, output \\n</end> and stop.
 
 end your output with
 </end>"""
+
+
+def _extract_json_object(text: str) -> str:
+    """Extract a JSON object from a model response that may include markdown
+    code fences, leading/trailing prose, or the </end> stop marker.
+
+    Strategy: find the first '{' and the last '}' and slice between them.
+    This is robust against ```json ... ``` wrapping, "Here's the verdict:"
+    prefixes, and trailing prose. It assumes the JSON object is the only
+    object in the response (no nested objects outside the primary one),
+    which is enforced by the system prompt schema.
+
+    If no braces are found, returns the original text so json.loads fails
+    with a meaningful error.
+    """
+    text = (text or "").strip()
+    if text.endswith(STOP_MARKER):
+        text = text[: -len(STOP_MARKER)].rstrip()
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end == -1 or end < start:
+        return text
+    return text[start : end + 1]
 
 
 def _build_user_prompt(row: Dict[str, Any], primary_product_content: Optional[str]) -> str:
@@ -357,10 +385,13 @@ def compute_verdict(
         verdict_meta["stop_reason"] = api_result.get("stop_reason")
         verdict_meta["primary_product_loaded"] = pp_content is not None
 
-        # Parse the JSON verdict.
+        # Parse the JSON verdict. Use _extract_json_object to defensively
+        # strip markdown code fences and any stray prose around the JSON —
+        # the system prompt forbids fences but models do it anyway.
         text = api_result.get("text", "")
+        json_text = _extract_json_object(text)
         try:
-            parsed = json.loads(text)
+            parsed = json.loads(json_text)
             verdict_meta.update(parsed)
         except json.JSONDecodeError as e:
             verdict_meta["error"] = f"verdict JSON parse failed: {e}"
