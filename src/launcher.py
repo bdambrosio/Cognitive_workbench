@@ -485,8 +485,35 @@ def main():
     # Validate sensor trigger dispositions against scheduled goals / task
     # templates. Done at config-load time (before any agent thread starts) so
     # the user gets early feedback if a sensor references a missing goal.
+    #
+    # Two sources are checked:
+    #   (a) YAML-declared scheduled_goals[].name — for goals defined in the
+    #       scenario config
+    #   (b) Persisted scheduled goal IDs from the character's resources.json
+    #       — for goals created at runtime via /goal add
+    # Either match passes the validation. The runtime _resolve_goal_id at
+    # OODA Decide handles both forms correctly; this validation just stops
+    # warning the user about runtime IDs that legitimately exist.
+    def _load_persisted_goal_ids(_world_name: str, _character_name: str) -> set:
+        """Read the character's persisted resources.json and return the set of
+        scheduled goal IDs (e.g. {'goal_1', 'goal_15'}). Returns empty set if
+        the file is missing or unreadable; caller falls back to YAML-only."""
+        import re as _re
+        repo_root = Path(__file__).resolve().parent.parent
+        candidate = repo_root / 'scenarios' / _world_name / 'resources' / _character_name / 'resources.json'
+        if not candidate.exists():
+            return set()
+        try:
+            text = candidate.read_text(encoding='utf-8', errors='replace')
+            return {f"goal_{m}" for m in _re.findall(r'"_scheduled_goal_(\w+)"', text)}
+        except Exception as _e:
+            logger.debug(f"_load_persisted_goal_ids: read failed for {candidate}: {_e}")
+            return set()
+
     if all_sensors:
         for _char_name, _config in characters:
+            _char_world = (_config.get('world_config') or {}).get('world_name', world_name)
+            _persisted_goal_ids = _load_persisted_goal_ids(_char_world, _char_name)
             for sensor_cfg in _config.get('sensors', []):
                 s_name = sensor_cfg.get('name', '')
                 if s_name not in all_sensors:
@@ -502,9 +529,14 @@ def main():
                         logger.warning(f"Sensor '{s_name}' has disposition 'trigger-task:{tmpl_name}' but template '{tmpl_name}' not found in {_char_name}'s task_templates")
                 elif effective_disposition.startswith('trigger:'):
                     goal_name = effective_disposition[len('trigger:'):]
-                    scheduled_goals = [g.get('name', '') for g in _config.get('scheduled_goals', [])]
-                    if goal_name not in scheduled_goals:
-                        logger.warning(f"Sensor '{s_name}' has disposition 'trigger:{goal_name}' but goal '{goal_name}' not found in {_char_name}'s scheduled goals")
+                    yaml_goal_names = [g.get('name', '') for g in _config.get('scheduled_goals', [])]
+                    if goal_name not in yaml_goal_names and goal_name not in _persisted_goal_ids:
+                        logger.warning(
+                            f"Sensor '{s_name}' has disposition 'trigger:{goal_name}' but "
+                            f"goal '{goal_name}' not found in {_char_name}'s YAML scheduled_goals "
+                            f"({len(yaml_goal_names)} entries) or persisted runtime goals "
+                            f"({len(_persisted_goal_ids)} entries)"
+                        )
 
     # ---- Set CLI mode env var before agent threads import their logging configs ----
     if args.cli:
