@@ -525,6 +525,21 @@ def main(argv: Optional[List[str]] = None) -> int:
         "still goes to stdout (or --out file). Useful for scripts that want "
         "clean stderr.",
     )
+    p.add_argument(
+        "--opus",
+        action="store_true",
+        help="After harvesting, call bench/verdict.py to grade the row with "
+        "an Anthropic model (default claude-sonnet-4-6). Reuses this "
+        "harvester's Zenoh session for primary-product lookup. Requires "
+        "CLAUDE_API_KEY in the environment. Adds an `opus_verdict` "
+        "sub-object to the row.",
+    )
+    p.add_argument(
+        "--opus-model",
+        default=None,
+        help="Override the default Anthropic model for --opus grading. "
+        "Defaults to verdict.py's DEFAULT_MODEL (claude-sonnet-4-6).",
+    )
     args = p.parse_args(argv)
 
     session = open_zenoh()
@@ -579,6 +594,29 @@ def main(argv: Optional[List[str]] = None) -> int:
         )
 
         row = compute_metrics(record, log_lines, args.goal, args.mode)
+
+        # Optional stage 2: Opus quality verdict.
+        if args.opus:
+            try:
+                from verdict import compute_verdict, format_verdict_summary, DEFAULT_MODEL
+            except ImportError as e:
+                print(
+                    f"WARN: --opus requested but verdict.py import failed: {e}",
+                    file=sys.stderr,
+                )
+            else:
+                opus_model = args.opus_model or DEFAULT_MODEL
+                print(
+                    f"Calling Opus verdict (model={opus_model})...",
+                    file=sys.stderr,
+                )
+                row = compute_verdict(
+                    row,
+                    session=session,
+                    character=args.character,
+                    model=opus_model,
+                )
+
         row_text = json.dumps(row, ensure_ascii=False)
 
         if args.out:
@@ -593,6 +631,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         # row is the first thing visible in scripted contexts).
         if not args.no_summary:
             print(format_summary(row), file=sys.stderr)
+            if args.opus and row.get("opus_verdict"):
+                from verdict import format_verdict_summary  # local import OK
+                print(format_verdict_summary(row), file=sys.stderr)
 
         return 0 if not row.get("_harvest_error") else 4
     finally:
