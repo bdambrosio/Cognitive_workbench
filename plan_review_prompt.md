@@ -404,6 +404,51 @@ item) or index into it with `get_items("$var")[0]` to get a single Note.
 If the reviewer sees `extract` called on a known Collection binding, fix it
 on first occurrence — don't leave it for the spiral guard to catch.
 
+### "Missing named Note triggers filesystem hunt"
+A goal references a sensor-written named Note (e.g. `_rss_pending_titles`,
+written by `rss-watcher`). `tool("load", target="_rss_pending_titles", ...)`
+returns `failed` because the sensor has not run yet. Instead of treating the
+empty input as the empty case, the planner concludes the resource must live
+on disk and burns 4-6 steps calling `fs-find` and `fs-list` against
+`Clippings/`, `daily_posts/`, `Analysis/`, `src/`, etc. — all places where
+infospace Notes never live. The world model usually already records the
+producer-consumer fact, but the planner ignores it.
+
+**Fix:** Names starting with `_` (and most names referenced in goal text
+that don't look like file paths) are infospace Notes, not files. If `load`
+fails on such a name AND `load` succeeds on a sibling note in the same goal
+(e.g. `rss-interests` works but `_rss_pending_titles` doesn't), the missing
+target is another named Note, not a file. Do not pivot to the filesystem.
+Treat the missing Note per the next antipattern.
+
+### "Missing sensor-written Note treated as failure"
+Sensor-written Notes follow a producer/consumer pattern: the producer only
+writes when there is fresh data to hand off. A missing Note means "no fresh
+data", which for a filter-and-report goal is the empty case ("say nothing"),
+not an error. Returning `failed` here causes the goal to retry forever and
+masks the actual semantics from the user.
+
+**Fix:** When `load` fails on a name that follows the `_*` sensor-output
+convention, return `success` with `value="No pending ... to filter."` and
+exit the step. Reserve `failed` for *expected* inputs that the user is
+supposed to maintain (e.g. an interests note the user curated).
+
+### "Hardcoded predicate from one observed run"
+The planner reads an interests/criteria Note in the planning run, sees its
+content (e.g. "AI, Agents, Markets"), and bakes that string literal into
+the plan as `predicate = "mentions AI, Agents, or Markets"`. On replay, if
+the user edits the criteria Note (which is the entire reason it lives in a
+Note rather than the plan), the predicate is stale. This also drifts toward
+keyword matching: a literal string list with "or" between terms is the
+keyword-matching shape, even though `filter-semantic` could do better with
+the raw text.
+
+**Fix:** Build the predicate from `get_text("$interests_var")` every run.
+A natural-language wrapper like
+`f"matches one or more of these user interests: {interests_text}"` keeps
+the plan general and lets `filter-semantic`'s LLM evaluate semantically
+against whatever the user wrote.
+
 ---
 
 ## Revision History
@@ -470,3 +515,14 @@ on first occurrence — don't leave it for the spiral guard to catch.
   extraction (triggers reprocess spiral); bookkeeping file format destroyed by
   verbose logging to pass quality gate. Title had colons — need filename
   sanitization beyond just spaces.
+- 2026-04-10: Review of goal_15 (filter RSS titles by user interests). 6 steps,
+  spiraled on missing `_rss_pending_titles`. Planner ignored the world-model
+  fact that this is a sensor-written named Note and spent steps 2-6 hunting
+  through `Clippings/`, `daily_posts/`, `Analysis/`, `src/` with `fs-find`.
+  Also hardcoded `predicate = "mentions AI, Agents, or Markets"` from one
+  observed read of `rss-interests`, defeating replay generality. Collapsed
+  to 1 step that treats missing pending-titles as the empty case (return
+  success silently per "if no matches, say nothing"), and builds the
+  predicate dynamically from `get_text("$interests")`. New patterns: missing
+  named Note triggers filesystem hunt; missing sensor-written Note treated
+  as failure; hardcoded predicate from one observed run.
