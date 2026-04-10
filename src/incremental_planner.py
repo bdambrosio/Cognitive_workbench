@@ -5419,7 +5419,15 @@ class IncrementalPlanner:
     #       states at least one matching item" for goals that explicitly
     #       allowed empty results, causing PARTIAL verifications on
     #       legitimate empty runs.
-    _VISION_GENERATOR_VERSION = 3
+    #   4 — fix V3 regression: the CONDITIONAL OUTPUTS guidance caused the
+    #       model to second-guess itself after generating criteria,
+    #       producing meta-commentary that polluted the criteria text and
+    #       got cut off mid-sentence when budget ran out. Switched the
+    #       output terminator from END_VISION (which the model started
+    #       skipping) to the standard `\n</end>` directive + stop sequence
+    #       so generation halts cleanly even if the model would otherwise
+    #       keep rambling.
+    _VISION_GENERATOR_VERSION = 4
 
     @staticmethod
     def _vision_text_hash(goal_text: str) -> str:
@@ -5452,27 +5460,23 @@ Instructions:
 - For simple execution goals (e.g., "run script X", "execute Y"), prefer "No vision criteria needed."
 - Prefer returning "No vision criteria needed." over generating speculative criteria.
 
-CONDITIONAL OUTPUTS — CRITICAL:
-If the goal has a conditional or either-or output (e.g., "if matches found, report them; else say 'no matches'"; "if file exists, summarize it; else report missing"), you MUST phrase the affected criteria as "If <condition> then <required output>". Do NOT phrase a conditional output as if it were always required. The eval LLM treats criteria as required; phrasing a conditional as required causes legitimate empty-case runs to be marked FAIL.
-
-Example of the WRONG way (causes false FAIL on legitimate empty runs):
-  matches_listed: The output explicitly states at least one matching item.
-
-Example of the RIGHT way (correctly handles both branches):
-  matches_listed: If matching items exist, the output explicitly states each one.
-  empty_case_reported: If no matching items exist, the output explicitly states "no matches" (or the goal-specified empty wording).
+CONDITIONAL OUTPUTS:
+If the goal has a conditional or either-or output (e.g., "if matches found, report them; else say 'no matches'"), phrase the affected criteria as "If <condition> then <required output>". Do NOT phrase a conditional output as if it were always required — the eval LLM treats criteria as required, so phrasing a conditional as required marks legitimate empty-case runs as FAIL.
 
 Format — number each criterion with a short positive label and a plain-English statement of what the artifact must be or contain (use "If X then Y" framing for conditional outputs):
 1. label: <plain-English statement>
 2. label: <plain-English statement>
-END_VISION
 
 Examples (illustrations of the format and tone, not criteria for this goal):
 1. non_empty: The output contains substantive content, not just whitespace or a placeholder.
 2. on_topic: The output addresses the topic named in the goal.
-3. names_articles: If matching articles exist, the output names at least one specific article title from the input."""
+3. names_articles: If matching articles exist, the output names at least one specific article title from the input.
 
-        result = self.executor.llm_generate(VISION_PROMPT, max_tokens=192, temperature=GEN_TEMPERATURE, stops=["\nEND_VISION", "END_VISION"])
+Output ONLY the numbered criteria (or "No vision criteria needed."). Do NOT add commentary, reflection, or meta-discussion about whether the criteria are right.
+end your output with
+</end>"""
+
+        result = self.executor.llm_generate(VISION_PROMPT, max_tokens=192, temperature=GEN_TEMPERATURE, stops=["</end>"])
         if not result.success or not result.text:
             logger.warning(f"_generate_vision_llm failed: {result.error if hasattr(result, 'error') else 'unknown'}")
             return ""

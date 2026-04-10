@@ -196,9 +196,19 @@ _END_BRACKET_RE = re.compile(
     r"duration_ms=(?P<dur>-?\d+)\s+quality=(?P<quality>\S+?)\]"
 )
 
-# Matches `Executing action: {"type": "<tool>"...}` lines emitted by
-# infospace_executor when it dispatches a tool call.
-_EXEC_ACTION_RE = re.compile(r'Executing action:\s*\{"type":\s*"([\w-]+)"')
+# Matches `Executing action: {"type": "<tool>", ...}` lines emitted by
+# infospace_executor when it dispatches a tool call. Captures both the
+# tool type and the optional `target` field so the harvester can classify
+# infrastructure (executor housekeeping like loading _ooda_state) vs
+# planner-issued calls.
+_EXEC_ACTION_RE = re.compile(
+    r'Executing action:\s*\{"type":\s*"([\w-]+)"'
+    r'(?:[^}]*?"target":\s*"([^"]*)")?'
+)
+
+# Tool types that are always infrastructure regardless of target. `init`
+# is the world-init pre-step the executor runs before each goal.
+_INFRA_TOOL_TYPES = {"init"}
 
 
 def parse_end_bracket(log_lines: List[str]) -> Dict[str, Any]:
@@ -218,26 +228,58 @@ def parse_end_bracket(log_lines: List[str]) -> Dict[str, Any]:
 
 
 def count_tool_calls(log_lines: List[str]) -> Dict[str, Any]:
-    """Count tool calls and per-type histogram from the log slice.
+    """Count tool calls and per-type histogram from the log slice, splitting
+    infrastructure calls (executor housekeeping like init and loads of
+    `_*` system notes) from planner-issued calls.
 
-    Tool failures are inferred from `Code block at step N failed` lines and
-    `Tool '<name>' executed` followed by status=failed (rare; the executor
-    usually wraps failure in a returned dict, not a log line).
+    Classification heuristic:
+      - `init` → always infrastructure
+      - `load` with target starting with `_` → infrastructure
+        (loads of _ooda_state, _scheduled_goals, _situation, etc.)
+      - any other call → planner-issued
+
+    The heuristic is conservative — sensor-written named Notes also start
+    with `_` (e.g. `_rss_pending_titles`), so a `load` of one of those is
+    technically planner-issued but will be counted as infrastructure here.
+    Acceptable for stage 1; the cross-validation harness can re-classify
+    from the cached_plan_actions source if it needs precision.
+
+    Tool failures are inferred from `Code block at step N failed` lines.
+    The executor usually wraps tool failures in a returned dict rather
+    than logging them as failures, so this count is a lower bound.
     """
     total = 0
+    infra = 0
     by_type: Dict[str, int] = {}
+    by_type_infra: Dict[str, int] = {}
+    by_type_planner: Dict[str, int] = {}
     code_block_failures = 0
+
     for line in log_lines:
         m = _EXEC_ACTION_RE.search(line)
         if m:
             total += 1
             t = m.group(1)
+            target = m.group(2) or ""
             by_type[t] = by_type.get(t, 0) + 1
+            is_infra = (t in _INFRA_TOOL_TYPES) or (
+                t == "load" and target.startswith("_")
+            )
+            if is_infra:
+                infra += 1
+                by_type_infra[t] = by_type_infra.get(t, 0) + 1
+            else:
+                by_type_planner[t] = by_type_planner.get(t, 0) + 1
         if "Code block at step" in line and "failed" in line.lower():
             code_block_failures += 1
+
     return {
         "tool_call_count": total,
         "tool_call_types": by_type,
+        "infrastructure_call_count": infra,
+        "infrastructure_call_types": by_type_infra,
+        "planner_tool_call_count": total - infra,
+        "planner_tool_call_types": by_type_planner,
         "code_block_failures": code_block_failures,
     }
 
@@ -292,9 +334,15 @@ def compute_metrics(
         "step_failures": step_failures,
         "step_exceptions": step_exceptions,
         "step_durations_ms_total": sum(step_durations_ms),
-        # Tool calls (from log slice)
+        # Tool calls (from log slice). The total includes both planner-
+        # issued calls and executor housekeeping; the planner_* fields
+        # isolate what the planner actually decided to call.
         "tool_call_count": counts["tool_call_count"],
         "tool_call_types": counts["tool_call_types"],
+        "planner_tool_call_count": counts["planner_tool_call_count"],
+        "planner_tool_call_types": counts["planner_tool_call_types"],
+        "infrastructure_call_count": counts["infrastructure_call_count"],
+        "infrastructure_call_types": counts["infrastructure_call_types"],
         "code_block_failures": counts["code_block_failures"],
         # Vision criteria provenance
         "vision_criteria": record.get("vision_criteria", ""),
@@ -313,6 +361,124 @@ def compute_metrics(
         "log_slice_lines": len(log_lines),
         "_harvest_error": record.get("_harvest_error"),
     }
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Human-readable summary
+# ──────────────────────────────────────────────────────────────────────────
+
+def _truncate(text: str, n: int = 240) -> str:
+    """Truncate text for the summary block, replacing newlines with spaces."""
+    if not text:
+        return ""
+    text = " ".join(text.split())
+    if len(text) <= n:
+        return text
+    return text[: n - 1] + "…"
+
+
+def _format_duration(ms: int) -> str:
+    if ms is None or ms < 0:
+        return "?"
+    if ms < 1000:
+        return f"{ms}ms"
+    if ms < 60_000:
+        return f"{ms / 1000:.1f}s"
+    return f"{ms // 60_000}m{(ms % 60_000) // 1000:02d}s"
+
+
+def format_summary(row: Dict[str, Any]) -> str:
+    """Render a multi-line human-readable summary of the harvested row.
+
+    Goes to stderr alongside (not instead of) the JSON row on stdout, so
+    a human watching the harness output can see what just happened
+    without parsing JSON. Suppress with --no-summary if scripting.
+    """
+    lines = []
+    lines.append("─" * 70)
+    lines.append(f"Goal:        {row.get('goal_id', '?')} — {row.get('goal_name', '')}")
+    text = _truncate(row.get("goal_text", ""), 200)
+    if text:
+        lines.append(f"Goal text:   {text}")
+    lines.append("")
+
+    # Run identity
+    submitted = row.get("submitted_mode") or "(default)"
+    actual = row.get("last_run_mode") or "?"
+    bracket = row.get("bracket_mode") or "?"
+    mode_str = f"submitted={submitted}  actual={actual}  bracket={bracket}"
+    lines.append(f"Run mode:    {mode_str}")
+    lines.append(
+        f"Outcome:     status={row.get('status', '?')}  "
+        f"quality={row.get('quality_status', '?')}  "
+        f"duration={_format_duration(row.get('bracket_duration_ms', -1))}"
+    )
+    err = row.get("_harvest_error")
+    if err:
+        lines.append(f"Harvest:     ⚠ {err}")
+    lines.append("")
+
+    # Plan structure + tool counts
+    lines.append(
+        f"Plan:        {row.get('cached_plan_step_count', 0)} cached step(s)  "
+        f"({row.get('step_results_count', 0)} step_result entries)"
+    )
+    lines.append(
+        f"Tool calls:  {row.get('tool_call_count', 0)} total = "
+        f"{row.get('planner_tool_call_count', 0)} planner + "
+        f"{row.get('infrastructure_call_count', 0)} infrastructure"
+    )
+    planner_types = row.get("planner_tool_call_types", {}) or {}
+    if planner_types:
+        type_summary = ", ".join(f"{k}:{v}" for k, v in sorted(planner_types.items()))
+        lines.append(f"  planner:   {type_summary}")
+    infra_types = row.get("infrastructure_call_types", {}) or {}
+    if infra_types:
+        type_summary = ", ".join(f"{k}:{v}" for k, v in sorted(infra_types.items()))
+        lines.append(f"  infra:     {type_summary}")
+    cb_fails = row.get("code_block_failures", 0)
+    step_fails = row.get("step_failures", 0)
+    step_excs = row.get("step_exceptions", 0)
+    if cb_fails or step_fails or step_excs:
+        lines.append(
+            f"Failures:    code_block={cb_fails}  "
+            f"step_failed={step_fails}  step_exception={step_excs}"
+        )
+    lines.append("")
+
+    # Vision criteria provenance
+    vc_version = row.get("vision_criteria_version")
+    vc_source = row.get("vision_criteria_source") or "(none)"
+    vc_model = row.get("vision_criteria_model") or "(none)"
+    if vc_version is not None:
+        lines.append(
+            f"Vision:      v{vc_version}  source={vc_source}  model={vc_model}"
+        )
+        vc_text = (row.get("vision_criteria") or "").strip()
+        if vc_text:
+            for vline in vc_text.splitlines()[:6]:
+                lines.append(f"  {vline}")
+            extra = len(vc_text.splitlines()) - 6
+            if extra > 0:
+                lines.append(f"  …({extra} more lines)")
+        eval_text = (row.get("last_quality_eval") or "").strip()
+        if eval_text:
+            lines.append("Quality eval:")
+            for eline in eval_text.splitlines()[:6]:
+                lines.append(f"  {eline}")
+    else:
+        lines.append("Vision:      (no criteria recorded)")
+    lines.append("")
+
+    # Last result excerpt
+    last_result = (row.get("last_result") or "").strip()
+    if last_result:
+        lines.append(f"Last result: {_truncate(last_result, 320)}")
+    pp = row.get("primary_product") or ""
+    if pp:
+        lines.append(f"Primary product: {pp}")
+    lines.append("─" * 70)
+    return "\n".join(lines)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -351,6 +517,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         action="store_true",
         help="Skip submitting the run; harvest the current goal-record state. "
         "Useful for collecting a row from a goal that already ran.",
+    )
+    p.add_argument(
+        "--no-summary",
+        action="store_true",
+        help="Suppress the human-readable summary block on stderr. JSON row "
+        "still goes to stdout (or --out file). Useful for scripts that want "
+        "clean stderr.",
     )
     args = p.parse_args(argv)
 
@@ -415,6 +588,11 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"Appended row to {args.out}", file=sys.stderr)
         else:
             print(row_text)
+
+        # Human-readable summary to stderr (after the JSON row, so the
+        # row is the first thing visible in scripted contexts).
+        if not args.no_summary:
+            print(format_summary(row), file=sys.stderr)
 
         return 0 if not row.get("_harvest_error") else 4
     finally:
