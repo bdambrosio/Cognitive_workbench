@@ -3320,19 +3320,22 @@ class ZenohExecutiveNode:
                 step_results_snapshot = list(sr)
                 steps_executed = len(sr)
             last_quality_eval = getattr(self.infospace_executor, '_last_quality_eval', "") or ""
-        if run_mode:
-            updates["last_run_mode"] = run_mode
-        if step_results_snapshot:
-            updates["step_results"] = step_results_snapshot
-        if last_quality_eval:
-            updates["last_quality_eval"] = last_quality_eval
-        # quality_status is the canonical pass/fail/needs_revision signal from
-        # the run. Persist whatever the run path put on the result dict so
-        # plan review and the harness can read it from one place.
+        # Always overwrite per-run instrumentation, even with empty values.
+        # An empty step_results list means "this run produced no per-step
+        # data" (typically a planning run, since execute_plan_sync only fires
+        # in replay) — that is the correct fact for this run, not a reason
+        # to keep stale data from the previous run. Same logic for the other
+        # three fields: each must reflect THIS run, not blend across runs.
+        updates["last_run_mode"] = run_mode
+        updates["step_results"] = step_results_snapshot
+        updates["last_quality_eval"] = last_quality_eval
+        # quality_status is the canonical pass/fail/needs_revision signal
+        # from the run. Read from the result dict (set by both planning and
+        # replay paths) and persist as a string; empty string when absent.
+        qs = ""
         if isinstance(result, dict):
-            qs = result.get("quality_status")
-            if qs:
-                updates["quality_status"] = str(qs)
+            qs = str(result.get("quality_status") or "")
+        updates["quality_status"] = qs
         self._update_scheduled_goal(goal_id, **updates)
         # Emit END log bracket. duration_ms is computed from the monotonic
         # start that the run-path stamped on the executor; quality is the
