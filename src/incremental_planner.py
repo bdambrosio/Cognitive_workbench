@@ -412,10 +412,14 @@ STAGE2_CODEGEN_PROMPT = (
     "- if/else control flow and loops are allowed.\n"
     "- Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
     "- LOOP PATTERN: tool() never raises — do NOT use try/except. Track ok/errors counts explicitly.\n"
-    "- EVAL TARGET: If your code block produces the goal's primary output artifact\n"
-    "  (the deliverable — e.g. the written note, the synthesized report), bind it to out=\"$eval_target\".\n"
-    "  The quality gate evaluates this artifact. If you don't set $eval_target, no quality check runs.\n"
-    "  Only set it on the step that creates or updates the real output, not on bookkeeping or verification steps.\n"
+    "- EVAL TARGET (REQUIRED): The step that produces the goal's primary output artifact\n"
+    "  (the deliverable — the written note, the synthesized report, the final say'd message)\n"
+    "  MUST bind that artifact to out=\"$eval_target\". Without this binding the quality gate\n"
+    "  cannot evaluate the run, and quality_status falls back to a weaker execution-only signal.\n"
+    "  Set $eval_target exactly once, on the step that creates or updates the real output.\n"
+    "  Do NOT set it on bookkeeping, verification, or pure side-effect (say-only) steps.\n"
+    "  If the deliverable is the say'd text itself, create-note(value=text, out=\"$eval_target\")\n"
+    "  before calling say.\n"
     "- OUTPUT SIZING: If OUTPUT GUIDANCE appears in the context with a target_tokens value,\n"
     "  pass target_tokens=<N> to the tool call that produces the FINAL output artifact of the goal\n"
     "  (the primary product — e.g. the last synthesize, generate-note, or extract call).\n"
@@ -5407,7 +5411,15 @@ class IncrementalPlanner:
     #   2 — natural-language positive criteria. Each criterion describes a
     #       property the GOOD artifact has; PASS now correctly maps to "the
     #       artifact has this property". Explicit ban on Python/code output.
-    _VISION_GENERATOR_VERSION = 2
+    #   3 — conditional criteria handling. For goals with conditional or
+    #       either-or outputs ("if X then say A, else say B"), criteria
+    #       must be phrased "If <condition> then <required output>" so the
+    #       eval LLM can correctly mark the criterion N/A or PASS in the
+    #       unmet-condition case. V2 produced criteria like "the output
+    #       states at least one matching item" for goals that explicitly
+    #       allowed empty results, causing PARTIAL verifications on
+    #       legitimate empty runs.
+    _VISION_GENERATOR_VERSION = 3
 
     @staticmethod
     def _vision_text_hash(goal_text: str) -> str:
@@ -5440,7 +5452,17 @@ Instructions:
 - For simple execution goals (e.g., "run script X", "execute Y"), prefer "No vision criteria needed."
 - Prefer returning "No vision criteria needed." over generating speculative criteria.
 
-Format — number each criterion with a short positive label and a plain-English statement of what the artifact must be or contain:
+CONDITIONAL OUTPUTS — CRITICAL:
+If the goal has a conditional or either-or output (e.g., "if matches found, report them; else say 'no matches'"; "if file exists, summarize it; else report missing"), you MUST phrase the affected criteria as "If <condition> then <required output>". Do NOT phrase a conditional output as if it were always required. The eval LLM treats criteria as required; phrasing a conditional as required causes legitimate empty-case runs to be marked FAIL.
+
+Example of the WRONG way (causes false FAIL on legitimate empty runs):
+  matches_listed: The output explicitly states at least one matching item.
+
+Example of the RIGHT way (correctly handles both branches):
+  matches_listed: If matching items exist, the output explicitly states each one.
+  empty_case_reported: If no matching items exist, the output explicitly states "no matches" (or the goal-specified empty wording).
+
+Format — number each criterion with a short positive label and a plain-English statement of what the artifact must be or contain (use "If X then Y" framing for conditional outputs):
 1. label: <plain-English statement>
 2. label: <plain-English statement>
 END_VISION
@@ -5448,7 +5470,7 @@ END_VISION
 Examples (illustrations of the format and tone, not criteria for this goal):
 1. non_empty: The output contains substantive content, not just whitespace or a placeholder.
 2. on_topic: The output addresses the topic named in the goal.
-3. names_articles: The output names at least one specific article title from the input."""
+3. names_articles: If matching articles exist, the output names at least one specific article title from the input."""
 
         result = self.executor.llm_generate(VISION_PROMPT, max_tokens=192, temperature=GEN_TEMPERATURE, stops=["\nEND_VISION", "END_VISION"])
         if not result.success or not result.text:

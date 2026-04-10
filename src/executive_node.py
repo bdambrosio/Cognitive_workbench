@@ -4576,12 +4576,25 @@ class ZenohExecutiveNode:
         for i, action in enumerate(actions):
             if action.get("type") == "_code_block_":
                 source = action.get("source", "")
-                # Find out= bindings
-                for m in re.finditer(r'out\s*=\s*["\'](\$\w+)["\']', source):
+                # Find out= bindings (writes)
+                for m in re.finditer(r'\bout\s*=\s*["\'](\$\w+)["\']', source):
                     all_bindings_written.add(m.group(1))
-                # Find get_text/get_json reads
-                for m in re.finditer(r'get_(?:text|json)\s*\(\s*["\'](\$\w+)["\']', source):
+                # Find reads via get_text / get_json / get_items helpers.
+                # All three accept a $var; the previous version of this
+                # checker missed get_items, producing false UNUSED BINDING
+                # flags for any Collection consumed via get_items in a
+                # subsequent step.
+                for m in re.finditer(r'\bget_(?:text|json|items)\s*\(\s*["\'](\$\w+)["\']', source):
                     all_bindings_read.add(m.group(1))
+                # Find reads via tool() keyword arguments. Any kwarg name
+                # other than 'out' that takes a "$var" value is a read —
+                # most common is target=, but split has source=, filter
+                # has predicate-target patterns, etc. Treating all non-out
+                # kwargs uniformly catches them all without requiring a
+                # hardcoded list of read-shaped kwarg names.
+                for m in re.finditer(r'\b(\w+)\s*=\s*["\'](\$\w+)["\']', source):
+                    if m.group(1) != 'out':
+                        all_bindings_read.add(m.group(2))
                 # Check for say with raw content (debug leftovers)
                 if re.search(r'tool\s*\(\s*["\']say["\'].*(?:str\(|content|paper_text)', source):
                     issues.append(f"Step {i+1}: possible debug 'say' dumping raw content")
