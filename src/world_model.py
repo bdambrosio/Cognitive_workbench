@@ -301,10 +301,11 @@ class WorldModel:
                     "last_observed_at": now,
                 }
                 raw_facts.append(existing)
+            weight = max(1, int(update.get("weight", 1)))
             if polarity == "contradict":
-                existing["contradiction_count"] = int(existing.get("contradiction_count", 0)) + 1
+                existing["contradiction_count"] = int(existing.get("contradiction_count", 0)) + weight
             else:
-                existing["support_count"] = int(existing.get("support_count", 0)) + 1
+                existing["support_count"] = int(existing.get("support_count", 0)) + weight
             existing["last_observed_at"] = now
             sc = existing.get("source_counts") or {}
             sc[source] = int(sc.get(source, 0)) + 1

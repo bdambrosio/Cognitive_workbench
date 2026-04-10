@@ -182,6 +182,13 @@ or filename, it creates absurdly long paths.
 **Fix:** Always truncate to the required word count in Python *before* using
 the classification for normalization, directory creation, or file operations.
 
+**Critical:** Split on BOTH spaces AND underscores when counting words:
+`re.split(r'[\s_]+', text)[:3]`. If you only split on spaces,
+`"financial_kline_model"` counts as 1 word and truncation has no effect —
+the planner joins multiple such "words" into an absurdly long underscore
+chain. Also sanitize with `re.sub(r'[^a-z0-9_]', '', text)` to prevent
+shell metacharacters in directory names.
+
 ### "Fragile line parsing"
 Parsing `fs-list` output by splitting on whitespace or specific delimiters.
 The output format may change or contain filenames with spaces.
@@ -364,6 +371,18 @@ Note, not in the content field. The planner tries `pluck` on various
 isn't needed at all — if the goal is content extraction, the Note body already
 has the full text (when GROBID is available).
 
+### "Split exec-script calls lose computed values on partial failure"
+A step computes a directory name in Python, then calls `exec-script` twice
+(mkdir, then mv). If `mkdir` succeeds but `mv` is denied by the user, the step
+returns failure and the computed directory name is lost. The retry step has to
+guess the name — and typically guesses wrong (uses a hardcoded fallback or
+reads the source code literal instead of the runtime value).
+
+**Fix:** Combine mkdir + mv in a single exec-script call:
+`tool("exec-script", target=f"mkdir -p '{dir}' && mv '{src}' '{dir}/'")`.
+This ensures both succeed or both fail atomically. If the user denies once,
+the retry has the same combined command.
+
 ### "Synthesize for structured extraction"
 The planner uses `synthesize` expecting a structured list (e.g., citation list,
 file inventory) but gets a narrative overview ("the literature reveals a clear
@@ -436,6 +455,11 @@ on first occurrence — don't leave it for the spiral guard to catch.
   map(extract) + flatten + create-note($eval_target) + say. New patterns: missing
   $eval_target binding; re-fetching content already loaded by semantic-scholar;
   pluck on tool_metadata fields (must use get-metadata + json.loads instead).
+- 2026-04-09: Review of goal_12 (classify+move .md files). 19 steps, massive
+  spiral. extract returned multi-phrase output, .replace(" ", "_") joined it
+  all into one huge directory name. Planner spent 16 steps trying to fix it.
+  Collapsed to 2 steps: fs-list → loop(fs-head + extract + truncate + mv).
+  Refined antipattern: split on spaces AND underscores when counting words.
 - 2026-04-08: Review of goal_14 (3-hop citation chain). 20 steps, hit step
   limit. Planner spiraled 13 steps on "truncation" that was actually the
   200-char binding preview. Built chain via synthesize (LLM-generated, lossy)

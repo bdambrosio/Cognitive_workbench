@@ -2861,7 +2861,10 @@ class ZenohExecutiveNode:
                     name = g.get('name') or g.get('goal_text', '?')
                     product = g.get('primary_product', '')
                     g_status = g.get('status', '?')
+                    triggered = g.get('triggered_by', '')
                     line = f"  {name} [{g_status}]"
+                    if triggered:
+                        line += f" (triggered by {triggered})"
                     if product:
                         line += f" → {product}"
                     goal_lines.append(line)
@@ -3582,7 +3585,10 @@ class ZenohExecutiveNode:
         # Apply any pending LLM switch before starting a new goal
         self._apply_pending_llm_switch()
         self._active_scheduled_goal_id = goal_id
-        self._update_scheduled_goal(goal_id, is_running=True, status="running")
+        goal_updates = {"is_running": True, "status": "running"}
+        if source and source != "user":
+            goal_updates["triggered_by"] = source
+        self._update_scheduled_goal(goal_id, **goal_updates)
         if hasattr(self, 'goal_scheduler'):
             self.goal_scheduler._executing_goal_id = goal_id
             self.goal_scheduler._executing_is_autonomous = False
@@ -4110,10 +4116,15 @@ class ZenohExecutiveNode:
             f"review goal_review_{goal_id}.md, check the trace in "
             f"goal_trace_{goal_id}.txt, and fix the plan in "
             f"goal_plan_{goal_id}.py. Use plan_review_prompt.md for "
-            f"review guidelines. Update the prompt file with any new patterns. "
+            f"review guidelines. Verify all tool calls in the plan against the "
+            f"Available Tools section and each tool's Skill.md parameter contract. "
+            f"Update the prompt file with any new patterns. "
             f"Add a ### LEARNINGS block at the end of the plan file with "
-            f"actionable insights for the world model. Note that you are not "
-            f"*required* to rewrite the plan unless failures are found."
+            f"actionable insights for the world model. In addition, report any "
+            f"potential codebase, planner prompt or instructions, or Skill.md "
+            f"updates you find. You are not required to rewrite the plan unless "
+            f"failures, incomplete coverage of the goal, or significant "
+            f"improvements are found."
         )
 
         self._say_to_user(
@@ -4298,6 +4309,7 @@ class ZenohExecutiveNode:
                         "polarity": "support",
                         "source": "plan_review",
                         "confidence": "high",
+                        "weight": 4,
                     })
                     wm_injected += 1
 
@@ -8247,7 +8259,7 @@ class ZenohExecutiveNode:
             return Action('ask_reply', {'text': evt.content}, a)
 
         if evt.classification == 'trigger':
-            goal_id = self._find_goal_id_by_name(evt.goal_name)
+            goal_id = self._resolve_goal_id(evt.goal_name)
             if goal_id:
                 return Action('proceed_goal', {'goal_id': goal_id, 'source': 'sensor_trigger'}, a)
             logger.warning(f"Decide: triggered goal '{evt.goal_name}' not found")
@@ -8817,12 +8829,14 @@ class ZenohExecutiveNode:
             logger.debug(f'Tier 2 goal formulation failed: {e}')
         return None
 
-    def _find_goal_id_by_name(self, goal_name: str) -> Optional[str]:
-        """Find a scheduled goal ID by name or goal_text."""
-        if not goal_name:
+    def _resolve_goal_id(self, ref: str) -> Optional[str]:
+        """Resolve a goal reference (goal_id, name, or goal_text) to a goal_id."""
+        if not ref:
             return None
         for goal in self._all_scheduled_goals():
-            if goal.get('name') == goal_name or goal.get('goal_text', '').strip() == goal_name:
+            if (goal.get('goal_id') == ref
+                    or goal.get('name') == ref
+                    or goal.get('goal_text', '').strip() == ref):
                 return goal.get('goal_id')
         return None
 

@@ -145,6 +145,7 @@ class SensorRunner:
         return {
             'parameters': self.parameters,
             'resource_manager': self.resource_manager,
+            'character_name': self.character_name,
             'zenoh_session': self.zenoh_session,
             'last_run': self.last_run,
             'run_count': self.run_count,
