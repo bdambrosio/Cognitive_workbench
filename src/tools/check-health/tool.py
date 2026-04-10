@@ -212,9 +212,63 @@ def _collect_cognitive_health(executor: InfospaceExecutor,
 # Report assembly
 # ---------------------------------------------------------------------------
 
+def _walk_for_status(section: Any, path: str, out: List[str]) -> None:
+    """Recursively walk a nested dict and surface any *_status field whose
+    value is 'warning' or 'critical' as a generic concern entry of the form
+    '{path}.{base}: {status} ({sibling_value})'.
+
+    This is the schema-drift safety net for _extract_concerns: the hand-coded
+    field name mappings below only catch concerns whose names match what the
+    function expects. If system-health.sh adds a new metric or renames an
+    existing one, the hand-coded pass produces no entry even though
+    overall_status correctly reports 'warning' from walking the same data.
+    The recursive walk catches anything the hand-coded pass missed, at the
+    cost of less human-readable wording.
+    """
+    if not isinstance(section, dict):
+        return
+    for key, val in section.items():
+        if key.endswith("_status") and isinstance(val, str) and val in ("warning", "critical"):
+            base = key[: -len("_status")]
+            # Try to find a sibling field that gives context for the status.
+            sibling = section.get(base)
+            if sibling is None:
+                for cand in (f"{base}_value", f"{base}_pct", f"{base}_used_pct", f"{base}_c"):
+                    if cand in section:
+                        sibling = section[cand]
+                        break
+            label = f"{path}.{base}" if path else base
+            if sibling is not None:
+                out.append(f"{label}: {val} ({sibling})")
+            else:
+                out.append(f"{label}: {val}")
+        elif isinstance(val, dict):
+            new_path = f"{path}.{key}" if path else key
+            _walk_for_status(val, new_path, out)
+        elif isinstance(val, list):
+            for i, item in enumerate(val):
+                new_path = f"{path}.{key}[{i}]" if path else f"{key}[{i}]"
+                _walk_for_status(item, new_path, out)
+
+
 def _extract_concerns(system: Dict, cognitive: Dict) -> List[str]:
-    """Walk all subsections and collect human-readable concern strings."""
-    concerns = []
+    """Walk all subsections and collect human-readable concern strings.
+
+    Two-pass approach:
+      1. Hand-mapped pass produces nice human-readable strings for known
+         signals (e.g. "Process(es) down: FastAPI UI" instead of
+         "system.processes.fastapi_ui: warning").
+      2. Recursive walk catches any *_status warning/critical that the
+         hand-mapped pass didn't surface — protects against schema drift
+         in system-health.sh adding metrics that the hand-mapped logic
+         doesn't know about.
+
+    Both passes contribute. The walk's entries are appended after the
+    hand-mapped ones with simple substring de-dup against the existing
+    list, so a hand-mapped "Process(es) down: FastAPI UI" suppresses the
+    walk's "system.processes.process: warning" entry.
+    """
+    concerns: List[str] = []
 
     # System concerns
     if "error" in system:
@@ -294,6 +348,29 @@ def _extract_concerns(system: Dict, cognitive: Dict) -> List[str]:
         concerns.append(
             f"No user interaction for {ui.get('last_interaction_hours_ago', 0):.0f} hours"
         )
+
+    # ── Recursive fallback: surface any *_status warning/critical the
+    # hand-mapped pass above didn't catch. Schema-drift insurance.
+    walked: List[str] = []
+    _walk_for_status(system, "system", walked)
+    _walk_for_status(cognitive, "cognitive", walked)
+
+    # Crude de-dup: if any walk entry's section path appears in an existing
+    # hand-mapped concern's lowercase form, drop the walk entry. e.g. the
+    # walk's "system.processes.process: warning" gets dropped if the
+    # hand-mapped concerns already contain "Process(es) down" (which mentions
+    # "process"). Imperfect but conservative — prefer redundant concerns over
+    # missed ones.
+    existing_lower = " | ".join(c.lower() for c in concerns)
+    for w in walked:
+        # Pull the unqualified base name from the path (last segment after dot).
+        try:
+            tail = w.split(":", 1)[0].split(".")[-1].lower()
+        except Exception:
+            tail = ""
+        if tail and tail in existing_lower:
+            continue
+        concerns.append(w)
 
     return concerns
 

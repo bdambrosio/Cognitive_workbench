@@ -259,6 +259,105 @@ REFLECTION_FRAME_SCHEMA = {
   ]
 }
 
+_SIDE_EFFECT_TOOL_TYPES = frozenset({
+    'send-email', 'post-bluesky', 'exec-script', 'run-script',
+})
+
+
+def _is_repeat_task(current_task: str, prior_tasks: List[str], threshold: float = 0.75) -> bool:
+    """Detect whether current_task is essentially the same as a recent prior
+    task description, using normalized difflib ratio against the last 2
+    entries in prior_tasks. Returns True if any prior task is ≥ threshold
+    similar.
+
+    Used to inject a REPEAT TASK DETECTED warning into the next Stage 2
+    user prompt when the planner is about to re-issue substantially the
+    same instructions it just gave itself. The existing STALL DETECTED
+    warning fires only on tool-level repetition; this catches task-level
+    repetition earlier (and from a different angle).
+    """
+    if not current_task or not prior_tasks:
+        return False
+    cur = current_task.strip().lower()
+    if not cur:
+        return False
+    for prior in prior_tasks[-2:]:
+        if not prior:
+            continue
+        prior_norm = prior.strip().lower()
+        if not prior_norm:
+            continue
+        ratio = difflib.SequenceMatcher(None, cur, prior_norm).ratio()
+        if ratio >= threshold:
+            return True
+    return False
+
+
+def _format_prior_side_effects(executor) -> str:
+    """Format successful side-effect tool calls from this run for the
+    Stage 2 user prompt, so the planner sees what's already been done and
+    doesn't try to repeat it.
+
+    Reads from executor._plan_actions, which the planner loop initializes
+    at the start of each goal and the executor appends to via
+    execute_action_tracked. The list contains every action call (both
+    successes and failures); we filter to side-effect tools that have a
+    bound resource, which is the closest proxy we have to "this call
+    actually went through".
+
+    Returns "" if no side effects so far, so callers can unconditionally
+    interpolate the result without an extra newline.
+    """
+    plan_actions = getattr(executor, '_plan_actions', None) or []
+    if not plan_actions:
+        return ""
+    bindings_flat = getattr(executor, 'plan_bindings_flat', None) or {}
+    side_effects = []
+    seen_descs = set()  # de-dup repeated identical calls in the prior history
+    for action in plan_actions:
+        atype = action.get('type', '')
+        if atype not in _SIDE_EFFECT_TOOL_TYPES:
+            continue
+        # Resolve the bound out= var to a resource_id, if any. Calls without
+        # an out= we still surface (the planner may not have bound a var).
+        out_var = action.get('out', '') or ''
+        rid = ''
+        if isinstance(out_var, str) and out_var.startswith('$'):
+            rid = bindings_flat.get(out_var.lstrip('$'), '') or ''
+        # Build a short description per tool type.
+        if atype == 'send-email':
+            to = action.get('to') or ''
+            subject = action.get('subject') or ''
+            desc = f"send-email to={to} subject={str(subject)[:60]}"
+        elif atype == 'post-bluesky':
+            body = action.get('value') or action.get('target') or ''
+            desc = f"post-bluesky body={str(body)[:60]}"
+        elif atype == 'exec-script':
+            script = action.get('target') or ''
+            desc = f"exec-script {str(script)[:80]}"
+        elif atype == 'run-script':
+            script = action.get('script_name') or action.get('target') or ''
+            desc = f"run-script {str(script)[:60]}"
+        else:
+            desc = atype
+        if rid:
+            desc = f"{desc} → {rid}"
+        if desc in seen_descs:
+            continue
+        seen_descs.add(desc)
+        side_effects.append(desc)
+    if not side_effects:
+        return ""
+    lines = [
+        "PRIOR SIDE EFFECTS THIS GOAL "
+        "(already performed; do NOT repeat unless intentionally different — "
+        "the same call will be blocked by dedup):"
+    ]
+    for i, se in enumerate(side_effects, 1):
+        lines.append(f"  {i}. {se}")
+    return "\n".join(lines) + "\n"
+
+
 def _build_bindings_inventory(plan_local_bindings: set, executor) -> str:
     """Build a compact one-line-per-binding inventory of plan-local resources.
 
@@ -359,11 +458,11 @@ Tools include primitives (above) and external tools loaded at runtime. See catal
 STAGE2_CODEGEN_PROMPT = (
     "#Stage 2 FORMAT:\n"
     "Write a Python code block to accomplish the CURRENT_TASK.\n"
-    "Linear example:\n"
+    "Linear example (note: the deliverable's out= is $eval_target — REQUIRED for the quality gate):\n"
     "```python\n"
     "r1 = tool(\"search-web\", query=\"transformers survey\", out=\"$papers\")\n"
     "if r1[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=f\"search failed: {r1.get('reason', 'unknown')}\")\n"
-    "r2 = tool(\"synthesize\", target=\"$papers\", focus=\"key findings\", out=\"$summary\")\n"
+    "r2 = tool(\"synthesize\", target=\"$papers\", focus=\"key findings\", out=\"$eval_target\")\n"
     "if r2[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=f\"synthesize failed: {r2.get('reason', 'unknown')}\")\n"
     "return executor._create_uniform_return(\"success\", value=\"done\")\n"
     "```\n"
@@ -393,6 +492,15 @@ STAGE2_CODEGEN_PROMPT = (
     "return executor._create_uniform_return(\"success\", value=f\"Processed {ok}/{total}\", extra={\"errors\": errors})\n"
     "```\n"
     "Rules:\n"
+    "- EVAL TARGET (REQUIRED, FIRST RULE): The step that produces the goal's primary\n"
+    "  output artifact (the deliverable — the written note, the synthesized report,\n"
+    "  the final say'd message) MUST bind that artifact to out=\"$eval_target\".\n"
+    "  Without this binding the quality gate cannot evaluate the run, and\n"
+    "  quality_status falls back to a weaker execution-only signal. Set $eval_target\n"
+    "  exactly once, on the step that creates or updates the real output. Do NOT set\n"
+    "  it on bookkeeping, verification, or pure side-effect (say-only) steps. If the\n"
+    "  deliverable is the say'd text itself, create-note(value=text, out=\"$eval_target\")\n"
+    "  before calling say. The linear example above demonstrates the pattern.\n"
     "- Call tools via: r = tool(\"tool-name\", param=value, out=\"$var\")\n"
     "- tool() returns dict with r[\"status\"] (\"success\"/\"failed\"), r[\"resource_id\"], r[\"value\"] (display string).\n"
     "- Max 16 tool() calls per code block.\n"
@@ -412,14 +520,6 @@ STAGE2_CODEGEN_PROMPT = (
     "- if/else control flow and loops are allowed.\n"
     "- Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
     "- LOOP PATTERN: tool() never raises — do NOT use try/except. Track ok/errors counts explicitly.\n"
-    "- EVAL TARGET (REQUIRED): The step that produces the goal's primary output artifact\n"
-    "  (the deliverable — the written note, the synthesized report, the final say'd message)\n"
-    "  MUST bind that artifact to out=\"$eval_target\". Without this binding the quality gate\n"
-    "  cannot evaluate the run, and quality_status falls back to a weaker execution-only signal.\n"
-    "  Set $eval_target exactly once, on the step that creates or updates the real output.\n"
-    "  Do NOT set it on bookkeeping, verification, or pure side-effect (say-only) steps.\n"
-    "  If the deliverable is the say'd text itself, create-note(value=text, out=\"$eval_target\")\n"
-    "  before calling say.\n"
     "- OUTPUT SIZING: If OUTPUT GUIDANCE appears in the context with a target_tokens value,\n"
     "  pass target_tokens=<N> to the tool call that produces the FINAL output artifact of the goal\n"
     "  (the primary product — e.g. the last synthesize, generate-note, or extract call).\n"
@@ -3022,6 +3122,11 @@ ALWAYS follow all formatting instructions exactly.
         deep_eval_prev_artifact = None
         plan_local_bindings = set()
         _asked_user_this_goal = False
+        # Per-step task history for the same-task-as-prior detector. The
+        # detector compares the current step's task description against the
+        # last 2 entries; >0.75 difflib ratio triggers a REPEAT TASK warning
+        # injected into the next Stage 2 user message.
+        _prior_tasks_history: List[str] = []
         for step in range(max_steps):
             if _interrupt_requested(executor):
                 _clear_interrupt(executor)
@@ -3030,10 +3135,21 @@ ALWAYS follow all formatting instructions exactly.
 
             # Stage 2: Generate and execute code block
             _bindings_line = _build_bindings_inventory(plan_local_bindings, executor) if step > 0 else ""
+            _side_effects_line = _format_prior_side_effects(executor) if step > 0 else ""
+            _repeat_warn = (
+                "REPEAT TASK DETECTED: This task is nearly identical to a previous step. "
+                "The previous attempt did not make progress. You MUST either: "
+                "(a) try a fundamentally different approach (different tools, different decomposition), OR "
+                "(b) mark DONE=YES on the next Stage 3 if the goal is functionally satisfied as-is, OR "
+                "(c) mark ASK_USER=YES if you genuinely cannot diagnose the failure.\n"
+            ) if _is_repeat_task(current_task, _prior_tasks_history) else ""
+            _prior_tasks_history.append(current_task or "")
             s += user(
                 f"STAGE 2 (step {step + 1}/{max_steps}):\n"
                 f"#GOAL: {goal_for_step}\n#END GOAL\n"
                 f"{_bindings_line}"
+                f"{_side_effects_line}"
+                f"{_repeat_warn}"
                 f"CURRENT_TASK: {current_task}\n"
                 f"{_output_guidance_line}"
                 "Write a Python code block using Stage 2 FORMAT.\n"
@@ -4076,18 +4192,32 @@ ALWAYS follow all formatting instructions exactly.
     deep_eval_prev_artifact = None
     plan_local_bindings = set()
     _asked_user_this_goal = False
+    # Per-step task history for the same-task-as-prior detector (see
+    # _is_repeat_task helper). Mirrors the SGLang backend.
+    _prior_tasks_history: List[str] = []
     for step in range(max_steps):
         if _interrupt_requested(executor):
             _clear_interrupt(executor)
             state["final_answer"] = "Interrupted by user."
             break
-        
+
         # Stage 2: Generate code block
         _bindings_line = _build_bindings_inventory(plan_local_bindings, executor) if step > 0 else ""
+        _side_effects_line = _format_prior_side_effects(executor) if step > 0 else ""
+        _repeat_warn = (
+            "REPEAT TASK DETECTED: This task is nearly identical to a previous step. "
+            "The previous attempt did not make progress. You MUST either: "
+            "(a) try a fundamentally different approach (different tools, different decomposition), OR "
+            "(b) mark DONE=YES on the next Stage 3 if the goal is functionally satisfied as-is, OR "
+            "(c) mark ASK_USER_NEEDED=YES if you genuinely cannot diagnose the failure.\n"
+        ) if _is_repeat_task(current_task, _prior_tasks_history) else ""
+        _prior_tasks_history.append(current_task or "")
         prompt += format_user(
             f"STAGE 2 (step {step + 1}/{max_steps}):\n"
             f"#GOAL: {goal_for_step}\n#END GOAL\n"
             f"{_bindings_line}"
+            f"{_side_effects_line}"
+            f"{_repeat_warn}"
             f"CURRENT_TASK: {current_task}\n"
             f"{_output_guidance_line}"
             "Write a Python code block using Stage 2 FORMAT.\n"

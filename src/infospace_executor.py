@@ -883,8 +883,36 @@ class InfospaceExecutor:
             _dedup_key = _hl.sha256('|'.join(_dedup_parts).encode('utf-8')).hexdigest()[:24]
             cached = self._side_effect_cache.get(_dedup_key)
             if cached:
-                logger.warning(f"Dedup: skipping duplicate {action_type} within planner session (returning cached result)")
-                return _bind_cached_result(cached)
+                # Side-effect dedup hit by planner-issued retry. Return an
+                # explicit failed status with a recovery-hint reason so the
+                # planner KNOWS the call was blocked. The previous behavior
+                # was to silently return the cached result, which left the
+                # planner unable to distinguish "the email got sent" from
+                # "the email is being blocked" — a key failure mode in
+                # goal_2 that turned a routine spiral into a 16-step one.
+                cached_resource_id = cached.get('resource_id') if isinstance(cached, dict) else None
+                cached_value = cached.get('value', '') if isinstance(cached, dict) else ''
+                logger.warning(
+                    f"Dedup: blocking duplicate {action_type} within goal "
+                    f"(cached as {cached_resource_id})"
+                )
+                return self._create_uniform_return(
+                    "failed",
+                    reason=(
+                        f"{action_type} refused: a previous {action_type} this goal "
+                        f"had identical recipient + subject + body content "
+                        f"(cached as {cached_resource_id}). "
+                        f"If you intended a different message, change the recipient, "
+                        f"subject, or body content. "
+                        f"If you have already accomplished the goal's communication "
+                        f"requirement, mark DONE=YES on the next Stage 3."
+                    ),
+                    extra={
+                        "dedup_blocked": True,
+                        "cached_resource_id": cached_resource_id,
+                        "cached_value": str(cached_value)[:200] if cached_value else "",
+                    },
+                )
 
         # Consecutive-failure guard: block a tool after N consecutive failures
         # during planning, forcing the planner to try a different approach.
