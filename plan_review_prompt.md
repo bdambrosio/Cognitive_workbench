@@ -443,11 +443,93 @@ keyword matching: a literal string list with "or" between terms is the
 keyword-matching shape, even though `filter-semantic` could do better with
 the raw text.
 
+**Recurrence note:** This antipattern has been observed multiple times on
+goal_15 (RSS title filtering). The plan consistently loads `$interests`
+into a binding but does not actually read the binding at runtime — the
+load is decorative. Documented antipatterns do not propagate back into
+planner behavior; review must run on every new plan.
+
 **Fix:** Build the predicate from `get_text("$interests_var")` every run.
 A natural-language wrapper like
 `f"matches one or more of these user interests: {interests_text}"` keeps
 the plan general and lets `filter-semantic`'s LLM evaluate semantically
 against whatever the user wrote.
+
+### "STAGE3 over-decomposition into single-action steps"
+The planner generates one tool call per step then drops back to STAGE3
+reflection ("next task: load X", "next task: split X", "next task: filter
+X", "next task: report"), ending up with 4-6 steps where 1 would do.
+Symptoms: every NEXT_TASK in the trace describes a single tool action;
+adjacent steps have similar source code; the cached plan grows to many
+steps each with 1-2 tool calls. Same root cause as "retry steps
+masquerading as a pipeline" but in a different form — the planner
+over-decomposes on success the same way it over-decomposes on failure.
+
+The codegen prompt's "Efficiency rule: combine single-tool-call steps"
+appears to be ignored in practice with low CODE_TEMPERATURE.
+
+**Fix at review time:** Collapse to a single step with the full pipeline
+(load → transform → filter → report) in one code block. Intra-step
+branching handles the success/empty/error paths.
+
+**Fix at planner time:** The combine-when-possible rule needs to fire
+as part of the STAGE3 select decision, not as advisory text in the
+system prompt. Or: have the planner verify on done-gate that the plan
+isn't a chain of single-action steps.
+
+### "Duplicate report when STAGE3 splits builder from reporter"
+A code block builds a result and says it inside an else branch (e.g.,
+`tool("say", value="no interesting new news")`). Then STAGE3 picks up
+"next task: report the result to the user" as if no report has happened
+yet. The next code block says the SAME message AGAIN. The user receives
+duplicate output. Same root cause as the over-decomposition pattern —
+the model doesn't notice that an earlier step's else-branch already
+accomplished the next subtask.
+
+**Fix:** Collapse builder and reporter into one step. If the builder
+already produces a final user-visible message, the next step should not
+exist. Cross-check: if step N-1's code contains a `tool("say", ...)`,
+step N should never repeat the same say.
+
+### "Missing $eval_target binding"
+Neither the planner nor the user explicitly binds `$eval_target` to the
+plan's primary product. Without it, `_vision_eval_check` never fires
+(it's gated on `eval_target` being a `Note_*` or `Collection_*` resource
+in `incremental_planner.py`). `quality_status` then comes only from the
+planner's own verification_answer (PARTIAL/SUCCESS/INCONCLUSIVE), which
+is a weaker signal than criterion-based evaluation against the artifact.
+
+**Fix at review time:** Add `out="$eval_target"` to whichever
+`create-note` / final tool call produces the deliverable. Verify the
+binding shows up in plan_bindings on completion.
+
+**Fix at planner time:** Worth promoting `$eval_target` from a "should"
+in the codegen prompt to a stronger requirement — verify at the done
+gate that some binding has been made and warn the planner if not.
+
+### "Conditional vision criterion phrased as required"
+Envision generates criteria like `matches_exist: The output explicitly
+states at least one article title that matches`, but the goal explicitly
+allows the empty case ("If no matches, report X"). On a legitimate
+empty-result run, the output is "no interesting new news" — which fails
+the criterion as phrased even though the goal was correctly achieved.
+The eval LLM (or the planner's verification) marks PARTIAL on what
+should be SUCCESS.
+
+This is an envision-prompt issue, not a plan issue. The plan can do
+nothing about a malformed criterion. The cached criteria need to handle
+either-or goals correctly.
+
+**Fix:** Update the envision prompt (in `_generate_vision_llm`) to
+generate conditional criteria for goals with conditional outputs.
+Pattern: "**If matches exist**, the output explicitly states each one;
+otherwise, the output explicitly states <empty-case wording>." The
+explicit "if" in front lets the eval LLM mark the criterion N/A or
+PASS when the empty case is the correct outcome.
+
+This may require updating the envision few-shot examples to include
+a goal with a conditional output. Bump `_VISION_GENERATOR_VERSION`
+when the prompt changes so existing cached criteria regenerate.
 
 ---
 
@@ -526,3 +608,19 @@ against whatever the user wrote.
   predicate dynamically from `get_text("$interests")`. New patterns: missing
   named Note triggers filesystem hunt; missing sensor-written Note treated
   as failure; hardcoded predicate from one observed run.
+- 2026-04-10: Second review of goal_15 after a fresh replan. Planner
+  produced a 5-step plan that successfully ran end-to-end ("no interesting
+  new news") but: (a) hardcoded the predicate AGAIN as `"matches AI, AI
+  Agents, or US Markets"` despite the antipattern being documented in
+  this file; (b) over-decomposed the work into 5 single-action steps via
+  STAGE3 reflection where 1 would do; (c) said "no interesting new news"
+  twice because step 4 repeated step 3's else-branch report; (d) did not
+  bind `$eval_target` so vision_eval never fired. Verification answer was
+  PARTIAL because envision criterion #1 ("matches_exist") was phrased as
+  required even though the goal explicitly allows the empty case. Collapsed
+  to 1 step. Three new patterns: STAGE3 over-decomposition into single-
+  action steps; duplicate report when STAGE3 splits builder from reporter;
+  conditional vision criterion phrased as required (envision-level fix).
+  Also: structural checker false-positives UNUSED BINDING for $vars
+  consumed via get_text/get_items inside code block source — checker fix
+  needed in `_run_plan_structural_checks`.
