@@ -3731,6 +3731,41 @@ class ZenohExecutiveNode:
             except Exception as e:
                 logger.warning(f'Failed to send concern resolve command: {e}')
 
+    def _init_run_instrumentation(self, mode: str):
+        """Reset per-run executor state and emit START log bracket.
+
+        Called from convergence points so every code path that runs a goal
+        gets the same instrumentation reset, regardless of which entry was
+        used (/goal run, /goal add, sense-data callback, sensor trigger,
+        chat handler, etc.):
+
+          - parse_and_set_goal at entry  → mode='replan'  (planning paths)
+          - _handle_goal_reuse at entry  → mode='replay'  (replay path)
+
+        The reset is unconditional and cheap (four attribute assignments).
+        It ensures _step_results, _last_run_mode, _last_quality_eval, and
+        _goal_started_at always reflect the most recent run, never stale
+        data from a prior goal. The START log bracket is gated on
+        _active_scheduled_goal_id being set, since non-scheduled-goal
+        callers of parse_and_set_goal (chat handlers, ad-hoc agent
+        messages) should not pollute the [GOAL goal_X mode=...] stream.
+        """
+        if self.infospace_executor is None:
+            return
+        self.infospace_executor._last_run_mode = mode
+        self.infospace_executor._goal_started_at = time.monotonic()
+        self.infospace_executor._step_results = []
+        self.infospace_executor._last_quality_eval = ""
+        if mode == "replay":
+            # Replay also needs _plan_actions reset because execute_plan_sync
+            # is the only path that records actions in replay; planning runs
+            # have generate_plan reset _plan_actions on their own.
+            self.infospace_executor._plan_actions = []
+
+        goal_id = getattr(self, '_active_scheduled_goal_id', None)
+        if goal_id:
+            logger.info(f"[GOAL {goal_id} mode={mode} START]")
+
     def _handle_goal_proceed(self, goal_id: str = None, source: str = "user"):
         if not goal_id:
             self._say_to_user("Please specify which goal to proceed, e.g. 'proceed goal_1'.")
@@ -3762,16 +3797,9 @@ class ZenohExecutiveNode:
             goal_id=goal_id,
             goal_name=goal.get("name", "") or goal.get("goal_text", "")[:80],
         )
-        # Stamp the run mode and a monotonic start so the END bracket and
-        # _set_scheduled_goal_result can compute duration / record mode without
-        # having to introspect scheduler events. Also clear per-run instrumentation
-        # so a previous replay run's data does not leak into this planning run.
-        if self.infospace_executor is not None:
-            self.infospace_executor._last_run_mode = "replan"
-            self.infospace_executor._goal_started_at = time.monotonic()
-            self.infospace_executor._step_results = []
-            self.infospace_executor._last_quality_eval = ""
-        logger.info(f"[GOAL {goal_id} mode=replan START]")
+        # Per-run instrumentation reset and START log are handled by
+        # _init_run_instrumentation, called at the entry of parse_and_set_goal
+        # (the planning convergence point) once the run thread starts.
         pre_resource_ids = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
         notify_user = source != "scheduler"
         goal_name = goal.get('name') or goal_id
@@ -3842,15 +3870,10 @@ class ZenohExecutiveNode:
             goal_id=goal_id,
             goal_name=goal.get("name", "") or goal.get("goal_text", "")[:80],
         )
-        # Stamp run mode and start time before any work runs. Also clear
-        # per-run instrumentation so a previous run's data does not leak.
-        if self.infospace_executor is not None:
-            self.infospace_executor._last_run_mode = "replay"
-            self.infospace_executor._goal_started_at = time.monotonic()
-            self.infospace_executor._step_results = []
-            self.infospace_executor._plan_actions = []
-            self.infospace_executor._last_quality_eval = ""
-        logger.info(f"[GOAL {goal_id} mode=replay START]")
+        # Per-run instrumentation reset and START log via the shared helper.
+        # Replay is the only entry path that does not go through
+        # parse_and_set_goal, so the call is explicit here.
+        self._init_run_instrumentation("replay")
 
         # Ensure vision_criteria are populated for this goal (cache hit or
         # generate+persist). Returns the criteria string; '' means no criteria.
@@ -11273,6 +11296,12 @@ class ZenohExecutiveNode:
 
     def parse_and_set_goal(self, template, goal_text):
         """Parse goal input from UI and set current goal."""
+        # Reset per-run instrumentation at the planning convergence point so
+        # every entry path (proceed, /goal add, sense-data, sensor trigger,
+        # chat handler, etc.) gets the same fresh state — no stale step_results
+        # or last_run_mode leaking from a prior goal's run.
+        self._init_run_instrumentation("replan")
+
         # Reset per-turn metrics for this goal (may run on goal thread)
         if self.infospace_executor:
             self.infospace_executor.turn_metrics = TurnMetrics()
