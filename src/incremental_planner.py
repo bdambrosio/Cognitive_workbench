@@ -399,7 +399,7 @@ STAGE2_CODEGEN_PROMPT = (
     "- out=\"$name\" binds the result resource. Chain via target=\"$name\" in the next call.\n"
     "- Binding names must be valid identifiers: use $clip_body, $item_0_url — never spaces or raw filenames in $vars (e.g. avoid \"$Trading Agents.md_content\").\n"
     "- Read content: get_text(\"$var\") → string, get_json(\"$var\") → dict or None, get_items(\"$var\") → list of Note IDs.\n"
-    "  These work on any $var that has been bound. No need to call load first.\n"
+    "  These are injected helpers. Primitives like get-metadata are tools: tool(\"get-metadata\", ...), NOT get_metadata(...).\n"
     "- fs-list returns a Note listing string — use get_text on its out= binding, not get_items.\n"
     "- load: ONLY for (a) binding a named persistent note, or (b) slicing a Collection.\n"
     "- Pass dicts/lists directly as value — do not pre-serialize with json.dumps().\n"
