@@ -6309,8 +6309,13 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             'type': 'main'
         }
         step_stack.append(main_frame)
-        
+
         executed_steps = 0
+        # Per-step instrumentation: caller may pre-initialize this list (e.g.
+        # _handle_goal_reuse does so before calling execute_plan_sync). If it
+        # wasn't pre-initialized, set it up now so the loop can append safely.
+        if not hasattr(self, '_step_results') or self._step_results is None:
+            self._step_results = []
         
         # Main execution loop
         while step_stack and executed_steps < max_steps:
@@ -6458,14 +6463,34 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                     current['idx'] = idx + 1
                     continue
                 from incremental_planner import execute_codegen_block
+                _step_started_at = datetime.now()
+                _step_t0 = time.monotonic()
+                _step_exception_type = None
+                _step_exception_message = None
                 try:
                     result = execute_codegen_block(source, self, "codegen")
                 except Exception as e:
                     logger.error(f"Code block replay error: {e}")
                     logger.error(traceback.format_exc())
+                    _step_exception_type = type(e).__name__
+                    _step_exception_message = str(e)
                     result = self._create_uniform_return("failed", reason=f"Code block replay error: {e}")
                 executed_steps += 1
                 last_action_result = result.copy()
+                # Record per-step outcome for the harness.
+                try:
+                    self._step_results.append({
+                        "step_idx": executed_steps - 1,
+                        "step_kind": "_code_block_",
+                        "status": result.get('status', 'unknown'),
+                        "reason": result.get('reason'),
+                        "exception_type": _step_exception_type,
+                        "exception_message": _step_exception_message,
+                        "started_at": _step_started_at.isoformat(),
+                        "duration_ms": int((time.monotonic() - _step_t0) * 1000),
+                    })
+                except Exception as _rec_err:
+                    logger.debug(f"step_results append failed: {_rec_err}")
                 if self.executive_node:
                     self.executive_node._publish_action_result(step, result, stype, datetime.now())
                 if result.get('status') == 'failed':
@@ -6481,12 +6506,29 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 continue
 
             # Execute action
+            _step_started_at = datetime.now()
+            _step_t0 = time.monotonic()
             try:
                 result = self.execute_action(step)
                 executed_steps += 1
 
                 # Track last action result in uniform format
                 last_action_result = result.copy()
+
+                # Record per-step outcome for the harness.
+                try:
+                    self._step_results.append({
+                        "step_idx": executed_steps - 1,
+                        "step_kind": stype or "unknown",
+                        "status": result.get('status', 'unknown'),
+                        "reason": result.get('reason'),
+                        "exception_type": None,
+                        "exception_message": None,
+                        "started_at": _step_started_at.isoformat(),
+                        "duration_ms": int((time.monotonic() - _step_t0) * 1000),
+                    })
+                except Exception as _rec_err:
+                    logger.debug(f"step_results append failed: {_rec_err}")
 
                 # Publish action result for UI display (if executive_node available)
                 # Skip say/ask - they self-publish
@@ -6514,6 +6556,21 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             except Exception as e:
                 logger.error(f"Error executing step {executed_steps}: {e}")
                 logger.error(traceback.format_exc())
+                # Record the failure as a step result before returning so the
+                # harness sees the exception even on a hard abort.
+                try:
+                    self._step_results.append({
+                        "step_idx": executed_steps,
+                        "step_kind": stype or "unknown",
+                        "status": "failed",
+                        "reason": f"Execution error: {e}",
+                        "exception_type": type(e).__name__,
+                        "exception_message": str(e),
+                        "started_at": _step_started_at.isoformat(),
+                        "duration_ms": int((time.monotonic() - _step_t0) * 1000),
+                    })
+                except Exception as _rec_err:
+                    logger.debug(f"step_results append failed: {_rec_err}")
                 return {
                     'status': 'failed',
                     'reason': f'Execution error at step {executed_steps}: {str(e)}',

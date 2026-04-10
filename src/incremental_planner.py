@@ -7,6 +7,7 @@ Note: SGLang backend must be configured before use:
     import sglang as sgl
     sgl.set_default_backend(sgl.Runtime(model_path="...", ...))
 """
+import hashlib
 import json
 import logging
 import traceback
@@ -4671,6 +4672,10 @@ class IncrementalPlanner:
         self.available_tools = available_tools
         self.logger = logger_instance or logger
         
+        # Store SGLang config (used to be discarded — kept now so envision
+        # provenance can record which model produced cached vision_criteria).
+        self.sgl_model_path = sgl_model_path
+
         # Store vLLM config
         self.vllm_model_path = vllm_model_path
         self.vllm_url = vllm_url
@@ -5387,32 +5392,67 @@ class IncrementalPlanner:
             return {"success": False, "error": str(e)}
 
 
-    def _generate_vision(self, goal_text: str) -> str:
-        """Generate evaluable quality criteria from the goal (vision for the target artifact)."""
-        VISION_PROMPT = f"""Given the following goal, generate 1-3 criteria that check for CLEAR FAILURE MODES only.
+    # ─────────────────────────────────────────────────────────────────────
+    # Vision criteria generation and caching.
+    #
+    # Bump _VISION_GENERATOR_VERSION when changing the envision prompt, the
+    # model used for envision, or any input that affects output. Bumping
+    # invalidates all cached vision_criteria on each goal's next run.
+    #
+    # Version history:
+    #   1 — initial version. Asked for "testable predicates" with failure-mode
+    #       labels; LLMs interpreted "predicate" as Python code and produced
+    #       expressions referring to undefined variables. Polarity also did
+    #       not match the eval prompt's PASS=satisfied semantics.
+    #   2 — natural-language positive criteria. Each criterion describes a
+    #       property the GOOD artifact has; PASS now correctly maps to "the
+    #       artifact has this property". Explicit ban on Python/code output.
+    _VISION_GENERATOR_VERSION = 2
+
+    @staticmethod
+    def _vision_text_hash(goal_text: str) -> str:
+        payload = json.dumps(
+            {"text": goal_text or "", "v": IncrementalPlanner._VISION_GENERATOR_VERSION},
+            sort_keys=True,
+        )
+        return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def _generate_vision_llm(self, goal_text: str) -> str:
+        """Run the envision LLM call against goal_text. Returns the criteria text
+        ('' if the LLM said no criteria needed or the call failed).
+
+        The prompt asks for natural-language positive criteria — properties
+        the GOOD artifact has — so PASS/FAIL maps cleanly onto the eval
+        prompt in _vision_eval_check. Do NOT ask for Python expressions:
+        the eval LLM cannot execute code, and code-shaped criteria with
+        undefined variables produced silent garbage in version 1."""
+        VISION_PROMPT = f"""Given the following goal, generate 1-3 quality criteria the final artifact should satisfy. These criteria will be evaluated by an LLM against the artifact, so write them as short natural-language statements — NOT as Python expressions, code, or pseudo-code. The evaluator cannot execute code.
 
 GOAL:
 {goal_text}
 
 Instructions:
-- Only check for obvious failures: empty output, completely off-topic content, or structurally broken output (e.g., JSON parse error when JSON is required).
-- Do NOT generate json_parse_error or JSON-related criteria unless the goal explicitly requires JSON output.
-- For run-script, shell scripts, or fire-and-forget tools, output is typically plain text — do NOT assume JSON.
-- For simple execution goals (e.g., "run script X", "execute Y"), prefer "No vision criteria needed."
-- Do include minimal criteria to check relevance of content to the goal.
+- Each criterion describes a property the GOOD output HAS (not a failure mode). The evaluator will mark it PASS if the artifact has the property and FAIL if it does not.
+- Focus on cheap-to-check, observable properties: non-empty output, topical relevance, presence of key information explicitly named in the goal, structural validity for declared output formats.
 - Do NOT check content correctness (dates, numbers, facts) — the agent is not a fact-checker.
-- If no obvious failure modes apply (e.g., a simple lookup or report), return "No vision criteria needed."
+- Do NOT generate JSON-related criteria unless the goal explicitly requires JSON output.
+- For run-script, shell scripts, or fire-and-forget tools, output is typically plain text — do not assume JSON.
+- For simple execution goals (e.g., "run script X", "execute Y"), prefer "No vision criteria needed."
 - Prefer returning "No vision criteria needed." over generating speculative criteria.
 
-Format — number each criterion with a short FAILURE label (e.g., "output_empty", "missing_X"):
-Label names must describe the FAILURE being detected, not the passing state.
-For example: use "output_empty" not "no_output"; use "topic_mismatch" not "off_topic".
-1. failure_label: "testable predicate that is True when the failure is present"
-END_VISION"""
+Format — number each criterion with a short positive label and a plain-English statement of what the artifact must be or contain:
+1. label: <plain-English statement>
+2. label: <plain-English statement>
+END_VISION
+
+Examples (illustrations of the format and tone, not criteria for this goal):
+1. non_empty: The output contains substantive content, not just whitespace or a placeholder.
+2. on_topic: The output addresses the topic named in the goal.
+3. names_articles: The output names at least one specific article title from the input."""
 
         result = self.executor.llm_generate(VISION_PROMPT, max_tokens=192, temperature=GEN_TEMPERATURE, stops=["\nEND_VISION", "END_VISION"])
         if not result.success or not result.text:
-            logger.warning(f"_generate_vision failed: {result.error if hasattr(result, 'error') else 'unknown'}")
+            logger.warning(f"_generate_vision_llm failed: {result.error if hasattr(result, 'error') else 'unknown'}")
             return ""
         vision_text = result.text.strip()
         if "no vision criteria needed" in vision_text.lower():
@@ -5420,6 +5460,111 @@ END_VISION"""
             return ""
         logger.info(f"Vision generator: {vision_text}")
         return vision_text
+
+    def _envision_model_name(self) -> str:
+        """Best-effort identifier for the model used by envision, recorded in
+        vision_criteria_meta so the harness can detect cross-version comparisons.
+
+        Walks the planner's stored backend paths first, then falls back to
+        the SGLang runtime on the executor (which holds model_path when
+        SGLang is the active backend), and finally to the executive_node's
+        character_config llm_config block."""
+        for attr in ("anthropic_model_path", "openrouter_model_path", "openai_model_path",
+                     "vllm_model_path", "sgl_model_path", "model_path"):
+            v = getattr(self, attr, None)
+            if v:
+                return str(v)
+        # SGLang runtime fallback: the runtime object on the executor
+        # carries the model path when SGLang is the active backend.
+        runtime = getattr(self.executor, "runtime", None)
+        if runtime is not None:
+            for attr in ("model_path", "model", "model_name"):
+                v = getattr(runtime, attr, None)
+                if v:
+                    return str(v)
+        # Last resort: walk through executive_node.character_config.llm_config.
+        en = getattr(self.executor, "executive_node", None)
+        if en is not None:
+            char_cfg = getattr(en, "character_config", {}) or {}
+            llm_cfg = char_cfg.get("llm_config", {}) or {}
+            for k in ("sgl_model_path", "vllm_model_path", "anthropic_model_path",
+                      "openai_model_path", "openrouter_model_path"):
+                v = llm_cfg.get(k)
+                if v:
+                    return str(v)
+        return "unknown"
+
+    def _generate_vision(self, goal_text: str) -> str:
+        """Cache-aware envision: returns persisted vision_criteria for the active
+        scheduled goal if valid, otherwise regenerates via the LLM, persists, and
+        returns the new criteria.
+
+        Cache validity: source must be 'auto' (manual criteria are immutable from
+        the runtime's perspective), and goal_text_hash (with the embedded
+        _VISION_GENERATOR_VERSION) must match. A missing or stale entry triggers
+        regeneration. Failure to access the goal record falls back to a one-shot
+        LLM call without persistence — the planner still gets criteria for this
+        run, the goal record is just not updated.
+        """
+        en = getattr(self.executor, 'executive_node', None)
+        active_goal_id = getattr(en, '_active_scheduled_goal_id', None) if en else None
+        current_hash = self._vision_text_hash(goal_text)
+
+        # Try cache lookup. We require that the active scheduled goal's
+        # stored goal_text actually matches what we were called with —
+        # otherwise this call is for a different goal (ad-hoc inline call,
+        # task-context-prepended text, etc.) and we must neither read from
+        # nor write to that goal record.
+        cache_writable_goal_id = None
+        if en and active_goal_id and hasattr(en, '_get_scheduled_goal'):
+            try:
+                goal = en._get_scheduled_goal(active_goal_id)
+            except Exception as e:
+                logger.warning(f"_generate_vision: cache lookup failed for {active_goal_id}: {e}")
+                goal = None
+            if goal and (goal.get('goal_text') or '') == goal_text:
+                cache_writable_goal_id = active_goal_id
+                cached_criteria = goal.get('vision_criteria') or ""
+                cached_meta = goal.get('vision_criteria_meta') or {}
+                cached_source = goal.get('vision_criteria_source') or ""
+                cached_hash = cached_meta.get('goal_text_hash') if isinstance(cached_meta, dict) else None
+
+                # Manual criteria are exempt from version-based invalidation.
+                if cached_source == "manual" and cached_criteria:
+                    logger.info(f"Vision generator: using manual criteria for {active_goal_id}")
+                    return cached_criteria
+
+                # Auto criteria with matching hash are reused. An empty
+                # cached_criteria with a matching hash means "this goal was
+                # previously envisioned and the LLM said no criteria are
+                # needed" — also a cache hit, just an empty one.
+                if cached_source == "auto" and cached_hash == current_hash:
+                    logger.info(f"Vision generator: cache hit for {active_goal_id}")
+                    return cached_criteria
+
+        # Cache miss / stale / no matching goal → generate fresh.
+        criteria = self._generate_vision_llm(goal_text)
+
+        # Persist only when we confirmed the active goal record matches.
+        if cache_writable_goal_id and en and hasattr(en, '_update_scheduled_goal'):
+            try:
+                meta = {
+                    "generator_version": self._VISION_GENERATOR_VERSION,
+                    "model": self._envision_model_name(),
+                    "generated_at": datetime.datetime.now().isoformat(),
+                    "goal_text_hash": current_hash,
+                }
+                en._update_scheduled_goal(
+                    cache_writable_goal_id,
+                    vision_criteria=criteria,
+                    vision_criteria_source="auto",
+                    vision_criteria_meta=meta,
+                )
+                logger.info(f"Vision generator: persisted criteria for {cache_writable_goal_id} (version={self._VISION_GENERATOR_VERSION})")
+            except Exception as e:
+                logger.warning(f"_generate_vision: failed to persist for {cache_writable_goal_id}: {e}")
+
+        return criteria
 
     def _preplan(self, goal_text: str) -> str:
         tool_lines = [f"- {name}: {meta.get('description', 'no description')}"

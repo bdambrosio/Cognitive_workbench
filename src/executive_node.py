@@ -104,7 +104,7 @@ class OrientedEvent:
 @dataclass
 class Action:
     """Routing decision produced by Decide stage."""
-    type: str               # 'dispatch_goal', 'proceed_goal', 'chat_response',
+    type: str               # 'dispatch_goal', 'proceed_goal', 'reuse_goal', 'chat_response',
                             # 'alert_response', 'ask_reply', 'agent_message',
                             # 'proactive_remark', 'trigger_existing_goal',
                             # 'no_action'
@@ -3111,6 +3111,15 @@ class ZenohExecutiveNode:
             "last_result": "",
             "primary_product": "",
             "name_customized": False,
+            # Vision criteria persistence (see incremental_planner._generate_vision)
+            "vision_criteria": "",
+            "vision_criteria_source": "",
+            "vision_criteria_meta": {},
+            # Per-run instrumentation surfaced for the benchmark harness
+            "step_results": [],
+            "last_run_mode": "",
+            "last_quality_eval": "",
+            "quality_status": "",
         }
 
     def _normalize_scheduled_goal(self, goal: Dict[str, Any]) -> Tuple[Dict[str, Any], bool]:
@@ -3133,12 +3142,25 @@ class ZenohExecutiveNode:
             "last_result": "",
             "primary_product": "",
             "name_customized": False,
+            "vision_criteria": "",
+            "vision_criteria_source": "",
+            "vision_criteria_meta": {},
+            "step_results": [],
+            "last_run_mode": "",
+            "last_quality_eval": "",
+            "quality_status": "",
         }.items():
             if key not in goal:
                 goal[key] = default
                 changed = True
         if not isinstance(goal.get("cached_plan_actions"), list):
             goal["cached_plan_actions"] = []
+            changed = True
+        if not isinstance(goal.get("step_results"), list):
+            goal["step_results"] = []
+            changed = True
+        if not isinstance(goal.get("vision_criteria_meta"), dict):
+            goal["vision_criteria_meta"] = {}
             changed = True
         if goal.get("schedule_mode") not in ("manual", "auto", "recurring", "daily"):
             goal["schedule_mode"] = "manual"
@@ -3284,7 +3306,53 @@ class ZenohExecutiveNode:
             plan_actions = result.get("plan") if isinstance(result, dict) else None
             if isinstance(plan_actions, list):
                 updates["cached_plan_actions"] = plan_actions
+        # Pull per-run instrumentation off the executor for the harness.
+        # All four are best-effort: missing attribute → field stays at its
+        # current goal-record value, which defaults to "" / [] / {}.
+        run_mode = ""
+        step_results_snapshot: List[Any] = []
+        last_quality_eval = ""
+        steps_executed = 0
+        if self.infospace_executor is not None:
+            run_mode = getattr(self.infospace_executor, '_last_run_mode', "") or ""
+            sr = getattr(self.infospace_executor, '_step_results', None)
+            if isinstance(sr, list):
+                step_results_snapshot = list(sr)
+                steps_executed = len(sr)
+            last_quality_eval = getattr(self.infospace_executor, '_last_quality_eval', "") or ""
+        if run_mode:
+            updates["last_run_mode"] = run_mode
+        if step_results_snapshot:
+            updates["step_results"] = step_results_snapshot
+        if last_quality_eval:
+            updates["last_quality_eval"] = last_quality_eval
+        # quality_status is the canonical pass/fail/needs_revision signal from
+        # the run. Persist whatever the run path put on the result dict so
+        # plan review and the harness can read it from one place.
+        if isinstance(result, dict):
+            qs = result.get("quality_status")
+            if qs:
+                updates["quality_status"] = str(qs)
         self._update_scheduled_goal(goal_id, **updates)
+        # Emit END log bracket. duration_ms is computed from the monotonic
+        # start that the run-path stamped on the executor; quality is the
+        # planner/replay-derived quality_status from the result dict.
+        try:
+            duration_ms = -1
+            if self.infospace_executor is not None:
+                t0 = getattr(self.infospace_executor, '_goal_started_at', None)
+                if t0 is not None:
+                    duration_ms = int((time.monotonic() - t0) * 1000)
+            quality = ""
+            if isinstance(result, dict):
+                quality = (result.get("quality_status") or "") or ""
+            logger.info(
+                f"[GOAL {goal_id} mode={run_mode or 'unknown'} END "
+                f"status={updates['status']} steps={steps_executed} "
+                f"duration_ms={duration_ms} quality={quality or 'none'}]"
+            )
+        except Exception as _bracket_err:
+            logger.debug(f"END bracket emit failed: {_bracket_err}")
         # ── Graph: goal outcome ──
         graph_success = False if user_interrupted else bool(success)
         self._graph_emit_goal_outcome(goal_id, graph_success, last_result_raw, primary_product, result)
@@ -3600,6 +3668,16 @@ class ZenohExecutiveNode:
             goal_id=goal_id,
             goal_name=goal.get("name", "") or goal.get("goal_text", "")[:80],
         )
+        # Stamp the run mode and a monotonic start so the END bracket and
+        # _set_scheduled_goal_result can compute duration / record mode without
+        # having to introspect scheduler events. Also clear per-run instrumentation
+        # so a previous replay run's data does not leak into this planning run.
+        if self.infospace_executor is not None:
+            self.infospace_executor._last_run_mode = "replan"
+            self.infospace_executor._goal_started_at = time.monotonic()
+            self.infospace_executor._step_results = []
+            self.infospace_executor._last_quality_eval = ""
+        logger.info(f"[GOAL {goal_id} mode=replan START]")
         pre_resource_ids = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
         notify_user = source != "scheduler"
         goal_name = goal.get('name') or goal_id
@@ -3670,6 +3748,27 @@ class ZenohExecutiveNode:
             goal_id=goal_id,
             goal_name=goal.get("name", "") or goal.get("goal_text", "")[:80],
         )
+        # Stamp run mode and start time before any work runs. Also clear
+        # per-run instrumentation so a previous run's data does not leak.
+        if self.infospace_executor is not None:
+            self.infospace_executor._last_run_mode = "replay"
+            self.infospace_executor._goal_started_at = time.monotonic()
+            self.infospace_executor._step_results = []
+            self.infospace_executor._plan_actions = []
+            self.infospace_executor._last_quality_eval = ""
+        logger.info(f"[GOAL {goal_id} mode=replay START]")
+
+        # Ensure vision_criteria are populated for this goal (cache hit or
+        # generate+persist). Returns the criteria string; '' means no criteria.
+        # Failure inside _generate_vision is non-fatal — execution still proceeds.
+        vision_criteria = ""
+        if self.incremental_planner is not None:
+            try:
+                vision_criteria = self.incremental_planner._generate_vision(goal.get("goal_text", "")) or ""
+            except Exception as e:
+                logger.warning(f"[GOAL {goal_id}] _generate_vision (replay) failed: {e}")
+                vision_criteria = ""
+
         pre_resource_ids = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
         goal_name = goal.get('name') or goal_id
 
@@ -3681,13 +3780,63 @@ class ZenohExecutiveNode:
             try:
                 sync_result = self.infospace_executor.execute_plan_sync({"plan": cached})
                 success = sync_result.get("status") == "success"
+                response_text = f"Cached plan replay {'succeeded' if success else 'failed'}: {sync_result.get('reason', '')}".strip()
+
+                # Quality evaluation: only override the execution-only baseline
+                # when criteria + a bound $eval_target are both present.
+                quality_status = "passed" if success else "failed"
+                eval_text = ""
+                try:
+                    bindings_flat = self.infospace_executor.plan_bindings_flat
+                    eval_target_id = bindings_flat.get('eval_target') if bindings_flat else None
+                except Exception:
+                    eval_target_id = None
+                if vision_criteria and eval_target_id and isinstance(eval_target_id, str) and (
+                    eval_target_id.startswith('Note_') or eval_target_id.startswith('Collection_')
+                ):
+                    try:
+                        from incremental_planner import _vision_eval_check
+                        eval_text = _vision_eval_check(vision_criteria, eval_target_id, self.infospace_executor) or ""
+                        if eval_text:
+                            # _vision_eval_check returns one line per criterion in the
+                            # form "criterion_name: PASS|FAIL - reason". Count verdicts;
+                            # any FAIL marks the run as needs_revision.
+                            fail_count = 0
+                            pass_count = 0
+                            for line in eval_text.splitlines():
+                                stripped = line.strip()
+                                if not stripped or ':' not in stripped:
+                                    continue
+                                verdict = stripped.split(':', 1)[1].strip().upper()
+                                if verdict.startswith('FAIL'):
+                                    fail_count += 1
+                                elif verdict.startswith('PASS'):
+                                    pass_count += 1
+                            if fail_count > 0:
+                                quality_status = "needs_revision"
+                            elif pass_count > 0:
+                                quality_status = "passed"
+                            # If neither matched (parser found no verdicts) leave the
+                            # execution-only baseline ("passed"/"failed") in place.
+                            logger.info(
+                                f"[GOAL {goal_id}] vision eval (replay) → "
+                                f"{quality_status} (pass={pass_count} fail={fail_count})"
+                            )
+                    except Exception as e:
+                        logger.warning(f"[GOAL {goal_id}] vision eval (replay) crashed: {e}")
+
+                # Stash the eval text so _set_scheduled_goal_result can persist it.
+                self.infospace_executor._last_quality_eval = eval_text
+
                 result = {
                     "success": success,
                     "plan": cached,
-                    "response": f"Cached plan replay {'succeeded' if success else 'failed'}: {sync_result.get('reason', '')}".strip(),
-                    "quality_status": "passed" if success else "failed",
+                    "response": response_text,
+                    "quality_status": quality_status,
                 }
             except Exception as e:
+                logger.error(f"[GOAL {goal_id}] replay raised: {e}")
+                logger.error(traceback.format_exc())
                 result = {"success": False, "error": str(e)}
             self._set_scheduled_goal_result(goal_id, result, used_cache=True, pre_resource_ids=pre_resource_ids)
             status = "completed" if result.get("success") else "failed"
@@ -4002,6 +4151,32 @@ class ZenohExecutiveNode:
         sections.append(f"**Updated:** {goal.get('updated', '')}")
         sections.append("")
 
+        # ── Run Provenance ──
+        # Captures what the most recent run looked like: which path executed,
+        # what the quality verdict was, and which envision config produced
+        # the criteria currently on the goal record. Empty fields render as
+        # "(none)" so the section stays compact for goals that haven't run yet.
+        sections.append("## Run Provenance")
+        last_run_mode = goal.get("last_run_mode", "") or "(none)"
+        quality_status = goal.get("quality_status", "") or "(none)"
+        vc_source = goal.get("vision_criteria_source", "") or "(none)"
+        vc_meta = goal.get("vision_criteria_meta", {}) or {}
+        sections.append(f"**Last run mode:** {last_run_mode}")
+        sections.append(f"**Quality status:** {quality_status}")
+        sections.append(f"**Vision criteria source:** {vc_source}")
+        if isinstance(vc_meta, dict) and vc_meta:
+            gen_v = vc_meta.get("generator_version", "(none)")
+            gen_model = vc_meta.get("model", "(none)")
+            gen_at = vc_meta.get("generated_at", "(none)")
+            gen_hash = vc_meta.get("goal_text_hash", "(none)")
+            sections.append(f"**Vision generator version:** {gen_v}")
+            sections.append(f"**Vision generator model:** {gen_model}")
+            sections.append(f"**Vision generated at:** {gen_at}")
+            sections.append(f"**Vision goal_text hash:** {gen_hash}")
+        else:
+            sections.append("**Vision criteria meta:** (none)")
+        sections.append("")
+
         # ── Plan ──
         actions = goal.get("cached_plan_actions") or []
         sections.append(f"## Cached Plan ({len(actions)} steps)")
@@ -4013,6 +4188,56 @@ class ZenohExecutiveNode:
             sections.append("```")
         else:
             sections.append("(no cached plan)")
+        sections.append("")
+
+        # ── Step Outcomes (per-run instrumentation) ──
+        # Populated by execute_plan_sync (replay mode) and by the planner
+        # entry path (planning mode resets it but the planner loop doesn't
+        # currently emit per-step entries — see step_results gap discussion).
+        # For replay runs this is the equivalent of the planner trace.
+        step_results = goal.get("step_results") or []
+        sections.append(f"## Step Outcomes ({len(step_results)} steps)")
+        if step_results:
+            for sr in step_results:
+                if not isinstance(sr, dict):
+                    continue
+                idx = sr.get("step_idx", "?")
+                kind = sr.get("step_kind", "?")
+                status = sr.get("status", "?")
+                dur = sr.get("duration_ms", "?")
+                line = f"- step {idx} [{kind}] → {status} ({dur} ms)"
+                exc = sr.get("exception_type")
+                if exc:
+                    line += f" — exception: {exc}: {sr.get('exception_message', '')}"
+                elif status == "failed":
+                    reason = sr.get("reason") or ""
+                    if reason:
+                        line += f" — reason: {reason[:200]}"
+                sections.append(line)
+        else:
+            sections.append("(no step_results recorded — goal has not run since the instrumentation landed, or last run was a planning run)")
+        sections.append("")
+
+        # ── Vision Criteria & Quality Eval ──
+        # The rubric the run was scored against, plus the eval verdict text
+        # from _vision_eval_check (replay) or the planner's STAGE2 vision
+        # eval (planning). Empty criteria means envision returned "no failure
+        # modes apply" — that is a valid configuration, not missing data.
+        vc_text = goal.get("vision_criteria", "") or ""
+        last_eval = goal.get("last_quality_eval", "") or ""
+        sections.append("## Vision Criteria")
+        if vc_text.strip():
+            sections.append("```")
+            sections.append(vc_text)
+            sections.append("```")
+        else:
+            sections.append("(no criteria — envision returned no failure modes for this goal)")
+        if last_eval.strip():
+            sections.append("")
+            sections.append("### Last Quality Eval")
+            sections.append("```")
+            sections.append(last_eval)
+            sections.append("```")
         sections.append("")
 
         # ── Scheduler Events ──
@@ -4084,7 +4309,17 @@ class ZenohExecutiveNode:
             trace_line_count = sum(1 for _ in open(trace_path, encoding='utf-8'))
             sections.append(f"See: `{trace_path}` ({trace_line_count} lines, {trace_size:,} bytes)")
         else:
-            sections.append("(no trace file — goal may not have been run in replan mode yet)")
+            # In replay mode the planner trace is not produced. Point the
+            # reader at the per-step instrumentation above instead of
+            # apologizing for missing data.
+            if step_results:
+                sections.append(
+                    "(no trace file — last run was replay mode, which does not "
+                    "produce a planner trace; see Step Outcomes section above for "
+                    "per-step execution data)"
+                )
+            else:
+                sections.append("(no trace file — goal may not have been run in replan mode yet)")
         sections.append("")
 
         # ── Review Prompt Reference ──
@@ -4114,10 +4349,17 @@ class ZenohExecutiveNode:
         # Build the Claude prompt for copy/paste
         claude_prompt = (
             f"review goal_review_{goal_id}.md, check the trace in "
-            f"goal_trace_{goal_id}.txt, and fix the plan in "
+            f"goal_trace_{goal_id}.txt (planning runs only — replay runs use "
+            f"the Step Outcomes section of the bundle instead), and fix the plan in "
             f"goal_plan_{goal_id}.py. Use plan_review_prompt.md for "
             f"review guidelines. Verify all tool calls in the plan against the "
             f"Available Tools section and each tool's Skill.md parameter contract. "
+            f"Use the Run Provenance section to confirm which mode last ran, "
+            f"the Step Outcomes section for per-step status / duration / "
+            f"exceptions, and the Vision Criteria + Last Quality Eval sections "
+            f"for the rubric and scored verdict. Cross-check Step Outcomes "
+            f"against Cached Plan to spot steps that failed silently or "
+            f"diverged from the plan. "
             f"Update the prompt file with any new patterns. "
             f"Add a ### LEARNINGS block at the end of the plan file with "
             f"actionable insights for the world model. In addition, report any "
@@ -4141,7 +4383,14 @@ class ZenohExecutiveNode:
 
     @staticmethod
     def _extract_goal_log(log_path: str, goal_id: str) -> list:
-        """Extract log lines bracketed by goal start/completion markers."""
+        """Extract log lines bracketed by goal start/completion markers.
+
+        Recognizes both the legacy free-form markers and the structured
+        ``[GOAL goal_X mode=... START/END]`` brackets emitted by the run-path
+        instrumentation. Either form is enough to bracket a slice; the loop
+        always tracks the LAST start (newer runs overwrite older slices) and
+        pairs it with the next end marker that appears.
+        """
         if not os.path.exists(log_path):
             return []
         try:
@@ -4150,14 +4399,26 @@ class ZenohExecutiveNode:
         except Exception:
             return []
 
+        new_start_marker = f"[GOAL {goal_id} mode="
+        new_end_substr_a = f"[GOAL {goal_id} mode="
         # Find the LAST occurrence of goal start and its matching completion
         start_idx = None
         end_idx = None
         for i, line in enumerate(all_lines):
-            if goal_id in line and ('replay requested' in line or 'proceed requested' in line or 'created and started' in line):
+            is_new_start = (new_start_marker in line and "START]" in line)
+            is_new_end = (new_end_substr_a in line and "END " in line)
+            is_old_start = (
+                goal_id in line and (
+                    'replay requested' in line
+                    or 'proceed requested' in line
+                    or 'created and started' in line
+                )
+            )
+            is_old_end = (start_idx is not None and 'goal thread completed' in line)
+            if is_new_start or is_old_start:
                 start_idx = i
                 end_idx = None  # reset end for this new start
-            elif start_idx is not None and 'goal thread completed' in line:
+            elif is_new_end or is_old_end:
                 end_idx = i
         if start_idx is not None:
             end_idx = end_idx or len(all_lines) - 1
@@ -8261,6 +8522,18 @@ class ZenohExecutiveNode:
         if evt.classification == 'trigger':
             goal_id = self._resolve_goal_id(evt.goal_name)
             if goal_id:
+                # Honor the goal's execution_mode the same way /goal run does
+                # (see _cmd_goal_run). If the goal is in replay mode and has
+                # a cached plan, route the trigger to reuse; otherwise plan
+                # from scratch. This lets sensor-triggered runs benefit from
+                # the review cycle (a hand-fixed cached plan stays in effect
+                # across triggers instead of being silently overwritten on
+                # every fire).
+                triggered_goal = self._get_scheduled_goal(goal_id)
+                if (triggered_goal
+                        and triggered_goal.get("execution_mode") == "replay"
+                        and triggered_goal.get("cached_plan_actions")):
+                    return Action('reuse_goal', {'goal_id': goal_id, 'source': 'sensor_trigger'}, a)
                 return Action('proceed_goal', {'goal_id': goal_id, 'source': 'sensor_trigger'}, a)
             logger.warning(f"Decide: triggered goal '{evt.goal_name}' not found")
             return Action('no_action', {}, a)
@@ -8502,6 +8775,8 @@ class ZenohExecutiveNode:
                 content = f"dispatch goal: {(action.payload or {}).get('goal_text', '')[:100]}"
             elif action.type == 'proceed_goal':
                 content = f"proceed goal {(action.payload or {}).get('goal_id', '')}"
+            elif action.type == 'reuse_goal':
+                content = f"reuse goal {(action.payload or {}).get('goal_id', '')}"
             nid = g.add_node("decision", content[:500],
                 attrs={"action_type": action.type,
                        "payload_summary": payload_summary})
@@ -8912,6 +9187,17 @@ class ZenohExecutiveNode:
             self._graph_emit_goal_launch(
                 p['goal_id'], (goal or {}).get('goal_text', ''), p.get('source', 'user'))
             self._handle_goal_proceed(goal_id=p['goal_id'], source=p.get('source', 'user'))
+            return
+
+        if t == 'reuse_goal':
+            if not p.get('goal_id'):
+                self._say_to_user("Please specify which goal to reuse, e.g. 'reuse goal_1'.")
+                return
+            # ── Graph: goal launch (reuse) ──
+            goal = self._get_scheduled_goal(p['goal_id'])
+            self._graph_emit_goal_launch(
+                p['goal_id'], (goal or {}).get('goal_text', ''), p.get('source', 'user'))
+            self._handle_goal_reuse(goal_id=p['goal_id'])
             return
 
         if t == 'chat_response':
