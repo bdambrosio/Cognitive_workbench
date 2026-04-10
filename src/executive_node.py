@@ -1585,11 +1585,96 @@ class ZenohExecutiveNode:
             logger.error(f'Error executing saved plan: {e}')
             traceback.print_exc()
     
+    def _start_sensors(self):
+        """Spawn sensor threads owned by this agent.
+
+        Called once from run() after core init is complete. Each sensor runs
+        as a daemon thread sharing this agent's resource_manager,
+        available_tools, and Zenoh session — so the rss-watcher (and any
+        other resource-touching sensor) can write Notes directly without
+        going through Zenoh or worrying about None references.
+
+        Sensor metadata (the dict loaded by the launcher from src/sensors/)
+        is passed in via character_config['_sensor_metadata_by_name']. The
+        per-character sensor list is in character_config['sensors']. Both
+        are populated in launcher.py before agent threads start.
+        """
+        all_sensors = self.character_config.get('_sensor_metadata_by_name') or {}
+        char_sensors = self.character_config.get('sensors', []) or []
+        if not all_sensors or not char_sensors:
+            return
+
+        try:
+            from sensor_runner import SensorRunner
+            from utils.sensor_loader import parse_schedule
+        except ImportError as e:
+            logger.warning(f"Sensor module import failed (non-fatal): {e}")
+            return
+
+        if not hasattr(self, '_sensor_threads'):
+            self._sensor_threads = []
+
+        # Use the launcher-provided shutdown event so the launcher's SIGINT
+        # / SIGTERM handler stops sensors as well as the agent. If the agent
+        # is running standalone (no launcher), fall back to a fresh event so
+        # sensors at least have something to wait on.
+        shutdown_event = getattr(self, '_shutdown_event', None)
+        if shutdown_event is None:
+            shutdown_event = threading.Event()
+
+        for sensor_cfg in char_sensors:
+            s_name = sensor_cfg.get('name', '')
+            if not s_name:
+                continue
+            if s_name not in all_sensors:
+                logger.warning(f"Sensor '{s_name}' declared for {self.character_name} but not found in src/sensors/")
+                continue
+            sensor_meta = all_sensors[s_name]
+
+            # Build per-character overrides (mirrors what launcher.py used to do)
+            overrides: Dict[str, Any] = {}
+            if 'schedule' in sensor_cfg:
+                secs = parse_schedule(sensor_cfg['schedule'])
+                if secs is not None:
+                    overrides['schedule_seconds'] = secs
+            if 'parameters' in sensor_cfg:
+                overrides['parameters'] = sensor_cfg['parameters']
+            if 'gate' in sensor_cfg:
+                overrides['gate'] = sensor_cfg['gate']
+            if 'disposition' in sensor_cfg:
+                overrides['disposition'] = sensor_cfg['disposition']
+
+            try:
+                runner = SensorRunner(
+                    sensor_name=s_name,
+                    sensor_meta=sensor_meta,
+                    character_name=self.character_name,
+                    scenario_overrides=overrides,
+                    resource_manager=self.resource_manager,
+                    zenoh_session=self.session,
+                    available_tools=self.available_tools or {},
+                    shutdown_event=shutdown_event,
+                )
+                t = threading.Thread(
+                    target=runner.run,
+                    name=f"sensor-{self.character_name}-{s_name}",
+                    daemon=True,
+                )
+                t.start()
+                self._sensor_threads.append(t)
+                logger.info(f"Started sensor {s_name} for {self.character_name}")
+            except Exception as e:
+                logger.warning(f"Failed to start sensor {s_name} for {self.character_name}: {e}")
+                traceback.print_exc()
+
+        if self._sensor_threads:
+            logger.info(f"{self.character_name}: started {len(self._sensor_threads)} sensor thread(s)")
+
     def run(self):
         """Main OODA loop."""
         try:
             logger.info('Executive Node running - press Ctrl+C to stop')
-            
+
             # Announce character presence
             self._announce_character()
             time.sleep(0.1)
@@ -1597,6 +1682,12 @@ class ZenohExecutiveNode:
 
             # Recover orphaned establishing tasks from prior session
             self._recover_stalled_establishing_tasks()
+
+            # Start sensor threads now that core OODA infrastructure (queues,
+            # resource_manager, infospace_executor, available_tools) is fully
+            # initialized. Sensors run as daemon threads sharing this agent's
+            # resource_manager directly — no race, no IPC, no None reference.
+            self._start_sensors()
 
             # Start main loop
             while not self.shutdown_requested:

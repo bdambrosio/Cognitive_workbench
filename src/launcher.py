@@ -289,7 +289,7 @@ def launch_task_manager() -> Optional[subprocess.Popen]:
 
 def run_agent(name: str, config: dict, runtime, tokenizer, shutdown_event: threading.Event):
     """Entry point for each character thread.
-    
+
     The node's OODA loop checks node.shutdown_requested. We monitor the
     shared shutdown_event and propagate it to the node.
     """
@@ -298,6 +298,10 @@ def run_agent(name: str, config: dict, runtime, tokenizer, shutdown_event: threa
         from executive_node import ZenohExecutiveNode
         logger.info(f"Starting agent thread: {name}")
         node = ZenohExecutiveNode(character_name=name, character_config=config, runtime=runtime, tokenizer=tokenizer)
+        # Hand the shared shutdown event to the node so its sensor threads
+        # (spawned in node.run() via _start_sensors) can wait on the same
+        # event the launcher uses for SIGINT/SIGTERM coordination.
+        node._shutdown_event = shutdown_event
         # Start a tiny daemon thread that propagates the shared event to this node
         def _watch_shutdown():
             shutdown_event.wait()
@@ -449,7 +453,11 @@ def main():
     except Exception as e:
         logger.warning(f"Sensor metadata loading failed (non-fatal): {e}")
 
-    # Enrich each character config with resolved sensor summaries for self-model
+    # Enrich each character config with resolved sensor summaries for self-model.
+    # Also stash the full sensor metadata dict on each character config so that
+    # ZenohExecutiveNode._start_sensors() can construct SensorRunner instances
+    # at agent-init time (with a real resource_manager) instead of having the
+    # launcher spawn sensors with resource_manager=None.
     if all_sensors:
         for _char_name, _config in characters:
             sensor_summaries = []
@@ -472,6 +480,31 @@ def main():
                     'description': meta.get('description', ''),
                 })
             _config['_sensor_configs'] = sensor_summaries
+            _config['_sensor_metadata_by_name'] = all_sensors
+
+    # Validate sensor trigger dispositions against scheduled goals / task
+    # templates. Done at config-load time (before any agent thread starts) so
+    # the user gets early feedback if a sensor references a missing goal.
+    if all_sensors:
+        for _char_name, _config in characters:
+            for sensor_cfg in _config.get('sensors', []):
+                s_name = sensor_cfg.get('name', '')
+                if s_name not in all_sensors:
+                    if s_name:
+                        logger.warning(f"Sensor '{s_name}' declared for {_char_name} but not found in src/sensors/")
+                    continue
+                sensor_meta = all_sensors[s_name]
+                effective_disposition = sensor_cfg.get('disposition', sensor_meta.get('disposition', 'inform'))
+                if effective_disposition.startswith('trigger-task:'):
+                    tmpl_name = effective_disposition[len('trigger-task:'):]
+                    task_templates = [t.get('name', '') for t in _config.get('task_templates', [])]
+                    if tmpl_name not in task_templates:
+                        logger.warning(f"Sensor '{s_name}' has disposition 'trigger-task:{tmpl_name}' but template '{tmpl_name}' not found in {_char_name}'s task_templates")
+                elif effective_disposition.startswith('trigger:'):
+                    goal_name = effective_disposition[len('trigger:'):]
+                    scheduled_goals = [g.get('name', '') for g in _config.get('scheduled_goals', [])]
+                    if goal_name not in scheduled_goals:
+                        logger.warning(f"Sensor '{s_name}' has disposition 'trigger:{goal_name}' but goal '{goal_name}' not found in {_char_name}'s scheduled goals")
 
     # ---- Set CLI mode env var before agent threads import their logging configs ----
     if args.cli:
@@ -488,73 +521,11 @@ def main():
 
     logger.info(f"All {len(threads)} agent threads started")
 
-    # ---- Launch sensor threads ----
-    sensor_threads: List[threading.Thread] = []
-    try:
-        from sensor_runner import SensorRunner
-
-        if all_sensors:
-            for char_name, config in characters:
-                char_sensors = config.get('sensors', [])
-                if not char_sensors:
-                    continue
-                for sensor_cfg in char_sensors:
-                    s_name = sensor_cfg.get('name', '')
-                    if s_name not in all_sensors:
-                        logger.warning(f"Sensor '{s_name}' declared for {char_name} but not found in src/sensors/")
-                        continue
-
-                    sensor_meta = all_sensors[s_name]
-
-                    # Build scenario overrides: parse schedule override if present
-                    overrides = {}
-                    if 'schedule' in sensor_cfg:
-                        from utils.sensor_loader import parse_schedule
-                        secs = parse_schedule(sensor_cfg['schedule'])
-                        if secs is not None:
-                            overrides['schedule_seconds'] = secs
-                    if 'parameters' in sensor_cfg:
-                        overrides['parameters'] = sensor_cfg['parameters']
-                    if 'gate' in sensor_cfg:
-                        overrides['gate'] = sensor_cfg['gate']
-                    if 'disposition' in sensor_cfg:
-                        overrides['disposition'] = sensor_cfg['disposition']
-
-                    # Validate trigger dispositions against scheduled goals / task templates
-                    effective_disposition = sensor_cfg.get('disposition', sensor_meta.get('disposition', 'inform'))
-                    if effective_disposition.startswith('trigger-task:'):
-                        tmpl_name = effective_disposition[len('trigger-task:'):]
-                        task_templates = [t.get('name', '') for t in config.get('task_templates', [])]
-                        if tmpl_name not in task_templates:
-                            logger.warning(f"Sensor '{s_name}' has disposition 'trigger-task:{tmpl_name}' but template '{tmpl_name}' not found in {char_name}'s task_templates")
-                    elif effective_disposition.startswith('trigger:'):
-                        goal_name = effective_disposition[len('trigger:'):]
-                        scheduled_goals = [g.get('name', '') for g in config.get('scheduled_goals', [])]
-                        if goal_name not in scheduled_goals:
-                            logger.warning(f"Sensor '{s_name}' has disposition 'trigger:{goal_name}' but goal '{goal_name}' not found in {char_name}'s scheduled goals")
-
-                    runner = SensorRunner(
-                        sensor_name=s_name,
-                        sensor_meta=sensor_meta,
-                        character_name=char_name,
-                        scenario_overrides=overrides,
-                        resource_manager=None,  # Set after agent init if needed
-                        zenoh_session=zenoh_session,
-                        available_tools={},
-                        shutdown_event=shutdown_event,
-                    )
-
-                    t = threading.Thread(target=runner.run, name=f"sensor-{char_name}-{s_name}", daemon=True)
-                    t.start()
-                    sensor_threads.append(t)
-                    logger.info(f"Started sensor {s_name} for {char_name}")
-    except Exception as e:
-        logger.warning(f"Sensor loading failed (non-fatal): {e}")
-        import traceback
-        traceback.print_exc()
-
-    if sensor_threads:
-        logger.info(f"Started {len(sensor_threads)} sensor threads")
+    # Sensor threads are now spawned by ZenohExecutiveNode._start_sensors()
+    # at the start of run() — after init has constructed the agent's
+    # resource_manager. The launcher's role for sensors is just to load the
+    # metadata once (above) and validate the dispositions; spawning happens
+    # in the agent thread so sensors get a real resource_manager reference.
 
     # ---- Wait for shutdown ----
     _interrupt_count = [0]
