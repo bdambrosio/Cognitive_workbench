@@ -24,12 +24,17 @@ Stages currently implemented:
   and the per-goal trial driver that composes `run` and `review` steps
   into one experimental record against a single goal.
 
-- **Stage 4** — `bench/experiment.py`: batch experiment runner.
-  Accepts an explicit goal list (names or ids) and a trial type (A, B,
-  or C), produces a trial plan, and executes it across the goals with
-  the appropriate reset strategy per goal. Writes per-goal records to
-  a JSONL file as they complete; writes a `.summary.json` sidecar at
-  the end.
+- **Stage 4** — `bench/baseline.py`, `bench/experiment.py`: batch
+  experiment runner with overlay-based state management.
+  `baseline.py` builds a truly-empty baseline snapshot by wiping the
+  character resource dir, booting Jill once to write the framework
+  scaffold, seeding goals from a YAML file via the new create-only
+  `/goal add` semantic, and snapshotting. `experiment.py` accepts an
+  explicit goal list and trial type (A/B/C), produces a plan, and
+  executes it with per-goal reset = baseline restore + orthogonal
+  overlays (world_model.json, cached_plan_actions). Captures
+  accumulating state between goals as sidecar files. Writes per-goal
+  records to a JSONL file as they complete.
 
 ## Prerequisites
 
@@ -200,11 +205,12 @@ python bench/experiment.py trial-B \
     --goals G01 G02 G03 G04 G05 G06 G07 G08 G09 G10 \
     --seed 42 --out runs/b.jsonl
 
-# Trial C: replay where a Trial B first-half plan exists, replan otherwise
+# Trial C: replay where a Trial B first-half plan exists, replan otherwise.
+# --trial-b-dir is the experiment dir produced by the Trial B run above.
 python bench/experiment.py trial-C \
     --goals G01 G02 G03 G04 G05 G06 G07 G08 G09 G10 \
     --seed 42 \
-    --post-firsthalf-label post-B-firsthalf-seed-42 \
+    --trial-b-dir exp/trial-B-seed-42 \
     --reviewed-in-b-from runs/b.jsonl \
     --out runs/c.jsonl
 ```
@@ -212,87 +218,119 @@ python bench/experiment.py trial-C \
 `--goals` accepts either display names (`G01`) or internal goal_ids
 (`goal_17`) or a mix. The same invocation works for 1 goal or 20.
 
-Trial C's `--reviewed-in-b-from` reads the first-half goal refs
-out of the Trial B JSONL file, so you don't hand-maintain the list.
+Trial C's `--reviewed-in-b-from` reads the first-half goal refs out of
+the Trial B JSONL file and derives the `cached_plan_<goal>.json` paths
+from `--trial-b-dir`, so you don't hand-maintain either list.
+
+### Overlay-based state management (the reset model)
+
+Every per-goal reset in every trial is a **full restore of the empty
+baseline** followed by an **explicit list of overlays** to carry
+forward specific slices of accumulated state. The overlay list is
+either empty (Trial A), or one or two items (Trial B phase 2, Trial
+C), or grows per-goal (Trial B phase 1 as world_model and cached_plans
+accumulate).
+
+Overlay operations — applied after `snapshot.restore()`, before
+`launcher.start()`:
+
+- **world_model**: copies a saved `world_model.json` over the
+  baseline's empty one. Simple file copy. Used to carry forward
+  world-model learnings from prior goals in the same trial.
+- **cached_plan**: offline JSON surgery on `resources.json`. Locates
+  the scheduled-goal Note by `note_name`, parses its `content` field,
+  sets `cached_plan_actions`, writes back. Used to inject a reviewed
+  plan from Trial B phase 1 into a Trial C replay.
+
+Capture operations — applied after a goal run completes, saving
+named sidecar files for subsequent overlays:
+
+- **world_model** → copy current `world_model.json` to
+  `exp/<trial>/world_model_after_<i>.json`
+- **cached_plan** → read `cached_plan_actions` from the scheduled-goal
+  Note, write as JSON list to `exp/<trial>/cached_plan_<goal>.json`
 
 ### Trial semantics (summary)
 
-| Trial | Per-goal protocol | Per-goal reset | Notes |
-|---|---|---|---|
-| A | `[replan]` | full restore of `baseline-clean` | 1 bounce per goal |
-| B phase 1 | `[replan, review commit, replay]` | full restore before *first* goal only | No inter-goal reset — world model and cached plans accumulate naturally |
-| B phase 1→2 boundary | — | — | Snapshot `post-B-firsthalf-seed-<seed>` |
-| B phase 2 | `[replan]` | full restore of `post-B-firsthalf-seed-<seed>` | World model carries forward from phase 1 |
-| C (reviewed) | `[replay]` | full restore of `post-B-firsthalf-seed-<seed>` | Uses the cached plan committed in B phase 1 |
-| C (unreviewed) | `[replan]` | full restore of `post-B-firsthalf-seed-<seed>` | Same accumulated state but no cached plan |
+| Trial | Per-goal protocol | Reset | Overlays | Captures |
+|---|---|---|---|---|
+| A | `[replan]` | `baseline-empty` (full) | none | none |
+| B phase 1 goal 0 | `[replan, review commit, replay]` | `baseline-empty` | none | world_model, cached_plan for this goal |
+| B phase 1 goal N>0 | `[replan, review commit, replay]` | `baseline-empty` | world_model from goal N-1 + cached_plans for goals 0..N-1 | world_model, cached_plan for this goal |
+| B phase 2 | `[replan]` | `baseline-empty` | world_model from end of phase 1 | none |
+| C (reviewed in B) | `[replay]` | `baseline-empty` | world_model + cached_plan for this goal | none |
+| C (unreviewed) | `[replan]` | `baseline-empty` | world_model only | none |
 
-### Known confound: Trial B phase 1 infospace contamination
+Every goal starts from **identical** framework scaffold (empty
+`_scheduled_goals` collection + seeded `_derived_concerns`) plus
+whatever overlays apply. There is no cross-goal contamination of
+persistent Notes, `_user_concerns`, `_situation`, `_ooda_state`, or
+`conversation_history` — those are lazily created and wiped on every
+reset.
 
-Because phase 1 has no per-goal reset (this is necessary so committed
-cached plans survive into the phase-boundary snapshot), persistent Notes
-created by earlier first-half goals remain visible to later first-half
-goals **and** to every second-half goal (which starts from the phase-1
-snapshot). If goal N creates a persistent Note that goal N+1's planner
-happens to find via `discover-notes`, that shows up as "helpfulness"
-in the Trial B numbers even though it's really infospace contamination.
+## Baseline setup (one-time, scripted)
 
-Two things to know:
+The experiment runner assumes a snapshot named `baseline-empty` already
+exists. `bench/baseline.py create` builds it end-to-end: wipes the
+character resource dir, boots Jill once so the framework scaffold gets
+written (two persistent resources: the seeded `_derived_concerns` Note
+from the scenario YAML, and an empty `_scheduled_goals` Collection),
+sends `/goal add` + `/goal rename` for each entry in a goals YAML file
+to seed G01..Gnn without running them, stops Jill, and takes the
+snapshot.
 
-1. The contamination is **uniform across all Trial B goals** since they
-   all derive from the same accumulating phase-1 state, so comparisons
-   *within* Trial B are internally consistent.
-2. The confound primarily affects the **Trial A vs Trial B phase 2**
-   comparison (which is meant to isolate world-model transfer). Trial A
-   vs Trial C is less affected — both sides are running against
-   "accumulated infospace" states of similar shape.
+```bash
+python bench/baseline.py create \
+    --label baseline-empty \
+    --goals-file bench/goals-infolab-bench.yaml
+```
 
-If the numbers show a suspiciously strong phase-2 effect, the next
-investigation is whether it's driven by a specific goal pair with
-obvious input/output overlap (e.g. G01 creates a paper Note that G04
-"find Notes about transformers" then picks up). Removing the confound
-would require splitting `resources.json` into "goal records" vs. "other
-persistent Notes" and handling them independently — significant work,
-deferred until evidence suggests it's needed.
+Prerequisites:
 
-## Baseline setup (one-time, manual)
+- Jill must be stopped before invoking this.
+- The agent-side `/goal add` command must support create-only
+  semantics (default: `run=False`). The `_cmd_goal_add` handler in
+  `executive_node.py` returns `"Goal <goal_id> created"` without
+  starting the goal on the worker thread.
+- The goals YAML file (`bench/goals-infolab-bench.yaml`) is the
+  canonical taskset definition. Edit it to change goals; re-run
+  `baseline.py create` afterward to rebuild.
 
-The experiment runner assumes a snapshot named `baseline-clean` already
-exists. This has to be created by hand because the alternative —
-programmatically clearing persistent state — risks wiping core framework
-built-ins (the conversation Collection, conversation history, `null_note`,
-`_*` bookkeeping notes) that Jill needs to function at all.
+The baseline can be inspected after creation:
 
-Procedure:
+```bash
+python bench/snapshot.py describe baseline-empty
+```
 
-1. **Stop Jill's launcher.** Confirm no leftover Python processes.
-2. **Delete the world model only:**
-   ```
-   rm scenarios/infolab/resources/Jill/world_model.json
-   rm scenarios/infolab/resources/Jill/world_model.json.bak  # if present
-   ```
-   Do NOT delete `resources.json` — it contains both the core framework
-   scaffold (conversation, null_note, `_*` bookkeeping notes) AND your
-   seeded G01..Gnn goal records. Losing it wipes all of those.
-3. **(Optional) Clean up non-framework persistent state.** If prior
-   runs left junk persistent Notes you want gone, delete them by hand
-   via Jill's CLI (`/note delete <id>` etc.). Do not bulk-delete; verify
-   each one is not a framework built-in.
-4. **Start Jill** and confirm responsive via `/status`. Run `/goals`
-   and confirm G01..Gnn are all present with the expected goal text.
-5. **Stop Jill.**
-6. **Take the snapshot:**
-   ```
-   python bench/snapshot.py snapshot baseline-clean
-   ```
-7. **Verify** the snapshot contents:
-   ```
-   python bench/snapshot.py describe baseline-clean
-   ```
-8. **Restart Jill.** You're now ready to run experiments.
+A `_baseline_seed_manifest.json` sidecar is written inside the
+snapshot directory, listing the goals seeded and their assigned
+goal_ids.
 
-The `baseline-clean` snapshot is the canonical starting point for all
-three trials. Take a fresh one any time you add goals, change goal text,
-or want to wipe accumulated learnings.
+Rebuild any time you change the goal set or want a truly clean start:
+
+```bash
+python bench/snapshot.py delete baseline-empty
+python bench/baseline.py create --label baseline-empty \
+    --goals-file bench/goals-infolab-bench.yaml
+```
+
+### Why not a manual baseline procedure?
+
+The older `baseline-clean` approach (delete `world_model.json`, keep
+`resources.json`) preserved the framework scaffold but also preserved
+accumulated session history: prior `_user_concerns`, `_situation`,
+`_ooda_state`, `conversation_history` items, prior FAISS-indexed
+persistent notes, cross-session `theory_of_mind` paragraphs, and
+closed-concerns lists that the planner reads on startup. Direct
+inspection of a post-run trace showed all of those leaking into planner
+behavior in ways that biased per-goal outcomes — in one case, a closed
+concern labeled "PDF fetch for arXiv paper 2604.08455 incomplete due to
+missing Note persistence" from a prior run was priming the current
+planner into a truncation spiral on the same goal.
+
+The overlay model eliminates this by design: every goal starts from the
+empty-scaffold baseline, with exactly the state the experiment says
+should carry forward and nothing else.
 
 ## Known limitations
 
@@ -308,9 +346,6 @@ or want to wipe accumulated learnings.
   planner persists the deliverable via `name=` instead of binding it to
   `out="$eval_target"`. Stage 2 falls back to grading against
   `last_result` alone in that case, with lower confidence per objective.
-- **Trial B phase 1 infospace contamination** — see Stage 4 usage above
-  for the full explanation. Mitigation requires infrastructure work
-  that's deferred until evidence justifies it.
 - **No automatic experiment resume.** If `run_experiment` crashes
   mid-trial, partial results are on disk (JSONL appends per-goal), but
   restarting manually with an updated goal list is the user's job.

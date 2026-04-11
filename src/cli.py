@@ -572,7 +572,7 @@ def _handle_query(session, character: str, data: dict, state: dict):
 
 # Command vocabulary for the LLM prompt (static — matches the registry)
 _COMMAND_VOCABULARY = """\
-/goal add <goal_text>          Create and run a new goal
+/goal add <goal_text>          Create a new goal (does NOT run it)
 /goal run <goal_id> [replan|replay]  Execute goal (override mode)
 /goal terminate <goal_id>      Stop a running goal
 /goal rename <goal_id> <name>  Rename a goal
@@ -675,7 +675,9 @@ RULES:
 - A single input may map to multiple commands (e.g., "stop and save" → two commands).
 - Requests like "tell me about X" or "what do you think about X" are chat, not commands.
 - Requests like "check email" or "run the health check" are /goal run if a matching goal exists,
-  or /goal add if the user seems to want something new done.
+  or /goal add with "run": true if the user seems to want something new done immediately.
+  (Plain /goal add creates a goal without running it — only use that when the user explicitly says
+  something like "just add a goal to..." without asking for immediate action.)
 - "make it so" or "do it" with no prior conversational context suggesting a specific action is chat.
 
 COMMAND VOCABULARY:
@@ -696,7 +698,7 @@ Respond with a JSON object. Examples:
 {{"interpretation": "command", "commands": [{{"cmd": "/goal run", "goal_id": "goal_2"}}]}}
 {{"interpretation": "command", "commands": [{{"cmd": "/stop"}}, {{"cmd": "/save"}}]}}
 {{"interpretation": "chat", "text": "How are you feeling today?"}}
-{{"interpretation": "command", "commands": [{{"cmd": "/goal add", "goal_text": "research quantum computing breakthroughs"}}]}}
+{{"interpretation": "command", "commands": [{{"cmd": "/goal add", "goal_text": "research quantum computing breakthroughs", "run": true}}]}}
 
 JSON response:"""
 
@@ -808,7 +810,7 @@ def _print_help():
 {C.BOLD}Goals:{C.RESET}
   /goals                         List all goals
   /goal show <id>                Show goal detail
-  /goal add <text>               Create and run new goal
+  /goal add <text>               Create new goal (does NOT run it)
   /goal run <id> [replan|replay]  Execute goal now (override mode)
   /goal terminate <id>           Stop a running goal
   /goal rename <id> <name>       Rename goal

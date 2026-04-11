@@ -49,7 +49,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Any, Dict, List, Optional
 
 # Path setup so we can import zenoh utils for the launcher liveness check.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -220,40 +220,25 @@ def restore(
     character: str = DEFAULT_CHARACTER,
     world: str = DEFAULT_WORLD,
     force: bool = False,
-    preserve: Optional[Iterable[str]] = None,
 ) -> Path:
     """Copy the snapshot back to the character's resource directory,
     overwriting any current state. Refuses if the launcher is running
     (unless force=True).
 
-    `preserve` is an optional iterable of snapshot filenames to leave
-    untouched on disk. The named files are neither copied from the
-    snapshot nor deleted — whatever is currently at `dest/<name>` stays.
-    This is how the batch layer expresses "reset infospace but keep
-    world_model.json" for Trial B's accumulating-review phase.
-
-    Preserve entries are validated against the known _SNAPSHOT_FILES
-    list so a typo fails loudly instead of silently copying the file.
-    Directories in _SNAPSHOT_DIRS are always fully restored and cannot
-    be preserved via this kwarg.
+    The previous `preserve=` kwarg was removed when the bench harness
+    switched to the overlay model — partial restores are now expressed
+    as `restore(label) + apply_*_overlay(...)` instead of
+    `restore(label, preserve=[...])`. The overlay model is strictly
+    clearer because each slice of per-run state (world_model,
+    cached_plans) is an explicit operation.
 
     Returns the destination directory on success.
     Raises RuntimeError on launcher-still-running or missing snapshot.
-    Raises ValueError on an unrecognized preserve entry.
     """
     if not force and is_launcher_running(character):
         raise RuntimeError(
             f"Launcher appears to be running for character '{character}'. "
             f"Stop it before restoring (or use --force to override)."
-        )
-
-    preserve_set = set(preserve or [])
-    known_files = {f for f, _optional in _SNAPSHOT_FILES}
-    unknown = preserve_set - known_files
-    if unknown:
-        raise ValueError(
-            f"preserve contains unknown snapshot file(s): {sorted(unknown)}. "
-            f"Valid entries: {sorted(known_files)}"
         )
 
     snap_dir = _snapshot_dir(label)
@@ -283,14 +268,9 @@ def restore(
     dest.mkdir(parents=True, exist_ok=True)
 
     restored: List[str] = []
-    preserved_actual: List[str] = []
 
-    # Files: copy each snapshot file back, overwriting whatever's there,
-    # except for files explicitly listed in `preserve`.
+    # Files: copy each snapshot file back, overwriting whatever's there.
     for fname, _optional in _SNAPSHOT_FILES:
-        if fname in preserve_set:
-            preserved_actual.append(fname)
-            continue
         snapfile = snap_dir / fname
         if not snapfile.exists():
             continue
@@ -312,11 +292,247 @@ def restore(
             if destsub.exists():
                 shutil.rmtree(destsub)
 
-    summary = f"Restored snapshot '{label}': {len(restored)} item(s)"
-    if preserved_actual:
-        summary += f", {len(preserved_actual)} preserved ({', '.join(preserved_actual)})"
-    summary += f" → {dest}"
-    print(summary, file=sys.stderr)
+    print(
+        f"Restored snapshot '{label}': {len(restored)} item(s) → {dest}",
+        file=sys.stderr,
+    )
+    return dest
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Overlay primitives
+# ──────────────────────────────────────────────────────────────────────────
+#
+# After restoring a baseline snapshot, the batch runner can overlay
+# specific slices of state before starting the launcher again. Two
+# slices are supported today:
+#
+# - world_model overlay: copy a saved world_model.json over the
+#   baseline's empty one. Simple file copy.
+#
+# - cached_plan overlay: inject a saved cached_plan_actions list into
+#   the scheduled-goal Note for a given goal_id (by note_name, which
+#   is stable across reseeds). Offline JSON surgery on resources.json.
+#
+# Symmetric capture functions read the same slices back out of disk
+# so they can be saved as sidecar artifacts for later overlay use.
+#
+# Both pairs require the launcher to be stopped (same constraint as
+# snapshot/restore — the agent's in-memory state would diverge from
+# disk if it were live). is_launcher_running() is checked with force=
+# override for tests.
+
+
+def _scheduled_goal_note_name(goal_id: str) -> str:
+    """Compute the note_name used by executive_node._scheduled_goal_note_name.
+
+    Mirrors the agent-side logic: 'goal_17' → '_scheduled_goal_17'.
+    """
+    return "_scheduled_goal_" + goal_id.replace("goal_", "")
+
+
+def _find_scheduled_goal_note(
+    resources_data: Dict[str, Any], goal_id: str,
+) -> Optional[Dict[str, Any]]:
+    """Locate the scheduled-goal Note within a loaded resources.json
+    dict by its stable note_name. Returns the Note instance dict (not a
+    copy — mutations propagate) or None if not found.
+    """
+    target_name = _scheduled_goal_note_name(goal_id)
+    notes = resources_data.get("note_instances") or {}
+    for note in notes.values():
+        props = note.get("properties") or {}
+        if props.get("note_name") == target_name:
+            return note
+    return None
+
+
+def apply_world_model_overlay(
+    source: Path,
+    *,
+    character: str = DEFAULT_CHARACTER,
+    world: str = DEFAULT_WORLD,
+    force: bool = False,
+) -> Path:
+    """Overlay a saved world_model.json file onto the character's
+    current resource directory. Copies `source` to
+    `scenarios/<world>/resources/<character>/world_model.json`,
+    replacing whatever's there.
+
+    Called after `restore(label)` to carry accumulated world_model
+    learnings forward into a fresh baseline.
+    """
+    if not force and is_launcher_running(character):
+        raise RuntimeError(
+            f"Launcher appears to be running for character '{character}'. "
+            f"Stop it before applying an overlay (or use force=True)."
+        )
+    source = Path(source)
+    if not source.exists():
+        raise RuntimeError(f"world_model overlay source not found: {source}")
+    dest = _resource_dir(world, character) / "world_model.json"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, dest)
+    print(
+        f"Overlaid world_model.json from {source} → {dest}",
+        file=sys.stderr,
+    )
+    return dest
+
+
+def apply_cached_plan_overlay(
+    goal_id: str,
+    source: Path,
+    *,
+    character: str = DEFAULT_CHARACTER,
+    world: str = DEFAULT_WORLD,
+    force: bool = False,
+) -> None:
+    """Inject a saved cached_plan_actions list into the scheduled-goal
+    Note for `goal_id`, by offline JSON surgery on resources.json.
+
+    `source` is a JSON file containing the cached_plan_actions list
+    (produced by `capture_cached_plan`). The target scheduled-goal Note
+    is located by its note_name (`_scheduled_goal_<N>`), and its
+    `properties.content` is re-serialized with the new field.
+
+    Raises RuntimeError if the goal Note can't be found (i.e. the
+    goal_id doesn't exist in the current resources.json — probably a
+    baseline/seed mismatch).
+    """
+    if not force and is_launcher_running(character):
+        raise RuntimeError(
+            f"Launcher appears to be running for character '{character}'. "
+            f"Stop it before applying an overlay (or use force=True)."
+        )
+    source = Path(source)
+    if not source.exists():
+        raise RuntimeError(f"cached_plan overlay source not found: {source}")
+    with open(source, "r", encoding="utf-8") as f:
+        new_plan_actions = json.load(f)
+    if not isinstance(new_plan_actions, list):
+        raise RuntimeError(
+            f"cached_plan source must contain a JSON list, got "
+            f"{type(new_plan_actions).__name__} in {source}"
+        )
+
+    resources_path = _resource_dir(world, character) / "resources.json"
+    if not resources_path.exists():
+        raise RuntimeError(
+            f"resources.json not found at {resources_path}. Restore a "
+            f"baseline before applying cached_plan overlays."
+        )
+    with open(resources_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    note = _find_scheduled_goal_note(data, goal_id)
+    if note is None:
+        raise RuntimeError(
+            f"scheduled-goal Note for '{goal_id}' not found in "
+            f"{resources_path}. Check that the baseline was seeded with "
+            f"this goal_id."
+        )
+
+    props = note.setdefault("properties", {})
+    content_str = props.get("content") or "{}"
+    try:
+        content_obj = json.loads(content_str) if isinstance(content_str, str) else content_str
+    except Exception as e:
+        raise RuntimeError(
+            f"scheduled-goal Note for '{goal_id}' has unparseable "
+            f"content: {e}"
+        )
+    if not isinstance(content_obj, dict):
+        raise RuntimeError(
+            f"scheduled-goal Note for '{goal_id}' content is not a dict"
+        )
+
+    content_obj["cached_plan_actions"] = new_plan_actions
+    props["content"] = json.dumps(content_obj)
+
+    with open(resources_path, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+
+    print(
+        f"Overlaid cached_plan for {goal_id} ({len(new_plan_actions)} "
+        f"actions) from {source}",
+        file=sys.stderr,
+    )
+
+
+def capture_world_model(
+    dest: Path,
+    *,
+    character: str = DEFAULT_CHARACTER,
+    world: str = DEFAULT_WORLD,
+) -> Path:
+    """Copy the current world_model.json out of the character's
+    resource dir to a named destination file. Used by the batch runner
+    to snapshot the accumulating world_model between Trial B phase 1
+    goals so it can be overlaid on the next run.
+
+    Does not require the launcher to be stopped — it's a read-only file
+    copy. (The launcher persists world_model.json at goal completion,
+    so capturing it between goals catches it in a consistent state.)
+    """
+    src = _resource_dir(world, character) / "world_model.json"
+    if not src.exists():
+        raise RuntimeError(f"world_model.json not found at {src}")
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dest)
+    return dest
+
+
+def capture_cached_plan(
+    goal_id: str,
+    dest: Path,
+    *,
+    character: str = DEFAULT_CHARACTER,
+    world: str = DEFAULT_WORLD,
+) -> Path:
+    """Read the cached_plan_actions list for `goal_id` out of the
+    current resources.json and write it as a JSON list to `dest`.
+
+    Returns `dest`. Raises RuntimeError if the goal Note or the
+    cached_plan field is missing.
+    """
+    resources_path = _resource_dir(world, character) / "resources.json"
+    if not resources_path.exists():
+        raise RuntimeError(f"resources.json not found at {resources_path}")
+    with open(resources_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    note = _find_scheduled_goal_note(data, goal_id)
+    if note is None:
+        raise RuntimeError(
+            f"scheduled-goal Note for '{goal_id}' not found in "
+            f"{resources_path}"
+        )
+
+    props = note.get("properties") or {}
+    content_str = props.get("content") or "{}"
+    try:
+        content_obj = json.loads(content_str) if isinstance(content_str, str) else content_str
+    except Exception as e:
+        raise RuntimeError(
+            f"scheduled-goal Note for '{goal_id}' has unparseable content: {e}"
+        )
+    plan_actions = content_obj.get("cached_plan_actions") if isinstance(content_obj, dict) else None
+    if plan_actions is None:
+        raise RuntimeError(
+            f"scheduled-goal Note for '{goal_id}' has no cached_plan_actions "
+            f"to capture (goal has not been reviewed/committed yet)"
+        )
+    if not isinstance(plan_actions, list):
+        raise RuntimeError(
+            f"cached_plan_actions for '{goal_id}' is not a list"
+        )
+
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with open(dest, "w", encoding="utf-8") as f:
+        json.dump(plan_actions, f)
     return dest
 
 
@@ -381,14 +597,6 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     sp_rest = sub.add_parser("restore", help="Restore state from a snapshot label")
     sp_rest.add_argument("label", help="Snapshot label to restore")
-    sp_rest.add_argument(
-        "--preserve",
-        action="append",
-        default=None,
-        metavar="FILENAME",
-        help="Snapshot file to leave untouched on disk (repeatable). "
-             "Useful for resetting infospace while keeping world_model.json.",
-    )
 
     sub.add_parser("list", help="List all snapshot labels")
 
@@ -409,7 +617,6 @@ def main(argv: Optional[List[str]] = None) -> int:
                 character=args.character,
                 world=args.world,
                 force=args.force,
-                preserve=args.preserve,
             )
         elif args.cmd == "list":
             labels = list_snapshots()

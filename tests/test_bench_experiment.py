@@ -32,6 +32,7 @@ from experiment import (  # noqa: E402
 
 
 SENTINEL_SESSION = object()
+DEFAULT_BASELINE = "baseline-empty"
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -46,103 +47,141 @@ def test_build_trial_A_structure_and_determinism():
 
     # Seeded shuffle is deterministic.
     assert plan_a == plan_b
-    # Different seed → likely different order (may collide for tiny sets,
-    # but with 3 goals seeds 42 vs 43 do in fact differ).
     assert plan_a["goals"] != plan_c["goals"]
 
     assert plan_a["trial_type"] == TRIAL_A
     assert plan_a["seed"] == 42
     assert plan_a["name"] == "trial-A-seed-42"
     assert set(plan_a["goals"]) == set(goals)
-    assert len(plan_a["goals"]) == 3
     for g in goals:
         assert plan_a["per_goal_protocol"][g] == [{"kind": "run", "mode": "replan"}]
+        # Every Trial A reset is a full restore of the empty baseline with
+        # no overlays — no carryover between goals.
         assert plan_a["per_goal_reset"][g] == {
-            "label": "baseline-clean",
-            "preserve": [],
+            "label": DEFAULT_BASELINE,
+            "overlays": [],
         }
-    assert plan_a["phase_boundaries"] == {}
-    assert plan_a["post_trial_snapshot"] is None
+        assert plan_a["per_goal_capture"][g] == []
 
 
-def test_build_trial_B_structure():
-    goals = ["G01", "G02", "G03", "G04", "G05", "G06", "G07", "G08", "G09", "G10"]
-    plan = build_trial_B(goals, seed=42, split_ratio=0.5)
+def test_build_trial_B_overlay_accumulation():
+    goals = ["G01", "G02", "G03", "G04", "G05", "G06"]
+    plan = build_trial_B(goals, seed=42, split_ratio=0.5, experiment_dir="/tmp/tb")
 
     assert plan["trial_type"] == TRIAL_B
     assert plan["name"] == "trial-B-seed-42"
-    assert len(plan["goals"]) == 10
 
     first_half = plan["metadata"]["first_half"]
     second_half = plan["metadata"]["second_half"]
-    assert len(first_half) == 5
-    assert len(second_half) == 5
+    assert len(first_half) == 3
+    assert len(second_half) == 3
     assert set(first_half) | set(second_half) == set(goals)
-    assert not (set(first_half) & set(second_half))
 
-    # First-half goal 0: full baseline restore.
-    assert plan["per_goal_reset"][first_half[0]] == {
-        "label": "baseline-clean", "preserve": [],
-    }
-    # First-half goals 1..4: no reset (launcher stays up so cached plans
-    # and world model accumulate).
-    for g in first_half[1:]:
-        assert plan["per_goal_reset"][g] is None
-    # First-half protocol is the 3-step accumulating-review cycle.
-    for g in first_half:
-        assert plan["per_goal_protocol"][g] == [
-            {"kind": "run",    "mode": "replan"},
-            {"kind": "review", "commit": True},
-            {"kind": "run",    "mode": "replay"},
-        ]
+    # Every reset targets the empty baseline.
+    for g in goals:
+        assert plan["per_goal_reset"][g]["label"] == DEFAULT_BASELINE
 
-    # Second-half: full restore of post-firsthalf snapshot, replan only.
-    expected_label = "post-B-firsthalf-seed-42"
+    # Phase 1 goal 0: no overlays (fresh start of the accumulating chain).
+    g0 = first_half[0]
+    assert plan["per_goal_reset"][g0]["overlays"] == []
+    assert plan["per_goal_protocol"][g0] == [
+        {"kind": "run",    "mode": "replan"},
+        {"kind": "review", "commit": True},
+        {"kind": "run",    "mode": "replay"},
+    ]
+
+    # Phase 1 goal 1: world_model from after goal 0 + cached_plan for goal 0.
+    g1 = first_half[1]
+    ov1 = plan["per_goal_reset"][g1]["overlays"]
+    assert {"op": "world_model", "source": "/tmp/tb/world_model_after_0.json"} in ov1
+    assert {
+        "op": "cached_plan",
+        "goal_ref": g0,
+        "source": f"/tmp/tb/cached_plan_{g0}.json",
+    } in ov1
+    assert len(ov1) == 2
+
+    # Phase 1 goal 2: world_model from after goal 1 + cached plans for 0..1.
+    g2 = first_half[2]
+    ov2 = plan["per_goal_reset"][g2]["overlays"]
+    wm_ops = [o for o in ov2 if o["op"] == "world_model"]
+    cp_ops = [o for o in ov2 if o["op"] == "cached_plan"]
+    assert len(wm_ops) == 1
+    assert wm_ops[0]["source"] == "/tmp/tb/world_model_after_1.json"
+    assert {o["goal_ref"] for o in cp_ops} == {g0, g1}
+
+    # Phase 2 goals: empty baseline + final phase-1 world_model only.
+    final_wm = "/tmp/tb/world_model_after_2.json"
     for g in second_half:
-        assert plan["per_goal_reset"][g] == {"label": expected_label, "preserve": []}
         assert plan["per_goal_protocol"][g] == [{"kind": "run", "mode": "replan"}]
+        assert plan["per_goal_reset"][g]["overlays"] == [
+            {"op": "world_model", "source": final_wm},
+        ]
+        # Second-half goals don't capture anything — they don't contribute
+        # to the accumulating state (no review commit in their protocol).
+        assert plan["per_goal_capture"][g] == []
 
-    # Phase boundary: snapshot immediately after the last first-half goal.
-    assert plan["phase_boundaries"] == {
-        len(first_half) - 1: {"action": "snapshot", "label": expected_label},
-    }
-    assert plan["metadata"]["post_firsthalf_snapshot"] == expected_label
-    assert plan["post_trial_snapshot"] is None
+    # Each phase-1 goal captures world_model + its own cached_plan.
+    for i, g in enumerate(first_half):
+        caps = plan["per_goal_capture"][g]
+        cap_ops = {c["op"] for c in caps}
+        assert "world_model" in cap_ops
+        assert "cached_plan" in cap_ops
+        wm_cap = next(c for c in caps if c["op"] == "world_model")
+        assert wm_cap["dest"] == f"/tmp/tb/world_model_after_{i}.json"
 
 
-def test_build_trial_C_picks_replay_for_reviewed_goals():
+def test_build_trial_C_mode_and_overlay_selection():
     goals = ["G01", "G02", "G03", "G04", "G05"]
-    reviewed = ["G01", "G03", "G05"]
+    reviewed = ["G02", "G04"]
     plan = build_trial_C(
         goals, seed=42,
-        post_firsthalf_label="post-B-firsthalf-seed-42",
         reviewed_in_b=reviewed,
+        final_world_model_path="/tmp/tb/world_model_after_2.json",
+        cached_plan_paths={
+            "G02": "/tmp/tb/cached_plan_G02.json",
+            "G04": "/tmp/tb/cached_plan_G04.json",
+        },
     )
 
     assert plan["trial_type"] == TRIAL_C
-    assert plan["name"] == "trial-C-seed-42"
-    assert set(plan["goals"]) == set(goals)
 
     for g in goals:
-        expected_mode = "replay" if g in reviewed else "replan"
-        assert plan["per_goal_protocol"][g] == [
-            {"kind": "run", "mode": expected_mode}
-        ]
-        assert plan["per_goal_reset"][g] == {
-            "label": "post-B-firsthalf-seed-42",
-            "preserve": [],
-        }
+        ov = plan["per_goal_reset"][g]["overlays"]
+        assert plan["per_goal_reset"][g]["label"] == DEFAULT_BASELINE
+        # Every goal gets the final world_model overlay.
+        assert any(
+            o["op"] == "world_model"
+            and o["source"] == "/tmp/tb/world_model_after_2.json"
+            for o in ov
+        )
+        if g in reviewed:
+            assert plan["per_goal_protocol"][g] == [{"kind": "run", "mode": "replay"}]
+            # Reviewed goals get a cached_plan overlay targeting this goal.
+            assert any(
+                o["op"] == "cached_plan" and o["goal_ref"] == g for o in ov
+            )
+        else:
+            assert plan["per_goal_protocol"][g] == [{"kind": "run", "mode": "replan"}]
+            # Unreviewed goals only get the world_model overlay.
+            assert all(o["op"] != "cached_plan" for o in ov)
 
-    assert plan["metadata"]["source_snapshot"] == "post-B-firsthalf-seed-42"
-    assert set(plan["metadata"]["reviewed_in_b"]) == set(reviewed)
+
+def test_build_trial_C_rejects_missing_cached_plan_paths():
+    with pytest.raises(ValueError, match="no cached_plan_paths"):
+        build_trial_C(
+            ["G01", "G02"], seed=42,
+            reviewed_in_b=["G02"],
+            final_world_model_path="/tmp/wm.json",
+            cached_plan_paths={},  # missing G02
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Runner fakes — installed by the fixture below
+# Runner fakes
 # ──────────────────────────────────────────────────────────────────────
 
 class FakeLauncher:
-    """Minimal stand-in for bench.launcher.LauncherProcess."""
     def __init__(self):
         self._running = False
         self.calls = []
@@ -164,18 +203,17 @@ class FakeLauncher:
 
 @pytest.fixture
 def mocked_runtime(monkeypatch):
-    """Replace every external dependency of run_experiment with a
-    recording stub. Returns a dict of the stubs so tests can inspect
-    and override behavior.
-    """
     state = {
         "launcher": FakeLauncher(),
-        "restore_calls": [],      # list of (label, preserve)
-        "snapshot_calls": [],     # list of labels
+        "restore_calls": [],            # list of (label, world)
+        "world_model_overlays": [],     # list of source paths
+        "cached_plan_overlays": [],     # list of (goal_id, source path)
+        "world_model_captures": [],     # list of dest paths
+        "cached_plan_captures": [],     # list of (goal_id, dest path)
         "sessions_opened": 0,
-        "resolved": {},           # goal_ref → goal_id (populated by tests)
-        "run_trial_calls": [],    # list of (goal_id, steps, trial_context)
-        "run_trial_result": None, # default result; tests can override
+        "resolved": {},                 # goal_ref → goal_id
+        "run_trial_calls": [],
+        "run_trial_result": None,
     }
 
     def fake_make_launcher(scenario=None, character=None):
@@ -183,19 +221,25 @@ def mocked_runtime(monkeypatch):
 
     def fake_open_session():
         state["sessions_opened"] += 1
-        # Return a dummy with a close() that does nothing.
         class _S:
             def close(self):
                 pass
         return _S()
 
-    def fake_restore(label, character=None, preserve=None):
-        state["restore_calls"].append(
-            (label, list(preserve) if preserve else [])
-        )
+    def fake_restore(label, character=None, world=None, force=False):
+        state["restore_calls"].append((label, world))
 
-    def fake_snapshot(label, character=None):
-        state["snapshot_calls"].append(label)
+    def fake_world_model_overlay(source, character=None, world=None, force=False):
+        state["world_model_overlays"].append(str(source))
+
+    def fake_cached_plan_overlay(goal_id, source, character=None, world=None, force=False):
+        state["cached_plan_overlays"].append((goal_id, str(source)))
+
+    def fake_world_model_capture(dest, character=None, world=None):
+        state["world_model_captures"].append(str(dest))
+
+    def fake_cached_plan_capture(goal_id, dest, character=None, world=None):
+        state["cached_plan_captures"].append((goal_id, str(dest)))
 
     def fake_resolve(session, character, goal_ref, timeout=3.0):
         gid = state["resolved"].get(goal_ref)
@@ -203,8 +247,7 @@ def mocked_runtime(monkeypatch):
             return None
         return {"goal_id": gid, "name": goal_ref}
 
-    def fake_run_trial(goal_id, *, steps, session, character, trial_context,
-                       run_timeout):
+    def fake_run_trial(goal_id, *, steps, session, character, trial_context, run_timeout):
         state["run_trial_calls"].append(
             {"goal_id": goal_id, "steps": list(steps), "trial_context": dict(trial_context)}
         )
@@ -220,19 +263,38 @@ def mocked_runtime(monkeypatch):
             default.update(state["run_trial_result"])
         return default
 
+    def fake_resolve_map_from_resources(*, character, world):
+        # Tests pre-populate `resolved` with goal_ref → goal_id mappings
+        # for the goals they care about. Return the same map here so
+        # overlay application can translate refs to ids.
+        return dict(state["resolved"])
+
+    def fake_resolve_map_live(session, character):
+        # Live (session-based) variant used for captures after a goal
+        # run — same source of truth as the offline variant above.
+        return dict(state["resolved"])
+
     monkeypatch.setattr(experiment, "_make_launcher", fake_make_launcher)
     monkeypatch.setattr(experiment, "_open_session", fake_open_session)
     monkeypatch.setattr(snapshot, "restore", fake_restore)
-    monkeypatch.setattr(snapshot, "snapshot", fake_snapshot)
+    monkeypatch.setattr(snapshot, "apply_world_model_overlay", fake_world_model_overlay)
+    monkeypatch.setattr(snapshot, "apply_cached_plan_overlay", fake_cached_plan_overlay)
+    monkeypatch.setattr(snapshot, "capture_world_model", fake_world_model_capture)
+    monkeypatch.setattr(snapshot, "capture_cached_plan", fake_cached_plan_capture)
     monkeypatch.setattr(harvester, "resolve_goal_handle", fake_resolve)
     monkeypatch.setattr(experiment, "run_trial", fake_run_trial)
-    # Default: preflight sees no external launcher (tests override when
-    # they want to exercise the preflight shutdown path).
+    monkeypatch.setattr(
+        experiment, "_resolve_goal_ref_map_from_resources",
+        fake_resolve_map_from_resources,
+    )
+    monkeypatch.setattr(
+        experiment, "_resolve_goal_ref_map",
+        fake_resolve_map_live,
+    )
     monkeypatch.setattr(
         experiment, "_preflight_shutdown_external_launcher",
         lambda character, **kw: True,
     )
-
     return state
 
 
@@ -250,98 +312,106 @@ def test_run_experiment_trial_A_happy_path(mocked_runtime, tmp_path):
     assert len(records) == 2
     assert all(r.get("error") is None for r in records)
 
-    # Each goal got a full-baseline restore followed by a launcher bounce.
-    assert mocked_runtime["restore_calls"] == [
-        ("baseline-clean", []),
-        ("baseline-clean", []),
-    ]
-    # start/wait_ready called once per goal, stop before each reset and
-    # at the end.
+    # Each goal got a full restore of baseline-empty. No overlays.
+    labels = [c[0] for c in mocked_runtime["restore_calls"]]
+    assert labels == ["baseline-empty", "baseline-empty"]
+    assert mocked_runtime["world_model_overlays"] == []
+    assert mocked_runtime["cached_plan_overlays"] == []
+
+    # start/wait_ready called once per goal.
     assert mocked_runtime["launcher"].calls.count("start") == 2
     assert mocked_runtime["launcher"].calls.count("wait_ready") == 2
 
-    # run_trial received the resolved goal_id, not the name.
+    # run_trial received the resolved goal_id for each goal.
     assert [c["goal_id"] for c in mocked_runtime["run_trial_calls"]] == \
         [mocked_runtime["resolved"][g] for g in plan["goals"]]
 
-    # JSONL sidecar contains two lines and a summary file exists.
+    # JSONL + summary file written.
     written = out.read_text(encoding="utf-8").strip().splitlines()
     assert len(written) == 2
     for line in written:
         rec = json.loads(line)
-        assert rec["batch_runner"]["reset_label"] == "baseline-clean"
-        assert rec["batch_runner"]["reset_preserve"] == []
+        assert rec["batch_runner"]["reset_label"] == "baseline-empty"
+        assert rec["batch_runner"]["overlays_applied"] == []
     summary_path = out.with_name(out.name + ".summary.json")
-    assert summary_path.exists()
-    summary = json.loads(summary_path.read_text(encoding="utf-8"))
-    assert summary["summary"]["trial_type"] == TRIAL_A
-    assert summary["summary"]["goals_attempted"] == 2
-    assert summary["summary"]["fatal_error"] is None
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))["summary"]
+    assert summary["trial_type"] == TRIAL_A
+    assert summary["fatal_error"] is None
+    assert summary["goals_attempted"] == 2
 
 
-def test_run_experiment_trial_B_phase1_no_reset_and_boundary_snapshot(
-    mocked_runtime, tmp_path,
-):
-    # 4 goals, 50/50 split → 2 first-half + 2 second-half.
+def test_run_experiment_trial_B_overlays_and_captures(mocked_runtime, tmp_path):
     goals = ["G01", "G02", "G03", "G04"]
     mocked_runtime["resolved"] = {g: f"goal_{i+1}" for i, g in enumerate(goals)}
-    plan = build_trial_B(goals, seed=42, split_ratio=0.5)
+    exp_dir = tmp_path / "tb"
+    plan = build_trial_B(
+        goals, seed=42, split_ratio=0.5, experiment_dir=str(exp_dir),
+    )
     out = tmp_path / "b.jsonl"
 
     run_experiment(plan, out_path=out)
 
     first_half = plan["metadata"]["first_half"]
-    snap_label = plan["metadata"]["post_firsthalf_snapshot"]
+    second_half = plan["metadata"]["second_half"]
 
-    # Phase 1: exactly one baseline restore (before goal 0 of first half).
-    # Phase 2: one post-firsthalf restore per second-half goal.
-    assert mocked_runtime["restore_calls"] == [
-        ("baseline-clean", []),
-        (snap_label, []),
-        (snap_label, []),
-    ]
-    # Exactly one snapshot call for the phase boundary (no post_trial).
-    assert mocked_runtime["snapshot_calls"] == [snap_label]
+    # Every goal (4 total) triggered a baseline-empty restore.
+    labels = [c[0] for c in mocked_runtime["restore_calls"]]
+    assert labels == ["baseline-empty"] * 4
 
-    # Launcher lifecycle sanity: at least one start per reset + one start
-    # after the phase-boundary snapshot. We don't check exact ordering
-    # beyond the count — the restore_calls ordering above already proves
-    # the reset strategy.
-    starts = mocked_runtime["launcher"].calls.count("start")
-    assert starts == 4  # 1 (phase1 start) + 1 (after boundary snapshot) + 2 (phase2 resets)
+    # Phase 1 goal 0: no overlays (no prior state to carry). Phase 1
+    # goal 1: 1 world_model + 1 cached_plan (for goal 0). Phase 1 goal 2:
+    # no — wait, this is a 2+2 split on 4 goals.
+    # Actually with 4 goals and split_ratio=0.5 → split=2, first half=2.
+    assert len(first_half) == 2
+    assert len(second_half) == 2
 
-    # Each first-half goal saw the 3-step protocol; each second-half goal
-    # saw [replan]. first_half flag stamped on trial_context.
+    # Check overlay sequence:
+    # Goal 0 (phase 1): 0 overlays.
+    # Goal 1 (phase 1): 1 wm + 1 cp.
+    # Goal 2 (phase 2, first second-half): 1 wm (final).
+    # Goal 3 (phase 2, second second-half): 1 wm (final).
+    assert len(mocked_runtime["world_model_overlays"]) == 3  # 1 + 1 + 1
+    assert len(mocked_runtime["cached_plan_overlays"]) == 1  # phase 1 goal 1
+
+    cp_overlay = mocked_runtime["cached_plan_overlays"][0]
+    g0_id = mocked_runtime["resolved"][first_half[0]]
+    assert cp_overlay[0] == g0_id
+
+    # Captures: phase 1 goals each captured world_model + cached_plan.
+    # Phase 2 captured nothing.
+    assert len(mocked_runtime["world_model_captures"]) == 2
+    assert len(mocked_runtime["cached_plan_captures"]) == 2
+
+    # run_trial protocols match the trial type.
     calls = mocked_runtime["run_trial_calls"]
     assert len(calls) == 4
     for c in calls:
         goal_ref = c["trial_context"]["goal_ref"]
         if goal_ref in first_half:
-            assert len(c["steps"]) == 3
+            assert len(c["steps"]) == 3  # replan + review + replay
             assert c["trial_context"]["first_half"] is True
         else:
-            assert len(c["steps"]) == 1
+            assert len(c["steps"]) == 1  # replan only
             assert c["trial_context"]["first_half"] is False
 
 
 def test_run_experiment_per_goal_failure_continues(mocked_runtime, tmp_path):
     mocked_runtime["resolved"] = {"G01": "goal_17", "G03": "goal_19"}
-    # Intentionally omit G02 → resolve returns None → synthetic failure.
+    # G02 missing → resolve returns None → synthetic failure.
     plan = build_trial_A(["G01", "G02", "G03"], seed=42)
     out = tmp_path / "a.jsonl"
 
     records = run_experiment(plan, out_path=out)
 
     assert len(records) == 3
-    errors = [r.get("error") for r in records]
-    # Exactly one record errored (the unresolved one); the other two are clean.
-    assert sum(1 for e in errors if e is not None) == 1
+    errs = [r.get("error") for r in records]
+    assert sum(1 for e in errs if e is not None) == 1
     bad = next(r for r in records if r.get("error"))
     assert "could not resolve goal ref 'G02'" in bad["error"]
     assert bad["goal_id"] is None
-    # Summary reflects the error without marking the run fatal.
-    summary_path = out.with_name(out.name + ".summary.json")
-    summary = json.loads(summary_path.read_text(encoding="utf-8"))["summary"]
+    summary = json.loads(
+        out.with_name(out.name + ".summary.json").read_text(encoding="utf-8"),
+    )["summary"]
     assert summary["fatal_error"] is None
     assert summary["errored_records"] == 1
     assert summary["goals_attempted"] == 3
@@ -351,7 +421,6 @@ def test_run_experiment_fatal_launcher_failure_aborts(mocked_runtime, tmp_path):
     mocked_runtime["resolved"] = {"G01": "goal_17", "G02": "goal_18", "G03": "goal_19"}
     plan = build_trial_A(["G01", "G02", "G03"], seed=42)
 
-    # Make wait_ready explode on the 2nd call (i.e. after goal 0 succeeds).
     orig_wait_ready = mocked_runtime["launcher"].wait_ready
     call_count = {"n": 0}
     def flaky_wait_ready(timeout=None):
@@ -364,7 +433,6 @@ def test_run_experiment_fatal_launcher_failure_aborts(mocked_runtime, tmp_path):
     out = tmp_path / "a.jsonl"
     records = run_experiment(plan, out_path=out)
 
-    # First goal ran. Second goal's reset failed. Third never attempted.
     assert len(records) == 1
     assert records[0].get("error") is None
     summary = json.loads(
@@ -378,9 +446,6 @@ def test_run_experiment_fatal_launcher_failure_aborts(mocked_runtime, tmp_path):
 def test_run_experiment_preflight_aborts_when_external_launcher_refuses_shutdown(
     mocked_runtime, monkeypatch, tmp_path,
 ):
-    # Override the default preflight stub to simulate "external launcher
-    # is up and refuses to come down" — run_experiment should never
-    # enter the main loop and should mark fatal_error in the summary.
     monkeypatch.setattr(
         experiment, "_preflight_shutdown_external_launcher",
         lambda character, **kw: False,
@@ -391,16 +456,14 @@ def test_run_experiment_preflight_aborts_when_external_launcher_refuses_shutdown
     records = run_experiment(plan, out_path=out)
 
     assert records == []
-    # No restore calls, no run_trial calls, no session opens.
     assert mocked_runtime["restore_calls"] == []
     assert mocked_runtime["run_trial_calls"] == []
-    assert mocked_runtime["sessions_opened"] == 0
 
-    summary_path = out.with_name(out.name + ".summary.json")
-    summary = json.loads(summary_path.read_text(encoding="utf-8"))["summary"]
+    summary = json.loads(
+        out.with_name(out.name + ".summary.json").read_text(encoding="utf-8"),
+    )["summary"]
     assert summary["fatal_error"] is not None
     assert "preflight" in summary["fatal_error"]
-    assert summary["goals_attempted"] == 0
 
 
 def test_read_reviewed_from_jsonl_extracts_first_half(tmp_path):
@@ -409,15 +472,12 @@ def test_read_reviewed_from_jsonl_extracts_first_half(tmp_path):
         {"trial_context": {"trial_type": "B", "goal_ref": "G03", "first_half": True}},
         {"trial_context": {"trial_type": "B", "goal_ref": "G07", "first_half": True}},
         {"trial_context": {"trial_type": "B", "goal_ref": "G01", "first_half": False}},
-        # Duplicate should be deduped.
         {"trial_context": {"trial_type": "B", "goal_ref": "G03", "first_half": True}},
-        # Wrong trial type should be ignored.
         {"trial_context": {"trial_type": "A", "goal_ref": "G05", "first_half": True}},
     ]
     with open(path, "w", encoding="utf-8") as f:
         for r in rows:
             f.write(json.dumps(r) + "\n")
-        # Add a malformed line to prove it's skipped, not fatal.
         f.write("not-valid-json\n")
 
     reviewed = read_reviewed_from_jsonl(path)

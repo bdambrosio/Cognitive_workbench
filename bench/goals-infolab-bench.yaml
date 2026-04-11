@@ -1,0 +1,66 @@
+# Cognitive Workbench benchmark goal set — infolab scenario
+#
+# Canonical definitions for the G01..G10 taskset used by the bench
+# experiment harness. `bench/baseline.py` consumes this file to seed a
+# fresh Jill before taking the `baseline-empty` snapshot: it sends one
+# `/goal add` per entry (create-only — the agent-side semantic is now
+# create-without-run) and then `/goal rename` to assign the human label.
+#
+# Goal texts are taken from docs/plan-review-eval-taskset.md. Edit here
+# to change the taskset; re-run `bench/baseline.py create` afterward to
+# rebuild the baseline snapshot.
+
+goals:
+  - name: G01
+    text: >-
+      Find the paper "Attention Is All You Need" on Semantic Scholar.
+      Create a Note with its title, authors, year, abstract, and citation count.
+
+  - name: G02
+    text: >-
+      Search the web for the current estimated number of parameters in Llama 3 405B.
+      Create a Note with the finding and source URL.
+
+  - name: G03
+    text: >-
+      Fetch the PDF from https://arxiv.org/pdf/2604.08455 .
+      Create a Note summarizing the paper's main contribution in 2-3 sentences.
+
+  - name: G04
+    text: >-
+      Find all existing Notes that mention transformer architectures or attention mechanisms.
+      Create a Collection containing the matches.
+
+  - name: G05
+    text: >-
+      Search Semantic Scholar for papers on "retrieval augmented generation" published after 2023.
+      Filter to papers with more than 50 citations.
+      Create a Collection of the filtered results.
+
+  - name: G06
+    text: >-
+      Search the web for arguments for and against using chain-of-thought prompting in
+      production systems. Create a Note presenting both sides.
+
+  - name: G07
+    text: >-
+      Given the existing Note named 'scaling-laws-mixed', extract only the claims about
+      model scaling laws. Create a new Note with just those claims, organized by sub-topic.
+
+  - name: G08
+    text: >-
+      Search Semantic Scholar for 3 recent papers on "sparse mixture of experts".
+      For each, extract whether they cite the original "Outrageously Large Neural Networks"
+      (Shazeer et al. 2017) paper. Create a Note summarizing the citation relationships.
+
+  - name: G09
+    text: >-
+      Fetch the blog post at https://lilianweng.github.io/posts/2023-06-23-agent/ .
+      Extract the 3 most important claims.
+      Create a Note with the claims and a one-sentence assessment of evidence quality for each.
+
+  - name: G10
+    text: >-
+      Search both the web and Semantic Scholar for "constitutional AI".
+      Identify papers or sources that appear in both result sets.
+      Create a Note listing the overlapping sources.

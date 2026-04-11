@@ -2051,7 +2051,10 @@ class ZenohExecutiveNode:
         # Mark the concern as delegated (prevents triage re-dispatch)
         self._derived_concern_model.mark_delegated(concern_id, delegate)
 
-        # Send /goal add command to the delegate agent's command channel
+        # Send /goal add command to the delegate agent's command channel.
+        # Cross-agent delegation wants immediate execution on the delegate
+        # side, so pass run=True (the default for /goal add is now
+        # create-only).
         callback_topic = f"cognitive/{self.character_name}/sense_data"
         command = {
             "cmd": "/goal add",
@@ -2060,6 +2063,7 @@ class ZenohExecutiveNode:
             "source_agent": self.character_name,
             "callback_topic": callback_topic,
             "callback_concern_id": concern_id,
+            "run": True,
         }
         try:
             self.session.put(
@@ -6637,7 +6641,14 @@ class ZenohExecutiveNode:
                 self.conversation_store.record_outgoing(source, clean_response, act_type="chat")
             self._say_to_user(f'[using tools: {goal_text[:120]}]')
             logger.info(f'🎯 Chat auto-escalated to goal: "{goal_text[:80]}"')
-            cmd_data = {'cmd': '/goal add', 'goal_text': goal_text, 'source': 'User'}
+            # Chat escalation wants immediate execution — pass run=True
+            # explicitly (the default for /goal add is now create-only).
+            cmd_data = {
+                'cmd': '/goal add',
+                'goal_text': goal_text,
+                'source': 'User',
+                'run': True,
+            }
             self._dispatch_command(cmd_data)
             return
 
@@ -7875,11 +7886,23 @@ class ZenohExecutiveNode:
     # -- Goals --
 
     def _cmd_goal_add(self, data: dict) -> str:
+        """Create a scheduled goal. By default (run=False) the goal is
+        created but NOT executed — a subsequent /goal run is required.
+        Callers that need the old "create and start running" behavior
+        (e.g. cross-agent delegate dispatch, chat auto-escalation) pass
+        run=True in the command payload.
+
+        The create-only default lets bench/baseline.py seed G01..Gnn into
+        a fresh Jill without firing them off.
+
+        Return format is always "Goal <goal_id> created" so callers can
+        parse the new goal_id even when they also requested run=True.
+        """
         goal_text = (data.get('goal_text') or '').strip()
         if not goal_text:
             return 'Usage: /goal add <goal text>'
-        # Don't close dialog — the goal is part of the ongoing conversation.
-        # Dialog is closed by /bye, shutdown, or UI end-conversation button.
+        run = bool(data.get('run', False))
+
         scheduled_goal = self._upsert_scheduled_goal(goal_text)
         goal_id = scheduled_goal["goal_id"]
         # User-created goals persist so they can be reused in goal chains.
@@ -7892,21 +7915,35 @@ class ZenohExecutiveNode:
         if data.get('source_agent'):
             scheduled_goal['source_agent'] = data['source_agent']
         self._save_scheduled_goal(scheduled_goal)
+
+        if not run:
+            return f"Goal {goal_id} created"
+
+        # run=True path: preserve pre-split semantics for callers that
+        # explicitly request immediate execution.
         if self._is_goal_running():
-            self._say_to_user(f"Goal '{goal_id}' created but another goal is already running.")
+            self._say_to_user(
+                f"Goal '{goal_id}' created but another goal is already running."
+            )
             return f"Goal {goal_id} created (queued)"
         self._active_scheduled_goal_id = goal_id
         self._update_scheduled_goal(goal_id, is_running=True, status="running")
         if hasattr(self, 'goal_scheduler'):
             self.goal_scheduler._executing_goal_id = goal_id
             self.goal_scheduler._executing_is_autonomous = False
-        pre = set(self.resource_manager.resource_registry.keys()) if self.resource_manager else set()
+        pre = (
+            set(self.resource_manager.resource_registry.keys())
+            if self.resource_manager else set()
+        )
+
         def _run():
-            # Clear last_say_text so we can detect whether *this* goal said anything
             self.last_say_text = ''
             result = self.parse_and_set_goal("", goal_text) or {}
-            self._set_scheduled_goal_result(goal_id, result, used_cache=False, pre_resource_ids=pre)
+            self._set_scheduled_goal_result(
+                goal_id, result, used_cache=False, pre_resource_ids=pre,
+            )
             return result
+
         self._run_goal_on_thread(_run)
         return f"Goal {goal_id} created and started"
 
