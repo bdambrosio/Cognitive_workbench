@@ -7,6 +7,9 @@ log/
 ros_venv/
 zenoh_venv/
 
+# Benchmark snapshots (large binary state copies, per-experiment)
+bench/snapshots/
+
 # Python cache files
 __pycache__/
 *.py[cod]
