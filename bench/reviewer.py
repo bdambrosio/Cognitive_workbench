@@ -279,6 +279,7 @@ def review_goal(
     temperature: float = DEFAULT_TEMPERATURE,
     bundle_timeout: float = DEFAULT_BUNDLE_TIMEOUT_S,
     commit_timeout: float = DEFAULT_COMMIT_TIMEOUT_S,
+    dry_run: bool = False,
 ) -> Dict[str, Any]:
     """Run the full /goal plan review → R-Opus → /goal plan commit cycle.
 
@@ -294,9 +295,17 @@ def review_goal(
         bundle_timeout: How long to wait for the review bundle file.
         commit_timeout: How long to wait for the commit handler to unlink
             the plan file.
+        dry_run: If True, still trigger /goal plan review and do the LLM
+            call so we get the rewritten plan text and learnings count,
+            but DO NOT write the rewritten plan to disk and DO NOT
+            trigger /goal plan commit. No agent state is mutated. The
+            cached plan file that /goal plan review dropped at
+            goal_plan_<id>.py is removed at the end so nothing leaks.
+            Used by trial.py to capture observational review data on
+            runs that should not be altered.
 
     Returns a result dict with:
-        goal_id, character, model, started_at, elapsed_ms,
+        goal_id, character, model, started_at, elapsed_ms, dry_run,
         bundle_received (bool), llm_called (bool), plan_written (bool),
         committed (bool), learnings_count (int), error (str or None),
         plan_text (str, the rewritten plan)
@@ -308,6 +317,7 @@ def review_goal(
         "character": character,
         "model": model,
         "started_at": started_at,
+        "dry_run": dry_run,
         "bundle_received": False,
         "llm_called": False,
         "plan_written": False,
@@ -428,36 +438,53 @@ def review_goal(
         result["plan_text"] = rewritten
         result["learnings_count"] = _count_learnings(rewritten)
 
-        # Step 6: write rewritten plan back to disk (overwrite the
-        # current cached plan that the review handler just dumped there)
-        try:
-            plan_path.write_text(rewritten, encoding="utf-8")
-        except Exception as e:
-            result["error"] = f"Failed to write rewritten plan: {e}"
-            result["elapsed_ms"] = int((time.monotonic() - t0) * 1000)
-            return result
-        result["plan_written"] = True
-
-        # Step 7: trigger /goal plan commit
-        _publish_command(session, character, "/goal plan commit", goal_id=goal_id)
-        print(
-            f"reviewer: triggered /goal plan commit {goal_id}, "
-            f"waiting for plan file removal...",
-            file=sys.stderr,
-        )
-
-        # Step 8: wait for the plan file to be unlinked (commit handler
-        # deletes it on success). If the file persists, the commit failed
-        # and the user needs to inspect the launcher log.
-        if not _wait_for_file_gone(plan_path, commit_timeout):
-            result["error"] = (
-                f"Commit didn't unlink {plan_path} within {commit_timeout}s. "
-                f"Check launcher log; the rewritten plan may still have "
-                f"been loaded."
+        if dry_run:
+            # Dry-run: clean up the plan file the /goal plan review
+            # handler dumped to disk so nothing leaks into the repo, and
+            # skip the commit publish entirely. The caller gets the
+            # rewritten plan text and learnings count via result["plan_text"]
+            # / result["learnings_count"] without mutating agent state.
+            try:
+                if plan_path.exists():
+                    plan_path.unlink()
+            except Exception:
+                pass
+            print(
+                f"reviewer: dry-run complete for {goal_id} "
+                f"(no plan written, no commit triggered)",
+                file=sys.stderr,
             )
-            result["elapsed_ms"] = int((time.monotonic() - t0) * 1000)
-            return result
-        result["committed"] = True
+        else:
+            # Step 6: write rewritten plan back to disk (overwrite the
+            # current cached plan that the review handler just dumped there)
+            try:
+                plan_path.write_text(rewritten, encoding="utf-8")
+            except Exception as e:
+                result["error"] = f"Failed to write rewritten plan: {e}"
+                result["elapsed_ms"] = int((time.monotonic() - t0) * 1000)
+                return result
+            result["plan_written"] = True
+
+            # Step 7: trigger /goal plan commit
+            _publish_command(session, character, "/goal plan commit", goal_id=goal_id)
+            print(
+                f"reviewer: triggered /goal plan commit {goal_id}, "
+                f"waiting for plan file removal...",
+                file=sys.stderr,
+            )
+
+            # Step 8: wait for the plan file to be unlinked (commit handler
+            # deletes it on success). If the file persists, the commit failed
+            # and the user needs to inspect the launcher log.
+            if not _wait_for_file_gone(plan_path, commit_timeout):
+                result["error"] = (
+                    f"Commit didn't unlink {plan_path} within {commit_timeout}s. "
+                    f"Check launcher log; the rewritten plan may still have "
+                    f"been loaded."
+                )
+                result["elapsed_ms"] = int((time.monotonic() - t0) * 1000)
+                return result
+            result["committed"] = True
 
     finally:
         if own_session:
@@ -542,6 +569,10 @@ def main(argv: Optional[list] = None) -> int:
     sp.add_argument("--temperature", type=float, default=DEFAULT_TEMPERATURE)
     sp.add_argument("--bundle-timeout", type=float, default=DEFAULT_BUNDLE_TIMEOUT_S)
     sp.add_argument("--commit-timeout", type=float, default=DEFAULT_COMMIT_TIMEOUT_S)
+    sp.add_argument("--dry-run", action="store_true",
+                    help="Run the LLM review but do not commit — leaves no "
+                         "files on disk and does not mutate agent state. "
+                         "The rewritten plan is only returned in the result dict.")
     sp.add_argument("--output", type=Path, default=None,
                     help="Optional path to write the result JSON")
 
@@ -557,6 +588,7 @@ def main(argv: Optional[list] = None) -> int:
             temperature=args.temperature,
             bundle_timeout=args.bundle_timeout,
             commit_timeout=args.commit_timeout,
+            dry_run=args.dry_run,
         )
         # Don't dump the full plan_text to stdout — too noisy. Print a
         # summary line and write the full result to --output if requested.
@@ -567,6 +599,10 @@ def main(argv: Optional[list] = None) -> int:
             with open(args.output, "w", encoding="utf-8") as f:
                 json.dump(result, f, indent=2)
             print(f"(full result written to {args.output})", file=sys.stderr)
+        # Exit success: dry-run is fine as long as the LLM call succeeded;
+        # non-dry-run needs committed=True.
+        if args.dry_run:
+            return 0 if result.get("llm_called") and not result.get("error") else 1
         return 0 if result.get("committed") else 1
 
     return 2
