@@ -13,6 +13,10 @@ bench/snapshots/
 # Benchmark experiment output (per-goal JSONL + summary sidecars)
 runs/
 
+# Benchmark experiment sidecar state (world_model/cached_plan captures
+# from Trial B/C runs used as Trial C overlay sources)
+exp/
+
 # Python cache files
 __pycache__/
 *.py[cod]

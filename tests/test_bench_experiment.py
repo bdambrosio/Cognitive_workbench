@@ -295,6 +295,12 @@ def mocked_runtime(monkeypatch):
         experiment, "_preflight_shutdown_external_launcher",
         lambda character, **kw: True,
     )
+    # The save-before-capture trigger is a live-agent Zenoh operation
+    # that tests don't want to run. Short-circuit it to return True.
+    monkeypatch.setattr(
+        experiment, "_trigger_agent_save_and_wait",
+        lambda session, character, world, **kw: True,
+    )
     return state
 
 

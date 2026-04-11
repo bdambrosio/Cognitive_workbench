@@ -315,6 +315,59 @@ def _open_session():
     return zenoh.open(make_localhost_config())
 
 
+def _trigger_agent_save_and_wait(
+    session,
+    character: str,
+    world: str,
+    *,
+    timeout: float = 10.0,
+    poll_interval: float = 0.1,
+) -> bool:
+    """Ask the running agent to flush its in-memory state to disk, and
+    wait for the on-disk `resources.json` mtime to advance.
+
+    Cached-plan and world-model captures read files from disk, but the
+    agent only writes those files on shutdown / save_all / a couple of
+    other handler paths — NOT after every goal completion. So the
+    captured files would otherwise be stale (the pre-run state from
+    the last baseline restore, not the post-run state we want).
+
+    Publishes an empty payload to `cognitive/save_all` (a global
+    subscriber that triggers `save_to_file` + `world_model.save()` in
+    every running character's handler) and polls the resources.json
+    mtime until it advances past the pre-publish value.
+
+    Returns True if the file mtime advanced (save observed), False on
+    timeout. Tests monkeypatch this to a no-op.
+    """
+    resources_path = snapshot._resource_dir(world, character) / "resources.json"
+    try:
+        old_mtime = (
+            resources_path.stat().st_mtime
+            if resources_path.exists() else 0.0
+        )
+    except Exception:
+        old_mtime = 0.0
+    try:
+        session.put("cognitive/save_all", b"{}")
+    except Exception as e:
+        print(
+            f"WARN: save_all publish failed for {character}: {e}",
+            file=sys.stderr,
+        )
+        return False
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            cur_mtime = resources_path.stat().st_mtime
+            if cur_mtime > old_mtime + 0.05:
+                return True
+        except Exception:
+            pass
+        time.sleep(poll_interval)
+    return False
+
+
 # Log files that individual launcher instances append to within one
 # bench top-level invocation. Cleared once at the start of each
 # top-level entry (experiment.py / baseline.py main()) so the logs
@@ -685,15 +738,26 @@ def run_experiment(
                     "goals_in_plan": len(plan["goals"]),
                 }
 
-                # ── Captures (run AFTER the trial completes, while the
-                #     launcher is still up so resources.json reflects the
-                #     just-committed state). These are read-only file
-                #     copies against the running agent's disk state; the
-                #     agent's resource manager writes are flushed at goal
-                #     completion before we get here. ──
+                # ── Captures (run AFTER the trial completes). The agent
+                #     only writes resources.json / world_model.json on
+                #     shutdown or save_all — NOT after every goal — so
+                #     we trigger save_all and wait for the mtime to
+                #     advance before reading. Without this the capture
+                #     reads stale pre-run state (e.g. empty
+                #     cached_plan_actions) and silently captures
+                #     garbage.
                 if captures:
                     try:
-                        # Build goal_ref→id map using the live session.
+                        saved = _trigger_agent_save_and_wait(
+                            session, character, world,
+                        )
+                        if not saved:
+                            print(
+                                f"WARN: agent save_all did not flush "
+                                f"resources.json within timeout — capture "
+                                f"for {goal_ref} may read stale data",
+                                file=sys.stderr,
+                            )
                         live_id_map = _resolve_goal_ref_map(session, character)
                         captures_applied = _apply_captures(
                             captures,
