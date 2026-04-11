@@ -10915,19 +10915,33 @@ class ZenohExecutiveNode:
         query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
 
     def _handle_resource_create_note_query(self, query):
-        """Handle query to create a Note from external caller."""
+        """Handle query to create a Note from external caller.
+
+        Parameters in the request payload:
+          content   — note body (str or JSON-serializable)
+          format    — 'text' (default) or 'json'
+          name      — optional stable name for load-by-name
+          persistent — optional bool (default False). If True, the Note
+                       is immediately marked persistent via
+                       mark_persistent, so it survives the next goal
+                       cleanup AND is serialized to resources.json on
+                       shutdown. This is the mechanism bench/baseline.py
+                       uses to seed notes into a fresh world before
+                       taking the baseline snapshot.
+        """
         if not self.resource_manager:
             response = {'success': False, 'error': 'Resource manager not available'}
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
             return
-        
+
         payload_bytes = query.payload.to_bytes() if query.payload else b'{}'
         params = json.loads(payload_bytes.decode('utf-8')) if payload_bytes else {}
-        
+
         content = params.get('content', '')
         format_type = params.get('format', 'text')
         note_name = params.get('name', '')
-        
+        persistent = bool(params.get('persistent', False))
+
         success, note_id, error_msg, _ = self.resource_manager.create_note(
             character_name=self.character_name,
             content=content,
@@ -10937,9 +10951,22 @@ class ZenohExecutiveNode:
             note_name=note_name,
             extra_props={}
         )
-        
+
+        if success and persistent and note_id:
+            mp_success, mp_error = self.resource_manager.mark_persistent(
+                note_id, self.character_name,
+            )
+            if not mp_success:
+                response = {
+                    'success': False,
+                    'note_id': note_id,
+                    'error': f'created but mark_persistent failed: {mp_error}',
+                }
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+
         if success:
-            response = {'success': True, 'note_id': note_id}
+            response = {'success': True, 'note_id': note_id, 'persistent': persistent}
         else:
             response = {'success': False, 'error': error_msg or 'Failed to create Note'}
         query.reply(query.key_expr, json.dumps(response).encode('utf-8'))

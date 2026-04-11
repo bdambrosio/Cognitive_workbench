@@ -2,17 +2,22 @@
 #
 # Canonical definitions for the G01..G10 taskset used by the bench
 # experiment harness. `bench/baseline.py` consumes this file to seed a
-# fresh Jill before taking the `baseline-empty` snapshot: it sends one
-# `/goal add` per entry (create-only — the agent-side semantic is
-# create-without-run) and then `/goal rename` to assign the human label.
+# fresh Jill before taking the `baseline-empty` snapshot. It sends
+# one `/goal add` per goal entry (create-only — the new default
+# semantic of /goal add) followed by `/goal rename` to assign the
+# display name, and one `resource/create_note` query per seed_notes
+# entry (with persistent=True) to pre-seed any Notes that goals
+# depend on (e.g. G07's `scaling-laws-mixed`).
 #
-# Goal texts are taken from docs/plan-review-eval-taskset.md. Edit here
-# to change the taskset; re-run `bench/baseline.py create` afterward to
-# rebuild the baseline snapshot.
+# Goal texts derive from docs/plan-review-eval-taskset.md, with
+# modifications documented per-goal where the bench behavior diverges
+# from the spec.
 #
 # This goal set runs in the isolated `benchlab` world
 # (scenarios/benchlab/) so bench rebuilds never touch the `infolab`
-# world used for interactive Jill.
+# world used for interactive Jill. Edit here to change the taskset;
+# re-run `bench/baseline.py create` afterward to rebuild the
+# baseline snapshot.
 
 goals:
   - name: G01
@@ -33,7 +38,10 @@ goals:
   - name: G04
     text: >-
       Find all existing Notes that mention transformer architectures or attention mechanisms.
-      Create a Collection containing the matches.
+      Create a Collection containing any matches. If no such Notes exist in the infospace,
+      create the Collection anyway (empty) and explicitly report that no matches were found.
+      An empty-result outcome is a valid, successful completion — the goal is to perform
+      the search and report its findings, not to guarantee non-empty results.
 
   - name: G05
     text: >-
@@ -68,3 +76,19 @@ goals:
       Search both the web and Semantic Scholar for "constitutional AI".
       Identify papers or sources that appear in both result sets.
       Create a Note listing the overlapping sources.
+
+
+# Seed notes: Notes that certain goals depend on already existing in
+# the infospace. `baseline.py` creates each of these as a persistent,
+# named Note before taking the snapshot. Each entry has:
+#   - name:         the stable note name (used by `load` / referenced
+#                   from goal text).
+#   - content:      inline string content, OR
+#   - content_file: path (repo-relative) to a file whose contents become
+#                   the note body. Use content_file for long-form seeds
+#                   to avoid bloating this YAML.
+# Exactly one of `content` and `content_file` must be set per entry.
+
+seed_notes:
+  - name: scaling-laws-mixed
+    content_file: bench/seed-notes/scaling-laws-mixed.md

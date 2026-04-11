@@ -67,10 +67,19 @@ DEFAULT_GOAL_ADD_TIMEOUT_S = 5.0
 # Goals YAML loader
 # ──────────────────────────────────────────────────────────────────────
 
-def load_goals_file(path: Path) -> List[Dict[str, str]]:
-    """Load a goals YAML and return a list of {name, text} dicts.
+def load_goals_file(
+    path: Path,
+) -> Dict[str, List[Dict[str, str]]]:
+    """Load a goals YAML and return a dict with:
+      - 'goals': list of {name, text} dicts (required, non-empty)
+      - 'seed_notes': list of {name, content} dicts (optional, can be
+         empty). Entries may supply either `content` (inline string) or
+         `content_file` (repo-relative path); this function resolves
+         `content_file` and returns the loaded text under `content` so
+         the caller sees a uniform shape.
 
-    Validates that every entry has both fields and that names are unique.
+    Validates that goal and seed-note names are unique within their
+    respective sections.
     """
     try:
         import yaml  # noqa: WPS433
@@ -82,13 +91,13 @@ def load_goals_file(path: Path) -> List[Dict[str, str]]:
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict) or "goals" not in data:
         raise ValueError(f"{path}: expected top-level key 'goals'")
-    goals = data["goals"]
-    if not isinstance(goals, list) or not goals:
+    goals_raw = data["goals"]
+    if not isinstance(goals_raw, list) or not goals_raw:
         raise ValueError(f"{path}: 'goals' must be a non-empty list")
 
-    seen_names: set = set()
-    out: List[Dict[str, str]] = []
-    for i, entry in enumerate(goals):
+    seen_goal_names: set = set()
+    goals: List[Dict[str, str]] = []
+    for i, entry in enumerate(goals_raw):
         if not isinstance(entry, dict):
             raise ValueError(f"{path}: goals[{i}] is not a dict")
         name = str(entry.get("name", "")).strip()
@@ -97,11 +106,52 @@ def load_goals_file(path: Path) -> List[Dict[str, str]]:
             raise ValueError(f"{path}: goals[{i}] missing 'name'")
         if not text:
             raise ValueError(f"{path}: goals[{i}] ({name}) missing 'text'")
-        if name in seen_names:
+        if name in seen_goal_names:
             raise ValueError(f"{path}: duplicate goal name '{name}'")
-        seen_names.add(name)
-        out.append({"name": name, "text": text})
-    return out
+        seen_goal_names.add(name)
+        goals.append({"name": name, "text": text})
+
+    seed_notes_raw = data.get("seed_notes", []) or []
+    if not isinstance(seed_notes_raw, list):
+        raise ValueError(f"{path}: 'seed_notes' must be a list if present")
+
+    seen_note_names: set = set()
+    seed_notes: List[Dict[str, str]] = []
+    for i, entry in enumerate(seed_notes_raw):
+        if not isinstance(entry, dict):
+            raise ValueError(f"{path}: seed_notes[{i}] is not a dict")
+        name = str(entry.get("name", "")).strip()
+        if not name:
+            raise ValueError(f"{path}: seed_notes[{i}] missing 'name'")
+        if name in seen_note_names:
+            raise ValueError(f"{path}: duplicate seed-note name '{name}'")
+        seen_note_names.add(name)
+
+        inline = entry.get("content")
+        file_ref = entry.get("content_file")
+        if inline is not None and file_ref is not None:
+            raise ValueError(
+                f"{path}: seed_notes[{i}] ({name}) sets both 'content' "
+                f"and 'content_file' — pick one"
+            )
+        if inline is not None:
+            content = str(inline)
+        elif file_ref is not None:
+            content_path = (_REPO_ROOT / str(file_ref)).resolve()
+            if not content_path.exists():
+                raise ValueError(
+                    f"{path}: seed_notes[{i}] ({name}) content_file not "
+                    f"found: {content_path}"
+                )
+            content = content_path.read_text(encoding="utf-8")
+        else:
+            raise ValueError(
+                f"{path}: seed_notes[{i}] ({name}) must supply "
+                f"'content' or 'content_file'"
+            )
+        seed_notes.append({"name": name, "content": content})
+
+    return {"goals": goals, "seed_notes": seed_notes}
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -177,6 +227,61 @@ def _wait_for_new_goal_id(
     return None
 
 
+def _create_seed_note(
+    session,
+    character: str,
+    name: str,
+    content: str,
+    *,
+    timeout: float = 10.0,
+) -> Optional[str]:
+    """Call the agent's `resource/create_note` queryable to create a
+    persistent named Note. Returns the new note_id on success, or None
+    on failure. The `persistent=True` flag instructs the agent to mark
+    the note persistent immediately, so it survives the next goal
+    cleanup AND is serialized to resources.json on shutdown.
+    """
+    key = f"cognitive/{character}/resource/create_note"
+    payload = {
+        "content": content,
+        "format": "text",
+        "name": name,
+        "persistent": True,
+    }
+    try:
+        for reply in session.get(
+            key,
+            payload=json.dumps(payload).encode("utf-8"),
+            timeout=timeout,
+        ):
+            if not (hasattr(reply, "ok") and reply.ok is not None):
+                continue
+            try:
+                body = reply.ok.payload.to_bytes().decode("utf-8")
+                parsed = json.loads(body)
+            except Exception as e:
+                print(
+                    f"WARN: create-note reply parse failed: {e}",
+                    file=sys.stderr,
+                )
+                continue
+            if parsed.get("success"):
+                return parsed.get("note_id")
+            else:
+                err = parsed.get("error", "unknown")
+                print(
+                    f"ERROR: create-note '{name}' failed: {err}",
+                    file=sys.stderr,
+                )
+                return None
+    except Exception as e:
+        print(
+            f"WARN: create-note query for '{name}' failed: {e}",
+            file=sys.stderr,
+        )
+    return None
+
+
 def _wait_for_goal_name(
     session,
     character: str,
@@ -221,6 +326,7 @@ def create_empty_baseline(
     *,
     label: str,
     goals: List[Dict[str, str]],
+    seed_notes: Optional[List[Dict[str, str]]] = None,
     character: str = DEFAULT_CHARACTER,
     world: str = DEFAULT_WORLD,
     scenario: str = DEFAULT_SCENARIO,
@@ -333,6 +439,34 @@ def create_empty_baseline(
                 f"({i + 1}/{len(goals)})",
                 file=sys.stderr,
             )
+
+        # ── Seed persistent notes via resource/create_note queryable ─
+        # These are created AFTER goals so failures don't prevent the
+        # goal set from being in the snapshot. Each note is flagged
+        # persistent=True so it survives transient cleanup AND gets
+        # serialized to resources.json on the upcoming shutdown.
+        seeded_notes_out: List[Dict[str, str]] = []
+        for i, n in enumerate(seed_notes or []):
+            note_name = n["name"]
+            content = n["content"]
+            new_note_id = _create_seed_note(
+                session, character, note_name, content,
+            )
+            if not new_note_id:
+                raise RuntimeError(
+                    f"baseline: seed note '{note_name}' creation failed"
+                )
+            seeded_notes_out.append({
+                "name": note_name,
+                "note_id": new_note_id,
+                "content_len": len(content),
+            })
+            print(
+                f"baseline: seeded note '{note_name}' as {new_note_id} "
+                f"({len(content)} chars) "
+                f"({i + 1}/{len(seed_notes or [])})",
+                file=sys.stderr,
+            )
     finally:
         try:
             if session is not None:
@@ -352,6 +486,7 @@ def create_empty_baseline(
     # ── Write a seed manifest next to the snapshot ────────────────────
     manifest_extras = {
         "seeded_goals": seeded,
+        "seeded_notes": seeded_notes_out,
         "goals_file_used": [{"name": g["name"]} for g in goals],
         "scenario": scenario,
     }
@@ -360,7 +495,7 @@ def create_empty_baseline(
 
     print(
         f"baseline: created '{label}' at {snap_dir} with "
-        f"{len(seeded)} goals seeded",
+        f"{len(seeded)} goals and {len(seeded_notes_out)} seed notes",
         file=sys.stderr,
     )
     return snap_dir
@@ -401,14 +536,15 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.cmd == "create":
         try:
-            goals = load_goals_file(args.goals_file)
+            parsed = load_goals_file(args.goals_file)
         except Exception as e:
             print(f"ERROR: failed to load goals file: {e}", file=sys.stderr)
             return 2
         try:
             create_empty_baseline(
                 label=args.label,
-                goals=goals,
+                goals=parsed["goals"],
+                seed_notes=parsed.get("seed_notes") or [],
                 character=args.character,
                 world=args.world,
                 scenario=args.scenario,
