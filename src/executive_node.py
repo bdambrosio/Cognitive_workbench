@@ -1722,6 +1722,17 @@ class ZenohExecutiveNode:
             if self._operational_goal_waiting and self._operational_task_note:
                 self._record_operational_goal_result()
                 self._operational_goal_waiting = False
+            # Reconcile persisted goal state for any worker path that exited
+            # without calling _set_scheduled_goal_result. Symmetric with the
+            # _executing_goal_id clear below: both views of "is it running?"
+            # self-heal when the worker thread is gone.
+            stale_gid = None
+            if hasattr(self, 'goal_scheduler') and self.goal_scheduler._executing_goal_id is not None:
+                stale_gid = self.goal_scheduler._executing_goal_id
+            elif getattr(self, '_active_scheduled_goal_id', None):
+                stale_gid = self._active_scheduled_goal_id
+            if stale_gid:
+                self._reconcile_stale_running_goal(stale_gid)
             # Clear scheduler executing_goal_id so /status doesn't show a phantom goal
             if hasattr(self, 'goal_scheduler') and self.goal_scheduler._executing_goal_id is not None:
                 self.goal_scheduler._executing_goal_id = None
@@ -3167,6 +3178,28 @@ class ZenohExecutiveNode:
                 except ValueError:
                     pass
         self._scheduled_goal_counter = max_id
+        # Sweep stale running flags left behind by a previous process that
+        # exited (crash, SIGKILL, restart) mid-goal without clearing the
+        # persisted goal record. There is no live worker thread at startup,
+        # so any goal still marked running is by definition stale.
+        try:
+            for goal in self._all_scheduled_goals():
+                if goal.get("is_running") or goal.get("status") == "running":
+                    gid = goal.get("goal_id", "?")
+                    logger.warning(
+                        f"Startup: clearing stale running flag on {gid} "
+                        f"(previous process exited without completing it)"
+                    )
+                    prior = goal.get("last_result") or ""
+                    self._update_scheduled_goal(
+                        gid,
+                        is_running=False,
+                        status="failed",
+                        last_result=(prior + ("\n" if prior else "") +
+                                     "[reconciled at startup: previous process exited before completion]").strip(),
+                    )
+        except Exception as e:
+            logger.debug(f"Startup stale-running sweep failed: {e}")
 
     def _scheduled_goal_note_name(self, goal_id: str) -> str:
         return SCHEDULED_GOAL_NOTE_PREFIX + goal_id.replace("goal_", "")
@@ -3317,6 +3350,40 @@ class ZenohExecutiveNode:
         goal["updated"] = datetime.now().isoformat()
         self._save_scheduled_goal(goal)
         return goal
+
+    def _reconcile_stale_running_goal(self, goal_id: str) -> None:
+        # Called from the main-loop thread-done path as a safety net: if a
+        # worker exited without routing through _set_scheduled_goal_result
+        # (exception before the update at line ~3430, early-return on goal
+        # lookup miss, etc.), the persisted record still claims running even
+        # though the thread is gone. Clear it so /goals matches /status.
+        if not goal_id:
+            return
+        try:
+            goal = self._get_scheduled_goal(goal_id)
+            if not goal:
+                return
+            if not (goal.get("is_running") or goal.get("status") == "running"):
+                return
+            logger.warning(
+                f"Reconciling stale running flag on {goal_id}: worker thread "
+                f"exited without writing a result"
+            )
+            prior = goal.get("last_result") or ""
+            self._update_scheduled_goal(
+                goal_id,
+                is_running=False,
+                status="failed",
+                last_result=(prior + ("\n" if prior else "") +
+                             "[reconciled: worker thread exited without writing a result]").strip(),
+            )
+            if hasattr(self, "goal_scheduler"):
+                try:
+                    self.goal_scheduler.notify_step_completed(goal_id)
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.debug(f"Reconcile stale running goal {goal_id} failed: {e}")
 
     def _delete_scheduled_goal(self, goal_id: str) -> bool:
         note_name = self._scheduled_goal_note_name(goal_id)

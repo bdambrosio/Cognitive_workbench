@@ -507,6 +507,40 @@ binding shows up in plan_bindings on completion.
 in the codegen prompt to a stronger requirement — verify at the done
 gate that some binding has been made and warn the planner if not.
 
+### "persist silently ignores out= parameter"
+The `persist` primitive (`src/infospace_executor.py::_execute_persist`) reads
+only `target` and `name`. Passing `out="$var"` looks like a binding request
+but the executor never calls `_bind_variable(out_var, ...)`, so `$var` is
+never bound. The structural checker then flags `$var` as an unused binding,
+which hides the real issue: the binding never happened at all.
+
+**Fix at review time:** Remove `out=` from any `persist` call in the plan.
+If you need the persisted resource under a new variable name, use
+`tool("bind", target="$matches", out="$new_name")` explicitly, or just
+keep referencing the pre-persist variable (persist is in-place).
+
+**Fix at codebase time:** Either implement `out=` in `_execute_persist`
+(one-line `self._bind_variable(out_var, resource_id)` before the return),
+or reject `out=` with an explicit error so the planner doesn't keep
+generating calls that look correct and silently drop the binding.
+
+### "Default discover-notes limit=5 undersamples 'all existing' queries"
+`discover-notes` defaults to `limit=5, threshold=0.3`. For goals phrased as
+"find **all existing** Notes that X" / "every Note that mentions Y", the
+default caps the result at the top-5 by similarity — there is no way from
+inside the plan to tell whether the returned Collection is exhaustive or
+truncated. The planner happily reports success on 5 results even when the
+goal explicitly said "all".
+
+**Fix:** When the goal wording signals exhaustiveness ("all", "every",
+"each"), pass an explicit `limit=` well above the expected match count
+(50 is a reasonable default for an infospace with a few hundred Notes).
+Consider lowering `threshold` slightly if the matches are heterogeneous.
+
+**Longer-term:** `discover-notes` should accept `limit=None` / `limit="all"`
+and stream every Note above threshold, not just the top-K. Currently there
+is no way to express "all matches" through the primitive itself.
+
 ### "Conditional vision criterion phrased as required"
 Envision generates criteria like `matches_exist: The output explicitly
 states at least one article title that matches`, but the goal explicitly
@@ -608,6 +642,18 @@ when the prompt changes so existing cached criteria regenerate.
   predicate dynamically from `get_text("$interests")`. New patterns: missing
   named Note triggers filesystem hunt; missing sensor-written Note treated
   as failure; hardcoded predicate from one observed run.
+- 2026-04-11: Review of goal_21 (G04 — find Notes mentioning transformer /
+  attention, create a Collection). Replan run, completed, quality=passed — but
+  the pass was from the planner's own verification answer, not the vision
+  criteria evaluator, because the plan never bound `$eval_target`. Collapsed
+  2 STAGE3-decomposed steps into 1, added `limit=50` to discover-notes to
+  actually honor the goal's "all existing Notes" wording, and aliased
+  `$matches → $eval_target` via `bind`. Two new patterns: **persist silently
+  ignores `out=`** (the planner originally wrote `out="$persisted"`, which
+  was a no-op — `_execute_persist` never calls `_bind_variable`); **default
+  discover-notes limit=5 undersamples "all" queries** (no signal to the
+  planner that results were truncated). Also reinforces STAGE3
+  over-decomposition and missing `$eval_target` — both recurring.
 - 2026-04-10: Second review of goal_15 after a fresh replan. Planner
   produced a 5-step plan that successfully ran end-to-end ("no interesting
   new news") but: (a) hardcoded the predicate AGAIN as `"matches AI, AI

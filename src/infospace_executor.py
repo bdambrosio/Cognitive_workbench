@@ -2901,10 +2901,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         Mark a Note or Collection as persistent (saved to filesystem).
         Optional name assigns a stable name for later loading by name.
-        
+
         Required: target
         Optional: name (stable name for load by name, e.g., "berkeley_weather_report")
-        
+                  out ($variable — alias the persisted resource to this variable)
+
         Target can be:
         - $variable referencing a Note or Collection
         - Literal Note_ID (e.g., "Note_123") or Collection_ID (e.g., "Collection_456")
@@ -2912,6 +2913,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         target_arg = action.get('target')
         name_arg = action.get('name')
+        out_var = action.get('out')
         
         if not target_arg:
             return self._create_uniform_return('failed', reason='persist requires target')
@@ -2956,9 +2958,12 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             if not name_success:
                 logger.warning(f"Persist succeeded but name assignment failed: {name_err}")
         
+        if out_var:
+            self._bind_variable(out_var, resource_id)
+
         logger.info(f"Marked {resource_id} as persistent")
         return self._create_uniform_return('success', value=None, resource_id=resource_id)
-    
+
     def search_resources(self, queries: List[str], k_notes: int = 3, k_collections: int = 2, threshold: float = 0.3) -> Dict:
         """
         Search for relevant Notes and Collections using embedding-based retrieval.

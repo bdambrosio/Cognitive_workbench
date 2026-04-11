@@ -18,8 +18,13 @@ be alive on the same Zenoh session).
 
 Usage:
     python bench/harvester.py --goal goal_15
+    python bench/harvester.py --goal G01            # resolved by name
     python bench/harvester.py --goal goal_15 --mode replay --out runs.jsonl
     python bench/harvester.py --goal goal_15 --no-submit  # harvest only
+
+The --goal argument accepts either the internal goal_id (goal_15) or the
+display name (G01). Name resolution is handled by resolve_goal_handle();
+goal_id matches take precedence, ambiguous name matches error out.
 """
 from __future__ import annotations
 
@@ -65,6 +70,10 @@ def query_goal_record(
     """Query the agent's scheduled_goals queryable and return the matching
     goal dict, or None if the goal isn't present or the queryable is silent.
 
+    Strict goal_id lookup. Does NOT match on display name — use
+    resolve_goal_handle for that. This function stays goal_id-only so hot
+    polling paths (wait_for_completion) never pay the name-match cost.
+
     The queryable returns a payload of shape:
         {"success": True, "goals": [ {goal_id: ..., ...}, ... ]}
     """
@@ -80,6 +89,55 @@ def query_goal_record(
             for g in payload.get("goals", []) or []:
                 if g.get("goal_id") == goal_id:
                     return g
+    except Exception as e:
+        print(f"WARN: scheduled_goals query failed: {e}", file=sys.stderr)
+    return None
+
+
+def resolve_goal_handle(
+    session: zenoh.Session,
+    character: str,
+    goal_ref: str,
+    timeout: float = 3.0,
+) -> Optional[Dict[str, Any]]:
+    """Resolve a goal reference to a full goal record.
+
+    `goal_ref` may be the internal goal_id (`goal_17`) or the display
+    name (`G01`). goal_id matches take precedence so an unambiguous ID
+    always wins — this matters because a goal named "goal_99" that
+    doesn't actually have goal_id goal_99 should still resolve.
+
+    Returns the full matched goal record (so callers can also use it as
+    the pre-submit snapshot without a second query), or None if nothing
+    matched. Raises ValueError if the name matches more than one goal,
+    so callers can surface the ambiguity instead of silently running
+    against the wrong one.
+    """
+    key = f"cognitive/{character}/scheduled_goals"
+    try:
+        for reply in session.get(key, timeout=timeout):
+            if not (hasattr(reply, "ok") and reply.ok is not None):
+                continue
+            try:
+                payload = json.loads(reply.ok.payload.to_bytes().decode("utf-8"))
+            except Exception:
+                continue
+            goals = payload.get("goals", []) or []
+            for g in goals:
+                if g.get("goal_id") == goal_ref:
+                    return g
+            name_matches = [g for g in goals if g.get("name") == goal_ref]
+            if len(name_matches) == 1:
+                return name_matches[0]
+            if len(name_matches) > 1:
+                candidate_ids = [g.get("goal_id", "?") for g in name_matches]
+                raise ValueError(
+                    f"Goal name '{goal_ref}' is ambiguous — matches "
+                    f"{len(name_matches)} goals: {candidate_ids}. "
+                    f"Pass an explicit goal_id."
+                )
+    except ValueError:
+        raise
     except Exception as e:
         print(f"WARN: scheduled_goals query failed: {e}", file=sys.stderr)
     return None
@@ -490,7 +548,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         description="Stage 1 benchmark harvester for Cognitive Workbench",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    p.add_argument("--goal", required=True, help="Goal ID to run (e.g. goal_15)")
+    p.add_argument(
+        "--goal",
+        required=True,
+        help="Goal ID or display name (e.g. goal_15 or G01). goal_id matches "
+        "take precedence; ambiguous name matches error out.",
+    )
     p.add_argument("--character", default=DEFAULT_CHARACTER, help="Character name")
     p.add_argument(
         "--mode",
@@ -544,9 +607,13 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     session = open_zenoh()
     try:
-        # Snapshot pre-submit state so wait_for_completion can detect a
-        # finished run via the updated timestamp even if we miss 'running'.
-        pre_record = query_goal_record(session, args.character, args.goal)
+        # Resolve --goal (which may be a name like "G01") to a canonical
+        # goal_id and the pre-submit goal record in one Zenoh round-trip.
+        try:
+            pre_record = resolve_goal_handle(session, args.character, args.goal)
+        except ValueError as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            return 2
         if pre_record is None:
             print(
                 f"ERROR: goal '{args.goal}' not found via "
@@ -555,15 +622,21 @@ def main(argv: Optional[List[str]] = None) -> int:
                 file=sys.stderr,
             )
             return 2
+        goal_id = pre_record.get("goal_id") or args.goal
+        if goal_id != args.goal:
+            print(
+                f"Resolved goal name '{args.goal}' → {goal_id}",
+                file=sys.stderr,
+            )
         pre_submit_updated = pre_record.get("updated", "")
 
         if not args.no_submit:
             print(
-                f"Submitting {args.goal} (mode={args.mode or 'default'}) "
+                f"Submitting {goal_id} (mode={args.mode or 'default'}) "
                 f"to {args.character}...",
                 file=sys.stderr,
             )
-            if not submit_goal_run(session, args.character, args.goal, args.mode):
+            if not submit_goal_run(session, args.character, goal_id, args.mode):
                 return 3
             # Give the agent a beat to update the goal record to running.
             time.sleep(1.0)
@@ -580,20 +653,20 @@ def main(argv: Optional[List[str]] = None) -> int:
             record = wait_for_completion(
                 session,
                 args.character,
-                args.goal,
+                goal_id,
                 args.poll_interval,
                 args.timeout,
                 pre_submit_updated,
             )
 
-        log_lines = slice_log_for_goal(args.log_path, args.goal)
+        log_lines = slice_log_for_goal(args.log_path, goal_id)
         print(
             f"Harvested goal record (status={record.get('status', '?')}) "
             f"and {len(log_lines)}-line log slice",
             file=sys.stderr,
         )
 
-        row = compute_metrics(record, log_lines, args.goal, args.mode)
+        row = compute_metrics(record, log_lines, goal_id, args.mode)
 
         # Optional stage 2: Opus quality verdict.
         if args.opus:

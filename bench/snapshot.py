@@ -49,7 +49,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Optional
+from typing import Iterable, List, Optional
 
 # Path setup so we can import zenoh utils for the launcher liveness check.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -220,18 +220,40 @@ def restore(
     character: str = DEFAULT_CHARACTER,
     world: str = DEFAULT_WORLD,
     force: bool = False,
+    preserve: Optional[Iterable[str]] = None,
 ) -> Path:
     """Copy the snapshot back to the character's resource directory,
     overwriting any current state. Refuses if the launcher is running
     (unless force=True).
 
+    `preserve` is an optional iterable of snapshot filenames to leave
+    untouched on disk. The named files are neither copied from the
+    snapshot nor deleted — whatever is currently at `dest/<name>` stays.
+    This is how the batch layer expresses "reset infospace but keep
+    world_model.json" for Trial B's accumulating-review phase.
+
+    Preserve entries are validated against the known _SNAPSHOT_FILES
+    list so a typo fails loudly instead of silently copying the file.
+    Directories in _SNAPSHOT_DIRS are always fully restored and cannot
+    be preserved via this kwarg.
+
     Returns the destination directory on success.
-    Raises RuntimeError on failure.
+    Raises RuntimeError on launcher-still-running or missing snapshot.
+    Raises ValueError on an unrecognized preserve entry.
     """
     if not force and is_launcher_running(character):
         raise RuntimeError(
             f"Launcher appears to be running for character '{character}'. "
             f"Stop it before restoring (or use --force to override)."
+        )
+
+    preserve_set = set(preserve or [])
+    known_files = {f for f, _optional in _SNAPSHOT_FILES}
+    unknown = preserve_set - known_files
+    if unknown:
+        raise ValueError(
+            f"preserve contains unknown snapshot file(s): {sorted(unknown)}. "
+            f"Valid entries: {sorted(known_files)}"
         )
 
     snap_dir = _snapshot_dir(label)
@@ -261,9 +283,14 @@ def restore(
     dest.mkdir(parents=True, exist_ok=True)
 
     restored: List[str] = []
+    preserved_actual: List[str] = []
 
-    # Files: copy each snapshot file back, overwriting whatever's there.
+    # Files: copy each snapshot file back, overwriting whatever's there,
+    # except for files explicitly listed in `preserve`.
     for fname, _optional in _SNAPSHOT_FILES:
+        if fname in preserve_set:
+            preserved_actual.append(fname)
+            continue
         snapfile = snap_dir / fname
         if not snapfile.exists():
             continue
@@ -285,10 +312,11 @@ def restore(
             if destsub.exists():
                 shutil.rmtree(destsub)
 
-    print(
-        f"Restored snapshot '{label}': {len(restored)} item(s) → {dest}",
-        file=sys.stderr,
-    )
+    summary = f"Restored snapshot '{label}': {len(restored)} item(s)"
+    if preserved_actual:
+        summary += f", {len(preserved_actual)} preserved ({', '.join(preserved_actual)})"
+    summary += f" → {dest}"
+    print(summary, file=sys.stderr)
     return dest
 
 
@@ -353,6 +381,14 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     sp_rest = sub.add_parser("restore", help="Restore state from a snapshot label")
     sp_rest.add_argument("label", help="Snapshot label to restore")
+    sp_rest.add_argument(
+        "--preserve",
+        action="append",
+        default=None,
+        metavar="FILENAME",
+        help="Snapshot file to leave untouched on disk (repeatable). "
+             "Useful for resetting infospace while keeping world_model.json.",
+    )
 
     sub.add_parser("list", help="List all snapshot labels")
 
@@ -368,7 +404,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         if args.cmd == "snapshot":
             snapshot(args.label, character=args.character, world=args.world, force=args.force)
         elif args.cmd == "restore":
-            restore(args.label, character=args.character, world=args.world, force=args.force)
+            restore(
+                args.label,
+                character=args.character,
+                world=args.world,
+                force=args.force,
+                preserve=args.preserve,
+            )
         elif args.cmd == "list":
             labels = list_snapshots()
             if not labels:

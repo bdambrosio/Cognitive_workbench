@@ -3120,6 +3120,7 @@ ALWAYS follow all formatting instructions exactly.
         stall_guard_state = {"prev_signature": None, "repeat_count": 0}
         deep_eval_retried = False
         deep_eval_prev_artifact = None
+        eval_target_retried = False
         plan_local_bindings = set()
         _asked_user_this_goal = False
         # Per-step task history for the same-task-as-prior detector. The
@@ -3346,6 +3347,25 @@ ALWAYS follow all formatting instructions exactly.
                     _clear_interrupt(executor)
                     s["final_answer"] = "Interrupted by user."
                     break
+
+                # $eval_target gate — if vision criteria exist but no step has
+                # bound $eval_target, the deep vision eval cannot run and
+                # quality_status falls back to a weaker signal. Reopen the
+                # loop once so the planner can alias the deliverable.
+                if vision_criteria and not last_eval_target and not eval_target_retried:
+                    eval_target_retried = True
+                    logger.info("Done gate: no $eval_target bound; reopening loop once to request binding")
+                    s += user(
+                        "STOP. The deliverable for this goal has not been bound to $eval_target, "
+                        "so the quality gate cannot evaluate it. In your next step, alias the "
+                        "deliverable with one line:\n"
+                        "    tool(\"bind\", target=\"$<your_deliverable_var>\", out=\"$eval_target\")\n"
+                        "Use the variable that holds the Note or Collection that answers the goal. "
+                        "Then mark DONE again."
+                    )
+                    s += assistant("Understood. I will bind the deliverable to $eval_target before marking DONE.\n")
+                    s[f"done_{step}"] = "NO"
+                    continue
 
                 # Verification
                 s += user(
@@ -4190,6 +4210,7 @@ ALWAYS follow all formatting instructions exactly.
     stall_guard_state = {"prev_signature": None, "repeat_count": 0}
     deep_eval_retried = False
     deep_eval_prev_artifact = None
+    eval_target_retried = False
     plan_local_bindings = set()
     _asked_user_this_goal = False
     # Per-step task history for the same-task-as-prior detector (see
@@ -4440,6 +4461,25 @@ ALWAYS follow all formatting instructions exactly.
                 _clear_interrupt(executor)
                 state["final_answer"] = "Interrupted by user."
                 break
+
+            # $eval_target gate — if vision criteria exist but no step has
+            # bound $eval_target, the deep vision eval cannot run and
+            # quality_status falls back to a weaker signal. Reopen the
+            # loop once so the planner can alias the deliverable.
+            if vision_criteria and not last_eval_target and not eval_target_retried:
+                eval_target_retried = True
+                logger.info("Done gate: no $eval_target bound; reopening loop once to request binding")
+                prompt += format_user(
+                    "STOP. The deliverable for this goal has not been bound to $eval_target, "
+                    "so the quality gate cannot evaluate it. In your next step, alias the "
+                    "deliverable with one line:\n"
+                    "    tool(\"bind\", target=\"$<your_deliverable_var>\", out=\"$eval_target\")\n"
+                    "Use the variable that holds the Note or Collection that answers the goal. "
+                    "Then mark DONE again."
+                )
+                prompt += format_assistant("Understood. I will bind the deliverable to $eval_target before marking DONE.\n")
+                state[f"done_{step}"] = "NO"
+                continue
 
             # Use inline verification from Stage 3 (no separate LLM call)
             inline_verification = state.get(f"verification_{step}", "").strip()
