@@ -3897,7 +3897,16 @@ class ZenohExecutiveNode:
             try:
                 sync_result = self.infospace_executor.execute_plan_sync({"plan": cached})
                 success = sync_result.get("status") == "success"
-                response_text = f"Cached plan replay {'succeeded' if success else 'failed'}: {sync_result.get('reason', '')}".strip()
+                # On success, leave response_text empty so _set_scheduled_goal_result's
+                # enrichment path surfaces the primary product's content as last_result
+                # — this reproduces what replan writes, via the real artifact rather
+                # than an LLM paraphrase. On failure, carry the reason so the user /
+                # harness can see why.
+                if success:
+                    response_text = ""
+                else:
+                    reason = sync_result.get('reason', '') or ''
+                    response_text = f"(replay failed) {reason}".strip()
 
                 # Quality evaluation: only override the execution-only baseline
                 # when criteria + a bound $eval_target are both present.
@@ -3945,11 +3954,16 @@ class ZenohExecutiveNode:
                 # Stash the eval text so _set_scheduled_goal_result can persist it.
                 self.infospace_executor._last_quality_eval = eval_text
 
+                # primary_product: reproduce the replan path's behavior by
+                # exposing the $eval_target binding so consumers (user-facing
+                # say, harness, verdict grader) see the same artifact pointer
+                # regardless of which path produced it.
                 result = {
                     "success": success,
                     "plan": cached,
                     "response": response_text,
                     "quality_status": quality_status,
+                    "primary_product": eval_target_id or "",
                 }
             except Exception as e:
                 logger.error(f"[GOAL {goal_id}] replay raised: {e}")
