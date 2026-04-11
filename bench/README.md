@@ -18,9 +18,18 @@ Stages currently implemented:
   structured `opus_verdict` sub-object. Can be invoked standalone on a
   saved row, or inline via `harvester.py --opus`.
 
-Later stages will add: snapshot/restore between trials, A/B comparison
-(planning vs replay against the same goal), batch runners, randomization,
-and overnight execution.
+- **Stage 3** — `bench/snapshot.py`, `bench/launcher.py`,
+  `bench/reviewer.py`, `bench/trial.py`: snapshot/restore primitive,
+  launcher lifecycle helper, automated plan reviewer with dry-run mode,
+  and the per-goal trial driver that composes `run` and `review` steps
+  into one experimental record against a single goal.
+
+- **Stage 4** — `bench/experiment.py`: batch experiment runner.
+  Accepts an explicit goal list (names or ids) and a trial type (A, B,
+  or C), produces a trial plan, and executes it across the goals with
+  the appropriate reset strategy per goal. Writes per-goal records to
+  a JSONL file as they complete; writes a `.summary.json` sidecar at
+  the end.
 
 ## Prerequisites
 
@@ -172,14 +181,124 @@ One JSON object per row. Stable keys (always present):
 - (When `--opus` flag set) `opus_verdict` sub-object with the model's
   per-objective grading; see Stage 2 usage above for the schema.
 
+## Stage 4 usage
+
+The experiment runner expects a `baseline-clean` snapshot to already
+exist. See **Baseline setup** below for the one-time manual procedure.
+
+```bash
+# Smoke: one goal, replan only
+python bench/experiment.py trial-A --goals G01 --seed 42 --out runs/smoke.jsonl
+
+# Trial A: baseline measurement, 10 goals
+python bench/experiment.py trial-A \
+    --goals G01 G02 G03 G04 G05 G06 G07 G08 G09 G10 \
+    --seed 42 --out runs/a.jsonl
+
+# Trial B: accumulating review, same 10 goals
+python bench/experiment.py trial-B \
+    --goals G01 G02 G03 G04 G05 G06 G07 G08 G09 G10 \
+    --seed 42 --out runs/b.jsonl
+
+# Trial C: replay where a Trial B first-half plan exists, replan otherwise
+python bench/experiment.py trial-C \
+    --goals G01 G02 G03 G04 G05 G06 G07 G08 G09 G10 \
+    --seed 42 \
+    --post-firsthalf-label post-B-firsthalf-seed-42 \
+    --reviewed-in-b-from runs/b.jsonl \
+    --out runs/c.jsonl
+```
+
+`--goals` accepts either display names (`G01`) or internal goal_ids
+(`goal_17`) or a mix. The same invocation works for 1 goal or 20.
+
+Trial C's `--reviewed-in-b-from` reads the first-half goal refs
+out of the Trial B JSONL file, so you don't hand-maintain the list.
+
+### Trial semantics (summary)
+
+| Trial | Per-goal protocol | Per-goal reset | Notes |
+|---|---|---|---|
+| A | `[replan]` | full restore of `baseline-clean` | 1 bounce per goal |
+| B phase 1 | `[replan, review commit, replay]` | full restore before *first* goal only | No inter-goal reset — world model and cached plans accumulate naturally |
+| B phase 1→2 boundary | — | — | Snapshot `post-B-firsthalf-seed-<seed>` |
+| B phase 2 | `[replan]` | full restore of `post-B-firsthalf-seed-<seed>` | World model carries forward from phase 1 |
+| C (reviewed) | `[replay]` | full restore of `post-B-firsthalf-seed-<seed>` | Uses the cached plan committed in B phase 1 |
+| C (unreviewed) | `[replan]` | full restore of `post-B-firsthalf-seed-<seed>` | Same accumulated state but no cached plan |
+
+### Known confound: Trial B phase 1 infospace contamination
+
+Because phase 1 has no per-goal reset (this is necessary so committed
+cached plans survive into the phase-boundary snapshot), persistent Notes
+created by earlier first-half goals remain visible to later first-half
+goals **and** to every second-half goal (which starts from the phase-1
+snapshot). If goal N creates a persistent Note that goal N+1's planner
+happens to find via `discover-notes`, that shows up as "helpfulness"
+in the Trial B numbers even though it's really infospace contamination.
+
+Two things to know:
+
+1. The contamination is **uniform across all Trial B goals** since they
+   all derive from the same accumulating phase-1 state, so comparisons
+   *within* Trial B are internally consistent.
+2. The confound primarily affects the **Trial A vs Trial B phase 2**
+   comparison (which is meant to isolate world-model transfer). Trial A
+   vs Trial C is less affected — both sides are running against
+   "accumulated infospace" states of similar shape.
+
+If the numbers show a suspiciously strong phase-2 effect, the next
+investigation is whether it's driven by a specific goal pair with
+obvious input/output overlap (e.g. G01 creates a paper Note that G04
+"find Notes about transformers" then picks up). Removing the confound
+would require splitting `resources.json` into "goal records" vs. "other
+persistent Notes" and handling them independently — significant work,
+deferred until evidence suggests it's needed.
+
+## Baseline setup (one-time, manual)
+
+The experiment runner assumes a snapshot named `baseline-clean` already
+exists. This has to be created by hand because the alternative —
+programmatically clearing persistent state — risks wiping core framework
+built-ins (the conversation Collection, conversation history, `null_note`,
+`_*` bookkeeping notes) that Jill needs to function at all.
+
+Procedure:
+
+1. **Stop Jill's launcher.** Confirm no leftover Python processes.
+2. **Delete the world model only:**
+   ```
+   rm scenarios/infolab/resources/Jill/world_model.json
+   rm scenarios/infolab/resources/Jill/world_model.json.bak  # if present
+   ```
+   Do NOT delete `resources.json` — it contains both the core framework
+   scaffold (conversation, null_note, `_*` bookkeeping notes) AND your
+   seeded G01..Gnn goal records. Losing it wipes all of those.
+3. **(Optional) Clean up non-framework persistent state.** If prior
+   runs left junk persistent Notes you want gone, delete them by hand
+   via Jill's CLI (`/note delete <id>` etc.). Do not bulk-delete; verify
+   each one is not a framework built-in.
+4. **Start Jill** and confirm responsive via `/status`. Run `/goals`
+   and confirm G01..Gnn are all present with the expected goal text.
+5. **Stop Jill.**
+6. **Take the snapshot:**
+   ```
+   python bench/snapshot.py snapshot baseline-clean
+   ```
+7. **Verify** the snapshot contents:
+   ```
+   python bench/snapshot.py describe baseline-clean
+   ```
+8. **Restart Jill.** You're now ready to run experiments.
+
+The `baseline-clean` snapshot is the canonical starting point for all
+three trials. Take a fresh one any time you add goals, change goal text,
+or want to wipe accumulated learnings.
+
 ## Known limitations
 
-- **No state isolation between runs.** The harvester does not snapshot or
-  restore the infospace. Re-running the same goal accumulates state.
 - **Tool call counts come from log scraping**, not from a structured
   per-call list. Reasonable for stages 1-2; will be replaced when the
   executor exposes a structured per-run action list.
-- **Single goal per invocation.** Use a shell loop or wait for stage 4.
 - **Planning runs leave `step_results` empty** because per-step capture
   only fires in `execute_plan_sync` (replay path). Planning-mode rows
   will show `step_results_count=0`; use `cached_plan_step_count` and
@@ -189,3 +308,11 @@ One JSON object per row. Stable keys (always present):
   planner persists the deliverable via `name=` instead of binding it to
   `out="$eval_target"`. Stage 2 falls back to grading against
   `last_result` alone in that case, with lower confidence per objective.
+- **Trial B phase 1 infospace contamination** — see Stage 4 usage above
+  for the full explanation. Mitigation requires infrastructure work
+  that's deferred until evidence justifies it.
+- **No automatic experiment resume.** If `run_experiment` crashes
+  mid-trial, partial results are on disk (JSONL appends per-goal), but
+  restarting manually with an updated goal list is the user's job.
+- **Single seed per invocation.** Running multiple seeds for statistical
+  strength is a shell loop; no built-in multi-seed orchestration.
