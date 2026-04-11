@@ -54,6 +54,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # note.
 import launcher   # noqa: E402
 import snapshot   # noqa: E402
+from experiment import clear_bench_logs  # noqa: E402
 
 DEFAULT_CHARACTER = "Jill"
 DEFAULT_WORLD = "benchlab"
@@ -393,6 +394,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                            default=DEFAULT_READY_TIMEOUT_S)
 
     args = p.parse_args(argv)
+
+    # Clear bench log files at top-level entry so baseline creation
+    # has a clean slate in the logs (same rule as experiment.py).
+    clear_bench_logs()
 
     if args.cmd == "create":
         try:

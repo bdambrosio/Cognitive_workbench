@@ -163,6 +163,9 @@ def submit_goal_run(
 # Polling for completion
 # ──────────────────────────────────────────────────────────────────────────
 
+NO_PROGRESS_TIMEOUT_S = 100.0
+
+
 def wait_for_completion(
     session: zenoh.Session,
     character: str,
@@ -171,34 +174,98 @@ def wait_for_completion(
     timeout: float,
     pre_submit_updated: Optional[str],
 ) -> Dict[str, Any]:
-    """Poll until the goal record's status leaves 'running' AND its updated
-    timestamp is newer than the pre-submit value (so we don't return the
-    pre-run state and call it done).
+    """Poll until the goal record reflects a real completion.
 
-    Returns the most recent goal record. If the timeout fires before
-    completion, the returned record carries `_harvest_error="timeout"`.
+    Two watchdogs run in parallel with the outer `timeout`:
+
+    1. **outer timeout** (`timeout`, default 30 min): absolute ceiling
+       on a single goal's wall time. Long by design so legit slow runs
+       aren't cut off.
+    2. **no-progress watchdog** (NO_PROGRESS_TIMEOUT_S = 100s): if the
+       goal record never shows forward progress — `status` leaving
+       "ready" OR `last_run_mode` getting populated — we declare the
+       run non-started and return with `_harvest_error =
+       "no_progress_non_started"`. Protects against the case where the
+       launcher's scheduled_goals queryable responds (so `wait_ready`
+       succeeds) but the agent can't actually execute goals (e.g.,
+       lingering sglang workers from an incomplete prior teardown
+       holding GPU resources). Without this, the outer 30-min timeout
+       would be wasted on runs that were never going to happen.
+
+    Acceptance criteria for "completed":
+    - `status ∈ {"completed", "failed"}` — return immediately.
+    - `status` terminal AND we observed `status == "running"` earlier
+      — return (legit post-run state, including "ready" from a
+      user-interrupted run).
+    - `status` terminal AND `last_run_mode != ""` AND
+      `updated > pre_submit_updated` — fast-completion escape hatch,
+      for runs that finished before our first poll caught them in
+      "running". The `last_run_mode` requirement is the fix for a
+      harvester bug that let `_cmd_goal_run`'s execution_mode-touch
+      trip this path on non-started runs. Only `_set_scheduled_goal_result`
+      sets `last_run_mode`, so its presence is the ground truth that
+      the goal thread actually ran to a result.
+
+    Returns the most recent goal record. On timeout (outer), carries
+    `_harvest_error="timeout"`. On no-progress, carries
+    `_harvest_error="no_progress_non_started"`.
     """
-    deadline = time.monotonic() + timeout
+    start_time = time.monotonic()
+    deadline = start_time + timeout
+    no_progress_deadline = start_time + NO_PROGRESS_TIMEOUT_S
     saw_running = False
+    saw_progress = False
     last_record: Optional[Dict[str, Any]] = None
+
     while time.monotonic() < deadline:
         record = query_goal_record(session, character, goal_id)
         if record is not None:
             last_record = record
             status = record.get("status", "")
             updated = record.get("updated", "")
+            last_run_mode = record.get("last_run_mode", "")
+
+            # Progress tracking: either the status has left "ready" or
+            # the run-completion path has stamped last_run_mode. Either
+            # is definitive evidence that /goal run was picked up.
+            if status != "ready" or last_run_mode:
+                saw_progress = True
+
             if status == "running":
                 saw_running = True
             elif status in TERMINAL_STATUSES:
-                # Two acceptance conditions: (a) we observed running at
-                # some earlier poll (so we know this is post-run state),
-                # OR (b) the updated timestamp moved past the pre-submit
-                # value (handles fast runs that finished before our first
-                # poll caught them in 'running' state).
                 if saw_running:
                     return record
-                if pre_submit_updated and updated and updated > pre_submit_updated:
+                # Fast-completion escape hatch, gated on last_run_mode
+                # so a non-started run (record touched only by
+                # _cmd_goal_run's execution_mode update) can't trip it.
+                if (
+                    pre_submit_updated
+                    and updated
+                    and updated > pre_submit_updated
+                    and last_run_mode
+                ):
                     return record
+
+        # No-progress watchdog: if nothing has happened within the
+        # grace window, the launcher is up but can't run goals. Return
+        # error so the batch runner can move on instead of burning the
+        # outer timeout.
+        if not saw_progress and time.monotonic() > no_progress_deadline:
+            print(
+                f"WARN: goal '{goal_id}' showed no progress after "
+                f"{NO_PROGRESS_TIMEOUT_S}s — treating as non-started",
+                file=sys.stderr,
+            )
+            if last_record is None:
+                return {
+                    "_harvest_error": "no_progress_non_started",
+                    "goal_id": goal_id,
+                }
+            out = dict(last_record)
+            out["_harvest_error"] = "no_progress_non_started"
+            return out
+
         time.sleep(poll_interval)
 
     print(f"WARN: timeout after {timeout}s waiting for goal completion", file=sys.stderr)

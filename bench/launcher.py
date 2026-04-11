@@ -228,6 +228,8 @@ class LauncherProcess:
           3. If still running, escalate to SIGTERM
           4. Wait again
           5. If still running, SIGKILL the process group
+          6. Verify sglang worker processes have also exited (waits up
+             to SGLANG_TEARDOWN_BUDGET_S, escalates to pkill if needed)
 
         Idempotent: safe to call when not running. Closes log file handle
         if one was opened.
@@ -235,7 +237,7 @@ class LauncherProcess:
         if self.process is None:
             return
         if self.process.poll() is not None:
-            self._cleanup_log()
+            self._finalize_stop()
             return
 
         # 1. Zenoh shutdown
@@ -251,7 +253,7 @@ class LauncherProcess:
                         f"(returncode={self.process.returncode})",
                         file=sys.stderr,
                     )
-                    self._cleanup_log()
+                    self._finalize_stop()
                     return
                 time.sleep(0.5)
 
@@ -274,7 +276,7 @@ class LauncherProcess:
                     f"(returncode={self.process.returncode})",
                     file=sys.stderr,
                 )
-                self._cleanup_log()
+                self._finalize_stop()
                 return
             time.sleep(0.5)
 
@@ -295,7 +297,116 @@ class LauncherProcess:
                 f"may be a zombie",
                 file=sys.stderr,
             )
+        self._finalize_stop()
+
+    def _finalize_stop(self) -> None:
+        """Common tail of stop(): close the log handle, then verify no
+        sglang worker processes linger from the launcher we just exited.
+        Called from every return path in stop().
+        """
         self._cleanup_log()
+        self._verify_sglang_teardown()
+
+    def _verify_sglang_teardown(
+        self,
+        max_wait_s: float = 180.0,
+        poll_interval: float = 3.0,
+    ) -> None:
+        """After the launcher subprocess exits, verify its sglang child
+        workers have also exited.
+
+        sglang's in-process runtime spawns scheduler, tokenizer, and
+        model-worker subprocesses. When the parent Python exits, SIGTERM
+        sometimes fails to reach all of them (they break from the
+        process group, or take a while to release GPU resources and
+        file locks). Lingering workers hold GPU memory + IPC ports that
+        the next launcher startup needs — the symptom is that the next
+        `wait_ready` succeeds but goal execution silently fails because
+        the new sglang runtime can't allocate resources.
+
+        Strategy:
+        1. Poll `pgrep -f sglang` up to `max_wait_s` (default 180s to
+           accommodate cognitive_graph / world_model save variance).
+        2. If still present, escalate to `pkill -f sglang` (SIGTERM,
+           not -9; in practice pkill is sufficient).
+        3. Wait 10s, re-verify. Log final state either way.
+
+        Best-effort: never raises, only logs. If the user has another
+        sglang process running elsewhere on the machine, the pkill will
+        catch it too — but bench runs assume no interactive Jill is
+        running concurrently (the preflight check enforces this).
+        """
+        start = time.monotonic()
+        logged_waiting = False
+        while time.monotonic() - start < max_wait_s:
+            if not self._sglang_workers_present():
+                elapsed = time.monotonic() - start
+                if logged_waiting:
+                    print(
+                        f"LauncherProcess: sglang workers exited after "
+                        f"{elapsed:.1f}s",
+                        file=sys.stderr,
+                    )
+                return
+            if not logged_waiting:
+                print(
+                    f"LauncherProcess: sglang workers still present after "
+                    f"subprocess exit — polling for teardown "
+                    f"(budget {max_wait_s:.0f}s)",
+                    file=sys.stderr,
+                )
+                logged_waiting = True
+            time.sleep(poll_interval)
+
+        # Didn't exit naturally — escalate.
+        print(
+            f"LauncherProcess: sglang workers STILL present after "
+            f"{max_wait_s:.0f}s, sending SIGTERM via pkill",
+            file=sys.stderr,
+        )
+        try:
+            subprocess.run(
+                ["pkill", "-f", "sglang"],
+                capture_output=True,
+            )
+        except Exception as e:
+            print(
+                f"LauncherProcess: pkill invocation failed: {e}",
+                file=sys.stderr,
+            )
+            return
+
+        # Give SIGTERM a moment, then re-check.
+        time.sleep(10.0)
+        if self._sglang_workers_present():
+            print(
+                f"LauncherProcess: WARN — sglang workers STILL present "
+                f"after pkill SIGTERM; giving up. Next launcher start may "
+                f"fail until they are cleaned up manually.",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"LauncherProcess: sglang workers exited after pkill",
+                file=sys.stderr,
+            )
+
+    @staticmethod
+    def _sglang_workers_present() -> bool:
+        """True if any process matching 'sglang' is running. Returns
+        False on pgrep failure (can't determine → treat as absent so
+        we don't loop forever).
+        """
+        try:
+            result = subprocess.run(
+                ["pgrep", "-f", "sglang"],
+                capture_output=True,
+                text=True,
+                timeout=5.0,
+            )
+            return result.returncode == 0 and bool(result.stdout.strip())
+        except Exception:
+            return False
 
     def _send_zenoh_shutdown(self) -> bool:
         """Send the shutdown message to cognitive/launcher/shutdown.

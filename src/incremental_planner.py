@@ -71,7 +71,7 @@ if not logger.handlers:
         _log_dir = os.path.join(os.path.dirname(__file__), '..', 'logs')
         os.makedirs(_log_dir, exist_ok=True)
         _log_path = os.path.join(_log_dir, 'incremental_planner.log')
-        file_handler = logging.FileHandler(_log_path, mode='w')
+        file_handler = logging.FileHandler(_log_path, mode='a')
         file_handler.setLevel(logging.INFO)
         file_handler.setFormatter(logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s',

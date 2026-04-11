@@ -30,7 +30,7 @@ _debug_env = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setLevel(logging.WARNING)
 
-file_handler = logging.FileHandler('logs/character_launcher.log', mode='w')
+file_handler = logging.FileHandler('logs/character_launcher.log', mode='a')
 file_handler.setLevel(logging.INFO)
 
 logging.basicConfig(

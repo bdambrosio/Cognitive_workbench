@@ -315,6 +315,37 @@ def _open_session():
     return zenoh.open(make_localhost_config())
 
 
+# Log files that individual launcher instances append to within one
+# bench top-level invocation. Cleared once at the start of each
+# top-level entry (experiment.py / baseline.py main()) so the logs
+# accumulate across launcher bounces WITHIN one run but don't carry
+# over BETWEEN separate invocations. The underlying log handlers use
+# mode='a' per src/executive_node.py etc., so bench bounces naturally
+# accumulate after the initial clear.
+_BENCH_LOG_FILES = [
+    _SRC_DIR / "logs" / "executive_node.log",
+    _SRC_DIR / "logs" / "character_launcher.log",
+    _REPO_ROOT / "logs" / "incremental_planner.log",
+    _REPO_ROOT / "logs" / "blackboard_planner.log",
+]
+
+
+def clear_bench_logs() -> None:
+    """Remove the agent-side log files that a bench invocation will
+    write to. Best-effort: missing files are silently ignored, errors
+    are logged but non-fatal.
+    """
+    for path in _BENCH_LOG_FILES:
+        try:
+            if path.exists():
+                path.unlink()
+        except Exception as e:
+            print(
+                f"WARN: could not clear log file {path}: {e}",
+                file=sys.stderr,
+            )
+
+
 def _preflight_shutdown_external_launcher(
     character: str,
     *,
@@ -911,6 +942,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     if not goals:
         print("ERROR: --goals is empty after parsing", file=sys.stderr)
         return 2
+
+    # Clear bench log files at the top-level entry. Within one
+    # experiment.py invocation, all launcher bounces append to these
+    # files, so debugging a mid-run failure has full context.
+    clear_bench_logs()
 
     if args.cmd == "trial-A":
         plan = build_trial_A(goals, args.seed, baseline=args.baseline)

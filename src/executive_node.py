@@ -48,7 +48,7 @@ import requests
 _cli_mode = os.getenv('CWB_CLI_MODE', '') == '1'
 
 # File handler with INFO level (full logging)
-file_handler = logging.FileHandler('logs/executive_node.log', mode='w')
+file_handler = logging.FileHandler('logs/executive_node.log', mode='a')
 file_handler.setLevel(logging.INFO)
 
 _handlers = [file_handler]

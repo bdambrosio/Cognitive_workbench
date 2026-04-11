@@ -27,7 +27,7 @@ try:
     _log_dir = os.path.join(os.path.dirname(__file__), 'logs')
     os.makedirs(_log_dir, exist_ok=True)
     _log_path = os.path.join(_log_dir, 'executive_node.log')
-    file_handler = logging.FileHandler(_log_path, mode='w')
+    file_handler = logging.FileHandler(_log_path, mode='a')
     file_handler.setLevel(logging.WARNING)
     if os.getenv('CWB_DEBUG', '') in ('1', 'true', 'yes', 'on'):
         file_handler.setLevel(logging.INFO)
