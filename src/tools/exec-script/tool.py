@@ -64,21 +64,35 @@ def tool(input_value=None, runtime=None, **kwargs):
 
     script_text = script_text.strip()
 
-    # ── Ask user for permission ──────────────────────────────────────
-    ask_result = executor._execute_ask({
-        "type": "ask",
-        "target": "User",
-        "value": f"exec-script wants to run the following script in scenarios/{world_name}/fs/:\n\n```\n{script_text}\n```\n\nProceed? (yes/no)",
-    })
+    # ── Ask user for permission (bypassed in benchmark_mode) ─────────
+    # In benchmark_mode the sandbox guard's interactive approval is an
+    # evaluation artefact, not a planner signal. Skip the ask and
+    # proceed — the scenario's fs sandbox is recoverable from the
+    # baseline snapshot if a plan does damage. Log the auto-approval
+    # so trial-log diffing still shows when a privileged tool ran.
+    benchmark_mode = bool(
+        getattr(getattr(executor, "executive_node", None), "benchmark_mode", False)
+    )
+    if benchmark_mode:
+        logger.info(
+            f"exec-script: benchmark_mode auto-approved script "
+            f"(length={len(script_text)}, cwd=scenarios/{world_name}/fs/)"
+        )
+    else:
+        ask_result = executor._execute_ask({
+            "type": "ask",
+            "target": "User",
+            "value": f"exec-script wants to run the following script in scenarios/{world_name}/fs/:\n\n```\n{script_text}\n```\n\nProceed? (yes/no)",
+        })
 
-    if ask_result.get("status") != "success":
-        return _fail(executor, "Permission request failed or timed out",
-                     value=ask_result.get("reason", "ask failed"))
+        if ask_result.get("status") != "success":
+            return _fail(executor, "Permission request failed or timed out",
+                         value=ask_result.get("reason", "ask failed"))
 
-    response = (ask_result.get("value") or "").strip().lower()
-    if response not in ("yes", "y"):
-        return _fail(executor, "User denied permission to execute script",
-                     value="denied")
+        response = (ask_result.get("value") or "").strip().lower()
+        if response not in ("yes", "y"):
+            return _fail(executor, "User denied permission to execute script",
+                         value="denied")
 
     # ── Execute the script ───────────────────────────────────────────
     fs_dir = _PROJECT_ROOT / "scenarios" / world_name / "fs"

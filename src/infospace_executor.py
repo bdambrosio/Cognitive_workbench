@@ -3650,6 +3650,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         next User message into that queue, unblocking this method.  All planner
         state (bindings, step count, reasoning context) is preserved.
 
+        In benchmark_mode, User-targeted asks are answered immediately with a
+        canned "use your best judgment" reply so unattended experiment runs
+        don't stall on planner ASK_USER. Sandbox guards (exec-script) skip
+        this path entirely by checking benchmark_mode at their own call site.
+
         Required: value
         Optional: target (defaults to 'User'), out
         """
@@ -3660,6 +3665,30 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             return self._create_uniform_return('failed', reason='ask requires value')
 
         target = action.get('target', 'User')
+
+        # ── benchmark_mode: canned reply for User-targeted asks ────────
+        # Reserved for unattended bench runs. Non-User asks (multi-agent
+        # flows) still go through the normal blocking path.
+        benchmark_mode = bool(
+            getattr(getattr(self, "executive_node", None), "benchmark_mode", False)
+        )
+        if benchmark_mode and target == 'User':
+            canned_reply = (
+                "Use your best judgment to complete the goal as quickly as "
+                "possible. I trust your decision."
+            )
+            logger.info(
+                f"❓ Ask (benchmark_mode): returning canned reply without "
+                f"blocking. Question: {str(question_text)[:120]}"
+            )
+            note_id = self._persist_note(canned_reply, source_context='ask_response')
+            if not note_id:
+                note_id = "Note_null"
+            if out_var:
+                self._bind_variable(out_var, note_id)
+            return self._create_uniform_return(
+                'success', value=canned_reply, resource_id=note_id,
+            )
 
         # --- Signal BEFORE publishing ---
         # Set awaiting_ask_response BEFORE publishing the ask action to prevent

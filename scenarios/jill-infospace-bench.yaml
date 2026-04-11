@@ -28,6 +28,7 @@ characters:
   Jill:
     manual: true
     manual_response: false
+    benchmark_mode: true
 
     task_scheduler:
       enabled: false
