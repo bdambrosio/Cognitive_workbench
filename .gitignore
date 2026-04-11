@@ -10,6 +10,9 @@ zenoh_venv/
 # Benchmark snapshots (large binary state copies, per-experiment)
 bench/snapshots/
 
+# Benchmark experiment output (per-goal JSONL + summary sidecars)
+runs/
+
 # Python cache files
 __pycache__/
 *.py[cod]

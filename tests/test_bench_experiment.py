@@ -226,6 +226,12 @@ def mocked_runtime(monkeypatch):
     monkeypatch.setattr(snapshot, "snapshot", fake_snapshot)
     monkeypatch.setattr(harvester, "resolve_goal_handle", fake_resolve)
     monkeypatch.setattr(experiment, "run_trial", fake_run_trial)
+    # Default: preflight sees no external launcher (tests override when
+    # they want to exercise the preflight shutdown path).
+    monkeypatch.setattr(
+        experiment, "_preflight_shutdown_external_launcher",
+        lambda character, **kw: True,
+    )
 
     return state
 
@@ -367,6 +373,34 @@ def test_run_experiment_fatal_launcher_failure_aborts(mocked_runtime, tmp_path):
     assert summary["fatal_error"] is not None
     assert "agent never became ready" in summary["fatal_error"]
     assert summary["goals_attempted"] == 1
+
+
+def test_run_experiment_preflight_aborts_when_external_launcher_refuses_shutdown(
+    mocked_runtime, monkeypatch, tmp_path,
+):
+    # Override the default preflight stub to simulate "external launcher
+    # is up and refuses to come down" — run_experiment should never
+    # enter the main loop and should mark fatal_error in the summary.
+    monkeypatch.setattr(
+        experiment, "_preflight_shutdown_external_launcher",
+        lambda character, **kw: False,
+    )
+    plan = build_trial_A(["G01", "G02"], seed=42)
+    out = tmp_path / "a.jsonl"
+
+    records = run_experiment(plan, out_path=out)
+
+    assert records == []
+    # No restore calls, no run_trial calls, no session opens.
+    assert mocked_runtime["restore_calls"] == []
+    assert mocked_runtime["run_trial_calls"] == []
+    assert mocked_runtime["sessions_opened"] == 0
+
+    summary_path = out.with_name(out.name + ".summary.json")
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))["summary"]
+    assert summary["fatal_error"] is not None
+    assert "preflight" in summary["fatal_error"]
+    assert summary["goals_attempted"] == 0
 
 
 def test_read_reviewed_from_jsonl_extracts_first_half(tmp_path):

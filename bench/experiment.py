@@ -52,8 +52,13 @@ _SRC_DIR = _REPO_ROOT / "src"
 sys.path.insert(0, str(_SRC_DIR))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import harvester  # noqa: E402
+# Import order matters: `import launcher` must precede `import harvester`
+# because harvester.py does its own `sys.path.insert(0, src_dir)` at module
+# load, which shadows bench/launcher.py with src/launcher.py (the main
+# agent launcher script, which has no LauncherProcess class). Loading
+# bench/launcher first pins it into sys.modules before harvester runs.
 import launcher   # noqa: E402
+import harvester  # noqa: E402
 import snapshot   # noqa: E402
 from trial import run_trial  # noqa: E402
 
@@ -226,6 +231,83 @@ def _open_session():
     return zenoh.open(make_localhost_config())
 
 
+def _preflight_shutdown_external_launcher(
+    character: str,
+    *,
+    shutdown_timeout: float = 30.0,
+    poll_interval: float = 1.0,
+) -> bool:
+    """If a launcher for `character` is already running (started by
+    someone other than this runner), send the standard Zenoh shutdown
+    signal and wait for it to go down.
+
+    Returns True if no external launcher was running OR one was running
+    and came down cleanly. Returns False if a launcher was running and
+    did not come down within the timeout. Tests monkeypatch this.
+    """
+    if not snapshot.is_launcher_running(character, timeout=1.0):
+        return True
+
+    print(
+        f"preflight: external launcher detected for '{character}'; "
+        f"sending Zenoh shutdown signal",
+        file=sys.stderr,
+    )
+    try:
+        import zenoh  # noqa: WPS433
+        from utils.zenoh_utils import make_localhost_config  # noqa: WPS433
+    except ImportError:
+        print("preflight: zenoh import failed; cannot signal shutdown",
+              file=sys.stderr)
+        return False
+
+    try:
+        session = zenoh.open(make_localhost_config())
+    except Exception as e:
+        print(f"preflight: zenoh open failed: {e}", file=sys.stderr)
+        return False
+
+    try:
+        payload = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "source": "bench-experiment-preflight",
+            "mode": "save_and_shutdown",
+        }
+        session.put(
+            "cognitive/launcher/shutdown",
+            json.dumps(payload).encode("utf-8"),
+        )
+    except Exception as e:
+        print(f"preflight: shutdown put failed: {e}", file=sys.stderr)
+        try:
+            session.close()
+        except Exception:
+            pass
+        return False
+
+    try:
+        session.close()
+    except Exception:
+        pass
+
+    deadline = time.monotonic() + shutdown_timeout
+    while time.monotonic() < deadline:
+        if not snapshot.is_launcher_running(character, timeout=1.0):
+            print(
+                f"preflight: external launcher for '{character}' is down",
+                file=sys.stderr,
+            )
+            return True
+        time.sleep(poll_interval)
+
+    print(
+        f"preflight: external launcher for '{character}' did NOT stop "
+        f"within {shutdown_timeout}s",
+        file=sys.stderr,
+    )
+    return False
+
+
 # ──────────────────────────────────────────────────────────────────────
 # Runner
 # ──────────────────────────────────────────────────────────────────────
@@ -267,8 +349,24 @@ def run_experiment(
             with open(out_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(rec, default=str) + "\n")
 
+    # Preflight: if an externally-started launcher is already running for
+    # this character, ask it to shut down via the standard Zenoh signal
+    # before we try to snapshot/restore. Our LauncherProcess instance can't
+    # stop a process it didn't start, so without this step the first
+    # snapshot.restore() would fail its liveness check.
+    if not _preflight_shutdown_external_launcher(character):
+        fatal_error = (
+            f"preflight: external launcher for '{character}' did not "
+            f"shut down when signaled — aborting before first reset"
+        )
+
     try:
-        for idx, goal_ref in enumerate(plan["goals"]):
+        if fatal_error:
+            # Skip the main loop but let the finally+summary block run.
+            plan_goals_iter: List[str] = []
+        else:
+            plan_goals_iter = plan["goals"]
+        for idx, goal_ref in enumerate(plan_goals_iter):
             reset = plan["per_goal_reset"][goal_ref]
             protocol = plan["per_goal_protocol"][goal_ref]
             bounce_start = time.monotonic()
