@@ -26,7 +26,7 @@ Usage:
 
     python bench/baseline.py create \\
         --label baseline-empty \\
-        --goals-file bench/goals-infolab-bench.yaml
+        --goals-file bench/goals-benchlab.yaml
 
 Requires the launcher to be stopped before invocation. Refuses to
 proceed if a launcher is already running (to avoid clobbering live
@@ -56,8 +56,8 @@ import launcher   # noqa: E402
 import snapshot   # noqa: E402
 
 DEFAULT_CHARACTER = "Jill"
-DEFAULT_WORLD = "infolab"
-DEFAULT_SCENARIO = "jill-infospace-bench.yaml"
+DEFAULT_WORLD = "benchlab"
+DEFAULT_SCENARIO = "jill-benchlab.yaml"
 DEFAULT_READY_TIMEOUT_S = 120.0
 DEFAULT_GOAL_ADD_TIMEOUT_S = 5.0
 

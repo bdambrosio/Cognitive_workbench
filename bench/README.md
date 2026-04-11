@@ -282,7 +282,7 @@ snapshot.
 ```bash
 python bench/baseline.py create \
     --label baseline-empty \
-    --goals-file bench/goals-infolab-bench.yaml
+    --goals-file bench/goals-benchlab.yaml
 ```
 
 Prerequisites:
@@ -292,7 +292,7 @@ Prerequisites:
   semantics (default: `run=False`). The `_cmd_goal_add` handler in
   `executive_node.py` returns `"Goal <goal_id> created"` without
   starting the goal on the worker thread.
-- The goals YAML file (`bench/goals-infolab-bench.yaml`) is the
+- The goals YAML file (`bench/goals-benchlab.yaml`) is the
   canonical taskset definition. Edit it to change goals; re-run
   `baseline.py create` afterward to rebuild.
 
@@ -311,7 +311,7 @@ Rebuild any time you change the goal set or want a truly clean start:
 ```bash
 python bench/snapshot.py delete baseline-empty
 python bench/baseline.py create --label baseline-empty \
-    --goals-file bench/goals-infolab-bench.yaml
+    --goals-file bench/goals-benchlab.yaml
 ```
 
 ### Why not a manual baseline procedure?

@@ -32,7 +32,7 @@ Or imperatively:
     proc.stop()
 
 Requires the zenoh_venv interpreter and a sensor-free scenario YAML
-(scenarios/jill-infospace-bench.yaml is the default).
+(scenarios/jill-benchlab.yaml is the default).
 """
 from __future__ import annotations
 
@@ -52,7 +52,7 @@ _SRC_DIR = _REPO_ROOT / "src"
 sys.path.insert(0, str(_SRC_DIR))
 
 DEFAULT_VENV_PYTHON = _REPO_ROOT / "zenoh_venv" / "bin" / "python3"
-DEFAULT_SCENARIO = "jill-infospace-bench.yaml"
+DEFAULT_SCENARIO = "jill-benchlab.yaml"
 DEFAULT_CHARACTER = "Jill"
 DEFAULT_READY_TIMEOUT_S = 60.0
 DEFAULT_SHUTDOWN_TIMEOUT_S = 30.0

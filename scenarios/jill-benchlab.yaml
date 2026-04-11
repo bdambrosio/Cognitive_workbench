@@ -1,18 +1,17 @@
-# Cognitive Workbench Configuration — BENCHMARK VARIANT
+# Cognitive Workbench Configuration — BENCHMARK WORLD
 #
-# This is a sensor-free copy of jill-infospace.yaml used by the bench/
-# experiment harness. It removes:
-#   - All sensors (rss-watcher, browser-visits, obsidian-clipper) so
-#     nothing fires on its own and contaminates trial measurements
-#   - The jill-offline delegated worker (one less moving part to control
-#     in cross-validation experiments)
+# This scenario runs Jill in a dedicated `benchlab` world that is
+# completely isolated from the `infolab` world used for interactive
+# use. State lives under scenarios/benchlab/, not scenarios/infolab/,
+# so bench baseline rebuilds and interactive Jill sessions never step
+# on each other.
 #
-# Everything else (world, llm, setting, Jill's character / capabilities /
-# seed_concerns) is identical to jill-infospace.yaml so the same agent
-# context applies.
+# Sensor-free by design — the bench harness drives goals explicitly
+# via /goal run commands and any spontaneous sensor trigger would
+# contaminate trial measurements.
 
 world_config:
-  world_name: "infolab"
+  world_name: "benchlab"
 
 llm_config:
   sgl_model_path: "unsloth/Qwen3-Coder-Next-FP8"

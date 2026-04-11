@@ -5,9 +5,9 @@ The cross-validation experiment harness needs to save the agent's persistent
 state to a labeled snapshot, run trials that mutate it, then restore back
 to the snapshot. This module provides those primitives.
 
-Snapshot scope (for character "Jill" in world "infolab"):
+Snapshot scope (for character "Jill" in world <W>, e.g. "benchlab"):
 
-  scenarios/infolab/resources/Jill/
+  scenarios/<W>/resources/Jill/
     world_model.json          ← persistent facts and tool contracts
     world_model.json.bak      ← backup file
     resources.json            ← all named notes incl. _situation, scheduled goals
@@ -16,11 +16,16 @@ Snapshot scope (for character "Jill" in world "infolab"):
     cognitive_graph.json      ← cognitive graph nodes/edges
     cognitive_graph.faiss     ← graph embedding index
     entity_index.json         ← entity index
-    infolab_notes.index.faiss
-    infolab_notes.index.meta
-    infolab_collections.index.faiss
-    infolab_collections.index.meta
+    <W>_notes.index.faiss     ← FAISS index names are world-parameterized
+    <W>_notes.index.meta         by infospace_resource_manager
+    <W>_collections.index.faiss
+    <W>_collections.index.meta
     planner_history/          ← compressed_trace.jsonl + reflection_frame.jsonl
+
+The FAISS index filenames are parameterized by the resource manager
+(`{world_name}_notes.index.*`), so the `_SNAPSHOT_FILE_TEMPLATES`
+list below uses a `{world}` placeholder that's substituted at
+snapshot/restore time to get the concrete filename for the target world.
 
 This is the complete persistent state for one character in one world.
 Anything else (logs, generated goal_plan_*.py / goal_review_*.md / goal_trace_*.txt
@@ -34,11 +39,11 @@ the snapshot module itself), use --force.
 
 Usage:
 
-  python bench/snapshot.py snapshot baseline-clean
-  python bench/snapshot.py restore  baseline-clean
+  python bench/snapshot.py snapshot baseline-empty
+  python bench/snapshot.py restore  baseline-empty
   python bench/snapshot.py list
-  python bench/snapshot.py describe baseline-clean
-  python bench/snapshot.py delete   baseline-clean
+  python bench/snapshot.py describe baseline-empty
+  python bench/snapshot.py delete   baseline-empty
 """
 from __future__ import annotations
 
@@ -57,13 +62,16 @@ _SRC_DIR = _REPO_ROOT / "src"
 sys.path.insert(0, str(_SRC_DIR))
 
 DEFAULT_CHARACTER = "Jill"
-DEFAULT_WORLD = "infolab"
+DEFAULT_WORLD = "benchlab"
 SNAPSHOTS_DIR = _REPO_ROOT / "bench" / "snapshots"
 
-# Files to snapshot, relative to the character's resource directory.
-# Files marked optional=True are skipped if they don't exist (e.g.
-# resources.json~ which is created lazily by the resource manager).
-_SNAPSHOT_FILES = [
+# File-name templates to snapshot, relative to the character's resource
+# directory. `{world}` is substituted with the actual world name at
+# snapshot/restore time (the resource manager names FAISS indexes by
+# world). Tuple is (name_template, optional). Files marked optional=True
+# are skipped if they don't exist at snapshot time (e.g. resources.json~
+# which is created lazily).
+_SNAPSHOT_FILE_TEMPLATES = [
     ("world_model.json", False),
     ("world_model.json.bak", True),
     ("resources.json", False),
@@ -72,14 +80,22 @@ _SNAPSHOT_FILES = [
     ("cognitive_graph.json", True),
     ("cognitive_graph.faiss", True),
     ("entity_index.json", True),
-    ("infolab_notes.index.faiss", True),
-    ("infolab_notes.index.meta", True),
-    ("infolab_collections.index.faiss", True),
-    ("infolab_collections.index.meta", True),
+    ("{world}_notes.index.faiss", True),
+    ("{world}_notes.index.meta", True),
+    ("{world}_collections.index.faiss", True),
+    ("{world}_collections.index.meta", True),
 ]
 _SNAPSHOT_DIRS = [
     "planner_history",  # compressed_trace.jsonl, reflection_frame.jsonl
 ]
+
+
+def _snapshot_files_for_world(world: str) -> List[tuple]:
+    """Resolve _SNAPSHOT_FILE_TEMPLATES against the target world name."""
+    return [
+        (tpl.format(world=world), optional)
+        for tpl, optional in _SNAPSHOT_FILE_TEMPLATES
+    ]
 
 
 def _resource_dir(world: str, character: str) -> Path:
@@ -169,7 +185,7 @@ def snapshot(
     captured: List[str] = []
     skipped: List[str] = []
 
-    for fname, optional in _SNAPSHOT_FILES:
+    for fname, optional in _snapshot_files_for_world(world):
         srcfile = src / fname
         if not srcfile.exists():
             if optional:
@@ -270,7 +286,7 @@ def restore(
     restored: List[str] = []
 
     # Files: copy each snapshot file back, overwriting whatever's there.
-    for fname, _optional in _SNAPSHOT_FILES:
+    for fname, _optional in _snapshot_files_for_world(world):
         snapfile = snap_dir / fname
         if not snapfile.exists():
             continue

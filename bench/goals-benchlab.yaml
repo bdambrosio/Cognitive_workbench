@@ -1,14 +1,18 @@
-# Cognitive Workbench benchmark goal set — infolab scenario
+# Cognitive Workbench benchmark goal set — benchlab world
 #
 # Canonical definitions for the G01..G10 taskset used by the bench
 # experiment harness. `bench/baseline.py` consumes this file to seed a
 # fresh Jill before taking the `baseline-empty` snapshot: it sends one
-# `/goal add` per entry (create-only — the agent-side semantic is now
+# `/goal add` per entry (create-only — the agent-side semantic is
 # create-without-run) and then `/goal rename` to assign the human label.
 #
 # Goal texts are taken from docs/plan-review-eval-taskset.md. Edit here
 # to change the taskset; re-run `bench/baseline.py create` afterward to
 # rebuild the baseline snapshot.
+#
+# This goal set runs in the isolated `benchlab` world
+# (scenarios/benchlab/) so bench rebuilds never touch the `infolab`
+# world used for interactive Jill.
 
 goals:
   - name: G01

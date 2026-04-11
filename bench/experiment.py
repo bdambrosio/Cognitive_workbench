@@ -63,8 +63,9 @@ import snapshot   # noqa: E402
 from trial import run_trial  # noqa: E402
 
 DEFAULT_CHARACTER = "Jill"
+DEFAULT_WORLD = "benchlab"
 DEFAULT_BASELINE_LABEL = "baseline-empty"
-DEFAULT_SCENARIO = "jill-infospace-bench.yaml"
+DEFAULT_SCENARIO = "jill-benchlab.yaml"
 DEFAULT_RUN_TIMEOUT_S = 30 * 60
 
 TRIAL_A = "A"
@@ -514,7 +515,7 @@ def run_experiment(
     plan: Dict[str, Any],
     *,
     character: str = DEFAULT_CHARACTER,
-    world: str = "infolab",
+    world: str = DEFAULT_WORLD,
     out_path: Optional[Path] = None,
     scenario: str = DEFAULT_SCENARIO,
     run_timeout: float = DEFAULT_RUN_TIMEOUT_S,
