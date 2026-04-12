@@ -45,9 +45,8 @@ goals:
 
   - name: G05
     text: >-
-      Search Semantic Scholar for papers on "retrieval augmented generation" published after 2023.
-      Filter to papers with more than 50 citations.
-      Create a Collection of the filtered results.
+      Search Semantic Scholar for 5 recent papers on "retrieval augmented generation".
+      Create a Collection containing the results.
 
   - name: G06
     text: >-
