@@ -6472,7 +6472,12 @@ class ZenohExecutiveNode:
         interpret → envision → chat three-call pipeline).
         Assessment is provided by the Orient stage of the OODA pipeline.
         """
-        self.conversation_store.record_incoming(source, text)
+        # Don't record user-entered slash commands in the conversation
+        # history. Commands are operational, not conversational, and
+        # including them pollutes the recent-dialog context that chat
+        # LLM prompts are built from.
+        if not text.lstrip().startswith('/'):
+            self.conversation_store.record_incoming(source, text)
 
         # Build system prompt (character + setting + capabilities + drives + agent state)
         system_prompt = self._update_system_prompt()
@@ -6577,6 +6582,13 @@ class ZenohExecutiveNode:
         )
 
         try:
+            # Stop sequences include the character name and "User:" to
+            # catch the failure mode where the LLM continues the
+            # RECENT DIALOG format instead of producing a fresh reply.
+            # When the model tries to emit "\nJill:" or "\nUser:", we
+            # cut it off immediately rather than letting it hallucinate
+            # a whole fake conversation turn.
+            self_turn_marker = f"\n{self.character_name}:"
             result = self.llm_generate(
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -6584,19 +6596,31 @@ class ZenohExecutiveNode:
                 ],
                 max_tokens=400,
                 temperature=0.7,
-                stops=["</end>"],
+                stops=["</end>", self_turn_marker, "\nUser:"],
             )
             if result.success and result.text:
                 response = result.text
-                # Truncate at </end or prompt-echo markers
+                # Truncate at </end> or prompt-echo markers. Includes
+                # the runtime character-name marker as a belt-and-
+                # suspenders to the stop sequence above.
                 for marker in ('</end>', '</end', '\nUSER:', '\nASSISTANT:',
                                '\n## ORIENTATION', '\nRECENT DIALOG:',
                                '\n#Objectives', '\n#Constraints', '\n#Format',
-                               '\nMessage from '):
+                               '\nMessage from ',
+                               self_turn_marker, '\nUser:'):
                     idx = response.find(marker)
                     if idx >= 0:
                         response = response[:idx]
                 response = response.strip()
+                # Strip a leading "Jill:" / "Jill: " self-prefix the
+                # model sometimes emits when echoing the dialog format.
+                # Breaks the self-reinforcing loop where a prefixed
+                # response gets recorded into conversation_store and
+                # then double-prefixed ("Jill: Jill: ...") on the next
+                # turn's RECENT DIALOG render.
+                _self_prefix = f"{self.character_name}:"
+                while response.startswith(_self_prefix):
+                    response = response[len(_self_prefix):].lstrip()
                 if not response:
                     logger.warning('Chat response empty after cleaning')
                 else:
