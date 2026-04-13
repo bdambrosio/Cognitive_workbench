@@ -85,32 +85,9 @@ if not logger.handlers:
 # ── Self-model data helpers (thin wrappers, fail silently) ────────────────
 
 def _safe_get_scheduler_status(executor: InfospaceExecutor) -> dict:
-    try:
-        en = getattr(executor, 'executive_node', None)
-        if en and hasattr(en, 'goal_scheduler'):
-            return en.goal_scheduler.get_status()
-    except Exception:
-        pass
+    """Goal scheduler removed — returns empty dict for compatibility."""
     return {}
 
-def _safe_get_all_tasks(executor: InfospaceExecutor) -> list:
-    """Read all task WIP notes (establishing + operational) as parsed dicts."""
-    try:
-        rm = getattr(executor, 'resource_manager', None)
-        if not rm:
-            return []
-        tasks = []
-        for name, note_id in list(rm.named_notes.items()):
-            if not name.startswith('_task_wip_'):
-                continue
-            res = rm.get_resource(note_id)
-            content = getattr(res, 'content', '') if res else ''
-            if content:
-                import json as _json
-                tasks.append(_json.loads(content))
-        return tasks
-    except Exception:
-        return []
 
 def _safe_get_scheduled_goals(executor: InfospaceExecutor) -> list:
     try:
@@ -3061,7 +3038,7 @@ ALWAYS follow all formatting instructions exactly.
                     from ooda_snapshot_renderer import render_self_model_section
                     self_model = render_self_model_section(
                         scheduler_status=_safe_get_scheduler_status(executor),
-                        tasks=_safe_get_all_tasks(executor),
+                        tasks=[],
                         derived_concerns=_dc,
                         scheduled_goals=_safe_get_scheduled_goals(executor),
                         sensor_configs=_safe_get_sensor_configs(executor),
@@ -4147,7 +4124,7 @@ ALWAYS follow all formatting instructions exactly.
                 from ooda_snapshot_renderer import render_self_model_section
                 self_model = render_self_model_section(
                     scheduler_status=_safe_get_scheduler_status(executor),
-                    tasks=_safe_get_all_tasks(executor),
+                    tasks=[],
                     derived_concerns=_dc,
                     scheduled_goals=_safe_get_scheduled_goals(executor),
                     sensor_configs=_safe_get_sensor_configs(executor),

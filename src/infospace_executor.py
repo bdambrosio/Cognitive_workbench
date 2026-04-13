@@ -3518,6 +3518,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         Produce output (agent speech/communication).
 
+        Signals the OODA planner, which owns all user-facing communication.
+        The planner's default policy is passthrough (forward as-is).
+
         Required: type, value
         Optional: target (default: "user")
         """
@@ -3537,77 +3540,18 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if target.lower() == 'user':
             target = 'User'
 
-        # Suppress public say during task establishment milestones.
-        # These are internal planner observations, not user conversation.
-        # Capture in WIP activity log instead of broadcasting.
-        if (self.executive_node
-                and getattr(self.executive_node, 'active_task_wip', None)
-                and getattr(self.executive_node, 'active_task_wip_waiting', False)):
-            logger.info(f"Say [{target}] (task-internal, suppressed): {value_str[:120]}")
-            # Store in a WIP activity buffer for Task Manager inspection
-            if not hasattr(self.executive_node, '_task_wip_activity_log'):
-                self.executive_node._task_wip_activity_log = []
-            self.executive_node._task_wip_activity_log.append({
-                'timestamp': datetime.now().isoformat(),
-                'text': value_str[:500],
-            })
-            # Cap the buffer
-            if len(self.executive_node._task_wip_activity_log) > 50:
-                self.executive_node._task_wip_activity_log = self.executive_node._task_wip_activity_log[-30:]
-            return self._create_uniform_return('success', value=value_str)
-
-        # Send message to target's sense_data (mirrors physical space send_text_input)
-        content_payload = {'source': self.agent_name, 'text': value_str}
-        if action.get('close'):
-            content_payload['close'] = True
-        sense_data = {
-            'timestamp': datetime.now().isoformat(),
-            'sequence_id': 0,
-            'mode': 'text',
-            'content': json.dumps(content_payload)
-        }
-        
-        self.session.put(
-            f"cognitive/{target}/sense_data",
-            json.dumps(sense_data)
-        )
-        
-        # Also publish to action channel for UI display
-        action_data = {
-            'type': 'say',
-            'action_type': 'say',
-            'action_id': f'action_{self.executive_node.action_counter}',
-            'timestamp': datetime.now().isoformat(),
-            'text': value_str,
-            'source': self.agent_name,
-            'target': target,
-            'is_text_only': True
-        }
-        self.executive_node.action_publisher.put(json.dumps(action_data))
-        self.executive_node.action_counter += 1
-        if hasattr(self.executive_node, 'last_say_text'):
-            self.executive_node.last_say_text = value_str
-        if hasattr(self.executive_node, 'conversation_store') and self.executive_node.conversation_store:
-            self.executive_node.conversation_store.record_outgoing(
-                target=target,
+        # Signal the OODA planner (which handles Zenoh publish, conversation
+        # recording, action channel, dialog management).
+        ooda = getattr(self.executive_node, 'ooda_planner', None)
+        if ooda:
+            ooda.handle_goal_say(
                 text=value_str,
-                act_type='say',
-                close=bool(action.get('close'))
+                target=target,
+                close=bool(action.get('close')),
             )
-        
-        logger.info(f"Say [{target}]: {value_str}")
-        
-        # If close flag set, close our own dialog with the target and set cooldown
-        if action.get('close') and target.lower() != 'user':
-            try:
-                if hasattr(self.executive_node, 'conversation_store') and self.executive_node.conversation_store:
-                    self.executive_node.conversation_store.close_dialog(target)
-                self.executive_node._dialog_cooldowns[target] = time.time()
-                self.executive_node._dialog_purposes.pop(target, None)
-                logger.info(f"Say [{target}]: dialog closed (close flag)")
-            except Exception as e:
-                logger.warning(f"Say close_dialog failed for {target}: {e}")
-        
+        else:
+            logger.warning(f"Say [{target}]: no ooda_planner, message lost: {value_str[:120]}")
+
         # Return truncated message text, no resource_id
         return self._create_uniform_return('success', value=value_str, resource_id=None)
     
@@ -3639,21 +3583,18 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # Return truncated thought text, resource_id if Note was created
         return self._create_uniform_return('success', value=str(value), resource_id=resource_id)
     
-    _ASK_TIMEOUT_SECONDS = 300  # 5 minutes
-
     def _execute_ask(self, action: Dict) -> Dict:
         """
         Ask target a question and block until a response arrives.
 
-        The planner thread blocks on executive_node._ask_response_queue.  The
-        main loop (OODA tick) detects ``awaiting_ask_response`` and routes the
-        next User message into that queue, unblocking this method.  All planner
-        state (bindings, step count, reasoning context) is preserved.
+        Signals the OODA planner, which owns all user-facing communication.
+        The planner publishes the question and blocks until the user responds
+        (or timeout). All planner state (bindings, step count, reasoning
+        context) is preserved while blocking.
 
         In benchmark_mode, User-targeted asks are answered immediately with a
         canned "use your best judgment" reply so unattended experiment runs
-        don't stall on planner ASK_USER. Sandbox guards (exec-script) skip
-        this path entirely by checking benchmark_mode at their own call site.
+        don't stall on planner ASK_USER.
 
         Required: value
         Optional: target (defaults to 'User'), out
@@ -3667,8 +3608,6 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         target = action.get('target', 'User')
 
         # ── benchmark_mode: canned reply for User-targeted asks ────────
-        # Reserved for unattended bench runs. Non-User asks (multi-agent
-        # flows) still go through the normal blocking path.
         benchmark_mode = bool(
             getattr(getattr(self, "executive_node", None), "benchmark_mode", False)
         )
@@ -3678,7 +3617,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 "possible. I trust your decision."
             )
             logger.info(
-                f"❓ Ask (benchmark_mode): returning canned reply without "
+                f"Ask (benchmark_mode): returning canned reply without "
                 f"blocking. Question: {str(question_text)[:120]}"
             )
             note_id = self._persist_note(canned_reply, source_context='ask_response')
@@ -3690,70 +3629,23 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 'success', value=canned_reply, resource_id=note_id,
             )
 
-        # --- Signal BEFORE publishing ---
-        # Set awaiting_ask_response BEFORE publishing the ask action to prevent
-        # a race where the reply arrives (via Zenoh → sense_data → text_input_queue)
-        # before the flag is set, causing the main loop to misclassify it as chat.
-        self.executive_node.awaiting_ask_response = True
-        self.executive_node.execution_paused = True
-        self.executive_node._publish_execution_state()
-
-        # Drain any stale items from a previous interrupted ask
-        while not self.executive_node._ask_response_queue.empty():
-            try:
-                self.executive_node._ask_response_queue.get_nowait()
-            except queue.Empty:
-                break
-
-        # NOW publish the ask action (after flag is set and queue is drained)
-        action_data = {
-            'type': 'ask',
-            'action_type': 'ask',
-            'action_id': f'action_{self.executive_node.action_counter}',
-            'timestamp': datetime.now().isoformat(),
-            'text': str(question_text),
-            'source': self.agent_name,
-            'target': target,
-            'is_text_only': True
-        }
-        self.executive_node.action_publisher.put(json.dumps(action_data))
-        self.executive_node.action_counter += 1
-        if hasattr(self.executive_node, 'conversation_store') and self.executive_node.conversation_store:
-            self.executive_node.conversation_store.record_outgoing(
-                target=target,
-                text=str(question_text),
-                act_type='ask',
-                close=False
-            )
-
-        # For non-User targets, also send question to target's sense_data so they actually hear it
-        if target != 'User':
-            sense_data = {
-                'timestamp': datetime.now().isoformat(),
-                'sequence_id': 0,
-                'mode': 'text',
-                'content': json.dumps({'source': self.agent_name, 'text': str(question_text)})
-            }
-            self.session.put(f"cognitive/{target}/sense_data", json.dumps(sense_data))
-
+        # Signal the OODA planner — blocks until user responds or timeout
         display_var = self._normalize_var_for_log(out_var) if out_var else None
-        logger.info(f"❓ Ask: '{question_text}' → blocking for response (timeout={self._ASK_TIMEOUT_SECONDS}s)")
+        logger.info(f"Ask: '{question_text}' -> signaling ooda_planner for response")
 
-        try:
-            response_text = self.executive_node._ask_response_queue.get(
-                timeout=self._ASK_TIMEOUT_SECONDS
+        ooda = getattr(self.executive_node, 'ooda_planner', None)
+        if ooda:
+            response_text = ooda.handle_goal_ask(
+                question_text=str(question_text),
+                target=target,
             )
-        except queue.Empty:
-            response_text = None  # Timeout
-
-        # Clear blocking state
-        self.executive_node.awaiting_ask_response = False
-        self.executive_node.execution_paused = False
-        self.executive_node._publish_execution_state()
+        else:
+            logger.warning("Ask: no ooda_planner available, failing")
+            response_text = None
 
         # None sentinel = timeout or interrupt
         if response_text is None:
-            logger.info(f"❓ Ask: timed out or interrupted waiting for response")
+            logger.info("Ask: timed out or interrupted waiting for response")
             if out_var:
                 self._bind_variable(out_var, "Note_null")
             return self._create_uniform_return(
@@ -3762,7 +3654,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             )
 
         # Create a Note with the user's response and bind to out var
-        logger.info(f"❓ Ask: received response ({len(response_text)} chars)")
+        logger.info(f"Ask: received response ({len(response_text)} chars)")
         note_id = self._persist_note(
             response_text, source_context='ask_response',
         )
@@ -3771,7 +3663,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
 
         if out_var:
             self._bind_variable(out_var, note_id)
-            logger.info(f"❓ Ask: bound {display_var}={note_id}")
+            logger.info(f"Ask: bound {display_var}={note_id}")
 
         return self._create_uniform_return(
             'success', value=str(response_text), resource_id=note_id,

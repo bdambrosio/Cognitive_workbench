@@ -503,13 +503,7 @@ def _handle_query(session, character: str, data: dict, state: dict):
             if dialog:
                 parts.append(f"{C.CYAN}in dialog{C.RESET}")
             print(f"  {', '.join(parts)}")
-            scheduler = agent_state.get('goal_scheduler', {})
-            if scheduler:
-                running = scheduler.get('executing_goal_id')
-                if running:
-                    print(f"  {C.CYAN}Running goal: {running}{C.RESET}")
-                else:
-                    print(f"  No goal running")
+            # Goal scheduler removed — goal running state shown via execution_state
         else:
             print(f"  {C.DIM}(no state received yet){C.RESET}")
 
@@ -983,10 +977,10 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
             data = json.loads(sample.payload.to_bytes().decode('utf-8'))
             with state_lock:
                 prev = state['agent_state']
-                prev_goal = prev.get('goal_scheduler', {}).get('executing_goal_id')
+                prev_goal = prev.get('executing_goal_id')
                 prev_dialog = prev.get('active_dialog', False)
                 state['agent_state'].update(data)
-                curr_goal = (data.get('goal_scheduler') or {}).get('executing_goal_id')
+                curr_goal = data.get('executing_goal_id')
                 curr_dialog = data.get('active_dialog', False)
                 curr_paused = data.get('paused', False)
                 # Detect goal start: clear say dedup so replayed plans can re-display
