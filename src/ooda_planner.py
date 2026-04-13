@@ -148,10 +148,12 @@ GOOD: "Search for Berkeley CA 3-day weather forecast using search-web. \
 Create a Note with temperature ranges and precipitation probability. \
 The user prefers concise bullet-point summaries."
 
-**Share results with the user.** The user cannot see your Notes. When a \
-goal completes for a user-facing concern, your next action should be \
-say — tell the user what you found, with the key facts, not just \
-"goal completed." Then mark the concern satisfied.
+**Share results with the user immediately.** The user cannot see your \
+Notes. When a goal just completed (shown in the Current Event section), \
+your FIRST action must be say — tell the user what you found, with the \
+key facts. Do not reflect, do not work on other concerns first. The \
+user asked a question and is waiting for the answer. Then on the next \
+cycle, mark the concern satisfied.
 
 The full pattern: submit-goal → (goal runs) → goal completes → \
 say (share findings) → update-concern (mark satisfied).
