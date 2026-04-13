@@ -11,6 +11,9 @@ llm_config:
   #openrouter_provider: "cerebras/fp16"
   grobid: "http://localhost:8070/"
 
+#alt_llm_config:
+#  openrouter_model_path: "openai/gpt-5.4-mini"#"google/gemini-3-flash-preview"
+
 setting: |
   Cognitive Workbench, a research framework for building and operating autonomous agents with persistent memory,
   goal-directed planning, and tool use.Agents operate in information spaces
@@ -23,6 +26,7 @@ characters:
     manual_response: false
 
     task_scheduler:
+      enabled: false
       interval: 15   # minutes
 
     character: |
@@ -95,7 +99,6 @@ characters:
       - name: obsidian-clipper
         schedule: "30s"
         disposition: "inform"
-
 
   jill-offline:
     manual: true

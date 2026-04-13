@@ -76,6 +76,44 @@ goals:
       Identify papers or sources that appear in both result sets.
       Create a Note listing the overlapping sources.
 
+  - name: G11
+    text: >-
+      Given the question "How do current LLM agents handle long-horizon planning?",
+      decompose it into 3-4 sub-questions, search Semantic Scholar for each, and create a
+      Collection of relevant papers organized by sub-question.
+
+  - name: G12
+    text: >-
+      Load the existing Notes named 'rlhf-reward-modeling', 'rlhf-ppo-training',
+      'rlhf-dpo-alternatives', 'rlhf-human-preferences', and 'rlhf-alignment-tax'. Synthesize
+      a 500-word essay connecting them. Create a Note with the essay.
+
+  - name: G13
+    text: >-
+      Given the claim "Vision transformers outperform CNNs on all image classification
+      benchmarks as of 2024", search Semantic Scholar and the web for supporting and
+      contradicting evidence. Create a Note with a verdict and an evidence summary.
+
+  - name: G14
+    text: >-
+      Given the topic "mechanistic interpretability", find 5 foundational papers and
+      5 recent papers (2024 or later) on Semantic Scholar. For each, extract a one-sentence
+      summary. Create a Note formatted as an annotated reading list, ordered from foundational
+      to recent.
+
+  - name: G15
+    text: >-
+      Search Semantic Scholar for papers describing RLHF, DPO, and KTO alignment
+      methods. For each method, extract its training signal, computational cost, and known
+      failure modes. Create a Note with a structured comparison.
+
+  - name: G16
+    text: >-
+      Search Semantic Scholar for papers on tool use in language models from
+      2023-2024. Extract what capabilities are covered. Compare against the existing Note
+      named 'desired-tool-capabilities'. Create a Note identifying gaps not yet addressed in
+      the literature.
+
 
 # Seed notes: Notes that certain goals depend on already existing in
 # the infospace. `baseline.py` creates each of these as a persistent,
@@ -91,3 +129,21 @@ goals:
 seed_notes:
   - name: scaling-laws-mixed
     content_file: bench/seed-notes/scaling-laws-mixed.md
+
+  - name: rlhf-reward-modeling
+    content_file: bench/seed-notes/rlhf-reward-modeling.md
+
+  - name: rlhf-ppo-training
+    content_file: bench/seed-notes/rlhf-ppo-training.md
+
+  - name: rlhf-dpo-alternatives
+    content_file: bench/seed-notes/rlhf-dpo-alternatives.md
+
+  - name: rlhf-human-preferences
+    content_file: bench/seed-notes/rlhf-human-preferences.md
+
+  - name: rlhf-alignment-tax
+    content_file: bench/seed-notes/rlhf-alignment-tax.md
+
+  - name: desired-tool-capabilities
+    content_file: bench/seed-notes/desired-tool-capabilities.md
