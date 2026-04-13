@@ -148,15 +148,11 @@ GOOD: "Search for Berkeley CA 3-day weather forecast using search-web. \
 Create a Note with temperature ranges and precipitation probability. \
 The user prefers concise bullet-point summaries."
 
-**Share results with the user immediately.** The user cannot see your \
-Notes. When a goal just completed (shown in the Current Event section), \
-your FIRST action must be say — tell the user what you found, with the \
-key facts. Do not reflect, do not work on other concerns first. The \
-user asked a question and is waiting for the answer. Then on the next \
-cycle, mark the concern satisfied.
-
-The full pattern: submit-goal → (goal runs) → goal completes → \
-say (share findings) → update-concern (mark satisfied).
+**Results are auto-shared.** When a goal completes successfully, the \
+system automatically tells the user the result. You do not need to \
+say the result yourself. After a goal completes, your job is to \
+update-concern (mark satisfied if the result was adequate, or plan a \
+follow-up if it wasn't).
 
 **Manage concerns actively.** After a successful goal, mark the \
 motivating concern as satisfied. If a goal failed or only partially \
@@ -769,15 +765,28 @@ class OodaPlanner:
     def inject_goal_completion(self, goal_result: Dict[str, Any]) -> None:
         """Called by executive_node when a goal completes.
 
-        The result is stored and injected into the next OODA cycle's
-        current_event context.
+        Automatically shares successful results with the user (the user
+        can't see Notes). The result is also stored for the next OODA
+        cycle's context so the planner can update concerns.
         """
         self._pending_goal_result = goal_result
+        status = goal_result.get('status', '?')
+        goal_text = goal_result.get('goal_text', '?')
+        result_summary = goal_result.get('result_summary', '')
+
         logger.info(
-            f"OODA planner: goal completion queued — "
-            f"{goal_result.get('status', '?')}: "
-            f"{goal_result.get('goal_text', '?')[:80]}"
+            f"OODA planner: goal completion — "
+            f"{status}: {goal_text[:80]}"
         )
+
+        # Auto-share successful results with the user
+        if status in ('completed', 'success') and result_summary:
+            # Truncate to a reasonable length for chat
+            share_text = result_summary[:500]
+            if len(result_summary) > 500:
+                share_text += "..."
+            self.say_to_user(share_text)
+            logger.info(f"OODA planner: auto-shared goal result with user")
 
     def get_recent_activity_summary(self, n: int = 5) -> str:
         """Return compact summary of recent OODA cycles for chat context.
