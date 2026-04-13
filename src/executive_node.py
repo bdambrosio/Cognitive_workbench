@@ -959,6 +959,9 @@ class ZenohExecutiveNode:
             conversation_store=self.conversation_store,
             executive_node=self,
         )
+        # Load prior session state (history) if available
+        if self.infospace_executor:
+            self.ooda_planner.load_state(self.infospace_executor)
 
         from user_concern_model import UserConcernModel
         self.user_concern_model = UserConcernModel(
@@ -9782,6 +9785,14 @@ class ZenohExecutiveNode:
                 logger.info(f'🏷 Saved entity index for {self.character_name}')
             except Exception as e:
                 logger.debug(f'Entity index save during shutdown failed: {e}')
+
+            # Save OODA planner state (history for cross-session continuity)
+            try:
+                if hasattr(self, 'ooda_planner'):
+                    self.ooda_planner.save_state(self._write_named_note)
+                    logger.info(f'🧠 Saved OODA planner state for {self.character_name}')
+            except Exception as e:
+                logger.error(f'Error saving OODA planner state during shutdown: {e}')
 
             # Save resource manager
             if self.resource_manager:

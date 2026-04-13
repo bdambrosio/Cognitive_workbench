@@ -788,6 +788,100 @@ class OodaPlanner:
             self.say_to_user(share_text)
             logger.info(f"OODA planner: auto-shared goal result with user")
 
+    # ── Persistence (sleep/wake) ──────────────────────────────────────
+
+    _STATE_NOTE_NAME = "_ooda_planner_state"
+
+    def save_state(self, write_named_note_fn) -> None:
+        """Persist planner history to a named Note.
+
+        Called during shutdown so the planner can resume with context
+        on the next startup.
+        """
+        if not self.history._cycles:
+            logger.info("OODA planner: no cycles to persist")
+            return
+
+        cycles_data = []
+        for c in self.history._cycles:
+            cycles_data.append({
+                "timestamp": c.timestamp,
+                "event_summary": c.event_summary,
+                "assessment_summary": c.assessment_summary,
+                "action": c.action,
+                "result_summary": c.result_summary,
+                "concern_ids": c.concern_ids,
+                "content_summary": c.content_summary,
+            })
+
+        state = {
+            "version": 1,
+            "cycle_count": len(cycles_data),
+            "cycles": cycles_data,
+        }
+
+        try:
+            write_named_note_fn(self._STATE_NOTE_NAME, json.dumps(state))
+            logger.info(
+                f"OODA planner: saved {len(cycles_data)} cycles "
+                f"to {self._STATE_NOTE_NAME}"
+            )
+        except Exception as e:
+            logger.warning(f"OODA planner: save_state failed: {e}")
+
+    def load_state(self, executor) -> None:
+        """Load planner history from a named Note on startup.
+
+        Args:
+            executor: InfospaceExecutor for loading the Note.
+        """
+        try:
+            result = executor.execute_action({
+                "type": "load",
+                "target": self._STATE_NOTE_NAME,
+                "out": "$_ooda_planner_tmp",
+            })
+            if result.get("status") != "success":
+                logger.info("OODA planner: no saved state found (first run)")
+                return
+
+            resource_id = result.get("resource_id", "")
+            if not resource_id:
+                return
+
+            # Read the note content
+            note_data = executor.resource_manager.get_resource(resource_id)
+            if not note_data:
+                return
+            content = (
+                getattr(note_data, "content", None)
+                or (note_data.get("properties", {}) if isinstance(note_data, dict) else {}).get("content", "")
+            )
+            if not content:
+                return
+
+            state = json.loads(content) if isinstance(content, str) else content
+            if not isinstance(state, dict) or "cycles" not in state:
+                return
+
+            count = 0
+            for c in state["cycles"]:
+                self.history.append(OodaCycle(
+                    timestamp=c.get("timestamp", "?"),
+                    event_summary=c.get("event_summary", ""),
+                    assessment_summary=c.get("assessment_summary", ""),
+                    action=c.get("action", {}),
+                    result_summary=c.get("result_summary", ""),
+                    concern_ids=c.get("concern_ids", []),
+                    content_summary=c.get("content_summary", ""),
+                ))
+                count += 1
+
+            logger.info(f"OODA planner: loaded {count} cycles from prior session")
+
+        except Exception as e:
+            logger.info(f"OODA planner: load_state failed: {e}")
+
     def get_recent_activity_summary(self, n: int = 5) -> str:
         """Return compact summary of recent OODA cycles for chat context.
 
