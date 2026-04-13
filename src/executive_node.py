@@ -6822,34 +6822,91 @@ class ZenohExecutiveNode:
 
         Bump magnitude is scaled by concern weight: bump * (1 + weight).
         A weight=1.0 concern gets 2x the bump; weight=0 gets 1x.
+
+        Adds time-based homeostatic pressure for concerns that are overdue:
+        pressure grows with hours since last service (satisfied_at or recency
+        fallback), scaled by the concern's revisit_hours.
         """
         DECAY = 0.9
         BUMP = {'strong': 0.3, 'moderate': 0.15, 'weak': 0.05, 'none': 0.0}
+        MAX_TIME_PRESSURE = 0.05  # per-cycle pressure when fully overdue
+
+        # Build a lookup of homeostatic pressure by concern_id
+        time_pressure = self._compute_homeostatic_pressure(MAX_TIME_PRESSURE)
+
         notes = assessment.get('notes', '')
-        if 'concerns:' not in notes:
-            # Decay all activations
-            for cid in self._character_concern_activations:
-                self._character_concern_activations[cid] *= DECAY
-            return
-        # Parse "concerns: homeostasis=strong, attend_to_user=moderate"
-        for segment in notes.split(';'):
-            segment = segment.strip()
-            if segment.startswith('concerns:'):
-                pairs = segment[len('concerns:'):].strip()
-                for pair in pairs.split(','):
-                    pair = pair.strip()
-                    if '=' in pair:
-                        cid, level = pair.rsplit('=', 1)
-                        cid = cid.strip()
-                        level = level.strip()
-                        old = self._character_concern_activations.get(cid, 0.0)
-                        weight = self._get_concern_weight(cid)
-                        new_val = old * DECAY + BUMP.get(level, 0.0) * (1.0 + weight)
-                        self._character_concern_activations[cid] = new_val
-                        # ── Graph: concern change ──
-                        if abs(new_val - old) >= self._cognitive_graph._config.get("concern_change_threshold", 0.05):
-                            self._graph_emit_concern_change(cid, old, new_val, level)
-                break
+        bumped = set()
+        if 'concerns:' in notes:
+            for segment in notes.split(';'):
+                segment = segment.strip()
+                if segment.startswith('concerns:'):
+                    pairs = segment[len('concerns:'):].strip()
+                    for pair in pairs.split(','):
+                        pair = pair.strip()
+                        if '=' in pair:
+                            cid, level = pair.rsplit('=', 1)
+                            cid = cid.strip()
+                            level = level.strip()
+                            old = self._character_concern_activations.get(cid, 0.0)
+                            weight = self._get_concern_weight(cid)
+                            pressure = time_pressure.get(cid, 0.0)
+                            new_val = old * DECAY + BUMP.get(level, 0.0) * (1.0 + weight) + pressure
+                            self._character_concern_activations[cid] = new_val
+                            bumped.add(cid)
+                            if abs(new_val - old) >= self._cognitive_graph._config.get("concern_change_threshold", 0.05):
+                                self._graph_emit_concern_change(cid, old, new_val, level)
+                    break
+
+        # Apply decay + time pressure to any homeostatic concern not in the
+        # assessment (so pressure builds even on irrelevant events).
+        for cid, pressure in time_pressure.items():
+            if cid in bumped or pressure <= 0:
+                continue
+            old = self._character_concern_activations.get(cid, 0.0)
+            new_val = old * DECAY + pressure
+            self._character_concern_activations[cid] = new_val
+
+        # Decay anything else that wasn't bumped
+        for cid in list(self._character_concern_activations.keys()):
+            if cid in bumped or cid in time_pressure:
+                continue
+            self._character_concern_activations[cid] *= DECAY
+
+    def _compute_homeostatic_pressure(self, max_pressure: float) -> Dict[str, float]:
+        """Compute time-based activation pressure for overdue concerns.
+
+        Pressure grows linearly from 0 at service time to max_pressure at
+        revisit_hours past service, capped at max_pressure thereafter.
+        Only applies to concerns with revisit_hours set (typically seeded
+        homeostatic concerns).
+        """
+        pressure: Dict[str, float] = {}
+        try:
+            dcm = getattr(self, '_derived_concern_model', None)
+            if not dcm:
+                return pressure
+            now = datetime.now()
+            for c in dcm.get_concerns():
+                revisit_hours = c.get('revisit_hours')
+                if not revisit_hours or float(revisit_hours) <= 0:
+                    continue
+                # Reference time: satisfied_at (if ever satisfied), else recency/created
+                ref_str = c.get('satisfied_at') or c.get('recency') or c.get('created')
+                if not ref_str:
+                    continue
+                try:
+                    ref_dt = datetime.fromisoformat(ref_str)
+                except (ValueError, TypeError):
+                    continue
+                elapsed_hours = (now - ref_dt).total_seconds() / 3600.0
+                ratio = min(elapsed_hours / float(revisit_hours), 1.0)
+                if ratio > 0:
+                    cid = c.get('concern_id', '')
+                    if cid:
+                        pressure[cid] = max_pressure * ratio
+        except Exception as e:
+            logger.debug(f"homeostatic pressure calculation failed: {e}")
+        return pressure
 
     def _triage_orient_nominations(self, assessment: Dict[str, Any]):
         """Check orient assessment for strong bumps on cold concerns — nominate for triage."""
