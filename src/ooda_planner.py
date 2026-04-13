@@ -773,28 +773,35 @@ class OodaPlanner:
     def inject_goal_completion(self, goal_result: Dict[str, Any]) -> None:
         """Called by executive_node when a goal completes.
 
-        Automatically shares successful results with the user (the user
-        can't see Notes). The result is also stored for the next OODA
-        cycle's context so the planner can update concerns.
+        The result is stored for the next OODA cycle's context so the
+        planner can update concerns.
+
+        For OODA-initiated goals (those with a concern_id), auto-shares
+        the result with the user since they didn't see the executor's
+        output directly. Chat-initiated goals ([GOAL_NEEDED] path) have
+        no concern_id — results already reached the user via the
+        executor, so we don't duplicate.
         """
         self._pending_goal_result = goal_result
         status = goal_result.get('status', '?')
         goal_text = goal_result.get('goal_text', '?')
         result_summary = goal_result.get('result_summary', '')
+        concern_id = goal_result.get('concern_id', '')
 
         logger.info(
             f"OODA planner: goal completion — "
-            f"{status}: {goal_text[:80]}"
+            f"{status}: {goal_text[:80]} "
+            f"(concern={concern_id or 'none'})"
         )
 
-        # Auto-share successful results with the user
-        if status in ('completed', 'success') and result_summary:
-            # Truncate to a reasonable length for chat
+        # Auto-share ONLY for autonomous OODA-initiated goals (concern_id set).
+        # Chat-initiated goals already delivered their result via the executor.
+        if concern_id and status in ('completed', 'success') and result_summary:
             share_text = result_summary[:500]
             if len(result_summary) > 500:
                 share_text += "..."
             self.say_to_user(share_text)
-            logger.info(f"OODA planner: auto-shared goal result with user")
+            logger.info(f"OODA planner: auto-shared OODA-initiated goal result")
 
     # ── Persistence (sleep/wake) ──────────────────────────────────────
 

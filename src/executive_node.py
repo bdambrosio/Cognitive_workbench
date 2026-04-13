@@ -2407,19 +2407,22 @@ class ZenohExecutiveNode:
                 self.action_publisher.put(json.dumps(result_action))
                 logger.info(f'📤 Published primary product content ({len(product_content)} chars) from {primary_product}')
             elif final_thoughts_clean and len(final_thoughts_clean) >= 20 and final_thoughts_clean.replace(' ', '').replace('.', '').replace(',', '').replace('!', '').replace('?', '').strip():
-                # No product content — show FINAL_ANSWER text
-                final_answer_action = {
-                    'type': 'say',
-                    'action_type': 'say',
-                    'action_id': f'final_answer_{int(time.time() * 1000)}',
-                    'timestamp': datetime.now().isoformat(),
-                    'text': final_thoughts_clean,
-                    'source': self.character_name,
-                    'target': 'User',
-                    'is_text_only': True
-                }
-                self.action_publisher.put(json.dumps(final_answer_action))
-                logger.info(f'📤 Published FINAL_ANSWER to action log: {final_thoughts_clean[:100]}...')
+                # Strip planner scaffolding (THOUGHTS:/DONE:/NEXT_TASK:/etc.)
+                # before publishing to the user.
+                display_text = self._strip_planner_scaffolding(final_thoughts_clean)
+                if display_text and len(display_text) >= 20:
+                    final_answer_action = {
+                        'type': 'say',
+                        'action_type': 'say',
+                        'action_id': f'final_answer_{int(time.time() * 1000)}',
+                        'timestamp': datetime.now().isoformat(),
+                        'text': display_text,
+                        'source': self.character_name,
+                        'target': 'User',
+                        'is_text_only': True
+                    }
+                    self.action_publisher.put(json.dumps(final_answer_action))
+                    logger.info(f'📤 Published FINAL_ANSWER to action log: {display_text[:100]}...')
 
         # Update living context (situation note) after non-trivial goal completion
         if not interrupted_final and self.current_goal and plan_result.get('status') in ('complete', 'failed'):
@@ -4690,6 +4693,34 @@ class ZenohExecutiveNode:
         return ""
 
 
+
+    def _strip_planner_scaffolding(self, text: str) -> str:
+        """Strip planner internal format (THOUGHTS:/DONE:/NEXT_TASK:/etc.)
+        from FINAL_ANSWER text before showing to the user.
+
+        Extracts just the content of THOUGHTS: if present, otherwise
+        returns the text with scaffolding lines removed.
+        """
+        if not text:
+            return text
+        import re as _re
+
+        # If text has THOUGHTS:, extract just that section up to the next
+        # scaffolding marker.
+        thoughts_match = _re.search(
+            r'THOUGHTS:\s*(.+?)(?=\n\s*(?:DONE|NEXT_TASK|REQUEST_TOOLS|ASK_USER|VERIFICATION|FINAL_ANSWER)\s*:|\Z)',
+            text, _re.DOTALL | _re.IGNORECASE
+        )
+        if thoughts_match:
+            return thoughts_match.group(1).strip()
+
+        # Fallback: remove individual scaffolding lines
+        scaffold_line = _re.compile(
+            r'^\s*(THOUGHTS|DONE|NEXT_TASK|REQUEST_TOOLS|ASK_USER|VERIFICATION|FINAL_ANSWER)\s*:.*$',
+            _re.IGNORECASE | _re.MULTILINE,
+        )
+        cleaned = scaffold_line.sub('', text).strip()
+        return cleaned
 
     def _sanitize_note_ids(self, text: str) -> str:
         """Replace literal Note IDs (e.g., Note_827) with their named equivalents.
