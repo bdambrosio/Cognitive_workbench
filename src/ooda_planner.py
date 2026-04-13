@@ -963,7 +963,7 @@ class OodaPlanner:
             "ask": self._action_ask,
             "wait": self._action_wait,
             "reflect": self._action_reflect,
-            "update-concern": self._action_stub,
+            "update-concern": self._action_update_concern,
             "update-user-model": self._action_stub,
             "configure-sensor": self._action_stub,
             "sleep": self._action_stub,
@@ -1034,8 +1034,87 @@ class OodaPlanner:
         logger.info(f"OODA reflect: {observation[:120]}")
         return {"status": "success", "summary": f"Reflected: {observation[:80]}"}
 
+    def _action_update_concern(self, action: Dict) -> Dict[str, Any]:
+        """Update a concern's state via the derived concern model.
+
+        Supports: satisfy (mark as addressed), activate, abandon,
+        and weight/description updates.
+        """
+        concern_id = action.get("concern_id", "")
+        updates = action.get("updates", {})
+        if not concern_id:
+            return {"status": "error", "summary": "update-concern requires concern_id"}
+
+        en = self.executive_node
+        dcm = getattr(en, '_derived_concern_model', None)
+        if not dcm:
+            return {"status": "error", "summary": "No derived concern model available"}
+
+        status_change = updates.get("status")
+        reason = updates.get("reason", updates.get("notes", ""))
+
+        if status_change == "satisfied":
+            revisit_hours = float(updates.get("revisit_hours", 24))
+            patch = {
+                "concern_id": concern_id,
+                "op": "satisfy_concern",
+                "why_this_satisfy": reason,
+                "field_updates": {"revisit_hours": revisit_hours},
+            }
+            dcm._apply_single_patch(patch, evidence_ref="ooda_planner")
+            dcm._save()
+            return {
+                "status": "success",
+                "summary": f"Concern {concern_id} satisfied (revisit in {revisit_hours}h): {reason[:80]}",
+            }
+        elif status_change == "active":
+            patch = {
+                "concern_id": concern_id,
+                "op": "activate_concern",
+                "why_this_activate": reason,
+                "field_updates": {},
+            }
+            dcm._apply_single_patch(patch, evidence_ref="ooda_planner")
+            dcm._save()
+            return {
+                "status": "success",
+                "summary": f"Concern {concern_id} activated: {reason[:80]}",
+            }
+        elif status_change == "abandoned":
+            patch = {
+                "concern_id": concern_id,
+                "op": "abandon_concern",
+                "why_this_abandon": reason,
+                "field_updates": {},
+            }
+            dcm._apply_single_patch(patch, evidence_ref="ooda_planner")
+            dcm._save()
+            return {
+                "status": "success",
+                "summary": f"Concern {concern_id} abandoned: {reason[:80]}",
+            }
+        elif updates:
+            # Weight or description update without status change
+            for concern in dcm.concerns:
+                if concern.get("concern_id") == concern_id:
+                    if "weight" in updates:
+                        concern["weight"] = float(updates["weight"])
+                    if "description" in updates:
+                        concern["concern_description"] = updates["description"]
+                    if "notes" in updates:
+                        concern.setdefault("history_summary", "")
+                        concern["history_summary"] += f"\n{reason}" if reason else ""
+                    dcm._save()
+                    return {
+                        "status": "success",
+                        "summary": f"Concern {concern_id} updated: {json.dumps(updates)[:80]}",
+                    }
+            return {"status": "error", "summary": f"Concern {concern_id} not found"}
+        else:
+            return {"status": "error", "summary": "update-concern requires updates dict"}
+
     def _action_stub(self, action: Dict) -> Dict[str, Any]:
-        """Stub for actions not yet wired in Phase 2."""
+        """Stub for actions not yet wired."""
         action_type = action.get("action", "?")
         logger.info(f"OODA action stub: {action_type} (not yet implemented)")
         return {"status": "stub", "summary": f"{action_type} not yet implemented"}

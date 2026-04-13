@@ -1743,6 +1743,26 @@ class ZenohExecutiveNode:
 
         # ── Gate: if goal is running, observe/orient done but no decide/act
         if self._is_goal_running():
+            # If the consumed event was a user chat message, acknowledge it
+            # so the user knows their message wasn't lost.
+            if event.classification == 'chat' and event.source == 'User':
+                goal_desc = ""
+                if self.current_goal:
+                    goal_desc = f" ({self.current_goal.to_string()[:80]})"
+                self.ooda_planner.say_to_user(
+                    f"I'm currently working on a goal{goal_desc}. "
+                    f"I'll get to your message as soon as it completes."
+                )
+                # Re-queue the event content so it's processed after goal completion
+                content_payload = {'source': event.source, 'text': event.content}
+                requeued = {
+                    'timestamp': datetime.now().isoformat(),
+                    'sequence_id': 0,
+                    'mode': 'text',
+                    'content': json.dumps(content_payload),
+                }
+                self.text_input_queue.append(requeued)
+                logger.info(f"Chat from {event.source} re-queued during goal execution")
             return
 
         # ── Branch: fast path (chat/alert/ask_reply) vs OODA planner ──
