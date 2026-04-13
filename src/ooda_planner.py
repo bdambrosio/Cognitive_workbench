@@ -612,6 +612,18 @@ class OodaPlanner:
             current_event=current_event,
         )
 
+        # ── Context budget tracking ────────────────────────────────────
+        sys_chars = len(OODA_SYSTEM_PROMPT)
+        ctx_chars = len(context)
+        total_chars = sys_chars + ctx_chars
+        # Rough token estimate: ~3.5 chars per token for English
+        est_tokens = total_chars // 3
+        logger.info(
+            f"OODA context: {total_chars} chars (~{est_tokens} tok) "
+            f"[system={sys_chars} context={ctx_chars} "
+            f"history={self.history.cycle_count} cycles]"
+        )
+
         # ── LLM call ───────────────────────────────────────────────────
         try:
             result = en.llm_generate(
