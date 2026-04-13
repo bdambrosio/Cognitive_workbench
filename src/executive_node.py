@@ -1701,25 +1701,26 @@ class ZenohExecutiveNode:
         elif self.ooda_planner.awaiting_ask_response:
             logger.debug(f'Ask routing: awaiting response but queue empty')
 
-        # ── 5. Skip event processing while goal is running ──────────────
-        if self._is_goal_running():
-            return
-
-        # ── 6. OODA pipeline (only when truly idle) ─────────────────────
+        # ── 3. Observe/Orient run even while goal is running ─────────────
+        #    (concern activations stay current; planner gated below)
         event = self._ooda_observe()
         if event is None:
-            self._ooda_idle_tick()
+            if not self._is_goal_running():
+                self._ooda_idle_tick()
             return
 
         # Reset per-turn metrics for this OODA cycle
         if self.infospace_executor:
             self.infospace_executor.turn_metrics = TurnMetrics()
 
-        # ── Graph: observe ──
+        # ── Observe: graph + living state ──
         self._graph_emit_observe(event)
         self._ooda_living_state.update_after_observe(event)
+
+        # ── Orient: character evaluator assessment ──
         oriented = self._ooda_orient(event)
-        # Build concern descriptions map for living state content
+
+        # ── Update living state + graph BEFORE branching ──
         _concern_descs = {}
         try:
             for c in character_evaluator.DEFAULT_CHARACTER_CONCERNS:
@@ -1732,7 +1733,6 @@ class ZenohExecutiveNode:
             pass
         self._ooda_living_state.update_after_orient(
             oriented, self._character_concern_activations, _concern_descs)
-        # Refresh goals and user concerns in living state
         try:
             self._ooda_living_state.update_goals(
                 self._all_scheduled_goals(), self._active_scheduled_goal_id)
@@ -1740,22 +1740,65 @@ class ZenohExecutiveNode:
                 self.user_concern_model.get_concerns() or [])
         except Exception:
             pass
-        action = self._ooda_decide(oriented)
-        # ── Graph: decide ──
-        self._graph_emit_decide(action)
-        # Record OODA event for UI feed
-        self._record_ooda_event(event, oriented, action)
-        self._ooda_act(action)
-        self._ooda_living_state.update_after_act(action)
 
-        # Emit per-turn latency summary (non-goal turns; goal turns emit in parse_and_set_goal)
-        # Suppress CLI echo for timer ticks — log only.
-        if self.infospace_executor and action.type != 'dispatch_goal':
-            if self.infospace_executor.turn_metrics.llm_calls:
-                _perf = self.infospace_executor.turn_metrics.summary()
-                logger.info(_perf)
-                if event.classification != 'timer':
-                    print(_perf, flush=True)
+        # ── Gate: if goal is running, observe/orient done but no decide/act
+        if self._is_goal_running():
+            return
+
+        # ── Branch: fast path (chat/alert/ask_reply) vs OODA planner ──
+        classification = event.classification
+        assessment = oriented.assessment if oriented else None
+
+        if classification in ('chat', 'ask_reply', 'alert', 'agent_message'):
+            # Fast path — existing decide/act pipeline
+            action = self._ooda_decide(oriented)
+            self._graph_emit_decide(action)
+            self._record_ooda_event(event, oriented, action)
+            self._ooda_act(action)
+            self._ooda_living_state.update_after_act(action)
+
+            if self.infospace_executor and action.type != 'dispatch_goal':
+                if self.infospace_executor.turn_metrics.llm_calls:
+                    _perf = self.infospace_executor.turn_metrics.summary()
+                    logger.info(_perf)
+                    if classification != 'timer':
+                        print(_perf, flush=True)
+        else:
+            # Strategic path — OODA planner
+            event_summary = (
+                f"{event.event_type}/{classification}: "
+                f"{(event.content or '')[:120]} "
+                f"(source={event.source or 'unknown'})"
+            )
+            assessment_summary = ""
+            if assessment:
+                assessment_summary = assessment.get('overall_rationale', '')[:150]
+
+            result = self.ooda_planner.step(
+                event_summary=event_summary,
+                assessment_summary=assessment_summary,
+                assessment=assessment,
+            )
+
+            # Record for UI feed (use a synthetic Action for compatibility)
+            if result:
+                action_type = result.get('status', 'unknown')
+                action_summary = result.get('summary', '')
+                synth_action = Action(
+                    f'ooda_{action_type}',
+                    {'summary': action_summary},
+                    assessment,
+                )
+                self._record_ooda_event(event, oriented, synth_action)
+                self._ooda_living_state.update_after_act(synth_action)
+
+            if self.infospace_executor:
+                if self.infospace_executor.turn_metrics.llm_calls:
+                    _perf = self.infospace_executor.turn_metrics.summary()
+                    logger.info(_perf)
+                    if classification != 'timer':
+                        print(_perf, flush=True)
+
         self._ooda_living_state.maybe_persist(
             self._write_named_note, self._derived_concern_model.get_concerns(),
             planner_summary=self._get_planner_summary())
@@ -3069,6 +3112,17 @@ class ZenohExecutiveNode:
         # ── Graph: goal outcome ──
         graph_success = False if user_interrupted else bool(success)
         self._graph_emit_goal_outcome(goal_id, graph_success, last_result_raw, primary_product, result)
+
+        # ── Notify OODA planner of goal completion ──
+        if hasattr(self, 'ooda_planner'):
+            self.ooda_planner.inject_goal_completion({
+                'goal_id': goal_id,
+                'goal_text': goal.get('goal_text', '')[:200],
+                'status': goal_status,
+                'primary_product': primary_product,
+                'result_summary': (last_result_raw or '')[:300],
+                'concern_id': goal.get('concern_id', ''),
+            })
         if goal_id in self._scheduler_started_goals:
             self._scheduler_started_goals.discard(goal_id)
         scheduler_end_status = "interrupted" if user_interrupted else updates["status"]
@@ -4809,17 +4863,27 @@ class ZenohExecutiveNode:
         except Exception:
             pass
 
+        # Recent OODA planner activity for strategic awareness
+        ooda_activity_block = ""
+        try:
+            if hasattr(self, 'ooda_planner'):
+                ooda_activity_block = self.ooda_planner.get_recent_activity_summary(5)
+        except Exception:
+            pass
+
         # Compact goals/tasks context for command resolution
         command_context = self._build_command_resolution_context()
 
         orientation_block = f"\n{orientation}\n\n" if orientation else "\n"
         self_model_insert = f"\n{self_model_block}\n\n" if self_model_block else ""
         concerns_insert = f"\n{user_concerns_block}\n\n" if user_concerns_block else ""
+        ooda_insert = f"\n{ooda_activity_block}\n\n" if ooda_activity_block else ""
         user_prompt = (
             f"RECENT DIALOG:\n{recent_turns}\n"
             f"{orientation_block}"
             f"{self_model_insert}"
             f"{concerns_insert}"
+            f"{ooda_insert}"
             f"{command_context}\n"
             f"Message from {source}: {text}\n\n"
             f"Respond directly to what {source} said. Ground your response in your "

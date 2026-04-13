@@ -471,6 +471,300 @@ class OodaPlanner:
         self.awaiting_ask_response = False
         self._ask_response_queue: queue.Queue = queue.Queue()
 
+        # Phase 2: event-action history (continuous across ticks)
+        self.history = OodaHistory()
+
+        # Phase 3: accumulated user prompt (appended each cycle)
+        self._accumulated_context: Optional[str] = None
+
+        # Pending goal completion events (set by executive_node on goal done)
+        self._pending_goal_result: Optional[Dict[str, Any]] = None
+
+    # ── Strategic planning step (Phase 3) ───────────────────────────────
+
+    def step(
+        self,
+        event_summary: str,
+        assessment_summary: str,
+        assessment: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Run one OODA planning cycle: assemble context, call LLM, dispatch action.
+
+        Called from the main loop for strategic events (not chat/alert).
+        Returns the dispatched action result, or None on failure.
+
+        Args:
+            event_summary: compact description of the triggering event
+            assessment_summary: one-line character_evaluator result
+            assessment: full assessment dict (for concern_ids extraction)
+        """
+        en = self.executive_node
+
+        # ── Assemble context from live state ────────────────────────────
+        char_config = en.character_config
+
+        # Concern landscape
+        user_concerns = []
+        try:
+            user_concerns = en.user_concern_model.get_concerns(active_only=True) or []
+        except Exception:
+            pass
+
+        derived_concerns = []
+        try:
+            dc = getattr(en, '_derived_concern_model', None)
+            derived_concerns = dc.get_concerns() if dc else []
+        except Exception:
+            pass
+
+        activations = dict(getattr(en, '_character_concern_activations', {}))
+        trends = {}
+        try:
+            ls = getattr(en, '_ooda_living_state', None)
+            if ls:
+                for ca in getattr(ls, 'concern_activations', []):
+                    cid = ca.get('id', '')
+                    if cid:
+                        trends[cid] = ca.get('trend', 'stable')
+        except Exception:
+            pass
+
+        concern_landscape = build_concern_landscape(
+            user_concerns, derived_concerns, activations, trends,
+        )
+
+        # Goal field
+        running_goal = None
+        recent_outcomes = []
+        try:
+            if en._is_goal_running() and en.current_goal:
+                running_goal = {
+                    'goal_text': en.current_goal.to_string(),
+                    'goal_id': getattr(en, '_active_scheduled_goal_id', ''),
+                }
+            # Gather recent completed goals
+            for g in en._all_scheduled_goals():
+                if g.get('status') in ('completed', 'failed'):
+                    recent_outcomes.append(g)
+            recent_outcomes = recent_outcomes[-3:]
+        except Exception:
+            pass
+
+        goal_field_str = build_goal_field(running_goal, recent_outcomes)
+
+        # Sensor state
+        sensor_state_str = build_sensor_state(
+            getattr(en, 'sensor_configs', []),
+            list(getattr(en, '_sensor_inform_queue', [])),
+        )
+
+        # Cognitive graph context
+        graph_ctx = ""
+        try:
+            cg = getattr(en, '_cognitive_graph', None)
+            if cg and event_summary:
+                graph_ctx = cg.assemble_context(
+                    event_summary,
+                    concern_activations=activations,
+                    k=10, max_hops=1,
+                )
+        except Exception as e:
+            logger.debug(f"Cognitive graph context assembly failed: {e}")
+
+        # Check for pending goal completion
+        current_event = f"Event: {event_summary}\nAssessment: {assessment_summary}"
+        if self._pending_goal_result:
+            gr = self._pending_goal_result
+            self._pending_goal_result = None
+            current_event += (
+                f"\n\nGoal completed: {gr.get('goal_text', '?')[:150]}"
+                f"\n  Status: {gr.get('status', '?')}"
+                f"\n  Product: {gr.get('primary_product', 'none')}"
+                f"\n  Summary: {gr.get('result_summary', '')[:200]}"
+            )
+            if gr.get('concern_id'):
+                current_event += f"\n  Concern: {gr['concern_id']}"
+
+        # Build the full context
+        context = assemble_ooda_context(
+            character_desc=char_config.get('character', ''),
+            capabilities_desc=char_config.get('capabilities', ''),
+            setting_desc=char_config.get('setting', ''),
+            concern_landscape=concern_landscape,
+            goal_field=goal_field_str,
+            sensor_state=sensor_state_str,
+            cognitive_graph_context=graph_ctx,
+            history=self.history,
+            current_event=current_event,
+        )
+
+        # ── LLM call ───────────────────────────────────────────────────
+        try:
+            result = en.llm_generate(
+                messages=[
+                    {"role": "system", "content": OODA_SYSTEM_PROMPT},
+                    {"role": "user", "content": context},
+                ],
+                max_tokens=300,
+                temperature=0.3,
+                is_json=True,
+            )
+        except Exception as e:
+            logger.error(f"OODA planner LLM call failed: {e}")
+            return None
+
+        if not getattr(result, 'success', False) or not getattr(result, 'text', ''):
+            logger.warning(
+                f"OODA planner LLM call unsuccessful: "
+                f"{getattr(result, 'error', 'no text')}"
+            )
+            return None
+
+        # ── Parse action ────────────────────────────────────────────────
+        action = self._parse_action(result.text)
+        if action is None:
+            logger.warning(f"OODA planner: failed to parse action from: {result.text[:200]}")
+            return None
+
+        logger.info(f"OODA planner action: {json.dumps(action)}")
+
+        # ── Dispatch ────────────────────────────────────────────────────
+        dispatch_result = self.dispatch_action(action)
+
+        # ── Record cycle ────────────────────────────────────────────────
+        concern_ids = []
+        if assessment:
+            try:
+                notes = assessment.get('notes', '')
+                # Extract concern IDs from assessment notes
+                if 'concerns:' in notes:
+                    concern_part = notes.split('concerns:')[1].split(';')[0]
+                    for token in concern_part.split(','):
+                        token = token.strip()
+                        if '=' in token:
+                            concern_ids.append(token.split('=')[0].strip())
+            except Exception:
+                pass
+        # Also include concern from the action itself
+        action_concern = action.get('concern_id')
+        if action_concern and action_concern not in concern_ids:
+            concern_ids.append(action_concern)
+
+        # Build content summary from action details
+        content_summary = self._build_content_summary(action, dispatch_result)
+
+        cycle = OodaCycle(
+            timestamp=datetime.now().strftime("%H:%M:%S"),
+            event_summary=event_summary[:150],
+            assessment_summary=assessment_summary[:150],
+            action=action,
+            result_summary=dispatch_result.get('summary', '')[:200],
+            concern_ids=concern_ids,
+            content_summary=content_summary,
+        )
+        self.history.append(cycle)
+
+        return dispatch_result
+
+    def _parse_action(self, text) -> Optional[Dict[str, Any]]:
+        """Parse LLM response as a JSON action object.
+
+        text may be a str (raw LLM output) or an already-parsed dict/list
+        (when the backend's is_json mode returns parsed JSON directly).
+        """
+        # Already parsed by backend
+        if isinstance(text, dict):
+            return text if 'action' in text else None
+        if isinstance(text, list):
+            # Take first dict with 'action' key
+            for item in text:
+                if isinstance(item, dict) and 'action' in item:
+                    return item
+            return None
+
+        raw = str(text).strip()
+        # Strip markdown fences if present
+        if raw.startswith('```'):
+            first_nl = raw.find('\n')
+            if first_nl >= 0:
+                raw = raw[first_nl + 1:]
+            if raw.endswith('```'):
+                raw = raw[:-3]
+            raw = raw.strip()
+
+        # Handle already-parsed JSON (some backends return parsed)
+        if isinstance(raw, dict):
+            return raw if 'action' in raw else None
+
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict) and 'action' in parsed:
+                return parsed
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        # Try extracting first JSON object from response
+        start = raw.find('{')
+        end = raw.rfind('}')
+        if start >= 0 and end > start:
+            try:
+                parsed = json.loads(raw[start:end + 1])
+                if isinstance(parsed, dict) and 'action' in parsed:
+                    return parsed
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        return None
+
+    def _build_content_summary(
+        self, action: Dict, result: Dict,
+    ) -> str:
+        """Build a content-aware summary of what this cycle was ABOUT."""
+        action_type = action.get('action', '')
+        if action_type == 'submit-goal':
+            return action.get('goal_text', '')[:120]
+        elif action_type == 'say':
+            return f"Said: {action.get('text', '')[:100]}"
+        elif action_type == 'ask':
+            reply = result.get('summary', '')
+            return f"Asked: {action.get('text', '')[:60]} → {reply[:60]}"
+        elif action_type == 'wait':
+            return action.get('reason', '')[:120]
+        elif action_type == 'reflect':
+            return action.get('observation', '')[:120]
+        elif action_type == 'update-concern':
+            cid = action.get('concern_id', '?')
+            return f"Updated concern {cid}: {json.dumps(action.get('updates', {}))[:80]}"
+        else:
+            return result.get('summary', '')[:120]
+
+    def inject_goal_completion(self, goal_result: Dict[str, Any]) -> None:
+        """Called by executive_node when a goal completes.
+
+        The result is stored and injected into the next OODA cycle's
+        current_event context.
+        """
+        self._pending_goal_result = goal_result
+        logger.info(
+            f"OODA planner: goal completion queued — "
+            f"{goal_result.get('status', '?')}: "
+            f"{goal_result.get('goal_text', '?')[:80]}"
+        )
+
+    def get_recent_activity_summary(self, n: int = 5) -> str:
+        """Return compact summary of recent OODA cycles for chat context.
+
+        Used by _handle_chat_response to give the chat generator
+        awareness of recent strategic activity.
+        """
+        if not self.history._cycles:
+            return ""
+        recent = self.history._cycles[-n:]
+        lines = ["## Recent Agent Activity"]
+        for c in recent:
+            lines.append(self.history._summarize_cycle(c))
+        return "\n".join(lines)
+
     # ── User-facing communication ───────────────────────────────────────
 
     def say_to_user(
