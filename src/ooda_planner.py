@@ -5,23 +5,443 @@ Phase 1: Communication ownership.
   The OODA planner owns all user-facing communication. The goal executor
   (infospace_executor) calls into this module rather than publishing
   directly to Zenoh. Default policy: passthrough (forward say/ask to user
-  as-is). Future phases add strategic filtering and the full OODA planning
-  loop.
+  as-is).
 
-Phase 2+: Action schemas, context assembly, continuous planning loop,
-  sleep/consolidation, concern-to-goal translation.
+Phase 2: Action schemas, context assembly, event-action history.
+  Defines the OODA planner's action vocabulary (9 actions), builds the
+  context prefix from live state, and maintains a rolling history of
+  event-action cycles with progressive rollup.
+
+Phase 3+: Continuous planning loop, sleep/consolidation.
 """
 
 import json
 import logging
 import queue
 import time
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 _ASK_TIMEOUT_SECONDS = 300  # 5 minutes
+
+# ── Action Schemas ──────────────────────────────────────────────────────────
+# Each schema defines an action the OODA planner can generate.
+# These are rendered into the system prompt as the planner's "skill set."
+
+OODA_ACTION_SCHEMAS = {
+    "submit-goal": {
+        "description": "Submit a bounded goal for the goal executor to plan and execute.",
+        "fields": {
+            "goal_text": "str — concrete, actionable goal description",
+            "expected_outcome": "str — what success looks like",
+            "concern_id": "str | null — which concern this serves",
+            "priority": "str — 'normal' or 'high'",
+        },
+    },
+    "update-concern": {
+        "description": "Modify a concern's state: adjust weight, change status, or add notes.",
+        "fields": {
+            "concern_id": "str — which concern to update",
+            "updates": "dict — fields to change (weight, status, notes, etc.)",
+        },
+    },
+    "update-user-model": {
+        "description": "Record an observation about the user's current state, interests, or needs.",
+        "fields": {
+            "observation": "str — what you observed about the user",
+        },
+    },
+    "configure-sensor": {
+        "description": "Adjust sensor parameters, enable/disable a sensor, or change its disposition.",
+        "fields": {
+            "sensor_name": "str — which sensor to configure",
+            "changes": "dict — parameter changes (schedule, disposition, enabled, etc.)",
+        },
+    },
+    "say": {
+        "description": "Send a message to the user. Use for proactive engagement, status updates, or remarks.",
+        "fields": {
+            "text": "str — message content",
+        },
+    },
+    "ask": {
+        "description": "Pose a question to the user. Use when you need information for a strategic decision.",
+        "fields": {
+            "text": "str — the question",
+        },
+    },
+    "wait": {
+        "description": "Explicitly decide to do nothing. Record why inaction is the right choice.",
+        "fields": {
+            "reason": "str — why waiting is appropriate right now",
+        },
+    },
+    "reflect": {
+        "description": "Write a strategic observation to your own context. Not an external action — a way to reason on paper before committing.",
+        "fields": {
+            "observation": "str — your strategic thought",
+        },
+    },
+    "sleep": {
+        "description": "Initiate a context consolidation cycle. Use when attention has drifted across too many concerns or context is growing large.",
+        "fields": {
+            "consolidation_note": "str — brief summary of where things stand for your future self",
+        },
+    },
+}
+
+
+def render_action_schemas_for_prompt() -> str:
+    """Render action schemas as a compact block for the system prompt."""
+    lines = []
+    for name, schema in OODA_ACTION_SCHEMAS.items():
+        fields_str = ", ".join(
+            f'"{k}": {v}' for k, v in schema["fields"].items()
+        )
+        lines.append(f'- **{name}**: {schema["description"]}')
+        lines.append(f'  Format: {{"action": "{name}", {fields_str}}}')
+    return "\n".join(lines)
+
+
+# ── System Prompt ───────────────────────────────────────────────────────────
+
+OODA_SYSTEM_PROMPT = """\
+You are the strategic planner for a cognitive agent. You operate at the \
+OODA level — observing events, orienting to the concern landscape, and \
+choosing one action per cycle. You do NOT execute goals yourself; you \
+submit them to the goal executor.
+
+Your role:
+- Decide WHAT to do, not HOW to do it. The goal executor handles tactics.
+- Maintain the concern landscape — adjust weights, notice when concerns \
+are satisfied or escalating.
+- Translate activated concerns into concrete, bounded goals when action \
+is warranted.
+- Communicate with the user when it serves a strategic purpose.
+- Wait deliberately when no action is needed — inaction is a valid choice.
+
+Level boundary (non-negotiable):
+- You CANNOT invoke infospace primitives (search-web, generate-note, etc.) directly.
+- You can ONLY cause things to happen via submit-goal.
+- This constraint preserves the attention budget at each level.
+
+## Available Actions
+
+Each cycle, generate exactly ONE action as a JSON object.
+
+""" + render_action_schemas_for_prompt() + """
+
+## Reasoning Guidance
+
+Before choosing an action, consider:
+1. What just happened? (the latest event and its assessment)
+2. Which concerns are active and trending? (the concern landscape)
+3. Is a goal already running? (if so, you can only wait, reflect, say, or ask)
+4. Has anything changed that makes a pending concern more or less urgent?
+5. Would the user benefit from hearing something right now?
+
+Prefer wait over premature action. A concern with rising activation will \
+still be there next cycle. A hasty goal submission wastes executor bandwidth.
+
+When submitting a goal, be specific and concrete:
+- BAD: "Look into the user's weather concern"
+- GOOD: "Search for Berkeley CA 3-day weather forecast, create a Note with \
+temperature ranges and precipitation probability"
+
+## Output Format
+
+Respond with a single JSON object. No markdown fences, no commentary — \
+just the JSON action.
+"""
+
+
+# ── Event-Action History ────────────────────────────────────────────────────
+
+@dataclass
+class OodaCycle:
+    """One cycle of the OODA planner: event -> action -> result."""
+    timestamp: str
+    event_summary: str          # what happened (type, source, content preview)
+    assessment_summary: str     # character_evaluator result, one line
+    action: Dict[str, Any]      # the JSON action chosen
+    result_summary: str         # what happened after (goal outcome, concern updated, etc.)
+    concern_ids: List[str]      # which concerns were involved
+    content_summary: str = ""   # substantive content: what was this ABOUT?
+
+
+class OodaHistory:
+    """Rolling history of OODA cycles with progressive rollup.
+
+    Recent cycles are kept in full. Older cycles are compressed to
+    one-line summaries. Oldest cycles are aggregated by concern.
+
+    The history is rendered as part of the "user prompt" (the evolving
+    context that grows each cycle).
+    """
+
+    def __init__(self, full_window: int = 3, summary_window: int = 15):
+        self._cycles: List[OodaCycle] = []
+        self._full_window = full_window          # last N cycles kept in full
+        self._summary_window = summary_window    # next N kept as summaries
+        # Older than full+summary are aggregated by concern
+
+    def append(self, cycle: OodaCycle) -> None:
+        self._cycles.append(cycle)
+
+    @property
+    def cycle_count(self) -> int:
+        return len(self._cycles)
+
+    def render(self) -> str:
+        """Render the history for the LLM context.
+
+        Returns a text block with three sections:
+        1. Full expansion of recent cycles
+        2. One-line summaries of older cycles
+        3. Concern-level aggregation of oldest cycles
+        """
+        if not self._cycles:
+            return "(no prior cycles)"
+
+        total = len(self._cycles)
+        full_start = max(0, total - self._full_window)
+        summary_start = max(0, full_start - self._summary_window)
+
+        parts = []
+
+        # Aggregated (oldest)
+        if summary_start > 0:
+            agg = self._aggregate(self._cycles[:summary_start])
+            if agg:
+                parts.append("### Aggregated History")
+                parts.append(agg)
+
+        # Summaries (middle)
+        if summary_start < full_start:
+            parts.append("### Recent Summary")
+            for c in self._cycles[summary_start:full_start]:
+                parts.append(self._summarize_cycle(c))
+
+        # Full expansion (most recent)
+        if full_start < total:
+            parts.append("### Current Cycles")
+            for c in self._cycles[full_start:total]:
+                parts.append(self._expand_cycle(c))
+
+        return "\n\n".join(parts)
+
+    def _expand_cycle(self, c: OodaCycle) -> str:
+        """Full expansion of a single cycle."""
+        action_str = json.dumps(c.action, indent=None)
+        lines = [
+            f"**[{c.timestamp}]** Event: {c.event_summary}",
+            f"  Assessment: {c.assessment_summary}",
+            f"  Action: {action_str}",
+            f"  Result: {c.result_summary}",
+        ]
+        if c.content_summary:
+            lines.append(f"  Content: {c.content_summary}")
+        if c.concern_ids:
+            lines.append(f"  Concerns: {', '.join(c.concern_ids)}")
+        return "\n".join(lines)
+
+    def _summarize_cycle(self, c: OodaCycle) -> str:
+        """One-line summary of a cycle."""
+        action_name = c.action.get("action", "?")
+        content = c.content_summary or c.event_summary
+        concerns = ", ".join(c.concern_ids) if c.concern_ids else "none"
+        return f"- [{c.timestamp}] {action_name}: {content[:100]} (concerns: {concerns})"
+
+    def _aggregate(self, cycles: List[OodaCycle]) -> str:
+        """Aggregate oldest cycles by concern with content summaries."""
+        if not cycles:
+            return ""
+        # Group by concern
+        by_concern: Dict[str, List[OodaCycle]] = {}
+        unconcerned: List[OodaCycle] = []
+        for c in cycles:
+            if c.concern_ids:
+                for cid in c.concern_ids:
+                    by_concern.setdefault(cid, []).append(c)
+            else:
+                unconcerned.append(c)
+
+        lines = []
+        for cid, group in sorted(by_concern.items()):
+            actions = {}
+            content_bits = []
+            for c in group:
+                a = c.action.get("action", "?")
+                actions[a] = actions.get(a, 0) + 1
+                if c.content_summary:
+                    content_bits.append(c.content_summary[:80])
+            action_counts = ", ".join(f"{a}x{n}" for a, n in actions.items())
+            content_preview = "; ".join(content_bits[:3])
+            if len(content_bits) > 3:
+                content_preview += f" (+{len(content_bits)-3} more)"
+            lines.append(
+                f"- Concern {cid}: {len(group)} cycles ({action_counts}). "
+                f"Content: {content_preview or 'routine'}"
+            )
+        if unconcerned:
+            lines.append(
+                f"- Unconcerned: {len(unconcerned)} cycles "
+                f"({', '.join(c.action.get('action', '?') for c in unconcerned[:5])})"
+            )
+        return "\n".join(lines)
+
+
+# ── Context Assembly ────────────────────────────────────────────────────────
+
+def assemble_ooda_context(
+    *,
+    character_desc: str,
+    capabilities_desc: str,
+    setting_desc: str,
+    concern_landscape: str,
+    goal_field: str,
+    sensor_state: str,
+    cognitive_graph_context: str,
+    history: OodaHistory,
+    current_event: str = "",
+) -> str:
+    """Build the "user prompt" for the OODA planner LLM call.
+
+    This is the evolving context that changes each cycle. Combined with
+    OODA_SYSTEM_PROMPT (fixed), it forms the full prompt.
+
+    Args:
+        character_desc: who this agent is
+        capabilities_desc: what this agent can do
+        setting_desc: the world this agent operates in
+        concern_landscape: formatted concern state (user + derived + activations)
+        goal_field: running goal, queued goals, recent outcomes
+        sensor_state: active sensors and recent readings
+        cognitive_graph_context: rendered relevant history from cognitive graph
+        history: OodaHistory instance with prior cycles
+        current_event: the event being processed this cycle (if any)
+    """
+    sections = []
+
+    sections.append("## Identity\n" + character_desc.strip())
+    sections.append("## Capabilities\n" + capabilities_desc.strip())
+    sections.append("## Setting\n" + setting_desc.strip())
+    sections.append("## Concern Landscape\n" + concern_landscape)
+    sections.append("## Goal Field\n" + goal_field)
+
+    if sensor_state:
+        sections.append("## Sensor State\n" + sensor_state)
+
+    if cognitive_graph_context:
+        sections.append("## Relevant History (from cognitive graph)\n"
+                        + cognitive_graph_context)
+
+    sections.append("## Event-Action History\n" + history.render())
+
+    if current_event:
+        sections.append("## Current Event\n" + current_event)
+
+    sections.append(
+        "## Your Turn\n"
+        "Based on the current event and context above, choose ONE action. "
+        "Respond with a single JSON object."
+    )
+
+    return "\n\n".join(sections)
+
+
+def build_concern_landscape(
+    user_concerns: List[Dict],
+    derived_concerns: List[Dict],
+    activations: Dict[str, float],
+    activation_trends: Dict[str, str],
+) -> str:
+    """Format the concern landscape for the OODA context.
+
+    Combines user concerns, derived concerns, and activation data
+    into a readable block.
+    """
+    lines = []
+
+    if user_concerns:
+        lines.append("**User Concerns:**")
+        for c in user_concerns:
+            label = c.get("concern_label", "?")
+            desc = c.get("concern_description", "")
+            status = c.get("status", "open")
+            weight = c.get("weight", 0)
+            lines.append(f"- {label} [{status}, weight={weight:.1f}]: {desc[:120]}")
+
+    if derived_concerns:
+        lines.append("\n**Derived Concerns:**")
+        for c in derived_concerns:
+            cid = c.get("concern_id", "?")
+            label = c.get("concern_label", "?")
+            status = c.get("status", "?")
+            desc = c.get("concern_description", "")
+            act = activations.get(cid, 0.0)
+            trend = activation_trends.get(cid, "stable")
+            lines.append(
+                f"- {label} [{status}, activation={act:.2f} {trend}]: {desc[:120]}"
+            )
+
+    if not user_concerns and not derived_concerns:
+        lines.append("No active concerns.")
+
+    return "\n".join(lines)
+
+
+def build_goal_field(
+    running_goal: Optional[Dict] = None,
+    recent_outcomes: Optional[List[Dict]] = None,
+) -> str:
+    """Format the goal field for the OODA context."""
+    lines = []
+    if running_goal:
+        lines.append(
+            f"**Running:** {running_goal.get('goal_text', '?')[:150]} "
+            f"(id={running_goal.get('goal_id', '?')})"
+        )
+    else:
+        lines.append("**Running:** none")
+
+    if recent_outcomes:
+        lines.append("**Recent outcomes:**")
+        for o in recent_outcomes[-3:]:
+            status = o.get("status", "?")
+            text = o.get("goal_text", "?")[:100]
+            product = o.get("primary_product", "")
+            lines.append(f"- [{status}] {text}")
+            if product:
+                lines.append(f"  Product: {product}")
+    return "\n".join(lines)
+
+
+def build_sensor_state(
+    sensor_configs: List[Dict],
+    recent_readings: Optional[List[Dict]] = None,
+) -> str:
+    """Format sensor state for the OODA context."""
+    lines = []
+    if sensor_configs:
+        lines.append("**Active sensors:**")
+        for s in sensor_configs:
+            name = s.get("name", "?")
+            sched = s.get("schedule", "?")
+            disp = s.get("disposition", "?")
+            lines.append(f"- {name} (every {sched}, disposition={disp})")
+
+    if recent_readings:
+        lines.append("\n**Recent readings:**")
+        for r in recent_readings[-5:]:
+            src = r.get("sensor_name", "?")
+            content = r.get("content", "")[:120]
+            lines.append(f"- [{src}] {content}")
+
+    return "\n".join(lines) if lines else ""
 
 
 class OodaPlanner:
@@ -224,6 +644,107 @@ class OodaPlanner:
         Blocks the calling (goal executor) thread until a response arrives.
         """
         return self.ask_user(question_text, target=target)
+
+    # ── Action dispatch (Phase 2) ──────────────────────────────────────
+
+    def dispatch_action(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        """Dispatch a parsed OODA action to its handler.
+
+        Returns a result dict with at least {status, summary}.
+        Phase 2: only submit-goal and say/ask are wired. Other actions
+        return stubs. Phase 3 will complete the wiring.
+        """
+        action_type = action.get("action", "")
+        handler = self._action_handlers.get(action_type)
+        if handler:
+            return handler(action)
+        logger.warning(f"Unknown OODA action: {action_type}")
+        return {"status": "error", "summary": f"Unknown action: {action_type}"}
+
+    @property
+    def _action_handlers(self) -> Dict[str, Any]:
+        return {
+            "submit-goal": self._action_submit_goal,
+            "say": self._action_say,
+            "ask": self._action_ask,
+            "wait": self._action_wait,
+            "reflect": self._action_reflect,
+            "update-concern": self._action_stub,
+            "update-user-model": self._action_stub,
+            "configure-sensor": self._action_stub,
+            "sleep": self._action_stub,
+        }
+
+    def _action_submit_goal(self, action: Dict) -> Dict[str, Any]:
+        """Submit a goal for direct execution (no scheduled goal persistence).
+
+        The goal runs on the executive_node's worker thread. This method
+        does NOT block — it submits and returns. The result arrives later
+        as a goal-completion event in the OODA context.
+        """
+        goal_text = action.get("goal_text", "")
+        concern_id = action.get("concern_id")
+        expected_outcome = action.get("expected_outcome", "")
+
+        if not goal_text:
+            return {"status": "error", "summary": "submit-goal requires goal_text"}
+
+        en = self.executive_node
+        if en._is_goal_running():
+            return {"status": "blocked", "summary": "Goal already running"}
+
+        logger.info(
+            f"OODA submit-goal: \"{goal_text[:100]}\" "
+            f"(concern={concern_id or 'none'})"
+        )
+
+        # Run via existing infrastructure — parse_and_set_goal on worker thread
+        en._run_goal_on_thread(
+            en.parse_and_set_goal,
+            en.character_config.get("template", ""),
+            goal_text,
+        )
+
+        return {
+            "status": "submitted",
+            "summary": f"Goal submitted: {goal_text[:120]}",
+            "concern_id": concern_id,
+            "expected_outcome": expected_outcome,
+        }
+
+    def _action_say(self, action: Dict) -> Dict[str, Any]:
+        text = action.get("text", "")
+        if not text:
+            return {"status": "error", "summary": "say requires text"}
+        self.say_to_user(text)
+        return {"status": "success", "summary": f"Said: {text[:80]}"}
+
+    def _action_ask(self, action: Dict) -> Dict[str, Any]:
+        text = action.get("text", "")
+        if not text:
+            return {"status": "error", "summary": "ask requires text"}
+        # Note: this blocks the OODA planner until the user responds.
+        # In Phase 3, the planning loop handles this appropriately.
+        response = self.ask_user(text)
+        if response is None:
+            return {"status": "timeout", "summary": "Ask timed out"}
+        return {"status": "success", "summary": f"User replied: {response[:80]}"}
+
+    def _action_wait(self, action: Dict) -> Dict[str, Any]:
+        reason = action.get("reason", "no reason given")
+        logger.info(f"OODA wait: {reason}")
+        return {"status": "success", "summary": f"Waiting: {reason}"}
+
+    def _action_reflect(self, action: Dict) -> Dict[str, Any]:
+        observation = action.get("observation", "")
+        logger.info(f"OODA reflect: {observation[:120]}")
+        return {"status": "success", "summary": f"Reflected: {observation[:80]}"}
+
+    def _action_stub(self, action: Dict) -> Dict[str, Any]:
+        """Stub for actions not yet wired in Phase 2."""
+        action_type = action.get("action", "?")
+        logger.info(f"OODA action stub: {action_type} (not yet implemented)")
+        return {"status": "stub", "summary": f"{action_type} not yet implemented"}
 
     # ── Main loop integration ───────────────────────────────────────────
 
