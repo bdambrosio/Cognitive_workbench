@@ -1593,12 +1593,16 @@ Only provide the result, followed by the </end> tag.""")
                 # Single string - treat as user message
                 chat_messages = [{"role": "user", "content": str(messages)}]
             
-            # Prepare payload
-            has_reasoning = "reasoning" in self.extra_request_params
+            # Prepare payload — add reasoning token budget to max_tokens so the
+            # model has room for both reasoning AND content output.
+            reasoning_budget = 0
+            reasoning_cfg = self.extra_request_params.get("reasoning", {})
+            if isinstance(reasoning_cfg, dict):
+                reasoning_budget = reasoning_cfg.get("max_tokens", 0)
             payload = {
                 "model": model,
                 "messages": chat_messages,
-                "max_tokens": max_tokens + (256 if has_reasoning else 0),
+                "max_tokens": max_tokens + reasoning_budget,
                 "temperature": temperature,
             }
             # Merge extra_request_params into payload
@@ -1922,11 +1926,16 @@ Only provide the result, followed by the </end> tag.""")
                 chat_messages = [{"role": "user", "content": str(messages)}]
             
             # Prepare payload (OpenRouter uses OpenAI-compatible format)
-            has_reasoning = "reasoning" in self.extra_request_params
+            # Add reasoning token budget to max_tokens so the model has room
+            # for both reasoning AND content output.
+            reasoning_budget = 0
+            reasoning_cfg = self.extra_request_params.get("reasoning", {})
+            if isinstance(reasoning_cfg, dict):
+                reasoning_budget = reasoning_cfg.get("max_tokens", 0)
             payload = {
                 "model": model,
                 "messages": chat_messages,
-                "max_tokens": max_tokens + (500 if has_reasoning else 0),
+                "max_tokens": max_tokens + reasoning_budget,
                 "temperature": temperature,
                 "top_p": 1.0,
                 "stream": False,
