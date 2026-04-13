@@ -122,6 +122,11 @@ class ResourceBrowser:
             """Get concerns from executive_node."""
             return self.query_concerns()
 
+        @self.app.get("/api/context")
+        async def get_context():
+            """Return browser context (map, character) for frontend."""
+            return {"map": self.map_name, "character": self.character_name}
+
         @self.app.post("/api/concern/{character}/manage")
         async def manage_concern(character: str, request: Request):
             """Manage a concern (close/resolve/abandon)."""
@@ -1175,14 +1180,148 @@ class ResourceBrowser:
 
         function showConcernDetail(concern, type) {
             const content = document.getElementById('resource-content');
-            if (!content) return;
-            const pre = content.querySelector('pre') || content.querySelector('textarea');
-            if (pre) {
-                pre.textContent = JSON.stringify(concern, null, 2);
-            }
-            // Show the content panel if hidden (when on concerns tab)
+            const display = document.getElementById('content-display');
+            if (!content || !display) return;
             content.style.display = '';
+
+            const isUser = type === 'user';
+            const cid = isUser ? (concern.concern_id || concern.id || '?') : (concern.concern_id || '?');
+            const label = concern.concern_label || concern.name || '?';
+            const desc = concern.concern_description || concern.description || '';
+            const status = concern.status || (isUser ? 'open' : '?');
+            const weight = concern.weight;
+            const category = concern.category || '';
+            const origin = concern.origin || '';
+            const rationale = concern.status_rationale || '';
+            const history = concern.history_summary || '';
+            const recency = concern.recency || '';
+            const created = concern.created || concern.created_at || '';
+
+            // Build action buttons based on type
+            let actions = '';
+            if (isUser) {
+                if (status === 'open') {
+                    actions = `
+                        <button onclick="manageConcern('${cid}', 'close', '${type}')" style="background:#5a4a30;color:#d4d4d4;border:none;padding:5px 12px;cursor:pointer;margin-right:6px">Close</button>
+                        <button onclick="manageConcern('${cid}', 'delete', '${type}')" style="background:#5a2d2d;color:#d4d4d4;border:none;padding:5px 12px;cursor:pointer">Delete</button>
+                    `;
+                } else {
+                    actions = `
+                        <button onclick="manageConcern('${cid}', 'reopen', '${type}')" style="background:#2d5a4a;color:#d4d4d4;border:none;padding:5px 12px;cursor:pointer;margin-right:6px">Reopen</button>
+                        <button onclick="manageConcern('${cid}', 'delete', '${type}')" style="background:#5a2d2d;color:#d4d4d4;border:none;padding:5px 12px;cursor:pointer">Delete</button>
+                    `;
+                }
+            } else {
+                // Derived concern
+                if (status === 'active' || status === 'surfaced') {
+                    actions = `
+                        <button onclick="manageConcern('${cid}', 'satisfy', '${type}')" style="background:#2d5a4a;color:#d4d4d4;border:none;padding:5px 12px;cursor:pointer;margin-right:6px">Satisfy</button>
+                        <button onclick="manageConcern('${cid}', 'abandon', '${type}')" style="background:#5a4a30;color:#d4d4d4;border:none;padding:5px 12px;cursor:pointer;margin-right:6px">Abandon</button>
+                        <button onclick="manageConcern('${cid}', 'delete', '${type}')" style="background:#5a2d2d;color:#d4d4d4;border:none;padding:5px 12px;cursor:pointer">Delete</button>
+                    `;
+                } else {
+                    actions = `
+                        <button onclick="manageConcern('${cid}', 'activate', '${type}')" style="background:#2d5a4a;color:#d4d4d4;border:none;padding:5px 12px;cursor:pointer;margin-right:6px">Activate</button>
+                        <button onclick="manageConcern('${cid}', 'delete', '${type}')" style="background:#5a2d2d;color:#d4d4d4;border:none;padding:5px 12px;cursor:pointer">Delete</button>
+                    `;
+                }
+            }
+
+            const statusColor = (status === 'open' || status === 'active') ? '#4ec9b0'
+                              : (status === 'closed' || status === 'satisfied') ? '#569cd6'
+                              : (status === 'abandoned') ? '#888' : '#ce9178';
+
+            display.classList.remove('empty-state');
+            display.innerHTML = `
+                <div style="padding:15px;color:#d4d4d4">
+                    <div style="border-bottom:1px solid #333;padding-bottom:10px;margin-bottom:12px">
+                        <div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px">
+                            ${isUser ? 'User Concern' : 'Derived Concern'} · ${cid}
+                        </div>
+                        <h2 style="margin:0;font-size:16px;color:#d4d4d4">${label}</h2>
+                        <div style="margin-top:6px">
+                            <span style="color:${statusColor};font-size:11px;text-transform:uppercase;letter-spacing:0.5px">${status}</span>
+                            ${weight !== undefined ? `<span style="color:#888;font-size:11px;margin-left:10px">weight: ${weight}</span>` : ''}
+                            ${category ? `<span style="color:#888;font-size:11px;margin-left:10px">category: ${category}</span>` : ''}
+                            ${origin ? `<span style="color:#888;font-size:11px;margin-left:10px">origin: ${origin}</span>` : ''}
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom:12px">
+                        <div style="color:#888;font-size:10px;text-transform:uppercase;margin-bottom:4px">Description</div>
+                        <div style="color:#d4d4d4;font-size:12px;line-height:1.5">${desc || '(none)'}</div>
+                    </div>
+
+                    ${rationale ? `
+                        <div style="margin-bottom:12px">
+                            <div style="color:#888;font-size:10px;text-transform:uppercase;margin-bottom:4px">Status rationale</div>
+                            <div style="color:#d4d4d4;font-size:12px;line-height:1.5">${rationale}</div>
+                        </div>
+                    ` : ''}
+
+                    ${history ? `
+                        <div style="margin-bottom:12px">
+                            <div style="color:#888;font-size:10px;text-transform:uppercase;margin-bottom:4px">History</div>
+                            <div style="color:#d4d4d4;font-size:12px;line-height:1.5;white-space:pre-wrap">${history}</div>
+                        </div>
+                    ` : ''}
+
+                    ${created || recency ? `
+                        <div style="color:#888;font-size:10px;margin-bottom:12px">
+                            ${created ? `created: ${created}` : ''}
+                            ${recency ? ` · recency: ${recency}` : ''}
+                        </div>
+                    ` : ''}
+
+                    <div style="border-top:1px solid #333;padding-top:10px;margin-top:15px">
+                        ${actions}
+                    </div>
+
+                    <details style="margin-top:15px">
+                        <summary style="color:#888;font-size:10px;text-transform:uppercase;cursor:pointer">Raw JSON</summary>
+                        <pre style="color:#888;font-size:10px;white-space:pre-wrap;margin-top:6px">${JSON.stringify(concern, null, 2)}</pre>
+                    </details>
+                </div>
+            `;
         }
+
+        async function manageConcern(concernId, action, type) {
+            // Confirm destructive actions
+            if (action === 'delete' && !confirm(`Delete concern ${concernId}? This cannot be undone.`)) {
+                return;
+            }
+            const character = window.characterName || '';
+            if (!character) {
+                alert('No character context available for concern management');
+                return;
+            }
+            try {
+                const resp = await fetch(`/api/concern/${character}/manage`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({concern_id: concernId, action: action, type: type}),
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    // Refresh concerns list and clear detail pane
+                    loadConcerns();
+                    document.getElementById('content-display').innerHTML = '<div class="empty-state"><p>← Select a concern to view its content</p></div>';
+                    document.getElementById('content-display').classList.add('empty-state');
+                } else {
+                    alert('Action failed: ' + (data.error || 'unknown error'));
+                }
+            } catch (e) {
+                alert('Action failed: ' + e.message);
+            }
+        }
+
+        // Load context (character name) on startup
+        fetch('/api/context').then(r => r.json()).then(data => {
+            window.characterName = data.character || '';
+            if (data.character) {
+                document.getElementById('map-name').textContent = `${data.map} · ${data.character}`;
+            }
+        }).catch(() => {});
 
         // Auto-load on page load
         refreshResources();
