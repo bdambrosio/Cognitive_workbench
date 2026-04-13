@@ -1593,16 +1593,12 @@ Only provide the result, followed by the </end> tag.""")
                 # Single string - treat as user message
                 chat_messages = [{"role": "user", "content": str(messages)}]
             
-            # Prepare payload — add reasoning token budget to max_tokens so the
-            # model has room for both reasoning AND content output.
-            reasoning_budget = 0
-            reasoning_cfg = self.extra_request_params.get("reasoning", {})
-            if isinstance(reasoning_cfg, dict):
-                reasoning_budget = reasoning_cfg.get("max_tokens", 0)
+            # Prepare payload
+            has_reasoning = "reasoning" in self.extra_request_params
             payload = {
                 "model": model,
                 "messages": chat_messages,
-                "max_tokens": max_tokens + reasoning_budget,
+                "max_tokens": max_tokens + (256 if has_reasoning else 0),
                 "temperature": temperature,
             }
             # Merge extra_request_params into payload
@@ -1926,16 +1922,11 @@ Only provide the result, followed by the </end> tag.""")
                 chat_messages = [{"role": "user", "content": str(messages)}]
             
             # Prepare payload (OpenRouter uses OpenAI-compatible format)
-            # Add reasoning token budget to max_tokens so the model has room
-            # for both reasoning AND content output.
-            reasoning_budget = 0
-            reasoning_cfg = self.extra_request_params.get("reasoning", {})
-            if isinstance(reasoning_cfg, dict):
-                reasoning_budget = reasoning_cfg.get("max_tokens", 0)
+            has_reasoning = "reasoning" in self.extra_request_params
             payload = {
                 "model": model,
                 "messages": chat_messages,
-                "max_tokens": max_tokens + reasoning_budget,
+                "max_tokens": max_tokens + (500 if has_reasoning else 0),
                 "temperature": temperature,
                 "top_p": 1.0,
                 "stream": False,
@@ -1981,6 +1972,8 @@ Only provide the result, followed by the </end> tag.""")
                         logger.warning(f"OpenRouter API {last_err} (attempt {attempt+1}/2), retrying...")
                         import time; time.sleep(2 ** attempt)
                         continue
+                    if response.status_code >= 400:
+                        logger.error(f"OpenRouter API {response.status_code} body: {response.text[:500]}")
                     response.raise_for_status()
                     break
                 except requests.exceptions.Timeout as e:
