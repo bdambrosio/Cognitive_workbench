@@ -1916,7 +1916,40 @@ class ZenohExecutiveNode:
         except Exception as e:
             logger.debug(f'Triage activation nomination skipped: {e}')
 
-        # Triage LLM call removed — OODA planner reads candidates directly
+        # Feed accumulated nominations to OODA planner as a synthetic event.
+        # When concerns have been nominated (activation threshold crossed,
+        # orient bypass), create an inform-level event so the planner sees
+        # the concern pressure on its next strategic cycle.
+        candidates = self._concern_triage.consume_candidates()
+        if candidates and hasattr(self, 'ooda_planner'):
+            summaries = []
+            for c in candidates[:4]:
+                summaries.append(
+                    f"{c.concern_label} (activation={c.activation:.2f}, "
+                    f"source={c.source}): {c.concern_description[:100]}"
+                )
+            concern_event = {
+                'timestamp': datetime.now().isoformat(),
+                'sequence_id': 0,
+                'mode': 'text',
+                'content': json.dumps({
+                    'source': 'concern_triage',
+                    'text': (
+                        f"Concern nomination: {len(candidates)} concern(s) "
+                        f"have crossed activation threshold and warrant "
+                        f"strategic attention:\n" + "\n".join(summaries)
+                    ),
+                }),
+                'sensor_name': 'concern_triage',
+                'disposition': 'inform',
+            }
+            self._sensor_inform_queue.append(concern_event)
+            if len(self._sensor_inform_queue) > 10:
+                self._sensor_inform_queue.pop(0)
+            logger.info(
+                f"Triage: injected concern nomination event for "
+                f"{len(candidates)} candidate(s)"
+            )
 
     # Triage context/decisions/delegation methods removed — OODA planner owns this
 
