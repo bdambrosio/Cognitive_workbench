@@ -116,6 +116,17 @@ class ResourceBrowser:
             """Get subgraph expansion or search results."""
             body = await request.json()
             return self.query_graph_subgraph(body)
+
+        @self.app.get("/api/concerns")
+        async def list_concerns():
+            """Get concerns from executive_node."""
+            return self.query_concerns()
+
+        @self.app.post("/api/concern/{character}/manage")
+        async def manage_concern(character: str, request: Request):
+            """Manage a concern (close/resolve/abandon)."""
+            body = await request.json()
+            return self.manage_concern_via_zenoh(character, body)
     
     def _key_prefix(self) -> str:
         """Return Zenoh key prefix for the target character (or wildcard fallback)."""
@@ -222,6 +233,34 @@ class ResourceBrowser:
                 return json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
 
         return {'success': False, 'error': 'No response from executive_node for graph subgraph'}
+
+    def query_concerns(self) -> Dict:
+        """Query executive_node for concerns (user + derived + activations)."""
+        key = f"{self._key_prefix()}/concerns"
+        logger.info(f"Querying concerns: {key}")
+
+        from zenoh import QueryTarget, ConsolidationMode
+        target = QueryTarget.BEST_MATCHING if self.character_name else QueryTarget.ALL
+        for reply in self.session.get(key, target=target, consolidation=ConsolidationMode.NONE, timeout=2.0):
+            if reply.ok:
+                try:
+                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if data.get('success'):
+                        return data
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    continue
+
+        return {'success': False, 'error': 'No response from executive_node for concerns'}
+
+    def manage_concern_via_zenoh(self, character: str, params: Dict) -> Dict:
+        """Publish a concern management command to executive_node."""
+        key = f"cognitive/{character}/control/concern_manage"
+        payload = json.dumps(params).encode('utf-8')
+        try:
+            self.session.put(key, payload)
+            return {'success': True}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
 
     def get_html(self) -> str:
         """Generate HTML UI."""
@@ -478,6 +517,7 @@ class ResourceBrowser:
             <div class="tab-bar">
                 <button class="tab-btn active" onclick="switchTab('resources')">Resources</button>
                 <button class="tab-btn" onclick="switchTab('graph')">Graph</button>
+                <button class="tab-btn" onclick="switchTab('concerns')">Concerns</button>
             </div>
             <div id="resources-tab" class="tab-panel active">
                 <div class="section">
@@ -493,6 +533,16 @@ class ResourceBrowser:
                 <div class="section">
                     <div class="section-title">Entities (<span id="entity-count">0</span>)</div>
                     <div id="entity-list"></div>
+                </div>
+            </div>
+            <div id="concerns-tab" class="tab-panel">
+                <div class="section">
+                    <div class="section-title">User Concerns (<span id="user-concerns-count">0</span>)</div>
+                    <div id="user-concerns-list"></div>
+                </div>
+                <div class="section">
+                    <div class="section-title">Derived Concerns (<span id="derived-concerns-count">0</span>)</div>
+                    <div id="derived-concerns-list"></div>
                 </div>
             </div>
         </div>
@@ -789,6 +839,7 @@ class ResourceBrowser:
             event.target.classList.add('active');
             document.getElementById('resources-tab').classList.toggle('active', tab === 'resources');
             document.getElementById('graph-sidebar').classList.toggle('active', tab === 'graph');
+            document.getElementById('concerns-tab').classList.toggle('active', tab === 'concerns');
             document.getElementById('resource-content').style.display = tab === 'resources' ? '' : 'none';
             const gp = document.getElementById('graph-panel');
             if (tab === 'graph') {
@@ -797,6 +848,9 @@ class ResourceBrowser:
                 loadEntityOverview();
             } else {
                 gp.classList.remove('active');
+            }
+            if (tab === 'concerns') {
+                loadConcerns();
             }
         }
 
@@ -1052,6 +1106,82 @@ class ResourceBrowser:
                 const tgtHidden = hidden.has((graphNodes.find(n => n.node_id === d.target?.node_id || n.node_id === d.target) || {}).type);
                 return (srcHidden && tgtHidden) ? 'none' : '';
             });
+        }
+
+        // ── Concerns tab ──────────────────────────────────────────
+        async function loadConcerns() {
+            try {
+                const resp = await fetch('/api/concerns');
+                const data = await resp.json();
+                if (!data.success) return;
+
+                const activations = data.activations || {};
+
+                // User concerns
+                const ucList = document.getElementById('user-concerns-list');
+                const uc = data.user_concerns || [];
+                document.getElementById('user-concerns-count').textContent = uc.length;
+                ucList.innerHTML = uc.map(c => {
+                    const label = c.concern_label || c.name || '?';
+                    const status = c.status || 'open';
+                    const desc = c.concern_description || c.description || '';
+                    const weight = c.weight || 0;
+                    const statusColor = status === 'open' ? '#4ec9b0' : status === 'closed' ? '#888' : '#ce9178';
+                    return `<div class="resource-item" onclick="showConcernDetail(${JSON.stringify(c).replace(/"/g, '&quot;')}, 'user')" style="padding:4px 6px;margin:1px 0;cursor:pointer">
+                        <div style="display:flex;justify-content:space-between;align-items:center">
+                            <span style="color:#d4d4d4;font-size:11px">${label}</span>
+                            <span style="color:${statusColor};font-size:9px;text-transform:uppercase">${status}</span>
+                        </div>
+                        <div style="color:#888;font-size:10px;margin-top:2px">${desc.substring(0,80)}${desc.length > 80 ? '...' : ''}</div>
+                        <div style="background:#333;height:3px;margin-top:3px;border-radius:1px">
+                            <div style="background:#569cd6;height:3px;width:${Math.min(weight * 100, 100)}%;border-radius:1px"></div>
+                        </div>
+                    </div>`;
+                }).join('');
+
+                // Derived concerns
+                const dcList = document.getElementById('derived-concerns-list');
+                const dc = data.derived_concerns || [];
+                document.getElementById('derived-concerns-count').textContent = dc.length;
+                dcList.innerHTML = dc.map(c => {
+                    const cid = c.concern_id || '?';
+                    const label = c.concern_label || cid;
+                    const status = c.status || '?';
+                    const desc = c.concern_description || '';
+                    const act = activations[cid] || {};
+                    const activation = act.activation || 0;
+                    const trend = act.trend || 'stable';
+                    const trendIcon = trend === 'rising' ? '↑' : trend === 'falling' ? '↓' : '→';
+                    const statusColor = status === 'active' ? '#4ec9b0' : status === 'satisfied' ? '#569cd6' : status === 'abandoned' ? '#888' : '#ce9178';
+                    const barColor = activation > 0.7 ? '#ce9178' : activation > 0.4 ? '#dcdcaa' : '#4ec9b0';
+                    return `<div class="resource-item" onclick="showConcernDetail(${JSON.stringify(c).replace(/"/g, '&quot;')}, 'derived')" style="padding:4px 6px;margin:1px 0;cursor:pointer">
+                        <div style="display:flex;justify-content:space-between;align-items:center">
+                            <span style="color:#d4d4d4;font-size:11px">${label}</span>
+                            <span style="color:${statusColor};font-size:9px">${status} ${trendIcon}</span>
+                        </div>
+                        <div style="color:#888;font-size:10px;margin-top:2px">${desc.substring(0,80)}${desc.length > 80 ? '...' : ''}</div>
+                        <div style="display:flex;align-items:center;gap:4px;margin-top:3px">
+                            <div style="flex:1;background:#333;height:3px;border-radius:1px">
+                                <div style="background:${barColor};height:3px;width:${Math.min(activation * 100, 100)}%;border-radius:1px"></div>
+                            </div>
+                            <span style="color:#888;font-size:9px">${activation.toFixed(2)}</span>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                console.error('Failed to load concerns:', e);
+            }
+        }
+
+        function showConcernDetail(concern, type) {
+            const content = document.getElementById('resource-content');
+            if (!content) return;
+            const pre = content.querySelector('pre') || content.querySelector('textarea');
+            if (pre) {
+                pre.textContent = JSON.stringify(concern, null, 2);
+            }
+            // Show the content panel if hidden (when on concerns tab)
+            content.style.display = '';
         }
 
         // Auto-load on page load

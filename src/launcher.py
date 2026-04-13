@@ -330,7 +330,7 @@ def main():
     parser.add_argument('--ui', action='store_true', help='Launch FastAPI web UI')
     parser.add_argument('--ui-port', type=int, default=3000, help='Port for web UI (default: 3000)')
     parser.add_argument('--resource-browser', action='store_true', help='Launch Resource Browser (port 3001)')
-    parser.add_argument('--task-manager', action='store_true', help='Launch Task & Concern Manager (port 3002)')
+    parser.add_argument('--task-manager', action='store_true', help='(deprecated — concerns now in resource browser)')
     parser.add_argument('--cli', action='store_true', help='Launch interactive CLI chat interface')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     args = parser.parse_args()
@@ -398,9 +398,8 @@ def main():
         if proc:
             service_procs.append(proc)
     if args.task_manager:
-        proc = launch_task_manager()
-        if proc:
-            service_procs.append(proc)
+        logger.warning("--task-manager is deprecated; concerns are now in the Resource Browser (Concerns tab)")
+        # task_manager.py no longer launched
 
     # ---- URL listener (shared; sensors drain the queue) ----
     # Start if any character declares a browser-visits sensor
