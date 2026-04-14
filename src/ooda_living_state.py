@@ -79,6 +79,17 @@ class OodaLivingState:
         # Epistemic boundary markers
         self.epistemic_markers: List[str] = []
 
+        # Unified operational markers — timestamps + summaries for self-reporting.
+        # Enables the agent to answer "when did I last do X?" without guessing.
+        self.operational_markers: Dict[str, Dict[str, Any]] = {
+            # {"timestamp": iso, "summary": str, ...extras}
+            "last_health_check": {},
+            "last_goal_completion": {},
+            "last_vision_eval_pass": {},
+            "last_user_interaction": {},
+            "last_autonomous_action": {},
+        }
+
         # Internal: activation history for trend computation
         self._activation_history: Dict[str, deque] = {}
 
@@ -95,14 +106,23 @@ class OodaLivingState:
             event: EventPacket dataclass instance.
         """
         content_preview = (getattr(event, "content", "") or "")[:80]
+        source = getattr(event, "source", "") or ""
+        classification = getattr(event, "classification", "") or ""
         self.last_event = {
             "event_type": getattr(event, "event_type", ""),
-            "classification": getattr(event, "classification", ""),
-            "source": getattr(event, "source", ""),
+            "classification": classification,
+            "source": source,
             "content_preview": content_preview,
             "goal_id": getattr(event, "goal_id", None),
             "timestamp": _now_iso(),
         }
+        # Stamp user interaction marker when a real user message arrives
+        if source == "User" and classification in ("chat", "ask_reply"):
+            self.record_operational_marker(
+                "last_user_interaction",
+                summary=content_preview,
+                classification=classification,
+            )
         self._dirty = True
 
     def update_after_orient(
@@ -235,6 +255,25 @@ class OodaLivingState:
                 "status": g.get("status", "?"),
             })
         self.foregrounded_goal_id = foregrounded_id
+        self._dirty = True
+
+    def record_operational_marker(
+        self, marker_name: str, summary: str = "", **extras: Any,
+    ) -> None:
+        """Stamp an operational marker with the current time + summary.
+
+        Use marker_name = 'last_health_check', 'last_goal_completion',
+        'last_vision_eval_pass', 'last_user_interaction',
+        'last_autonomous_action'. Extras (e.g., goal_id, status, concern_id)
+        are merged into the record for self-reporting.
+        """
+        if marker_name not in self.operational_markers:
+            self.operational_markers[marker_name] = {}
+        record = {"timestamp": _now_iso()}
+        if summary:
+            record["summary"] = summary[:200]
+        record.update({k: v for k, v in extras.items() if v is not None})
+        self.operational_markers[marker_name] = record
         self._dirty = True
 
     # ── Persistence ────────────────────────────────────────────────────
@@ -665,6 +704,45 @@ class OodaLivingState:
             lines.extend(unresolved_lines)
             parts.append("\n".join(lines))
 
+        # ── Operational Markers ───────────────────────────────────────────
+        # Timestamps of key operational events, for self-reporting
+        # ("when did I last run a health check?", etc.)
+        marker_lines: List[str] = []
+        for name, record in self.operational_markers.items():
+            if not record or not record.get("timestamp"):
+                continue
+            ts_str = record.get("timestamp", "")
+            # Display just HH:MM:SS or elapsed-since
+            try:
+                marker_dt = datetime.fromisoformat(ts_str)
+                now_dt = datetime.now(timezone.utc)
+                if marker_dt.tzinfo is None:
+                    marker_dt = marker_dt.replace(tzinfo=timezone.utc)
+                elapsed = (now_dt - marker_dt).total_seconds()
+                if elapsed < 60:
+                    when = f"{int(elapsed)}s ago"
+                elif elapsed < 3600:
+                    when = f"{int(elapsed / 60)}m ago"
+                elif elapsed < 86400:
+                    when = f"{int(elapsed / 3600)}h ago"
+                else:
+                    when = f"{int(elapsed / 86400)}d ago"
+            except Exception:
+                when = ts_str[:16]
+            summary = record.get("summary", "")
+            line = f"- {name}: {when}"
+            if summary:
+                line += f" — {summary}"
+            marker_lines.append(line)
+
+        if marker_lines:
+            lines = [
+                "## Operational Markers",
+                "Timestamps of key operational events for self-reporting.",
+            ]
+            lines.extend(marker_lines)
+            parts.append("\n".join(lines))
+
         return "\n\n".join(parts)
 
     def load(self, infospace_executor) -> bool:
@@ -700,6 +778,7 @@ class OodaLivingState:
             "last_event": self.last_event,
             "transitions": list(self.transitions),
             "epistemic_markers": self.epistemic_markers,
+            "operational_markers": self.operational_markers,
             "_activation_history": {
                 k: list(v) for k, v in self._activation_history.items()
             },
@@ -714,6 +793,13 @@ class OodaLivingState:
         self.goal_field = data.get("goal_field", [])
         self.foregrounded_goal_id = data.get("foregrounded_goal_id")
         self.last_event = data.get("last_event", {})
+        # Operational markers — merge with default keys so new markers added
+        # later are present even when loading old state.
+        loaded_markers = data.get("operational_markers", {})
+        if isinstance(loaded_markers, dict):
+            for k, v in loaded_markers.items():
+                if isinstance(v, dict):
+                    self.operational_markers[k] = v
         self.transitions = deque(
             data.get("transitions", []), maxlen=_TRANSITIONS_MAXLEN
         )

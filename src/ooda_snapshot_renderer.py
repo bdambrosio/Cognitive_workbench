@@ -182,6 +182,7 @@ def render_self_model_section(
     sensor_configs: Optional[Sequence[Dict[str, Any]]] = None,
     execution_mode: str = "step",
     tool_count: int = 0,
+    operational_markers: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> str:
     """Render the operational self-model section for planner consumption.
 
@@ -298,5 +299,37 @@ def render_self_model_section(
             sched_s = s.get("schedule_seconds", 0)
             sensor_lines.append(f"- {name}: {stype}-type, disposition={disp}, every {int(sched_s)}s")
         parts.append("### Active Sensors\n" + "\n".join(sensor_lines))
+
+    # ── Operational Markers (for self-reporting) ──────────────────────
+    if operational_markers:
+        from datetime import datetime, timezone
+        marker_lines: List[str] = []
+        now_dt = datetime.now(timezone.utc)
+        for name, record in operational_markers.items():
+            if not record or not record.get("timestamp"):
+                continue
+            ts_str = record.get("timestamp", "")
+            try:
+                marker_dt = datetime.fromisoformat(ts_str)
+                if marker_dt.tzinfo is None:
+                    marker_dt = marker_dt.replace(tzinfo=timezone.utc)
+                elapsed = (now_dt - marker_dt).total_seconds()
+                if elapsed < 60:
+                    when = f"{int(elapsed)}s ago"
+                elif elapsed < 3600:
+                    when = f"{int(elapsed / 60)}m ago"
+                elif elapsed < 86400:
+                    when = f"{int(elapsed / 3600)}h ago"
+                else:
+                    when = f"{int(elapsed / 86400)}d ago"
+            except Exception:
+                when = ts_str[:16]
+            summary = record.get("summary", "")
+            line = f"- {name}: {when}"
+            if summary:
+                line += f" — {summary[:100]}"
+            marker_lines.append(line)
+        if marker_lines:
+            parts.append("### Operational Markers\n" + "\n".join(marker_lines))
 
     return "## Operational Self-Model\n\n" + "\n\n".join(parts)

@@ -1145,6 +1145,18 @@ class OodaPlanner:
             goal_text,
         )
 
+        # Mark autonomous action for self-reporting
+        try:
+            ls = getattr(en, '_ooda_living_state', None)
+            if ls:
+                ls.record_operational_marker(
+                    "last_autonomous_action",
+                    summary=f"submit-goal: {goal_text[:150]}",
+                    concern_id=concern_id or None,
+                )
+        except Exception:
+            pass
+
         return {
             "status": "submitted",
             "summary": f"Goal submitted: {goal_text[:120]}",

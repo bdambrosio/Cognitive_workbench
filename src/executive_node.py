@@ -3205,6 +3205,28 @@ class ZenohExecutiveNode:
                 'result_summary': (last_result_raw or '')[:300],
                 'concern_id': goal.get('concern_id', ''),
             })
+
+        # ── Update operational markers for self-reporting ──
+        try:
+            goal_text_lc = (goal.get('goal_text', '') or '').lower()
+            summary_text = (last_result_raw or '')[:120] or goal.get('goal_text', '')[:120]
+            self._ooda_living_state.record_operational_marker(
+                'last_goal_completion',
+                summary=summary_text,
+                goal_id=goal_id,
+                status=goal_status,
+                primary_product=primary_product or None,
+            )
+            # Detect health check goals by content — the goal text or tool use mentions check-health
+            if 'check-health' in goal_text_lc or 'health check' in goal_text_lc or 'system health' in goal_text_lc:
+                self._ooda_living_state.record_operational_marker(
+                    'last_health_check',
+                    summary=summary_text,
+                    goal_id=goal_id,
+                    status=goal_status,
+                )
+        except Exception as e:
+            logger.debug(f'operational marker update failed: {e}')
         if goal_id in self._scheduler_started_goals:
             self._scheduler_started_goals.discard(goal_id)
         scheduler_end_status = "interrupted" if user_interrupted else updates["status"]
@@ -4944,6 +4966,7 @@ class ZenohExecutiveNode:
         try:
             from ooda_snapshot_renderer import render_self_model_section
             dc = getattr(self, '_derived_concern_model', None)
+            ls = getattr(self, '_ooda_living_state', None)
             self_model_block = render_self_model_section(
                 scheduler_status={},
                 tasks=[],
@@ -4952,6 +4975,7 @@ class ZenohExecutiveNode:
                 sensor_configs=self.sensor_configs,
                 execution_mode=getattr(self, 'execution_mode', 'step'),
                 tool_count=len(self.infospace_executor.available_tools) if self.infospace_executor else 0,
+                operational_markers=getattr(ls, 'operational_markers', None) if ls else None,
             )
         except Exception:
             pass
