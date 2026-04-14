@@ -2543,25 +2543,54 @@ def _count_eval_verdicts(eval_text: str) -> dict:
     """Parse per-criterion PASS/FAIL/INAPPLICABLE counts from eval text.
 
     Looks for lines matching: criterion_name: PASS|FAIL|INAPPLICABLE [- reason]
-    Returns {'pass': N, 'fail': N, 'inapplicable': N, 'total': N, 'applicable': N, 'pass_ratio': float}.
+    Tracks must_/should_ tier prefixes separately for two-tier gating.
+    Returns counts dict with pass/fail/inapplicable totals plus
+    must_pass/must_fail/should_pass/should_fail breakdowns.
     """
-    counts = {'pass': 0, 'fail': 0, 'inapplicable': 0}
+    counts = {
+        'pass': 0, 'fail': 0, 'inapplicable': 0,
+        'must_pass': 0, 'must_fail': 0,
+        'should_pass': 0, 'should_fail': 0,
+    }
+    # Pattern to extract the criterion label at line start
+    import re as _re
+    label_re = _re.compile(r'^\s*\d*\.?\s*([a-z_][a-z0-9_]*)\s*:', _re.IGNORECASE)
+
     for line in eval_text.splitlines():
         line = line.strip()
         if not line or line.startswith('RECOMMENDATION') or line.startswith('STATUS'):
             continue
         lo = line.lower()
+        verdict = None
         if ': pass' in lo or lo.endswith(': pass'):
             counts['pass'] += 1
+            verdict = 'pass'
         elif ': fail' in lo:
             counts['fail'] += 1
+            verdict = 'fail'
         elif ': inapplicable' in lo:
             counts['inapplicable'] += 1
+            verdict = 'inapplicable'
+
+        if verdict in ('pass', 'fail'):
+            m = label_re.match(line)
+            if m:
+                label = m.group(1).lower()
+                if label.startswith('must_'):
+                    counts[f'must_{verdict}'] += 1
+                elif label.startswith('should_'):
+                    counts[f'should_{verdict}'] += 1
+                else:
+                    # Legacy unprefixed criteria: treat as must_ for safety
+                    counts[f'must_{verdict}'] += 1
+
     total = counts['pass'] + counts['fail'] + counts['inapplicable']
     applicable = counts['pass'] + counts['fail']
     counts['total'] = total
     counts['applicable'] = applicable
     counts['pass_ratio'] = counts['pass'] / applicable if applicable > 0 else 1.0
+    counts['must_applicable'] = counts['must_pass'] + counts['must_fail']
+    counts['all_must_pass'] = counts['must_fail'] == 0
     return counts
 
 
@@ -2576,9 +2605,10 @@ def _parse_deep_eval_status(deep_text: str) -> str:
     Returns one of: "satisfied", "needs_revision", "unknown".
 
     Override rules (checked in order):
-    1. If RECOMMENDATION says to remove/reframe a criterion → satisfied
-    2. If pass ratio among applicable criteria >= threshold → satisfied
-    3. Otherwise respect the LLM's STATUS line
+    1. If all must_ criteria pass → satisfied (should_ failures are nice-to-have)
+    2. If RECOMMENDATION says to remove/reframe a criterion → satisfied
+    3. If pass ratio among applicable criteria >= threshold → satisfied
+    4. Otherwise respect the LLM's STATUS line
     """
     if not deep_text:
         return "unknown"
@@ -2592,14 +2622,21 @@ def _parse_deep_eval_status(deep_text: str) -> str:
         status = m.group(1).strip().upper()
         raw = "satisfied" if status == "SATISFIED" else "needs_revision"
         if raw == "needs_revision":
-            # Override 1: recommendation says criterion is inapplicable
+            # Override 1: two-tier gate — all must_ pass, should_ failures OK
+            if verdicts['must_applicable'] > 0 and verdicts['all_must_pass'] and verdicts['should_fail'] > 0:
+                logger.info(
+                    f"Vision eval: overriding NEEDS_REVISION → satisfied "
+                    f"(all must_ pass; {verdicts['should_fail']} should_ failures treated as nice-to-have)"
+                )
+                return "satisfied"
+            # Override 2: recommendation says criterion is inapplicable
             rec_m = re.search(r"RECOMMENDATION[:\s]+(.+?)(?:\n|$)", text, flags=re.IGNORECASE | re.DOTALL)
             if rec_m:
                 rec = rec_m.group(1).lower()
                 if ("remove" in rec or "reframe" in rec) and "criterion" in rec:
                     logger.info(f"Vision eval: overriding NEEDS_REVISION → satisfied (recommendation: remove/reframe criterion)")
                     return "satisfied"
-            # Override 2: pass ratio above threshold
+            # Override 3: pass ratio above threshold
             if verdicts['applicable'] > 0 and verdicts['pass_ratio'] >= _VISION_PASS_RATIO_THRESHOLD:
                 logger.info(f"Vision eval: overriding NEEDS_REVISION → satisfied "
                             f"(pass ratio {verdicts['pass']}/{verdicts['applicable']} = {verdicts['pass_ratio']:.0%} "
@@ -2609,6 +2646,10 @@ def _parse_deep_eval_status(deep_text: str) -> str:
     lo = text.lower()
     if any(k in lo for k in ["needs_revision", "needs revision", "revision needed", "any fail", "criterion_"]):
         if "pass" not in lo or "fail" in lo:
+            # Two-tier override for fallback parsing path
+            if verdicts['must_applicable'] > 0 and verdicts['all_must_pass'] and verdicts['should_fail'] > 0:
+                logger.info(f"Vision eval: overriding needs_revision → satisfied (all must_ pass)")
+                return "satisfied"
             rec_m = re.search(r"RECOMMENDATION[:\s]+(.+?)(?:\n|$)", text, flags=re.IGNORECASE | re.DOTALL)
             if rec_m:
                 rec = rec_m.group(1).lower()
@@ -3423,8 +3464,28 @@ ALWAYS follow all formatting instructions exactly.
             )
             if stall_reason:
                 logger.info(stall_reason)
-                # If we haven't nudged yet, give one more step with ASK_USER hint
+                # If we haven't nudged yet, give one more step with ASK_USER hint.
+                # Also trigger a criterion review: maybe the vision criteria are
+                # unachievable given what tools actually produce.
                 if not stall_guard_state.get("nudged"):
+                    if vision_criteria and last_eval_target:
+                        artifact_txt = _resolve_eval_target_text(last_eval_target, executor) or ""
+                        failures = (locals().get('shallow_text') or "") + "\n" + (locals().get('deep_text') or "")
+                        revised = _criterion_review_on_stall(
+                            vision_criteria, artifact_txt, failures, executor,
+                        )
+                        if revised:
+                            vision_criteria = revised
+                            logger.info(f"Step {step}: Criterion review produced revised criteria; re-evaluating")
+                            s += user(
+                                f"CRITERION REVIEW: The vision criteria have been revised based on what the tools actually produced:\n{revised}\n"
+                                f"Your next DONE check will evaluate against these revised criteria."
+                            )
+                            s += assistant("Understood. I will proceed with the revised criteria.\n")
+                            stall_guard_state["prev_signature"] = None
+                            stall_guard_state["repeat_count"] = 0
+                            stall_guard_state["nudged"] = True
+                            continue
                     s += user(
                         "STALL DETECTED: You are repeating the same approach without progress. "
                         "Consider using ASK_USER in your next Stage 3 to get guidance from the user, "
@@ -4575,8 +4636,26 @@ ALWAYS follow all formatting instructions exactly.
         )
         if stall_reason:
             logger.info(stall_reason)
-            # If we haven't nudged yet, give one more step with ASK_USER hint
+            # If we haven't nudged yet, try criterion review first, then nudge.
             if not stall_guard_state.get("nudged"):
+                if vision_criteria and last_eval_target:
+                    artifact_txt = _resolve_eval_target_text(last_eval_target, executor) or ""
+                    failures = (locals().get('shallow_text') or "") + "\n" + (locals().get('deep_text') or "")
+                    revised = _criterion_review_on_stall(
+                        vision_criteria, artifact_txt, failures, executor,
+                    )
+                    if revised:
+                        vision_criteria = revised
+                        logger.info(f"Step {step}: Criterion review produced revised criteria; re-evaluating")
+                        prompt += format_user(
+                            f"CRITERION REVIEW: The vision criteria have been revised based on what the tools actually produced:\n{revised}\n"
+                            f"Your next DONE check will evaluate against these revised criteria."
+                        )
+                        prompt += format_assistant("Understood. I will proceed with the revised criteria.\n")
+                        stall_guard_state["prev_signature"] = None
+                        stall_guard_state["repeat_count"] = 0
+                        stall_guard_state["nudged"] = True
+                        continue
                 prompt += format_user(
                     "STALL DETECTED: You are repeating the same approach without progress. "
                     "Consider setting ASK_USER_NEEDED: YES in your next Stage 3 to get guidance from the user, "
@@ -4716,6 +4795,71 @@ def parse_request_tools(raw_text: str) -> Optional[List[str]]:
             tools = re.findall(r'"([^"]+)"', content)
             if tools:
                 return tools
+        return None
+
+
+def _criterion_review_on_stall(
+    vision_criteria: str,
+    artifact_text: str,
+    recent_failures: str,
+    executor: "InfospaceExecutor",
+) -> Optional[str]:
+    """Ask an LLM whether stalled criteria are achievable given actual output.
+
+    Called when the stall guard fires on a vision-eval loop. Returns updated
+    criteria text with unreasonable criteria dropped or downgraded to
+    should_, or None if no change warranted.
+
+    The review is triggered by evidence (repeated failure) — not a free
+    bailout. The LLM gets the actual artifact and failure history and
+    decides whether criteria are testable with the tools that produced
+    this output.
+    """
+    if not vision_criteria or not artifact_text:
+        return None
+
+    review_prompt = f"""You are reviewing quality criteria for achievability. A planner has been stuck repeatedly failing the same criteria. Your job is to decide whether the criteria are reasonable given what the tools actually produced.
+
+ORIGINAL CRITERIA:
+{vision_criteria}
+
+ACTUAL ARTIFACT PRODUCED:
+{artifact_text[:2000]}
+
+RECENT FAILURE REASONS:
+{recent_failures[:1500]}
+
+Your task:
+- For each criterion, decide: (a) keep as-is, (b) downgrade from must_ to should_, or (c) remove entirely
+- Downgrade when: the criterion asks for content the available tools cannot produce (e.g., "specific runtime values" when the tool returned N/A), or when the criterion is a nice-to-have rather than essential
+- Remove when: the criterion is truly inapplicable to this artifact type
+- Keep when: the artifact genuinely fails a reasonable requirement
+
+Output the revised criteria in the same numbered format, using must_/should_ prefixes. If all criteria should remain unchanged, output exactly:
+KEEP_UNCHANGED
+
+If you revise, output ONLY the revised numbered criteria (no commentary).
+end your output with
+</end>"""
+
+    try:
+        result = executor.llm_generate(
+            review_prompt, max_tokens=256, temperature=0.1, stops=["</end>"]
+        )
+        if not getattr(result, 'success', False) or not getattr(result, 'text', ''):
+            return None
+        text = result.text.strip()
+        if "KEEP_UNCHANGED" in text.upper():
+            logger.info("Criterion review: criteria kept unchanged")
+            return None
+        # Sanity check: output should contain numbered criteria
+        if not re.search(r'^\s*\d+\.\s*(must_|should_)', text, re.MULTILINE):
+            logger.info(f"Criterion review: output lacked tier prefixes; ignoring")
+            return None
+        logger.info(f"Criterion review: revised criteria:\n{text}")
+        return text
+    except Exception as e:
+        logger.debug(f"Criterion review failed: {e}")
         return None
 
 
@@ -5574,7 +5718,7 @@ class IncrementalPlanner:
     #       skipping) to the standard `\n</end>` directive + stop sequence
     #       so generation halts cleanly even if the model would otherwise
     #       keep rambling.
-    _VISION_GENERATOR_VERSION = 4
+    _VISION_GENERATOR_VERSION = 5
 
     @staticmethod
     def _vision_text_hash(goal_text: str) -> str:
@@ -5607,17 +5751,23 @@ Instructions:
 - For simple execution goals (e.g., "run script X", "execute Y"), prefer "No vision criteria needed."
 - Prefer returning "No vision criteria needed." over generating speculative criteria.
 
+TWO TIERS — classify each criterion:
+- must_ prefix: essential properties the artifact MUST have. Failure blocks goal completion. Use for: artifact existence, topical relevance, required structural elements explicitly named in the goal.
+- should_ prefix: quality/completeness properties that are nice-to-have. Failure is noted but does not block completion. Use for: specific value presence when values may not be obtainable, thoroughness, formatting polish, cross-reference accuracy.
+
+Be conservative with must_ — only use it when the criterion is clearly achievable with the available tools and the goal would be meaningless without it. Default to should_ when in doubt.
+
 CONDITIONAL OUTPUTS:
 If the goal has a conditional or either-or output (e.g., "if matches found, report them; else say 'no matches'"), phrase the affected criteria as "If <condition> then <required output>". Do NOT phrase a conditional output as if it were always required — the eval LLM treats criteria as required, so phrasing a conditional as required marks legitimate empty-case runs as FAIL.
 
-Format — number each criterion with a short positive label and a plain-English statement of what the artifact must be or contain (use "If X then Y" framing for conditional outputs):
-1. label: <plain-English statement>
-2. label: <plain-English statement>
+Format — number each criterion with a tier-prefixed label and a plain-English statement:
+1. must_<label>: <plain-English statement>
+2. should_<label>: <plain-English statement>
 
 Examples (illustrations of the format and tone, not criteria for this goal):
-1. non_empty: The output contains substantive content, not just whitespace or a placeholder.
-2. on_topic: The output addresses the topic named in the goal.
-3. names_articles: If matching articles exist, the output names at least one specific article title from the input.
+1. must_non_empty: The output contains substantive content, not just whitespace or a placeholder.
+2. must_on_topic: The output addresses the topic named in the goal.
+3. should_names_articles: If matching articles exist, the output names at least one specific article title from the input.
 
 Output ONLY the numbered criteria (or "No vision criteria needed."). Do NOT add commentary, reflection, or meta-discussion about whether the criteria are right.
 end your output with
