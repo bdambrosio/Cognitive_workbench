@@ -1219,7 +1219,7 @@ class OodaPlanner:
                 "why_this_satisfy": reason,
                 "field_updates": {"revisit_hours": revisit_hours},
             }
-            dcm._apply_single_patch(patch, evidence_ref="ooda_planner")
+            dcm._apply_patch(patch, evidence_ref="ooda_planner")
             dcm._save()
             return {
                 "status": "success",
@@ -1232,7 +1232,7 @@ class OodaPlanner:
                 "why_this_activate": reason,
                 "field_updates": {},
             }
-            dcm._apply_single_patch(patch, evidence_ref="ooda_planner")
+            dcm._apply_patch(patch, evidence_ref="ooda_planner")
             dcm._save()
             return {
                 "status": "success",
@@ -1245,7 +1245,7 @@ class OodaPlanner:
                 "why_this_abandon": reason,
                 "field_updates": {},
             }
-            dcm._apply_single_patch(patch, evidence_ref="ooda_planner")
+            dcm._apply_patch(patch, evidence_ref="ooda_planner")
             dcm._save()
             return {
                 "status": "success",
