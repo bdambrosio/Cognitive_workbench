@@ -1649,14 +1649,26 @@ class ZenohExecutiveNode:
             # resource_manager directly — no race, no IPC, no None reference.
             self._start_sensors()
 
-            # Start main loop
+            # Start main loop — adaptive sleep: fast when busy, slow when idle
             while not self.shutdown_requested:
                 try:
                     self._main_loop_tick()
                 except Exception as e:
                     traceback.print_exc()
                     logger.error(f'Error in main loop: {e}')
-                time.sleep(0.2)
+                # Sleep short when there's work pending; longer when truly idle.
+                # Pending work: goal running, text input waiting, ask in flight,
+                # or sensor events queued.
+                has_pending = (
+                    self._is_goal_running()
+                    or bool(self.text_input_queue)
+                    or (hasattr(self, 'ooda_planner') and self.ooda_planner.awaiting_ask_response)
+                    or bool(self._sensor_alert_queue)
+                    or bool(self._sensor_trigger_queue)
+                    or bool(self._sensor_trigger_task_queue)
+                    or bool(self._sensor_inform_queue)
+                )
+                time.sleep(0.2 if has_pending else 2.0)
                 
         except KeyboardInterrupt:
             logger.info('Executive Node shutting down...')
@@ -1782,10 +1794,7 @@ class ZenohExecutiveNode:
 
             if self.infospace_executor and action.type != 'dispatch_goal':
                 if self.infospace_executor.turn_metrics.llm_calls:
-                    _perf = self.infospace_executor.turn_metrics.summary()
-                    logger.info(_perf)
-                    if classification != 'timer':
-                        print(_perf, flush=True)
+                    logger.info(self.infospace_executor.turn_metrics.summary())
         else:
             # Strategic path — OODA planner
             event_summary = (
@@ -1817,10 +1826,7 @@ class ZenohExecutiveNode:
 
             if self.infospace_executor:
                 if self.infospace_executor.turn_metrics.llm_calls:
-                    _perf = self.infospace_executor.turn_metrics.summary()
-                    logger.info(_perf)
-                    if classification != 'timer':
-                        print(_perf, flush=True)
+                    logger.info(self.infospace_executor.turn_metrics.summary())
 
         self._ooda_living_state.maybe_persist(
             self._write_named_note, self._derived_concern_model.get_concerns(),
@@ -9755,11 +9761,9 @@ class ZenohExecutiveNode:
             # Ensure indexing is re-enabled even if goal failed or was interrupted
             if self.resource_manager and self.resource_manager.indexing_deferred:
                 self.resource_manager.flush_deferred_indexes()
-            # Emit per-turn latency summary for goal turns
+            # Emit per-turn latency summary for goal turns (log only)
             if self.infospace_executor and self.infospace_executor.turn_metrics.llm_calls:
-                _perf = self.infospace_executor.turn_metrics.summary()
-                logger.info(_perf)
-                print(_perf, flush=True)
+                logger.info(self.infospace_executor.turn_metrics.summary())
 
     def _get_recent_chat_memories(self, num_entries: int) -> List[Dict[str, Any]]:
         """Get recent memory entries from memory module."""
