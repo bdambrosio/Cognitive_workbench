@@ -136,10 +136,23 @@ class DerivedConcernModel:
         self._last_updated: Optional[str] = None
         self._last_idle_update: float = 0.0
         self._seed_concerns: List[Dict[str, Any]] = []
+        # concern_ids recently activated by LLM patches — consumed by triage
+        self._pending_activations: List[str] = []
 
     def set_seed_concerns(self, seeds: List[Dict[str, Any]]):
         """Set seed concern definitions from character config. Call before load()."""
         self._seed_concerns = seeds or []
+
+    def consume_pending_activations(self) -> List[str]:
+        """Return and clear the list of concerns recently activated by LLM patches.
+
+        Called by the triage idle-tick to nominate newly-activated concerns
+        bypassing activation monitoring. The LLM's decision to activate a
+        concern is itself a signal that action is warranted.
+        """
+        pending = list(self._pending_activations)
+        self._pending_activations = []
+        return pending
 
     # ── Persistence ───────────────────────────────────────────────────
 
@@ -509,6 +522,10 @@ class DerivedConcernModel:
             updates['status'] = 'active'
             target['satisfied_at'] = None  # Clear any previous satisfaction
             self._merge_updates(target, updates, evidence_ref)
+            # Queue for triage nomination — the LLM's explicit decision to
+            # activate this concern is an action signal, not just a state update.
+            if concern_id not in self._pending_activations:
+                self._pending_activations.append(concern_id)
             logger.info(f'Derived concern model: \u25b6{concern_id} activated \u2014 {patch.get("why_this_activate", "")}')
 
         elif op in ('satisfy_concern', 'resolve_concern'):
@@ -534,7 +551,8 @@ class DerivedConcernModel:
                       'category', 'revisit_hours'):
             if field in updates:
                 if field == 'weight':
-                    target[field] = float(updates[field])
+                    # Clamp weight to [0.0, 1.0] — LLM patches can drift arbitrarily
+                    target[field] = max(0.0, min(1.0, float(updates[field])))
                 elif field == 'status' and updates[field] not in STATUS_VALUES:
                     continue  # reject invalid status
                 else:

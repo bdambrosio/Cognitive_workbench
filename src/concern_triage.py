@@ -121,6 +121,33 @@ class ConcernTriage:
             f'(activation={activation:.2f}, bump={bump_level})'
         )
 
+    def nominate_from_llm_decision(
+        self,
+        concern_id: str,
+        concern_label: str,
+        concern_description: str,
+        activation: float,
+    ):
+        """Nominate a concern because the derived-concern-model LLM explicitly
+        activated it. Bypasses activation/trend filtering — the LLM's reasoned
+        decision is itself the signal.
+        """
+        if self._is_deferred(concern_id):
+            return
+        if self._is_already_nominated(concern_id):
+            return
+        self._candidates.append(TriageCandidate(
+            concern_id=concern_id,
+            concern_label=concern_label,
+            concern_description=concern_description,
+            source='llm_activation',
+            activation=activation,
+        ))
+        logger.info(
+            f'Triage: LLM-activation nomination for {concern_label} '
+            f'(activation={activation:.2f})'
+        )
+
     # ── Candidate access (for OODA planner) ─────────────────────────────
 
     def get_candidates(self) -> List[TriageCandidate]:

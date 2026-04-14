@@ -1916,6 +1916,29 @@ class ZenohExecutiveNode:
 
         serviced_ids = self._build_serviced_concern_ids()
 
+        # Direct-activation nominations: concerns the derived-concern-model LLM
+        # decided to activate. The LLM's reasoned decision to activate is
+        # itself a signal; don't require the activation-monitor to catch up.
+        try:
+            pending = self._derived_concern_model.consume_pending_activations()
+            if pending:
+                active_concerns = self._derived_concern_model.get_concerns(active_only=True)
+                for cid in pending:
+                    if cid in serviced_ids:
+                        continue
+                    concern = next((c for c in active_concerns if c.get('concern_id') == cid), None)
+                    if not concern:
+                        continue
+                    activation = self._character_concern_activations.get(cid, 0.0)
+                    self._concern_triage.nominate_from_llm_decision(
+                        concern_id=cid,
+                        concern_label=concern.get('concern_label', cid),
+                        concern_description=concern.get('concern_description', ''),
+                        activation=activation,
+                    )
+        except Exception as e:
+            logger.debug(f'Triage direct-activation nomination skipped: {e}')
+
         # Activation-monitor nominations: check living state concern activations
         try:
             active_concerns = self._derived_concern_model.get_concerns(active_only=True)
