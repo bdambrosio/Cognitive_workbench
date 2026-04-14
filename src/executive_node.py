@@ -1668,7 +1668,7 @@ class ZenohExecutiveNode:
                     or bool(self._sensor_trigger_task_queue)
                     or bool(self._sensor_inform_queue)
                 )
-                time.sleep(0.2 if has_pending else 2.0)
+                time.sleep(0.2 if has_pending else 0.5)
                 
         except KeyboardInterrupt:
             logger.info('Executive Node shutting down...')
