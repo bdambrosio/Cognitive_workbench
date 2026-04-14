@@ -1,7 +1,7 @@
 ---
 name: claude-code
 type: python
-description: "Delegate coding, research, and analysis tasks to Claude Code CLI. Use target=self to ground any claims about your own architecture, capabilities, or behavior in actual source code rather than generating from general knowledge."
+description: "Delegate coding, research, and code analysis tasks to Claude Code CLI. PREFERRED tool for reading, searching, or analyzing source code (including your own — use target=self). Use whenever a goal asks you to look at, analyze, or reason about code files (your src/, your codebase, your implementation, fs/src/). Ground claims about your own architecture, capabilities, or behavior in actual source code rather than generating from general knowledge."
 schema_hint:
   action: "string: ask | reset (default: ask)"
   target: "string: sandbox | self (default: sandbox)"
