@@ -6884,7 +6884,7 @@ class ZenohExecutiveNode:
 
         # Update character concern activations (exponential decay)
         if assessment:
-            self._update_character_concern_activations(assessment)
+            self._update_character_concern_activations(assessment, event=event)
             # Orient-stage triage nomination: strong bump on a cold concern
             self._triage_orient_nominations(assessment)
 
@@ -6905,7 +6905,7 @@ class ZenohExecutiveNode:
         # Fixed character concerns (homeostasis, attend_to_user, etc.)
         return 0.5
 
-    def _update_character_concern_activations(self, assessment: Dict[str, Any]):
+    def _update_character_concern_activations(self, assessment: Dict[str, Any], event: Any = None):
         """Update running character concern activation levels from assessment.
 
         Bump magnitude is scaled by concern weight: bump * (1 + weight).
@@ -6914,7 +6914,28 @@ class ZenohExecutiveNode:
         Adds time-based homeostatic pressure for concerns that are overdue:
         pressure grows with hours since last service (satisfied_at or recency
         fallback), scaled by the concern's revisit_hours.
+
+        Skips bumps entirely when the event is a self-referential
+        concern-triage nomination — the nomination should not amplify the
+        same concern it nominated (would create a runaway feedback loop).
         """
+        # Break the feedback loop: nomination events are self-referential
+        # (they were generated BECAUSE the concern is active). Don't let them
+        # re-bump the same concern.
+        event_source = getattr(event, 'source', '') or ''
+        sensor_name = ''
+        if event is not None:
+            raw = getattr(event, 'raw_sense_data', None)
+            if isinstance(raw, dict):
+                sensor_name = raw.get('sensor_name', '') or ''
+        if event_source in ('concern_triage', 'sensor:concern_triage') or sensor_name == 'concern_triage':
+            # Still apply decay + time pressure, but skip the assessment bump.
+            time_pressure = self._compute_homeostatic_pressure(0.05)
+            for cid in list(self._character_concern_activations.keys()):
+                old = self._character_concern_activations[cid]
+                self._character_concern_activations[cid] = old * 0.9 + time_pressure.get(cid, 0.0)
+            return
+
         DECAY = 0.9
         BUMP = {'strong': 0.3, 'moderate': 0.15, 'weak': 0.05, 'none': 0.0}
         MAX_TIME_PRESSURE = 0.05  # per-cycle pressure when fully overdue
