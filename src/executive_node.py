@@ -5314,6 +5314,26 @@ class ZenohExecutiveNode:
             self.infospace_executor._remove_bindings_for_resource(resource_id)
         return success, error_msg
 
+    def _build_concern_context(self, entity: str) -> str:
+        """Render active user concerns as context for ToM / Companion updates.
+
+        Grounds the LLM's inferences about what the user cares about in the
+        operational concern list, reducing fabrication on thin evidence.
+        """
+        try:
+            active_uc = self.user_concern_model.get_concerns(active_only=True) or []
+            if not active_uc:
+                return ""
+            lines = [f"Active user concerns (what {entity} currently cares about):"]
+            for c in active_uc[:8]:
+                label = c.get("concern_label", "?")
+                weight = c.get("weight", "")
+                desc = c.get("concern_description", "")
+                lines.append(f"  - {label} (weight={weight}): {desc}")
+            return "\n".join(lines)
+        except Exception:
+            return ""
+
     def _update_tom_from_turns(self, entity: str, raw_transcript: str):
         """Update Theory of Mind model for an entity from conversation turns.
 
@@ -5349,19 +5369,7 @@ class ZenohExecutiveNode:
                 return
 
             # Build discourse state context including active user concerns
-            discourse_ctx = ""
-            try:
-                active_uc = self.user_concern_model.get_concerns(active_only=True) or []
-                if active_uc:
-                    lines = [f"Active user concerns (what {entity} currently cares about):"]
-                    for c in active_uc[:8]:
-                        label = c.get("concern_label", "?")
-                        weight = c.get("weight", "")
-                        desc = c.get("concern_description", "")
-                        lines.append(f"  - {label} (weight={weight}): {desc}")
-                    discourse_ctx = "\n".join(lines)
-            except Exception:
-                pass
+            discourse_ctx = self._build_concern_context(entity)
 
             # Run ToM update (single LLM call)
             tom_text = dt.update_tom_from_discourse_segment(
@@ -5383,6 +5391,58 @@ class ZenohExecutiveNode:
                     pass
         except Exception as e:
             logger.warning(f'ToM update for {entity} failed: {e}')
+
+    def _update_companion_from_turns(self, raw_transcript: str):
+        """Update Companion Model for the user from conversation turns.
+
+        Friendship-lens counterpart to _update_tom_from_turns: tracks state of
+        mind, current chapter, what matters, thinking style, what's on their
+        mind, and how to be useful. User-only by design.
+        """
+        if not raw_transcript or len(raw_transcript) < 40:
+            return
+        try:
+            from discourse import DiscourseTracker
+            dt = DiscourseTracker(self.llm_generate, self.character_name, "User")
+
+            companion_note_name = "_companion_user"
+            previous_companion = ""
+            try:
+                load_result = self.infospace_executor.execute_action(
+                    {"type": "load", "target": companion_note_name, "out": "$_companion_tmp"})
+                if load_result.get('status') == 'success' and load_result.get('resource_id'):
+                    previous_companion = self.infospace_executor._get_content(load_result['resource_id']) or ""
+            except Exception:
+                pass
+
+            dialog = []
+            for line in raw_transcript.split('\n'):
+                if ':' in line:
+                    speaker, text = line.split(':', 1)
+                    dialog.append({'source': speaker.strip(), 'text': text.strip()})
+
+            if len(dialog) < 2:
+                return
+
+            concern_ctx = self._build_concern_context("User")
+
+            companion_text = dt.update_companion_from_discourse_segment(
+                dialog, "User", start=0, end=len(dialog) - 1,
+                discourse_state=concern_ctx, previous_companion_state=previous_companion)
+
+            if companion_text and len(companion_text.strip()) > 20:
+                self._write_named_note(companion_note_name, companion_text.strip())
+                logger.info(f'💛 Companion model updated ({len(companion_text)} chars)')
+                try:
+                    nid = self._cognitive_graph.add_node(
+                        "companion_update", "Companion model update for User",
+                        attrs={"entity": "User", "length": len(companion_text)})
+                    if self._last_event_node:
+                        self._cognitive_graph.add_edge(self._last_event_node, nid, "triggered_by")
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.warning(f'Companion update failed: {e}')
 
     def _archive_dialog(self, entity: str, dialog_id: str, note_ids: list):
         """Archive a single completed dialog: synthesize its turns into conversation_history.
@@ -5417,6 +5477,10 @@ class ZenohExecutiveNode:
 
         # Update Theory of Mind for this entity
         self._update_tom_from_turns(entity, raw_transcript)
+
+        # Update Companion Model (user only — friendship-lens counterpart to ToM)
+        if entity and entity.lower() == "user":
+            self._update_companion_from_turns(raw_transcript)
 
         try:
             # Build a temporary collection binding for synthesize
@@ -5703,7 +5767,9 @@ class ZenohExecutiveNode:
                         if turn:
                             raw_lines.append(f"{turn.get('source', '?')}: {turn.get('text', '')}")
                     if raw_lines:
-                        self._update_tom_from_turns("User", "\n".join(raw_lines))
+                        transcript = "\n".join(raw_lines)
+                        self._update_tom_from_turns("User", transcript)
+                        self._update_companion_from_turns(transcript)
             except Exception as e:
                 logger.debug(f"Shutdown ToM update failed: {e}")
 
@@ -7852,6 +7918,19 @@ class ZenohExecutiveNode:
             pass
         return ''
 
+    def _get_companion_content(self) -> str:
+        """Return persisted Companion Model content for the user, or '' if unavailable."""
+        try:
+            if self.resource_manager:
+                rid = self.resource_manager.named_notes.get('_companion_user', '')
+                if rid:
+                    res = self.resource_manager.get_resource(rid)
+                    if res:
+                        return res.get('properties', {}).get('content', '')
+        except Exception:
+            pass
+        return ''
+
     def _get_ooda_readable_content(self) -> str:
         """Return the rendered readable OODA state content, or '' if unavailable."""
         try:
@@ -8174,6 +8253,11 @@ class ZenohExecutiveNode:
         tom_content = self._get_tom_content("User")
         if tom_content:
             system_prompt += f"\n## Theory of Mind (your model of the User)\n{tom_content}\n"
+
+        # Inline Companion Model for User (friendship-lens complement to ToM)
+        companion_content = self._get_companion_content()
+        if companion_content:
+            system_prompt += f"\n## Companion Model (what you know about the User as a person)\n{companion_content}\n"
 
         return system_prompt
 

@@ -482,6 +482,61 @@ Do not include any other text or formatting directives in your response.
 End your response with:
 </end>
 """
+
+COMPANION_UPDATE_TEMPLATE = """You are updating a Companion Model — an ongoing, friend-to-friend understanding of {{$other_person_name}}. This is NOT a trust assessment; it is the texture a good friend would hold about them: what they're in the middle of, how they're doing, what matters to them, and how to be useful right now.
+
+PREVIOUS COMPANION MODEL:
+{{$previous_companion_model}}
+
+CURRENT DISCOURSE STATE:
+{{$current_discourse_state}}
+
+CONVERSATION SEGMENT:
+{{$conversation_turns}}
+
+PARTICIPANT: {{$other_person_name}}
+
+TASK: Produce a full updated model. Preserve what's still true, revise what's changed, drop what's stale. Each section is 1-2 sentences — tight and evocative, not comprehensive. When evidence is thin, say so rather than invent. Prefer the phrasing a thoughtful friend would use in their head.
+
+OUTPUT FORMAT:
+
+COMPANION MODEL: {{$other_person_name}}
+
+CURRENT CHAPTER:
+[The arc they're in right now — the throughline behind day-to-day moments. Updates slowly, across weeks. 1-2 sentences.]
+
+STATE OF MIND:
+[Mood, energy, stress, and the direction of travel. Refresh every conversation. 1-2 sentences.]
+
+WHAT MATTERS TO THEM:
+[Values and commitments underneath goals — the slow-moving core. Only revise on genuinely new evidence; otherwise carry forward. 1-2 sentences.]
+
+HOW THEY THINK & WORK:
+[Cognitive and decision style; feedback tolerance. Slow-moving. 1-2 sentences.]
+
+ON THEIR MIND:
+[The handful of people, open loops, or unspoken weights recurring lately. Append new, prune stale. 1-2 sentences or a short list.]
+
+HOW TO BE USEFUL RIGHT NOW:
+[What mode they seem to want from me — challenger, executor, sounding board, quiet witness. Updates with mood. 1-2 sentences.]
+
+UPDATE GUIDANCE:
+
+- CADENCE: CURRENT CHAPTER, STATE OF MIND, ON THEIR MIND, and HOW TO BE USEFUL change often; WHAT MATTERS and HOW THEY THINK rarely do. If the segment gives no new evidence for a slow-moving field, carry the previous text forward unchanged.
+
+- EVIDENCE: Ground observations in what was actually said or done. It is better to write "unclear yet" than to fabricate texture. Distinguish observation from inference ("sounded tired" vs. "seems depleted").
+
+- VOICE: Write as a friend's private notes — conversational, specific, warm but honest. Avoid clinical or evaluative language ("the subject exhibits..."). No numeric scores. No moral judgments.
+
+- RESTRAINT: Do not psychoanalyze. Do not speculate about childhood, pathology, or motives beyond what's visible. If they vented, note the venting — don't diagnose the cause.
+
+- TRAJECTORY: Where it matters (state of mind especially), note the direction, not just the level: "lifting", "sinking", "steadier than last week".
+
+- PRUNING: ON THEIR MIND is not a log. If something hasn't surfaced in several conversations, drop it unless it's clearly load-bearing.
+
+End your response with:
+</end>
+"""
 class DiscourseTracker:
     def __init__(self, llm_generate: Callable, self_character_name: str, other_character_name: str):
         self.llm_generate = llm_generate
@@ -605,7 +660,49 @@ class DiscourseTracker:
         if not success:
             logger.warning(f'ToM update failed')
             return ""
-        
+
+        return response_text
+
+    def update_companion_from_discourse_segment(self, dialog, character_name, start=0, end=None, discourse_state="", previous_companion_state=""):
+        if end is None:
+            end = len(dialog) - 1
+        segment = self.format_segment(dialog, start, end)
+
+        prompt = COMPANION_UPDATE_TEMPLATE
+        bindings = {
+            'conversation_turns': segment,
+            'current_discourse_state': discourse_state,
+            'previous_companion_model': previous_companion_state,
+            'other_person_name': character_name,
+            'start_turn': start,
+            'end_turn': end
+        }
+        for key, value in bindings.items():
+            prompt = prompt.replace(f"{{{{${key}}}}}", str(value))
+
+        response = self.llm_generate(
+            messages=[prompt],
+            bindings={},
+            max_tokens=2000,
+            temperature=0.4,
+            stops=['</end>'],
+            is_json=False
+        )
+
+        if isinstance(response, dict):
+            response_text = response.get('text', '')
+            success = response.get('success', False)
+        elif hasattr(response, 'text'):
+            response_text = response.text
+            success = response.success if hasattr(response, 'success') else True
+        else:
+            response_text = str(response)
+            success = True
+
+        if not success:
+            logger.warning(f'Companion update failed')
+            return ""
+
         return response_text
 # Extraction functions (LLM-based, clearly defined)
 def extract_agenda_items(llm_generate: Callable, discourse_state: str, my_name: str) -> List[dict]:
