@@ -77,18 +77,7 @@ source zenoh_venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Optional: Browser automation
-
-The `browse` tool requires the [agent-browser](https://github.com/vercel-labs/agent-browser) CLI (Rust binary, not a Python package):
-
-```bash
-cargo install agent-browser        # if you have Rust/cargo
-# or download a prebuilt binary from https://github.com/vercel-labs/agent-browser/releases
-```
-
-Skip this if you don't need browser automation — all other tools work without it.
-
-### 3. Configure an LLM backend
+### 2. Configure an LLM backend
 
 **Option A — Local GPU (SGLang):**
  - Edit `scenarios/jill-infospace.yaml` and set `sgl_model_path` to your preferred model. SGLang can be finicky, sorry, but use of @function makes reasoning loop so much faster.
@@ -106,16 +95,29 @@ alt_llm_config:
   openrouter_model_path: "qwen/qwen3-235b-a22b-2507"
 ```
 
-### 4. Run
+### 3. Run
 
 ```bash
 source zenoh_venv/bin/activate
 cd src
 
+python3 launcher.py ../scenarios/jill-infospace.yaml --cli --resource-browser
+# Or with the web UI:
 python3 launcher.py ../scenarios/jill-infospace.yaml --ui --resource-browser
 # Or for OpenRouter:
 python3 launcher.py ../scenarios/jill-infospace-openrouter.yaml --ui --resource-browser
 ```
+
+### 4. Optional: Browser automation
+
+The `browse` tool requires the [agent-browser](https://github.com/vercel-labs/agent-browser) CLI (Rust binary, not a Python package):
+
+```bash
+cargo install agent-browser        # if you have Rust/cargo
+# or download a prebuilt binary from https://github.com/vercel-labs/agent-browser/releases
+```
+
+Skip this if you don't need browser automation — all other tools work without it.
 
 Open [http://localhost:3000](http://localhost:3000) and submit a goal via the **+ Goal** button:
 ```

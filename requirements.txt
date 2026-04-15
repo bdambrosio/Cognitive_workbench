@@ -46,7 +46,4 @@ spacy>=3.7.0  # Used by test_space.py
 imageio>=2.30.0  # Used by utils/create-log-gif
 Pillow>=10.0.0  # Image processing for log GIF creation
 
-# Development and testing (optional)
-pytest>=7.4.0
-pytest-asyncio>=0.21.0
-datasets>=2.14.0  # HuggingFace datasets for eval benchmarks
+# Development and testing dependencies live in requirements-dev.txt

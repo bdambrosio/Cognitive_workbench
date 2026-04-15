@@ -1,0 +1,9 @@
+# Development and test-only dependencies
+# Install with: pip install -r requirements-dev.txt
+# (Assumes requirements.txt is already installed.)
+
+-r requirements.txt
+
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+datasets>=2.14.0  # HuggingFace datasets for eval benchmarks (large download)
