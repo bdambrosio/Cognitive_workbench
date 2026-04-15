@@ -894,6 +894,7 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
     from prompt_toolkit import PromptSession
     from prompt_toolkit.history import FileHistory
     from prompt_toolkit.formatted_text import HTML
+    from prompt_toolkit.patch_stdout import patch_stdout
 
     active_character = character_names[0]
 
@@ -1012,6 +1013,7 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
     last_ctrl_c = 0.0
 
     try:
+      with patch_stdout(raw=True):
         while not shutdown_event.is_set():
             try:
                 prompt_text = HTML(f'<aaa fg="ansigreen">{active_character}</aaa>&gt; ')
