@@ -6355,11 +6355,39 @@ class ZenohExecutiveNode:
             return f"Unknown command: {cmd}"
 
         source = data.get('source', 'User')
+
+        # Resolve goal_id by name for /goal * commands. The LLM's chat command
+        # path often emits names (G07, "weather goal") instead of canonical IDs.
+        if cmd.startswith('/goal ') and data.get('goal_id'):
+            ref = str(data['goal_id']).strip()
+            if ref and not self._get_scheduled_goal(ref):
+                resolved = self._resolve_goal_ref(ref)
+                if resolved and resolved != ref:
+                    data = dict(data)
+                    data['goal_id'] = resolved
+
         try:
             return entry['handler'](data)
         except Exception as e:
             logger.error(f'Command dispatch error ({cmd}): {e}', exc_info=True)
             return f'Command failed: {e}'
+
+    def _resolve_goal_ref(self, ref: str) -> Optional[str]:
+        """Resolve a goal reference (id or name) to a canonical goal_id.
+
+        Tries exact id match, then case-insensitive name match. Returns
+        None if nothing matches.
+        """
+        if not ref:
+            return None
+        ref_lower = ref.lower()
+        name_match = None
+        for g in self._all_scheduled_goals():
+            if g.get('goal_id') == ref:
+                return ref
+            if (g.get('name') or '').lower() == ref_lower:
+                name_match = g.get('goal_id')
+        return name_match
 
     def _handle_command_message(self, sample):
         """Zenoh callback for the unified command channel."""
@@ -8818,6 +8846,14 @@ class ZenohExecutiveNode:
                 active_dialog = self.conversation_store.has_active_dialogs()
             except Exception:
                 pass
+            current_goal_name = ''
+            current_goal_text = ''
+            if self.current_goal and self.current_goal.name != 'sleep':
+                current_goal_name = self.current_goal.name
+                try:
+                    current_goal_text = self.current_goal.to_string()
+                except Exception:
+                    current_goal_text = ''
             state_data = {
                 'paused': self.execution_paused,
                 'mode': self.execution_mode,
@@ -8826,6 +8862,8 @@ class ZenohExecutiveNode:
                 'llm_mode': self.llm_mode,
                 'llm_switch_pending': self.llm_switch_pending,
                 'active_dialog': active_dialog,
+                'current_goal_name': current_goal_name,
+                'current_goal_text': current_goal_text,
                 'timestamp': time.time()
             }
             self.execution_state_publisher.put(json.dumps(state_data).encode('utf-8'))

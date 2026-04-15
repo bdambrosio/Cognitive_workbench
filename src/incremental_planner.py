@@ -3724,7 +3724,7 @@ def vllm_gen(slot_name: str, prompt: str, state: Dict[str, Any], max_tokens: int
     try:
         response = executor.llm_generate(
             messages=messages,
-            max_tokens=max_tokens+256,  # allow for reasoning
+            max_tokens=max_tokens+1024,  # allow for reasoning
             temperature=temperature,
             stops=stop_list if stop_list else None,
             reasoning_effort=reasoning_effort
@@ -3812,7 +3812,7 @@ def vllm_gen_multi(prompt: str, state: Dict[str, Any], specs: List[Dict],
     try:
         response = executor.llm_generate(
             messages=messages,
-            max_tokens=total_max_tokens + 256,  # allow for reasoning
+            max_tokens=total_max_tokens + 1024,  # allow for reasoning
             temperature=max_temperature,
             stops=final_stops if final_stops else None
         )

@@ -503,7 +503,13 @@ def _handle_query(session, character: str, data: dict, state: dict):
             if dialog:
                 parts.append(f"{C.CYAN}in dialog{C.RESET}")
             print(f"  {', '.join(parts)}")
-            # Goal scheduler removed — goal running state shown via execution_state
+            goal_name = agent_state.get('current_goal_name', '')
+            goal_text = agent_state.get('current_goal_text', '')
+            if goal_name:
+                label = goal_text or goal_name
+                if len(label) > 120:
+                    label = label[:117] + '...'
+                print(f"  {C.GREEN}Running goal:{C.RESET} {C.BOLD}{goal_name}{C.RESET} — {label}")
         else:
             print(f"  {C.DIM}(no state received yet){C.RESET}")
 
