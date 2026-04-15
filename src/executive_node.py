@@ -7694,27 +7694,87 @@ class ZenohExecutiveNode:
             logger.debug(f'Tier 2 concern trigger failed: {e}')
 
     def _formulate_goal_from_orient(self, evt: EventPacket, assessment: Dict[str, Any]) -> Optional[str]:
-        """Generate goal text from Orient's assessment + event content."""
+        """Generate goal text from Orient's assessment + event content.
+
+        The goal is consumed downstream by the incremental planner, which
+        decomposes it into 1-15 tool-call steps.  Inputs to the formulator
+        therefore include the bumped concerns (so the goal serves standing
+        intent, not just the event surface) and recent goal outcomes (so the
+        formulator avoids duplicating recent work and can frame successors).
+        Returns None when the model declines (event served no clear concern).
+        """
         content = evt.content if isinstance(evt.content, str) else str(evt.content)
         rationale = assessment.get('overall_rationale', '')
+
+        # Resolve bumped concerns to label+description+weight.  Bumps come
+        # from Orient's notes field (concerns:cid=level pairs).  Look each
+        # up in both concern stores; missing IDs are silently skipped.
+        bumps = self._parse_orient_concern_bumps(assessment)
+        concerns_lines = []
+        if bumps:
+            try:
+                user_concerns = self.user_concern_model.get_concerns() or []
+            except Exception:
+                user_concerns = []
+            try:
+                derived_concerns = self._derived_concern_model.get_concerns() or []
+            except Exception:
+                derived_concerns = []
+            all_concerns = {c.get('concern_id'): c for c in (user_concerns + derived_concerns) if c.get('concern_id')}
+            for cid, level in bumps.items():
+                c = all_concerns.get(cid)
+                if not c:
+                    continue
+                label = c.get('concern_label', cid)
+                desc = c.get('concern_description', '').strip()
+                weight = c.get('weight', '')
+                w_str = f" weight={weight}" if weight != '' else ''
+                concerns_lines.append(f"- {label} (bumped={level}{w_str}): {desc}")
+        concerns_block = ("\nConcerns this event activated:\n" + "\n".join(concerns_lines)) if concerns_lines else ""
+
+        # Recent OODA activity — what's been tried lately.  Helps avoid
+        # duplicate goals and primes successor framing.
+        recent_block = ""
+        try:
+            if hasattr(self, 'ooda_planner'):
+                summary = self.ooda_planner.get_recent_activity_summary(3)
+                if summary:
+                    recent_block = f"\n{summary}"
+        except Exception:
+            pass
+
         try:
             result = self.llm_generate(
                 messages=[
                     {"role": "system", "content":
-                        "You formulate a concise goal statement for an autonomous agent. "
-                        "The goal should be a single actionable sentence describing what to accomplish. "
-                        "Respond with ONLY the goal text, nothing else. End with </end>."},
+                        "You formulate a goal statement for an autonomous agent. "
+                        "The goal will be passed to a planner that decomposes it into tool-call "
+                        "steps (web search, shell, semantic operations on Notes/Collections, "
+                        "user dialogue, code execution). "
+                        "A good goal specifies WHAT to produce, WHERE to read inputs from, and "
+                        "what 'done' looks like — specific enough for decomposition, not a vague "
+                        "aspiration. One or two sentences. "
+                        "If no concern listed below is clearly served by acting on this event, "
+                        "respond with exactly <no_goal/> and nothing else. "
+                        "Otherwise respond with ONLY the goal text. End with </end>."},
                     {"role": "user", "content":
-                        f"Event: {content[:400]}\n"
-                        f"Assessment: {rationale}\n\n"
-                        f"Formulate a goal for the agent to pursue based on this event."},
+                        f"Event ({evt.classification} from {evt.source}): {content[:2000]}\n"
+                        f"Orient assessment: {rationale}"
+                        f"{concerns_block}"
+                        f"{recent_block}\n\n"
+                        f"Formulate a goal that addresses the bumped concerns by acting on this event, "
+                        f"or decline with <no_goal/> if none is clearly served."},
                 ],
                 max_tokens=612,
                 temperature=0.3,
                 stops=['</end>'],
             )
             if result.success and result.text:
-                return result.text.strip()
+                text = result.text.strip()
+                if '<no_goal/>' in text or text == '':
+                    logger.debug('Tier 2 goal formulation declined (no concern clearly served)')
+                    return None
+                return text
         except Exception as e:
             logger.debug(f'Tier 2 goal formulation failed: {e}')
         return None

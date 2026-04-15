@@ -4356,7 +4356,7 @@ ALWAYS follow all formatting instructions exactly.
         # Stage 3: simplified reflection (5 fields + inline verification when DONE)
         prompt += format_assistant("")
         compressed_for_llm = _build_compressed_prompt(prompt, keep_last_n_steps=2) if step >= 3 else None
-        stage3_block = vllm_gen(f"stage3_block_{step}", prompt, state, max_tokens=384, temperature=GEN_TEMPERATURE, executor=executor, llm_prompt=compressed_for_llm)
+        stage3_block = vllm_gen(f"stage3_block_{step}", prompt, state, max_tokens=384, temperature=GEN_TEMPERATURE, executor=executor, llm_prompt=compressed_for_llm, reasoning_effort="low")
         prompt += stage3_block + "\n"
 
         thoughts_val = _strip_think_tags(_extract_between_labels(stage3_block, "THOUGHTS:", "DONE:"))

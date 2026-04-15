@@ -4,7 +4,7 @@ world_config:
   world_name: "infolab"
 
 llm_config:
-  openrouter_model_path: "openai/gpt-5.4-mini"#"minimax/minimax-m2.7"#qwen/qwen-2.5-72b-instruct" #"qwen/qwen3.6-plus-preview:free"#google/gemini-3-flash-preview" #"qwen/qwen3.5-397b-a17b"
+  openrouter_model_path: "minimax/minimax-m2.7"#"qwen/qwen3.5-397b-a17b"#"google/gemini-3-flash-preview" #"qwen/qwen3.6-plus"#"openai/gpt-5.4"#"openai/gpt-5.4-mini"#"minimax/minimax-m2.7"#qwen/qwen-2.5-72b-instruct" #"qwen/qwen3.5-397b-a17b"
   extra_request_params:
     reasoning:
       effort: "low"

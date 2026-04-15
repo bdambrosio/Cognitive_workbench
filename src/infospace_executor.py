@@ -1921,12 +1921,27 @@ Only provide the result, followed by the </end> tag.""")
                 # Single string - treat as user message
                 chat_messages = [{"role": "user", "content": str(messages)}]
             
-            # Prepare payload (OpenRouter uses OpenAI-compatible format)
-            has_reasoning = "reasoning" in self.extra_request_params
+            # Prepare payload (OpenRouter uses OpenAI-compatible format).
+            # Two independent concerns:
+            #  - reasoning_configured: the scenario expects a reasoning model,
+            #    so the max_tokens budget must accommodate thinking tokens.
+            #    The model will reason regardless of whether we send the hint
+            #    (MiniMax does its own reasoning; Gemini-3 likewise).
+            #  - skip_reasoning_hint: some OpenRouter routes ignore or
+            #    mishandle the `reasoning` extra_body (MiniMax providers
+            #    vary — Minimax/Fireworks/Together all route the same model;
+            #    Gemini-3-Flash-Preview returns empty content when hinted).
+            #    Skip the hint but keep the budget.
+            _model_lc = (model or "").lower()
+            reasoning_configured = "reasoning" in self.extra_request_params
+            skip_reasoning_hint = reasoning_configured and (
+                _model_lc.startswith("minimax/")
+                or _model_lc.startswith("google/gemini-3-")
+            )
             payload = {
                 "model": model,
                 "messages": chat_messages,
-                "max_tokens": max_tokens + (500 if has_reasoning else 0),
+                "max_tokens": max_tokens + (4096 if reasoning_configured else 0),
                 "temperature": temperature,
                 "top_p": 1.0,
                 "stream": False,
@@ -1935,6 +1950,8 @@ Only provide the result, followed by the </end> tag.""")
             # 'extra_body' contents are flattened into top-level (SDK convention → raw HTTP)
             if self.extra_request_params:
                 for k, v in self.extra_request_params.items():
+                    if k == "reasoning" and skip_reasoning_hint:
+                        continue
                     if k == "extra_body" and isinstance(v, dict):
                         payload.update(v)
                     else:
