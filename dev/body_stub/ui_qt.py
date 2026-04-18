@@ -25,16 +25,18 @@ from typing import Optional
 
 import numpy as np
 
-from PyQt6.QtCore import Qt, QPointF, QTimer
+from PyQt6.QtCore import Qt, QPointF, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import (
     QColor, QFont, QImage, QPainter, QPen, QPixmap, QPolygonF,
 )
 from PyQt6.QtWidgets import (
-    QApplication, QCheckBox, QDoubleSpinBox, QGridLayout, QGroupBox,
-    QHBoxLayout, QLabel, QLineEdit, QMainWindow, QPlainTextEdit,
-    QPushButton, QSizePolicy, QTabWidget, QVBoxLayout, QWidget,
+    QApplication, QCheckBox, QComboBox, QDockWidget, QDoubleSpinBox,
+    QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
+    QPlainTextEdit, QPushButton, QSizePolicy, QTabWidget, QTextBrowser,
+    QVBoxLayout, QWidget,
 )
 
+from .jill_client import JillClient
 from .ui_base import StubUI
 
 logger = logging.getLogger(__name__)
@@ -402,6 +404,125 @@ class LocalMapView(QWidget):
             p.end()
 
 
+# ── Vision dock (VLM chat + detect on current frame) ────────────────
+
+class _VisionWorker(QThread):
+    """One-shot thread running a vision_service call; emits result on done."""
+
+    chat_result = pyqtSignal(str)
+    detect_result = pyqtSignal(object)  # vision_service.DetectResult
+    error = pyqtSignal(str)
+
+    def __init__(self, mode: str, kwargs: dict, parent=None):
+        super().__init__(parent)
+        self._mode = mode
+        self._kwargs = kwargs
+
+    def run(self) -> None:
+        try:
+            import vision_service as vs
+            if self._mode == "chat":
+                self.chat_result.emit(vs.chat(**self._kwargs))
+            elif self._mode == "detect":
+                self.detect_result.emit(vs.detect(**self._kwargs))
+            else:
+                self.error.emit(f"unknown mode {self._mode!r}")
+        except Exception as e:
+            self.error.emit(f"{type(e).__name__}: {e}")
+
+
+class VisionDock(QDockWidget):
+    """Chat + detect pane talking to a local VLM via src/vision_service.py."""
+
+    send_chat = pyqtSignal(str, bool)   # text, attach_frame
+    run_detect = pyqtSignal()
+
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__("Vision", parent)
+        self.setAllowedAreas(
+            Qt.DockWidgetArea.RightDockWidgetArea
+            | Qt.DockWidgetArea.LeftDockWidgetArea
+        )
+        body = QWidget()
+        v = QVBoxLayout(body)
+        v.setContentsMargins(6, 6, 6, 6)
+        v.setSpacing(4)
+
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(QLabel("route:"))
+        self.mode_combo = QComboBox()
+        self.mode_combo.addItem("Direct VLM", "direct")
+        self.mode_combo.addItem("Jill", "jill")
+        mode_row.addWidget(self.mode_combo)
+        mode_row.addStretch(1)
+        v.addLayout(mode_row)
+
+        self.transcript = QTextBrowser()
+        self.transcript.setOpenExternalLinks(False)
+        self.transcript.setMinimumWidth(320)
+        v.addWidget(self.transcript, 1)
+
+        self.input = QLineEdit()
+        self.input.setPlaceholderText("Ask about the scene, or just chat…")
+        v.addWidget(self.input)
+
+        self.attach_box = QCheckBox("attach current frame")
+        v.addWidget(self.attach_box)
+
+        btn_row = QHBoxLayout()
+        self.send_btn = QPushButton("Send")
+        self.detect_btn = QPushButton("Detect frame")
+        btn_row.addWidget(self.send_btn)
+        btn_row.addWidget(self.detect_btn)
+        btn_row.addStretch(1)
+        v.addLayout(btn_row)
+
+        self.status = QLabel("idle")
+        self.status.setStyleSheet("color:#888;")
+        v.addWidget(self.status)
+
+        self.setWidget(body)
+
+        self.send_btn.clicked.connect(self._emit_send)
+        self.input.returnPressed.connect(self._emit_send)
+        self.detect_btn.clicked.connect(self.run_detect)
+        self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
+        self._on_mode_changed()
+
+    def mode(self) -> str:
+        return self.mode_combo.currentData() or "direct"
+
+    def _emit_send(self) -> None:
+        text = self.input.text().strip()
+        if not text:
+            return
+        self.send_chat.emit(text, self.attach_box.isChecked())
+        self.input.clear()
+
+    def _on_mode_changed(self) -> None:
+        # Detect is a VLM-specific operation; in Jill mode Jill decides
+        # when to call vision-query herself.
+        self.detect_btn.setEnabled(self.mode() == "direct")
+
+    def set_busy(self, busy: bool, label: str = "") -> None:
+        self.send_btn.setEnabled(not busy)
+        self.detect_btn.setEnabled(not busy)
+        self.input.setEnabled(not busy)
+        self.status.setText(label or ("waiting…" if busy else "idle"))
+
+    def append_turn(self, role: str, text: str) -> None:
+        from html import escape
+        color = {"user": "#4a9", "assistant": "#ddd", "error": "#c66"}.get(role, "#888")
+        prefix = {"user": "you", "assistant": "vlm", "error": "error"}.get(role, role)
+        html = (
+            f'<div style="margin:4px 0;">'
+            f'<span style="color:{color};font-weight:bold;">{prefix}:</span> '
+            f'<span style="white-space:pre-wrap;">{escape(text)}</span>'
+            f'</div>'
+        )
+        self.transcript.append(html)
+
+
 # ── Main window ─────────────────────────────────────────────────────
 
 class BodyStubWindow(QMainWindow):
@@ -410,7 +531,18 @@ class BodyStubWindow(QMainWindow):
         self.controller = controller
         self.config = config
         self.setWindowTitle("Body Stub — dev tool (do not run alongside Jill)")
-        self.resize(980, 720)
+        self.resize(1340, 720)
+        # Vision state — transcript and last detect result tied to the rgb_ts
+        # they were computed from, so boxes auto-clear when a newer frame lands.
+        self._vision_transcript: list[dict] = []
+        self._vision_boxes: list = []
+        self._vision_boxes_for_ts: float = 0.0
+        self._vision_worker: Optional[_VisionWorker] = None
+        # Jill client is lazy-connected on first use (Jill mode).
+        self._jill_client = JillClient(
+            router=config.jill_router or config.router,
+            character=config.jill_character,
+        )
         self._build_ui()
         self._wire_signals()
         self._timer = QTimer(self)
@@ -525,12 +657,17 @@ class BodyStubWindow(QMainWindow):
 
         self.setCentralWidget(central)
 
+        self.vision_dock = VisionDock(self)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.vision_dock)
+
     def _wire_signals(self) -> None:
         self.connect_btn.clicked.connect(self._on_connect_clicked)
         self.live_box.toggled.connect(self._on_live_toggled)
         self.apply_btn.clicked.connect(self._on_apply_clicked)
         self.stop_btn.clicked.connect(self._on_stop_clicked)
         self.rgb_btn.clicked.connect(self._on_rgb_clicked)
+        self.vision_dock.send_chat.connect(self._on_vision_send)
+        self.vision_dock.run_detect.connect(self._on_vision_detect)
 
     # ── Signal handlers ──────────────────────────────────────────────
 
@@ -576,6 +713,103 @@ class BodyStubWindow(QMainWindow):
         else:
             self.rgb_meta.setText(f"request_id {req[:8]}… pending")
 
+    # ── Vision handlers ──────────────────────────────────────────────
+
+    def _current_frame(self) -> tuple[Optional[bytes], float]:
+        snap = self._snapshot()
+        return snap["rgb_jpeg"], snap["rgb_ts"]
+
+    def _on_vision_send(self, text: str, attach_frame: bool) -> None:
+        if self.vision_dock.mode() == "jill":
+            self._send_to_jill(text, attach_frame)
+            return
+        if self._vision_worker is not None:
+            return
+        jpeg, _ts = self._current_frame()
+        if attach_frame and not jpeg:
+            self.vision_dock.append_turn("error", "No RGB frame to attach (request one first).")
+            return
+        self._vision_transcript.append({"role": "user", "content": text})
+        self.vision_dock.append_turn("user", text + (" [+frame]" if attach_frame else ""))
+        images = [jpeg] if (attach_frame and jpeg) else None
+        self._start_vision_worker(
+            "chat",
+            {"messages": list(self._vision_transcript), "images": images},
+        )
+
+    def _send_to_jill(self, text: str, attach_frame: bool) -> None:
+        if not self._jill_client.connected:
+            err = self._jill_client.connect()
+            if err is not None:
+                self.vision_dock.append_turn("error", f"Jill connect failed: {err}")
+                return
+        image_path: Optional[str] = None
+        if attach_frame:
+            jpeg, _ts = self._current_frame()
+            if not jpeg:
+                self.vision_dock.append_turn("error", "No RGB frame to attach (request one first).")
+                return
+            try:
+                import vision_service
+                image_path = vision_service.cache_jpeg(jpeg)
+            except Exception as e:
+                self.vision_dock.append_turn("error", f"cache write failed: {e}")
+                return
+        ok = self._jill_client.publish_chat(text, image_path=image_path)
+        if not ok:
+            self.vision_dock.append_turn("error", "Jill publish failed.")
+            return
+        suffix = f" [+frame:{image_path}]" if image_path else ""
+        self.vision_dock.append_turn("user", text + suffix)
+
+    def _on_vision_detect(self) -> None:
+        if self._vision_worker is not None:
+            return
+        jpeg, ts = self._current_frame()
+        if not jpeg:
+            self.vision_dock.append_turn("error", "No RGB frame — click Request RGB first.")
+            return
+        self._vision_pending_ts = ts
+        self.vision_dock.append_turn("user", "[detect objects in current frame]")
+        self._start_vision_worker("detect", {"jpeg_bytes": jpeg})
+
+    def _start_vision_worker(self, mode: str, kwargs: dict) -> None:
+        worker = _VisionWorker(mode, kwargs, parent=self)
+        worker.chat_result.connect(self._on_vision_chat_result)
+        worker.detect_result.connect(self._on_vision_detect_result)
+        worker.error.connect(self._on_vision_error)
+        worker.finished.connect(self._on_vision_finished)
+        self._vision_worker = worker
+        self.vision_dock.set_busy(True, f"{mode}…")
+        worker.start()
+
+    def _on_vision_chat_result(self, text: str) -> None:
+        self._vision_transcript.append({"role": "assistant", "content": text})
+        self.vision_dock.append_turn("assistant", text)
+
+    def _on_vision_detect_result(self, result) -> None:
+        self._vision_transcript.append({"role": "assistant", "content": result.text})
+        if result.boxes:
+            summary = "detected: " + ", ".join(
+                f"{b.label}" + (f" ({b.confidence:.2f})" if b.confidence is not None else "")
+                for b in result.boxes
+            )
+            self.vision_dock.append_turn("assistant", summary)
+        else:
+            self.vision_dock.append_turn("assistant", result.text)
+        self._vision_boxes = result.boxes
+        self._vision_boxes_for_ts = getattr(self, "_vision_pending_ts", 0.0)
+
+    def _on_vision_error(self, msg: str) -> None:
+        self.vision_dock.append_turn("error", msg)
+
+    def _on_vision_finished(self) -> None:
+        worker = self._vision_worker
+        self._vision_worker = None
+        self.vision_dock.set_busy(False)
+        if worker is not None:
+            worker.deleteLater()
+
     # ── Redraw tick ──────────────────────────────────────────────────
 
     def _snapshot(self) -> dict:
@@ -611,6 +845,13 @@ class BodyStubWindow(QMainWindow):
         self._render_rgb(snap)
         self._render_lidar(snap)
         self._render_local_map(snap)
+        self._drain_jill_replies()
+
+    def _drain_jill_replies(self) -> None:
+        if not self._jill_client.connected:
+            return
+        for text, _ts in self._jill_client.drain_replies():
+            self.vision_dock.append_turn("assistant", text)
 
     def _render_status(self, snap: dict) -> None:
         now = time.time()
@@ -677,6 +918,14 @@ class BodyStubWindow(QMainWindow):
                     Qt.AspectRatioMode.KeepAspectRatio,
                     Qt.TransformationMode.SmoothTransformation,
                 )
+                if (
+                    self._vision_boxes
+                    and snap["rgb_ts"] == self._vision_boxes_for_ts
+                ):
+                    scaled = _overlay_boxes(
+                        scaled, self._vision_boxes,
+                        snap["rgb_width"], snap["rgb_height"],
+                    )
                 self.rgb_label.setPixmap(scaled)
         elif pending:
             self.rgb_label.setText("awaiting RGB reply…")
@@ -729,10 +978,42 @@ class BodyStubWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:
         try:
+            self._jill_client.close()
+        except Exception:
+            logger.exception("jill_client close raised")
+        try:
             self.controller.shutdown()
         except Exception:
             logger.exception("shutdown raised on close")
         super().closeEvent(event)
+
+
+def _overlay_boxes(pm: QPixmap, boxes, src_w: int, src_h: int) -> QPixmap:
+    """Draw detect boxes on a scaled pixmap, scaling coords from source dims."""
+    if not src_w or not src_h:
+        return pm
+    sx = pm.width() / float(src_w)
+    sy = pm.height() / float(src_h)
+    out = QPixmap(pm)
+    p = QPainter(out)
+    try:
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        pen = QPen(QColor(255, 220, 60), 2)
+        p.setPen(pen)
+        p.setFont(QFont("Sans", 9, QFont.Weight.Bold))
+        for b in boxes:
+            try:
+                x1, y1, x2, y2 = b.bbox
+            except (TypeError, ValueError):
+                continue
+            rx, ry = int(x1 * sx), int(y1 * sy)
+            rw, rh = int((x2 - x1) * sx), int((y2 - y1) * sy)
+            p.drawRect(rx, ry, rw, rh)
+            label = b.label if b.confidence is None else f"{b.label} {b.confidence:.2f}"
+            p.drawText(rx + 2, max(ry - 2, 10), label)
+    finally:
+        p.end()
+    return out
 
 
 def _brief(obj) -> str:

@@ -7,6 +7,13 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from pathlib import Path
+
+# Make src/ importable so the vision dock can reach src/vision_service.py
+# and src/utils/*. Same pattern used by bench scripts.
+_SRC = Path(__file__).resolve().parents[2] / "src"
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
 
 from .config import ENV_VAR, StubConfig, resolve_router
 from .controller import StubController

@@ -24,12 +24,12 @@ from incremental_planner import (
     build_tool_catalog,
     tool_catalog_text,
     load_skill_docs,
-    repair_json_string,
     sgl_to_infospace_action,
     execute_infospace_action,
     parse_request_tools,
     stage0_resource_retrieval,
 )
+from utils.json_utils import repair_json_string
 
 # Import SGLang functions if available
 if HAS_SGLANG:

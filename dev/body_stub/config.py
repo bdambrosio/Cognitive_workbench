@@ -26,6 +26,11 @@ class StubConfig:
     # from 5 Hz; set this to ~3× the Pi's configured period.
     map_stale_s: float = 2.0
 
+    # Jill chat routing (used only when the Vision dock's "Jill" mode is
+    # selected). jill_router=None means reuse the body stub's router.
+    jill_character: str = "Jill"
+    jill_router: Optional[str] = None
+
     topics: "Topics" = field(default_factory=lambda: Topics())
 
 
