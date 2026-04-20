@@ -19,13 +19,15 @@ from __future__ import annotations
 import json
 import logging
 import math
+import os
 import sys
+import tempfile
 import time
 from typing import Optional
 
 import numpy as np
 
-from PyQt6.QtCore import Qt, QPointF, QThread, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QPointF, QProcess, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import (
     QColor, QFont, QImage, QPainter, QPen, QPixmap, QPolygonF,
 )
@@ -431,6 +433,48 @@ class _VisionWorker(QThread):
             self.error.emit(f"{type(e).__name__}: {e}")
 
 
+class _TTSWorker(QThread):
+    """Fetches mp3 bytes from the xAI TTS API in a background thread."""
+
+    audio_ready = pyqtSignal(bytes)
+    error = pyqtSignal(str)
+
+    def __init__(self, text: str, api_key: str, parent=None):
+        super().__init__(parent)
+        self._text = text
+        self._api_key = api_key
+
+    def run(self) -> None:
+        try:
+            import requests
+            res = requests.post(
+                "https://api.x.ai/v1/tts",
+                headers={
+                    "Authorization": f"Bearer {self._api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "text": self._text,
+                    "voice_id": "Eve",
+                    "output_format": {
+                        "codec": "mp3",
+                        "sample_rate": 44100,
+                        "bit_rate": 128000,
+                    },
+                    "language": "en",
+                },
+                timeout=30,
+            )
+            if res.status_code != 200:
+                self.error.emit(
+                    f"HTTP {res.status_code}: {res.text[:200]}"
+                )
+                return
+            self.audio_ready.emit(res.content)
+        except Exception as e:
+            self.error.emit(f"{type(e).__name__}: {e}")
+
+
 class VisionDock(QDockWidget):
     """Chat + detect pane talking to a local VLM via src/vision_service.py."""
 
@@ -468,6 +512,14 @@ class VisionDock(QDockWidget):
 
         self.attach_box = QCheckBox("attach current frame")
         v.addWidget(self.attach_box)
+
+        self.speak_box = QCheckBox("Speak replies (xAI TTS)")
+        v.addWidget(self.speak_box)
+
+        self._speak_queue: list[str] = []
+        self._tts_worker: Optional[_TTSWorker] = None
+        self._play_process: Optional[QProcess] = None
+        self._audio_tmp_path: Optional[str] = None
 
         btn_row = QHBoxLayout()
         self.send_btn = QPushButton("Send")
@@ -521,6 +573,83 @@ class VisionDock(QDockWidget):
             f'</div>'
         )
         self.transcript.append(html)
+        if role == "assistant":
+            self.speak(text)
+
+    # ── TTS / speak ──────────────────────────────────────────────────
+
+    def speak(self, text: str) -> None:
+        if not self.speak_box.isChecked():
+            return
+        text = (text or "").strip()
+        if not text:
+            return
+        self._speak_queue.append(text)
+        self._pump_speak_queue()
+
+    def _pump_speak_queue(self) -> None:
+        if self._tts_worker is not None or self._play_process is not None:
+            return
+        if not self._speak_queue:
+            return
+        api_key = os.environ.get("GROK_API_KEY")
+        if not api_key:
+            self.append_turn("error", "GROK_API_KEY not set; disabling speak.")
+            self._speak_queue.clear()
+            self.speak_box.setChecked(False)
+            return
+        text = self._speak_queue.pop(0)
+        worker = _TTSWorker(text, api_key, parent=self)
+        worker.audio_ready.connect(self._on_tts_ready)
+        worker.error.connect(self._on_tts_error)
+        worker.finished.connect(self._on_tts_finished)
+        self._tts_worker = worker
+        worker.start()
+
+    def _on_tts_ready(self, data: bytes) -> None:
+        try:
+            fd, path = tempfile.mkstemp(suffix=".mp3", prefix="bodystub_tts_")
+            with os.fdopen(fd, "wb") as f:
+                f.write(data)
+        except Exception as e:
+            self.append_turn("error", f"TTS write failed: {e}")
+            return
+        self._audio_tmp_path = path
+        proc = QProcess(self)
+        proc.finished.connect(self._on_play_finished)
+        proc.errorOccurred.connect(self._on_play_error)
+        self._play_process = proc
+        proc.start(
+            "ffplay",
+            ["-nodisp", "-autoexit", "-loglevel", "quiet", path],
+        )
+
+    def _on_tts_error(self, msg: str) -> None:
+        self.append_turn("error", f"TTS: {msg}")
+
+    def _on_tts_finished(self) -> None:
+        worker = self._tts_worker
+        self._tts_worker = None
+        if worker is not None:
+            worker.deleteLater()
+        if self._play_process is None:
+            self._pump_speak_queue()
+
+    def _on_play_finished(self, *_args) -> None:
+        proc = self._play_process
+        self._play_process = None
+        if proc is not None:
+            proc.deleteLater()
+        if self._audio_tmp_path:
+            try:
+                os.unlink(self._audio_tmp_path)
+            except OSError:
+                pass
+            self._audio_tmp_path = None
+        self._pump_speak_queue()
+
+    def _on_play_error(self, _err) -> None:
+        self.append_turn("error", "ffplay failed (is ffmpeg installed?)")
 
 
 # ── Main window ─────────────────────────────────────────────────────
