@@ -32,11 +32,21 @@ class StubController:
         self._session: Optional[Any] = None
         self._heartbeat_pub: Optional[Any] = None
         self._cmd_vel_pub: Optional[Any] = None
+        self._cmd_direct_pub: Optional[Any] = None
         self._subscribers: List[Any] = []
 
         self._stop_event = threading.Event()
         self._hb_thread: Optional[threading.Thread] = None
         self._cv_thread: Optional[threading.Thread] = None
+
+        # Monotonic-ts generator for outgoing cmd_vel/cmd_direct payloads.
+        # The Pi motor_controller uses payload ts to pick between the two
+        # last commands (direct_ts >= twist_ts → direct wins). We must
+        # never emit a ts that goes backwards, or a stale stored command
+        # on the other topic could re-win precedence. Protected by
+        # self.state.lock so publisher thread and supersede calls can't
+        # race.
+        self._last_sent_ts: float = 0.0
 
     # ── Connection lifecycle ─────────────────────────────────────────
 
@@ -62,7 +72,7 @@ class StubController:
             target=self._heartbeat_loop, name="body-stub-heartbeat", daemon=True,
         )
         self._cv_thread = threading.Thread(
-            target=self._cmd_vel_loop, name="body-stub-cmdvel", daemon=True,
+            target=self._cmd_loop, name="body-stub-cmd", daemon=True,
         )
         self._hb_thread.start()
         self._cv_thread.start()
@@ -72,6 +82,10 @@ class StubController:
         return True, None
 
     def disconnect(self) -> None:
+        # Best-effort neutralize any stored command on the Pi before the
+        # publisher thread stops. Matters when the stub is the only
+        # commander (no watchdog to e-stop on heartbeat loss).
+        self._supersede_both_zero()
         with self.state.lock:
             self.state.live_command = False
             self.state.connected = False
@@ -93,7 +107,9 @@ class StubController:
             except Exception:
                 pass
         self._subscribers.clear()
-        for pub in (self._heartbeat_pub, self._cmd_vel_pub):
+        for pub in (
+            self._heartbeat_pub, self._cmd_vel_pub, self._cmd_direct_pub,
+        ):
             if pub is not None:
                 try:
                     pub.undeclare()
@@ -101,6 +117,7 @@ class StubController:
                     pass
         self._heartbeat_pub = None
         self._cmd_vel_pub = None
+        self._cmd_direct_pub = None
         if self._session is not None:
             try:
                 self._session.close()
@@ -115,6 +132,7 @@ class StubController:
         t = self.config.topics
         self._heartbeat_pub = self._session.declare_publisher(t.heartbeat)
         self._cmd_vel_pub = self._session.declare_publisher(t.cmd_vel)
+        self._cmd_direct_pub = self._session.declare_publisher(t.cmd_direct)
 
     def _declare_subscribers(self) -> None:
         assert self._session is not None
@@ -233,16 +251,24 @@ class StubController:
     # ── Publisher threads ────────────────────────────────────────────
 
     def _heartbeat_loop(self) -> None:
+        """Publish body/heartbeat whenever connected.
+
+        Deliberately not gated on live_command: per body_project_spec
+        §8.2, the desktop agent publishes heartbeat "whenever she
+        expects the robot to be active" — i.e. whenever connected.
+        Gating on live_command created a deadlock where the watchdog
+        e-stopped the robot for lack of heartbeat, which in turn
+        disabled the UI's drive controls.
+        """
         period = 1.0 / max(0.5, self.config.heartbeat_hz)
         while not self._stop_event.is_set():
             start = time.monotonic()
             try:
                 with self.state.lock:
-                    live = self.state.live_command
                     connected = self.state.connected
                     self.state.heartbeat_seq += 1
                     seq = self.state.heartbeat_seq
-                if live and connected and self._heartbeat_pub is not None:
+                if connected and self._heartbeat_pub is not None:
                     payload = json.dumps({"seq": seq, "ts": now_ts()}).encode("utf-8")
                     self._heartbeat_pub.put(payload)
             except Exception:
@@ -250,7 +276,27 @@ class StubController:
             elapsed = time.monotonic() - start
             self._stop_event.wait(max(0.0, period - elapsed))
 
-    def _cmd_vel_loop(self) -> None:
+    def _next_ts_locked(self) -> float:
+        """Return a ts strictly greater than any previously emitted ts.
+
+        Must be called with self.state.lock held. Protects the Pi's
+        ts-based precedence logic against our own local clock going
+        backwards (NTP step, VM suspend, etc).
+        """
+        t = now_ts()
+        if t <= self._last_sent_ts:
+            t = self._last_sent_ts + 1e-6
+        self._last_sent_ts = t
+        return t
+
+    def _cmd_loop(self) -> None:
+        """Publish the active command topic at cmd_vel_hz.
+
+        Mode dispatch is read from state.cmd_mode each cycle; this makes
+        the publisher the single source of truth for which topic is
+        "live" at any instant. Supersession of the inactive topic on
+        mode switch is handled out-of-band by _supersede_both_locked.
+        """
         period = 1.0 / max(0.5, self.config.cmd_vel_hz)
         while not self._stop_event.is_set():
             start = time.monotonic()
@@ -258,16 +304,29 @@ class StubController:
                 with self.state.lock:
                     live = self.state.live_command
                     connected = self.state.connected
+                    mode = self.state.cmd_mode
                     lin, ang = self.state.last_cmd_vel
-                if live and connected and self._cmd_vel_pub is not None:
+                    left, right = self.state.last_cmd_direct
+                    timeout_ms = self.config.cmd_vel_timeout_ms
+                    ts = self._next_ts_locked() if (live and connected) else None
+                if ts is None:
+                    pass
+                elif mode == "cmd_direct" and self._cmd_direct_pub is not None:
                     payload = json.dumps({
-                        "linear": lin,
-                        "angular": ang,
-                        "timeout_ms": self.config.cmd_vel_timeout_ms,
+                        "ts": ts,
+                        "left": left, "right": right,
+                        "timeout_ms": timeout_ms,
+                    }).encode("utf-8")
+                    self._cmd_direct_pub.put(payload)
+                elif self._cmd_vel_pub is not None:
+                    payload = json.dumps({
+                        "ts": ts,
+                        "linear": lin, "angular": ang,
+                        "timeout_ms": timeout_ms,
                     }).encode("utf-8")
                     self._cmd_vel_pub.put(payload)
             except Exception:
-                logger.exception("cmd_vel publish failed")
+                logger.exception("cmd publish failed")
             elapsed = time.monotonic() - start
             self._stop_event.wait(max(0.0, period - elapsed))
 
@@ -278,25 +337,70 @@ class StubController:
             self.state.live_command = bool(enable)
             if not enable:
                 self.state.last_cmd_vel = (0.0, 0.0)
+                self.state.last_cmd_direct = (0.0, 0.0)
 
     def set_cmd_vel(self, linear: float, angular: float) -> None:
         with self.state.lock:
             self.state.last_cmd_vel = (float(linear), float(angular))
 
+    def set_cmd_direct(self, left: float, right: float) -> None:
+        with self.state.lock:
+            self.state.last_cmd_direct = (float(left), float(right))
+
+    def set_cmd_mode(self, mode: str) -> None:
+        """Switch active publisher between 'cmd_vel' and 'cmd_direct'.
+
+        Supersedes the leaving topic with an explicit zero so the Pi's
+        ts-based precedence cannot keep a stale command from the old
+        topic winning over fresh commands on the new one.
+        """
+        if mode not in ("cmd_vel", "cmd_direct"):
+            raise ValueError(f"unknown cmd mode: {mode!r}")
+        with self.state.lock:
+            prev = self.state.cmd_mode
+            if prev == mode:
+                return
+            self.state.cmd_mode = mode
+            # Clear both sets on mode switch; the user re-enters values
+            # on the new slider set.
+            self.state.last_cmd_vel = (0.0, 0.0)
+            self.state.last_cmd_direct = (0.0, 0.0)
+        self._supersede_both_zero()
+
     def stop_all(self) -> None:
-        """Zero cmd_vel and drop live command. Publishes one explicit zero."""
+        """ALL-STOP. Zero both command sets, drop live_command, and
+        publish zeros on *both* cmd topics so neither can win precedence
+        on the Pi after this call returns.
+        """
         with self.state.lock:
             self.state.last_cmd_vel = (0.0, 0.0)
+            self.state.last_cmd_direct = (0.0, 0.0)
             self.state.live_command = False
-        if self._cmd_vel_pub is not None:
-            try:
-                payload = json.dumps({
-                    "linear": 0.0, "angular": 0.0,
-                    "timeout_ms": self.config.cmd_vel_timeout_ms,
-                }).encode("utf-8")
-                self._cmd_vel_pub.put(payload)
-            except Exception:
-                logger.exception("stop_all publish failed")
+        self._supersede_both_zero()
+
+    def _supersede_both_zero(self) -> None:
+        """Publish a zero command on both cmd_vel and cmd_direct with a
+        shared monotonic ts. At tie ts, the Pi's `direct_ts >= twist_ts`
+        rule makes direct win — but both payloads are zero so the motion
+        outcome is identical, and the next live publish gets a strictly
+        larger ts that resolves cleanly.
+        """
+        if self._cmd_vel_pub is None or self._cmd_direct_pub is None:
+            return
+        with self.state.lock:
+            ts = self._next_ts_locked()
+            timeout_ms = self.config.cmd_vel_timeout_ms
+        try:
+            self._cmd_vel_pub.put(json.dumps({
+                "ts": ts, "linear": 0.0, "angular": 0.0,
+                "timeout_ms": timeout_ms,
+            }).encode("utf-8"))
+            self._cmd_direct_pub.put(json.dumps({
+                "ts": ts, "left": 0.0, "right": 0.0,
+                "timeout_ms": timeout_ms,
+            }).encode("utf-8"))
+        except Exception:
+            logger.exception("supersede publish failed")
 
     def request_rgb(self) -> Optional[str]:
         """Publish body/oakd/config capture_rgb; returns request_id or None."""

@@ -33,9 +33,9 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDockWidget, QDoubleSpinBox,
-    QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
-    QPlainTextEdit, QPushButton, QSizePolicy, QTabWidget, QTextBrowser,
-    QVBoxLayout, QWidget,
+    QFrame, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+    QMainWindow, QPlainTextEdit, QPushButton, QSizePolicy, QSpinBox,
+    QTabWidget, QTextBrowser, QVBoxLayout, QWidget,
 )
 
 from .jill_client import JillClient
@@ -652,6 +652,488 @@ class VisionDock(QDockWidget):
         self.append_turn("error", "ffplay failed (is ffmpeg installed?)")
 
 
+# ── Motor test dock ─────────────────────────────────────────────────
+
+# Heartbeat freshness gate: body/status must have landed within this
+# window, and status.heartbeat_ok must be true. 2 s matches the spec's
+# HEARTBEAT_TIMEOUT_MS default; a stale status probably means the
+# watchdog itself isn't running.
+_STATUS_FRESH_S = 2.0
+
+
+class DifferentialPad(QWidget):
+    """Skid-steer 2D pad for driving both wheels with one mouse.
+
+    Mouse position inside the unit circle maps to (left, right) wheel
+    velocities via the standard tank mapping:
+
+        nx, ny ∈ [-1, +1]   (y up; clamped to unit circle)
+        left  = clamp(ny + nx, -1, +1) * max_wheel
+        right = clamp(ny - nx, -1, +1) * max_wheel
+
+    Consequences:
+      * Center = stop.
+      * Pure up = straight forward at max_wheel.
+      * Pure right = L fwd, R rev → spin right (CW) in place.
+      * Top-right corner (projected onto circle) = tight right turn
+        while moving forward (L full, R slow/zero).
+      * Drag outside the circle projects back onto the edge.
+      * Mouse release snaps the handle to center → zero command.
+
+    Widget is always enabled; disabling is done by the parent dock
+    (engage toggle) via setEnabled().
+    """
+
+    # (left_mps, right_mps) — emitted on every position change.
+    cmd_changed = pyqtSignal(float, float)
+
+    def __init__(self, max_wheel: float, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self._max_wheel = float(max_wheel)
+        self._nx: float = 0.0  # normalized [-1, 1]
+        self._ny: float = 0.0
+        self._dragging: bool = False
+        self.setMinimumSize(240, 240)
+        self.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding,
+        )
+        self.setMouseTracking(False)  # only update while button is down
+
+    # ── Public API ──────────────────────────────────────────────────
+
+    def set_max_wheel(self, v: float) -> None:
+        self._max_wheel = float(v)
+        self._emit()  # same position, new scale
+
+    def current_mps(self) -> tuple[float, float]:
+        L = max(-1.0, min(1.0, self._ny + self._nx)) * self._max_wheel
+        R = max(-1.0, min(1.0, self._ny - self._nx)) * self._max_wheel
+        return L, R
+
+    def recenter(self) -> None:
+        self._nx = 0.0
+        self._ny = 0.0
+        self._dragging = False
+        self._emit()
+        self.update()
+
+    # ── Geometry ────────────────────────────────────────────────────
+
+    def _center_radius(self) -> tuple[float, float, float]:
+        w, h = self.width(), self.height()
+        cx, cy = w / 2.0, h / 2.0
+        r = min(w, h) / 2.0 - 10.0
+        return cx, cy, max(r, 1.0)
+
+    def _pixel_to_norm(self, px: float, py: float) -> tuple[float, float]:
+        cx, cy, r = self._center_radius()
+        nx = (px - cx) / r
+        ny = -(py - cy) / r  # screen y is down; make up positive
+        # Project onto unit circle if outside.
+        d = math.hypot(nx, ny)
+        if d > 1.0 and d > 0.0:
+            nx /= d
+            ny /= d
+        return nx, ny
+
+    def _norm_to_pixel(self, nx: float, ny: float) -> tuple[float, float]:
+        cx, cy, r = self._center_radius()
+        return cx + nx * r, cy - ny * r
+
+    # ── Events ──────────────────────────────────────────────────────
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() != Qt.MouseButton.LeftButton:
+            return
+        self._dragging = True
+        self._nx, self._ny = self._pixel_to_norm(
+            event.position().x(), event.position().y(),
+        )
+        self._emit()
+        self.update()
+
+    def mouseMoveEvent(self, event) -> None:
+        if not self._dragging:
+            return
+        self._nx, self._ny = self._pixel_to_norm(
+            event.position().x(), event.position().y(),
+        )
+        self._emit()
+        self.update()
+
+    def mouseReleaseEvent(self, event) -> None:
+        if event.button() != Qt.MouseButton.LeftButton:
+            return
+        self.recenter()
+
+    def leaveEvent(self, _event) -> None:
+        # Safety: if the pointer exits the widget mid-drag (e.g. user
+        # drags off the window), treat as release.
+        if self._dragging:
+            self.recenter()
+
+    def _emit(self) -> None:
+        L, R = self.current_mps()
+        self.cmd_changed.emit(L, R)
+
+    # ── Painting ────────────────────────────────────────────────────
+
+    def paintEvent(self, _event) -> None:
+        p = QPainter(self)
+        try:
+            p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            w, h = self.width(), self.height()
+            enabled = self.isEnabled()
+            p.fillRect(0, 0, w, h,
+                       QColor(18, 18, 18) if enabled else QColor(28, 28, 28))
+            cx, cy, r = self._center_radius()
+
+            # Outer circle
+            ring = QColor(120, 160, 200) if enabled else QColor(70, 70, 70)
+            p.setPen(QPen(ring, 2))
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawEllipse(QPointF(cx, cy), r, r)
+
+            # Inner rings at 0.5 and 0.25 for speed reference
+            p.setPen(QPen(QColor(60, 60, 60), 1))
+            for frac in (0.25, 0.5, 0.75):
+                p.drawEllipse(QPointF(cx, cy), r * frac, r * frac)
+
+            # Crosshairs (F=forward up, R=spin right, B=back, L=spin left)
+            p.setPen(QPen(QColor(70, 70, 70), 1))
+            p.drawLine(int(cx - r), int(cy), int(cx + r), int(cy))
+            p.drawLine(int(cx), int(cy - r), int(cx), int(cy + r))
+            tag = QColor(130, 130, 130) if enabled else QColor(60, 60, 60)
+            p.setPen(tag)
+            p.setFont(QFont("Sans", 9, QFont.Weight.Bold))
+            p.drawText(int(cx - 5), int(cy - r - 2), "F")
+            p.drawText(int(cx - 5), int(cy + r + 14), "B")
+            p.drawText(int(cx - r - 14), int(cy + 5), "L")
+            p.drawText(int(cx + r + 4), int(cy + 5), "R")
+
+            # Current position dot + line from center
+            if enabled:
+                hx, hy = self._norm_to_pixel(self._nx, self._ny)
+                p.setPen(QPen(QColor(255, 200, 60), 2))
+                p.drawLine(int(cx), int(cy), int(hx), int(hy))
+                p.setPen(QPen(QColor(255, 220, 100), 1))
+                p.setBrush(QColor(255, 220, 100))
+                p.drawEllipse(QPointF(hx, hy), 7, 7)
+
+            # Readout text (L/R in m/s)
+            L, R = self.current_mps()
+            txt = f"L {L:+.2f}   R {R:+.2f}  m/s"
+            p.setPen(QColor(220, 220, 220) if enabled else QColor(100, 100, 100))
+            p.setFont(QFont("Monospace", 10, QFont.Weight.Bold))
+            p.drawText(8, h - 10, txt)
+        finally:
+            p.end()
+
+
+class _Pill(QLabel):
+    """Small colored chip used for motion-gate indicators."""
+
+    def __init__(self, text: str, parent: Optional[QWidget] = None):
+        super().__init__(text, parent)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setFont(QFont("Monospace", 8))
+        self.setMinimumWidth(70)
+        self.set_state(False)
+
+    def set_state(self, ok: bool) -> None:
+        bg = "#2c7a2c" if ok else "#5a2a2a"
+        fg = "white" if ok else "#bbb"
+        self.setStyleSheet(
+            f"background:{bg};color:{fg};"
+            f"padding:1px 6px;border-radius:4px;"
+        )
+
+
+class MotorTestDock(QDockWidget):
+    """Per-wheel motor test panel (body/cmd_direct).
+
+    Purpose: bring-up + calibration tool. Bypasses the twist→differential
+    math so left/right can be tested independently.
+
+      * Engage button arms the tester. Engage ON → mode=cmd_direct +
+        live_command=True; publisher emits cmd_direct continuously with
+        whatever the sliders read. Engage OFF → stop_all() +
+        mode=cmd_vel. No separate "hold-to-drive" dead-man button —
+        single-mouse UX can't hold a button AND drag a slider.
+      * Sliders are center-snap, release-to-zero. Mouse-up on either
+        slider snaps it back to 0.0 m/s (immediate published zero).
+      * STOP button is the panic path: full stop and disengage.
+      * Gate pills are diagnostic only — they do NOT block commands.
+        The negative gates (e-stop, timeout, stall) are all cleared on
+        the Pi by a fresh command, so blocking commands on their
+        account would be a deadlock.
+      * Feedback readouts come straight from body/motor_state (PWM,
+        direction, flags) and body/odom (left_ticks/right_ticks,
+        diffed locally for ticks/s). No wheel_base_m dependency.
+    """
+
+    # (mode,) — emitted when user toggles engage. "cmd_direct" or "cmd_vel".
+    mode_change_requested = pyqtSignal(str)
+    # (left_mps, right_mps)
+    cmd_direct_changed = pyqtSignal(float, float)
+    # panic stop
+    stop_requested = pyqtSignal()
+
+    def __init__(self, max_wheel_default: float, timeout_ms_default: int,
+                 parent: Optional[QWidget] = None):
+        super().__init__("Motor Test (cmd_direct)", parent)
+        self.setAllowedAreas(
+            Qt.DockWidgetArea.RightDockWidgetArea
+            | Qt.DockWidgetArea.LeftDockWidgetArea
+        )
+        self._max_wheel = float(max_wheel_default)
+        self._tick_hist: dict[str, tuple[int, float]] = {}  # side → (ticks, ts)
+        self._tick_rate: dict[str, float] = {"left": 0.0, "right": 0.0}
+
+        body = QWidget()
+        v = QVBoxLayout(body)
+        v.setContentsMargins(6, 6, 6, 6)
+        v.setSpacing(6)
+
+        # --- engage row ---
+        engage_row = QHBoxLayout()
+        self.engage_btn = QPushButton("Engage direct control")
+        self.engage_btn.setCheckable(True)
+        self.engage_btn.setStyleSheet(
+            "QPushButton:checked{background:#2c7a2c;color:white;"
+            "font-weight:bold;}"
+        )
+        engage_row.addWidget(self.engage_btn)
+        engage_row.addStretch(1)
+        v.addLayout(engage_row)
+
+        # --- limits row ---
+        limits_row = QHBoxLayout()
+        limits_row.addWidget(QLabel("Max wheel (m/s):"))
+        self.max_wheel_box = QDoubleSpinBox()
+        self.max_wheel_box.setRange(0.05, 1.0)
+        self.max_wheel_box.setSingleStep(0.05)
+        self.max_wheel_box.setDecimals(2)
+        self.max_wheel_box.setValue(self._max_wheel)
+        limits_row.addWidget(self.max_wheel_box)
+        limits_row.addSpacing(12)
+        limits_row.addWidget(QLabel("Timeout (ms):"))
+        self.timeout_box = QSpinBox()
+        self.timeout_box.setRange(100, 5000)
+        self.timeout_box.setSingleStep(50)
+        self.timeout_box.setValue(int(timeout_ms_default))
+        self.timeout_box.setToolTip(
+            "timeout_ms field sent with each cmd_direct payload"
+        )
+        limits_row.addWidget(self.timeout_box)
+        limits_row.addStretch(1)
+        v.addLayout(limits_row)
+
+        # --- differential pad (replaces left/right sliders) ---
+        self.pad = DifferentialPad(self._max_wheel)
+        v.addWidget(self.pad, 1)
+
+        # --- stop ---
+        btn_row = QHBoxLayout()
+        self.stop_btn = QPushButton("STOP")
+        self.stop_btn.setStyleSheet(
+            "QPushButton{background:#aa2222;color:white;font-weight:bold;"
+            "padding:8px;}"
+        )
+        btn_row.addWidget(self.stop_btn, 1)
+        v.addLayout(btn_row)
+
+        # --- gate pills ---
+        gate_frame = QFrame()
+        gate_frame.setFrameShape(QFrame.Shape.StyledPanel)
+        gv = QVBoxLayout(gate_frame)
+        gv.setContentsMargins(6, 4, 6, 4)
+        gv.setSpacing(4)
+        gates_row = QHBoxLayout()
+        gates_row.setSpacing(4)
+        self.pills = {
+            "connected": _Pill("conn"),
+            "live": _Pill("live"),
+            "hb_ok": _Pill("hb"),
+            "no_estop": _Pill("no-stop"),
+            "no_timeout": _Pill("no-to"),
+            "no_stall": _Pill("no-stall"),
+        }
+        for pill in self.pills.values():
+            gates_row.addWidget(pill)
+        gates_row.addStretch(1)
+        gv.addLayout(gates_row)
+        self.status_line = QLabel("disconnected")
+        self.status_line.setStyleSheet("color:#bbb;")
+        gv.addWidget(self.status_line)
+        v.addWidget(gate_frame)
+
+        # --- measured readouts ---
+        meas_frame = QFrame()
+        meas_frame.setFrameShape(QFrame.Shape.StyledPanel)
+        mv = QVBoxLayout(meas_frame)
+        mv.setContentsMargins(6, 4, 6, 4)
+        mv.setSpacing(2)
+        mono = QFont("Monospace", 9)
+        self.meas_header = QLabel("Measured (motor_state + odom):")
+        mv.addWidget(self.meas_header)
+        self.meas_left = QLabel("L: —")
+        self.meas_right = QLabel("R: —")
+        for lbl in (self.meas_left, self.meas_right):
+            lbl.setFont(mono)
+            mv.addWidget(lbl)
+        v.addWidget(meas_frame)
+
+        v.addStretch(1)
+        self.setWidget(body)
+
+        # --- wiring ---
+        self.engage_btn.toggled.connect(self._on_engage_toggled)
+        self.max_wheel_box.valueChanged.connect(self._on_max_wheel_changed)
+        self.pad.cmd_changed.connect(self._on_pad_changed)
+        self.stop_btn.clicked.connect(self.stop_requested)
+
+        # Pad is disabled until engaged.
+        self._set_controls_enabled(False)
+
+    # ── User actions ─────────────────────────────────────────────────
+
+    def _on_pad_changed(self, left: float, right: float) -> None:
+        # The pad produces m/s directly (it was given max_wheel at
+        # construction and kept in sync via set_max_wheel).
+        self.cmd_direct_changed.emit(left, right)
+
+    def _on_engage_toggled(self, on: bool) -> None:
+        self.engage_btn.setText(
+            "Release direct control (→ cmd_vel)" if on
+            else "Engage direct control"
+        )
+        self._set_controls_enabled(on)
+        if not on:
+            self.pad.recenter()
+        self.mode_change_requested.emit("cmd_direct" if on else "cmd_vel")
+
+    def _on_max_wheel_changed(self, v: float) -> None:
+        self._max_wheel = float(v)
+        self.pad.set_max_wheel(self._max_wheel)
+
+    def _set_controls_enabled(self, on: bool) -> None:
+        self.pad.setEnabled(on)
+
+    def timeout_ms(self) -> int:
+        return int(self.timeout_box.value())
+
+    def engaged(self) -> bool:
+        return self.engage_btn.isChecked()
+
+    # ── Redraw (called from BodyStubWindow._tick) ────────────────────
+
+    def update_state(self, snap: dict, now: float) -> None:
+        motor = snap.get("motor") or {}
+        status = snap.get("status") or {}
+        status_ts = snap.get("status_ts") or 0.0
+
+        # Tick-rate derivation from odom.left_ticks / right_ticks.
+        odom = snap.get("odom") or {}
+        odom_ts = snap.get("odom_ts") or 0.0
+        for side, key in (("left", "left_ticks"), ("right", "right_ticks")):
+            ticks = odom.get(key)
+            if not isinstance(ticks, (int, float)) or odom_ts <= 0.0:
+                continue
+            prev = self._tick_hist.get(side)
+            self._tick_hist[side] = (int(ticks), float(odom_ts))
+            if prev is None:
+                continue
+            dt = odom_ts - prev[1]
+            if dt <= 0.0:
+                continue
+            self._tick_rate[side] = (int(ticks) - prev[0]) / dt
+
+        # --- gates ---
+        connected = bool(snap.get("connected"))
+        live = bool(snap.get("live"))
+        hb_ok = (
+            bool(status.get("heartbeat_ok", False))
+            and status_ts > 0.0
+            and (now - status_ts) <= _STATUS_FRESH_S
+        )
+        # motor_state.e_stop_active already ORs status.e_stop_active on Pi,
+        # per Body-side review. Use it as the authoritative motion gate.
+        e_stop = bool(motor.get("e_stop_active", False))
+        cmd_timeout = bool(motor.get("cmd_timeout_active", False))
+        stall = bool(motor.get("stall_detected", False))
+
+        gates = {
+            "connected": connected,
+            "live": connected and live,
+            "hb_ok": connected and hb_ok,
+            "no_estop": connected and not e_stop,
+            "no_timeout": connected and not cmd_timeout,
+            "no_stall": connected and not stall,
+        }
+        for key, ok in gates.items():
+            self.pills[key].set_state(ok)
+
+        reason = self._reason_string(
+            connected=connected, live=live, hb_ok=hb_ok,
+            status_seen=(status_ts > 0.0),
+            status_e_stop=bool(status.get("e_stop_active", False)),
+            motor_seen=(snap.get("motor_ts") or 0.0) > 0.0,
+            e_stop=e_stop, cmd_timeout=cmd_timeout, stall=stall,
+            engaged=self.engaged(),
+        )
+        self.status_line.setText(reason)
+
+        # --- measured readouts ---
+        if not motor:
+            self.meas_left.setText("L: no motor_state yet")
+            self.meas_right.setText("R: no motor_state yet")
+        else:
+            def fmt(side_key_pwm: str, side_key_dir: str, rate_key: str) -> str:
+                pwm = motor.get(side_key_pwm)
+                dire = motor.get(side_key_dir) or "?"
+                pwm_s = f"{float(pwm):+.2f}" if isinstance(pwm, (int, float)) else "  — "
+                rate = self._tick_rate.get(rate_key, 0.0)
+                return f"PWM {pwm_s}  dir {dire:<3}  ticks/s {rate:+8.1f}"
+            self.meas_left.setText("L: " + fmt("left_pwm", "left_dir", "left"))
+            self.meas_right.setText("R: " + fmt("right_pwm", "right_dir", "right"))
+
+    def _reason_string(
+        self, *, connected: bool, live: bool, hb_ok: bool, status_seen: bool,
+        status_e_stop: bool, motor_seen: bool,
+        e_stop: bool, cmd_timeout: bool, stall: bool, engaged: bool,
+    ) -> str:
+        """Human-readable status.
+
+        Pre-engage states report setup problems (disconnected, missing
+        topics). Once engaged, reports whatever condition on the Pi is
+        inhibiting actual motion — but only as a diagnostic; the dock
+        keeps publishing regardless so a stuck latch can self-clear on
+        the next fresh command.
+        """
+        if not connected:
+            return "disconnected — press Connect"
+        if not engaged:
+            return "not engaged — main window cmd_vel controls active"
+        if not motor_seen:
+            return "engaged — waiting for motor_state…"
+        if not status_seen:
+            return "engaged — no body/status seen (watchdog running?)"
+        if not hb_ok:
+            return "engaged — heartbeat not ok at watchdog yet"
+        if status_e_stop:
+            return "engaged — watchdog holds e-stop (status.e_stop_active)"
+        if e_stop:
+            return "engaged — motor holds e-stop (motor_state.e_stop_active)"
+        if cmd_timeout:
+            return "engaged — motor sees cmd_timeout_active"
+        if stall:
+            return "engaged — stall_detected; return to zero to clear"
+        if not live:
+            return "engaged — publisher not live (should not happen)"
+        return "driving"
+
+
 # ── Main window ─────────────────────────────────────────────────────
 
 class BodyStubWindow(QMainWindow):
@@ -691,7 +1173,7 @@ class BodyStubWindow(QMainWindow):
         conn_row.addWidget(self.router_edit)
         self.connect_btn = QPushButton("Connect")
         conn_row.addWidget(self.connect_btn)
-        self.live_box = QCheckBox("Live command (publish heartbeat + cmd_vel)")
+        self.live_box = QCheckBox("Live command (publish cmd_vel)")
         self.live_box.setEnabled(False)
         conn_row.addWidget(self.live_box)
         conn_row.addStretch(1)
@@ -789,6 +1271,15 @@ class BodyStubWindow(QMainWindow):
         self.vision_dock = VisionDock(self)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.vision_dock)
 
+        self.motor_dock = MotorTestDock(
+            max_wheel_default=self.config.max_wheel_vel_default,
+            timeout_ms_default=self.config.cmd_vel_timeout_ms,
+            parent=self,
+        )
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.motor_dock)
+        # Tab the motor dock behind vision so both can be raised independently.
+        self.tabifyDockWidget(self.vision_dock, self.motor_dock)
+
     def _wire_signals(self) -> None:
         self.connect_btn.clicked.connect(self._on_connect_clicked)
         self.live_box.toggled.connect(self._on_live_toggled)
@@ -797,6 +1288,9 @@ class BodyStubWindow(QMainWindow):
         self.rgb_btn.clicked.connect(self._on_rgb_clicked)
         self.vision_dock.send_chat.connect(self._on_vision_send)
         self.vision_dock.run_detect.connect(self._on_vision_detect)
+        self.motor_dock.mode_change_requested.connect(self._on_motor_mode_change)
+        self.motor_dock.cmd_direct_changed.connect(self._on_cmd_direct_changed)
+        self.motor_dock.stop_requested.connect(self._on_stop_clicked)
 
     # ── Signal handlers ──────────────────────────────────────────────
 
@@ -832,7 +1326,14 @@ class BodyStubWindow(QMainWindow):
     def _on_stop_clicked(self) -> None:
         self.linear_box.setValue(0.0)
         self.angular_box.setValue(0.0)
-        self.controller.stop_all()
+        # Disengage the motor dock first if it's active. Unchecking
+        # engage_btn triggers _on_motor_mode_change('cmd_vel'), which
+        # calls stop_all() itself — so we don't need to call it twice
+        # in that branch.
+        if self.motor_dock.engage_btn.isChecked():
+            self.motor_dock.engage_btn.setChecked(False)
+        else:
+            self.controller.stop_all()
         self.live_box.setChecked(False)
 
     def _on_rgb_clicked(self) -> None:
@@ -841,6 +1342,36 @@ class BodyStubWindow(QMainWindow):
             self.rgb_meta.setText("request failed (not connected?)")
         else:
             self.rgb_meta.setText(f"request_id {req[:8]}… pending")
+
+    # ── Motor-test dock handlers ────────────────────────────────────
+
+    def _on_motor_mode_change(self, mode: str) -> None:
+        """Dock engage toggled → switch controller mode and arm/disarm.
+
+        Engage ON → mode=cmd_direct, live_command=True. Publisher
+        emits cmd_direct at cmd_vel_hz with current slider values.
+        Main window's cmd_vel live_box is unchecked so the two paths
+        don't race (only one publisher emits per cycle, but the
+        user-facing state should be unambiguous).
+
+        Engage OFF → stop_all() (zero both topics, drop live, supersede),
+        then switch stored mode back to cmd_vel. User can drive cmd_vel
+        again from the main row by re-checking live_box.
+        """
+        # Push the dock's timeout value into the config so the next
+        # published command carries it.
+        self.controller.config.cmd_vel_timeout_ms = self.motor_dock.timeout_ms()
+        if mode == "cmd_direct":
+            if self.live_box.isChecked():
+                self.live_box.setChecked(False)
+            self.controller.set_cmd_mode("cmd_direct")
+            self.controller.set_live_command(True)
+        else:
+            self.controller.stop_all()
+            self.controller.set_cmd_mode("cmd_vel")
+
+    def _on_cmd_direct_changed(self, left: float, right: float) -> None:
+        self.controller.set_cmd_direct(left, right)
 
     # ── Vision handlers ──────────────────────────────────────────────
 
@@ -975,6 +1506,7 @@ class BodyStubWindow(QMainWindow):
         self._render_lidar(snap)
         self._render_local_map(snap)
         self._drain_jill_replies()
+        self.motor_dock.update_state(snap, time.time())
 
     def _drain_jill_replies(self) -> None:
         if not self._jill_client.connected:

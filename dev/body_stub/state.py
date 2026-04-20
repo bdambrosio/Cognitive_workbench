@@ -28,7 +28,12 @@ class BodyState:
     connected: bool = False
     live_command: bool = False
     router: str = ""
+    # Command mode selects which topic the publisher loop drives:
+    # "cmd_vel" → body/cmd_vel (linear/angular twist)
+    # "cmd_direct" → body/cmd_direct (per-wheel m/s, for bring-up)
+    cmd_mode: str = "cmd_vel"
     last_cmd_vel: Tuple[float, float] = (0.0, 0.0)
+    last_cmd_direct: Tuple[float, float] = (0.0, 0.0)  # (left, right) m/s
     heartbeat_seq: int = 0
     pending_rgb_request_id: Optional[str] = None
     pending_rgb_ts: float = 0.0

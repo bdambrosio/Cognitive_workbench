@@ -21,6 +21,10 @@ class StubConfig:
     cmd_vel_timeout_ms: int = 500
     rgb_request_timeout_s: float = 3.0
     ui_redraw_hz: float = 10.0
+    # Motor-test dock: UI-side clamp on per-wheel slider range (m/s).
+    # Independent of Pi motor.max_wheel_vel_ms — belt-and-suspenders so a
+    # mis-configured Pi can't be commanded past the tester's own ceiling.
+    max_wheel_vel_default: float = 0.3
     # local_map: how long without a sample before we treat the panel as
     # stale ("no map / disabled?"). Pi default cadence is moving downward
     # from 5 Hz; set this to ~3× the Pi's configured period.
@@ -39,6 +43,7 @@ class Topics:
     # Publish
     heartbeat: str = "body/heartbeat"
     cmd_vel: str = "body/cmd_vel"
+    cmd_direct: str = "body/cmd_direct"
     oakd_config: str = "body/oakd/config"
     # Subscribe
     status: str = "body/status"
