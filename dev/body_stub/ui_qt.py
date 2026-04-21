@@ -406,6 +406,148 @@ class LocalMapView(QWidget):
             p.end()
 
 
+class DriveableView(QWidget):
+    """Top-down render of the driveable layer on body/map/local_2p5d.
+
+    Cell encoding (int8):  1 = clear, 0 = blocked, -1 = unknown/null.
+    Fixed three-color palette — no autoscale: a single outlier pixel cannot
+    wash the rest out.
+    """
+
+    COLOR_CLEAR = (60, 170, 90)      # green
+    COLOR_BLOCKED = (180, 60, 60)    # red
+    COLOR_UNKNOWN = (60, 60, 60)     # dark gray
+    COLOR_ABSENT_BG = (10, 10, 10)
+
+    def __init__(
+        self,
+        parent: Optional[QWidget] = None,
+        *,
+        stale_s: float = 2.0,
+    ):
+        super().__init__(parent)
+        self.setMinimumSize(240, 240)
+        self.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding,
+        )
+        self._drive: Optional[np.ndarray] = None
+        self._meta: Optional[dict] = None
+        self._ts: float = 0.0
+        self._stale_s = stale_s
+
+    def update_map(
+        self, drive: Optional[np.ndarray],
+        meta: Optional[dict], ts: float,
+    ) -> None:
+        self._drive = drive
+        self._meta = meta
+        self._ts = ts
+        self.update()
+
+    def paintEvent(self, _event) -> None:
+        p = QPainter(self)
+        try:
+            p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            w, h = self.width(), self.height()
+            p.fillRect(0, 0, w, h, QColor(*self.COLOR_ABSENT_BG))
+
+            if self._drive is None or self._meta is None:
+                p.setPen(QColor(160, 160, 160))
+                msg = (
+                    "driveable N/A (Pi driveable_enabled off?)"
+                    if self._meta is not None
+                    else "no map (Pi local_map disabled?)"
+                )
+                p.drawText(10, 16, msg)
+                return
+
+            drive = self._drive
+            nx, ny = drive.shape
+            res = float(self._meta.get("resolution_m", 0.0))
+            origin_x = float(self._meta.get("origin_x_m", 0.0))
+            origin_y = float(self._meta.get("origin_y_m", 0.0))
+            if res <= 0.0:
+                p.setPen(QColor(255, 100, 100))
+                p.drawText(10, 16, f"bad resolution_m={res}")
+                return
+
+            # Orient: forward (i=nx-1) → top, left (j=ny-1) → left.
+            display = drive[::-1, ::-1]
+            rgb = np.empty((nx, ny, 3), dtype=np.uint8)
+            rgb[...] = self.COLOR_UNKNOWN
+            rgb[display == 1] = self.COLOR_CLEAR
+            rgb[display == 0] = self.COLOR_BLOCKED
+            rgb = np.ascontiguousarray(rgb)
+            qimg = QImage(
+                rgb.data, ny, nx, 3 * ny, QImage.Format.Format_RGB888,
+            ).copy()
+
+            map_w_m = ny * res
+            map_h_m = nx * res
+            margin = 6
+            avail_w = max(1, w - 2 * margin)
+            avail_h = max(1, h - 2 * margin)
+            scale = min(avail_w / map_w_m, avail_h / map_h_m)
+            draw_w = max(1, int(map_w_m * scale))
+            draw_h = max(1, int(map_h_m * scale))
+            ox = margin + (avail_w - draw_w) // 2
+            oy = margin + (avail_h - draw_h) // 2
+            scaled = qimg.scaled(
+                draw_w, draw_h,
+                Qt.AspectRatioMode.IgnoreAspectRatio,
+                Qt.TransformationMode.FastTransformation,
+            )
+            p.drawImage(ox, oy, scaled)
+
+            p.setPen(QPen(QColor(70, 70, 70), 1))
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawRect(ox, oy, draw_w, draw_h)
+
+            # Robot marker, same convention as LocalMapView.
+            i_robot = -origin_x / res
+            j_robot = -origin_y / res
+            r_disp = (nx - 1) - i_robot
+            c_disp = (ny - 1) - j_robot
+            cell_px_w = draw_w / ny
+            cell_px_h = draw_h / nx
+            rx = ox + (c_disp + 0.5) * cell_px_w
+            ry = oy + (r_disp + 0.5) * cell_px_h
+            off_grid = (
+                i_robot < 0 or i_robot >= nx
+                or j_robot < 0 or j_robot >= ny
+            )
+            rx = max(ox, min(ox + draw_w - 1, rx))
+            ry = max(oy, min(oy + draw_h - 1, ry))
+            color = QColor(255, 200, 80) if off_grid else QColor(255, 255, 255)
+            p.setPen(QPen(color, 1))
+            p.setBrush(color)
+            tri_size = 9.0
+            tri = QPolygonF([
+                QPointF(rx, ry - tri_size),
+                QPointF(rx - tri_size * 0.7, ry + tri_size * 0.7),
+                QPointF(rx + tri_size * 0.7, ry + tri_size * 0.7),
+            ])
+            p.drawPolygon(tri)
+            if off_grid:
+                p.setPen(QColor(255, 200, 80))
+                p.drawText(int(rx) + 12, int(ry) + 4, "robot off-grid")
+
+            age = time.time() - self._ts if self._ts > 0 else 0.0
+            if age > self._stale_s:
+                p.fillRect(ox, oy, draw_w, draw_h, QColor(0, 0, 0, 140))
+                p.setPen(QColor(255, 200, 80))
+                p.drawText(
+                    ox + 6, oy + 16,
+                    f"stale ({age:.1f}s) — Pi local_map disabled?",
+                )
+
+            # Legend
+            p.setPen(QColor(180, 180, 180))
+            p.drawText(margin, margin + 10, "clear / blocked / unknown")
+        finally:
+            p.end()
+
+
 # ── Vision dock (VLM chat + detect on current frame) ────────────────
 
 class _VisionWorker(QThread):
@@ -1236,6 +1378,15 @@ class BodyStubWindow(QMainWindow):
         mv.addWidget(self.local_map_meta)
         maps_tabs.addTab(map_tab, "Local map (2.5D)")
 
+        drive_tab = QWidget()
+        dv2 = QVBoxLayout(drive_tab)
+        dv2.setContentsMargins(4, 4, 4, 4)
+        self.driveable_view = DriveableView(stale_s=self.config.map_stale_s)
+        dv2.addWidget(self.driveable_view)
+        self.driveable_meta = QLabel("—")
+        dv2.addWidget(self.driveable_meta)
+        maps_tabs.addTab(drive_tab, "Driveable")
+
         grid.addWidget(maps_tabs, 1, 1)
 
         root.addLayout(grid)
@@ -1495,6 +1646,7 @@ class BodyStubWindow(QMainWindow):
                 local_map_grid=s.local_map_grid,
                 local_map_meta=s.local_map_meta,
                 local_map_ts=s.local_map_ts,
+                local_map_driveable=s.local_map_driveable,
             )
         return snap
 
@@ -1505,6 +1657,7 @@ class BodyStubWindow(QMainWindow):
         self._render_rgb(snap)
         self._render_lidar(snap)
         self._render_local_map(snap)
+        self._render_driveable(snap)
         self._drain_jill_replies()
         self.motor_dock.update_state(snap, time.time())
 
@@ -1622,6 +1775,33 @@ class BodyStubWindow(QMainWindow):
                 if isinstance(v, (int, float)):
                     parts.append(f"{k.replace('_ts','')}={now - float(v):4.2f}s")
         self.local_map_meta.setText("  ".join(parts))
+
+    def _render_driveable(self, snap: dict) -> None:
+        drive = snap.get("local_map_driveable")
+        meta = snap["local_map_meta"]
+        ts = snap["local_map_ts"]
+        self.driveable_view.update_map(drive, meta, ts)
+        if meta is None:
+            self.driveable_meta.setText("—")
+            return
+        if drive is None:
+            self.driveable_meta.setText("driveable layer absent (Pi driveable_enabled off?)")
+            return
+        nx, ny = drive.shape
+        total = drive.size
+        clear = int((drive == 1).sum())
+        blocked = int((drive == 0).sum())
+        unknown = total - clear - blocked
+        parts = [
+            f"{nx}×{ny}",
+            f"clear={clear*100.0/total:4.1f}%",
+            f"blocked={blocked*100.0/total:4.1f}%",
+            f"unknown={unknown*100.0/total:4.1f}%",
+        ]
+        clr = meta.get("driveable_clearance_height_m")
+        if isinstance(clr, (int, float)):
+            parts.append(f"clearance={float(clr):.2f}m")
+        self.driveable_meta.setText("  ".join(parts))
 
     def _render_lidar(self, snap: dict) -> None:
         scan = snap["lidar"]

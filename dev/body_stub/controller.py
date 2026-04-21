@@ -226,6 +226,7 @@ class StubController:
         with self.state.lock:
             self.state.local_map_grid = msg["grid"]
             self.state.local_map_meta = msg["meta"]
+            self.state.local_map_driveable = msg.get("driveable")
             self.state.local_map_ts = now_ts()
 
     def _on_oakd_rgb(self, sample: Any) -> None:

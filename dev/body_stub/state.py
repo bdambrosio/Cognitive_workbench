@@ -71,6 +71,8 @@ class BodyState:
     local_map_grid: Optional[np.ndarray] = None
     local_map_meta: Optional[Dict[str, Any]] = None
     local_map_ts: float = 0.0
+    # Driveable layer rides on the same message; int8 (-1 unknown, 0 blocked, 1 clear)
+    local_map_driveable: Optional[np.ndarray] = None
 
     lock: RLock = field(default_factory=RLock, repr=False)
 
@@ -169,8 +171,10 @@ def decode_local_map(payload: bytes) -> Optional[Dict[str, Any]]:
     """Decode body/map/local_2p5d.
 
     Returns dict with keys:
-        meta: dict (everything except max_height_m)
+        meta: dict (everything except max_height_m / driveable)
         grid: np.ndarray float32 shape (nx, ny), unmeasured cells as NaN
+        driveable: np.ndarray int8 shape (nx, ny) or None if layer absent
+                   (-1 unknown/null, 0 blocked, 1 clear)
     Returns None if the payload is malformed or kind is unsupported.
     """
     msg = _decode_json(payload)
@@ -200,8 +204,36 @@ def decode_local_map(payload: bytes) -> Optional[Dict[str, Any]]:
                 flat[idx] = nan if v is None else float(v)
                 idx += 1
         grid = flat.reshape((nx, ny))
-        meta = {k: v for k, v in msg.items() if k != "max_height_m"}
-        return {"meta": meta, "grid": grid}
+
+        driveable: Optional[np.ndarray] = None
+        drows = msg.get("driveable")
+        if isinstance(drows, list) and len(drows) == nx:
+            dflat = np.empty(nx * ny, dtype=np.int8)
+            j = 0
+            ok = True
+            for r in drows:
+                if not isinstance(r, list) or len(r) != ny:
+                    logger.warning(
+                        f"local_map: driveable row len mismatch at {j//ny}"
+                    )
+                    ok = False
+                    break
+                for v in r:
+                    if v is True:
+                        dflat[j] = 1
+                    elif v is False:
+                        dflat[j] = 0
+                    else:
+                        dflat[j] = -1  # null / unknown
+                    j += 1
+            if ok:
+                driveable = dflat.reshape((nx, ny))
+
+        meta = {
+            k: v for k, v in msg.items()
+            if k not in ("max_height_m", "driveable")
+        }
+        return {"meta": meta, "grid": grid, "driveable": driveable}
     except (KeyError, TypeError, ValueError) as e:
         logger.warning(f"local_map decode failed: {e}")
         return None
