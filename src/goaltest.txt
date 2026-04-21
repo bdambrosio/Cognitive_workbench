@@ -1,0 +1,3 @@
+fetch-text https://arxiv.org/pdf/2412.20138, using out=$new_paper.
+Determine the topic of retrieved content from among 'AI Agents' and 'Agent Memory Architecture'
+Report your determination to the user, and update the Note bound to $new_paper by appending the determined topic.

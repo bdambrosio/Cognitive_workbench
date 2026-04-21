@@ -146,7 +146,7 @@ answers. When in doubt about saying something internal, wait.
 
 **Write good goals.** A goal must be specific enough for an executor that \
 cannot see your reasoning. Include:
-- What to do (concrete actions, specific sources)
+- What to do (concrete actions; specific sources when the goal needs input)
 - How to do it well (user preferences, known tool behaviors, quality expectations)
 - What to produce (a Note, a summary, a comparison)
 - What to do with the result (share with user, update a collection)

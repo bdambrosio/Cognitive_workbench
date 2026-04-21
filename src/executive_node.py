@@ -7751,7 +7751,7 @@ class ZenohExecutiveNode:
                         "The goal will be passed to a planner that decomposes it into tool-call "
                         "steps (web search, shell, semantic operations on Notes/Collections, "
                         "user dialogue, code execution). "
-                        "A good goal specifies WHAT to produce, WHERE to read inputs from, and "
+                        "A good goal specifies WHAT to produce, WHERE to read inputs from (when the goal needs external input), and "
                         "what 'done' looks like — specific enough for decomposition, not a vague "
                         "aspiration. One or two sentences. "
                         "If no concern listed below is clearly served by acting on this event, "

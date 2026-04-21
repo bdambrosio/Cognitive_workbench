@@ -22,8 +22,9 @@
 goals:
   - name: G01
     text: >-
-      Find the paper "Attention Is All You Need" on Semantic Scholar.
-      Create a Note with its title, authors, year, abstract, and citation count.
+      Search Semantic Scholar for the paper "Attention Is All You Need".
+      Create a Note containing the paper's title, authors, year, full abstract,
+      and citation count — include all five fields.
 
   - name: G02
     text: >-
@@ -32,8 +33,8 @@ goals:
 
   - name: G03
     text: >-
-      Fetch the PDF from https://arxiv.org/pdf/2604.08455 .
-      Create a Note summarizing the paper's main contribution in 2-3 sentences.
+      Fetch the PDF at https://arxiv.org/pdf/2604.08455 and create a Note
+      summarizing the paper's main contribution in 2-3 concise sentences.
 
   - name: G04
     text: >-
@@ -55,8 +56,9 @@ goals:
 
   - name: G07
     text: >-
-      Given the existing Note named 'scaling-laws-mixed', extract only the claims about
-      model scaling laws. Create a new Note with just those claims, organized by sub-topic.
+      Load the existing Note named 'scaling-laws-mixed' and extract every distinct
+      claim about model scaling laws, ignoring background or editorial content.
+      Create a new Note with the extracted claims organized by sub-topic.
 
   - name: G08
     text: >-
@@ -66,9 +68,10 @@ goals:
 
   - name: G09
     text: >-
-      Fetch the blog post at https://lilianweng.github.io/posts/2023-06-23-agent/ .
-      Extract the 3 most important claims.
-      Create a Note with the claims and a one-sentence assessment of evidence quality for each.
+      Fetch the blog post at https://lilianweng.github.io/posts/2023-06-23-agent/
+      and extract the 3 most important claims — prioritize claims with empirical
+      evidence over opinions. Create a Note with each claim and a one-sentence
+      assessment of its evidence quality.
 
   - name: G10
     text: >-
@@ -113,6 +116,40 @@ goals:
       2023-2024. Extract what capabilities are covered. Compare against the existing Note
       named 'desired-tool-capabilities'. Create a Note identifying gaps not yet addressed in
       the literature.
+
+  # G17-G20: judgment-heavy goals added to reveal local-vs-cloud LLM quality
+  # differentiation that the G01-G16 fetch/record-dominated set under-exposes.
+  # G17 embeds classification mid-flow; G18 and G20 are pure-reasoning goals
+  # with no external I/O; G19 tests contradiction detection over seeded Notes.
+
+  - name: G17
+    text: >-
+      Fetch https://arxiv.org/pdf/2412.20138 and classify the paper's primary topic
+      as either "AI Agents" or "Agent Memory Architecture" based on its core
+      contribution, not incidental mentions. Create a Note containing the full-text
+      fetch with the determined topic appended at the end.
+
+  - name: G18
+    text: >-
+      Design a minimal API for operating a two-wheel-plus-caster mobile robot from an
+      LLM agent with 2-5s call latency. Create a Note with three sections — (a) LLM-side
+      skills, (b) platform API contracts, (c) reflexive behaviors below the LLM — with a
+      brief justification for each item.
+
+  - name: G19
+    text: >-
+      Load the Notes 'rlhf-reward-modeling' and 'rlhf-dpo-alternatives' and identify
+      claims that directly contradict each other — quote both sides of each contradiction
+      and assess which is better-supported by its surrounding context. Create a Note with
+      the findings; if no contradictions exist, state that explicitly with verification
+      reasoning.
+
+  - name: G20
+    text: >-
+      Recommend one hardware option for training a 70B-parameter model from scratch among:
+      (A) 8×H100 at $200k, (B) 4×H200 at $180k, (C) 16×A100 at $150k. Create a Note
+      naming the single recommended option with reasoning about memory capacity, throughput,
+      and cost-per-useful-FLOP.
 
 
 # Seed notes: Notes that certain goals depend on already existing in
