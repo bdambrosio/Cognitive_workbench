@@ -5897,4 +5897,7 @@ OUTPUT SCHEMA (JSON only, no other text):
         if reflection.text is None:
             logger.warning("Reflection LLM returned None (JSON parse failed or empty response); returning empty frame")
             return {}
+        if not isinstance(reflection.text, dict):
+            logger.warning(f"Reflection LLM returned non-dict ({type(reflection.text).__name__}); returning empty frame")
+            return {}
         return reflection.text
