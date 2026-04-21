@@ -1130,6 +1130,8 @@ class OodaPlanner:
             return {"status": "error", "summary": "submit-goal requires goal_text"}
 
         en = self.executive_node
+        if not getattr(en, 'autonomy_enabled', True):
+            return {"status": "blocked", "summary": "Autonomy disabled; skipping submit-goal"}
         if en._is_goal_running():
             return {"status": "blocked", "summary": "Goal already running"}
 

@@ -307,6 +307,14 @@ def _parse_command(line: str) -> Optional[dict]:
         return {'cmd': '/continuous'}
     if cmd == 'llm':
         return {'cmd': '/llm'}
+    if cmd == 'autonomy':
+        if not args:
+            return {'cmd': '/autonomy'}
+        sub = args[0].lower()
+        if sub in ('on', 'off', 'toggle'):
+            return {'cmd': '/autonomy', 'action': sub}
+        _print_error("Usage: /autonomy <on|off>")
+        return None
     if cmd == 'delay' and args:
         return {'cmd': '/delay', 'delay': float(args[0])}
     if cmd == 'scheduler':
@@ -597,6 +605,7 @@ _COMMAND_VOCABULARY = """\
 /stop                           Halt current execution
 /continuous                     Toggle continuous mode
 /llm                            Toggle LLM (primary/alt)
+/autonomy on|off                Enable/disable autonomous goal submission
 /delay <seconds>                Set turn delay
 /scheduler on|off               Enable/disable goal scheduler
 /scheduler interval <secs>      Set scheduler check interval
@@ -840,6 +849,7 @@ def _print_help():
   /stop                          Halt current execution
   /continuous                    Toggle continuous execution
   /llm                           Toggle LLM mode (primary/alt)
+  /autonomy [on|off]             Enable/disable autonomous goal submission
   /delay <seconds>               Set turn delay
   /scheduler [on|off|interval N] Goal scheduler config
   /clear <target>                Clear (world-model|map|transients|persistents)

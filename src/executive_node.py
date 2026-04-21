@@ -1129,6 +1129,7 @@ class ZenohExecutiveNode:
         self.awaiting_user_input = False
         self.continuous_mode = False  # Continuous mode: resubmit goal on completion
         self.continuous_goal_text = None  # Original goal text for continuous resubmission
+        self.autonomy_enabled = True  # When False, OODA planner's submit-goal action is blocked
         self.last_completed_goal_text = None  # Last completed goal text (for enabling continuous mode after completion)
         self.plan_just_generated = False  # Skip execution on same turn as plan generation
         self.observations = None
@@ -6286,6 +6287,11 @@ class ZenohExecutiveNode:
                 'description': 'Toggle LLM mode (primary/alt)',
                 'args': [],
             },
+            '/autonomy': {
+                'handler': self._cmd_autonomy,
+                'description': 'Toggle autonomous goal submission (on|off)',
+                'args': ['action'],
+            },
             '/delay': {
                 'handler': self._cmd_delay,
                 'description': 'Set turn delay seconds',
@@ -6747,6 +6753,22 @@ class ZenohExecutiveNode:
             self.continuous_goal_text = None
             self._publish_execution_state()
             return "Continuous mode disabled"
+
+    def _cmd_autonomy(self, data: dict) -> str:
+        action = (data.get('action') or '').strip().lower()
+        if action == 'on':
+            enable = True
+        elif action == 'off':
+            enable = False
+        elif action in ('', 'toggle'):
+            enable = not self.autonomy_enabled
+        else:
+            return 'Usage: /autonomy <on|off>'
+        self.autonomy_enabled = enable
+        self._publish_execution_state()
+        state = 'enabled' if enable else 'disabled'
+        logger.info(f'🛑 Autonomy {state} for {self.character_name}')
+        return f'Autonomy {state}'
 
     def _cmd_llm_toggle(self, data: dict) -> str:
         new_mode = 'alt' if self.llm_mode == 'primary' else 'primary'
@@ -8919,6 +8941,7 @@ class ZenohExecutiveNode:
                 'mode': self.execution_mode,
                 'character': self.character_name,
                 'continuous_mode': self.continuous_mode,
+                'autonomy_enabled': self.autonomy_enabled,
                 'llm_mode': self.llm_mode,
                 'llm_switch_pending': self.llm_switch_pending,
                 'active_dialog': active_dialog,
