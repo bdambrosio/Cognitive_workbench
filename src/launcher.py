@@ -174,6 +174,18 @@ def create_sglang_runtime(llm_config: dict):
 
         # Optional custom chat template (e.g. to suppress thinking mode)
         chat_template = llm_config.get('chat_template')
+        # Optional sglang reasoning parser (e.g. "qwen3" for Qwen3+ models
+        # that emit <think>...</think>). See sglang ReasoningParser.DetectorMap
+        # for valid values: deepseek-r1, deepseek-v3, glm45, gpt-oss, interns1,
+        # kimi, kimi_k2, minimax, minimax-append-think, nano_v3, qwen3,
+        # qwen3-thinking, step3, step3p5.
+        reasoning_parser = llm_config.get('reasoning_parser')
+
+        extra_kwargs = {}
+        if chat_template:
+            extra_kwargs['chat_template'] = chat_template
+        if reasoning_parser:
+            extra_kwargs['reasoning_parser'] = reasoning_parser
 
         if 'NVFP4' in sgl_model_path: # patch for Qwen3.5-122B-A10B-NVFP4 models as of 3/1/2026
             logger.info(f"🚀 Initializing SGLang Runtime with NVFP4 patch!")
@@ -197,27 +209,21 @@ def create_sglang_runtime(llm_config: dict):
                     kv_cache_dtype="bf16",
                     context_length=32768,
                     port=5000,
-                    chat_template=chat_template,
+                    **extra_kwargs,
                 )
-                
-                sgl.set_default_backend(runtime)            
+
+                sgl.set_default_backend(runtime)
                 #runtime = sgl.Runtime(model_path=sgl_model_path,device="cuda",context_length=65536,tp_size=1,mem_fraction_static=0.9,quantization="modelopt_fp4",attention_backend="triton",**({'chat_template': chat_template} if chat_template else {}))
         elif 'FP8' in sgl_model_path:
             logger.info("Initializing SGLang Runtime for FP8")
-            if chat_template:
-                runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, 
-                          dtype="auto", tp_size=1, mem_fraction_static=0.85, attention_backend="triton", fp8_gemm_runner_backend="cutlass", chat_template=chat_template)
-            else:
-                runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, 
-                          dtype="auto", tp_size=1, mem_fraction_static=0.85, attention_backend="triton", fp8_gemm_runner_backend="cutlass")
+            runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536,
+                      dtype="auto", tp_size=1, mem_fraction_static=0.85, attention_backend="triton", fp8_gemm_runner_backend="cutlass", **extra_kwargs)
         else:
-            if chat_template:
-                runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, dtype="auto", tp_size=1, mem_fraction_static=0.9, attention_backend="triton", chat_template=chat_template)
-            else:
-                runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, dtype="auto", tp_size=1, mem_fraction_static=0.9, attention_backend="triton")
+            runtime = sgl.Runtime(model_path=sgl_model_path, tokenizer_path=sgl_model_path, device="cuda", context_length=65536, dtype="auto", tp_size=1, mem_fraction_static=0.9, attention_backend="triton", **extra_kwargs)
 
         sgl.set_default_backend(runtime)
-        logger.info(f"SGLang Runtime initialized (model={sgl_model_path})" + (f", chat_template={chat_template}" if chat_template else ""))
+        extras_log = ", ".join(f"{k}={v}" for k, v in extra_kwargs.items())
+        logger.info(f"SGLang Runtime initialized (model={sgl_model_path})" + (f", {extras_log}" if extras_log else ""))
         # Restore SIGINT handler now that child processes have been spawned
         signal.signal(signal.SIGINT, prev_sigint)
         return runtime, tokenizer

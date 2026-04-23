@@ -4,14 +4,11 @@ world_config:
   world_name: "infolab"
 
 llm_config:
-  vllm_model_path: "google/gemma-4-31B-it" #unsloth/Qwen3-Coder-Next-FP8" #Qwen/Qwen3-Next-80B-A3B-Instruct-FP8"
-  #vllm_url: "http://192.168.1.100:5000"  # remote vLLM server (default: http://localhost:5000)
+  vllm_model_path: "Qwen/Qwen3.6-27B"
+  reasoning_parser: "qwen3"
   extra_request_params:
-    #reasoning:
-    #  effort: "low"
-    extra_body:
-      chat_template_kwargs:
-        enable_thinking: false
+    reasoning:
+      effort: "low"
   grobid: "http://localhost:8070/"
 
 setting: |
