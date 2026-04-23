@@ -13,9 +13,10 @@ import base64
 import json
 import logging
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from threading import RLock
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Deque, Dict, Optional, Tuple
 
 import numpy as np
 
@@ -73,8 +74,38 @@ class BodyState:
     local_map_ts: float = 0.0
     # Driveable layer rides on the same message; int8 (-1 unknown, 0 blocked, 1 clear)
     local_map_driveable: Optional[np.ndarray] = None
+    # Wall-clock arrival ts of the last few local_map messages, for period
+    # estimation. Sweep-360 sizes its settle from this.
+    local_map_arrivals: Deque[float] = field(
+        default_factory=lambda: deque(maxlen=8), repr=False,
+    )
 
     lock: RLock = field(default_factory=RLock, repr=False)
+
+    def snapshot_lidar(self) -> Tuple[Optional[Dict[str, Any]], float]:
+        """Return (scan_dict, ts) under the state lock.
+
+        The dict reference is shared, not deep-copied — the controller
+        swaps in a fresh dict on every message rather than mutating in
+        place, so the returned reference is safe to read from another
+        thread for the lifetime of one mission step.
+        """
+        with self.lock:
+            return self.lidar_scan, self.lidar_ts
+
+    def local_map_period_s(self) -> Optional[float]:
+        """Median inter-arrival of recent local_map messages, or None
+        if too few have arrived to estimate.
+        """
+        with self.lock:
+            ts = list(self.local_map_arrivals)
+        if len(ts) < 2:
+            return None
+        deltas = sorted(b - a for a, b in zip(ts[:-1], ts[1:]) if (b - a) > 0)
+        if not deltas:
+            return None
+        n = len(deltas)
+        return deltas[n // 2] if n % 2 else 0.5 * (deltas[n // 2 - 1] + deltas[n // 2])
 
 
 def _decode_json(payload: bytes) -> Optional[Dict[str, Any]]:

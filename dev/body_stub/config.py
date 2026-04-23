@@ -55,6 +55,7 @@ class Topics:
     oakd_depth: str = "body/oakd/depth"
     oakd_rgb: str = "body/oakd/rgb"
     local_map: str = "body/map/local_2p5d"
+    sweep_cmd: str = "body/sweep/cmd"
 
 
 def resolve_router(cli_value: Optional[str]) -> str:

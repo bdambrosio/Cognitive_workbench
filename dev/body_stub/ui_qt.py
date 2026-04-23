@@ -40,6 +40,9 @@ from PyQt6.QtWidgets import (
 
 from .jill_client import JillClient
 from .ui_base import StubUI
+# sweep_dock is imported lazily inside BodyStubWindow._build_ui to break
+# the circular import: sweep_dock pulls in LocalMapView/DriveableView
+# from this module.
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +192,10 @@ class LidarView(QWidget):
         self.setMinimumSize(240, 240)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._scan: Optional[dict] = None
-        self._max_range_m: float = 6.0
+        # Display cap, not a validity cap: the scan's own range_max (if
+        # smaller) still wins for sample validity. Set lower than typical
+        # hardware range_max so close features render ~2x larger.
+        self._max_range_m: float = 3.0
 
     def update_scan(self, scan: Optional[dict]) -> None:
         self._scan = scan
@@ -231,9 +237,10 @@ class LidarView(QWidget):
                 angle_inc = (2.0 * math.pi) / n
             else:
                 angle_inc = float(angle_inc)
-            range_max = float(self._scan.get("range_max", self._max_range_m))
-            if range_max <= 0.0:
-                range_max = self._max_range_m
+            scan_max = float(self._scan.get("range_max", self._max_range_m))
+            if scan_max <= 0.0:
+                scan_max = self._max_range_m
+            display_max = min(scan_max, self._max_range_m)
 
             p.setPen(QPen(QColor(120, 220, 255), 2))
             for i, r in enumerate(ranges):
@@ -241,13 +248,16 @@ class LidarView(QWidget):
                     rv = float(r)
                 except Exception:
                     continue
-                if not math.isfinite(rv) or rv <= 0.0 or rv > range_max:
+                if not math.isfinite(rv) or rv <= 0.0 or rv > scan_max:
                     continue
                 a = angle_min + i * angle_inc
                 # Body frame: 0 rad = forward (+x), +π/2 = robot-left (+y).
                 # Screen: +y is down. Bird's-eye view → rotate 90° CCW so
                 # forward points UP on screen and robot-left points LEFT.
-                scale = (rv / range_max) * radius
+                # Cells beyond display_max clamp to the outer ring rather
+                # than vanishing, so you can still see where things are,
+                # just not how far.
+                scale = min(rv / display_max, 1.0) * radius
                 px = cx - scale * math.sin(a)
                 py = cy - scale * math.cos(a)
                 p.drawPoint(int(px), int(py))
@@ -829,10 +839,15 @@ class DifferentialPad(QWidget):
     # (left_mps, right_mps) — emitted on every position change.
     cmd_changed = pyqtSignal(float, float)
 
+    # Expo curve on radius: r_out = (1-EXPO)*r + EXPO*r^3. 0=linear,
+    # 1=pure cubic. Softens response near center so small mouse nudges
+    # produce small commands; outer-edge full-stick still hits ±1.
+    EXPO: float = 0.7
+
     def __init__(self, max_wheel: float, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self._max_wheel = float(max_wheel)
-        self._nx: float = 0.0  # normalized [-1, 1]
+        self._nx: float = 0.0  # normalized [-1, 1] (raw mouse position)
         self._ny: float = 0.0
         self._dragging: bool = False
         self.setMinimumSize(240, 240)
@@ -847,9 +862,22 @@ class DifferentialPad(QWidget):
         self._max_wheel = float(v)
         self._emit()  # same position, new scale
 
+    def _curved(self) -> tuple[float, float]:
+        """Apply expo curve on radius; angle unchanged. Keeps center soft
+        without losing full-stick range.
+        """
+        nx, ny = self._nx, self._ny
+        r = math.hypot(nx, ny)
+        if r <= 0.0:
+            return 0.0, 0.0
+        r_out = (1.0 - self.EXPO) * r + self.EXPO * (r ** 3)
+        s = r_out / r
+        return nx * s, ny * s
+
     def current_mps(self) -> tuple[float, float]:
-        L = max(-1.0, min(1.0, self._ny + self._nx)) * self._max_wheel
-        R = max(-1.0, min(1.0, self._ny - self._nx)) * self._max_wheel
+        nx, ny = self._curved()
+        L = max(-1.0, min(1.0, ny + nx)) * self._max_wheel
+        R = max(-1.0, min(1.0, ny - nx)) * self._max_wheel
         return L, R
 
     def recenter(self) -> None:
@@ -1431,6 +1459,11 @@ class BodyStubWindow(QMainWindow):
         # Tab the motor dock behind vision so both can be raised independently.
         self.tabifyDockWidget(self.vision_dock, self.motor_dock)
 
+        from .sweep_dock import SweepDock
+        self.sweep_dock = SweepDock(self.controller, parent=self)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.sweep_dock)
+        self.tabifyDockWidget(self.vision_dock, self.sweep_dock)
+
     def _wire_signals(self) -> None:
         self.connect_btn.clicked.connect(self._on_connect_clicked)
         self.live_box.toggled.connect(self._on_live_toggled)
@@ -1442,6 +1475,7 @@ class BodyStubWindow(QMainWindow):
         self.motor_dock.mode_change_requested.connect(self._on_motor_mode_change)
         self.motor_dock.cmd_direct_changed.connect(self._on_cmd_direct_changed)
         self.motor_dock.stop_requested.connect(self._on_stop_clicked)
+        self.sweep_dock.mission_active.connect(self._on_sweep_active)
 
     # ── Signal handlers ──────────────────────────────────────────────
 
@@ -1523,6 +1557,25 @@ class BodyStubWindow(QMainWindow):
 
     def _on_cmd_direct_changed(self, left: float, right: float) -> None:
         self.controller.set_cmd_direct(left, right)
+
+    # ── Sweep mission lockout ────────────────────────────────────────
+
+    def _on_sweep_active(self, active: bool) -> None:
+        """Lock out competing commanding controls while sweep is running.
+
+        Sweep owns cmd_vel for the duration; the Live cmd checkbox and
+        the motor-test dock would race. Abort + ALL STOP stay live.
+        """
+        if active:
+            # Disengage motor dock if user had it engaged.
+            if self.motor_dock.engage_btn.isChecked():
+                self.motor_dock.engage_btn.setChecked(False)
+            # Drop the main-window live toggle; sweep manages live_command itself.
+            if self.live_box.isChecked():
+                self.live_box.setChecked(False)
+        self.live_box.setEnabled(not active and self._snapshot()["connected"])
+        self.motor_dock.engage_btn.setEnabled(not active)
+        self.apply_btn.setEnabled(not active)
 
     # ── Vision handlers ──────────────────────────────────────────────
 
@@ -1818,6 +1871,16 @@ class BodyStubWindow(QMainWindow):
         )
 
     def closeEvent(self, event) -> None:
+        # Halt any in-flight sweep before tearing down. The mission worker
+        # publishes cmd_vel through the controller's session, so we have
+        # to wait for it to release that responsibility before disconnect.
+        try:
+            sweep = getattr(self, "sweep_dock", None)
+            if sweep is not None:
+                sweep.request_abort()
+                sweep.wait_for_mission(timeout_ms=2000)
+        except Exception:
+            logger.exception("sweep abort raised on close")
         try:
             self._jill_client.close()
         except Exception:

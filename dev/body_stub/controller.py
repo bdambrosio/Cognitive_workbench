@@ -12,7 +12,7 @@ import logging
 import threading
 import time
 import uuid
-from typing import Any, List, Optional, Tuple
+from typing import Any, Callable, List, Optional, Tuple
 
 from .config import StubConfig
 from .state import (
@@ -38,6 +38,10 @@ class StubController:
         self._stop_event = threading.Event()
         self._hb_thread: Optional[threading.Thread] = None
         self._cv_thread: Optional[threading.Thread] = None
+
+        # Optional handler for body/sweep/cmd. Set by SweepDock at startup;
+        # Zenoh thread invokes it with the parsed JSON dict.
+        self._sweep_cmd_handler: Optional[Callable[[dict], None]] = None
 
         # Monotonic-ts generator for outgoing cmd_vel/cmd_direct payloads.
         # The Pi motor_controller uses payload ts to pick between the two
@@ -147,6 +151,7 @@ class StubController:
             (t.oakd_depth, self._on_oakd_depth),
             (t.oakd_rgb, self._on_oakd_rgb),
             (t.local_map, self._on_local_map),
+            (t.sweep_cmd, self._on_sweep_cmd),
         ]
         for key, cb in pairs:
             sub = self._session.declare_subscriber(key, cb)
@@ -227,7 +232,33 @@ class StubController:
             self.state.local_map_grid = msg["grid"]
             self.state.local_map_meta = msg["meta"]
             self.state.local_map_driveable = msg.get("driveable")
-            self.state.local_map_ts = now_ts()
+            ts = now_ts()
+            self.state.local_map_ts = ts
+            self.state.local_map_arrivals.append(ts)
+
+    def _on_sweep_cmd(self, sample: Any) -> None:
+        try:
+            data = json.loads(self._payload_bytes(sample).decode("utf-8"))
+        except Exception:
+            logger.warning("sweep_cmd: bad JSON payload")
+            return
+        if not isinstance(data, dict):
+            return
+        handler = self._sweep_cmd_handler
+        if handler is None:
+            logger.debug("sweep_cmd received but no handler registered")
+            return
+        try:
+            handler(data)
+        except Exception:
+            logger.exception("sweep_cmd handler raised")
+
+    def set_sweep_cmd_handler(self, handler: Optional[Callable[[dict], None]]) -> None:
+        """Register a callback for body/sweep/cmd messages. Invoked from
+        the Zenoh subscribe thread; the callee is responsible for
+        marshalling to its own thread (e.g. via a Qt queued signal).
+        """
+        self._sweep_cmd_handler = handler
 
     def _on_oakd_rgb(self, sample: Any) -> None:
         msg = decode_rgb(self._payload_bytes(sample))
