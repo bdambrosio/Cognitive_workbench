@@ -13,7 +13,7 @@ Each turn:
     3. LLM reply         → OpenAI-compatible chat/completions
     4. record_outgoing   → ConversationStore
     5. publish /action
-    6. discourse update  → DiscourseTracker (analyze + update_tom)
+    6. discourse update  → DiscourseTracker (analyze_segment + companion)
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import queue
+import re
 import sys
 import threading
 import uuid
@@ -42,6 +43,14 @@ from cot_profiles import is_reasoning_model, resolve_profile  # noqa: E402
 
 
 logger = logging.getLogger('chat_loop')
+
+
+# Web-search prefix routing. Explicit user-typed slash-style command
+# ("web:" or "search:" at the start of a turn). Bruce explicitly authorized
+# this keyword-prefix trigger; do NOT extend this to natural-language
+# detection without semantic routing per the project's no-keyword-matching
+# rule.
+_SEARCH_PREFIX_RE = re.compile(r'^\s*(?:web|search):\s*', re.IGNORECASE)
 
 
 # ─── LLM backend ────────────────────────────────────────────────────────────
@@ -225,10 +234,15 @@ class ChatLoop:
         except Exception as e:
             logger.warning(f"[{character_name}] mark_persistent(conversation) failed: {e}")
 
-        # ---- Discourse / ToM (lazy; one tracker per other-entity) ----
+        # ---- Discourse / Companion (lazy; one tracker per other-entity) ----
+        # ToM is intentionally NOT run in chat mode: its trust-assessment
+        # framing (Competence / Intentionality / Reliability / Transparency)
+        # is from a multi-agent collaboration scenario and adds no value in
+        # single-user chat. Companion covers the substantive overlap (state
+        # of mind, what matters, cognitive style, useful-mode).
         self._discourse_trackers: Dict[str, Any] = {}
         self._discourse_state: Dict[str, str] = {}
-        self._tom_state: Dict[str, str] = {}
+        self._companion_state: Dict[str, str] = {}
         self._restore_chat_state_from_notes()
 
         # ---- Zenoh wiring ----
@@ -327,7 +341,7 @@ class ChatLoop:
         return _gen
 
     # ------------------------------------------------------------------
-    # Persistence — discourse_state and tom_state via named Notes,
+    # Persistence — discourse_state and companion_state via named Notes,
     # save/load via the resource manager's standard mechanism.
     # ------------------------------------------------------------------
 
@@ -353,8 +367,9 @@ class ChatLoop:
             logger.warning(f"[{self.character_name}] _save_state_note failed: {e}")
 
     def _restore_chat_state_from_notes(self) -> None:
-        """Re-populate _discourse_state and _tom_state from named notes that
-        were persisted in a previous session."""
+        """Re-populate _discourse_state and _companion_state from named notes
+        that were persisted in a previous session. Stale chat:tom_state:* notes
+        from older sessions are ignored — ToM is no longer run in chat mode."""
         try:
             for name, note_id in self.resource_manager.named_notes.items():
                 if not name.startswith("chat:"):
@@ -371,13 +386,13 @@ class ChatLoop:
                     continue
                 if kind == "discourse_state":
                     self._discourse_state[entity] = content
-                elif kind == "tom_state":
-                    self._tom_state[entity] = content
-            if self._discourse_state or self._tom_state:
+                elif kind == "companion_state":
+                    self._companion_state[entity] = content
+            if self._discourse_state or self._companion_state:
                 logger.info(
                     f"[{self.character_name}] restored chat state: "
                     f"{len(self._discourse_state)} discourse, "
-                    f"{len(self._tom_state)} tom entries"
+                    f"{len(self._companion_state)} companion entries"
                 )
         except Exception as e:
             logger.warning(f"[{self.character_name}] _restore_chat_state_from_notes failed: {e}")
@@ -407,6 +422,28 @@ class ChatLoop:
             f"cognitive/{self.character_name}/sense_data",
             self._on_sense_data,
         )
+
+        # Resource queryables for resource_browser. Chat mode exposes only the
+        # Notes/Collections surface; concerns and graph remain executive-only.
+        self._resources_list_q = self._zenoh_session.declare_queryable(
+            f"cognitive/{self.character_name}/resources",
+            self._handle_resources_list_query,
+        )
+        self._resource_remove_q = self._zenoh_session.declare_queryable(
+            f"cognitive/{self.character_name}/resource/remove/*",
+            self._handle_resource_remove_query,
+        )
+        self._resource_update_q = self._zenoh_session.declare_queryable(
+            f"cognitive/{self.character_name}/resource/update/*",
+            self._handle_resource_update_query,
+        )
+        # Single-chunk wildcard — does not match resource/remove/* or
+        # resource/update/* (those have an extra path segment).
+        self._resource_by_id_q = self._zenoh_session.declare_queryable(
+            f"cognitive/{self.character_name}/resource/*",
+            self._handle_resource_by_id_query,
+        )
+
         logger.info(
             f"[{self.character_name}] chat zenoh ready "
             f"(in=cognitive/{self.character_name}/sense_data, "
@@ -463,6 +500,200 @@ class ChatLoop:
             logger.warning(f"[{self.character_name}] publish failed: {e}")
 
     # ------------------------------------------------------------------
+    # Web search (v1: verbatim prefix-stripped query, no LLM rewriting).
+    #
+    # SEAM: query rewriting via LLM goes between _extract_search_query
+    # and _run_web_search — replace the single-string `query` with a list
+    # of formulated queries, run each, merge syntheses. Bruce notes LLM
+    # query rewriting is effective and is the natural follow-up.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _extract_search_query(text: str) -> Optional[str]:
+        """If `text` starts with `web:` or `search:` (case-insensitive),
+        return the post-prefix query; else None. Empty post-prefix is
+        treated as no-trigger (returns None)."""
+        if not text:
+            return None
+        m = _SEARCH_PREFIX_RE.match(text)
+        if not m:
+            return None
+        query = text[m.end():].strip()
+        return query or None
+
+    @staticmethod
+    def _search_note_name(query: str) -> str:
+        slug = re.sub(r'[^a-z0-9]+', '-', query.lower()).strip('-')
+        if len(slug) > 60:
+            slug = slug[:60].rstrip('-')
+        return f"search:{slug}" if slug else "search:result"
+
+    def _get_llm_search(self):
+        """Lazy-load llm_search from src/tools/search-web/tool.py. Cached on
+        the instance after first load. Hyphenated package directory rules
+        out plain `import`, so we use importlib by file path — same pattern
+        executive_node uses for tool dispatch."""
+        if hasattr(self, '_llm_search_cached'):
+            return self._llm_search_cached
+        try:
+            import importlib.util
+            tool_path = os.path.join(_SRC_DIR, "tools", "search-web", "tool.py")
+            spec = importlib.util.spec_from_file_location(
+                "_chat_search_web_tool", tool_path)
+            if spec is None or spec.loader is None:
+                self._llm_search_cached = None
+                return None
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            self._llm_search_cached = getattr(mod, 'llm_search', None)
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] could not load search tool: {e}")
+            self._llm_search_cached = None
+        return self._llm_search_cached
+
+    def _run_web_search(self, query: str) -> Optional[Dict[str, Any]]:
+        """Run a single web search and persist the synthesis as a named
+        Note. Returns {synthesis, sources, query} on success, None on
+        failure (missing API key, no results, network error, etc)."""
+        llm_search = self._get_llm_search()
+        if llm_search is None:
+            return None
+        try:
+            result = llm_search(query=query, wall_time_limit=90.0)
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] web search raised: {e}")
+            return None
+        if not result or not result.get('synthesis'):
+            return None
+
+        synthesis = str(result['synthesis'])
+        sources = result.get('sources', []) or []
+
+        try:
+            success, note_id, err, _ = self.resource_manager.create_note(
+                self.character_name, synthesis, "text",
+                "search-web", query, self._search_note_name(query),
+                {
+                    'kind': 'web_search',
+                    'query': query,
+                    'sources': sources,
+                    'source_count': len(sources),
+                    'model': result.get('_model', ''),
+                },
+            )
+            if success and note_id:
+                self.resource_manager.mark_persistent(note_id, self.character_name)
+            elif err:
+                logger.warning(f"[{self.character_name}] persist search note failed: {err}")
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] persist search note failed: {e}")
+
+        return {'synthesis': synthesis, 'sources': sources, 'query': query}
+
+    @staticmethod
+    def _format_search_context_message(search_context: Dict[str, Any]) -> str:
+        query = search_context.get('query', '')
+        synthesis = search_context.get('synthesis', '')
+        sources = search_context.get('sources', []) or []
+        src_lines = []
+        for s in sources:
+            domain = s.get('domain') or '?'
+            url = s.get('url') or ''
+            title = s.get('title') or ''
+            if url:
+                src_lines.append(f"- {domain}: {title} ({url})")
+            else:
+                src_lines.append(f"- {domain}: {title}")
+        src_block = "\n".join(src_lines) if src_lines else "(no source list)"
+        return (
+            f"[Web search results for: \"{query}\"\n\n"
+            f"{synthesis}\n\n"
+            f"Sources:\n{src_block}\n\n"
+            f"Instructions: When you draw on these results in your reply, "
+            f"cite by domain or publication name (e.g. \"per nytimes.com\" "
+            f"or \"according to NOAA\"), not as \"the source\" or \"the "
+            f"writeup\". If the search did not address the question, say so "
+            f"plainly rather than improvising.]"
+        )
+
+    # ------------------------------------------------------------------
+    # Resource queryable handlers (chat-mode subset of executive_node)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _json_safe_resource(resource: Dict[str, Any]) -> Dict[str, Any]:
+        rc = resource.copy()
+        if 'type' in rc:
+            rc['type'] = str(rc['type'])
+        if 'location' in rc and isinstance(rc['location'], tuple):
+            rc['location'] = list(rc['location'])
+        if 'properties' in rc and isinstance(rc['properties'], dict):
+            props = rc['properties'].copy()
+            for k, v in props.items():
+                if isinstance(v, datetime):
+                    props[k] = v.isoformat()
+            rc['properties'] = props
+        return rc
+
+    def _reply(self, query, payload: Dict[str, Any]) -> None:
+        try:
+            query.reply(query.key_expr, json.dumps(payload).encode('utf-8'))
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] query reply failed: {e}")
+
+    def _handle_resources_list_query(self, query) -> None:
+        try:
+            resources = self.resource_manager.get_resource_list()
+            self._reply(query, {
+                'success': True,
+                'resources': [self._json_safe_resource(r) for r in resources],
+            })
+        except Exception as e:
+            logger.error(f"[{self.character_name}] resources list query failed: {e}")
+            self._reply(query, {'success': False, 'error': str(e)})
+
+    def _handle_resource_by_id_query(self, query) -> None:
+        try:
+            resource_id = str(query.key_expr).split('/')[-1]
+            r = self.resource_manager.get_resource(resource_id)
+            if not r:
+                self._reply(query, {'success': False, 'error': f'Resource {resource_id} not found'})
+                return
+            self._reply(query, {'success': True, 'resource': self._json_safe_resource(r)})
+        except Exception as e:
+            logger.error(f"[{self.character_name}] resource by id query failed: {e}")
+            self._reply(query, {'success': False, 'error': str(e)})
+
+    def _handle_resource_remove_query(self, query) -> None:
+        try:
+            resource_id = str(query.key_expr).split('/')[-1]
+            success, err = self.resource_manager.delete_resource(resource_id)
+            if success:
+                self._reply(query, {'success': True, 'message': f'Resource {resource_id} deleted'})
+                self._persist_to_disk()
+            else:
+                self._reply(query, {'success': False, 'error': err or f'Failed to delete {resource_id}'})
+        except Exception as e:
+            logger.error(f"[{self.character_name}] resource remove query failed: {e}")
+            self._reply(query, {'success': False, 'error': str(e)})
+
+    def _handle_resource_update_query(self, query) -> None:
+        try:
+            resource_id = str(query.key_expr).split('/')[-1]
+            payload_bytes = query.payload.to_bytes() if query.payload else b'{}'
+            params = json.loads(payload_bytes.decode('utf-8')) if payload_bytes else {}
+            new_content = params.get('content', '')
+            success, err = self.resource_manager.update_note_content(resource_id, new_content)
+            if success:
+                self._reply(query, {'success': True, 'message': f'Note {resource_id} updated'})
+                self._persist_to_disk()
+            else:
+                self._reply(query, {'success': False, 'error': err or f'Failed to update {resource_id}'})
+        except Exception as e:
+            logger.error(f"[{self.character_name}] resource update query failed: {e}")
+            self._reply(query, {'success': False, 'error': str(e)})
+
+    # ------------------------------------------------------------------
     # Discourse / ToM
     # ------------------------------------------------------------------
 
@@ -481,7 +712,7 @@ class ChatLoop:
                  'text': str(t.get('text', ''))} for t in turns]
 
     def _update_discourse_async(self, entity: str) -> None:
-        """Run discourse + ToM updates after a turn. Synchronous for now."""
+        """Run discourse + companion updates after a turn. Synchronous for now."""
         if not self.discourse_enabled:
             return
         try:
@@ -490,30 +721,34 @@ class ChatLoop:
                 return
             tracker = self._get_tracker(entity)
             prev_disc = self._discourse_state.get(entity, '')
-            prev_tom = self._tom_state.get(entity, '')
-            # Discourse and ToM calls have 3000-token budgets and finish
-            # naturally; grammar adds no value here and the byte-cap +
-            # permissive-answer pattern leaks thinking into the output,
-            # which then contaminates self._discourse_state /
-            # self._tom_state and re-injects into chat_reply's system
-            # prompt on subsequent turns. Run unconstrained.
+            # Discourse and companion calls run with generous token budgets and
+            # no grammar gate. Grammar adds no value here, and the byte-cap +
+            # permissive-answer pattern leaks thinking into the output, which
+            # then contaminates state notes and re-injects into chat_reply's
+            # system prompt on subsequent turns.
             tracker.llm_generate = self._make_llm_callable('none')
             new_disc = tracker.analyze_segment(
                 dialog, start=0, end=len(dialog) - 1,
-                previous_discourse_state=prev_disc, tom=prev_tom,
+                previous_discourse_state=prev_disc, tom='',
             )
             if new_disc:
                 self._discourse_state[entity] = str(new_disc)
                 self._save_state_note('discourse_state', entity, str(new_disc))
+
+            # Companion model — fair-witness texture for the chat reply.
+            # Runs per-turn here (rather than only at dialog close as in
+            # executive_node) because chat-mode sessions rarely emit `close`,
+            # and the template is built to self-prune slow-moving fields.
+            prev_comp = self._companion_state.get(entity, '')
             tracker.llm_generate = self._make_llm_callable('none')
-            new_tom = tracker.update_tom_from_discourse_segment(
+            new_comp = tracker.update_companion_from_discourse_segment(
                 dialog, character_name=entity, start=0, end=len(dialog) - 1,
                 discourse_state=self._discourse_state.get(entity, ''),
-                previous_tom_state=prev_tom,
+                previous_companion_state=prev_comp,
             )
-            if new_tom:
-                self._tom_state[entity] = str(new_tom)
-                self._save_state_note('tom_state', entity, str(new_tom))
+            if new_comp and len(str(new_comp).strip()) > 20:
+                self._companion_state[entity] = str(new_comp)
+                self._save_state_note('companion_state', entity, str(new_comp))
         except Exception as e:
             logger.warning(f'[{self.character_name}] discourse update failed: {e}')
 
@@ -563,9 +798,12 @@ class ChatLoop:
             parts.append("## Capabilities (chat-only mode)\n" + self.capabilities)
         if self.setting:
             parts.append("## Setting\n" + self.setting)
-        tom = self._tom_state.get(source, '').strip()
-        if tom:
-            parts.append(f"## What you currently believe about {source}\n{tom}")
+        companion = self._companion_state.get(source, '').strip()
+        if companion:
+            parts.append(
+                f"## Companion model of {source} (fair-witness texture, not a brief to flatter)\n"
+                f"{companion}"
+            )
         disc = self._discourse_state.get(source, '').strip()
         if disc:
             parts.append("## Outstanding discourse objects\n" + disc)
@@ -578,7 +816,9 @@ class ChatLoop:
         )
         return "\n\n".join(parts)
 
-    def _build_chat_messages(self, source: str, new_text: str, orientation: str) -> List[Dict[str, str]]:
+    def _build_chat_messages(self, source: str, new_text: str, orientation: str,
+                             search_context: Optional[Dict[str, Any]] = None,
+                             search_error: Optional[str] = None) -> List[Dict[str, str]]:
         system = self._build_system_prompt(source, orientation)
         msgs: List[Dict[str, str]] = [{'role': 'system', 'content': system}]
         history = self.store.get_recent_turns(source, limit=self.history_limit, scope='all')
@@ -589,6 +829,17 @@ class ChatLoop:
         for t in history:
             role = 'user' if t.get('direction') == 'in' else 'assistant'
             msgs.append({'role': role, 'content': str(t.get('text', ''))})
+
+        # Web-search context is per-turn only — sits immediately before the
+        # actual user turn so the model treats it as context for *this*
+        # answer, not as persona/state. Not part of the system prompt
+        # (which would persist across turns).
+        if search_context:
+            msgs.append({'role': 'user',
+                         'content': self._format_search_context_message(search_context)})
+        elif search_error:
+            msgs.append({'role': 'user', 'content': f"[{search_error}]"})
+
         msgs.append({'role': 'user', 'content': new_text})
         return msgs
 
@@ -597,6 +848,30 @@ class ChatLoop:
     # ------------------------------------------------------------------
 
     def _process_user_turn(self, source: str, text: str, close: bool) -> None:
+        # Web-search prefix is handled BEFORE recording the turn so the
+        # ConversationStore (and downstream discourse / companion
+        # summarizers) never see the literal "web:" / "search:" prefix.
+        search_context: Optional[Dict[str, Any]] = None
+        search_error: Optional[str] = None
+        query = self._extract_search_query(text)
+        if query:
+            text = query  # cleaned text — what gets recorded and replied to
+            logger.info(f"[{self.character_name}] web search requested: {query!r}")
+            search_context = self._run_web_search(query)
+            if search_context is None:
+                search_error = (
+                    "Web search unavailable (no API key set, backend "
+                    "returned no results, or network error). Replying "
+                    "without web context."
+                )
+                logger.info(f"[{self.character_name}] search failed for: {query!r}")
+            else:
+                logger.info(
+                    f"[{self.character_name}] search ok: "
+                    f"{len(search_context['sources'])} sources, "
+                    f"{len(search_context['synthesis'])} chars"
+                )
+
         self.store.record_incoming(source, text, close=close)
 
         if not text:
@@ -605,7 +880,10 @@ class ChatLoop:
             return
 
         orientation = self._orientation_summary(source, text)
-        messages = self._build_chat_messages(source, text, orientation)
+        messages = self._build_chat_messages(
+            source, text, orientation,
+            search_context=search_context, search_error=search_error,
+        )
 
         try:
             # Grammar is disabled (yaml is_reasoning_model=false) and

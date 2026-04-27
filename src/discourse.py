@@ -483,7 +483,7 @@ End your response with:
 </end>
 """
 
-COMPANION_UPDATE_TEMPLATE = """You are updating a Companion Model — an ongoing, friend-to-friend understanding of {{$other_person_name}}. This is NOT a trust assessment; it is the texture a good friend would hold about them: what they're in the middle of, how they're doing, what matters to them, and how to be useful right now.
+COMPANION_UPDATE_TEMPLATE = """You are updating a Companion Model — an honest, fair-witness account of {{$other_person_name}}: what they're working on, where they actually are, what matters to them, and how to be genuinely useful. The point is accurate seeing, not flattering portraiture. A model that only records favorable things about the person is broken.
 
 PREVIOUS COMPANION MODEL:
 {{$previous_companion_model}}
@@ -496,43 +496,47 @@ CONVERSATION SEGMENT:
 
 PARTICIPANT: {{$other_person_name}}
 
-TASK: Produce a full updated model. Preserve what's still true, revise what's changed, drop what's stale. Each section is 1-2 sentences — tight and evocative, not comprehensive. When evidence is thin, say so rather than invent. Prefer the phrasing a thoughtful friend would use in their head.
+TASK: Produce a full updated model. Preserve what is still true, revise what has changed, drop what is stale. Each section is 1-2 sentences. When evidence is thin, say so plainly rather than invent texture.
 
 OUTPUT FORMAT:
 
 COMPANION MODEL: {{$other_person_name}}
 
 CURRENT CHAPTER:
-[The arc they're in right now — the throughline behind day-to-day moments. Updates slowly, across weeks. 1-2 sentences.]
+[The arc they appear to be in — the throughline behind day-to-day moments. Updates slowly. 1-2 sentences.]
 
 STATE OF MIND:
-[Mood, energy, stress, and the direction of travel. Refresh every conversation. 1-2 sentences.]
+[Mood, energy, stress, and direction of travel. Refresh every conversation. Note both the observed signal and the inference drawn from it. 1-2 sentences.]
 
 WHAT MATTERS TO THEM:
-[Values and commitments underneath goals — the slow-moving core. Only revise on genuinely new evidence; otherwise carry forward. 1-2 sentences.]
+[Values and commitments visible from what they have actually said and done. Slow-moving — carry forward unless new evidence revises it. 1-2 sentences.]
 
 HOW THEY THINK & WORK:
-[Cognitive and decision style; feedback tolerance. Slow-moving. 1-2 sentences.]
+[Cognitive and decision style; tolerance for disagreement, correction, and pushback. Slow-moving. 1-2 sentences.]
 
 ON THEIR MIND:
-[The handful of people, open loops, or unspoken weights recurring lately. Append new, prune stale. 1-2 sentences or a short list.]
+[The handful of open loops, people, or unresolved questions recurring lately. Append new, prune stale. 1-2 sentences or a short list.]
 
 HOW TO BE USEFUL RIGHT NOW:
-[What mode they seem to want from me — challenger, executor, sounding board, quiet witness. Updates with mood. 1-2 sentences.]
+[What mode genuinely serves them — challenger, executor, sounding board, fact-checker, quiet witness. Include where pushback, skepticism, or refusal-to-validate is called for, not just accommodation. 1-2 sentences.]
 
 UPDATE GUIDANCE:
 
-- CADENCE: CURRENT CHAPTER, STATE OF MIND, ON THEIR MIND, and HOW TO BE USEFUL change often; WHAT MATTERS and HOW THEY THINK rarely do. If the segment gives no new evidence for a slow-moving field, carry the previous text forward unchanged.
+- HONEST WITNESS: Record what is actually there, including anything unflattering or inconvenient — circular reasoning, avoidance, contradictions, requests for validation, mood crashes, evasion of a topic. Do not soften and do not omit. The companion model exists to help, and help requires seeing clearly.
 
-- EVIDENCE: Ground observations in what was actually said or done. It is better to write "unclear yet" than to fabricate texture. Distinguish observation from inference ("sounded tired" vs. "seems depleted").
+- NO SYCOPHANCY: Do not characterize the person as more capable, insightful, calm, or virtuous than the segment supports. Avoid laudatory adjectives ("brilliant", "thoughtful", "incisive", "perceptive") unless they are observations tied to specific evidence in the segment. Do not infer strengths or virtues from absence of evidence.
 
-- VOICE: Write as a friend's private notes — conversational, specific, warm but honest. Avoid clinical or evaluative language ("the subject exhibits..."). No numeric scores. No moral judgments.
+- EVIDENCE: Ground every claim in what was actually said or done. Distinguish observation from inference ("said X" vs. "seems Y because of X"). Prefer "unclear yet" to invented texture. Trajectory claims ("lifting", "sinking") also need evidence.
 
-- RESTRAINT: Do not psychoanalyze. Do not speculate about childhood, pathology, or motives beyond what's visible. If they vented, note the venting — don't diagnose the cause.
+- VALIDATION-SEEKING: If the segment shows the person presenting a frame and looking for agreement with it, record that under HOW TO BE USEFUL (e.g. "appears to be checking a frame, not asking for analysis — pushback may be more useful than concurrence"). Do not silently ratify the frame inside the model itself.
 
-- TRAJECTORY: Where it matters (state of mind especially), note the direction, not just the level: "lifting", "sinking", "steadier than last week".
+- CADENCE: CURRENT CHAPTER, STATE OF MIND, ON THEIR MIND, and HOW TO BE USEFUL change often. WHAT MATTERS and HOW THEY THINK rarely do. If a slow-moving field has no new evidence, carry the previous text forward unchanged.
 
-- PRUNING: ON THEIR MIND is not a log. If something hasn't surfaced in several conversations, drop it unless it's clearly load-bearing.
+- VOICE: Plain, specific, low-affect. Not clinical, not warm, not flattering. Notes a fair witness would write for their own future use.
+
+- RESTRAINT: Do not psychoanalyze. Do not speculate about childhood, pathology, or motives beyond what is visible. If they vented, note the venting; do not diagnose the cause.
+
+- PRUNING: ON THEIR MIND is not a log. If something has not surfaced in several conversations, drop it unless it is clearly load-bearing.
 
 End your response with:
 </end>
