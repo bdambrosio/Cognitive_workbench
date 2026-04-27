@@ -84,7 +84,8 @@ class _ChatBackend:
              top_p: float = 1.0,
              stops: Optional[List[str]] = None,
              is_json: bool = False,
-             cot_profile: Optional[str] = None) -> str:
+             cot_profile: Optional[str] = None,
+             enable_thinking: Optional[bool] = None) -> str:
         stops = stops or []
         if self._cloud_llm is not None:
             from Messages import SystemMessage, UserMessage, AssistantMessage
@@ -116,6 +117,14 @@ class _ChatBackend:
             # llama-server accepts `grammar`; SGLangAPIServer (our wrapper)
             # accepts both `grammar` and `ebnf`. Send `grammar` for both.
             body['grammar'] = grammar
+
+        # Per-request thinking suppression for Qwen3.x and similar jinja
+        # templates that auto-prefix <think>. Setting enable_thinking=False
+        # tells the chat template NOT to open the thinking block, so the
+        # model goes straight to the answer. Soft `/think` `/nothink`
+        # directives don't work on Qwen3.6 — only this template kwarg does.
+        if enable_thinking is False:
+            body['chat_template_kwargs'] = {'enable_thinking': False}
 
         resp = requests.post(url, headers={'Content-Type': 'application/json'}, json=body, timeout=120)
         resp.raise_for_status()
@@ -197,13 +206,30 @@ class ChatLoop:
             world_config=world_config,
             agent_name=character_name,
         )
+        # Restore prior session: notes, collections, FAISS indexes (load_resources
+        # internally calls load_indexes + reindex). Idempotent if file is missing.
+        try:
+            self.resource_manager.load_from_file()
+        except Exception as e:
+            logger.warning(f"[{character_name}] load_from_file failed (starting fresh): {e}")
+
         self.store = ConversationStore(self.resource_manager, character_name, logger)
         self.store.initialize()
+        # Mark the conversation Collection persistent. After this, every Note
+        # added to it (record_incoming/record_outgoing) auto-persists per the
+        # resource manager's persistence model.
+        try:
+            conv_id = self.resource_manager.named_collections.get(self.store.collection_name)
+            if conv_id:
+                self.resource_manager.mark_persistent(conv_id, character_name)
+        except Exception as e:
+            logger.warning(f"[{character_name}] mark_persistent(conversation) failed: {e}")
 
         # ---- Discourse / ToM (lazy; one tracker per other-entity) ----
         self._discourse_trackers: Dict[str, Any] = {}
         self._discourse_state: Dict[str, str] = {}
         self._tom_state: Dict[str, str] = {}
+        self._restore_chat_state_from_notes()
 
         # ---- Zenoh wiring ----
         self._inbox: "queue.Queue[dict]" = queue.Queue()
@@ -217,7 +243,8 @@ class ChatLoop:
 
     def _llm_generate(self, messages, bindings=None, max_tokens=400,
                       temperature=0.7, stops=None, is_json=False,
-                      cot_profile: Optional[str] = None) -> SimpleNamespace:
+                      cot_profile: Optional[str] = None,
+                      enable_thinking: Optional[bool] = None) -> SimpleNamespace:
         """Callable conforming to the convention used by character_evaluator
         and discourse: list-of-strings positional roles. Returns
         SimpleNamespace(success, text, error).
@@ -249,6 +276,7 @@ class ChatLoop:
                 stops=stops,
                 is_json=is_json,
                 cot_profile=cot_profile,
+                enable_thinking=enable_thinking,
             )
             if not text:
                 return SimpleNamespace(success=False, text='', error='empty response')
@@ -275,11 +303,14 @@ class ChatLoop:
         'triage': 768,
     }
 
-    def _make_llm_callable(self, cot_profile: Optional[str]):
+    def _make_llm_callable(self, cot_profile: Optional[str],
+                           enable_thinking: Optional[bool] = None):
         """Return an llm_generate-shaped callable bound to a CoT profile.
 
         Used to hand profile-tagged callables to consumers (character_evaluator,
-        DiscourseTracker) that don't know about profiles themselves.
+        DiscourseTracker) that don't know about profiles or thinking themselves.
+        `enable_thinking=False` suppresses <think> auto-prefix at the chat
+        template level (Qwen3.6 and similar).
         """
         floor = self._PROFILE_TOKEN_FLOOR.get(cot_profile or '', 0)
 
@@ -289,8 +320,74 @@ class ChatLoop:
                                       max_tokens=max(max_tokens, floor),
                                       temperature=temperature,
                                       stops=stops, is_json=is_json,
-                                      cot_profile=cot_profile)
+                                      cot_profile=cot_profile,
+                                      enable_thinking=enable_thinking)
         return _gen
+
+    # ------------------------------------------------------------------
+    # Persistence — discourse_state and tom_state via named Notes,
+    # save/load via the resource manager's standard mechanism.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _state_note_name(kind: str, entity: str) -> str:
+        # Single namespace for chat-loop-owned state notes.
+        return f"chat:{kind}:{entity}"
+
+    def _save_state_note(self, kind: str, entity: str, text: str) -> None:
+        """Create-or-replace a named Note holding chat state, and mark it
+        persistent so save_to_file() includes it."""
+        try:
+            success, note_id, err, _ = self.resource_manager.create_note(
+                self.character_name, str(text), "text", "chat-loop", "",
+                self._state_note_name(kind, entity),
+                {"kind": "chat_state", "entity": entity},
+            )
+            if success and note_id:
+                self.resource_manager.mark_persistent(note_id, self.character_name)
+            elif err:
+                logger.warning(f"[{self.character_name}] state note create failed: {err}")
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] _save_state_note failed: {e}")
+
+    def _restore_chat_state_from_notes(self) -> None:
+        """Re-populate _discourse_state and _tom_state from named notes that
+        were persisted in a previous session."""
+        try:
+            for name, note_id in self.resource_manager.named_notes.items():
+                if not name.startswith("chat:"):
+                    continue
+                parts = name.split(":", 2)
+                if len(parts) != 3:
+                    continue
+                _, kind, entity = parts
+                note = self.resource_manager.get_resource(note_id)
+                if not note:
+                    continue
+                content = note.get("properties", {}).get("content", "")
+                if not isinstance(content, str) or not content:
+                    continue
+                if kind == "discourse_state":
+                    self._discourse_state[entity] = content
+                elif kind == "tom_state":
+                    self._tom_state[entity] = content
+            if self._discourse_state or self._tom_state:
+                logger.info(
+                    f"[{self.character_name}] restored chat state: "
+                    f"{len(self._discourse_state)} discourse, "
+                    f"{len(self._tom_state)} tom entries"
+                )
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] _restore_chat_state_from_notes failed: {e}")
+
+    def _persist_to_disk(self) -> None:
+        """Flush the resource manager (notes/collections/relations + indexes)
+        to disk. Safe to call frequently; the resource manager only writes the
+        files that have changed contents."""
+        try:
+            self.resource_manager.save_to_file()
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] save_to_file failed: {e}")
 
     # ------------------------------------------------------------------
     # Zenoh wiring
@@ -392,17 +489,21 @@ class ChatLoop:
             tracker = self._get_tracker(entity)
             prev_disc = self._discourse_state.get(entity, '')
             prev_tom = self._tom_state.get(entity, '')
-            # Tag the tracker's underlying call with a profile per call
-            # site: object extraction vs belief revision want different
-            # <think> shapes.
-            tracker.llm_generate = self._make_llm_callable('extract')
+            # Discourse and ToM calls have 3000-token budgets and finish
+            # naturally; grammar adds no value here and the byte-cap +
+            # permissive-answer pattern leaks thinking into the output,
+            # which then contaminates self._discourse_state /
+            # self._tom_state and re-injects into chat_reply's system
+            # prompt on subsequent turns. Run unconstrained.
+            tracker.llm_generate = self._make_llm_callable('none')
             new_disc = tracker.analyze_segment(
                 dialog, start=0, end=len(dialog) - 1,
                 previous_discourse_state=prev_disc, tom=prev_tom,
             )
             if new_disc:
                 self._discourse_state[entity] = str(new_disc)
-            tracker.llm_generate = self._make_llm_callable('revise_belief')
+                self._save_state_note('discourse_state', entity, str(new_disc))
+            tracker.llm_generate = self._make_llm_callable('none')
             new_tom = tracker.update_tom_from_discourse_segment(
                 dialog, character_name=entity, start=0, end=len(dialog) - 1,
                 discourse_state=self._discourse_state.get(entity, ''),
@@ -410,6 +511,7 @@ class ChatLoop:
             )
             if new_tom:
                 self._tom_state[entity] = str(new_tom)
+                self._save_state_note('tom_state', entity, str(new_tom))
         except Exception as e:
             logger.warning(f'[{self.character_name}] discourse update failed: {e}')
 
@@ -504,8 +606,16 @@ class ChatLoop:
         messages = self._build_chat_messages(source, text, orientation)
 
         try:
-            reply = self.backend.chat(messages, max_tokens=600, temperature=0.7,
-                                      cot_profile='chat_reply')
+            # Suppress thinking entirely for the main chat reply: Qwen3.6's
+            # over-deliberation on multi-turn prompts caused thinking to
+            # leak into the answer channel under any byte-budget grammar.
+            # Conversational replies don't need deliberation; let the model
+            # answer directly. With thinking off, all of max_tokens is
+            # available for the answer (vs. ~50% before) so we bump it
+            # modestly to comfortably cover deep multi-paragraph replies.
+            reply = self.backend.chat(messages, max_tokens=1024, temperature=0.7,
+                                      cot_profile='none',
+                                      enable_thinking=False)
         except Exception as e:
             logger.error(f"[{self.character_name}] LLM call failed: {e}")
             reply = f"[{self.character_name}] I had trouble generating a reply: {e}"
@@ -522,6 +632,10 @@ class ChatLoop:
 
         if close:
             self.store.close_dialog(source)
+
+        # Autosave per turn — small write, but means we never lose a
+        # completed exchange to a launcher kill or crash.
+        self._persist_to_disk()
 
     # ------------------------------------------------------------------
     # Main loop
@@ -559,6 +673,10 @@ class ChatLoop:
                     import traceback
                     traceback.print_exc()
         finally:
+            # Final flush before tearing down zenoh, so SIGINT on the
+            # launcher captures any in-flight discourse/ToM updates that
+            # might race the autosave above.
+            self._persist_to_disk()
             self._shutdown_zenoh()
 
     def _shutdown_zenoh(self) -> None:
