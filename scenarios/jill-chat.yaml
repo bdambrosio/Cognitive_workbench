@@ -38,11 +38,13 @@ characters:
       server: local
       model: ""
       vllm_url: http://127.0.0.1:5000
-      # Structured-CoT gate. When true, _ChatBackend attaches a GBNF
-      # grammar from cot_profiles per call site. Profiles bound the
-      # <think> block by *byte budget* (permissive interior), forcing
-      # the model to close </think> when it would otherwise spiral.
-      is_reasoning_model: true
+      # Structured-CoT gate. Tested with Qwen3.6-27B and judged a failure:
+      # any byte-budget constraint forced premature </think> closure that
+      # leaked thinking into the answer channel and degraded reply
+      # quality. Disabled. Infrastructure (cot_profiles.py, _ChatBackend
+      # grammar attach) is kept for possible future use with different
+      # models, but `false` here makes resolve_profile() unreachable.
+      is_reasoning_model: false
 
     # On by default per project decision.
     discourse:

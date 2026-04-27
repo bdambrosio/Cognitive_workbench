@@ -297,10 +297,12 @@ class ChatLoop:
 
     # Per-profile max_tokens floor. Caller-supplied max_tokens may be tuned
     # for non-reasoning models (e.g. character_evaluator hardcodes 256 for a
-    # ~150-token JSON envelope); reasoning models also burn budget on the
-    # constrained <think> block, so the floor must accommodate both.
+    # ~150-token JSON envelope); Qwen3.6-class reasoning models burn 1000-3000
+    # tokens on free thinking before producing the answer, so floors are
+    # generous to avoid finish_reason=length truncating mid-thought.
     _PROFILE_TOKEN_FLOOR = {
-        'triage': 768,
+        'triage': 4096,
+        'none': 4096,    # covers discourse extract + revise_belief callables
     }
 
     def _make_llm_callable(self, cot_profile: Optional[str],
@@ -606,16 +608,15 @@ class ChatLoop:
         messages = self._build_chat_messages(source, text, orientation)
 
         try:
-            # Suppress thinking entirely for the main chat reply: Qwen3.6's
-            # over-deliberation on multi-turn prompts caused thinking to
-            # leak into the answer channel under any byte-budget grammar.
-            # Conversational replies don't need deliberation; let the model
-            # answer directly. With thinking off, all of max_tokens is
-            # available for the answer (vs. ~50% before) so we bump it
-            # modestly to comfortably cover deep multi-paragraph replies.
-            reply = self.backend.chat(messages, max_tokens=1024, temperature=0.7,
-                                      cot_profile='none',
-                                      enable_thinking=False)
+            # Grammar is disabled (yaml is_reasoning_model=false) and
+            # thinking is left at its template default (on). The model
+            # thinks freely; llama-server splits content/reasoning_content
+            # via the chat template's reasoning extraction; our client-side
+            # `</think>` strip pulls the answer out of content. max_tokens
+            # is generous so a multi-turn reply with substantial thinking
+            # never hits finish_reason=length mid-thought.
+            reply = self.backend.chat(messages, max_tokens=4096, temperature=0.7,
+                                      cot_profile='none')
         except Exception as e:
             logger.error(f"[{self.character_name}] LLM call failed: {e}")
             reply = f"[{self.character_name}] I had trouble generating a reply: {e}"
