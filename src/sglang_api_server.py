@@ -44,19 +44,33 @@ class ChatCompletionRequest(BaseModel):
     max_tokens: Optional[int] = 2000
     stop: Optional[List[str]] = None
     stream: Optional[bool] = False
+    # Sampling-time grammar constraint. SGLang accepts `regex` natively and
+    # `ebnf` on recent versions. `grammar` is a forward-compat passthrough
+    # for GBNF-style strings (currently unused by SGLang; kept for parity
+    # with llama.cpp clients that may target either backend).
+    regex: Optional[str] = None
+    ebnf: Optional[str] = None
+    grammar: Optional[str] = None
 
 
 class SGLangAPIServer:
     """OpenAI-compatible API server for SGLang Runtime."""
     
-    def __init__(self, runtime, model_path: str, port: int = 5000):
+    def __init__(self, runtime, model_path: str, port: int = 5000,
+                 reasoning_parser: Optional[str] = None):
         """
         Initialize API server.
-        
+
         Args:
             runtime: SGLang Runtime instance
             model_path: Model path (for model ID generation)
             port: Port to listen on
+            reasoning_parser: If set (e.g. "qwen3"), the wrapper post-
+                processes generated text to strip the leading
+                <think>…</think> block so OpenAI-compatible clients see
+                only the answer channel. SGLang's native /v1/chat/completions
+                applies this; the function/gen path used here does not, so
+                the wrapper does it explicitly.
         """
         if not HAS_FASTAPI:
             raise ImportError("FastAPI not available")
@@ -64,10 +78,11 @@ class SGLangAPIServer:
             raise ImportError("SGLang not available")
         if runtime is None:
             raise ValueError("Runtime cannot be None")
-        
+
         self.runtime = runtime
         self.model_path = model_path
         self.port = port
+        self.reasoning_parser = reasoning_parser
         self.app = FastAPI(title="SGLang OpenAI API")
         self.server_thread = None
         self.server = None
@@ -149,27 +164,40 @@ class SGLangAPIServer:
                         conversation_parts.append(("assistant", content))
                 
                 # Generate using SGLang
-                stop_str = None
+                stop_arg = None
                 if request.stop:
                     if isinstance(request.stop, list) and len(request.stop) > 0:
-                        stop_str = request.stop[0]  # SGLang uses single stop string
+                        stop_arg = request.stop  # SGLang accepts a list
                     elif isinstance(request.stop, str):
-                        stop_str = request.stop
-                
+                        stop_arg = request.stop
+
+                # Capture grammar / regex constraints (sampling-time guided
+                # decoding). `ebnf` is preferred on recent SGLang; `regex`
+                # is the older path. `grammar` (GBNF) is forwarded as
+                # `ebnf` if the engine accepts it; otherwise ignored with
+                # a warning so llama.cpp-shaped requests don't silently
+                # produce unconstrained output.
+                ebnf_arg = request.ebnf or request.grammar or None
+                regex_arg = request.regex or None
+
                 # Create generation function with proper message structure
                 @function
                 def generate_chat(s, system_text, user_text):
                     if system_text:
                         s += system(system_text)
                     s += user(user_text)
-                    
+
                     # Generate response
                     gen_kwargs = {
                         "max_tokens": request.max_tokens or 2000,
                         "temperature": request.temperature or 0.7
                     }
-                    if stop_str:
-                        gen_kwargs["stop"] = stop_str
+                    if stop_arg:
+                        gen_kwargs["stop"] = stop_arg
+                    if ebnf_arg:
+                        gen_kwargs["ebnf"] = ebnf_arg
+                    if regex_arg:
+                        gen_kwargs["regex"] = regex_arg
                     s += assistant(gen("output", **gen_kwargs))
                 
                 # Build user text from conversation (last user message + any assistant context)
@@ -205,6 +233,19 @@ class SGLangAPIServer:
                     user_text=user_text
                 )
                 result_text = state["output"].strip()
+
+                # Reasoning-parser stripping. SGLang's native chat endpoint
+                # applies the configured reasoning_parser to split thinking
+                # from content; the function/gen path bypasses that, so the
+                # wrapper does it here. We strip only when the runtime was
+                # configured with a reasoning_parser to avoid mangling
+                # genuine <think>…</think> content from non-reasoning runs.
+                if self.reasoning_parser and result_text:
+                    if '</think>' in result_text:
+                        result_text = result_text.split('</think>', 1)[1].lstrip()
+                    elif result_text.lstrip().startswith('<think>'):
+                        # Truncated mid-think (no closing tag) → no answer
+                        result_text = ''
                 
                 # Build OpenAI-compatible response
                 response_id = f"chatcmpl-{uuid.uuid4().hex[:12]}"

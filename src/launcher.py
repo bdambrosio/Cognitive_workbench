@@ -68,8 +68,13 @@ def parse_characters(config_data: dict, llm_config: dict, world_config: dict, se
             new_config['ontology'] = ontology
             new_config['activities'] = activities
             new_config['characters'] = characters_config.copy()
-            new_config['llm_config'] = llm_config
-            new_config['alt_llm_config'] = alt_llm
+            # Merge per-character llm_config OVER top-level so per-character
+            # overrides (server, model, vllm_url, is_reasoning_model, etc.)
+            # actually reach the agent. Same for alt_llm_config.
+            char_llm = config.get('llm_config') or {}
+            new_config['llm_config'] = {**(llm_config or {}), **char_llm}
+            char_alt_llm = config.get('alt_llm_config') or {}
+            new_config['alt_llm_config'] = {**(alt_llm or {}), **char_alt_llm}
             new_config['world_config'] = world_config
             new_config['setting'] = setting
             result.append((name.capitalize(), new_config))
@@ -81,8 +86,10 @@ def parse_characters(config_data: dict, llm_config: dict, world_config: dict, se
                 new_config['ontology'] = ontology
                 new_config['activities'] = activities
                 new_config['characters'] = characters_config
-                new_config['llm_config'] = llm_config
-                new_config['alt_llm_config'] = alt_llm
+                char_llm = char_config.get('llm_config') or {}
+                new_config['llm_config'] = {**(llm_config or {}), **char_llm}
+                char_alt_llm = char_config.get('alt_llm_config') or {}
+                new_config['alt_llm_config'] = {**(alt_llm or {}), **char_alt_llm}
                 new_config['world_config'] = world_config
                 new_config['setting'] = setting
                 result.append((name.capitalize(), new_config))
@@ -233,15 +240,18 @@ def create_sglang_runtime(llm_config: dict):
         return None, None
 
 
-def start_api_server(runtime, model_path: str, port: int = 5000):
+def start_api_server(runtime, model_path: str, port: int = 5000,
+                     reasoning_parser: Optional[str] = None):
     """Start the OpenAI-compatible API server on a daemon thread. Returns server or None."""
     if runtime is None:
         return None
     try:
         from sglang_api_server import SGLangAPIServer
-        server = SGLangAPIServer(runtime=runtime, model_path=model_path, port=port)
+        server = SGLangAPIServer(runtime=runtime, model_path=model_path, port=port,
+                                 reasoning_parser=reasoning_parser)
         server.start()
-        logger.info(f"OpenAI-compatible API server started on port {port}")
+        logger.info(f"OpenAI-compatible API server started on port {port}"
+                    + (f" (reasoning_parser={reasoning_parser})" if reasoning_parser else ""))
         return server
     except Exception as e:
         logger.warning(f"Failed to start API server: {e}")
@@ -296,9 +306,23 @@ def launch_task_manager() -> Optional[subprocess.Popen]:
 def run_agent(name: str, config: dict, runtime, tokenizer, shutdown_event: threading.Event):
     """Entry point for each character thread.
 
-    The node's OODA loop checks node.shutdown_requested. We monitor the
-    shared shutdown_event and propagate it to the node.
+    Dispatches on config['mode']:
+      - 'chat'  → lightweight ChatLoop (no OODA, no concerns/goals/sensors)
+      - default → full ZenohExecutiveNode OODA loop
     """
+    mode = config.get('mode', 'agent')
+    if mode == 'chat':
+        try:
+            from chat.chat_loop import ChatLoop
+            logger.info(f"Starting chat thread: {name}")
+            loop = ChatLoop(character_name=name, character_config=config, shutdown_event=shutdown_event)
+            loop.run()
+        except Exception as e:
+            logger.error(f"Chat {name} crashed: {e}")
+            import traceback
+            traceback.print_exc()
+        return
+
     node = None
     try:
         from executive_node import ZenohExecutiveNode
@@ -390,7 +414,8 @@ def main():
 
     # ---- Shared SGLang runtime ----
     runtime, tokenizer = create_sglang_runtime(llm_config)
-    api_server = start_api_server(runtime, llm_config.get('sgl_model_path', ''))
+    api_server = start_api_server(runtime, llm_config.get('sgl_model_path', ''),
+                                  reasoning_parser=llm_config.get('reasoning_parser'))
 
     # ---- Shared services (subprocesses) ----
     service_procs: List[subprocess.Popen] = []

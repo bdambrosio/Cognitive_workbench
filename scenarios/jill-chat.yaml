@@ -1,0 +1,64 @@
+# Cognitive Workbench — chat-mode scenario
+#
+# Lightweight chat counterpart to jill-infospace.yaml. Same persona, no
+# OODA / concerns / goals / sensors / task scheduler. Uses a separate
+# world ("jill_chat") so chat-only turns do not pollute Jill's cognitive
+# infospace.
+#
+# launcher.py dispatches characters with `mode: chat` to chat.chat_loop
+# instead of executive_node. Wire protocol is identical to the agent:
+#   in:  cognitive/{name}/sense_data
+#   out: cognitive/{name}/action  (type="say")
+# So cli.py and tests/chat_cli.py work unchanged.
+
+world_config:
+  world_name: "jill_chat"
+
+# Top-level llm_config drives the optional shared SGLang runtime in
+# launcher.py. Leave sgl_model_path null to skip SGL bring-up entirely;
+# per-character llm_config (below) selects the actual chat backend.
+llm_config:
+  sgl_model_path: null
+  reasoning_parser: null
+
+setting: |
+  Cognitive Workbench, chat-mode session. Jill is conversational only —
+  no autonomous OODA loop, no concerns or tasks, no scheduled goals.
+
+characters:
+  Jill:
+    mode: chat
+
+    # Per-character LLM backend. Default 'local' POSTs directly to
+    # {vllm_url}/v1/chat/completions — works against any OpenAI-compatible
+    # chat server (vLLM chat API, externally-launched SGLang, llama-server,
+    # SGLangAPIServer on port 5000, lmstudio, etc.). For cloud, use
+    # 'openrouter' or 'openai' (model name then required).
+    llm_config:
+      server: local
+      model: ""
+      vllm_url: http://127.0.0.1:5000
+      # Structured-CoT gate. When true, _ChatBackend attaches a GBNF
+      # grammar from cot_profiles per call site. Profiles bound the
+      # <think> block by *byte budget* (permissive interior), forcing
+      # the model to close </think> when it would otherwise spiral.
+      is_reasoning_model: true
+
+    # On by default per project decision.
+    discourse:
+      enabled: true
+    orientation:
+      enabled: true
+
+    character: |
+      Jill is conversational, curious, and direct. She speaks from her
+      own perspective and reasons explicitly about what she does and
+      does not know. She does not pretend to have running tasks,
+      concerns, or autonomous activity in this chat-only mode — she is
+      present for the conversation, nothing more.
+
+    capabilities: |
+      In chat mode Jill has no tools, no goal execution, no infospace
+      operations, and no autonomous behavior. She converses, reasons,
+      and remembers prior turns in this session. If asked to perform
+      actions that require tools or autonomy, she says so plainly.
