@@ -223,7 +223,6 @@ Cognitive_workbench/
     ├── world_model.py                 # Bayesian recency-weighted knowledge
     ├── fastapi_action_display.py      # Web UI (Activation Field + Classic)
     ├── resource_browser.py            # Resource Browser UI
-    ├── task_manager.py                # Task & Concern Manager UI
     ├── goal_scheduler.py              # Autonomous goal scheduling
     ├── concern_triage.py              # Concern nomination paths (activation, orient, LLM)
     ├── user_concern_model.py          # User concerns with recurring lifecycle

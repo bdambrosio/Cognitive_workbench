@@ -2744,7 +2744,6 @@ Generated: {generated_at}
                         <button onclick="saveAll()" style="background: #95e1d3; color: #1a1a1a; margin-right: 10px;" title="Save all resources and memory to disk">Save</button>
                         <button onclick="exportToObsidian()" style="background: #7c3aed; color: white; margin-right: 10px;" title="Export action log to Obsidian vault">Obsidian</button>
                         <button onclick="openResourceBrowser()" style="background: #0e639c; color: white; margin-right: 10px;" title="Open resource browser in new tab to view Notes and Collections">🔍 Browser</button>
-                        <button onclick="openTaskManager()" style="background: #388a34; color: white; margin-right: 10px;" title="Open task & concern manager">📋 Tasks</button>
                         <button onclick="shutdownWithSave()" style="background: #ff4757; color: white;" title="Save all data and shutdown the system">Shutdown</button>
                     </div>
                     <div style="margin-bottom: 15px; padding: 10px; background: #333; border-radius: 5px;">
@@ -4315,10 +4314,6 @@ Generated: {generated_at}
             // Open Resource Browser in new tab
             // Just open it - browser will show connection error if not running
             window.open('http://localhost:3001', 'resource_browser');
-        }
-
-        function openTaskManager() {
-            window.open('http://localhost:3002', 'task_manager');
         }
 
         // Test Runner Functions
