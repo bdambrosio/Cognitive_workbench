@@ -51,7 +51,15 @@ REACT_MAX_ITERS = 8
 
 # Tools the model can emit. Validated structurally in _parse_react_action;
 # the dispatcher in _run_react_loop knows how to run each.
-_REACT_TOOLS = ('process_text', 'search', 'respond')
+_REACT_TOOLS = ('process_text', 'search', 'fetch_text', 'respond')
+
+# Per-character collection holding episodic specifics across conversations.
+# Auto-RAG searches this on every turn; post-turn reflection writes to it.
+_MEMORIES_COLLECTION_NAME = "memories"
+# Trim observation text from fetch_text before it lands in the working log.
+# Bigger than search synthesis (which is already digested) since fetch_text
+# is raw page text — but bounded so a single fetch can't blow the prompt.
+_FETCH_TEXT_OBS_CAP = 8000
 
 # Per-iteration auto-binding: $step1, $step2, ... names the result of each
 # action so subsequent actions can reference it. Scoped to the current turn
@@ -64,28 +72,52 @@ _REACT_BINDING_RE = re.compile(r'^\$step\d+$')
 class _ChatBackend:
     """Thin OpenAI-compatible chat client with structured-CoT support.
 
-    Routes by server name:
-      - 'openrouter' / 'openai' → utils.llm_api.LLM (cloud clients;
-        grammar attachment skipped — cloud APIs don't accept GBNF).
-      - anything else (local, vllm, llama.cpp, sglang_api_server, lmstudio,
-        unset) → POST {base_url}/v1/chat/completions directly. The
-        SGLangAPIServer wrapper accepts both `grammar` (GBNF, forwarded
-        as ebnf) and `ebnf` directly; llama-server accepts `grammar`.
+    Routes (checked in order):
+      1. `api_key` set → unified OpenAI-compat path. POST to
+         {base_url}/v1/chat/completions with `Authorization: Bearer
+         <env[api_key]>`. Grammar / chat_template_kwargs are NOT attached
+         (cloud endpoints reject them). The api_key field is the NAME of
+         an environment variable, not the key itself.
+      2. server in ('openrouter', 'openai') → utils.llm_api.LLM (legacy
+         cloud shortcut, kept for back-compat).
+      3. anything else (local, vllm, llama.cpp, sglang_api_server, lmstudio,
+         unset) → POST {base_url}/v1/chat/completions directly, no auth.
+         SGLangAPIServer accepts both `grammar` (GBNF, forwarded as ebnf)
+         and `ebnf`; llama-server accepts `grammar`.
 
-    `cot_profile` selects a GBNF skeleton for the <think> block. It is
-    only attached when the model gates as reasoning (auto-detected by
-    name or forced via `is_reasoning=True`).
+    `cot_profile` selects a GBNF skeleton for the <think> block. Attached
+    only when the model gates as reasoning (auto-detected by name or
+    forced via `is_reasoning=True`) AND we're on path 3 (no api_key).
     """
 
     def __init__(self, server: str, model: str, base_url: str,
-                 is_reasoning: Optional[bool] = None):
+                 is_reasoning: Optional[bool] = None,
+                 api_key: Optional[str] = None):
         self.server = (server or 'local').lower()
         self.model = model or ''
         self.base_url = (base_url or 'http://127.0.0.1:5000').rstrip('/')
         if self.base_url.endswith('/v1'):
             self.base_url = self.base_url[:-3]
+        # New unified path: api_key field is the NAME of an env var. We
+        # resolve it once at init so a missing env var fails loudly here
+        # (with the var name) instead of silently 401-ing on first call.
+        self._api_key_value: Optional[str] = None
+        self._api_key_var: Optional[str] = None
+        if api_key:
+            api_key = str(api_key).strip()
+            if api_key:
+                self._api_key_var = api_key
+                resolved = os.environ.get(api_key)
+                if not resolved:
+                    raise RuntimeError(
+                        f"_ChatBackend: api_key env var {api_key!r} is not set. "
+                        f"Either export {api_key} or remove the api_key field.")
+                self._api_key_value = resolved
+        # Legacy cloud shortcut — only used when api_key is NOT set, so
+        # the new unified path takes precedence for any config that
+        # specifies api_key (even if server happens to be openrouter/openai).
         self._cloud_llm = None
-        if self.server in ('openrouter', 'openai'):
+        if self._api_key_value is None and self.server in ('openrouter', 'openai'):
             from utils.llm_api import LLM
             self._cloud_llm = LLM(server_name=self.server, model_name=self.model)
         if is_reasoning is None:
@@ -127,21 +159,31 @@ class _ChatBackend:
         if stops:
             body['stop'] = stops
 
-        grammar = resolve_profile(cot_profile) if self.is_reasoning else None
-        if grammar:
-            # llama-server accepts `grammar`; SGLangAPIServer (our wrapper)
-            # accepts both `grammar` and `ebnf`. Send `grammar` for both.
-            body['grammar'] = grammar
+        # Skip grammar / chat_template_kwargs when going to a cloud endpoint
+        # (signaled by api_key being set). Cloud providers reject those
+        # fields; locally-served engines (llama-server, SGLangAPIServer)
+        # accept them.
+        is_cloud = self._api_key_value is not None
+        if not is_cloud:
+            grammar = resolve_profile(cot_profile) if self.is_reasoning else None
+            if grammar:
+                # llama-server accepts `grammar`; SGLangAPIServer (our wrapper)
+                # accepts both `grammar` and `ebnf`. Send `grammar` for both.
+                body['grammar'] = grammar
 
-        # Per-request thinking suppression for Qwen3.x and similar jinja
-        # templates that auto-prefix <think>. Setting enable_thinking=False
-        # tells the chat template NOT to open the thinking block, so the
-        # model goes straight to the answer. Soft `/think` `/nothink`
-        # directives don't work on Qwen3.6 — only this template kwarg does.
-        if enable_thinking is False:
-            body['chat_template_kwargs'] = {'enable_thinking': False}
+            # Per-request thinking suppression for Qwen3.x and similar jinja
+            # templates that auto-prefix <think>. Setting enable_thinking=False
+            # tells the chat template NOT to open the thinking block, so the
+            # model goes straight to the answer. Soft `/think` `/nothink`
+            # directives don't work on Qwen3.6 — only this template kwarg does.
+            if enable_thinking is False:
+                body['chat_template_kwargs'] = {'enable_thinking': False}
 
-        resp = requests.post(url, headers={'Content-Type': 'application/json'}, json=body, timeout=120)
+        headers: Dict[str, str] = {'Content-Type': 'application/json'}
+        if self._api_key_value:
+            headers['Authorization'] = f'Bearer {self._api_key_value}'
+
+        resp = requests.post(url, headers=headers, json=body, timeout=120)
         resp.raise_for_status()
         data = resp.json()
         choices = data.get('choices') or []
@@ -200,6 +242,7 @@ class ChatLoop:
             model=llm_cfg.get('model', ''),
             base_url=llm_cfg.get('vllm_url') or llm_cfg.get('base_url') or 'http://127.0.0.1:5000',
             is_reasoning=llm_cfg.get('is_reasoning_model'),
+            api_key=llm_cfg.get('api_key'),
         )
 
         # ---- Persona ----
@@ -250,6 +293,13 @@ class ChatLoop:
         self._discourse_state: Dict[str, str] = {}
         self._companion_state: Dict[str, str] = {}
         self._restore_chat_state_from_notes()
+
+        # ---- Long-term memory (cross-conversation, per-character) ----
+        # A 'memories' Collection holds episodic specifics that should
+        # survive past the rolling Companion summary. Auto-RAG queries it
+        # at turn start; a post-turn reflection step decides what to write.
+        self._memories_collection_id: Optional[str] = None
+        self._init_memories()
 
         # ---- Zenoh wiring ----
         self._inbox: "queue.Queue[dict]" = queue.Queue()
@@ -411,6 +461,170 @@ class ChatLoop:
             self.resource_manager.save_to_file()
         except Exception as e:
             logger.warning(f"[{self.character_name}] save_to_file failed: {e}")
+
+    # ------------------------------------------------------------------
+    # Long-term memory — per-character "memories" Collection.
+    # Notes carry kind=memory + entity; the Collection is FAISS-indexed so
+    # `search_collection` returns ranked chunks. add_to_collection
+    # auto-updates the index for indexed Collections.
+    # ------------------------------------------------------------------
+
+    def _init_memories(self) -> None:
+        """Get-or-create the memories Collection, mark it persistent, ensure
+        it has a semantic index. Idempotent: safe across restarts because
+        load_from_file restores named_collections, and index_collection is
+        a no-op for already-indexed collections."""
+        try:
+            cid = self.resource_manager.named_collections.get(_MEMORIES_COLLECTION_NAME)
+            if not cid:
+                success, cid, err, _ = self.resource_manager.create_collection(
+                    self.character_name, [], "list", "chat-loop", "",
+                    _MEMORIES_COLLECTION_NAME,
+                    {"kind": "memories"},
+                )
+                if not success or not cid:
+                    logger.warning(f"[{self.character_name}] create memories collection failed: {err}")
+                    return
+            self.resource_manager.mark_persistent(cid, self.character_name)
+            self.resource_manager.index_collection(self.character_name, cid, index_type='semantic')
+            self._memories_collection_id = cid
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] _init_memories failed: {e}")
+
+    def _remember(self, text: str, entity: str = "") -> Optional[str]:
+        """Persist one memory string into the memories Collection. Returns
+        the new note_id, or None on failure."""
+        if not self._memories_collection_id:
+            return None
+        text = (text or "").strip()
+        if not text:
+            return None
+        try:
+            success, note_id, err, _ = self.resource_manager.create_note(
+                self.character_name, text, "text", "chat-loop", entity or "",
+                "",
+                {
+                    "kind": "memory",
+                    "entity": entity,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                },
+            )
+            if not success or not note_id:
+                logger.warning(f"[{self.character_name}] memory create failed: {err}")
+                return None
+            self.resource_manager.mark_persistent(note_id, self.character_name)
+            ok, _, add_err = self.resource_manager.add_to_collection(
+                self._memories_collection_id, note_id, self.character_name)
+            if not ok:
+                logger.warning(f"[{self.character_name}] memory add_to_collection failed: {add_err}")
+            return note_id
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] _remember failed: {e}")
+            return None
+
+    def _recall(self, query: str, k: int = 3, threshold: float = 0.3) -> List[str]:
+        """Semantic search over the memories Collection. Returns ranked chunk
+        strings, highest score first. Empty list on miss / not yet indexed /
+        any error."""
+        if not self._memories_collection_id or not query:
+            return []
+        try:
+            ok, results, err = self.resource_manager.search_collection(
+                self.character_name, self._memories_collection_id, query,
+                mode='semantic', limit=k, threshold=threshold)
+            if not ok or not results:
+                return []
+            out: List[str] = []
+            for r in results:
+                doc = r.get('document') if isinstance(r, dict) else None
+                if isinstance(doc, str) and doc.strip():
+                    out.append(doc.strip())
+            return out
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] _recall failed: {e}")
+            return []
+
+    # Reflection prompt: extract durable episodic specifics from the latest
+    # exchange. Companion already absorbs personality/style/mood, so the bar
+    # for memory is "would NOT be recoverable from the companion model on a
+    # fresh re-read" — names, places, commitments, stable preferences.
+    _REFLECT_SYS = (
+        "You watch chats between {character} and {entity}. Your job: extract "
+        "any episodic specifics from the latest exchange that should survive "
+        "into FUTURE conversations — facts that would NOT be obvious from a "
+        "persona description or rolling companion summary.\n\n"
+        "CAPTURE:\n"
+        "- Personal facts the user shared (names, places, relationships).\n"
+        "- Stable preferences expressed plainly.\n"
+        "- Long-running project/work context.\n"
+        "- Specific commitments or follow-ups agreed.\n\n"
+        "SKIP:\n"
+        "- Pleasantries, mood, conversational tone.\n"
+        "- Anything already in the companion model verbatim.\n"
+        "- One-off questions with no stable signal (\"what's the weather\").\n"
+        "- Hypothetical / brainstorm content unless explicitly affirmed.\n\n"
+        "Output ONLY a JSON array of strings, each ≤ 200 chars, third-person "
+        "about {entity}. Output `[]` if nothing qualifies. No prose."
+    )
+
+    def _reflect_and_remember(self, source: str) -> List[str]:
+        """Run a single reflection LLM call over the latest exchange; for any
+        memory strings returned, persist them. Returns the list written (for
+        trace/logging). Failure-tolerant: any error path returns []."""
+        if not self._memories_collection_id:
+            return []
+        try:
+            dialog = self._build_dialog(source, limit=4)
+            if not dialog:
+                return []
+            convo = "\n".join(f"{t['source']}: {t['text']}" for t in dialog)
+            companion = self._companion_state.get(source, '').strip()
+            sys_msg = self._REFLECT_SYS.format(
+                character=self.character_name, entity=source)
+            user_parts = []
+            if companion:
+                user_parts.append(
+                    "## Existing companion model (do NOT re-extract from this; "
+                    "use only to avoid duplicates)\n" + companion)
+            user_parts.append("## Latest exchange\n" + convo)
+            user_parts.append(
+                "Return JSON array now. Each string is one durable memory, "
+                "third-person, ≤ 200 chars. `[]` if nothing qualifies.")
+            result = self._llm_generate(
+                [{'role': 'system', 'content': sys_msg},
+                 {'role': 'user', 'content': "\n\n".join(user_parts)}],
+                max_tokens=4096, temperature=0.3, is_json=True,
+                cot_profile='none')
+            if not result.success:
+                return []
+            payload = result.text
+            memories: List[str] = []
+            if isinstance(payload, list):
+                memories = [str(m).strip() for m in payload if str(m).strip()]
+            elif isinstance(payload, str):
+                # Cloud LLM may return raw text; try a salvage parse.
+                stripped = payload.strip()
+                if stripped.startswith('['):
+                    try:
+                        parsed = json.loads(stripped)
+                        if isinstance(parsed, list):
+                            memories = [str(m).strip() for m in parsed if str(m).strip()]
+                    except Exception:
+                        return []
+            if not memories:
+                return []
+            written: List[str] = []
+            for m in memories:
+                if len(m) > 240:
+                    m = m[:240].rstrip()
+                if self._remember(m, entity=source):
+                    written.append(m)
+            if written:
+                logger.info(f"[{self.character_name}] remembered {len(written)} item(s) from {source}")
+            return written
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] _reflect_and_remember failed: {e}")
+            return []
 
     # ------------------------------------------------------------------
     # Zenoh wiring
@@ -578,6 +792,85 @@ class ChatLoop:
             logger.warning(f"[{self.character_name}] persist search note failed: {e}")
 
         return {'synthesis': synthesis, 'sources': sources, 'query': query}
+
+    # ------------------------------------------------------------------
+    # fetch_text — backend for the ReAct `fetch_text` tool. Loaded the
+    # same way as search-web (importlib by file path, hyphenated dir).
+    # ------------------------------------------------------------------
+
+    def _get_fetch_text_tool(self):
+        """Lazy-load the fetch-text tool's `tool` callable. Cached on the
+        instance after first load. The executive_node tool expects an
+        `executor` kwarg with `_create_uniform_return`; we pass a stub
+        since chat doesn't run an executor."""
+        if hasattr(self, '_fetch_text_cached'):
+            return self._fetch_text_cached
+        try:
+            import importlib.util
+            tool_path = os.path.join(_SRC_DIR, "tools", "fetch-text", "tool.py")
+            spec = importlib.util.spec_from_file_location(
+                "_chat_fetch_text_tool", tool_path)
+            if spec is None or spec.loader is None:
+                self._fetch_text_cached = None
+                return None
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            self._fetch_text_cached = getattr(mod, 'tool', None)
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] could not load fetch-text tool: {e}")
+            self._fetch_text_cached = None
+        return self._fetch_text_cached
+
+    class _FetchTextStubExecutor:
+        """Minimal stand-in for InfospaceExecutor — fetch-text only calls
+        `_create_uniform_return`, so this is sufficient."""
+        @staticmethod
+        def _create_uniform_return(status, value=None, reason=None,
+                                   resource_id=None, extra=None, data=None):
+            return {'status': status, 'value': value, 'reason': reason,
+                    'resource_id': resource_id, 'extra': extra, 'data': data}
+
+    def _run_fetch_text(self, url: str) -> str:
+        """Fetch+extract text from a URL (or Note/Collection ID, or local
+        absolute path). Returns text capped to _FETCH_TEXT_OBS_CAP chars
+        for the ReAct working log. Returns a `(fetch_text …)` failure
+        marker on any error so the model sees the failure cleanly."""
+        if not url:
+            return '(fetch_text: empty url)'
+        fetch = self._get_fetch_text_tool()
+        if fetch is None:
+            return '(fetch_text: tool unavailable)'
+        try:
+            result = fetch(url, executor=self._FetchTextStubExecutor,
+                           resource_manager=self.resource_manager)
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] fetch_text raised: {e}")
+            return f'(fetch_text error: {e})'
+        if not isinstance(result, dict):
+            return '(fetch_text: unexpected return shape)'
+        if result.get('status') != 'success':
+            return f"(fetch_text failed: {result.get('reason') or 'unknown'})"
+        # The tool returns a JSON-encoded blob in `value` and a parsed dict
+        # in `extra`. Prefer `extra` for the text field.
+        extra = result.get('extra') or {}
+        text = ''
+        if isinstance(extra, dict):
+            text = str(extra.get('text') or '').strip()
+        if not text:
+            value = result.get('value') or ''
+            try:
+                parsed = json.loads(value) if isinstance(value, str) else value
+                if isinstance(parsed, dict):
+                    text = str(parsed.get('text') or '').strip()
+                elif isinstance(parsed, str):
+                    text = parsed.strip()
+            except Exception:
+                text = str(value).strip()
+        if not text:
+            return '(fetch_text: no text extracted)'
+        if len(text) > _FETCH_TEXT_OBS_CAP:
+            text = text[:_FETCH_TEXT_OBS_CAP].rstrip() + f"\n…[truncated at {_FETCH_TEXT_OBS_CAP} chars]"
+        return text
 
     # ------------------------------------------------------------------
     # ReAct loop — single-action-per-iteration tool use for chat.
@@ -901,7 +1194,8 @@ class ChatLoop:
     # System prompt + turn assembly
     # ------------------------------------------------------------------
 
-    def _build_system_prompt(self, source: str, orientation: str) -> str:
+    def _build_system_prompt(self, source: str, orientation: str,
+                             recall: Optional[List[str]] = None) -> str:
         """Build the persona/state portion of the system prompt — shared base
         for ReAct mode. The prose-only directive that used to live here was
         moved out: ReAct supplies its own JSON-emit directive in
@@ -920,6 +1214,15 @@ class ChatLoop:
                 f"## Companion model of {source} (fair-witness texture, not a brief to flatter)\n"
                 f"{companion}"
             )
+        if recall:
+            # Episodic specifics retrieved from prior conversations. Distinct
+            # from the rolling Companion summary: these are durable facts
+            # (names, places, commitments) that should not decay with style.
+            mem_block = "\n".join(f"- {m}" for m in recall)
+            parts.append(
+                f"## Recalled memories (from prior conversations with {source})\n"
+                f"{mem_block}"
+            )
         disc = self._discourse_state.get(source, '').strip()
         if disc:
             parts.append("## Outstanding discourse objects\n" + disc)
@@ -937,8 +1240,9 @@ class ChatLoop:
     # direct prose reply.
     # ------------------------------------------------------------------
 
-    def _build_react_system_prompt(self, source: str, orientation: str) -> str:
-        base = self._build_system_prompt(source, orientation)
+    def _build_react_system_prompt(self, source: str, orientation: str,
+                                   recall: Optional[List[str]] = None) -> str:
+        base = self._build_system_prompt(source, orientation, recall=recall)
         react = (
             "\n\n## ReAct Tool Loop — READ FIRST\n"
             "Each emission is ONE JSON action object — nothing else. Prose "
@@ -953,9 +1257,12 @@ class ChatLoop:
             "Tools (each emission picks ONE):\n"
             "1. `{\"tool\": \"process_text\", \"source\": <string|$stepN>, \"instruction\": <string>}` — "
             "LLM pass over text in context. Use to formulate queries, render results in your voice, extract info.\n"
-            "2. `{\"tool\": \"search\", \"query\": <string|$stepN>}` — web search.\n"
-            "3. `{\"tool\": \"respond\", \"text\": <string|$stepN>}` — final reply, exits loop. "
-            "Must be in your voice; pass search results through process_text first or write the reply yourself.\n"
+            "2. `{\"tool\": \"search\", \"query\": <string|$stepN>}` — web search (digested synthesis + sources).\n"
+            "3. `{\"tool\": \"fetch_text\", \"url\": <string|$stepN>}` — full text from a single URL "
+            "(or local file path). Use when a search hit looks promising and the snippet isn't enough; "
+            "always pass the result through process_text before responding.\n"
+            "4. `{\"tool\": \"respond\", \"text\": <string|$stepN>}` — final reply, exits loop. "
+            "Must be in your voice; pass search/fetch results through process_text first or write the reply yourself.\n"
             "\n"
             "Each action's result auto-binds to `$step1, $step2, …` (per-turn scope).\n"
             "\n"
@@ -969,7 +1276,8 @@ class ChatLoop:
         return base + react
 
     def _build_react_prompt(self, source: str, user_text: str, orientation: str,
-                            log: List[Tuple[str, str]]) -> List[Dict[str, str]]:
+                            log: List[Tuple[str, str]],
+                            recall: Optional[List[str]] = None) -> List[Dict[str, str]]:
         """Single user-role text containing history + current input + working log."""
         parts: List[str] = []
         history = self.store.get_recent_turns(source, limit=self.history_limit, scope='all')
@@ -993,11 +1301,16 @@ class ChatLoop:
         parts.append("")
         parts.append("Emit next action:")
         return [
-            {'role': 'system', 'content': self._build_react_system_prompt(source, orientation)},
+            {'role': 'system', 'content': self._build_react_system_prompt(source, orientation, recall=recall)},
             {'role': 'user', 'content': "\n".join(parts)},
         ]
 
-    def _run_react_loop(self, source: str, user_text: str, orientation: str) -> str:
+    def _run_react_loop(self, source: str, user_text: str, orientation: str,
+                        recall: Optional[List[str]] = None
+                        ) -> Tuple[str, List[Tuple[str, str]], List[Dict[str, Any]], str]:
+        """Run the ReAct loop. Returns (reply, log, iters, exit_reason).
+        The trace is NOT written here — caller writes it after post-turn
+        reflection so the trace can include memories written."""
         log: List[Tuple[str, str]] = []
         # Per-iteration record:
         #   system   — full system prompt sent (constant across iters,
@@ -1014,7 +1327,7 @@ class ChatLoop:
         iters: List[Dict[str, Any]] = []
         for i in range(REACT_MAX_ITERS):
             pre_log_len = len(log)
-            prompt = self._build_react_prompt(source, user_text, orientation, log)
+            prompt = self._build_react_prompt(source, user_text, orientation, log, recall=recall)
             sys_msg = prompt[0]['content']
             usr_msg = prompt[1]['content']
             try:
@@ -1025,8 +1338,7 @@ class ChatLoop:
                 iters.append({'system': sys_msg, 'user': usr_msg,
                               'raw': f'(LLM call failed: {e})', 'appended': []})
                 reply = self._react_fallback_synthesis(log, str(e))
-                self._write_react_trace(source, user_text, log, iters, reply, 'llm_error')
-                return reply
+                return reply, log, iters, 'llm_error'
 
             iters.append({'system': sys_msg, 'user': usr_msg, 'raw': raw or '',
                           'appended': []})
@@ -1044,8 +1356,7 @@ class ChatLoop:
                 text = self._resolve_react_value(action.get('text', ''), log)
                 logger.info(f"[{self.character_name}] ReAct iter {i+1}: respond ({len(text)} chars)")
                 # respond appends nothing to the log (loop exits); appended stays []
-                self._write_react_trace(source, user_text, log, iters, text, 'respond')
-                return text
+                return text, log, iters, 'respond'
 
             binding = f'$step{i+1}'
             log.append((f'ACTION {i+1}', json.dumps(action)))
@@ -1058,8 +1369,11 @@ class ChatLoop:
                 q = self._resolve_react_value(action.get('query', ''), log)
                 result = self._run_web_search(q) if q else None
                 obs = self._format_react_search_observation(result) if result else '(search failed or empty query)'
+            elif tool == 'fetch_text':
+                u = self._resolve_react_value(action.get('url', ''), log)
+                obs = self._run_fetch_text(u)
             else:
-                obs = f"unknown tool {tool!r}; available: process_text, search, respond"
+                obs = f"unknown tool {tool!r}; available: process_text, search, fetch_text, respond"
 
             log.append((binding, obs))
             iters[-1]['appended'] = log[pre_log_len:]
@@ -1067,14 +1381,15 @@ class ChatLoop:
 
         logger.warning(f"[{self.character_name}] ReAct hit max iters ({REACT_MAX_ITERS})")
         reply = self._react_fallback_synthesis(log)
-        self._write_react_trace(source, user_text, log, iters, reply, 'max_iters')
-        return reply
+        return reply, log, iters, 'max_iters'
 
     def _write_react_trace(self, source: str, user_text: str,
                            log: List[Tuple[str, str]],
                            iters: List[Dict[str, Any]],
                            final_response: str,
-                           exit_reason: str) -> None:
+                           exit_reason: str,
+                           recall: Optional[List[str]] = None,
+                           memories_written: Optional[List[str]] = None) -> None:
         """Append one ReAct session to logs/chat_trace_{character}.txt.
 
         Continuing-computation layout:
@@ -1101,16 +1416,26 @@ class ChatLoop:
             sep = '=' * 80
             sub = '-' * 80
             n_iters = len(iters)
+            n_recall = len(recall or [])
             lines = [
                 '', sep,
                 f'Chat session: {ts}',
                 f'Source: {source}',
                 f'User input: {user_text}',
                 f'Iterations: {n_iters}',
+                f'Recall hits: {n_recall}',
                 f'Exit: {exit_reason}',
                 f'Final response length: {len(final_response)} chars',
                 sep, '',
             ]
+
+            if recall:
+                lines.append(sub)
+                lines.append('>>> RECALL HITS (auto-RAG over memories collection)')
+                lines.append(sub)
+                for m in recall:
+                    lines.append(f'- {m}')
+                lines.append('')
 
             if iters:
                 first = iters[0]
@@ -1156,6 +1481,15 @@ class ChatLoop:
             lines.append(sub)
             lines.append(final_response)
             lines.append('')
+
+            if memories_written:
+                lines.append(sub)
+                lines.append('>>> MEMORIES WRITTEN (post-turn reflection)')
+                lines.append(sub)
+                for m in memories_written:
+                    lines.append(f'- {m}')
+                lines.append('')
+
             lines.append(sep)
             with open(trace_path, 'a', encoding='utf-8') as f:
                 f.write('\n'.join(lines) + '\n')
@@ -1199,9 +1533,17 @@ class ChatLoop:
             return
 
         orientation = self._orientation_summary(source, text)
+        # Auto-RAG: pull top-k durable memories that match this turn's input.
+        # Injected next to the Companion block in the system prompt; no ReAct
+        # tool call required. Cheap miss (one embedding query).
+        recall = self._recall(text, k=3)
 
+        log: List[Tuple[str, str]] = []
+        iters: List[Dict[str, Any]] = []
+        exit_reason = 'crashed'
         try:
-            reply = self._run_react_loop(source, text, orientation)
+            reply, log, iters, exit_reason = self._run_react_loop(
+                source, text, orientation, recall=recall)
         except Exception as e:
             logger.error(f"[{self.character_name}] ReAct loop crashed: {e}")
             import traceback
@@ -1217,6 +1559,19 @@ class ChatLoop:
         logger.info(f"[{self.character_name}] -> {source}: {reply!r}")
 
         self._update_discourse_async(source)
+        # Post-turn reflection: decide whether anything from this exchange
+        # should land in long-term memory. Runs after companion update so
+        # the reflection prompt can see the latest companion state and
+        # avoid duplicating it.
+        memories_written = self._reflect_and_remember(source)
+
+        # Trace write deferred to here so it can include memories written
+        # during reflection. Skipped if we never entered the ReAct loop
+        # (no iters means the crash path above caught a pre-loop error).
+        if iters:
+            self._write_react_trace(
+                source, text, log, iters, reply, exit_reason,
+                recall=recall, memories_written=memories_written)
 
         if close:
             self.store.close_dialog(source)
