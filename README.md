@@ -6,6 +6,17 @@ A research framework for autonomous agents with incremental planning, persistent
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
+## Project Direction (April 2026)
+
+The chat-mode subproject (`src/chat/`) is becoming the primary interface. It already provides:
+
+- **ReAct tool use** — web search, full-page fetch, in-context text transformation, with per-iteration tracing
+- **Long-term memory** — per-character `memories` collection with categorized recall (`fact` / `preference` / `commitment`), auto-RAG injection at turn start, and post-turn reflection that suppresses writes from hypothetical / role-play / counterfactual frames
+- **Companion Model + Discourse tracking** — single-user fair-witness texture and outstanding-discourse state, persisted across sessions
+- **Unified cloud-LLM config** — `api_key` field naming an env var triggers Bearer-auth POST to any OpenAI-compatible endpoint (MIMO, OpenRouter, OpenAI, hosted vLLM, …); legacy server shortcuts still work
+
+The full executive-node architecture described below — continuous OODA planner, incremental planner, cognitive graph, concerns, sensors — remains operational, but future development is shifting to chat mode. **Concerns and sensors are the main pieces that still need to be ported into chat before executive-mode components can be retired.** This is a stated intention, not a present-day rewrite; the executive path is still fully usable today and is what runs by default for `jill-infospace*.yaml` scenarios. Chat mode runs from `jill-chat*.yaml` scenarios via the same launcher.
+
 ## What This Is
 
 Cognitive Workbench is experimental research software for studying LLM-based cognitive architectures. It prioritizes **inspectable agent behavior** and fast iteration over stability.
@@ -167,19 +178,22 @@ A Chrome extension that captures page visits and feeds them to the agent via the
 
 ## Available Scenarios
 
-| Scenario | World | Backend |
-|----------|-------|---------|
-| `jill-infospace.yaml` | Core infospace | SGLang (local GPU) |
-| `jill-infospace-openrouter.yaml` | Core infospace | OpenRouter (cloud) |
-| `jill-infospace-anthropic.yaml` | Core infospace | Anthropic Claude |
-| `jill-infospace-openai.yaml` | Core infospace | OpenAI |
-| `jill-infospace-vllm.yaml` | Core infospace | vLLM (local GPU) |
-| `jill-fs.yaml` | File system | SGLang |
-| `jill-fs-openrouter.yaml` | File system | OpenRouter (cloud) |
-| `jill-minecraft.yaml` | Minecraft 3D world | SGLang |
-| `jill-osworld.yaml` | Desktop automation | SGLang |
-| `jill-scienceworld.yaml` | Science simulation | SGLang |
-| `jack-and-jill.yaml` | Multi-agent | SGLang |
+| Scenario | Mode | World | Backend |
+|----------|------|-------|---------|
+| `jill-chat.yaml` | **Chat (primary)** | Chat-only world | OpenAI-compatible local server |
+| `jill-chat-vllm.yaml` | Chat | Chat-only world | vLLM (local GPU) |
+| `jill-chat-mimo.yaml` | Chat | Chat-only world | MIMO cloud (unified `api_key` form) |
+| `jill-infospace.yaml` | Executive (legacy) | Core infospace | SGLang (local GPU) |
+| `jill-infospace-openrouter.yaml` | Executive (legacy) | Core infospace | OpenRouter (cloud) |
+| `jill-infospace-anthropic.yaml` | Executive (legacy) | Core infospace | Anthropic Claude |
+| `jill-infospace-openai.yaml` | Executive (legacy) | Core infospace | OpenAI |
+| `jill-infospace-vllm.yaml` | Executive (legacy) | Core infospace | vLLM (local GPU) |
+| `jill-fs.yaml` | Executive | File system | SGLang |
+| `jill-fs-openrouter.yaml` | Executive | File system | OpenRouter (cloud) |
+| `jill-minecraft.yaml` | Executive | Minecraft 3D world | SGLang |
+| `jill-osworld.yaml` | Executive | Desktop automation | SGLang |
+| `jill-scienceworld.yaml` | Executive | Science simulation | SGLang |
+| `jack-and-jill.yaml` | Executive | Multi-agent | SGLang |
 
 See [Configuration](docs/configuration.md) for details on each.
 
@@ -194,12 +208,14 @@ Cognitive_workbench/
 ├── scenarios/                         # Scenario YAML files + runtime data
 ├── browser_extension/                 # Chrome extension for page visit tracking
 └── src/
-    ├── launcher.py                    # Entry point
-    ├── executive_node.py              # Main tick coordinator, fast-path chat, goal lifecycle
-    ├── ooda_planner.py                # Continuous OODA planner (strategic loop)
-    ├── incremental_planner.py         # Inner goal planner (tool-using execution loop)
+    ├── launcher.py                    # Entry point — dispatches by scenario `mode`
+    ├── chat/                          # Chat-mode subproject (becoming primary)
+    │   └── chat_loop.py               #   ReAct loop, memories collection, fetch_text, unified cloud LLM
+    ├── executive_node.py              # Main tick coordinator, fast-path chat, goal lifecycle (legacy)
+    ├── ooda_planner.py                # Continuous OODA planner (legacy)
+    ├── incremental_planner.py         # Inner goal planner (legacy)
     ├── infospace_executor.py           # Primitives + tool execution
-    ├── infospace_resource_manager.py   # Notes/Collections/Relations + FAISS
+    ├── infospace_resource_manager.py   # Notes/Collections/Relations + FAISS (shared by chat and executive)
     ├── entity_index.py                # NER extraction, entity index, graph integration
     ├── cognitive_graph.py             # Typed event graph — reflective computational trace
     ├── conversation_store.py          # Dialog lifecycle, archival, session backfill
