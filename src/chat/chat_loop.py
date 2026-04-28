@@ -70,6 +70,30 @@ _MEMORY_CATEGORIES = ('fact', 'preference', 'commitment')
 # entirely — the asymmetric cost of a poisoned memory is worse than
 # missing one we'll re-encounter.
 _REFLECT_FRAME_OK = 'none'
+
+# Per-character collection holding actionable directives to keep on hand —
+# distinct from memories (which are stable specifics to recall). A concern
+# is something Jill can reasonably expect to act on as an instruction;
+# preferences (modifiers like "be brief") stay in memories.
+_CONCERNS_COLLECTION_NAME = "concerns"
+_CONCERN_CATEGORIES = ('one_shot', 'durable', 'derived')
+_CONCERN_STATUSES = ('active', 'satisfied', 'abandoned')
+
+# Decay tau in days, per concern category. Effective weight at read time
+# is exp(-(now - last_engaged_at) / tau), starting from 1.0 at engagement.
+# Recall hits refresh last_engaged_at. When effective weight drops below
+# the satisfied threshold, the concern transitions from active to satisfied
+# (lazy — computed on read, no background sweep).
+_CONCERN_DECAY_TAU_DAYS = {
+    'one_shot': 1.0,    # ~3 days to drop below 0.05
+    'derived':  7.0,    # ~3 weeks to drop below 0.05
+    'durable':  30.0,   # ~3 months to drop below 0.05
+}
+_CONCERN_SATISFIED_THRESHOLD = 0.1
+# Top-N active concerns surfaced into the system prompt always-on (in
+# addition to anything semantic-recall fishes out). Bounded so the prompt
+# can't blow up as the corpus grows.
+_CONCERN_ALWAYS_ON_BUDGET = 5
 # Trim observation text from fetch_text before it lands in the working log.
 # Bigger than search synthesis (which is already digested) since fetch_text
 # is raw page text — but bounded so a single fetch can't blow the prompt.
@@ -308,6 +332,19 @@ class ChatLoop:
         self._companion_state: Dict[str, str] = {}
         self._restore_chat_state_from_notes()
 
+        # ---- Concurrency primitives (must precede anything FAISS-touching) ----
+        # _faiss_lock serializes the one cross-thread FAISS race: main
+        # thread `_recall` reading the memories collection vs background
+        # thread `_remember` writing to it. FAISS is not thread-safe and
+        # releases the GIL during its C calls.
+        # _post_turn_executor: single-worker pool for discourse + reflection
+        # so the main thread returns to the inbox immediately after publishing.
+        self._faiss_lock = threading.Lock()
+        self._post_turn_executor = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix=f'chat-{character_name}-postturn',
+        )
+
         # ---- Long-term memory (cross-conversation, per-character) ----
         # A 'memories' Collection holds episodic specifics that should
         # survive past the rolling Companion summary. Auto-RAG queries it
@@ -315,31 +352,22 @@ class ChatLoop:
         self._memories_collection_id: Optional[str] = None
         self._init_memories()
 
+        # ---- Concerns (actionable directives, separate from memories) ----
+        # A 'concerns' Collection holds standalone instructions Jill should
+        # be ready to advance — distinct from preferences (modifiers) and
+        # facts (specifics). Lifecycle: active → satisfied via lazy decay,
+        # → abandoned only via explicit user revocation. Seeded from the
+        # YAML `concerns:` block on first launch; reflection adds derived
+        # concerns at turn end; recall surfaces them in the system prompt.
+        self._concerns_collection_id: Optional[str] = None
+        self._init_concerns()
+        self._seed_concerns_from_config(character_config)
+
         # ---- Zenoh wiring ----
         self._inbox: "queue.Queue[dict]" = queue.Queue()
         self._zenoh_session = None
         self._action_pub = None
         self._sense_sub = None
-
-        # ---- Post-turn background work ----
-        # Discourse update + reflection are LLM-bound (~5-15s combined) and
-        # are conceptually side effects of the turn, not part of producing
-        # the response. They run in a single-worker executor so the main
-        # thread can return to listening for the next inbox message
-        # immediately after publishing. Single worker (not a thread pool)
-        # keeps reflection ordered relative to the turns it summarizes and
-        # bounds resource use under message bursts.
-        #
-        # _faiss_lock serializes the one cross-thread FAISS race: main
-        # thread `_recall` reading the memories collection vs background
-        # thread `_remember` writing to it. FAISS is not thread-safe and
-        # releases the GIL during its C calls, so concurrent add/search
-        # on the same store can corrupt the index.
-        self._faiss_lock = threading.Lock()
-        self._post_turn_executor = ThreadPoolExecutor(
-            max_workers=1,
-            thread_name_prefix=f'chat-{character_name}-postturn',
-        )
 
     # ------------------------------------------------------------------
     # LLM helper (used by character_evaluator and DiscourseTracker)
@@ -612,6 +640,278 @@ class ChatLoop:
             logger.warning(f"[{self.character_name}] _recall failed: {e}")
             return []
 
+    # ------------------------------------------------------------------
+    # Concerns — actionable directives Jill should keep ready to advance.
+    # Distinct from memories (stable specifics): a concern is something
+    # she can reasonably expect to act on as an instruction; a preference
+    # ("be brief") is a modifier that stays in memories.
+    #
+    # Lifecycle is lazy: weight = exp(-(now - last_engaged_at) / tau)
+    # is computed at read time. Recall hits refresh last_engaged_at.
+    # When weight drops below _CONCERN_SATISFIED_THRESHOLD the concern
+    # transitions active → satisfied at the next read, except for seed
+    # concerns (architectural baseline from YAML, immune to decay).
+    # ------------------------------------------------------------------
+
+    def _init_concerns(self) -> None:
+        """Get-or-create the concerns Collection, mark it persistent,
+        ensure semantic index exists. Idempotent across restarts."""
+        try:
+            cid = self.resource_manager.named_collections.get(_CONCERNS_COLLECTION_NAME)
+            if not cid:
+                success, cid, err, _ = self.resource_manager.create_collection(
+                    self.character_name, [], "list", "chat-loop", "",
+                    _CONCERNS_COLLECTION_NAME,
+                    {"kind": "concerns"},
+                )
+                if not success or not cid:
+                    logger.warning(f"[{self.character_name}] create concerns collection failed: {err}")
+                    return
+            self.resource_manager.mark_persistent(cid, self.character_name)
+            self.resource_manager.index_collection(self.character_name, cid, index_type='semantic')
+            self._concerns_collection_id = cid
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] _init_concerns failed: {e}")
+
+    @staticmethod
+    def _seed_concern_name(idx: int) -> str:
+        return f"chat:concern:seed:{idx}"
+
+    def _seed_concerns_from_config(self, character_config: dict) -> None:
+        """Instantiate concerns listed under YAML key `concerns:` if they
+        don't already exist. Each seed gets a stable named-note slot so
+        re-init is idempotent. Seed concerns carry seed=True and are
+        immune to decay-induced satisfaction (they're architectural
+        baseline, not ephemeral user-derived content)."""
+        seeds = character_config.get('concerns') or []
+        if not isinstance(seeds, list) or not self._concerns_collection_id:
+            return
+        for idx, seed in enumerate(seeds):
+            if not isinstance(seed, dict):
+                continue
+            text = str(seed.get('text', '') or '').strip()
+            if not text:
+                continue
+            category = str(seed.get('category', 'durable') or 'durable').lower()
+            if category not in _CONCERN_CATEGORIES:
+                category = 'durable'
+            entity = str(seed.get('entity', 'User') or 'User')
+            name = self._seed_concern_name(idx)
+            if name in self.resource_manager.named_notes:
+                continue  # Already seeded; preserve any edits
+            self._add_concern(text, category=category, entity=entity,
+                              provenance='asserted', seed=True, name=name)
+
+    def _add_concern(self, text: str, category: str = 'durable',
+                     entity: str = 'User', provenance: str = 'asserted',
+                     seed: bool = False, name: str = '') -> Optional[str]:
+        """Create a new concern note and add it to the concerns Collection.
+        Returns the new note_id, or None on failure. Held under
+        _faiss_lock for the same reason _remember is."""
+        if not self._concerns_collection_id:
+            return None
+        text = (text or "").strip()
+        if not text:
+            return None
+        if category not in _CONCERN_CATEGORIES:
+            category = 'durable'
+        if provenance not in ('asserted', 'inferred'):
+            provenance = 'inferred' if category == 'derived' else 'asserted'
+        now_iso = datetime.now(timezone.utc).isoformat()
+        try:
+            with self._faiss_lock:
+                success, note_id, err, _ = self.resource_manager.create_note(
+                    self.character_name, text, "text", "chat-loop", entity or "",
+                    name or "",
+                    {
+                        "kind": "concern",
+                        "category": category,
+                        "status": "active",
+                        "entity": entity,
+                        "provenance": provenance,
+                        "seed": bool(seed),
+                        "last_engaged_at": now_iso,
+                    },
+                )
+                if not success or not note_id:
+                    logger.warning(f"[{self.character_name}] concern create failed: {err}")
+                    return None
+                self.resource_manager.mark_persistent(note_id, self.character_name)
+                ok, _, add_err = self.resource_manager.add_to_collection(
+                    self._concerns_collection_id, note_id, self.character_name)
+                if not ok:
+                    logger.warning(f"[{self.character_name}] concern add_to_collection failed: {add_err}")
+                return note_id
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] _add_concern failed: {e}")
+            return None
+
+    @staticmethod
+    def _concern_decayed_weight(properties: Dict[str, Any]) -> float:
+        """Weight = exp(-Δdays / tau) where Δ is now − last_engaged_at and
+        tau depends on category. Returns 0.0 for malformed timestamps."""
+        import math
+        try:
+            last_iso = properties.get('last_engaged_at') or properties.get('created_at')
+            if not last_iso:
+                return 0.0
+            last = datetime.fromisoformat(str(last_iso))
+            if last.tzinfo is None:
+                last = last.replace(tzinfo=timezone.utc)
+            delta_days = (datetime.now(timezone.utc) - last).total_seconds() / 86400.0
+            cat = str(properties.get('category', 'durable') or 'durable').lower()
+            tau = _CONCERN_DECAY_TAU_DAYS.get(cat, _CONCERN_DECAY_TAU_DAYS['durable'])
+            if tau <= 0:
+                return 1.0
+            return math.exp(-max(0.0, delta_days) / tau)
+        except Exception:
+            return 0.0
+
+    def _maybe_transition_to_satisfied(self, note: Dict[str, Any], weight: float) -> bool:
+        """Lazy transition: if weight is below threshold and this isn't a
+        seed concern, mark active → satisfied in place. Returns True if
+        the transition fired (caller should skip surfacing this concern)."""
+        props = note.get('properties') or {}
+        if props.get('status') != 'active':
+            return props.get('status') != 'active'
+        if props.get('seed'):
+            return False
+        if weight >= _CONCERN_SATISFIED_THRESHOLD:
+            return False
+        props['status'] = 'satisfied'
+        return True
+
+    def _refresh_concern_engagement(self, note_id: str) -> None:
+        """Reset last_engaged_at to now for one concern note. Called when
+        a concern surfaces via semantic recall."""
+        note = self.resource_manager.get_resource(note_id)
+        if not note:
+            return
+        props = note.setdefault('properties', {})
+        props['last_engaged_at'] = datetime.now(timezone.utc).isoformat()
+
+    def _iter_active_concerns(self) -> List[Tuple[str, Dict[str, Any], float]]:
+        """Iterate the concerns collection and return (note_id, note,
+        weight) for every active concern. Performs lazy decay transitions
+        as a side effect — after this call, any concern whose decayed
+        weight fell below the threshold has its status flipped to
+        satisfied (except seed concerns)."""
+        if not self._concerns_collection_id:
+            return []
+        coll = self.resource_manager.get_resource(self._concerns_collection_id)
+        if not coll:
+            return []
+        note_ids = (coll.get('properties') or {}).get('content', []) or []
+        out: List[Tuple[str, Dict[str, Any], float]] = []
+        for nid in note_ids:
+            note = self.resource_manager.get_resource(nid)
+            if not note:
+                continue
+            props = note.get('properties') or {}
+            if props.get('status') != 'active':
+                continue
+            w = self._concern_decayed_weight(props)
+            if self._maybe_transition_to_satisfied(note, w):
+                continue
+            out.append((nid, note, w))
+        return out
+
+    def _top_active_concerns(self, n: int = _CONCERN_ALWAYS_ON_BUDGET
+                             ) -> List[Tuple[str, str, str, float]]:
+        """Return up to n active concerns ranked by current decayed
+        weight, descending. Tuple shape: (note_id, text, category, weight).
+        No reinforcement — top-N surfacing alone doesn't refresh engagement."""
+        active = self._iter_active_concerns()
+        active.sort(key=lambda t: t[2], reverse=True)
+        out: List[Tuple[str, str, str, float]] = []
+        for nid, note, w in active[:max(0, n)]:
+            props = note.get('properties') or {}
+            text = str(props.get('content', '') or '').strip()
+            if not text:
+                continue
+            cat = str(props.get('category', 'durable') or 'durable')
+            out.append((nid, text, cat, w))
+        return out
+
+    def _recall_concerns(self, query: str, k: int = 3,
+                         threshold: float = 0.5) -> List[Tuple[str, str, str, float]]:
+        """Semantic recall over the concerns collection. Hits refresh
+        last_engaged_at on the source notes. Returns (note_id, text,
+        category, weight) tuples for active matches."""
+        if not self._concerns_collection_id or not query:
+            return []
+        try:
+            with self._faiss_lock:
+                ok, results, err = self.resource_manager.search_collection(
+                    self.character_name, self._concerns_collection_id, query,
+                    mode='semantic', limit=k, threshold=threshold)
+            if not ok or not results:
+                return []
+            out: List[Tuple[str, str, str, float]] = []
+            for r in results:
+                if not isinstance(r, dict):
+                    continue
+                doc = r.get('document')
+                if not isinstance(doc, str) or not doc.strip():
+                    continue
+                meta = r.get('metadata') or {}
+                note_id = meta.get('source_note_id')
+                if not note_id:
+                    continue
+                note = self.resource_manager.get_resource(note_id)
+                if not note:
+                    continue
+                props = note.get('properties') or {}
+                if props.get('status') != 'active':
+                    continue
+                # Reinforce: hits refresh last_engaged_at, then we
+                # recompute weight so the returned tuple reflects the
+                # post-refresh value (close to 1.0).
+                self._refresh_concern_engagement(note_id)
+                w = self._concern_decayed_weight(note.get('properties') or {})
+                cat = str(props.get('category', 'durable') or 'durable')
+                out.append((note_id, doc.strip(), cat, w))
+            return out
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] _recall_concerns failed: {e}")
+            return []
+
+    def _get_concerns_for_prompt(self, query: str
+                                 ) -> List[Tuple[str, str]]:
+        """Combined concern surface for the system prompt. Union of:
+          - semantic recall on the user's input (reinforces matches)
+          - top-N active concerns by current weight (always-on budget)
+        Deduped by note_id; ordering: recall hits first (most relevant
+        to this turn), then top-N filler. Returns (text, category)."""
+        seen: set = set()
+        out: List[Tuple[str, str]] = []
+        for nid, text, cat, _w in self._recall_concerns(query, k=3):
+            if nid in seen:
+                continue
+            seen.add(nid)
+            out.append((text, cat))
+        for nid, text, cat, _w in self._top_active_concerns():
+            if nid in seen:
+                continue
+            seen.add(nid)
+            out.append((text, cat))
+        return out
+
+    def _set_concern_status(self, concern_id: str, new_status: str
+                            ) -> Tuple[bool, Optional[str]]:
+        """Manual status transition (for browser-driven abandon/close).
+        Returns (ok, error_message)."""
+        if new_status not in _CONCERN_STATUSES:
+            return False, f"invalid status {new_status!r}"
+        note = self.resource_manager.get_resource(concern_id)
+        if not note:
+            return False, f"concern {concern_id} not found"
+        props = note.get('properties') or {}
+        if props.get('kind') != 'concern':
+            return False, f"{concern_id} is not a concern"
+        props['status'] = new_status
+        return True, None
+
     # Reflection prompt: extract durable episodic specifics from the latest
     # exchange. Two-stage decision:
     #   (a) Frame check. If the exchange is a hypothetical / role-play /
@@ -626,7 +926,7 @@ class ChatLoop:
     # fresh re-read" — names, places, commitments, stable preferences.
     _REFLECT_SYS = (
         "You watch chats between {character} and {entity}. Your job has "
-        "two stages.\n\n"
+        "three stages.\n\n"
         "STAGE 1 — Frame check. Classify the latest exchange as one of:\n"
         "- `hypothetical`: 'imagine that…', 'suppose…', 'what if…'\n"
         "- `roleplay`: user asked {character} to take on a persona, character, or voice\n"
@@ -634,41 +934,63 @@ class ChatLoop:
         "- `instructional`: user is teaching {character} how to behave, not stating facts\n"
         "- `none`: a real exchange where statements about {entity}, the world, or "
         "agreements between you carry their literal weight\n"
-        "If the frame is anything other than `none`, return memories=[]. "
-        "When in doubt, prefer the more conservative classification — a "
-        "wrongly-saved hypothetical poisons future recall.\n\n"
-        "STAGE 2 — If frame is `none`, extract durable specifics that should "
-        "survive into FUTURE conversations.\n"
-        "CAPTURE:\n"
+        "If the frame is anything other than `none`, return memories=[] AND "
+        "concerns=[]. When in doubt, prefer the more conservative classification.\n\n"
+        "STAGE 2 — Memories. If frame is `none`, extract stable specifics "
+        "that should survive into FUTURE conversations.\n"
+        "CAPTURE as memories:\n"
         "- Personal facts the user shared (names, places, relationships) → category=`fact`\n"
         "- Long-running project/work context → category=`fact`\n"
-        "- Stable preferences expressed plainly → category=`preference`\n"
-        "- Specific commitments or follow-ups agreed (with timeframe if given) → category=`commitment`\n"
-        "SKIP:\n"
+        "- Stable preferences expressed plainly (modifiers, not actions) → category=`preference`\n"
+        "- Specific commitments or follow-ups agreed → category=`commitment`\n"
+        "SKIP from memories:\n"
         "- Pleasantries, mood, conversational tone (companion handles these).\n"
         "- Anything already in the companion model verbatim.\n"
-        "- One-off questions with no stable signal (\"what's the weather\").\n"
-        "- Brainstorm content the user has not affirmed.\n\n"
+        "- One-off questions with no stable signal.\n\n"
+        "STAGE 3 — Concerns. Distinct from memories. A concern is an "
+        "ACTIONABLE INSTRUCTION {character} should be ready to advance — "
+        "something she can reasonably take action on, not a fact or modifier. "
+        "Capture concerns at THREE granularities:\n"
+        "- `one_shot`: a specific request the user made that has a clear "
+        "completion (\"look up X\", \"draft me an email about Y\"). Decays "
+        "fast.\n"
+        "- `durable`: an ongoing directive {entity} expects {character} to "
+        "uphold over time (\"keep me posted on X\", \"help me think through "
+        "my dissertation\"). Decays slowly.\n"
+        "- `derived`: something {character} noticed worth tracking that the "
+        "user did NOT explicitly request (\"user keeps coming back to topic "
+        "X\"). Use sparingly — only when there's substantive evidence in the "
+        "exchange.\n"
+        "SKIP from concerns:\n"
+        "- Modifiers like \"be brief\" / \"don't use emoji\" — those go to "
+        "memories as preferences, not concerns.\n"
+        "- Items already covered by an existing concern in the system prompt.\n"
+        "- Speculative inferences without textual support.\n\n"
         "Output ONLY this JSON shape — nothing else:\n"
-        "  {{\"frame\": \"<one of: hypothetical|roleplay|counterfactual|instructional|none>\", "
+        "  {{\"frame\": \"<hypothetical|roleplay|counterfactual|instructional|none>\", "
         "\"memories\": [{{\"text\": \"<≤200 chars, third-person about {entity}>\", "
-        "\"category\": \"<fact|preference|commitment>\"}}, …]}}\n"
+        "\"category\": \"<fact|preference|commitment>\"}}, …], "
+        "\"concerns\": [{{\"text\": \"<≤200 chars, action-oriented "
+        "third-person directive>\", \"category\": \"<one_shot|durable|derived>\"}}, …]}}\n"
         "If nothing qualifies (or frame≠none): "
-        "{{\"frame\": \"<value>\", \"memories\": []}}. No prose."
+        "{{\"frame\": \"<value>\", \"memories\": [], \"concerns\": []}}. No prose."
     )
 
-    def _reflect_and_remember(self, source: str) -> List[str]:
+    def _reflect_and_remember(self, source: str) -> Tuple[List[str], List[str]]:
         """Run a single reflection LLM call over the latest exchange; for any
-        memory strings returned, persist them. Returns the list written (for
-        trace/logging). Failure-tolerant: any error path returns []."""
+        memories AND concerns returned, persist them. Returns (memories_written,
+        concerns_written). Failure-tolerant: any error path returns ([], [])."""
         if not self._memories_collection_id:
-            return []
+            return ([], [])
         try:
             dialog = self._build_dialog(source, limit=4)
             if not dialog:
-                return []
+                return ([], [])
             convo = "\n".join(f"{t['source']}: {t['text']}" for t in dialog)
             companion = self._companion_state.get(source, '').strip()
+            # Show the LLM the active concerns so it doesn't re-derive ones
+            # we already track. Compact: text + category badge.
+            existing_concerns = self._top_active_concerns(n=10)
             sys_msg = self._REFLECT_SYS.format(
                 character=self.character_name, entity=source)
             user_parts = []
@@ -676,17 +998,22 @@ class ChatLoop:
                 user_parts.append(
                     "## Existing companion model (do NOT re-extract from this; "
                     "use only to avoid duplicates)\n" + companion)
+            if existing_concerns:
+                lines = [f"- [{cat}] {text}" for _nid, text, cat, _w in existing_concerns]
+                user_parts.append(
+                    "## Existing active concerns (do NOT re-emit; emit only "
+                    "NEW concerns this exchange surfaced)\n" + "\n".join(lines))
             user_parts.append("## Latest exchange\n" + convo)
             user_parts.append(
-                "Return the JSON object now (keys: frame, memories). "
-                "memories=[] if frame≠none or nothing qualifies.")
+                "Return the JSON object now (keys: frame, memories, concerns). "
+                "Both lists empty if frame≠none or nothing qualifies.")
             result = self._llm_generate(
                 [{'role': 'system', 'content': sys_msg},
                  {'role': 'user', 'content': "\n\n".join(user_parts)}],
                 max_tokens=4096, temperature=0.3, is_json=True,
                 cot_profile='none')
             if not result.success:
-                return []
+                return ([], [])
             payload = result.text
             # Salvage: cloud LLMs may return text instead of parsed JSON.
             if isinstance(payload, str):
@@ -695,81 +1022,95 @@ class ChatLoop:
                     try:
                         payload = json.loads(stripped)
                     except Exception:
-                        return []
+                        return ([], [])
                 else:
-                    return []
+                    return ([], [])
 
-            frame, raw_memories = self._parse_reflection_payload(payload)
+            frame, raw_memories, raw_concerns = self._parse_reflection_payload(payload)
 
             if frame != _REFLECT_FRAME_OK:
                 logger.info(
                     f"[{self.character_name}] reflection suppressed "
-                    f"(frame={frame!r}) — no memories written")
-                return []
-            if not raw_memories:
-                return []
-            written: List[str] = []
+                    f"(frame={frame!r}) — no memories/concerns written")
+                return ([], [])
+
+            mems_written: List[str] = []
             for text, category in raw_memories:
                 if len(text) > 240:
                     text = text[:240].rstrip()
                 if self._remember(text, entity=source, category=category):
-                    written.append(text)
-            if written:
+                    mems_written.append(text)
+
+            cons_written: List[str] = []
+            for text, category in raw_concerns:
+                if len(text) > 240:
+                    text = text[:240].rstrip()
+                # Concerns derived by reflection: provenance follows category.
+                # one_shot/durable typically come from explicit user requests
+                # (asserted); derived is by definition inferred.
+                provenance = 'inferred' if category == 'derived' else 'asserted'
+                if self._add_concern(text, category=category, entity=source,
+                                     provenance=provenance, seed=False):
+                    cons_written.append(text)
+
+            if mems_written or cons_written:
                 logger.info(
-                    f"[{self.character_name}] remembered {len(written)} "
-                    f"item(s) from {source}")
-            return written
+                    f"[{self.character_name}] reflection wrote "
+                    f"{len(mems_written)} memory(s), "
+                    f"{len(cons_written)} concern(s) from {source}")
+            return (mems_written, cons_written)
         except Exception as e:
             logger.warning(f"[{self.character_name}] _reflect_and_remember failed: {e}")
-            return []
+            return ([], [])
 
     @staticmethod
-    def _parse_reflection_payload(payload: Any) -> Tuple[str, List[Tuple[str, str]]]:
-        """Normalize reflection output to (frame, [(text, category), …]).
+    def _parse_reflection_payload(payload: Any
+                                  ) -> Tuple[str, List[Tuple[str, str]], List[Tuple[str, str]]]:
+        """Normalize reflection output to (frame, memories, concerns) where
+        each list contains (text, category) tuples.
 
         Accepts:
-          - New shape: {"frame": "...", "memories": [{"text": ..., "category": ...}, …]}
-          - New shape with bare strings inside memories (legacy-tolerant
-            within the new envelope): {"frame": "...", "memories": ["str", …]}
-          - Old shape: bare list of strings (no frame envelope) — assume
-            frame=none for backward compat with older models.
-        Anything else returns ('unknown', []) — caller treats non-`none`
-        frame as a suppression signal, so this fails safe.
+          - New envelope: {"frame": "...", "memories": [...], "concerns": [...]}
+            with each list of {text, category} dicts (or bare strings).
+          - Legacy envelope without `concerns`: still parses, concerns=[].
+          - Bare list of strings: assumed frame=none, treated as memories.
+        Anything else returns ('unknown', [], []) — caller treats non-`none`
+        frame as a suppression signal so this fails safe.
         """
-        # Old shape — bare list. Assume frame=none.
-        if isinstance(payload, list):
-            mems: List[Tuple[str, str]] = []
-            for item in payload:
+
+        def _normalize_items(raw: Any, allowed: Tuple[str, ...],
+                             default_cat: str) -> List[Tuple[str, str]]:
+            out: List[Tuple[str, str]] = []
+            if not isinstance(raw, list):
+                return out
+            for item in raw:
                 if isinstance(item, str) and item.strip():
-                    mems.append((item.strip(), 'fact'))
+                    out.append((item.strip(), default_cat))
                 elif isinstance(item, dict):
                     t = str(item.get('text', '') or '').strip()
-                    c = str(item.get('category', 'fact') or 'fact').strip().lower()
-                    if c not in _MEMORY_CATEGORIES:
-                        c = 'fact'
+                    c = str(item.get('category', default_cat) or default_cat).strip().lower()
+                    if c not in allowed:
+                        c = default_cat
                     if t:
-                        mems.append((t, c))
-            return (_REFLECT_FRAME_OK, mems)
+                        out.append((t, c))
+            return out
 
-        # New shape — object with frame + memories.
+        # Old shape — bare list. Assume frame=none.
+        if isinstance(payload, list):
+            return (_REFLECT_FRAME_OK,
+                    _normalize_items(payload, _MEMORY_CATEGORIES, 'fact'),
+                    [])
+
+        # New envelope.
         if isinstance(payload, dict):
             frame = str(payload.get('frame', '') or '').strip().lower() or 'unknown'
-            raw = payload.get('memories', []) or []
-            mems = []
-            if isinstance(raw, list):
-                for item in raw:
-                    if isinstance(item, str) and item.strip():
-                        mems.append((item.strip(), 'fact'))
-                    elif isinstance(item, dict):
-                        t = str(item.get('text', '') or '').strip()
-                        c = str(item.get('category', 'fact') or 'fact').strip().lower()
-                        if c not in _MEMORY_CATEGORIES:
-                            c = 'fact'
-                        if t:
-                            mems.append((t, c))
-            return (frame, mems)
+            mems = _normalize_items(payload.get('memories', []),
+                                    _MEMORY_CATEGORIES, 'fact')
+            cons = _normalize_items(payload.get('concerns', []),
+                                    _CONCERN_CATEGORIES, 'durable')
+            return (frame, mems, cons)
 
-        return ('unknown', [])
+        return ('unknown', [], [])
 
     # ------------------------------------------------------------------
     # Zenoh wiring
@@ -788,8 +1129,8 @@ class ChatLoop:
             self._on_sense_data,
         )
 
-        # Resource queryables for resource_browser. Chat mode exposes only the
-        # Notes/Collections surface; concerns and graph remain executive-only.
+        # Resource queryables for resource_browser. Chat mode now exposes
+        # Notes, Collections, AND concerns (graph still executive-only).
         self._resources_list_q = self._zenoh_session.declare_queryable(
             f"cognitive/{self.character_name}/resources",
             self._handle_resources_list_query,
@@ -807,6 +1148,18 @@ class ChatLoop:
         self._resource_by_id_q = self._zenoh_session.declare_queryable(
             f"cognitive/{self.character_name}/resource/*",
             self._handle_resource_by_id_query,
+        )
+        # Concerns queryables. The browser frontend already expects the
+        # executive's shape (user_concerns + derived_concerns + activations);
+        # _handle_concerns_query adapts chat's flat concerns collection to
+        # that shape so the existing UI works unchanged.
+        self._concerns_q = self._zenoh_session.declare_queryable(
+            f"cognitive/{self.character_name}/concerns",
+            self._handle_concerns_query,
+        )
+        self._concern_manage_q = self._zenoh_session.declare_queryable(
+            f"cognitive/{self.character_name}/control/concern_manage",
+            self._handle_concern_manage_query,
         )
 
         logger.info(
@@ -1244,6 +1597,151 @@ class ChatLoop:
             self._reply(query, {'success': False, 'error': str(e)})
 
     # ------------------------------------------------------------------
+    # Concern queryables (browser-facing).
+    # The Resource Browser frontend expects the executive's shape
+    # ({user_concerns: [...], derived_concerns: [...], activations: {}});
+    # we adapt chat's single concerns collection to that split:
+    #   - user_concerns  = category in (one_shot, durable). Status remap:
+    #                      active→open, satisfied→closed, abandoned→abandoned
+    #                      so the UI's user-concern color/label code (which
+    #                      checks "open"/"closed") works unchanged.
+    #   - derived_concerns = category == derived. Status passthrough.
+    # ------------------------------------------------------------------
+
+    _USER_CONCERN_STATUS_MAP = {'active': 'open', 'satisfied': 'closed',
+                                'abandoned': 'abandoned'}
+
+    def _serialize_concern(self, note_id: str, note: Dict[str, Any],
+                           is_user_kind: bool) -> Dict[str, Any]:
+        """Build a dict matching the field names the resource_browser
+        frontend looks for. The browser falls back gracefully through
+        concern_description || description, concern_label || name, etc.,
+        so we populate both forms to keep the UI working."""
+        props = note.get('properties') or {}
+        text = str(props.get('content', '') or '')
+        status = props.get('status', 'active')
+        if is_user_kind:
+            status = self._USER_CONCERN_STATUS_MAP.get(status, status)
+        # Compact label for the list-row heading: first line, capped.
+        first_line = text.split('\n', 1)[0].strip()
+        if len(first_line) > 60:
+            label = first_line[:60].rstrip() + '…'
+        else:
+            label = first_line or note_id
+        return {
+            # IDs (browser checks concern_id first, falls back to id)
+            'concern_id': note_id,
+            'id': note_id,
+            # Headings (browser checks concern_label || name)
+            'concern_label': label,
+            'name': label,
+            # Body text (browser checks concern_description || description)
+            'concern_description': text,
+            'description': text,
+            # State + lifecycle
+            'category': props.get('category', 'durable'),
+            'status': status,
+            'weight': self._concern_decayed_weight(props),
+            'provenance': props.get('provenance', 'asserted'),
+            'origin': 'seed' if props.get('seed') else 'reflection',
+            'seed': bool(props.get('seed', False)),
+            'entity': props.get('entity', ''),
+            'created_at': props.get('created_at', ''),
+            'created': props.get('created_at', ''),
+            'last_engaged_at': props.get('last_engaged_at', ''),
+            'recency': props.get('last_engaged_at', ''),
+        }
+
+    def _all_concerns_split(self) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """Iterate the concerns collection and split by category for the
+        browser API. No status filtering — browser shows all states."""
+        if not self._concerns_collection_id:
+            return ([], [])
+        coll = self.resource_manager.get_resource(self._concerns_collection_id)
+        if not coll:
+            return ([], [])
+        note_ids = (coll.get('properties') or {}).get('content', []) or []
+        user_concerns: List[Dict[str, Any]] = []
+        derived_concerns: List[Dict[str, Any]] = []
+        for nid in note_ids:
+            note = self.resource_manager.get_resource(nid)
+            if not note:
+                continue
+            cat = (note.get('properties') or {}).get('category', 'durable')
+            if cat == 'derived':
+                derived_concerns.append(self._serialize_concern(nid, note, is_user_kind=False))
+            else:
+                user_concerns.append(self._serialize_concern(nid, note, is_user_kind=True))
+        return (user_concerns, derived_concerns)
+
+    def _handle_concerns_query(self, query) -> None:
+        try:
+            user_concerns, derived_concerns = self._all_concerns_split()
+            self._reply(query, {
+                'success': True,
+                'user_concerns': user_concerns,
+                'derived_concerns': derived_concerns,
+                'activations': {},  # chat has no activation system
+            })
+        except Exception as e:
+            logger.error(f"[{self.character_name}] concerns query failed: {e}")
+            self._reply(query, {'success': False, 'error': str(e)})
+
+    def _handle_concern_manage_query(self, query) -> None:
+        """Browser → chat: status transitions and hard delete.
+        Payload: {"concern_id": "Note_X", "action": "close|reopen|satisfy|
+                  abandon|activate|delete", "type": "user|derived"}.
+
+        The action vocabulary mirrors what resource_browser.py emits.
+        `delete` is a hard delete (the browser confirms with a dialog
+        first); status actions go through _set_concern_status."""
+        try:
+            payload_bytes = query.payload.to_bytes() if query.payload else b'{}'
+            params = json.loads(payload_bytes.decode('utf-8')) if payload_bytes else {}
+            concern_id = str(params.get('concern_id', '') or '').strip()
+            action = str(params.get('action', '') or '').strip().lower()
+            if not concern_id or not action:
+                self._reply(query, {'success': False,
+                                    'error': "missing concern_id or action"})
+                return
+
+            # Hard delete — the browser confirms first.
+            if action == 'delete':
+                ok, err = self.resource_manager.delete_resource(concern_id)
+                if ok:
+                    self._persist_to_disk()
+                    self._reply(query, {'success': True,
+                                        'message': f'{concern_id} deleted'})
+                else:
+                    self._reply(query, {'success': False,
+                                        'error': err or f'delete failed for {concern_id}'})
+                return
+
+            # Status transitions — map browser vocabulary to chat statuses.
+            action_to_status = {
+                'close': 'satisfied', 'closed': 'satisfied',
+                'satisfy': 'satisfied', 'satisfied': 'satisfied',
+                'abandon': 'abandoned', 'abandoned': 'abandoned',
+                'reopen': 'active', 'reactivate': 'active',
+                'activate': 'active', 'active': 'active',
+            }
+            new_status = action_to_status.get(action)
+            if not new_status:
+                self._reply(query, {'success': False,
+                                    'error': f"unknown action {action!r}"})
+                return
+            ok, err = self._set_concern_status(concern_id, new_status)
+            if ok:
+                self._persist_to_disk()
+                self._reply(query, {'success': True,
+                                    'message': f'{concern_id} → {new_status}'})
+            else:
+                self._reply(query, {'success': False, 'error': err})
+        except Exception as e:
+            logger.error(f"[{self.character_name}] concern_manage query failed: {e}")
+            self._reply(query, {'success': False, 'error': str(e)})
+
+    # ------------------------------------------------------------------
     # Discourse / ToM
     # ------------------------------------------------------------------
 
@@ -1350,7 +1848,8 @@ class ChatLoop:
     }
 
     def _build_system_prompt(self, source: str, orientation: str,
-                             recall: Optional[List[Tuple[str, str]]] = None) -> str:
+                             recall: Optional[List[Tuple[str, str]]] = None,
+                             concerns: Optional[List[Tuple[str, str]]] = None) -> str:
         """Build the persona/state portion of the system prompt — shared base
         for ReAct mode. The prose-only directive that used to live here was
         moved out: ReAct supplies its own JSON-emit directive in
@@ -1368,6 +1867,20 @@ class ChatLoop:
             parts.append(
                 f"## Companion model of {source} (fair-witness texture, not a brief to flatter)\n"
                 f"{companion}"
+            )
+        if concerns:
+            # Active concerns sit ABOVE memories: concerns are directives
+            # to advance, memories are background to draw on. Rendering
+            # is compact (badges, not headers) since the typical set is
+            # 1-5 items.
+            con_lines = [f"- [{cat}] {text}" for text, cat in concerns]
+            parts.append(
+                f"## Active concerns (instructions to keep ready to advance)\n"
+                f"one_shot = a specific request to fulfill once; durable = "
+                f"ongoing directive; derived = something Jill noticed worth "
+                f"tracking. Recall reinforces these on engagement; without it "
+                f"they decay.\n\n"
+                + "\n".join(con_lines)
             )
         if recall:
             # Episodic specifics retrieved from prior conversations. Distinct
@@ -1417,8 +1930,9 @@ class ChatLoop:
     # ------------------------------------------------------------------
 
     def _build_react_system_prompt(self, source: str, orientation: str,
-                                   recall: Optional[List[Tuple[str, str]]] = None) -> str:
-        base = self._build_system_prompt(source, orientation, recall=recall)
+                                   recall: Optional[List[Tuple[str, str]]] = None,
+                                   concerns: Optional[List[Tuple[str, str]]] = None) -> str:
+        base = self._build_system_prompt(source, orientation, recall=recall, concerns=concerns)
         react = (
             "\n\n## ReAct Tool Loop — READ FIRST\n"
             "Each emission is ONE JSON action object — nothing else. Prose "
@@ -1453,7 +1967,8 @@ class ChatLoop:
 
     def _build_react_prompt(self, source: str, user_text: str, orientation: str,
                             log: List[Tuple[str, str]],
-                            recall: Optional[List[Tuple[str, str]]] = None) -> List[Dict[str, str]]:
+                            recall: Optional[List[Tuple[str, str]]] = None,
+                            concerns: Optional[List[Tuple[str, str]]] = None) -> List[Dict[str, str]]:
         """Single user-role text containing history + current input + working log."""
         parts: List[str] = []
         history = self.store.get_recent_turns(source, limit=self.history_limit, scope='all')
@@ -1477,12 +1992,13 @@ class ChatLoop:
         parts.append("")
         parts.append("Emit next action:")
         return [
-            {'role': 'system', 'content': self._build_react_system_prompt(source, orientation, recall=recall)},
+            {'role': 'system', 'content': self._build_react_system_prompt(source, orientation, recall=recall, concerns=concerns)},
             {'role': 'user', 'content': "\n".join(parts)},
         ]
 
     def _run_react_loop(self, source: str, user_text: str, orientation: str,
-                        recall: Optional[List[Tuple[str, str]]] = None
+                        recall: Optional[List[Tuple[str, str]]] = None,
+                        concerns: Optional[List[Tuple[str, str]]] = None
                         ) -> Tuple[str, List[Tuple[str, str]], List[Dict[str, Any]], str]:
         """Run the ReAct loop. Returns (reply, log, iters, exit_reason).
         The trace is NOT written here — caller writes it after post-turn
@@ -1503,7 +2019,7 @@ class ChatLoop:
         iters: List[Dict[str, Any]] = []
         for i in range(REACT_MAX_ITERS):
             pre_log_len = len(log)
-            prompt = self._build_react_prompt(source, user_text, orientation, log, recall=recall)
+            prompt = self._build_react_prompt(source, user_text, orientation, log, recall=recall, concerns=concerns)
             sys_msg = prompt[0]['content']
             usr_msg = prompt[1]['content']
             try:
@@ -1722,13 +2238,17 @@ class ChatLoop:
         # Injected next to the Companion block in the system prompt; no ReAct
         # tool call required. Cheap miss (one embedding query).
         recall = self._recall(text, k=3)
+        # Active concerns: combined surface of semantic-recall hits (which
+        # also reinforce engagement) + top-N by current weight (always-on
+        # budget). Rendered as a separate block above the memories block.
+        concerns = self._get_concerns_for_prompt(text)
 
         log: List[Tuple[str, str]] = []
         iters: List[Dict[str, Any]] = []
         exit_reason = 'crashed'
         try:
             reply, log, iters, exit_reason = self._run_react_loop(
-                source, text, orientation, recall=recall)
+                source, text, orientation, recall=recall, concerns=concerns)
         except Exception as e:
             logger.error(f"[{self.character_name}] ReAct loop crashed: {e}")
             import traceback
