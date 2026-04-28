@@ -26,6 +26,7 @@ import re
 import sys
 import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
@@ -320,6 +321,26 @@ class ChatLoop:
         self._action_pub = None
         self._sense_sub = None
 
+        # ---- Post-turn background work ----
+        # Discourse update + reflection are LLM-bound (~5-15s combined) and
+        # are conceptually side effects of the turn, not part of producing
+        # the response. They run in a single-worker executor so the main
+        # thread can return to listening for the next inbox message
+        # immediately after publishing. Single worker (not a thread pool)
+        # keeps reflection ordered relative to the turns it summarizes and
+        # bounds resource use under message bursts.
+        #
+        # _faiss_lock serializes the one cross-thread FAISS race: main
+        # thread `_recall` reading the memories collection vs background
+        # thread `_remember` writing to it. FAISS is not thread-safe and
+        # releases the GIL during its C calls, so concurrent add/search
+        # on the same store can corrupt the index.
+        self._faiss_lock = threading.Lock()
+        self._post_turn_executor = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix=f'chat-{character_name}-postturn',
+        )
+
     # ------------------------------------------------------------------
     # LLM helper (used by character_evaluator and DiscourseTracker)
     # ------------------------------------------------------------------
@@ -508,7 +529,14 @@ class ChatLoop:
                   category: str = 'fact') -> Optional[str]:
         """Persist one memory string into the memories Collection. Returns
         the new note_id, or None on failure. `category` is one of
-        _MEMORY_CATEGORIES; unknown values coerce to 'fact'."""
+        _MEMORY_CATEGORIES; unknown values coerce to 'fact'.
+
+        Held under _faiss_lock for the FAISS-touching span (create_note
+        indexes the new note, add_to_collection updates the memories
+        collection's vector store). Without the lock, a concurrent
+        _recall in the main thread could race a background _remember
+        and corrupt the FAISS index.
+        """
         if not self._memories_collection_id:
             return None
         text = (text or "").strip()
@@ -517,25 +545,26 @@ class ChatLoop:
         if category not in _MEMORY_CATEGORIES:
             category = 'fact'
         try:
-            success, note_id, err, _ = self.resource_manager.create_note(
-                self.character_name, text, "text", "chat-loop", entity or "",
-                "",
-                {
-                    "kind": "memory",
-                    "category": category,
-                    "entity": entity,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                },
-            )
-            if not success or not note_id:
-                logger.warning(f"[{self.character_name}] memory create failed: {err}")
-                return None
-            self.resource_manager.mark_persistent(note_id, self.character_name)
-            ok, _, add_err = self.resource_manager.add_to_collection(
-                self._memories_collection_id, note_id, self.character_name)
-            if not ok:
-                logger.warning(f"[{self.character_name}] memory add_to_collection failed: {add_err}")
-            return note_id
+            with self._faiss_lock:
+                success, note_id, err, _ = self.resource_manager.create_note(
+                    self.character_name, text, "text", "chat-loop", entity or "",
+                    "",
+                    {
+                        "kind": "memory",
+                        "category": category,
+                        "entity": entity,
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                    },
+                )
+                if not success or not note_id:
+                    logger.warning(f"[{self.character_name}] memory create failed: {err}")
+                    return None
+                self.resource_manager.mark_persistent(note_id, self.character_name)
+                ok, _, add_err = self.resource_manager.add_to_collection(
+                    self._memories_collection_id, note_id, self.character_name)
+                if not ok:
+                    logger.warning(f"[{self.character_name}] memory add_to_collection failed: {add_err}")
+                return note_id
         except Exception as e:
             logger.warning(f"[{self.character_name}] _remember failed: {e}")
             return None
@@ -550,9 +579,10 @@ class ChatLoop:
         if not self._memories_collection_id or not query:
             return []
         try:
-            ok, results, err = self.resource_manager.search_collection(
-                self.character_name, self._memories_collection_id, query,
-                mode='semantic', limit=k, threshold=threshold)
+            with self._faiss_lock:
+                ok, results, err = self.resource_manager.search_collection(
+                    self.character_name, self._memories_collection_id, query,
+                    mode='semantic', limit=k, threshold=threshold)
             if not ok or not results:
                 return []
             out: List[Tuple[str, str]] = []
@@ -565,6 +595,8 @@ class ChatLoop:
                 # Map chunk back to source note to read its category.
                 # Chunks store source_note_id in metadata (per
                 # _index_note_chunks). Missing note → fall back to 'fact'.
+                # No lock needed for this lookup — get_resource is a dict
+                # read, not a FAISS operation.
                 cat = 'fact'
                 meta = r.get('metadata') or {}
                 note_id = meta.get('source_note_id')
@@ -1650,6 +1682,28 @@ class ChatLoop:
     # Per-turn handling
     # ------------------------------------------------------------------
 
+    def _post_turn_work(self, source: str, close: bool) -> None:
+        """Background side-effect job for one turn: discourse update,
+        reflection (memory writes), optional dialog close, autosave.
+
+        Runs on the post-turn executor (single worker) so jobs are
+        sequential per character. Failure-tolerant: any exception is
+        logged but does not propagate out of the executor (the main
+        thread is no longer here to receive it anyway).
+        """
+        try:
+            self._update_discourse_async(source)
+            # Reflection runs after discourse so it can see the latest
+            # companion state and avoid duplicating it.
+            self._reflect_and_remember(source)
+            if close:
+                self.store.close_dialog(source)
+            # Autosave. Memories written above land on disk here; without
+            # this, a SIGINT mid-job loses the turn's memory updates.
+            self._persist_to_disk()
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] post-turn work failed: {e}")
+
     def _process_user_turn(self, source: str, text: str, close: bool) -> None:
         # Each turn drives a ReAct loop: process_text / search / respond.
         # The prior web:/search: prefix path is gone — the model decides
@@ -1697,19 +1751,17 @@ class ChatLoop:
             self._write_react_trace(
                 source, text, log, iters, reply, exit_reason, recall=recall)
 
-        self._update_discourse_async(source)
-        # Post-turn reflection: decide whether anything from this exchange
-        # should land in long-term memory. Runs after companion update so
-        # the reflection prompt can see the latest companion state and
-        # avoid duplicating it. Side effect only — not part of the trace.
-        self._reflect_and_remember(source)
-
-        if close:
-            self.store.close_dialog(source)
-
-        # Autosave per turn — small write, but means we never lose a
-        # completed exchange to a launcher kill or crash.
-        self._persist_to_disk()
+        # Post-turn work (discourse + reflection + close + persist) is
+        # ~5-15s of LLM calls and conceptually a side effect of the turn.
+        # Submitted to a single-worker executor so the main thread can
+        # return to the inbox immediately. The single worker keeps post-
+        # turn jobs ordered relative to the turns they summarize.
+        try:
+            self._post_turn_executor.submit(self._post_turn_work, source, close)
+        except RuntimeError:
+            # Executor already shut down (process tearing down).
+            # Fall back to synchronous so nothing is silently dropped.
+            self._post_turn_work(source, close)
 
     # ------------------------------------------------------------------
     # Main loop
@@ -1747,9 +1799,16 @@ class ChatLoop:
                     import traceback
                     traceback.print_exc()
         finally:
-            # Final flush before tearing down zenoh, so SIGINT on the
-            # launcher captures any in-flight discourse/ToM updates that
-            # might race the autosave above.
+            # Drain any in-flight post-turn jobs so their memory writes
+            # and discourse updates land on disk before we tear down.
+            # wait=True blocks until the current job (if any) completes;
+            # queued jobs also drain in order.
+            try:
+                self._post_turn_executor.shutdown(wait=True)
+            except Exception as e:
+                logger.warning(f"[{self.character_name}] executor shutdown failed: {e}")
+            # Final flush after the executor drains so any work it did
+            # in its last job (or that we did synchronously) is on disk.
             self._persist_to_disk()
             self._shutdown_zenoh()
 
