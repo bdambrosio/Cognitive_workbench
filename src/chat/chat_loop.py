@@ -1532,22 +1532,18 @@ class ChatLoop:
                            iters: List[Dict[str, Any]],
                            final_response: str,
                            exit_reason: str,
-                           recall: Optional[List[Tuple[str, str]]] = None,
-                           memories_written: Optional[List[str]] = None) -> None:
+                           recall: Optional[List[Tuple[str, str]]] = None) -> None:
         """Append one ReAct session to logs/chat_trace_{character}.txt.
 
-        Continuing-computation layout:
-          - SYSTEM PROMPT (once; constant across iters, sent verbatim each call)
-          - INITIAL CONTEXT (once; iter-1 user message: history + current
-            input + empty working log + 'Emit next action:')
-          - Per iteration k:
-              MODEL RAW EMISSION — the full thought + tool call (debug)
-              APPENDED TO CONTEXT FOR NEXT ITER — what the runtime carried
-                  forward into the working log (parsed action + observation,
-                  or NOTE for parse error, or nothing for respond/exit).
-                  The diff between EMISSION and APPENDED is exactly the
-                  reasoning that gets compressed away before the next iter.
-          - FINAL RESPONSE TO USER
+        Captures only the reasoning loop — recall context, system prompt,
+        initial context, per-iteration emissions/appends, final response.
+        Post-turn side effects (discourse update, reflection / memories
+        written) are NOT in the trace; they're side outputs of the turn,
+        not part of the response-generation context.
+
+        Called immediately after the ReAct loop completes (before the slow
+        post-turn LLM calls) so format_prompt has access to the trace
+        without waiting on reflection.
 
         format_prompt.py 'Load Chat Trace' reads this file by section.
         """
@@ -1625,15 +1621,6 @@ class ChatLoop:
             lines.append(sub)
             lines.append(final_response)
             lines.append('')
-
-            if memories_written:
-                lines.append(sub)
-                lines.append('>>> MEMORIES WRITTEN (post-turn reflection)')
-                lines.append(sub)
-                for m in memories_written:
-                    lines.append(f'- {m}')
-                lines.append('')
-
             lines.append(sep)
             with open(trace_path, 'a', encoding='utf-8') as f:
                 f.write('\n'.join(lines) + '\n')
@@ -1702,20 +1689,20 @@ class ChatLoop:
         self._publish_say(reply)
         logger.info(f"[{self.character_name}] -> {source}: {reply!r}")
 
+        # Trace write goes immediately after publish, before any slow
+        # post-turn LLM work, so format_prompt can read the reasoning
+        # trace without waiting on discourse/reflection. Skipped if we
+        # never entered the ReAct loop (pre-loop crash above).
+        if iters:
+            self._write_react_trace(
+                source, text, log, iters, reply, exit_reason, recall=recall)
+
         self._update_discourse_async(source)
         # Post-turn reflection: decide whether anything from this exchange
         # should land in long-term memory. Runs after companion update so
         # the reflection prompt can see the latest companion state and
-        # avoid duplicating it.
-        memories_written = self._reflect_and_remember(source)
-
-        # Trace write deferred to here so it can include memories written
-        # during reflection. Skipped if we never entered the ReAct loop
-        # (no iters means the crash path above caught a pre-loop error).
-        if iters:
-            self._write_react_trace(
-                source, text, log, iters, reply, exit_reason,
-                recall=recall, memories_written=memories_written)
+        # avoid duplicating it. Side effect only — not part of the trace.
+        self._reflect_and_remember(source)
 
         if close:
             self.store.close_dialog(source)
