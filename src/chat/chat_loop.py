@@ -94,6 +94,14 @@ _CONCERN_SATISFIED_THRESHOLD = 0.1
 # addition to anything semantic-recall fishes out). Bounded so the prompt
 # can't blow up as the corpus grows.
 _CONCERN_ALWAYS_ON_BUDGET = 5
+# Similarity threshold for recurrence detection. A candidate concern
+# whose top match in the concerns collection exceeds this value is
+# treated as the same concern: we refresh + possibly promote/revive
+# the existing note rather than create a near-duplicate. Tuned high
+# (vs the 0.5 used for surfacing recall) because a false merge silently
+# loses specificity, while a missed merge just creates a sibling that
+# can be merged manually.
+_CONCERN_RECURRENCE_THRESHOLD = 0.8
 # Trim observation text from fetch_text before it lands in the working log.
 # Bigger than search synthesis (which is already digested) since fetch_text
 # is raw page text — but bounded so a single fetch can't blow the prompt.
@@ -702,12 +710,68 @@ class ChatLoop:
             self._add_concern(text, category=category, entity=entity,
                               provenance='asserted', seed=True, name=name)
 
+    def _find_similar_concern(self, text: str,
+                              threshold: float = _CONCERN_RECURRENCE_THRESHOLD
+                              ) -> Optional[str]:
+        """Find the top semantically-similar existing concern whose
+        similarity meets `threshold`. Returns the source note_id, or None
+        if no match. Excludes abandoned concerns (the user explicitly
+        revoked them — recurrence shouldn't auto-revive). Active and
+        satisfied are both eligible; the caller decides what to do."""
+        if not self._concerns_collection_id or not text:
+            return None
+        try:
+            with self._faiss_lock:
+                ok, results, _ = self.resource_manager.search_collection(
+                    self.character_name, self._concerns_collection_id, text,
+                    mode='semantic', limit=1, threshold=threshold)
+            if not ok or not results:
+                return None
+            r = results[0] if isinstance(results[0], dict) else None
+            if not r:
+                return None
+            meta = r.get('metadata') or {}
+            note_id = meta.get('source_note_id')
+            if not note_id:
+                return None
+            note = self.resource_manager.get_resource(note_id)
+            if not note:
+                return None
+            status = (note.get('properties') or {}).get('status', 'active')
+            if status == 'abandoned':
+                return None
+            return note_id
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] _find_similar_concern failed: {e}")
+            return None
+
+    def _promote_existing_concern(self, note_id: str) -> str:
+        """Apply recurrence-promotion rules in place:
+          - last_engaged_at always refreshed (the recurrence IS engagement)
+          - status: satisfied → active (revival)
+          - category: one_shot → durable (intensity promotion)
+          - durable / derived: category unchanged (no de-promotion)
+        Returns the same note_id so callers have a uniform shape."""
+        note = self.resource_manager.get_resource(note_id)
+        if not note:
+            return note_id
+        props = note.setdefault('properties', {})
+        props['last_engaged_at'] = datetime.now(timezone.utc).isoformat()
+        if props.get('status') == 'satisfied':
+            props['status'] = 'active'
+        if props.get('category') == 'one_shot':
+            props['category'] = 'durable'
+        return note_id
+
     def _add_concern(self, text: str, category: str = 'durable',
                      entity: str = 'User', provenance: str = 'asserted',
                      seed: bool = False, name: str = '') -> Optional[str]:
-        """Create a new concern note and add it to the concerns Collection.
-        Returns the new note_id, or None on failure. Held under
-        _faiss_lock for the same reason _remember is."""
+        """Create a new concern note and add it to the concerns Collection,
+        OR — if a near-twin already exists — refresh and promote/revive
+        the existing note instead. Returns the resulting note_id (newly
+        created or pre-existing), or None on failure. Held under
+        _faiss_lock for the FAISS-touching span; pre-add similarity check
+        also serializes through the same lock."""
         if not self._concerns_collection_id:
             return None
         text = (text or "").strip()
@@ -717,6 +781,15 @@ class ChatLoop:
             category = 'durable'
         if provenance not in ('asserted', 'inferred'):
             provenance = 'inferred' if category == 'derived' else 'asserted'
+
+        # Recurrence check. Skipped for seed concerns (those go in
+        # deterministic named-note slots and shouldn't get folded into
+        # arbitrary user-derived twins).
+        if not seed:
+            existing = self._find_similar_concern(text)
+            if existing:
+                return self._promote_existing_concern(existing)
+
         now_iso = datetime.now(timezone.utc).isoformat()
         try:
             with self._faiss_lock:
