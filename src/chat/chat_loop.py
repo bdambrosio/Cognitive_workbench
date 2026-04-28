@@ -56,6 +56,19 @@ _REACT_TOOLS = ('process_text', 'search', 'fetch_text', 'respond')
 # Per-character collection holding episodic specifics across conversations.
 # Auto-RAG searches this on every turn; post-turn reflection writes to it.
 _MEMORIES_COLLECTION_NAME = "memories"
+
+# Memory subtype, stored on the note's `properties.category`. Distinct from
+# the existing `properties.kind="memory"` discriminator (which says what
+# class of note this is — memory vs companion_state vs web_search etc).
+# Reflection picks one per memory; default is `fact`. Unknown values from
+# the model are coerced to `fact` rather than dropped.
+_MEMORY_CATEGORIES = ('fact', 'preference', 'commitment')
+
+# Frame values the reflection LLM may return. Only `none` permits writes.
+# Anything else (or unparseable / missing) suppresses the turn's memories
+# entirely — the asymmetric cost of a poisoned memory is worse than
+# missing one we'll re-encounter.
+_REFLECT_FRAME_OK = 'none'
 # Trim observation text from fetch_text before it lands in the working log.
 # Bigger than search synthesis (which is already digested) since fetch_text
 # is raw page text — but bounded so a single fetch can't blow the prompt.
@@ -491,20 +504,25 @@ class ChatLoop:
         except Exception as e:
             logger.warning(f"[{self.character_name}] _init_memories failed: {e}")
 
-    def _remember(self, text: str, entity: str = "") -> Optional[str]:
+    def _remember(self, text: str, entity: str = "",
+                  category: str = 'fact') -> Optional[str]:
         """Persist one memory string into the memories Collection. Returns
-        the new note_id, or None on failure."""
+        the new note_id, or None on failure. `category` is one of
+        _MEMORY_CATEGORIES; unknown values coerce to 'fact'."""
         if not self._memories_collection_id:
             return None
         text = (text or "").strip()
         if not text:
             return None
+        if category not in _MEMORY_CATEGORIES:
+            category = 'fact'
         try:
             success, note_id, err, _ = self.resource_manager.create_note(
                 self.character_name, text, "text", "chat-loop", entity or "",
                 "",
                 {
                     "kind": "memory",
+                    "category": category,
                     "entity": entity,
                     "created_at": datetime.now(timezone.utc).isoformat(),
                 },
@@ -522,10 +540,13 @@ class ChatLoop:
             logger.warning(f"[{self.character_name}] _remember failed: {e}")
             return None
 
-    def _recall(self, query: str, k: int = 3, threshold: float = 0.3) -> List[str]:
-        """Semantic search over the memories Collection. Returns ranked chunk
-        strings, highest score first. Empty list on miss / not yet indexed /
-        any error."""
+    def _recall(self, query: str, k: int = 3, threshold: float = 0.3
+                ) -> List[Tuple[str, str]]:
+        """Semantic search over the memories Collection. Returns ranked
+        (text, category) tuples, highest score first. Category is read
+        from the source note's properties; pre-taxonomy memories without
+        a category default to 'fact'. Empty list on miss / not yet
+        indexed / any error."""
         if not self._memories_collection_id or not query:
             return []
         try:
@@ -534,37 +555,74 @@ class ChatLoop:
                 mode='semantic', limit=k, threshold=threshold)
             if not ok or not results:
                 return []
-            out: List[str] = []
+            out: List[Tuple[str, str]] = []
             for r in results:
-                doc = r.get('document') if isinstance(r, dict) else None
-                if isinstance(doc, str) and doc.strip():
-                    out.append(doc.strip())
+                if not isinstance(r, dict):
+                    continue
+                doc = r.get('document')
+                if not isinstance(doc, str) or not doc.strip():
+                    continue
+                # Map chunk back to source note to read its category.
+                # Chunks store source_note_id in metadata (per
+                # _index_note_chunks). Missing note → fall back to 'fact'.
+                cat = 'fact'
+                meta = r.get('metadata') or {}
+                note_id = meta.get('source_note_id')
+                if note_id:
+                    note = self.resource_manager.get_resource(note_id)
+                    if note:
+                        raw = (note.get('properties') or {}).get('category')
+                        if isinstance(raw, str) and raw in _MEMORY_CATEGORIES:
+                            cat = raw
+                out.append((doc.strip(), cat))
             return out
         except Exception as e:
             logger.warning(f"[{self.character_name}] _recall failed: {e}")
             return []
 
     # Reflection prompt: extract durable episodic specifics from the latest
-    # exchange. Companion already absorbs personality/style/mood, so the bar
-    # for memory is "would NOT be recoverable from the companion model on a
+    # exchange. Two-stage decision:
+    #   (a) Frame check. If the exchange is a hypothetical / role-play /
+    #       counterfactual / instructional frame, suppress all writes. The
+    #       cost of poisoning memory with frame-bound content is asymmetric
+    #       — a bad memory taints every future recall hit on that topic;
+    #       a missed real fact just gets re-asserted next time.
+    #   (b) For real exchanges, extract memories AND tag each with a
+    #       category: fact (default) / preference / commitment.
+    # Companion already absorbs personality/style/mood, so the bar for
+    # memory is "would NOT be recoverable from the companion model on a
     # fresh re-read" — names, places, commitments, stable preferences.
     _REFLECT_SYS = (
-        "You watch chats between {character} and {entity}. Your job: extract "
-        "any episodic specifics from the latest exchange that should survive "
-        "into FUTURE conversations — facts that would NOT be obvious from a "
-        "persona description or rolling companion summary.\n\n"
+        "You watch chats between {character} and {entity}. Your job has "
+        "two stages.\n\n"
+        "STAGE 1 — Frame check. Classify the latest exchange as one of:\n"
+        "- `hypothetical`: 'imagine that…', 'suppose…', 'what if…'\n"
+        "- `roleplay`: user asked {character} to take on a persona, character, or voice\n"
+        "- `counterfactual`: discussion of an alternate world / past / scenario\n"
+        "- `instructional`: user is teaching {character} how to behave, not stating facts\n"
+        "- `none`: a real exchange where statements about {entity}, the world, or "
+        "agreements between you carry their literal weight\n"
+        "If the frame is anything other than `none`, return memories=[]. "
+        "When in doubt, prefer the more conservative classification — a "
+        "wrongly-saved hypothetical poisons future recall.\n\n"
+        "STAGE 2 — If frame is `none`, extract durable specifics that should "
+        "survive into FUTURE conversations.\n"
         "CAPTURE:\n"
-        "- Personal facts the user shared (names, places, relationships).\n"
-        "- Stable preferences expressed plainly.\n"
-        "- Long-running project/work context.\n"
-        "- Specific commitments or follow-ups agreed.\n\n"
+        "- Personal facts the user shared (names, places, relationships) → category=`fact`\n"
+        "- Long-running project/work context → category=`fact`\n"
+        "- Stable preferences expressed plainly → category=`preference`\n"
+        "- Specific commitments or follow-ups agreed (with timeframe if given) → category=`commitment`\n"
         "SKIP:\n"
-        "- Pleasantries, mood, conversational tone.\n"
+        "- Pleasantries, mood, conversational tone (companion handles these).\n"
         "- Anything already in the companion model verbatim.\n"
         "- One-off questions with no stable signal (\"what's the weather\").\n"
-        "- Hypothetical / brainstorm content unless explicitly affirmed.\n\n"
-        "Output ONLY a JSON array of strings, each ≤ 200 chars, third-person "
-        "about {entity}. Output `[]` if nothing qualifies. No prose."
+        "- Brainstorm content the user has not affirmed.\n\n"
+        "Output ONLY this JSON shape — nothing else:\n"
+        "  {{\"frame\": \"<one of: hypothetical|roleplay|counterfactual|instructional|none>\", "
+        "\"memories\": [{{\"text\": \"<≤200 chars, third-person about {entity}>\", "
+        "\"category\": \"<fact|preference|commitment>\"}}, …]}}\n"
+        "If nothing qualifies (or frame≠none): "
+        "{{\"frame\": \"<value>\", \"memories\": []}}. No prose."
     )
 
     def _reflect_and_remember(self, source: str) -> List[str]:
@@ -588,8 +646,8 @@ class ChatLoop:
                     "use only to avoid duplicates)\n" + companion)
             user_parts.append("## Latest exchange\n" + convo)
             user_parts.append(
-                "Return JSON array now. Each string is one durable memory, "
-                "third-person, ≤ 200 chars. `[]` if nothing qualifies.")
+                "Return the JSON object now (keys: frame, memories). "
+                "memories=[] if frame≠none or nothing qualifies.")
             result = self._llm_generate(
                 [{'role': 'system', 'content': sys_msg},
                  {'role': 'user', 'content': "\n\n".join(user_parts)}],
@@ -598,33 +656,88 @@ class ChatLoop:
             if not result.success:
                 return []
             payload = result.text
-            memories: List[str] = []
-            if isinstance(payload, list):
-                memories = [str(m).strip() for m in payload if str(m).strip()]
-            elif isinstance(payload, str):
-                # Cloud LLM may return raw text; try a salvage parse.
+            # Salvage: cloud LLMs may return text instead of parsed JSON.
+            if isinstance(payload, str):
                 stripped = payload.strip()
-                if stripped.startswith('['):
+                if stripped.startswith(('{', '[')):
                     try:
-                        parsed = json.loads(stripped)
-                        if isinstance(parsed, list):
-                            memories = [str(m).strip() for m in parsed if str(m).strip()]
+                        payload = json.loads(stripped)
                     except Exception:
                         return []
-            if not memories:
+                else:
+                    return []
+
+            frame, raw_memories = self._parse_reflection_payload(payload)
+
+            if frame != _REFLECT_FRAME_OK:
+                logger.info(
+                    f"[{self.character_name}] reflection suppressed "
+                    f"(frame={frame!r}) — no memories written")
+                return []
+            if not raw_memories:
                 return []
             written: List[str] = []
-            for m in memories:
-                if len(m) > 240:
-                    m = m[:240].rstrip()
-                if self._remember(m, entity=source):
-                    written.append(m)
+            for text, category in raw_memories:
+                if len(text) > 240:
+                    text = text[:240].rstrip()
+                if self._remember(text, entity=source, category=category):
+                    written.append(text)
             if written:
-                logger.info(f"[{self.character_name}] remembered {len(written)} item(s) from {source}")
+                logger.info(
+                    f"[{self.character_name}] remembered {len(written)} "
+                    f"item(s) from {source}")
             return written
         except Exception as e:
             logger.warning(f"[{self.character_name}] _reflect_and_remember failed: {e}")
             return []
+
+    @staticmethod
+    def _parse_reflection_payload(payload: Any) -> Tuple[str, List[Tuple[str, str]]]:
+        """Normalize reflection output to (frame, [(text, category), …]).
+
+        Accepts:
+          - New shape: {"frame": "...", "memories": [{"text": ..., "category": ...}, …]}
+          - New shape with bare strings inside memories (legacy-tolerant
+            within the new envelope): {"frame": "...", "memories": ["str", …]}
+          - Old shape: bare list of strings (no frame envelope) — assume
+            frame=none for backward compat with older models.
+        Anything else returns ('unknown', []) — caller treats non-`none`
+        frame as a suppression signal, so this fails safe.
+        """
+        # Old shape — bare list. Assume frame=none.
+        if isinstance(payload, list):
+            mems: List[Tuple[str, str]] = []
+            for item in payload:
+                if isinstance(item, str) and item.strip():
+                    mems.append((item.strip(), 'fact'))
+                elif isinstance(item, dict):
+                    t = str(item.get('text', '') or '').strip()
+                    c = str(item.get('category', 'fact') or 'fact').strip().lower()
+                    if c not in _MEMORY_CATEGORIES:
+                        c = 'fact'
+                    if t:
+                        mems.append((t, c))
+            return (_REFLECT_FRAME_OK, mems)
+
+        # New shape — object with frame + memories.
+        if isinstance(payload, dict):
+            frame = str(payload.get('frame', '') or '').strip().lower() or 'unknown'
+            raw = payload.get('memories', []) or []
+            mems = []
+            if isinstance(raw, list):
+                for item in raw:
+                    if isinstance(item, str) and item.strip():
+                        mems.append((item.strip(), 'fact'))
+                    elif isinstance(item, dict):
+                        t = str(item.get('text', '') or '').strip()
+                        c = str(item.get('category', 'fact') or 'fact').strip().lower()
+                        if c not in _MEMORY_CATEGORIES:
+                            c = 'fact'
+                        if t:
+                            mems.append((t, c))
+            return (frame, mems)
+
+        return ('unknown', [])
 
     # ------------------------------------------------------------------
     # Zenoh wiring
@@ -1194,8 +1307,18 @@ class ChatLoop:
     # System prompt + turn assembly
     # ------------------------------------------------------------------
 
+    # Order in which categories appear in the rendered memories block.
+    # Operationally most-relevant first: preferences shape every reply,
+    # commitments may need follow-up, facts are background context.
+    _CATEGORY_RENDER_ORDER = ('preference', 'commitment', 'fact')
+    _CATEGORY_HEADERS = {
+        'preference': 'Preferences',
+        'commitment': 'Commitments',
+        'fact': 'Facts',
+    }
+
     def _build_system_prompt(self, source: str, orientation: str,
-                             recall: Optional[List[str]] = None) -> str:
+                             recall: Optional[List[Tuple[str, str]]] = None) -> str:
         """Build the persona/state portion of the system prompt — shared base
         for ReAct mode. The prose-only directive that used to live here was
         moved out: ReAct supplies its own JSON-emit directive in
@@ -1216,13 +1339,34 @@ class ChatLoop:
             )
         if recall:
             # Episodic specifics retrieved from prior conversations. Distinct
-            # from the rolling Companion summary: these are durable facts
-            # (names, places, commitments) that should not decay with style.
-            mem_block = "\n".join(f"- {m}" for m in recall)
-            parts.append(
-                f"## Recalled memories (from prior conversations with {source})\n"
-                f"{mem_block}"
-            )
+            # from the rolling Companion summary: these are durable items
+            # that should not decay with style. Rendered grouped by
+            # category so the model can treat each group on its own terms.
+            grouped: Dict[str, List[str]] = {c: [] for c in _MEMORY_CATEGORIES}
+            for text, cat in recall:
+                if cat not in grouped:
+                    cat = 'fact'
+                grouped[cat].append(text)
+
+            body_lines: List[str] = []
+            for cat in self._CATEGORY_RENDER_ORDER:
+                items = grouped.get(cat) or []
+                if not items:
+                    continue
+                if body_lines:
+                    body_lines.append('')  # blank line between groups
+                body_lines.append(f"{self._CATEGORY_HEADERS[cat]}:")
+                for t in items:
+                    body_lines.append(f"- {t}")
+
+            if body_lines:
+                parts.append(
+                    f"## Recalled memories (from prior conversations with {source})\n"
+                    "Preferences shape how to respond; commitments are open "
+                    "agreements that may need follow-up; facts are background "
+                    "specifics about " + source + ".\n\n"
+                    + "\n".join(body_lines)
+                )
         disc = self._discourse_state.get(source, '').strip()
         if disc:
             parts.append("## Outstanding discourse objects\n" + disc)
@@ -1241,7 +1385,7 @@ class ChatLoop:
     # ------------------------------------------------------------------
 
     def _build_react_system_prompt(self, source: str, orientation: str,
-                                   recall: Optional[List[str]] = None) -> str:
+                                   recall: Optional[List[Tuple[str, str]]] = None) -> str:
         base = self._build_system_prompt(source, orientation, recall=recall)
         react = (
             "\n\n## ReAct Tool Loop — READ FIRST\n"
@@ -1277,7 +1421,7 @@ class ChatLoop:
 
     def _build_react_prompt(self, source: str, user_text: str, orientation: str,
                             log: List[Tuple[str, str]],
-                            recall: Optional[List[str]] = None) -> List[Dict[str, str]]:
+                            recall: Optional[List[Tuple[str, str]]] = None) -> List[Dict[str, str]]:
         """Single user-role text containing history + current input + working log."""
         parts: List[str] = []
         history = self.store.get_recent_turns(source, limit=self.history_limit, scope='all')
@@ -1306,7 +1450,7 @@ class ChatLoop:
         ]
 
     def _run_react_loop(self, source: str, user_text: str, orientation: str,
-                        recall: Optional[List[str]] = None
+                        recall: Optional[List[Tuple[str, str]]] = None
                         ) -> Tuple[str, List[Tuple[str, str]], List[Dict[str, Any]], str]:
         """Run the ReAct loop. Returns (reply, log, iters, exit_reason).
         The trace is NOT written here — caller writes it after post-turn
@@ -1388,7 +1532,7 @@ class ChatLoop:
                            iters: List[Dict[str, Any]],
                            final_response: str,
                            exit_reason: str,
-                           recall: Optional[List[str]] = None,
+                           recall: Optional[List[Tuple[str, str]]] = None,
                            memories_written: Optional[List[str]] = None) -> None:
         """Append one ReAct session to logs/chat_trace_{character}.txt.
 
@@ -1433,8 +1577,8 @@ class ChatLoop:
                 lines.append(sub)
                 lines.append('>>> RECALL HITS (auto-RAG over memories collection)')
                 lines.append(sub)
-                for m in recall:
-                    lines.append(f'- {m}')
+                for text, cat in recall:
+                    lines.append(f'[{cat}] {text}')
                 lines.append('')
 
             if iters:
