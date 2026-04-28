@@ -650,13 +650,39 @@ class ChatLoop:
 
     def _run_process_text(self, source_text: str, instruction: str) -> str:
         """Apply a focused LLM pass to source_text using the given instruction.
-        Used by the ReAct process_text tool. Output is the transformed text
-        with no preamble/headers."""
-        sys_msg = (
-            "You are a focused text-transformation tool. Apply the instruction "
-            "to the source text. Output ONLY the transformed result — no "
-            "preamble, no commentary, no headers, no markdown fences."
-        )
+        Used by the ReAct process_text tool.
+
+        The persona block is passed as system context so output respects
+        Jill's voice (fair witness, no sycophancy, grounded specifics). The
+        citation rule is added explicitly because the persona doesn't
+        codify it: when the source contains a 'Sources:' block (the format
+        web-search results use), the output must cite by domain or
+        publication name rather than 'the source' / 'the writeup'.
+        """
+        has_sources = isinstance(source_text, str) and 'Sources:' in source_text
+        sys_parts = [
+            f"You are {self.character_name}. The user has asked you to apply an "
+            "instruction to a source text. Output ONLY the transformed result — "
+            "no preamble, no commentary, no headers, no markdown fences."
+        ]
+        if self.persona:
+            sys_parts.append("## Persona (governs voice and stance)\n" + self.persona)
+        if has_sources:
+            sys_parts.append(
+                "## Citation requirement\n"
+                "The source contains a 'Sources:' block. Cite by real "
+                "publication / domain when available (e.g. \"per weather.com\", "
+                "\"according to NOAA\", \"per ir.tesla.com\"). Never use "
+                "generic phrases like \"the source\" or \"the writeup\". If "
+                "a source line lacks a domain or carries '(no public URL)', "
+                "do NOT invent a domain and do NOT forward the raw URL — say "
+                "something honest like \"per the weather service consulted\" "
+                "or attribute by the source title. Never paste an opaque "
+                "internal reference (e.g. weather://turn0forecast0) into "
+                "your output. If the source did not address the instruction, "
+                "say so plainly rather than improvise."
+            )
+        sys_msg = "\n\n".join(sys_parts)
         user_msg = f"INSTRUCTION:\n{instruction}\n\nSOURCE:\n{source_text}"
         try:
             result = self.backend.chat(
@@ -672,18 +698,32 @@ class ChatLoop:
     @staticmethod
     def _format_react_search_observation(search_result: Dict[str, Any]) -> str:
         """Render a search result (synthesis + sources) into the scratchpad
-        observation text. Sources capped to keep prompt size bounded."""
+        observation text. Sources capped to keep prompt size bounded.
+
+        Filters opaque internal references (non-http URLs like OpenAI
+        Responses API's `weather://turn0forecast0` grounding refs) — the
+        URL is dropped and the scheme-as-domain (`weather`) is suppressed
+        so downstream citation doesn't forward garbage."""
         synthesis = search_result.get('synthesis', '') or ''
         sources = search_result.get('sources', []) or []
         src_lines = []
         for s in sources[:8]:
-            domain = s.get('domain') or '?'
+            domain = s.get('domain') or ''
             url = s.get('url') or ''
             title = s.get('title') or ''
-            if url:
+            is_real_url = url.startswith(('http://', 'https://'))
+            if not is_real_url:
+                url = ''
+                # A "domain" with no dot is usually just the URL scheme
+                # of an opaque ref (e.g. "weather"); not a real publication.
+                if domain and '.' not in domain:
+                    domain = ''
+            if url and domain:
                 src_lines.append(f"- {domain}: {title} ({url})")
-            else:
+            elif domain:
                 src_lines.append(f"- {domain}: {title}")
+            elif title:
+                src_lines.append(f"- {title} (no public URL)")
         if not src_lines:
             return synthesis
         return f"{synthesis}\n\nSources:\n" + "\n".join(src_lines)
@@ -959,16 +999,26 @@ class ChatLoop:
 
     def _run_react_loop(self, source: str, user_text: str, orientation: str) -> str:
         log: List[Tuple[str, str]] = []
+        # Per-iteration record: {system, user, raw} — full text of the
+        # prompt sent and the model's response. Written verbatim into the
+        # trace file so we can replay exactly what the model saw.
+        iters: List[Dict[str, str]] = []
         for i in range(REACT_MAX_ITERS):
             prompt = self._build_react_prompt(source, user_text, orientation, log)
+            sys_msg = prompt[0]['content']
+            usr_msg = prompt[1]['content']
             try:
                 raw = self.backend.chat(prompt, max_tokens=2048, temperature=0.7,
                                         cot_profile='none')
             except Exception as e:
                 logger.error(f"[{self.character_name}] ReAct iter {i+1} LLM failed: {e}")
+                iters.append({'system': sys_msg, 'user': usr_msg,
+                              'raw': f'(LLM call failed: {e})'})
                 reply = self._react_fallback_synthesis(log, str(e))
-                self._write_react_trace(source, user_text, log, reply, 'llm_error')
+                self._write_react_trace(source, user_text, log, iters, reply, 'llm_error')
                 return reply
+
+            iters.append({'system': sys_msg, 'user': usr_msg, 'raw': raw or ''})
 
             action = self._parse_react_action(raw)
             if action is None:
@@ -981,7 +1031,7 @@ class ChatLoop:
             if tool == 'respond':
                 text = self._resolve_react_value(action.get('text', ''), log)
                 logger.info(f"[{self.character_name}] ReAct iter {i+1}: respond ({len(text)} chars)")
-                self._write_react_trace(source, user_text, log, text, 'respond')
+                self._write_react_trace(source, user_text, log, iters, text, 'respond')
                 return text
 
             binding = f'$step{i+1}'
@@ -1003,16 +1053,23 @@ class ChatLoop:
 
         logger.warning(f"[{self.character_name}] ReAct hit max iters ({REACT_MAX_ITERS})")
         reply = self._react_fallback_synthesis(log)
-        self._write_react_trace(source, user_text, log, reply, 'max_iters')
+        self._write_react_trace(source, user_text, log, iters, reply, 'max_iters')
         return reply
 
     def _write_react_trace(self, source: str, user_text: str,
-                           log: List[Tuple[str, str]], final_response: str,
+                           log: List[Tuple[str, str]],
+                           iters: List[Dict[str, str]],
+                           final_response: str,
                            exit_reason: str) -> None:
         """Append one ReAct session to logs/chat_trace_{character}.txt.
-        Section format mirrors planner_trace_{agent}.txt: a delimiter line,
-        a header block with metadata, then the log + final response. The
-        format_prompt.py 'Load Chat Trace' button reads this file."""
+
+        Mirrors the completeness of incremental_planner's str(s) trace dump:
+        every iteration's full system message, full user message (including
+        all conversation history + working log accumulated up to that
+        point), and the raw model response are written verbatim. No
+        truncation, no summarization. The format_prompt.py 'Load Chat
+        Trace' button reads this file.
+        """
         try:
             from pathlib import Path
             log_dir = Path(__file__).resolve().parent.parent / 'logs'
@@ -1020,22 +1077,41 @@ class ChatLoop:
             trace_path = log_dir / f'chat_trace_{self.character_name}.txt'
             ts = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
             sep = '=' * 80
-            iters = len([e for e in log if e[0].startswith('ACTION')])
+            sub = '-' * 80
+            n_iters = len(iters)
             lines = [
                 '', sep,
                 f'Chat session: {ts}',
                 f'Source: {source}',
                 f'User input: {user_text}',
-                f'Iterations: {iters}',
+                f'Iterations: {n_iters}',
                 f'Exit: {exit_reason}',
                 f'Final response length: {len(final_response)} chars',
                 sep, '',
             ]
-            for label, content in log:
-                lines.append(f'### {label}')
-                lines.append(str(content))
+            # Full per-iteration prompt + response. Yes, the system and the
+            # bulk of the user message repeat across iterations — that's
+            # intentional, you're seeing exactly what the model saw at each
+            # call, character for character.
+            for idx, it in enumerate(iters):
+                lines.append(sub)
+                lines.append(f'>>> ITERATION {idx + 1} — SYSTEM MESSAGE')
+                lines.append(sub)
+                lines.append(it.get('system', ''))
                 lines.append('')
-            lines.append('### Final response to user')
+                lines.append(sub)
+                lines.append(f'>>> ITERATION {idx + 1} — USER MESSAGE')
+                lines.append(sub)
+                lines.append(it.get('user', ''))
+                lines.append('')
+                lines.append(sub)
+                lines.append(f'>>> ITERATION {idx + 1} — RAW MODEL RESPONSE')
+                lines.append(sub)
+                lines.append(it.get('raw', ''))
+                lines.append('')
+            lines.append(sub)
+            lines.append('>>> FINAL RESPONSE TO USER')
+            lines.append(sub)
             lines.append(final_response)
             lines.append('')
             lines.append(sep)
