@@ -19,7 +19,7 @@ import datetime
 import difflib
 import textwrap
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from infospace_executor import InfospaceExecutor
 from plan_guidance import PlanGuidance
 # ToolModel disabled — tool contracts in WorldModel serve this role
@@ -430,79 +430,88 @@ Tools include primitives (above) and external tools loaded at runtime. See catal
 """
 
 
-# ── Shared codegen prompt (Stage 2 examples + rules) ──────────────────────────
-# Used by both SGLang and vLLM/OpenRouter planner backends.  Edit HERE to keep
-# the two backends in sync; each backend appends its own Stage 3 format/rules.
-STAGE2_CODEGEN_PROMPT = (
+# ── Stage 2 action-list prompt (v1 replacement for Python codegen) ────────────
+# The planner emits a JSON list of action dicts. The executor runs them in
+# order, stops at the first failure, and returns a uniform_return — no
+# Python execution, no second variable namespace, no status-check
+# boilerplate. Iteration over Collections uses the existing `map` primitive,
+# which now accepts a list body for multi-step per-item work. Anything
+# requiring real Python (text parsing, arithmetic, custom string handling)
+# fragments into another planner loop iteration.
+STAGE2_ACTION_LIST_PROMPT = (
     "#Stage 2 FORMAT:\n"
-    "Write a Python code block to accomplish the CURRENT_TASK.\n"
-    "Linear example (note: the deliverable's out= is $eval_target — REQUIRED for the quality gate):\n"
-    "```python\n"
-    "r1 = tool(\"search-web\", query=\"transformers survey\", out=\"$papers\")\n"
-    "if r1[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=f\"search failed: {r1.get('reason', 'unknown')}\")\n"
-    "r2 = tool(\"synthesize\", target=\"$papers\", focus=\"key findings\", out=\"$eval_target\")\n"
-    "if r2[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=f\"synthesize failed: {r2.get('reason', 'unknown')}\")\n"
-    "return executor._create_uniform_return(\"success\", value=\"done\")\n"
+    "Emit a JSON list of action dicts to accomplish the CURRENT_TASK.\n"
+    "The list is executed in order, stopping at the first action that returns "
+    "status='failed'. You do NOT write status checks, retries, or explicit "
+    "returns — the executor handles all of that automatically.\n"
+    "\n"
+    "Linear example (the deliverable's out= is $eval_target — REQUIRED for the quality gate):\n"
+    "```json\n"
+    "[\n"
+    "  {\"type\": \"search-web\", \"query\": \"transformers survey\", \"out\": \"$papers\"},\n"
+    "  {\"type\": \"synthesize\", \"target\": \"$papers\", \"focus\": \"key findings\", \"out\": \"$eval_target\"}\n"
+    "]\n"
     "```\n"
-    "Reading content example:\n"
-    "```python\n"
-    "# To read content from a bound $var, use get_text/get_json/get_items directly.\n"
-    "# NO need to call load first — these read straight from the resource store.\n"
-    "text = get_text(\"$my_note\")       # returns Note content as string\n"
-    "data = get_json(\"$my_note\")       # returns Note content parsed as dict (or None)\n"
-    "ids  = get_items(\"$my_collection\") # returns list of Note IDs in the Collection\n"
+    "\n"
+    "Map example (apply one tool to each item in a Collection):\n"
+    "```json\n"
+    "[\n"
+    "  {\"type\": \"map\", \"target\": \"$inbox\", \"operation\": \"extract\",\n"
+    "   \"instruction\": \"get subject\", \"out\": \"$subjects\"}\n"
+    "]\n"
     "```\n"
-    "Loop example (multi-item processing):\n"
-    "```python\n"
-    "items = get_items(\"$inbox\")  # list of resource IDs from a Collection\n"
-    "total = len(items)\n"
-    "ok = 0\n"
-    "errors = []\n"
-    "for item_id in items:\n"
-    "    r = tool(\"extract\", target=item_id, instruction=\"get subject\", out=\"$subject\")\n"
-    "    if r[\"status\"] == \"success\":\n"
-    "        subj = get_json(\"$subject\")\n"
-    "        ok += 1\n"
-    "    else:\n"
-    "        errors.append(r.get(\"reason\", \"unknown\"))\n"
-    "if ok == 0:\n"
-    "    return executor._create_uniform_return(\"failed\", reason=f\"All {total} items failed: {errors[:3]}\")\n"
-    "return executor._create_uniform_return(\"success\", value=f\"Processed {ok}/{total}\", extra={\"errors\": errors})\n"
+    "\n"
+    "Map with multi-step body (sequence of actions per item):\n"
+    "```json\n"
+    "[\n"
+    "  {\"type\": \"map\", \"target\": \"$inbox\", \"operation\": [\n"
+    "    {\"type\": \"extract\", \"target\": \"$item\", \"instruction\": \"get subject\", \"out\": \"$subj\"},\n"
+    "    {\"type\": \"create-note\", \"value\": \"$subj\", \"out\": \"$rec\"}\n"
+    "  ], \"out\": \"$records\"}\n"
+    "]\n"
     "```\n"
+    "Inside a map body, $item is the current Collection element. Other body "
+    "$vars are scoped to one iteration and do not leak out.\n"
+    "\n"
     "Rules:\n"
-    "- EVAL TARGET (REQUIRED, FIRST RULE): The step that produces the goal's primary\n"
-    "  output artifact (the deliverable — the written note, the synthesized report,\n"
-    "  the final say'd message) MUST bind that artifact to out=\"$eval_target\".\n"
-    "  Without this binding the quality gate cannot evaluate the run, and\n"
-    "  quality_status falls back to a weaker execution-only signal. Set $eval_target\n"
-    "  exactly once, on the step that creates or updates the real output. Do NOT set\n"
-    "  it on bookkeeping, verification, or pure side-effect (say-only) steps. If the\n"
-    "  deliverable is the say'd text itself, create-note(value=text, out=\"$eval_target\")\n"
-    "  before calling say. The linear example above demonstrates the pattern.\n"
-    "- Call tools via: r = tool(\"tool-name\", param=value, out=\"$var\")\n"
-    "- tool() returns dict with r[\"status\"] (\"success\"/\"failed\"), r[\"resource_id\"], r[\"value\"] (display string).\n"
-    "- Max 16 tool() calls per code block.\n"
-    "- Prefer longer cohesive blocks: if CURRENT_TASK has connected subtasks, combine them in one block.\n"
-    "- out=\"$name\" binds the result resource. Chain via target=\"$name\" in the next call.\n"
-    "- Binding names must be valid identifiers: use $clip_body, $item_0_url — never spaces or raw filenames in $vars (e.g. avoid \"$Trading Agents.md_content\").\n"
-    "- Read content: get_text(\"$var\") → string, get_json(\"$var\") → dict or None, get_items(\"$var\") → list of Note IDs.\n"
-    "  These are injected helpers. Primitives like get-metadata are tools: tool(\"get-metadata\", ...), NOT get_metadata(...).\n"
-    "- fs-list returns a Note listing string — use get_text on its out= binding, not get_items.\n"
-    "- load: ONLY for (a) binding a named persistent note, or (b) slicing a Collection.\n"
-    "- Pass dicts/lists directly as value — do not pre-serialize with json.dumps().\n"
-    "- CODE BLOCK SCOPE: each step executes in a fresh function. Python locals do NOT persist across steps.\n"
-    "  Only $bindings (created via out=) persist. Use get_text/get_json/get_items for cross-step access.\n"
-    "- EXEC-SCRIPT ATOMICITY: Combine related shell operations (mkdir + mv, etc.) in a single exec-script\n"
-    "  call with &&. Separate calls risk partial success — if the first succeeds and the second is denied,\n"
-    "  computed values (e.g. the directory name) are lost and the retry step must guess them.\n"
-    "- if/else control flow and loops are allowed.\n"
-    "- Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
-    "- LOOP PATTERN: tool() never raises — do NOT use try/except. Track ok/errors counts explicitly.\n"
-    "- OUTPUT SIZING: If OUTPUT GUIDANCE appears in the context with a target_tokens value,\n"
-    "  pass target_tokens=<N> to the tool call that produces the FINAL output artifact of the goal\n"
-    "  (the primary product — e.g. the last synthesize, generate-note, or extract call).\n"
-    "  Do NOT apply target_tokens to intermediate/preparatory tool calls.\n"
+    "- EVAL TARGET (REQUIRED, FIRST RULE): the action that produces the goal's "
+    "primary deliverable MUST bind it to out=\"$eval_target\". Without this "
+    "binding the quality gate cannot evaluate the run. Set $eval_target exactly "
+    "once, on the action that creates or updates the real output. Do not set it "
+    "on bookkeeping, verification, or pure side-effect (say-only) actions. If "
+    "the deliverable is the say'd text itself, emit create-note with "
+    "out=\"$eval_target\" first, then say.\n"
+    "- Action shape: {\"type\": \"<tool-or-primitive-name>\", ...args, \"out\": \"$var\"}. "
+    "The 'type' field is the tool/primitive name. All other fields are that "
+    "tool's parameters exactly as documented in the catalog. 'out' binds the "
+    "result for downstream actions.\n"
+    "- Reference earlier outputs by $var: target=\"$papers\", value=\"$summary\". "
+    "$var bindings persist across actions in this list and across planner steps.\n"
+    "- Binding names must be valid identifiers: $clip_body, $item_0. No spaces, "
+    "no raw filenames in $vars (e.g. avoid \"$Trading Agents.md_content\").\n"
+    "- Pass dicts/lists directly as JSON values — do not pre-serialize with "
+    "json.dumps. {\"value\": {\"k\": \"v\"}} not {\"value\": \"{\\\"k\\\": \\\"v\\\"}\"}.\n"
+    "- Stop-on-failure is automatic. Do NOT add status-check actions, "
+    "error-coalescing actions, or fallback branches. If the first action "
+    "fails, the planner sees that on the next loop iteration and decides "
+    "what to do.\n"
+    "- Iteration over a Collection uses the map primitive (above). There is "
+    "no for / if / while construct in the action list itself.\n"
+    "- For computation that requires real Python (regex parsing, arithmetic, "
+    "custom string handling), do not try to express it in the list. Emit only "
+    "the actions you can express now; the planner will run another loop "
+    "iteration with the next task.\n"
+    "- Max 16 actions per list. Each map body counts as one entry in the "
+    "outer list, regardless of body length.\n"
+    "- OUTPUT SIZING: if OUTPUT GUIDANCE appears in the context with a "
+    "target_tokens value, set target_tokens=<N> on the action that produces "
+    "the FINAL output artifact (typically the action with out=\"$eval_target\"). "
+    "Do not apply target_tokens to intermediate actions.\n"
+    "- Output ONLY the JSON list. No prose around it, no Python, no comments "
+    "inside the JSON. A single ```json ... ``` fence is acceptable for "
+    "readability but not required.\n"
 )
+
 
 
 def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
@@ -1288,16 +1297,16 @@ def _get_exemplar_hint_for_failure(tool_result: str, executor) -> str:
     if "ERROR |" not in tool_result:
         return ""
     # Extract tool name from "ERROR | tool_name failed: reason"
-    # or from "_code_block_ failed: reason" (code block wraps tool calls)
+    # or from "_action_list_ failed: reason" (action list wraps multiple actions)
     import re
     m = re.search(r'ERROR \| (\S+) failed:', tool_result)
     if not m:
         return ""
     failed_tool = m.group(1)
-    # _code_block_ failures: scan the error for a tool name
-    if failed_tool == "_code_block_":
-        # Look for tool name in the error text
-        for candidate in re.findall(r'tool\("([^"]+)"', tool_result):
+    # _action_list_ failures: the inner failed action's type appears in the
+    # reason snippet (e.g. "action at index 2 [search-web] returned non-success").
+    if failed_tool == "_action_list_":
+        for candidate in re.findall(r'\[([a-z][a-z0-9_-]+)\]', tool_result):
             failed_tool = candidate
             break
         else:
@@ -1357,263 +1366,160 @@ _CODEGEN_FORBIDDEN_PATTERNS = [
 ]
 
 
-def validate_codegen_block(code: str) -> tuple:
+def extract_action_list(raw_text: str) -> Optional[List[Dict]]:
+    """Extract a JSON action list from LLM-generated Stage 2 output.
+
+    Strips ```json fences (or bare ``` fences), then walks the text to
+    find the first balanced top-level `[...]` and json-parses it.
+
+    Returns the parsed list of dicts, or None if no valid list is found.
     """
-    Static validation of LLM-generated code blocks before exec.
-    
-    Checks:
-    - Forbidden patterns (imports, exec, file I/O, class/def, etc.)
-    - Must contain 1-16 execute_action_tracked calls
-    - Must contain at least one return executor._create_uniform_return
-    - Max 512 executable code lines (comments and blanks are free)
-    - Hard cap of 512 total lines
-    
-    Args:
-        code: Python code string
-        
-    Returns:
-        (ok: bool, reason: str) - reason is empty on success
-    """
-    if not code or not code.strip():
-        return False, "Empty code block"
-    
-    lines = code.strip().splitlines()
-    code_lines = [l for l in lines if l.strip() and not l.strip().startswith('#')]
-    if len(code_lines) > 512:
-        return False, f"Code block too long ({len(code_lines)} code lines, max 512)"
-    if len(lines) > 512:
-        return False, f"Code block too long ({len(lines)} total lines, max 512)"
-
-    # Check forbidden patterns
-    for pattern in _CODEGEN_FORBIDDEN_PATTERNS:
-        match = re.search(pattern, code)
-        if match:
-            return False, f"Forbidden pattern: {match.group()}"
-    
-    # Count tool calls: tool() shorthand + legacy execute_action_tracked (0-16; 0 allowed for read-only)
-    call_count = (len(re.findall(r'\btool\s*\(', code))
-                  + len(re.findall(r'executor\.execute_action_tracked\s*\(', code)))
-    if call_count > 16:
-        return False, f"Too many tool calls ({call_count}, max 16)"
-
-    # Must have a return with _create_uniform_return
-    if 'executor._create_uniform_return' not in code:
-        return False, "Missing return executor._create_uniform_return(...)"
-
-    # Reject silent-failure patterns: except blocks whose body is only continue or pass.
-    # Allow except blocks that handle errors visibly (e.g. errors.append, return failure).
-    if re.search(r'^\s*except\b[^:]*:\s*\n\s*(continue|pass)\s*$', code, re.MULTILINE):
-        return False, "Silent 'except: continue/pass' not allowed. Track errors explicitly and check r['status']."
-
-    return True, ""
-
-
-def extract_code_block(raw_text: str) -> str:
-    """
-    Extract Python code from LLM-generated Stage 2 output for _code_block_ tool.
-    
-    Handles:
-    - Triple backtick fenced blocks (```python ... ```)
-    - CODE: label prefix
-    - Raw code (fallback)
-    
-    Args:
-        raw_text: Raw text from Stage 2 generation (tool_args area)
-        
-    Returns:
-        Extracted Python code string
-    """
-    if not raw_text:
-        return ""
-    
+    if not raw_text or not isinstance(raw_text, str):
+        return None
     text = raw_text.strip()
-    
-    # Remove CODE: prefix if present
-    if text.upper().startswith("CODE:"):
-        text = text[5:].strip()
-    
-    # Try to extract from complete triple backtick fences
-    fence_match = re.search(r'```(?:python)?\s*\n(.*?)```', text, re.DOTALL)
-    if fence_match:
-        return fence_match.group(1).strip()
-
-    # Handle incomplete fenced blocks (common when generation is stopped at closing fence)
-    # e.g. "```python\n...code..." or "```\n...code..."
-    if text.startswith("```"):
-        lines = text.splitlines()
-        if lines and lines[0].strip().startswith("```"):
-            lines = lines[1:]
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-        return "\n".join(lines).strip()
-    
-    # Fallback: return everything (may already be raw code)
-    return text.strip()
-
-
-def count_codegen_action_calls(code: str) -> int:
-    """Count tool calls (tool() shorthand + legacy execute_action_tracked) in a code block."""
-    if not code:
-        return 0
-    return (len(re.findall(r'\btool\s*\(', code))
-            + len(re.findall(r'executor\.execute_action_tracked\s*\(', code)))
-
-
-def execute_codegen_block(code: str, executor, method_name: str = "codegen") -> Dict:
-    """
-    Validate and execute an LLM-generated code block in a sandboxed namespace.
-    
-    The code is wrapped in a function so that 'return' statements work.
-    Executor helpers for resource access are also available in the namespace.
-    
-    Args:
-        code: Python code string (from extract_code_block)
-        executor: InfospaceExecutor instance
-        method_name: Method name for UI logging (default: "codegen")
-        
-    Returns:
-        uniform_return dict
-    """
-    # Defensive normalization: some backends may still return fenced blocks.
-    code = extract_code_block(code)
-    ok, reason = validate_codegen_block(code)
-    if not ok:
-        logger.warning(f"Code block validation failed: {reason}")
-        return executor._create_uniform_return("failed", reason=f"Code validation failed: {reason}")
-    
-    # Wrap code in a function so `return` works
-    indented = textwrap.indent(code, "    ")
-    wrapped = f"def _codegen_fn(executor):\n{indented}\n"
-
-    def _resolve_resource_id(ref):
-        if not isinstance(ref, str):
-            return None
-        if ref.startswith("$"):
-            return executor.plan_bindings_flat.get(ref[1:])
-        if ref in executor.plan_bindings_flat:
-            return executor.plan_bindings_flat.get(ref)
-        if ref.startswith("Note_") or ref.startswith("Collection_"):
-            return ref
+    # Strip optional fences (with or without json language tag)
+    text = re.sub(r'^```(?:json)?\s*', '', text)
+    text = re.sub(r'\s*```\s*$', '', text)
+    text = text.strip()
+    if not text:
         return None
-
-    def _get_resource_content(ref):
-        resource_id = _resolve_resource_id(ref)
-        if not resource_id:
-            return None
-        return executor._get_content(resource_id)
-
-    def get_text(ref):
-        content = _get_resource_content(ref)
-        if content is None:
-            return ""
-        if isinstance(content, str):
-            return content
-        return json.dumps(content, ensure_ascii=False)
-
-    def get_json(ref):
-        content = _get_resource_content(ref)
-        if isinstance(content, dict):
-            return content
-        if isinstance(content, str):
-            try:
-                return json.loads(content)
-            except Exception:
-                return None
+    # Locate the first '['
+    start = text.find('[')
+    if start < 0:
         return None
-
-    def get_items(ref):
-        content = _get_resource_content(ref)
-        if isinstance(content, list):
-            return content
-        return []
-
-    def tool(type_name, **kwargs):
-        """Shorthand for executor.execute_action_tracked.
-
-        Usage:  r = tool("search-web", query="transformers survey", out="$papers")
-        Returns the same dict as execute_action_tracked (keys: status, resource_id, value, extra).
-        """
-        action = {"type": type_name, **kwargs}
-        return executor.execute_action_tracked(action, method_name)
-
-    # Expose helpers both as free functions and executor methods.
-    # This prevents common codegen failures like calling executor.get_json(...).
-    executor.get_text = get_text
-    executor.get_json = get_json
-    executor.get_items = get_items
-
-    namespace = {
-        "executor": executor,
-        "json": json,
-        "logger": logger,
-        "tool": tool,
-        "get_text": get_text,
-        "get_json": get_json,
-        "get_items": get_items,
-    }
+    # Walk to find the matching ']'. Track string state and escape state so
+    # brackets inside string literals don't fool the depth counter.
+    depth = 0
+    in_str = False
+    esc = False
+    end = -1
+    for i in range(start, len(text)):
+        c = text[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif c == '\\':
+                esc = True
+            elif c == '"':
+                in_str = False
+            continue
+        if c == '"':
+            in_str = True
+        elif c == '[':
+            depth += 1
+        elif c == ']':
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+    if end < 0:
+        return None
+    candidate = text[start:end + 1]
     try:
-        exec(wrapped, namespace)
-        result = namespace["_codegen_fn"](executor)
+        actions = json.loads(candidate)
     except Exception as e:
-        logger.error(f"Code block execution error: {e}")
-        logger.error(traceback.format_exc())
-        return executor._create_uniform_return("failed", reason=f"Code block exception: {str(e)}")
-    
-    if not isinstance(result, dict) or result.get("type") != "uniform_return":
-        return executor._create_uniform_return("failed", reason="Code block did not return uniform_return")
-    return result
+        logger.debug(f"extract_action_list: JSON parse failed: {e}")
+        return None
+    if not isinstance(actions, list):
+        return None
+    return actions
 
 
-def _execute_and_record_code_block(code_text: str, executor, step: int) -> tuple:
-    """Execute a code block, record it as a single _code_block_ plan action, and
-    persist the output as a Note when substantial.
+def validate_action_list(actions: List[Dict],
+                         known_action_types: Optional[set] = None,
+                         max_actions: int = 16) -> Tuple[bool, Optional[str]]:
+    """Lightweight structural validation of a parsed action list.
+
+    Returns (ok, reason). Catches gross malformation early; type-not-found,
+    missing-required-fields, and bad $out shape are surfaced at runtime
+    by the executor's per-action handlers and don't need duplicating here.
+
+    known_action_types: optional set of recognized action names to gate
+        against; if None, all type names pass structural check.
+    """
+    if not isinstance(actions, list):
+        return False, "Top-level must be a JSON list of action dicts"
+    if not actions:
+        return False, "Action list is empty"
+    if len(actions) > max_actions:
+        return False, f"Too many actions ({len(actions)} > {max_actions})"
+
+    for i, act in enumerate(actions):
+        if not isinstance(act, dict):
+            return False, f"Action {i} is not a dict (got {type(act).__name__})"
+        a_type = act.get('type')
+        if not a_type or not isinstance(a_type, str):
+            return False, f"Action {i} missing or non-string 'type' field"
+        if known_action_types is not None and a_type not in known_action_types:
+            return False, f"Action {i}: unknown type {a_type!r}"
+        # Recursively validate map bodies expressed as a list
+        if a_type == 'map':
+            op = act.get('operation')
+            if isinstance(op, list):
+                ok, reason = validate_action_list(
+                    op, known_action_types=known_action_types,
+                    max_actions=max_actions,
+                )
+                if not ok:
+                    return False, f"Action {i} (map body): {reason}"
+    return True, None
+
+
+def _execute_and_record_action_list(actions: List[Dict], raw_text: str,
+                                     executor, step: int) -> tuple:
+    """Execute a parsed action list as one planner step, record it as a
+    single _action_list_ plan action (so cached plans can replay it),
+    and persist substantial output as a Note when no Note bindings were
+    created during the list.
 
     Returns:
-        (result_dict, new_bindings, tool_result_text, code_block_output_created)
+        (result_dict, new_bindings, tool_result_text, action_list_output_created)
     """
     bindings_before = dict(executor.plan_bindings_flat)
-    # Snapshot plan_actions so we can replace individual tool calls with one _code_block_
     _pa = getattr(executor, '_plan_actions', [])
     _pa_start = len(_pa)
 
-    result_dict = execute_codegen_block(code_text, executor, "codegen")
+    # Run the list. method_name="action_list" routes each action through
+    # execute_action_tracked, so individual actions land in _plan_actions
+    # for cache replay. We then collapse them into a single _action_list_
+    # entry below.
+    result_dict = executor.execute_action_list(actions, method_name="action_list")
 
     if hasattr(executor, "_done_gate_retry_active"):
         executor._done_gate_retry_active = False
 
-    # Capture the last tool action before replacing individual actions.
-    # The last out= binding is the code block's primary artifact.
+    # Capture the last individual action with an `out` binding — used as
+    # the "headline tool" for the Stage 3 result line.
     last_tool_action = None
     if hasattr(executor, '_plan_actions') and len(executor._plan_actions) > _pa_start:
-        # Walk backwards to find the last action with an 'out' param
         for i in range(len(executor._plan_actions) - 1, _pa_start - 1, -1):
             act = executor._plan_actions[i]
             if act.get('out'):
                 last_tool_action = act
                 break
-        # If no out= action, just take the very last action
         if not last_tool_action:
             last_tool_action = executor._plan_actions[-1]
 
-    # Replace individual actions recorded during the code block with a single
-    # _code_block_ action containing the source, making cached plans replayable.
+    # Replace the per-action records with a single _action_list_ entry
+    # carrying the parsed list. This is the unit of cached-plan replay.
     if hasattr(executor, '_plan_actions'):
         replaced_count = len(executor._plan_actions) - _pa_start
         del executor._plan_actions[_pa_start:]
-        executor._plan_actions.append({"type": "_code_block_", "source": code_text})
-        logger.info(f"Step {step}: Replaced {replaced_count} tracked actions with 1 _code_block_ (source={len(code_text)} chars)")
+        executor._plan_actions.append({"type": "_action_list_", "actions": actions})
+        logger.info(
+            f"Step {step}: Replaced {replaced_count} tracked actions with "
+            f"1 _action_list_ ({len(actions)} actions)"
+        )
 
     logger.info(f"Step {step}: plan_actions count: {len(getattr(executor, '_plan_actions', []))}")
 
-    new_bindings = {k: v for k, v in executor.plan_bindings_flat.items() if bindings_before.get(k) != v}
+    new_bindings = {k: v for k, v in executor.plan_bindings_flat.items()
+                    if bindings_before.get(k) != v}
 
-    # Build Stage 3 result text showing all bindings (compact summary per binding)
-    # so the LLM can see what each tool call produced, not just the last one.
-    # The code block return is still used for status (success/failed/reason).
-    action = {"type": "_code_block_", "source": code_text}
+    # Build Stage 3 result text — same shape as the old codegen path.
+    action = {"type": "_action_list_", "actions": actions}
     status = result_dict.get('status', 'failed')
     if status == 'success' and new_bindings:
-        # Build per-binding summaries: "$var → NoteID (preview)"
         binding_lines = []
         for var_name, rid in new_bindings.items():
             if var_name.startswith('_'):
@@ -1633,21 +1539,19 @@ def _execute_and_record_code_block(code_text: str, executor, step: int) -> tuple
             else:
                 binding_lines.append(f"${var_name} → {rid}")
 
-        # Compose result: header + per-binding lines
-        tool_name = last_tool_action.get('type', 'unknown') if last_tool_action else '_code_block_'
-        last_var = list(new_bindings.keys())[-1]
-        header = f"SUCCESS | {tool_name} → _code_block_ completed ({len(new_bindings)} bindings)"
+        tool_name = last_tool_action.get('type', 'unknown') if last_tool_action else '_action_list_'
+        header = (f"SUCCESS | {tool_name} → _action_list_ completed "
+                  f"({len(new_bindings)} bindings)")
         if len(binding_lines) <= 4:
             tool_result = header + "\n" + "\n".join(binding_lines)
         else:
-            # Too many bindings — show first 2 and last 2
             tool_result = header + "\n" + "\n".join(binding_lines[:2] + ["..."] + binding_lines[-2:])
     else:
         tool_result = format_result_text(result_dict, action)
 
-    # Persist code block return value as Note when substantial, but only if the
-    # code block didn't already create Note bindings (avoids duplicate content).
-    code_block_output_created = False
+    # Persist substantial output as a Note when the list didn't already
+    # create Note bindings.
+    action_list_output_created = False
     note_bindings_created = any(
         isinstance(v, str) and v.startswith("Note_")
         for v in new_bindings.values()
@@ -1663,10 +1567,13 @@ def _execute_and_record_code_block(code_text: str, executor, step: int) -> tuple
         else:
             raw = str(raw) if raw is not None else ''
         if isinstance(raw, str) and len(raw) > 80:
-            executor.execute_action_tracked({"type": "create-note", "value": raw, "out": "$code_block_output"}, "codegen")
-            code_block_output_created = True
+            executor.execute_action_tracked(
+                {"type": "create-note", "value": raw, "out": "$action_list_output"},
+                "action_list",
+            )
+            action_list_output_created = True
 
-    return result_dict, new_bindings, tool_result, code_block_output_created
+    return result_dict, new_bindings, tool_result, action_list_output_created
 
 
 def _strip_numbered_prefix(text: str) -> str:
@@ -2004,7 +1911,7 @@ _ARTIFACT_PRODUCING_TOOLS = frozenset({"synthesize", "extract", "generate-note"}
 
 # Subset of artifact-producing tools that typically produce goal-level output.
 # A FAIL from the lightweight classifier on these triggers deep (subplanner) evaluation.
-_GOAL_LEVEL_TOOLS = frozenset({"synthesize", "_code_block_"})
+_GOAL_LEVEL_TOOLS = frozenset({"synthesize", "_action_list_"})
 _SIDE_EFFECT_TOOLS = frozenset({"send-email", "post-bluesky"})
 
 
@@ -2192,8 +2099,10 @@ def _select_primary_artifact_id(
         if not _is_side_effect_artifact(rid, executor):
             return rid
 
+    # Legacy parameter name kept for caller compatibility; the binding is now
+    # $action_list_output (created by _execute_and_record_action_list).
     if code_block_output_created:
-        rid = _resolve_artifact_reference_id("$code_block_output", executor)
+        rid = _resolve_artifact_reference_id("$action_list_output", executor)
         if rid:
             return rid
 
@@ -2975,7 +2884,7 @@ ALWAYS follow all formatting instructions exactly.
 
         # Stage 2/3 format instructions (Stage 2 from shared constant)
         s += user(
-            STAGE2_CODEGEN_PROMPT +
+            STAGE2_ACTION_LIST_PROMPT +
             "\n"
             "#Stage 3 FORMAT:\n"
             "  THOUGHTS: <brief assessment of result and progress>\n"
@@ -3044,34 +2953,57 @@ ALWAYS follow all formatting instructions exactly.
                 f"{_repeat_warn}"
                 f"CURRENT_TASK: {current_task}\n"
                 f"{_output_guidance_line}"
-                "Write a Python code block using Stage 2 FORMAT.\n"
-                "Reminder: chain via $bindings (out=\"$name\"), end with return executor._create_uniform_return(...), max 16 tool calls. Locals don't persist across steps. No try/except — check r[\"status\"] instead.\n"
+                "Emit a JSON action list using Stage 2 FORMAT.\n"
+                "Reminder: chain via $bindings (out=\"$name\"), max 16 actions, the executor stops on first failure automatically. No status checks, no try/except, no Python.\n"
             )
 
             s += assistant(
-                "```python\n"
-                + gen(f"code_block_{step}", max_tokens=2048, temperature=CODE_TEMPERATURE, stop=["\n```"])
+                "```json\n"
+                + gen(f"action_list_{step}", max_tokens=2048, temperature=CODE_TEMPERATURE, stop=["\n```"])
                 + "\n```\n"
             )
-            
-            code_text = _strip_think_tags(s[f"code_block_{step}"].strip())
-            # Strip trailing incomplete backtick fences (model sometimes emits `` or ` without newline)
-            code_text = re.sub(r'`{1,3}\s*$', '', code_text).rstrip()
-            s[f"code_block_{step}"] = code_text
-            logger.info(f"Step {step}: Code block ({len(code_text)} chars):\n{code_text}")
-            call_count = count_codegen_action_calls(code_text)
-            logger.info(f"Step {step}: Code block action calls={call_count} (logged before execution)")
 
-            # Interrupt checkpoint: after code-block gen, before execute
-            if _interrupt_requested(executor):
-                _clear_interrupt(executor)
-                s["final_answer"] = "Interrupted by user."
-                break
+            raw_text = _strip_think_tags(s[f"action_list_{step}"].strip())
+            raw_text = re.sub(r'`{1,3}\s*$', '', raw_text).rstrip()
+            s[f"action_list_{step}"] = raw_text
+            logger.info(f"Step {step}: Action list raw ({len(raw_text)} chars):\n{raw_text}")
 
-            # Set task context for tool exemplar recording
-            executor._current_task_context = current_task
+            # Parse + validate
+            actions = extract_action_list(raw_text)
+            if actions is None:
+                logger.warning(f"Step {step}: Could not extract JSON action list from output")
+                result_dict = executor._create_uniform_return(
+                    "failed",
+                    reason="Stage 2 output did not contain a parseable JSON action list",
+                )
+                new_bindings = {}
+                tool_result = format_result_text(result_dict, {"type": "_action_list_"})
+                code_block_output_created = False
+            else:
+                ok, vreason = validate_action_list(actions, known_action_types=executor._get_known_action_names())
+                if not ok:
+                    logger.warning(f"Step {step}: Action list validation failed: {vreason}")
+                    result_dict = executor._create_uniform_return(
+                        "failed",
+                        reason=f"Action list validation failed: {vreason}",
+                    )
+                    new_bindings = {}
+                    tool_result = format_result_text(result_dict, {"type": "_action_list_"})
+                    code_block_output_created = False
+                else:
+                    logger.info(f"Step {step}: Action list parsed: {len(actions)} actions")
 
-            result_dict, new_bindings, tool_result, code_block_output_created = _execute_and_record_code_block(code_text, executor, step)
+                    # Interrupt checkpoint: after gen + parse, before execute
+                    if _interrupt_requested(executor):
+                        _clear_interrupt(executor)
+                        s["final_answer"] = "Interrupted by user."
+                        break
+
+                    # Set task context for tool exemplar recording
+                    executor._current_task_context = current_task
+
+                    result_dict, new_bindings, tool_result, code_block_output_created = \
+                        _execute_and_record_action_list(actions, raw_text, executor, step)
             
             logger.info(f"Step {step}: -> {tool_result[:100]}")
             if new_bindings:
@@ -3333,7 +3265,7 @@ ALWAYS follow all formatting instructions exactly.
                 stall_guard_state,
                 done_raw=done_raw,
                 next_task_raw=next_task_raw,
-                code_text=code_text
+                raw_text=raw_text,
             )
             if stall_reason:
                 logger.info(stall_reason)
@@ -4081,7 +4013,7 @@ ALWAYS follow all formatting instructions exactly.
 
     # Stage 2/3 format instructions (Stage 2 from shared constant)
     prompt += format_user(
-        STAGE2_CODEGEN_PROMPT +
+        STAGE2_ACTION_LIST_PROMPT +
         "\n"
         "#Stage 3 FORMAT:\n"
         "  THOUGHTS: <brief assessment of result and progress>\n"
@@ -4152,34 +4084,58 @@ ALWAYS follow all formatting instructions exactly.
             f"{_repeat_warn}"
             f"CURRENT_TASK: {current_task}\n"
             f"{_output_guidance_line}"
-            "Write a Python code block using Stage 2 FORMAT.\n"
+            "Emit a JSON action list using Stage 2 FORMAT.\n"
         )
 
-        prompt += format_assistant("```python\n")
+        prompt += format_assistant("```json\n")
         # Use compressed prompt for LLM call to reduce token count on later steps
         compressed_for_llm = _build_compressed_prompt(prompt, keep_last_n_steps=2) if step >= 3 else None
-        code_raw = vllm_gen(f"code_block_{step}", prompt, state, max_tokens=2048, temperature=GEN_TEMPERATURE, stop=["\n```"], executor=executor, llm_prompt=compressed_for_llm, reasoning_effort="medium")
-        prompt += code_raw + "\n```\n"
-        # Strip echoed code fences if model includes them
-        code_text = code_raw.strip()
+        raw_emitted = vllm_gen(f"action_list_{step}", prompt, state, max_tokens=2048, temperature=GEN_TEMPERATURE, stop=["\n```"], executor=executor, llm_prompt=compressed_for_llm, reasoning_effort="medium")
+        prompt += raw_emitted + "\n```\n"
+        # Strip echoed fences if model includes them
+        raw_text = raw_emitted.strip()
         import re as _re
-        code_text = _re.sub(r'^```(?:python)?\s*', '', code_text)
-        code_text = _re.sub(r'`{1,3}\s*$', '', code_text).rstrip()
-        
-        logger.info(f"Step {step}: Code block ({len(code_text)} chars):\n{code_text}")
-        call_count = count_codegen_action_calls(code_text)
-        logger.info(f"Step {step}: Code block action calls={call_count} (logged before execution)")
-        
-        # Interrupt checkpoint: after code-block gen, before execute
+        raw_text = _re.sub(r'^```(?:json)?\s*', '', raw_text)
+        raw_text = _re.sub(r'`{1,3}\s*$', '', raw_text).rstrip()
+
+        logger.info(f"Step {step}: Action list raw ({len(raw_text)} chars):\n{raw_text}")
+
+        # Interrupt checkpoint: after gen, before parse/execute
         if _interrupt_requested(executor):
             _clear_interrupt(executor)
             state["final_answer"] = "Interrupted by user."
             break
 
-        # Set task context for tool exemplar recording
-        executor._current_task_context = current_task
+        # Parse + validate
+        actions = extract_action_list(raw_text)
+        if actions is None:
+            logger.warning(f"Step {step}: Could not extract JSON action list from output")
+            result_dict = executor._create_uniform_return(
+                "failed",
+                reason="Stage 2 output did not contain a parseable JSON action list",
+            )
+            new_bindings = {}
+            tool_result = format_result_text(result_dict, {"type": "_action_list_"})
+            code_block_output_created = False
+        else:
+            ok_v, vreason = validate_action_list(actions, known_action_types=executor._get_known_action_names())
+            if not ok_v:
+                logger.warning(f"Step {step}: Action list validation failed: {vreason}")
+                result_dict = executor._create_uniform_return(
+                    "failed",
+                    reason=f"Action list validation failed: {vreason}",
+                )
+                new_bindings = {}
+                tool_result = format_result_text(result_dict, {"type": "_action_list_"})
+                code_block_output_created = False
+            else:
+                logger.info(f"Step {step}: Action list parsed: {len(actions)} actions")
 
-        result_dict, new_bindings, tool_result, code_block_output_created = _execute_and_record_code_block(code_text, executor, step)
+                # Set task context for tool exemplar recording
+                executor._current_task_context = current_task
+
+                result_dict, new_bindings, tool_result, code_block_output_created = \
+                    _execute_and_record_action_list(actions, raw_text, executor, step)
 
         logger.info(f"Step {step}: -> {tool_result[:100]}")
         if new_bindings:
@@ -4505,7 +4461,7 @@ ALWAYS follow all formatting instructions exactly.
             stall_guard_state,
             done_raw=done_raw,
             next_task_raw=next_task_raw,
-            code_text=code_text
+            raw_text=raw_text,
         )
         if stall_reason:
             logger.info(stall_reason)
@@ -4764,18 +4720,19 @@ def _normalize_loop_text(text: str) -> str:
     return normalized
 
 
-def _extract_action_types_from_code(code_text: str) -> List[str]:
-    """Extract action types from code block for simple repetition detection."""
-    if not code_text:
+def _extract_action_types_from_code(raw_text: str) -> List[str]:
+    """Extract action types from a Stage 2 emission for simple repetition
+    detection. Works on the JSON action-list emission shape ("type": "name")."""
+    if not raw_text:
         return []
-    return re.findall(r'["\']type["\']\s*:\s*["\']([^"\']+)["\']', code_text)
+    return re.findall(r'["\']type["\']\s*:\s*["\']([^"\']+)["\']', raw_text)
 
 
 def _stall_guard_check(
     guard_state: Dict[str, Any],
     done_raw: str,
     next_task_raw: str,
-    code_text: str
+    raw_text: str,
 ) -> Optional[str]:
     """
     Detect repeated plan loops using deterministic structural signatures.
@@ -4787,7 +4744,7 @@ def _stall_guard_check(
         return None
 
     next_task_sig = _normalize_loop_text(next_task_raw)[:220]
-    action_sig = tuple(_extract_action_types_from_code(code_text)[:8])
+    action_sig = tuple(_extract_action_types_from_code(raw_text)[:8])
     signature = (next_task_sig, action_sig)
 
     prev_signature = guard_state.get("prev_signature")

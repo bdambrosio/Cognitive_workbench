@@ -2,6 +2,23 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Jill - Chat CLI",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/launcher.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "SGLANG_DISABLE_DEEP_GEMM": "1",
+                "FLASHINFER_DISABLE_VERSION_CHECK": "1"
+            },
+            "args": ["jill-chat.yaml", "--cli", "--resource-browser"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
             "name": "Jill - Infospace CLI",
             "type": "debugpy",
             "request": "launch",

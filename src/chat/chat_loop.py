@@ -45,12 +45,18 @@ from cot_profiles import is_reasoning_model, resolve_profile  # noqa: E402
 logger = logging.getLogger('chat_loop')
 
 
-# Web-search prefix routing. Explicit user-typed slash-style command
-# ("web:" or "search:" at the start of a turn). Bruce explicitly authorized
-# this keyword-prefix trigger; do NOT extend this to natural-language
-# detection without semantic routing per the project's no-keyword-matching
-# rule.
-_SEARCH_PREFIX_RE = re.compile(r'^\s*(?:web|search):\s*', re.IGNORECASE)
+# ReAct loop: maximum iterations per turn before forcing a fallback
+# synthesis. Typical turns are 1-4 iters; cap exists to bound runaway loops.
+REACT_MAX_ITERS = 8
+
+# Tools the model can emit. Validated structurally in _parse_react_action;
+# the dispatcher in _run_react_loop knows how to run each.
+_REACT_TOOLS = ('process_text', 'search', 'respond')
+
+# Per-iteration auto-binding: $step1, $step2, ... names the result of each
+# action so subsequent actions can reference it. Scoped to the current turn
+# only — does not leak into conversation history or the next turn's loop.
+_REACT_BINDING_RE = re.compile(r'^\$step\d+$')
 
 
 # ─── LLM backend ────────────────────────────────────────────────────────────
@@ -500,26 +506,9 @@ class ChatLoop:
             logger.warning(f"[{self.character_name}] publish failed: {e}")
 
     # ------------------------------------------------------------------
-    # Web search (v1: verbatim prefix-stripped query, no LLM rewriting).
-    #
-    # SEAM: query rewriting via LLM goes between _extract_search_query
-    # and _run_web_search — replace the single-string `query` with a list
-    # of formulated queries, run each, merge syntheses. Bruce notes LLM
-    # query rewriting is effective and is the natural follow-up.
+    # Web search — backend for the ReAct `search` tool. Persists each
+    # synthesis as a named Note so it appears in /resources.
     # ------------------------------------------------------------------
-
-    @staticmethod
-    def _extract_search_query(text: str) -> Optional[str]:
-        """If `text` starts with `web:` or `search:` (case-insensitive),
-        return the post-prefix query; else None. Empty post-prefix is
-        treated as no-trigger (returns None)."""
-        if not text:
-            return None
-        m = _SEARCH_PREFIX_RE.match(text)
-        if not m:
-            return None
-        query = text[m.end():].strip()
-        return query or None
 
     @staticmethod
     def _search_note_name(query: str) -> str:
@@ -590,13 +579,104 @@ class ChatLoop:
 
         return {'synthesis': synthesis, 'sources': sources, 'query': query}
 
+    # ------------------------------------------------------------------
+    # ReAct loop — single-action-per-iteration tool use for chat.
+    #
+    # Tools: process_text (LLM transformation), search (web), respond (exit).
+    # Each emit is a single JSON object; results auto-bind to $step1, $step2…
+    # Variable scope is per-turn; nothing leaks into conversation history.
+    # ------------------------------------------------------------------
+
     @staticmethod
-    def _format_search_context_message(search_context: Dict[str, Any]) -> str:
-        query = search_context.get('query', '')
-        synthesis = search_context.get('synthesis', '')
-        sources = search_context.get('sources', []) or []
+    def _parse_react_action(raw: str) -> Optional[Dict[str, Any]]:
+        """Extract a single JSON action object from LLM output. Tolerates
+        ```json fences and surrounding prose. Returns None if no balanced
+        JSON object can be found."""
+        if not raw or not isinstance(raw, str):
+            return None
+        text = raw.strip()
+        text = re.sub(r'^```(?:json)?\s*', '', text)
+        text = re.sub(r'\s*```\s*$', '', text)
+        text = text.strip()
+        if not text:
+            return None
+        start = text.find('{')
+        if start < 0:
+            return None
+        depth = 0
+        in_str = False
+        esc = False
+        end = -1
+        for i in range(start, len(text)):
+            c = text[i]
+            if in_str:
+                if esc:
+                    esc = False
+                elif c == '\\':
+                    esc = True
+                elif c == '"':
+                    in_str = False
+                continue
+            if c == '"':
+                in_str = True
+            elif c == '{':
+                depth += 1
+            elif c == '}':
+                depth -= 1
+                if depth == 0:
+                    end = i
+                    break
+        if end < 0:
+            return None
+        try:
+            obj = json.loads(text[start:end + 1])
+        except Exception:
+            return None
+        if not isinstance(obj, dict):
+            return None
+        return obj
+
+    @staticmethod
+    def _resolve_react_value(val: Any, log: List[Tuple[str, str]]) -> str:
+        """Literal string passes through; `$stepN` looks up the log."""
+        if not isinstance(val, str):
+            return str(val) if val is not None else ''
+        if _REACT_BINDING_RE.match(val):
+            for label, content in log:
+                if label == val:
+                    return content
+            return ''
+        return val
+
+    def _run_process_text(self, source_text: str, instruction: str) -> str:
+        """Apply a focused LLM pass to source_text using the given instruction.
+        Used by the ReAct process_text tool. Output is the transformed text
+        with no preamble/headers."""
+        sys_msg = (
+            "You are a focused text-transformation tool. Apply the instruction "
+            "to the source text. Output ONLY the transformed result — no "
+            "preamble, no commentary, no headers, no markdown fences."
+        )
+        user_msg = f"INSTRUCTION:\n{instruction}\n\nSOURCE:\n{source_text}"
+        try:
+            result = self.backend.chat(
+                [{'role': 'system', 'content': sys_msg},
+                 {'role': 'user', 'content': user_msg}],
+                max_tokens=2048, temperature=0.4, cot_profile='none',
+            )
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] process_text failed: {e}")
+            return f"(process_text error: {e})"
+        return (result or '').strip()
+
+    @staticmethod
+    def _format_react_search_observation(search_result: Dict[str, Any]) -> str:
+        """Render a search result (synthesis + sources) into the scratchpad
+        observation text. Sources capped to keep prompt size bounded."""
+        synthesis = search_result.get('synthesis', '') or ''
+        sources = search_result.get('sources', []) or []
         src_lines = []
-        for s in sources:
+        for s in sources[:8]:
             domain = s.get('domain') or '?'
             url = s.get('url') or ''
             title = s.get('title') or ''
@@ -604,17 +684,9 @@ class ChatLoop:
                 src_lines.append(f"- {domain}: {title} ({url})")
             else:
                 src_lines.append(f"- {domain}: {title}")
-        src_block = "\n".join(src_lines) if src_lines else "(no source list)"
-        return (
-            f"[Web search results for: \"{query}\"\n\n"
-            f"{synthesis}\n\n"
-            f"Sources:\n{src_block}\n\n"
-            f"Instructions: When you draw on these results in your reply, "
-            f"cite by domain or publication name (e.g. \"per nytimes.com\" "
-            f"or \"according to NOAA\"), not as \"the source\" or \"the "
-            f"writeup\". If the search did not address the question, say so "
-            f"plainly rather than improvising.]"
-        )
+        if not src_lines:
+            return synthesis
+        return f"{synthesis}\n\nSources:\n" + "\n".join(src_lines)
 
     # ------------------------------------------------------------------
     # Resource queryable handlers (chat-mode subset of executive_node)
@@ -790,6 +862,10 @@ class ChatLoop:
     # ------------------------------------------------------------------
 
     def _build_system_prompt(self, source: str, orientation: str) -> str:
+        """Build the persona/state portion of the system prompt — shared base
+        for ReAct mode. The prose-only directive that used to live here was
+        moved out: ReAct supplies its own JSON-emit directive in
+        _build_react_system_prompt. There is no non-ReAct chat path now."""
         parts: List[str] = []
         parts.append(f"You are {self.character_name}, speaking in first person.")
         if self.persona:
@@ -809,69 +885,194 @@ class ChatLoop:
             parts.append("## Outstanding discourse objects\n" + disc)
         if orientation:
             parts.append(orientation)
-        parts.append(
-            "Respond as a single conversational turn. Do not narrate actions, "
-            "do not roleplay tools you do not have, do not emit JSON or code "
-            "fences unless the user asked for them."
-        )
         return "\n\n".join(parts)
 
-    def _build_chat_messages(self, source: str, new_text: str, orientation: str,
-                             search_context: Optional[Dict[str, Any]] = None,
-                             search_error: Optional[str] = None) -> List[Dict[str, str]]:
-        system = self._build_system_prompt(source, orientation)
-        msgs: List[Dict[str, str]] = [{'role': 'system', 'content': system}]
+    # ------------------------------------------------------------------
+    # ReAct loop — continuing-computation style.
+    # System prompt: persona + companion + tool catalog (stable).
+    # User message: conversation history + current input + working log +
+    # "Emit next action:" trailer (rebuilt each iteration).
+    # The user input is part of the log text, NOT a separate user-role
+    # message — that's what stops chat-trained models from defaulting to
+    # direct prose reply.
+    # ------------------------------------------------------------------
+
+    def _build_react_system_prompt(self, source: str, orientation: str) -> str:
+        base = self._build_system_prompt(source, orientation)
+        react = (
+            "\n\n## ReAct Tool Loop — READ FIRST\n"
+            "Each emission is ONE JSON action object — nothing else. Prose "
+            "around the JSON is discarded and the loop will retry. Output "
+            "begins with `{` and ends with `}`.\n"
+            "\n"
+            "You do NOT know: today's date, current weather, recent news, "
+            "current prices, or anything requiring fresh information. For "
+            "time-sensitive or fact-specific questions, your first action "
+            "is `search`.\n"
+            "\n"
+            "Tools (each emission picks ONE):\n"
+            "1. `{\"tool\": \"process_text\", \"source\": <string|$stepN>, \"instruction\": <string>}` — "
+            "LLM pass over text in context. Use to formulate queries, render results in your voice, extract info.\n"
+            "2. `{\"tool\": \"search\", \"query\": <string|$stepN>}` — web search.\n"
+            "3. `{\"tool\": \"respond\", \"text\": <string|$stepN>}` — final reply, exits loop. "
+            "Must be in your voice; pass search results through process_text first or write the reply yourself.\n"
+            "\n"
+            "Each action's result auto-binds to `$step1, $step2, …` (per-turn scope).\n"
+            "\n"
+            "Worked example. User: 'what's the weather in Berkeley tomorrow?'\n"
+            "  Iter 1: `{\"tool\": \"search\", \"query\": \"Berkeley CA weather forecast tomorrow\"}` → $step1\n"
+            "  Iter 2: `{\"tool\": \"process_text\", \"source\": \"$step1\", \"instruction\": \"answer the user in your voice in 1-2 sentences, citing the source domain\"}` → $step2\n"
+            "  Iter 3: `{\"tool\": \"respond\", \"text\": \"$step2\"}` → loop exits.\n"
+            "\n"
+            "Output ONLY one JSON object. No prose, no apology, no explanation."
+        )
+        return base + react
+
+    def _build_react_prompt(self, source: str, user_text: str, orientation: str,
+                            log: List[Tuple[str, str]]) -> List[Dict[str, str]]:
+        """Single user-role text containing history + current input + working log."""
+        parts: List[str] = []
         history = self.store.get_recent_turns(source, limit=self.history_limit, scope='all')
-        # The just-recorded incoming turn is in history; drop the trailing entry
-        # if it duplicates new_text to avoid sending it twice.
-        if history and history[-1].get('direction') == 'in' and str(history[-1].get('text', '')) == new_text:
+        if history and history[-1].get('direction') == 'in' and str(history[-1].get('text', '')) == user_text:
             history = history[:-1]
-        for t in history:
-            role = 'user' if t.get('direction') == 'in' else 'assistant'
-            msgs.append({'role': role, 'content': str(t.get('text', ''))})
+        if history:
+            parts.append("## Conversation history")
+            for t in history:
+                who = source if t.get('direction') == 'in' else self.character_name
+                parts.append(f"{who}: {t.get('text', '')}")
+            parts.append("")
+        parts.append("## Current user input")
+        parts.append(user_text)
+        parts.append("")
+        parts.append("## Working log")
+        if not log:
+            parts.append("(empty — emit your first action)")
+        else:
+            for label, content in log:
+                parts.append(f"{label}:\n{content}")
+        parts.append("")
+        parts.append("Emit next action:")
+        return [
+            {'role': 'system', 'content': self._build_react_system_prompt(source, orientation)},
+            {'role': 'user', 'content': "\n".join(parts)},
+        ]
 
-        # Web-search context is per-turn only — sits immediately before the
-        # actual user turn so the model treats it as context for *this*
-        # answer, not as persona/state. Not part of the system prompt
-        # (which would persist across turns).
-        if search_context:
-            msgs.append({'role': 'user',
-                         'content': self._format_search_context_message(search_context)})
-        elif search_error:
-            msgs.append({'role': 'user', 'content': f"[{search_error}]"})
+    def _run_react_loop(self, source: str, user_text: str, orientation: str) -> str:
+        log: List[Tuple[str, str]] = []
+        for i in range(REACT_MAX_ITERS):
+            prompt = self._build_react_prompt(source, user_text, orientation, log)
+            try:
+                raw = self.backend.chat(prompt, max_tokens=2048, temperature=0.7,
+                                        cot_profile='none')
+            except Exception as e:
+                logger.error(f"[{self.character_name}] ReAct iter {i+1} LLM failed: {e}")
+                reply = self._react_fallback_synthesis(log, str(e))
+                self._write_react_trace(source, user_text, log, reply, 'llm_error')
+                return reply
 
-        msgs.append({'role': 'user', 'content': new_text})
-        return msgs
+            action = self._parse_react_action(raw)
+            if action is None:
+                logger.warning(f"[{self.character_name}] ReAct iter {i+1}: unparseable: {raw[:160]!r}")
+                log.append(('NOTE', "Previous output was prose, not JSON. The user's task above is "
+                            "unanswered. Do NOT apologize — emit ONE JSON action now to address it."))
+                continue
+
+            tool = action.get('tool')
+            if tool == 'respond':
+                text = self._resolve_react_value(action.get('text', ''), log)
+                logger.info(f"[{self.character_name}] ReAct iter {i+1}: respond ({len(text)} chars)")
+                self._write_react_trace(source, user_text, log, text, 'respond')
+                return text
+
+            binding = f'$step{i+1}'
+            log.append((f'ACTION {i+1}', json.dumps(action)))
+
+            if tool == 'process_text':
+                src = self._resolve_react_value(action.get('source', ''), log)
+                ins = action.get('instruction', '')
+                obs = self._run_process_text(src, ins) if (src and ins) else '(missing source or instruction)'
+            elif tool == 'search':
+                q = self._resolve_react_value(action.get('query', ''), log)
+                result = self._run_web_search(q) if q else None
+                obs = self._format_react_search_observation(result) if result else '(search failed or empty query)'
+            else:
+                obs = f"unknown tool {tool!r}; available: process_text, search, respond"
+
+            log.append((binding, obs))
+            logger.info(f"[{self.character_name}] ReAct iter {i+1}: {tool} → {binding} ({len(obs)} chars)")
+
+        logger.warning(f"[{self.character_name}] ReAct hit max iters ({REACT_MAX_ITERS})")
+        reply = self._react_fallback_synthesis(log)
+        self._write_react_trace(source, user_text, log, reply, 'max_iters')
+        return reply
+
+    def _write_react_trace(self, source: str, user_text: str,
+                           log: List[Tuple[str, str]], final_response: str,
+                           exit_reason: str) -> None:
+        """Append one ReAct session to logs/chat_trace_{character}.txt.
+        Section format mirrors planner_trace_{agent}.txt: a delimiter line,
+        a header block with metadata, then the log + final response. The
+        format_prompt.py 'Load Chat Trace' button reads this file."""
+        try:
+            from pathlib import Path
+            log_dir = Path(__file__).resolve().parent.parent / 'logs'
+            log_dir.mkdir(exist_ok=True)
+            trace_path = log_dir / f'chat_trace_{self.character_name}.txt'
+            ts = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
+            sep = '=' * 80
+            iters = len([e for e in log if e[0].startswith('ACTION')])
+            lines = [
+                '', sep,
+                f'Chat session: {ts}',
+                f'Source: {source}',
+                f'User input: {user_text}',
+                f'Iterations: {iters}',
+                f'Exit: {exit_reason}',
+                f'Final response length: {len(final_response)} chars',
+                sep, '',
+            ]
+            for label, content in log:
+                lines.append(f'### {label}')
+                lines.append(str(content))
+                lines.append('')
+            lines.append('### Final response to user')
+            lines.append(final_response)
+            lines.append('')
+            lines.append(sep)
+            with open(trace_path, 'a', encoding='utf-8') as f:
+                f.write('\n'.join(lines) + '\n')
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] react trace write failed: {e}")
+
+    def _react_fallback_synthesis(self, log: List[Tuple[str, str]], fail_reason: str = '') -> str:
+        """Force a Jill-voice reply when respond never fired."""
+        if not log:
+            return f"(I couldn't formulate a response.{(' — ' + fail_reason) if fail_reason else ''})"
+        summary = "\n".join(f"{label}: {content[:400]}" for label, content in log)
+        sys_msg = (f"You are {self.character_name}, speaking in first person. The ReAct "
+                   "loop did not exit cleanly. Synthesize the log into a reply, in your voice. "
+                   "If incomplete, say so honestly rather than fabricate.")
+        user_msg = (f"Log:\n{summary}"
+                    + (f"\n\n(Failure: {fail_reason})" if fail_reason else "")
+                    + "\n\nWrite the response now. No preamble.")
+        try:
+            result = self.backend.chat(
+                [{'role': 'system', 'content': sys_msg}, {'role': 'user', 'content': user_msg}],
+                max_tokens=1024, temperature=0.7, cot_profile='none')
+            return (result or '').strip() or "(could not synthesize)"
+        except Exception as e:
+            return f"(trouble formulating a response: {e})"
 
     # ------------------------------------------------------------------
     # Per-turn handling
     # ------------------------------------------------------------------
 
     def _process_user_turn(self, source: str, text: str, close: bool) -> None:
-        # Web-search prefix is handled BEFORE recording the turn so the
-        # ConversationStore (and downstream discourse / companion
-        # summarizers) never see the literal "web:" / "search:" prefix.
-        search_context: Optional[Dict[str, Any]] = None
-        search_error: Optional[str] = None
-        query = self._extract_search_query(text)
-        if query:
-            text = query  # cleaned text — what gets recorded and replied to
-            logger.info(f"[{self.character_name}] web search requested: {query!r}")
-            search_context = self._run_web_search(query)
-            if search_context is None:
-                search_error = (
-                    "Web search unavailable (no API key set, backend "
-                    "returned no results, or network error). Replying "
-                    "without web context."
-                )
-                logger.info(f"[{self.character_name}] search failed for: {query!r}")
-            else:
-                logger.info(
-                    f"[{self.character_name}] search ok: "
-                    f"{len(search_context['sources'])} sources, "
-                    f"{len(search_context['synthesis'])} chars"
-                )
-
+        # Each turn drives a ReAct loop: process_text / search / respond.
+        # The prior web:/search: prefix path is gone — the model decides
+        # when to search via the search tool. Only the final respond text
+        # enters conversation history / discourse / companion. The ReAct
+        # scratchpad is per-turn and not persisted.
         self.store.record_incoming(source, text, close=close)
 
         if not text:
@@ -880,23 +1081,13 @@ class ChatLoop:
             return
 
         orientation = self._orientation_summary(source, text)
-        messages = self._build_chat_messages(
-            source, text, orientation,
-            search_context=search_context, search_error=search_error,
-        )
 
         try:
-            # Grammar is disabled (yaml is_reasoning_model=false) and
-            # thinking is left at its template default (on). The model
-            # thinks freely; llama-server splits content/reasoning_content
-            # via the chat template's reasoning extraction; our client-side
-            # `</think>` strip pulls the answer out of content. max_tokens
-            # is generous so a multi-turn reply with substantial thinking
-            # never hits finish_reason=length mid-thought.
-            reply = self.backend.chat(messages, max_tokens=4096, temperature=0.7,
-                                      cot_profile='none')
+            reply = self._run_react_loop(source, text, orientation)
         except Exception as e:
-            logger.error(f"[{self.character_name}] LLM call failed: {e}")
+            logger.error(f"[{self.character_name}] ReAct loop crashed: {e}")
+            import traceback
+            traceback.print_exc()
             reply = f"[{self.character_name}] I had trouble generating a reply: {e}"
 
         reply = (reply or '').strip()

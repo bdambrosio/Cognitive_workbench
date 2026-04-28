@@ -640,6 +640,107 @@ layout.addWidget(load_trace_button)
 # Connect the button's clicked signal to the function
 load_trace_button.clicked.connect(load_trace_section)
 
+
+def load_chat_trace_section():
+    """Load section(s) of chat_trace_{agent}.txt — written by the chat ReAct
+    loop, one section per turn. Mirrors load_trace_section's UI but reads
+    a different file pattern and recognizes 'Chat session:' as the section
+    marker."""
+    trace_dir = Path(__file__).parent / "logs"
+
+    dialog = QDialog(window)
+    dialog.setWindowTitle("Load Chat Trace Sections")
+    dialog_layout = QVBoxLayout()
+
+    agent_label = QLabel("Agent name:")
+    dialog_layout.addWidget(agent_label)
+    agent_combo = QComboBox()
+    agent_combo.setEditable(True)
+    if trace_dir.exists():
+        for f in sorted(trace_dir.glob("chat_trace_*.txt")):
+            agent = f.stem.replace("chat_trace_", "")
+            if agent and agent not in [agent_combo.itemText(i) for i in range(agent_combo.count())]:
+                agent_combo.addItem(agent)
+    if agent_combo.count() == 0:
+        agent_combo.addItems(["Jill"])
+    agent_combo.setCurrentIndex(0)
+    dialog_layout.addWidget(agent_combo)
+
+    label = QLabel("How many turns (sections) to load?")
+    dialog_layout.addWidget(label)
+    combo = QComboBox()
+    combo.addItems(["1", "2", "3", "4", "5", "10"])
+    combo.setCurrentIndex(0)
+    dialog_layout.addWidget(combo)
+
+    button_layout = QHBoxLayout()
+    ok_button = QPushButton("OK")
+    cancel_button = QPushButton("Cancel")
+    button_layout.addWidget(ok_button)
+    button_layout.addWidget(cancel_button)
+    dialog_layout.addLayout(button_layout)
+
+    dialog.setLayout(dialog_layout)
+    ok_button.clicked.connect(dialog.accept)
+    cancel_button.clicked.connect(dialog.reject)
+
+    if dialog.exec() != QDialog.DialogCode.Accepted:
+        return
+
+    agent_name = agent_combo.currentText().strip() or "Jill"
+    num_sections = int(combo.currentText())
+    trace_file_path = trace_dir / f"chat_trace_{agent_name}.txt"
+
+    if not trace_file_path.exists():
+        QMessageBox.critical(window, "Error", f"Chat trace file not found: {trace_file_path}")
+        return
+
+    try:
+        with open(trace_file_path, 'r', encoding='utf-8') as f:
+            trace_lines = f.readlines()
+    except Exception as e:
+        QMessageBox.critical(window, "Error", f"Failed to read trace file: {str(e)}")
+        return
+
+    # Each turn's section starts with the "Chat session:" header line.
+    match_indices = []
+    for i in range(len(trace_lines) - 1, -1, -1):
+        if trace_lines[i].startswith("Chat session:"):
+            match_indices.append(i)
+
+    if not match_indices:
+        QMessageBox.warning(window, "Error", "No 'Chat session:' header found in chat trace file.")
+        return
+
+    if len(match_indices) < num_sections:
+        QMessageBox.information(window, "Info", f"Only {len(match_indices)} turn(s) found, loading all.")
+        num_sections = len(match_indices)
+
+    # match_indices is reverse-ordered (last turn first). Pick the start of
+    # the last n turns; include the '=' separator line above the header.
+    start_index = match_indices[num_sections - 1]
+    if start_index > 0 and trace_lines[start_index - 1].startswith('='):
+        start_index -= 1
+
+    section_lines = trace_lines[start_index:]
+    section_text = ''.join(section_lines)
+
+    current_text = text_edit.toPlainText()
+    if not current_text.strip():
+        text_edit.clear()
+        text_edit.setPlainText(section_text)
+        text_edit.setFont(textFont)
+    else:
+        cursor = text_edit.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        cursor.insertText('\n\n' + section_text)
+        text_edit.setTextCursor(cursor)
+
+
+load_chat_trace_button = QPushButton("Load Chat Trace")
+layout.addWidget(load_chat_trace_button)
+load_chat_trace_button.clicked.connect(load_chat_trace_section)
+
 # Create submit button for API calls
 submit_button = QPushButton("Submit")
 layout.addWidget(submit_button)

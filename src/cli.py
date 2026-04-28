@@ -511,13 +511,30 @@ def _handle_query(session, character: str, data: dict, state: dict):
             if dialog:
                 parts.append(f"{C.CYAN}in dialog{C.RESET}")
             print(f"  {', '.join(parts)}")
+            goal_id = agent_state.get('current_goal_id', '')
             goal_name = agent_state.get('current_goal_name', '')
             goal_text = agent_state.get('current_goal_text', '')
+            goal_src = agent_state.get('current_goal_id_source', '')
+            active_sched = agent_state.get('active_scheduled_goal_id', '')
+            goal_running = agent_state.get('is_goal_running', False)
             if goal_name:
                 label = goal_text or goal_name
                 if len(label) > 120:
                     label = label[:117] + '...'
-                print(f"  {C.GREEN}Running goal:{C.RESET} {C.BOLD}{goal_name}{C.RESET} — {label}")
+                gid_tag = f"{C.CYAN}{goal_id}{C.RESET}  " if goal_id else ''
+                # Diagnostic suffix: surface dual-id confusion when we're
+                # showing a Goal-instance id rather than a scheduled-goal id,
+                # or when the active scheduled-goal pointer is stale.
+                src_note = ''
+                if goal_src == 'stale_active':
+                    src_note = f"  {C.YELLOW}[stale active_scheduled_goal_id={active_sched}, record not found]{C.RESET}"
+                elif goal_src == 'goal_instance':
+                    src_note = f"  {C.DIM}[Goal-instance id; not a scheduled-goal record]{C.RESET}"
+                print(f"  {C.GREEN}Running goal:{C.RESET} {gid_tag}{C.BOLD}{goal_name}{C.RESET} — {label}{src_note}")
+            else:
+                # No running goal: say so explicitly rather than going silent.
+                worker_alive = " (worker thread alive but no goal bound)" if goal_running else ""
+                print(f"  {C.DIM}Active goal: none{worker_alive}{C.RESET}")
         else:
             print(f"  {C.DIM}(no state received yet){C.RESET}")
 

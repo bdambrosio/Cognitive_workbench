@@ -3828,10 +3828,10 @@ class ZenohExecutiveNode:
         for i, action in enumerate(actions):
             atype = action.get("type", "unknown")
             header = f"─── Step {i + 1}  [{atype}] ───"
-            if atype == "_code_block_":
-                source = action.get("source", "")
-                # Normalize indentation and add line numbers
-                lines = textwrap.dedent(source).strip().splitlines()
+            if atype == "_action_list_":
+                inner = action.get("actions", [])
+                pretty = json.dumps(inner, indent=2)
+                lines = pretty.splitlines()
                 numbered = [f"  {n + 1:3d} │ {line}" for n, line in enumerate(lines)]
                 parts.append(f"{header}\n" + "\n".join(numbered))
             elif atype == "ask":
@@ -3852,13 +3852,15 @@ class ZenohExecutiveNode:
           # Delete a step by removing its entire block (header through next header).
           # Reorder steps by moving blocks. Edit code freely.
 
-          ### STEP 1 [_code_block_]
-          <source code>
+          ### STEP 1 [_action_list_]
+          [
+            {"type": "...", ...},
+            ...
+          ]
 
           ### STEP 2 [ask]
           <ask value>
         """
-        import textwrap
         lines = [
             f"# Goal: {goal.get('goal_id', '?')} — {goal.get('name', '')}",
             f"# execution_mode: {goal.get('execution_mode', 'replan')}",
@@ -3866,7 +3868,7 @@ class ZenohExecutiveNode:
             "# Instructions:",
             "#   - Delete a step by removing its entire block (### STEP header through next header).",
             "#   - Reorder steps by moving blocks.",
-            "#   - Edit code freely within a step.",
+            "#   - Edit the JSON freely within an action-list step.",
             "#   - To set execution_mode, change the value on the execution_mode line above.",
             "#   - Lines starting with # outside of step blocks are comments (ignored).",
             "",
@@ -3874,9 +3876,9 @@ class ZenohExecutiveNode:
         for i, action in enumerate(actions):
             atype = action.get("type", "unknown")
             lines.append(f"### STEP {i + 1} [{atype}]")
-            if atype == "_code_block_":
-                source = textwrap.dedent(action.get("source", "")).strip()
-                lines.append(source)
+            if atype == "_action_list_":
+                inner = action.get("actions", [])
+                lines.append(json.dumps(inner, indent=2))
             elif atype == "ask":
                 lines.append(action.get("value", ""))
             else:
@@ -3918,8 +3920,16 @@ class ZenohExecutiveNode:
             while body_lines and body_lines[-1].startswith("#"):
                 body_lines.pop()
             body = "\n".join(body_lines).strip()
-            if atype == "_code_block_":
-                actions.append({"type": "_code_block_", "source": body})
+            if atype == "_action_list_":
+                try:
+                    inner = json.loads(body)
+                    if not isinstance(inner, list):
+                        logger.warning(f"_action_list_ STEP body is not a JSON list; skipping")
+                        continue
+                    actions.append({"type": "_action_list_", "actions": inner})
+                except json.JSONDecodeError as e:
+                    logger.warning(f"_action_list_ STEP body is not valid JSON: {e}; skipping")
+                    continue
             elif atype == "ask":
                 actions.append({"type": "ask", "value": body})
             else:
@@ -4354,35 +4364,43 @@ class ZenohExecutiveNode:
         for line in http_errors:
             issues.append(f"HTTP ERROR: {line.strip()[-120:]}")
 
-        # Static analysis of plan code
+        # Static analysis of plan: walk action lists, collect $out (writes)
+        # and any other field-value that's a $var (reads). With JSON action
+        # lists this is a direct dict walk — no regex parsing of source.
         all_bindings_written = set()
         all_bindings_read = set()
-        import re
+
+        def _walk_action(a: dict, step_idx: int):
+            if not isinstance(a, dict):
+                return
+            for k, v in a.items():
+                if k == 'type':
+                    continue
+                if k == 'out' and isinstance(v, str) and v.startswith('$'):
+                    all_bindings_written.add(v)
+                    continue
+                if isinstance(v, str) and v.startswith('$'):
+                    all_bindings_read.add(v)
+                elif isinstance(v, list):
+                    # Map body or $-var-laden value list — recurse
+                    for item in v:
+                        if isinstance(item, dict):
+                            _walk_action(item, step_idx)
+                        elif isinstance(item, str) and item.startswith('$'):
+                            all_bindings_read.add(item)
+            # 'say' with literal raw value-from-large-binding is a common
+            # debug leftover; flag it heuristically.
+            if a.get('type') == 'say':
+                val = a.get('value', '')
+                if isinstance(val, str) and val.startswith('$'):
+                    # Reading a $var into say is fine — not flagged.
+                    pass
+
         for i, action in enumerate(actions):
-            if action.get("type") == "_code_block_":
-                source = action.get("source", "")
-                # Find out= bindings (writes)
-                for m in re.finditer(r'\bout\s*=\s*["\'](\$\w+)["\']', source):
-                    all_bindings_written.add(m.group(1))
-                # Find reads via get_text / get_json / get_items helpers.
-                # All three accept a $var; the previous version of this
-                # checker missed get_items, producing false UNUSED BINDING
-                # flags for any Collection consumed via get_items in a
-                # subsequent step.
-                for m in re.finditer(r'\bget_(?:text|json|items)\s*\(\s*["\'](\$\w+)["\']', source):
-                    all_bindings_read.add(m.group(1))
-                # Find reads via tool() keyword arguments. Any kwarg name
-                # other than 'out' that takes a "$var" value is a read —
-                # most common is target=, but split has source=, filter
-                # has predicate-target patterns, etc. Treating all non-out
-                # kwargs uniformly catches them all without requiring a
-                # hardcoded list of read-shaped kwarg names.
-                for m in re.finditer(r'\b(\w+)\s*=\s*["\'](\$\w+)["\']', source):
-                    if m.group(1) != 'out':
-                        all_bindings_read.add(m.group(2))
-                # Check for say with raw content (debug leftovers)
-                if re.search(r'tool\s*\(\s*["\']say["\'].*(?:str\(|content|paper_text)', source):
-                    issues.append(f"Step {i+1}: possible debug 'say' dumping raw content")
+            if action.get("type") == "_action_list_":
+                inner = action.get("actions", []) or []
+                for a in inner:
+                    _walk_action(a, i)
 
         # Check for written-but-never-read bindings (excluding common sinks)
         sinks = {'$obs_result', '$kb_written', '$kb_write', '$updated_processed'}
@@ -7843,6 +7861,16 @@ class ZenohExecutiveNode:
             return
 
         if t == 'dispatch_goal':
+            # Autonomous goal injection from the character-evaluator
+            # (formulate_new_goal). Gated by autonomy_enabled — the same
+            # flag that gates ooda_planner.submit-goal — so /autonomy off
+            # silences both autonomous-goal-injection paths in one move.
+            if not getattr(self, 'autonomy_enabled', True):
+                logger.info(
+                    f"Autonomy disabled; suppressing dispatch_goal "
+                    f"({(p.get('goal_text', '') or '')[:80]!r})"
+                )
+                return
             scheduled_goal = self._upsert_scheduled_goal(p['goal_text'])
             goal_id = scheduled_goal["goal_id"]
             # Auto-created goals are ephemeral (deleted on completion)
@@ -8928,14 +8956,53 @@ class ZenohExecutiveNode:
                 active_dialog = self.conversation_store.has_active_dialogs()
             except Exception:
                 pass
+            current_goal_id = ''
             current_goal_name = ''
             current_goal_text = ''
-            if self.current_goal and self.current_goal.name != 'sleep':
+            goal_id_source = ''  # diagnostic: 'scheduled' | 'goal_instance' | 'stale_active' | 'none'
+
+            # Prefer the scheduled-goal record (authoritative for OODA-
+            # dispatched goals). self.current_goal is set inside the worker
+            # thread by parse_and_set_goal, so during the dispatch window
+            # _active_scheduled_goal_id is set but self.current_goal is
+            # still stale (None or the previous 'sleep') — leaving /status
+            # silent while a goal is in fact running.
+            active_sched_id = getattr(self, '_active_scheduled_goal_id', None)
+            sched_lookup_failed = False
+            if active_sched_id:
+                try:
+                    sched = self._get_scheduled_goal(active_sched_id)
+                except Exception:
+                    sched = None
+                if sched:
+                    current_goal_id = active_sched_id
+                    current_goal_name = sched.get('name') or (sched.get('goal_text', '') or '')[:60]
+                    current_goal_text = sched.get('goal_text', '') or ''
+                    goal_id_source = 'scheduled'
+                else:
+                    sched_lookup_failed = True
+
+            if not current_goal_id and self.current_goal and self.current_goal.name != 'sleep':
+                current_goal_id = getattr(self.current_goal, 'id', '') or ''
                 current_goal_name = self.current_goal.name
                 try:
                     current_goal_text = self.current_goal.to_string()
                 except Exception:
                     current_goal_text = ''
+                # Diagnose: are we showing a Goal-instance id because
+                # _active_scheduled_goal_id is missing, or because its
+                # lookup failed (record was deleted but the active-id
+                # pointer wasn't reset)?
+                goal_id_source = 'stale_active' if sched_lookup_failed else 'goal_instance'
+
+            if not current_goal_id:
+                goal_id_source = 'none'
+
+            try:
+                goal_running = self._is_goal_running()
+            except Exception:
+                goal_running = False
+
             state_data = {
                 'paused': self.execution_paused,
                 'mode': self.execution_mode,
@@ -8945,8 +9012,16 @@ class ZenohExecutiveNode:
                 'llm_mode': self.llm_mode,
                 'llm_switch_pending': self.llm_switch_pending,
                 'active_dialog': active_dialog,
+                'current_goal_id': current_goal_id,
                 'current_goal_name': current_goal_name,
                 'current_goal_text': current_goal_text,
+                'current_goal_id_source': goal_id_source,
+                'active_scheduled_goal_id': active_sched_id or '',
+                'is_goal_running': goal_running,
+                # Restores cli.py goal-start / [Ready] detection that broke
+                # when the goal_scheduler subscriber was removed in favor of
+                # the OODA planner (no one was publishing this field anymore).
+                'executing_goal_id': current_goal_id if goal_running else '',
                 'timestamp': time.time()
             }
             self.execution_state_publisher.put(json.dumps(state_data).encode('utf-8'))

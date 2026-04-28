@@ -1144,7 +1144,86 @@ class InfospaceExecutor:
             logger.error(f"Error executing action {action_type}: {e}")
             logger.error(traceback.format_exc())
             return self._create_uniform_return('failed', reason=f'Execution error: {str(e)}')
-    
+
+    def execute_action_list(self, actions: List[Dict],
+                             method_name: Optional[str] = "action_list") -> Dict:
+        """
+        Execute an ordered list of actions, stopping on the first failure.
+
+        Each action is dispatched through execute_action_tracked (when
+        method_name is set) or execute_action (when method_name is None).
+        The tracked path records each action in _plan_actions, runs
+        side-effect dedup, and emits UI events — used by the planner
+        step. The untracked path is used by map-body iteration where
+        per-item tracking would pollute the plan trace.
+
+        Both paths write any `$out` bindings into plan_bindings_flat,
+        so subsequent actions in the list can reference earlier `$out`
+        variables in the same way they would across separate planner
+        steps.
+
+        Failure semantics:
+          - First action returning status != 'success' aborts the list.
+          - Returned uniform_return carries status='failed', reason from
+            the failing action, and extra={'failed_at': i, 'action': {...},
+            'completed': i} so the planner can see which step broke.
+
+        Success semantics:
+          - All actions succeed → returns the last action's uniform_return
+            (status='success', with that step's value/data/resource_id).
+          - Empty list → returns success with no value (no-op).
+
+        This is the v1 replacement for Python codeblock execution. The
+        planner emits an ordered list of action dicts; the executor
+        runs them in sequence with binding propagation handled by the
+        same machinery used between planner steps. No exec(), no
+        sandbox, no second variable namespace.
+        """
+        if not actions:
+            return self._create_uniform_return('success', value=None)
+
+        if not isinstance(actions, list):
+            return self._create_uniform_return(
+                'failed',
+                reason=f'execute_action_list expected list, got {type(actions).__name__}',
+            )
+
+        last_result: Optional[Dict] = None
+        for i, action in enumerate(actions):
+            if not isinstance(action, dict):
+                return self._create_uniform_return(
+                    'failed',
+                    reason=f'action at index {i} is not a dict (got {type(action).__name__})',
+                    extra={'failed_at': i, 'completed': i},
+                )
+
+            if method_name is None:
+                result = self.execute_action(action)
+            else:
+                result = self.execute_action_tracked(action, method_name)
+            last_result = result
+
+            if not isinstance(result, dict) or result.get('status') != 'success':
+                # Strip large fields from the action snapshot to keep the
+                # failure return compact; the planner needs the type and
+                # the failing reason, not the full payload.
+                action_snapshot = {k: v for k, v in action.items()
+                                   if k in ('type', 'target', 'value', 'out', 'name', 'operation')}
+                reason = (result.get('reason') if isinstance(result, dict) else None) \
+                    or f'action at index {i} returned non-success'
+                return self._create_uniform_return(
+                    'failed',
+                    reason=reason,
+                    extra={
+                        'failed_at': i,
+                        'action': action_snapshot,
+                        'completed': i,
+                    },
+                )
+
+        return last_result if last_result is not None \
+            else self._create_uniform_return('success', value=None)
+
     def _get_known_action_names(self) -> set:
         """Return all known action names (built-in handlers + available tools)."""
         builtins = {
@@ -3846,17 +3925,23 @@ Make sure the string is in a format that can be parsed by the json.loads functio
     def _execute_map(self, action: Dict) -> Dict:
         """
         Apply operation to each item in a Collection.
-        
+
         Required: type, target, operation, out
         Optional: filter_null (bool), tool-specific parameters at top level
-        
+
         operation can be:
         - String: tool name or primitive name (e.g., "tool-name", "add", "remove")
         - Dict: {"tool": "name", ...} where all fields except "tool" are parameters (flat format)
-        
+        - List: [{action}, {action}, ...] — multi-step body executed via
+          execute_action_list per item. $item is bound to the current
+          Collection element; other body $vars are scoped to one iteration
+          via push/pop_binding_scope and do not leak to subsequent iterations
+          or to the outer plan. The body's last action's value/resource_id
+          becomes that iteration's contribution to the result Collection.
+
         Argument types:
         - target: $variable (Collection to map over)
-        - operation: string or dict (string for tool/primitive, dict with "tool" field)
+        - operation: string, dict, or list of action dicts
         - Additional fields at top level: tool-specific parameters (instruction, pattern, etc.)
         - filter_null: bool (exclude null/None results, default: true)
         - out: $variable name for result Collection
@@ -3918,9 +4003,21 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 logger.warning(f"Failed to fetch content for {note_id}, skipping")
                 continue
             structured_content = content if isinstance(content, dict) else self._parse_note_content_to_dict(content)
-            
+
             # Apply operation based on type
-            if isinstance(operation, str):
+            if isinstance(operation, list):
+                # Multi-step per-item body: bind $item to the current Collection
+                # element, run the body via execute_action_list inside a fresh
+                # binding scope so per-item $vars don't leak across iterations
+                # or to the outer plan. method_name=None so per-item actions
+                # don't pollute _plan_actions / cached-plan replay.
+                self.push_binding_scope(copy_outer=True)
+                try:
+                    self._bind_variable('item', note_id)
+                    result = self.execute_action_list(operation, method_name=None)
+                finally:
+                    self.pop_binding_scope()
+            elif isinstance(operation, str):
                 # Check if operation is blacklisted (needs special handling)
                 if operation in MAP_BLACKLIST:
                     # Special handling for blacklisted primitives
@@ -4109,7 +4206,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 else:
                     return self._create_uniform_return('failed', reason='operation dict must have "tool" field')
             else:
-                return self._create_uniform_return('failed', reason='operation must be string (tool/primitive name) or dict')
+                return self._create_uniform_return('failed', reason='operation must be a string (tool/primitive name), a dict with "tool" field, or a list of action dicts')
             
             # Handle result
             if result.get('status') == 'success':
@@ -6428,33 +6525,51 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                         'last_action_result': last_action_result if 'last_action_result' in locals() else None
                     }
 
-            # Handle code blocks (replayed from cached plans)
+            # Legacy saved plans from before the action-list migration: stop
+            # immediately with an actionable message so the user clears the cache.
             if stype == '_code_block_':
-                source = step.get('source')
-                if not source:
-                    logger.error("_code_block_ action missing 'source'; skipping")
+                logger.warning(
+                    "Cached plan contains legacy _code_block_ step (Python "
+                    "codegen format, no longer supported). Clear the cache "
+                    "with /goal cache clear <goal_id> and re-plan."
+                )
+                result = self._create_uniform_return(
+                    'failed',
+                    reason=("Cached plan is in legacy _code_block_ format and "
+                            "cannot be replayed. Clear the cache and re-plan."),
+                )
+                executed_steps += 1
+                last_action_result = result.copy()
+                if self.executive_node:
+                    self.executive_node._publish_action_result(step, result, stype, datetime.now())
+                current['idx'] = idx + 1
+                continue
+
+            # Handle action lists (replayed from cached plans)
+            if stype == '_action_list_':
+                actions = step.get('actions')
+                if not isinstance(actions, list):
+                    logger.error("_action_list_ action missing 'actions' list; skipping")
                     current['idx'] = idx + 1
                     continue
-                from incremental_planner import execute_codegen_block
                 _step_started_at = datetime.now()
                 _step_t0 = time.monotonic()
                 _step_exception_type = None
                 _step_exception_message = None
                 try:
-                    result = execute_codegen_block(source, self, "codegen")
+                    result = self.execute_action_list(actions, method_name="action_list")
                 except Exception as e:
-                    logger.error(f"Code block replay error: {e}")
+                    logger.error(f"Action list replay error: {e}")
                     logger.error(traceback.format_exc())
                     _step_exception_type = type(e).__name__
                     _step_exception_message = str(e)
-                    result = self._create_uniform_return("failed", reason=f"Code block replay error: {e}")
+                    result = self._create_uniform_return("failed", reason=f"Action list replay error: {e}")
                 executed_steps += 1
                 last_action_result = result.copy()
-                # Record per-step outcome for the harness.
                 try:
                     self._step_results.append({
                         "step_idx": executed_steps - 1,
-                        "step_kind": "_code_block_",
+                        "step_kind": "_action_list_",
                         "status": result.get('status', 'unknown'),
                         "reason": result.get('reason'),
                         "exception_type": _step_exception_type,
@@ -6467,7 +6582,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 if self.executive_node:
                     self.executive_node._publish_action_result(step, result, stype, datetime.now())
                 if result.get('status') == 'failed':
-                    logger.warning(f"Code block at step {executed_steps} failed: {result.get('reason')}")
+                    logger.warning(f"Action list at step {executed_steps} failed: {result.get('reason')}")
                 current['idx'] = idx + 1
                 if self.interrupt_requested:
                     return {
@@ -6713,25 +6828,41 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                         'last_action_result': last_action_result if 'last_action_result' in locals() else None
                     }
 
-            # Handle code blocks (replayed from cached plans)
+            # Legacy saved plans (pre action-list migration)
             if stype == '_code_block_':
-                source = step.get('source')
-                if not source:
-                    logger.error("_code_block_ action missing 'source'; skipping")
+                logger.warning(
+                    "Cached plan contains legacy _code_block_ step. Clear the "
+                    "cache with /goal cache clear <goal_id> and re-plan."
+                )
+                result = self._create_uniform_return(
+                    'failed',
+                    reason="Legacy _code_block_ format unsupported; clear cache and re-plan.",
+                )
+                executed_steps += 1
+                last_action_result = result.copy()
+                if self.executive_node:
+                    self.executive_node._publish_action_result(step, result, stype, datetime.now())
+                current['idx'] = idx + 1
+                continue
+
+            # Handle action lists (replayed from cached plans)
+            if stype == '_action_list_':
+                actions = step.get('actions')
+                if not isinstance(actions, list):
+                    logger.error("_action_list_ action missing 'actions' list; skipping")
                     current['idx'] = idx + 1
                     continue
-                from incremental_planner import execute_codegen_block
                 try:
-                    result = execute_codegen_block(source, self, "codegen")
+                    result = self.execute_action_list(actions, method_name="action_list")
                 except Exception as e:
-                    logger.error(f"Code block replay error: {e}")
-                    result = self._create_uniform_return("failed", reason=f"Code block replay error: {e}")
+                    logger.error(f"Action list replay error: {e}")
+                    result = self._create_uniform_return("failed", reason=f"Action list replay error: {e}")
                 executed_steps += 1
                 last_action_result = result.copy()
                 if self.executive_node:
                     self.executive_node._publish_action_result(step, result, stype, datetime.now())
                 if result.get('status') == 'failed':
-                    logger.warning(f"Code block at step {executed_steps} failed: {result.get('reason')}")
+                    logger.warning(f"Action list at step {executed_steps} failed: {result.get('reason')}")
                 current['idx'] = idx + 1
                 if self.interrupt_requested:
                     return {
