@@ -999,11 +999,21 @@ class ChatLoop:
 
     def _run_react_loop(self, source: str, user_text: str, orientation: str) -> str:
         log: List[Tuple[str, str]] = []
-        # Per-iteration record: {system, user, raw} — full text of the
-        # prompt sent and the model's response. Written verbatim into the
-        # trace file so we can replay exactly what the model saw.
-        iters: List[Dict[str, str]] = []
+        # Per-iteration record:
+        #   system   — full system prompt sent (constant across iters,
+        #              captured here for trace fidelity)
+        #   user     — full user message sent (grows with the working log)
+        #   raw      — model's full raw emission (thought + tool call)
+        #   appended — log entries this iter's parsed action contributed to
+        #              the working log for the NEXT iter to see. May be 0
+        #              entries (respond / loop-exit) or 2 entries (action
+        #              + observation) or 1 entry (NOTE on parse error).
+        # The model's raw emission and `appended` differ — the difference
+        # is exactly the reasoning that got "compressed away" before the
+        # next iter saw the context.
+        iters: List[Dict[str, Any]] = []
         for i in range(REACT_MAX_ITERS):
+            pre_log_len = len(log)
             prompt = self._build_react_prompt(source, user_text, orientation, log)
             sys_msg = prompt[0]['content']
             usr_msg = prompt[1]['content']
@@ -1013,24 +1023,27 @@ class ChatLoop:
             except Exception as e:
                 logger.error(f"[{self.character_name}] ReAct iter {i+1} LLM failed: {e}")
                 iters.append({'system': sys_msg, 'user': usr_msg,
-                              'raw': f'(LLM call failed: {e})'})
+                              'raw': f'(LLM call failed: {e})', 'appended': []})
                 reply = self._react_fallback_synthesis(log, str(e))
                 self._write_react_trace(source, user_text, log, iters, reply, 'llm_error')
                 return reply
 
-            iters.append({'system': sys_msg, 'user': usr_msg, 'raw': raw or ''})
+            iters.append({'system': sys_msg, 'user': usr_msg, 'raw': raw or '',
+                          'appended': []})
 
             action = self._parse_react_action(raw)
             if action is None:
                 logger.warning(f"[{self.character_name}] ReAct iter {i+1}: unparseable: {raw[:160]!r}")
                 log.append(('NOTE', "Previous output was prose, not JSON. The user's task above is "
                             "unanswered. Do NOT apologize — emit ONE JSON action now to address it."))
+                iters[-1]['appended'] = log[pre_log_len:]
                 continue
 
             tool = action.get('tool')
             if tool == 'respond':
                 text = self._resolve_react_value(action.get('text', ''), log)
                 logger.info(f"[{self.character_name}] ReAct iter {i+1}: respond ({len(text)} chars)")
+                # respond appends nothing to the log (loop exits); appended stays []
                 self._write_react_trace(source, user_text, log, iters, text, 'respond')
                 return text
 
@@ -1049,6 +1062,7 @@ class ChatLoop:
                 obs = f"unknown tool {tool!r}; available: process_text, search, respond"
 
             log.append((binding, obs))
+            iters[-1]['appended'] = log[pre_log_len:]
             logger.info(f"[{self.character_name}] ReAct iter {i+1}: {tool} → {binding} ({len(obs)} chars)")
 
         logger.warning(f"[{self.character_name}] ReAct hit max iters ({REACT_MAX_ITERS})")
@@ -1058,17 +1072,25 @@ class ChatLoop:
 
     def _write_react_trace(self, source: str, user_text: str,
                            log: List[Tuple[str, str]],
-                           iters: List[Dict[str, str]],
+                           iters: List[Dict[str, Any]],
                            final_response: str,
                            exit_reason: str) -> None:
         """Append one ReAct session to logs/chat_trace_{character}.txt.
 
-        Mirrors the completeness of incremental_planner's str(s) trace dump:
-        every iteration's full system message, full user message (including
-        all conversation history + working log accumulated up to that
-        point), and the raw model response are written verbatim. No
-        truncation, no summarization. The format_prompt.py 'Load Chat
-        Trace' button reads this file.
+        Continuing-computation layout:
+          - SYSTEM PROMPT (once; constant across iters, sent verbatim each call)
+          - INITIAL CONTEXT (once; iter-1 user message: history + current
+            input + empty working log + 'Emit next action:')
+          - Per iteration k:
+              MODEL RAW EMISSION — the full thought + tool call (debug)
+              APPENDED TO CONTEXT FOR NEXT ITER — what the runtime carried
+                  forward into the working log (parsed action + observation,
+                  or NOTE for parse error, or nothing for respond/exit).
+                  The diff between EMISSION and APPENDED is exactly the
+                  reasoning that gets compressed away before the next iter.
+          - FINAL RESPONSE TO USER
+
+        format_prompt.py 'Load Chat Trace' reads this file by section.
         """
         try:
             from pathlib import Path
@@ -1089,26 +1111,46 @@ class ChatLoop:
                 f'Final response length: {len(final_response)} chars',
                 sep, '',
             ]
-            # Full per-iteration prompt + response. Yes, the system and the
-            # bulk of the user message repeat across iterations — that's
-            # intentional, you're seeing exactly what the model saw at each
-            # call, character for character.
-            for idx, it in enumerate(iters):
+
+            if iters:
+                first = iters[0]
                 lines.append(sub)
-                lines.append(f'>>> ITERATION {idx + 1} — SYSTEM MESSAGE')
+                lines.append('>>> SYSTEM PROMPT (sent verbatim every iteration)')
                 lines.append(sub)
-                lines.append(it.get('system', ''))
+                lines.append(first.get('system', ''))
                 lines.append('')
                 lines.append(sub)
-                lines.append(f'>>> ITERATION {idx + 1} — USER MESSAGE')
+                lines.append('>>> INITIAL CONTEXT (iter-1 user message; working log empty)')
                 lines.append(sub)
-                lines.append(it.get('user', ''))
+                lines.append(first.get('user', ''))
                 lines.append('')
-                lines.append(sub)
-                lines.append(f'>>> ITERATION {idx + 1} — RAW MODEL RESPONSE')
-                lines.append(sub)
-                lines.append(it.get('raw', ''))
-                lines.append('')
+
+                for idx, it in enumerate(iters):
+                    lines.append(sub)
+                    lines.append(f'>>> ITERATION {idx + 1} — MODEL RAW EMISSION (thought + tool call)')
+                    lines.append(sub)
+                    lines.append(it.get('raw', ''))
+                    lines.append('')
+
+                    appended = it.get('appended', []) or []
+                    lines.append(sub)
+                    lines.append(f'>>> ITERATION {idx + 1} — APPENDED TO CONTEXT FOR NEXT ITER')
+                    lines.append(sub)
+                    if not appended:
+                        # respond exit, or LLM-error before any append
+                        if exit_reason == 'respond' and idx == n_iters - 1:
+                            lines.append('(respond — loop exits, nothing appended)')
+                        elif exit_reason == 'llm_error' and idx == n_iters - 1:
+                            lines.append('(LLM call failed — nothing appended)')
+                        else:
+                            lines.append('(nothing appended)')
+                    else:
+                        for label, content in appended:
+                            lines.append(f'{label}:')
+                            lines.append(str(content))
+                            lines.append('')
+                    lines.append('')
+
             lines.append(sub)
             lines.append('>>> FINAL RESPONSE TO USER')
             lines.append(sub)
