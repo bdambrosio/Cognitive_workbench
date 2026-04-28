@@ -15,11 +15,10 @@ world_config:
   world_name: "jill_chat"
 
 # Top-level llm_config drives the optional shared SGLang runtime in
-# launcher.py. Cloud setups don't need a local runtime — leave
-# sgl_model_path null to skip SGL bring-up entirely. The actual chat
-# backend is selected by per-character llm_config (below).
+# launcher.py. Leave sgl_model_path null to skip SGL bring-up entirely;
+# per-character llm_config (below) selects the actual chat backend.
 llm_config:
-  sgl_model_path: null
+  vllm_model_path: https://token-plan-sgp.xiaomimimo.com/v1
   reasoning_parser: null
 
 setting: |
@@ -30,35 +29,21 @@ characters:
   Jill:
     mode: chat
 
-    # Per-character LLM backend. Three forms:
-    #   1. Local OpenAI-compatible server (vLLM chat API, externally-launched
-    #      SGLang, llama-server, SGLangAPIServer on port 5000, lmstudio, …):
-    #         server: local
-    #         model: ""
-    #         base_url: http://127.0.0.1:5000   # or vllm_url (alias)
-    #   2. Legacy cloud shortcuts (route through utils.llm_api.LLM):
-    #         server: openrouter|openai
-    #         model: <model-id>
-    #   3. Unified cloud / OpenAI-compatible endpoint (this scenario):
-    #         server: local                     # any non-shortcut value
-    #         model: <model-id>
-    #         base_url: <provider /v1 url>
-    #         api_key: NAME_OF_ENV_VAR_HOLDING_KEY
-    #      The api_key field is the *name* of an env var, not the key itself.
-    #      Bearer auth is attached automatically; grammar / chat_template_kwargs
-    #      are skipped (cloud endpoints reject them).
+    # Per-character LLM backend. Default 'local' POSTs directly to
+    # {vllm_url}/v1/chat/completions — works against any OpenAI-compatible
+    # chat server (vLLM chat API, externally-launched SGLang, llama-server,
+    # SGLangAPIServer on port 5000, lmstudio, etc.). For cloud, use
+    # 'openrouter' or 'openai' (model name then required).
     llm_config:
       server: local
-      model: "mimo-v2.5"
-      base_url: https://api.xiaomimimo.com/v1
-      api_key: "XIAOMI_API_KEY"
+      model: ""
+      vllm_url: http://127.0.0.1:5000
       # Structured-CoT gate. Tested with Qwen3.6-27B and judged a failure:
       # any byte-budget constraint forced premature </think> closure that
       # leaked thinking into the answer channel and degraded reply
       # quality. Disabled. Infrastructure (cot_profiles.py, _ChatBackend
       # grammar attach) is kept for possible future use with different
       # models, but `false` here makes resolve_profile() unreachable.
-      # When api_key is set, grammar is skipped regardless.
       is_reasoning_model: false
 
     # On by default per project decision.

@@ -540,7 +540,7 @@ class ChatLoop:
             logger.warning(f"[{self.character_name}] _remember failed: {e}")
             return None
 
-    def _recall(self, query: str, k: int = 3, threshold: float = 0.3
+    def _recall(self, query: str, k: int = 3, threshold: float = 0.5
                 ) -> List[Tuple[str, str]]:
         """Semantic search over the memories Collection. Returns ranked
         (text, category) tuples, highest score first. Category is read
