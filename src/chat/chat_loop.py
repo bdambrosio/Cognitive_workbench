@@ -2069,6 +2069,43 @@ class ChatLoop:
             {'role': 'user', 'content': "\n".join(parts)},
         ]
 
+    # --- ReAct status line (CLI feedback during the loop) -----------------
+    # Subsequent _emit_status calls overwrite the previous one via \r, so the
+    # user sees a single line that mutates as the loop progresses
+    # ("thinking…" → "using search…" → "thinking…" → "using process_text…").
+    # _clear_status wipes the line before the response is published, so the
+    # CLI's response print starts on a clean line.
+
+    _STATUS_DIM = '\033[2m'
+    _STATUS_RESET = '\033[0m'
+    _STATUS_PAD = 80  # enough to overwrite any reasonable previous status
+
+    def _emit_status(self, msg: str) -> None:
+        """Overwrite the current terminal line with a transient status.
+        No-op when stdout isn't a TTY (logs / piped output) — printed
+        per-iteration log lines via logger.info already cover that case."""
+        if not sys.stdout.isatty():
+            return
+        try:
+            line = f"\r{self._STATUS_DIM}[{self.character_name}] {msg}{self._STATUS_RESET}"
+            # Pad with spaces so a shorter status overwrites leftover chars
+            # from a longer previous one. The \r places the cursor back at
+            # column 0; the next write (or _clear_status) replaces this.
+            sys.stdout.write(line.ljust(self._STATUS_PAD))
+            sys.stdout.flush()
+        except Exception:
+            pass  # status is non-essential; never raise
+
+    def _clear_status(self) -> None:
+        """Clear the status line and return cursor to column 0."""
+        if not sys.stdout.isatty():
+            return
+        try:
+            sys.stdout.write('\r' + ' ' * self._STATUS_PAD + '\r')
+            sys.stdout.flush()
+        except Exception:
+            pass
+
     def _run_react_loop(self, source: str, user_text: str, orientation: str,
                         recall: Optional[List[Tuple[str, str]]] = None,
                         concerns: Optional[List[Tuple[str, str]]] = None
@@ -2095,6 +2132,7 @@ class ChatLoop:
             prompt = self._build_react_prompt(source, user_text, orientation, log, recall=recall, concerns=concerns)
             sys_msg = prompt[0]['content']
             usr_msg = prompt[1]['content']
+            self._emit_status('thinking…')
             try:
                 raw = self.backend.chat(prompt, max_tokens=2048, temperature=0.7,
                                         cot_profile='none')
@@ -2103,6 +2141,7 @@ class ChatLoop:
                 iters.append({'system': sys_msg, 'user': usr_msg,
                               'raw': f'(LLM call failed: {e})', 'appended': []})
                 reply = self._react_fallback_synthesis(log, str(e))
+                self._clear_status()
                 return reply, log, iters, 'llm_error'
 
             iters.append({'system': sys_msg, 'user': usr_msg, 'raw': raw or '',
@@ -2111,6 +2150,7 @@ class ChatLoop:
             action = self._parse_react_action(raw)
             if action is None:
                 logger.warning(f"[{self.character_name}] ReAct iter {i+1}: unparseable: {raw[:160]!r}")
+                self._emit_status('parse failed, retrying…')
                 log.append(('NOTE', "Previous output was prose, not JSON. The user's task above is "
                             "unanswered. Do NOT apologize — emit ONE JSON action now to address it."))
                 iters[-1]['appended'] = log[pre_log_len:]
@@ -2121,8 +2161,10 @@ class ChatLoop:
                 text = self._resolve_react_value(action.get('text', ''), log)
                 logger.info(f"[{self.character_name}] ReAct iter {i+1}: respond ({len(text)} chars)")
                 # respond appends nothing to the log (loop exits); appended stays []
+                self._clear_status()
                 return text, log, iters, 'respond'
 
+            self._emit_status(f'using {tool}…')
             binding = f'$step{i+1}'
             log.append((f'ACTION {i+1}', json.dumps(action)))
 
@@ -2146,6 +2188,7 @@ class ChatLoop:
 
         logger.warning(f"[{self.character_name}] ReAct hit max iters ({REACT_MAX_ITERS})")
         reply = self._react_fallback_synthesis(log)
+        self._clear_status()
         return reply, log, iters, 'max_iters'
 
     def _write_react_trace(self, source: str, user_text: str,
