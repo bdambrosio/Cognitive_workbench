@@ -1220,33 +1220,49 @@ class ChatLoop:
         "memories as preferences, not concerns.\n"
         "- Items already covered by an existing concern in the system prompt.\n"
         "- Speculative inferences without textual support.\n\n"
-        "For each concern, ALSO include (optional, but strongly preferred "
-        "for durable concerns):\n"
-        "- `cadence_days` (number|null): how often the concern wants to "
-        "fire. Reflects the rhythm of the underlying signal:\n"
-        "    daily event (S&P close, weather): 1\n"
+        "For EVERY concern, emit these three additional fields:\n"
+        "- `cadence_days` (number|null): firing rhythm. The rhythm of the "
+        "underlying signal, not how often you'd nag the user. Examples:\n"
+        "    daily event (S&P close, weather, news roundup): 1\n"
         "    weekly check-in (project, hobby): 7\n"
-        "    annual event (birthday): 365\n"
-        "    one_shot/derived: null (don't fire autonomously)\n"
-        "- `lifetime_days` (number|null): how long {entity}'s interest in "
-        "this topic plausibly persists without re-engagement. SHOULD BE "
-        "3-10× cadence. null means immortal (no auto-prune). Examples:\n"
-        "    daily-fire concern: 14-30 (couple weeks of grace)\n"
-        "    weekly-fire concern: 60-180 (months)\n"
+        "    annual event (birthday, anniversary): 365\n"
+        "    one_shot or derived: null (no autonomous fire)\n"
+        "- `lifetime_days` (number|null): decay tau — how long {entity}'s "
+        "interest in this topic plausibly persists without re-engagement. "
+        "Generally 3-10× cadence. null = immortal. Examples:\n"
+        "    daily-fire concern: 14-30\n"
+        "    weekly-fire concern: 60-180\n"
         "    annual-fire concern: null\n"
-        "- `instruction` (string): the action {character} takes when this "
-        "concern fires. Required for durable; optional otherwise. "
-        "Phrased as a directive {character} could execute. Examples:\n"
+        "- `instruction` (string|null): what {character} does when this "
+        "concern fires. A directive she could execute, in the imperative. "
+        "Examples:\n"
         "    \"Search for today's S&P 500 close and summarize the move.\"\n"
-        "    \"Check in on dissertation prep — ask if anything's blocking.\"\n\n"
+        "    \"Check in on dissertation prep — ask if anything's blocking.\"\n"
+        "    \"Pull recent papers on multi-agent coordination from arxiv.\"\n\n"
+        "**REQUIRED for category=durable**: cadence_days MUST be a number, "
+        "lifetime_days MUST be a number, instruction MUST be a non-empty "
+        "string. A durable concern without these fields cannot fire and is "
+        "operationally useless. Do not skip them.\n"
+        "**For one_shot and derived**: cadence_days and instruction may be "
+        "null (those categories don't fire autonomously). lifetime_days "
+        "should still be a number to drive decay; null is also acceptable.\n\n"
         "Output ONLY this JSON shape — nothing else:\n"
-        "  {{\"frame\": \"<hypothetical|roleplay|counterfactual|instructional|none>\", "
-        "\"memories\": [{{\"text\": \"<≤200 chars, third-person about {entity}>\", "
-        "\"category\": \"<fact|preference|commitment>\"}}, …], "
-        "\"concerns\": [{{\"text\": \"<≤200 chars, action-oriented "
-        "third-person directive>\", \"category\": \"<one_shot|durable|derived>\", "
-        "\"cadence_days\": <number|null>, \"lifetime_days\": <number|null>, "
-        "\"instruction\": \"<directive {character} could execute>\"}}, …]}}\n"
+        "  {{\"frame\": \"<hypothetical|roleplay|counterfactual|instructional|none>\",\n"
+        "   \"memories\": [{{\"text\": \"...\", \"category\": \"fact|preference|commitment\"}}, ...],\n"
+        "   \"concerns\": [{{\"text\": \"...\", \"category\": \"one_shot|durable|derived\",\n"
+        "                  \"cadence_days\": <number|null>,\n"
+        "                  \"lifetime_days\": <number|null>,\n"
+        "                  \"instruction\": \"<imperative directive>|null\"}}, ...]}}\n\n"
+        "WORKED EXAMPLE. {entity} just said: \"Please keep an eye on S&P 500 "
+        "closes — I want to hear about them every day.\"\n"
+        "Correct output:\n"
+        "{{\"frame\": \"none\", \"memories\": [], \"concerns\": [{{\n"
+        "  \"text\": \"Track the S&P 500 closing price daily.\",\n"
+        "  \"category\": \"durable\",\n"
+        "  \"cadence_days\": 1,\n"
+        "  \"lifetime_days\": 14,\n"
+        "  \"instruction\": \"Search for today's S&P 500 close and summarize the day's move.\"\n"
+        "}}]}}\n"
         "If nothing qualifies (or frame≠none): "
         "{{\"frame\": \"<value>\", \"memories\": [], \"concerns\": []}}. No prose."
     )
@@ -1290,6 +1306,15 @@ class ChatLoop:
             if not result.success:
                 return ([], [])
             payload = result.text
+            # Diagnostic: log the raw payload so we can see whether the LLM
+            # is emitting cadence_days / lifetime_days / instruction or
+            # silently dropping them (which forces category-default fallback
+            # and an unfireable concern).
+            try:
+                _preview = json.dumps(payload) if not isinstance(payload, str) else payload
+            except Exception:
+                _preview = repr(payload)
+            logger.info(f"[{self.character_name}] reflection raw: {_preview[:800]}")
             # Salvage: cloud LLMs may return text instead of parsed JSON.
             if isinstance(payload, str):
                 stripped = payload.strip()
