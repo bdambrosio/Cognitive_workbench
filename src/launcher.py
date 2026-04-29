@@ -296,7 +296,8 @@ def run_agent(name: str, config: dict, runtime, tokenizer, shutdown_event: threa
     """Entry point for each character thread.
 
     Dispatches on config['mode']:
-      - 'chat'  → lightweight ChatLoop (no OODA, no concerns/goals/sensors)
+      - 'chat'  → lightweight ChatLoop. No OODA, no goals, no task scheduler,
+                  but sensors (e.g. tick) and concerns are wired through.
       - default → full ZenohExecutiveNode OODA loop
     """
     mode = config.get('mode', 'agent')

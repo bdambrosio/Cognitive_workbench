@@ -123,3 +123,12 @@ characters:
     concerns:
       - text: "Track what the user wants from me — both immediate and durable — so I can act on it when relevant."
         category: durable
+
+    # Sensors. The `tick` sensor is the autonomy trigger: a heartbeat
+    # publishes to sense_data every `schedule`, the chat loop dispatches
+    # on it, runs `_check_and_fire_concerns`, and autonomously executes
+    # the instruction of any concern whose cadence has elapsed (cap 2
+    # per tick; the rest defer to the next tick).
+    sensors:
+      - name: tick
+        schedule: "30m"

@@ -1198,12 +1198,18 @@ class ResourceBrowser:
             const recency = concern.recency || '';
             const created = concern.created || concern.created_at || '';
             // Phase B firing fields (chat-mode concerns)
-            const cadence = concern.cadence_days;
+            const cadenceHours = concern.cadence_hours;
+            const cadenceAllowed = Array.isArray(concern.cadence_hours_allowed)
+                                   ? concern.cadence_hours_allowed
+                                   : [1, 2, 4, 8, 12, 24, 168];
             const lifetime = concern.lifetime_days;
             const instruction = concern.instruction || '';
-            const lastFired = concern.last_fired_at || '';
+            const lastActed = concern.last_acted_at || '';
             const provenance = concern.provenance || '';
             const seed = concern.seed === true;
+            const fmtHours = (h) => (h === null || h === undefined) ? '∞'
+                                  : (h < 24 ? `${h}h`
+                                           : (h % 24 === 0 ? `${h/24}d` : `${h}h`));
             const fmtDays = (d) => (d === null || d === undefined) ? '∞'
                                  : (d < 1 ? `${(d*24).toFixed(1)}h`
                                           : (d % 1 === 0 ? `${d}d` : `${d.toFixed(1)}d`));
@@ -1257,11 +1263,17 @@ class ResourceBrowser:
                             ${origin ? `<span style="color:#888;font-size:11px;margin-left:10px">origin: ${origin}</span>` : ''}
                             ${seed ? `<span style="color:#dcdcaa;font-size:11px;margin-left:10px">seed</span>` : ''}
                         </div>
-                        ${(cadence !== undefined || lifetime !== undefined) ? `
-                            <div style="margin-top:4px">
-                                <span style="color:#888;font-size:11px">cadence: ${fmtDays(cadence)}</span>
-                                <span style="color:#888;font-size:11px;margin-left:10px">lifetime: ${fmtDays(lifetime)}</span>
-                                ${provenance ? `<span style="color:#888;font-size:11px;margin-left:10px">provenance: ${provenance}</span>` : ''}
+                        ${(cadenceHours !== undefined || lifetime !== undefined) ? `
+                            <div style="margin-top:4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                                <span style="color:#888;font-size:11px">cadence:</span>
+                                <select onchange="setCadenceHours('${cid}', this.value, '${type}')" style="background:#2d2d2d;color:#d4d4d4;border:1px solid #3e3e42;font-size:11px;padding:1px 4px">
+                                    <option value="" ${cadenceHours === null || cadenceHours === undefined ? 'selected' : ''}>(none — won't fire)</option>
+                                    ${cadenceAllowed.map(h =>
+                                        `<option value="${h}" ${cadenceHours === h ? 'selected' : ''}>${fmtHours(h)}</option>`
+                                    ).join('')}
+                                </select>
+                                <span style="color:#888;font-size:11px">lifetime: ${fmtDays(lifetime)}</span>
+                                ${provenance ? `<span style="color:#888;font-size:11px">provenance: ${provenance}</span>` : ''}
                             </div>
                         ` : ''}
                     </div>
@@ -1276,7 +1288,7 @@ class ResourceBrowser:
                             <div style="color:#888;font-size:10px;text-transform:uppercase;margin-bottom:4px">Impulse (action when this concern fires)</div>
                             <div style="color:#d4d4d4;font-size:12px;line-height:1.5;font-style:italic">${instruction}</div>
                         </div>
-                    ` : (cadence !== undefined && cadence !== null ? `
+                    ` : (cadenceHours !== undefined && cadenceHours !== null ? `
                         <div style="margin-bottom:12px">
                             <div style="color:#888;font-size:10px;text-transform:uppercase;margin-bottom:4px">Impulse</div>
                             <div style="color:#666;font-size:12px;line-height:1.5;font-style:italic">(no instruction — concern won't fire)</div>
@@ -1297,11 +1309,11 @@ class ResourceBrowser:
                         </div>
                     ` : ''}
 
-                    ${created || recency || lastFired ? `
+                    ${created || recency || lastActed ? `
                         <div style="color:#888;font-size:10px;margin-bottom:12px">
                             ${created ? `created: ${created}` : ''}
                             ${recency ? ` · last engaged: ${recency}` : ''}
-                            ${lastFired ? ` · last fired: ${lastFired}` : ''}
+                            ${lastActed ? ` · last acted: ${lastActed}` : ''}
                         </div>
                     ` : ''}
 
@@ -1344,6 +1356,32 @@ class ResourceBrowser:
                 }
             } catch (e) {
                 alert('Action failed: ' + e.message);
+            }
+        }
+
+        async function setCadenceHours(concernId, rawValue, type) {
+            // Combo-box → backend snap-and-write. Empty string → null (no fire).
+            const character = window.characterName || '';
+            if (!character) {
+                alert('No character context available');
+                return;
+            }
+            const value = (rawValue === '' || rawValue === null) ? null : Number(rawValue);
+            try {
+                const resp = await fetch(`/api/concern/${character}/manage`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({concern_id: concernId, action: 'set_cadence_hours',
+                                          type: type, value: value}),
+                });
+                const data = await resp.json();
+                if (!data.success) {
+                    alert('set cadence failed: ' + (data.error || 'unknown error'));
+                }
+                // Refresh list so the row reflects the snapped value.
+                loadConcerns();
+            } catch (e) {
+                alert('set cadence failed: ' + e.message);
             }
         }
 
