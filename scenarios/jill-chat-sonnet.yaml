@@ -6,6 +6,13 @@
 # a separate world ("jill_chat") so chat-only turns do not pollute
 # Jill's cognitive infospace.
 #
+# This variant routes Jill to Anthropic Claude Sonnet 4.6 via the native
+# Messages API (https://api.anthropic.com/v1/messages). Triggered by
+# server: anthropic in _ChatBackend — different endpoint, x-api-key +
+# anthropic-version headers, system as a top-level field. The route
+# omits temperature/top_p uniformly (Opus 4.7 rejects temperature; for
+# Sonnet/Haiku the model defaults are fine).
+#
 # launcher.py dispatches characters with `mode: chat` to chat.chat_loop
 # instead of executive_node. Wire protocol is identical to the agent:
 #   in:  cognitive/{name}/sense_data
@@ -16,10 +23,11 @@ world_config:
   world_name: "jill_chat"
 
 # Top-level llm_config drives the optional shared SGLang runtime in
-# launcher.py. Leave sgl_model_path null to skip SGL bring-up entirely;
-# per-character llm_config (below) selects the actual chat backend.
+# launcher.py. Cloud setups don't need a local runtime — leave
+# sgl_model_path null to skip SGL bring-up entirely. The actual chat
+# backend is selected by per-character llm_config (below).
 llm_config:
-  vllm_model_path: https://token-plan-sgp.xiaomimimo.com/v1
+  sgl_model_path: null
   reasoning_parser: null
 
 setting: |
@@ -32,21 +40,14 @@ characters:
   Jill:
     mode: chat
 
-    # Per-character LLM backend. Default 'local' POSTs directly to
-    # {vllm_url}/v1/chat/completions — works against any OpenAI-compatible
-    # chat server (vLLM chat API, externally-launched SGLang, llama-server,
-    # SGLangAPIServer on port 5000, lmstudio, etc.). For cloud, use
-    # 'openrouter' or 'openai' (model name then required).
+    # Per-character LLM backend — Anthropic Claude native Messages API.
+    # server: anthropic selects the dedicated route in _ChatBackend.
+    # api_key holds the NAME of the env var with the key.
     llm_config:
-      server: local
-      model: ""
-      vllm_url: http://127.0.0.1:5000
-      # Structured-CoT gate. Tested with Qwen3.6-27B and judged a failure:
-      # any byte-budget constraint forced premature </think> closure that
-      # leaked thinking into the answer channel and degraded reply
-      # quality. Disabled. Infrastructure (cot_profiles.py, _ChatBackend
-      # grammar attach) is kept for possible future use with different
-      # models, but `false` here makes resolve_profile() unreachable.
+      server: anthropic
+      model: "claude-sonnet-4-6"
+      base_url: https://api.anthropic.com
+      api_key: "CLAUDE_API_KEY"
       is_reasoning_model: false
 
     # On by default per project decision.

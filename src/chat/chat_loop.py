@@ -139,14 +139,19 @@ class _ChatBackend:
     """Thin OpenAI-compatible chat client with structured-CoT support.
 
     Routes (checked in order):
-      1. `api_key` set → unified OpenAI-compat path. POST to
+      1. server == 'anthropic' → POST {base_url}/v1/messages with
+         `x-api-key` + `anthropic-version` headers. system is a top-level
+         string field; messages contains only user/assistant. temperature
+         and top_p are omitted (Opus 4.7 rejects them; defaults are fine
+         for other Claude models). stops → stop_sequences. Requires api_key.
+      2. `api_key` set → unified OpenAI-compat path. POST to
          {base_url}/v1/chat/completions with `Authorization: Bearer
          <env[api_key]>`. Grammar / chat_template_kwargs are NOT attached
          (cloud endpoints reject them). The api_key field is the NAME of
          an environment variable, not the key itself.
-      2. server in ('openrouter', 'openai') → utils.llm_api.LLM (legacy
+      3. server in ('openrouter', 'openai') → utils.llm_api.LLM (legacy
          cloud shortcut, kept for back-compat).
-      3. anything else (local, vllm, llama.cpp, sglang_api_server, lmstudio,
+      4. anything else (local, vllm, llama.cpp, sglang_api_server, lmstudio,
          unset) → POST {base_url}/v1/chat/completions directly, no auth.
          SGLangAPIServer accepts both `grammar` (GBNF, forwarded as ebnf)
          and `ebnf`; llama-server accepts `grammar`.
@@ -179,6 +184,13 @@ class _ChatBackend:
                         f"_ChatBackend: api_key env var {api_key!r} is not set. "
                         f"Either export {api_key} or remove the api_key field.")
                 self._api_key_value = resolved
+        # Anthropic native route requires api_key. Validate up front so
+        # the failure is loud at scenario load instead of on first turn.
+        if self.server == 'anthropic' and self._api_key_value is None:
+            raise RuntimeError(
+                "_ChatBackend: server='anthropic' requires api_key "
+                "(name of env var holding the Anthropic API key).")
+
         # Legacy cloud shortcut — only used when api_key is NOT set, so
         # the new unified path takes precedence for any config that
         # specifies api_key (even if server happens to be openrouter/openai).
@@ -212,6 +224,57 @@ class _ChatBackend:
             if response is None:
                 raise RuntimeError(f'cloud LLM ({self.server}) returned None')
             return response if isinstance(response, str) else json.dumps(response)
+
+        # Anthropic native Messages API. Different endpoint, headers, and
+        # body shape than OpenAI chat completions. temperature/top_p are
+        # omitted: Opus 4.7 rejects temperature outright, and other Claude
+        # models work fine on defaults. cot_profile / enable_thinking /
+        # is_json are local-engine concepts and don't apply here.
+        if self.server == 'anthropic':
+            sys_parts: List[str] = []
+            convo: List[Dict[str, str]] = []
+            for m in messages:
+                role = m.get('role')
+                content = m.get('content', '')
+                if role == 'system':
+                    if content:
+                        sys_parts.append(content)
+                else:
+                    convo.append({'role': role, 'content': content})
+            body = {
+                'model': self.model,
+                'max_tokens': max_tokens,
+                'messages': convo,
+            }
+            if sys_parts:
+                body['system'] = "\n\n".join(sys_parts)
+            if stops:
+                body['stop_sequences'] = stops
+            headers = {
+                'Content-Type': 'application/json',
+                'x-api-key': self._api_key_value,
+                'anthropic-version': '2023-06-01',
+            }
+            resp = requests.post(
+                f'{self.base_url}/v1/messages',
+                headers=headers, json=body, timeout=120,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            blocks = data.get('content') or []
+            text = ''.join(
+                b.get('text', '') for b in blocks
+                if isinstance(b, dict) and b.get('type') == 'text'
+            )
+            try:
+                logger.info(
+                    "<llm-raw> route=anthropic stop=%s text=%s",
+                    data.get('stop_reason'),
+                    json.dumps(text, ensure_ascii=False),
+                )
+            except Exception:
+                pass
+            return text
 
         url = f'{self.base_url}/v1/chat/completions'
         body: Dict[str, Any] = {
@@ -2266,19 +2329,21 @@ class ChatLoop:
     # ------------------------------------------------------------------
 
     def _build_react_system_prompt(self, source: str, orientation: str,
+                                   now_str: str,
                                    recall: Optional[List[Tuple[str, str]]] = None,
                                    concerns: Optional[List[Tuple[str, str]]] = None) -> str:
         base = self._build_system_prompt(source, orientation, recall=recall, concerns=concerns)
         react = (
-            "\n\n## ReAct Tool Loop — READ FIRST\n"
+            f"\n\n## Now\n{now_str}\n"
+            "\n"
+            "## ReAct Tool Loop — READ FIRST\n"
             "Each emission is ONE JSON action object — nothing else. Prose "
             "around the JSON is discarded and the loop will retry. Output "
             "begins with `{` and ends with `}`.\n"
             "\n"
-            "You do NOT know: today's date, current weather, recent news, "
-            "current prices, or anything requiring fresh information. For "
-            "time-sensitive or fact-specific questions, your first action "
-            "is `search`.\n"
+            "You do NOT know: current weather, recent news, current prices, "
+            "or anything requiring fresh information. For time-sensitive or "
+            "fact-specific questions, your first action is `search`.\n"
             "\n"
             "Tools (each emission picks ONE):\n"
             "1. `{\"tool\": \"process_text\", \"source\": <string|$stepN>, \"instruction\": <string>}` — "
@@ -2301,11 +2366,12 @@ class ChatLoop:
         )
         return base + react
 
-    def _build_react_prompt(self, source: str, user_text: str, orientation: str,
-                            log: List[Tuple[str, str]],
-                            recall: Optional[List[Tuple[str, str]]] = None,
-                            concerns: Optional[List[Tuple[str, str]]] = None) -> List[Dict[str, str]]:
-        """Single user-role text containing history + current input + working log."""
+    def _build_react_user_prefix(self, source: str, user_text: str) -> str:
+        """Build the user-message PREFIX for the ReAct loop. Constructed once
+        per loop; the working-log entries and the "Emit next action:" trailer
+        are appended by the caller (store-and-append: the prefix is byte-stable
+        across iterations so KV cache hits, only the log grows). Ends with
+        '## Working log\\n' so the first appended entry sits below the header."""
         parts: List[str] = []
         history = self.store.get_recent_turns(source, limit=self.history_limit, scope='all')
         if history and history[-1].get('direction') == 'in' and str(history[-1].get('text', '')) == user_text:
@@ -2320,17 +2386,7 @@ class ChatLoop:
         parts.append(user_text)
         parts.append("")
         parts.append("## Working log")
-        if not log:
-            parts.append("(empty — emit your first action)")
-        else:
-            for label, content in log:
-                parts.append(f"{label}:\n{content}")
-        parts.append("")
-        parts.append("Emit next action:")
-        return [
-            {'role': 'system', 'content': self._build_react_system_prompt(source, orientation, recall=recall, concerns=concerns)},
-            {'role': 'user', 'content': "\n".join(parts)},
-        ]
+        return "\n".join(parts) + "\n"
 
     # --- ReAct status line (CLI feedback during the loop) -----------------
     # Subsequent _emit_status calls overwrite the previous one via \r, so the
@@ -2390,32 +2446,59 @@ class ChatLoop:
         # is exactly the reasoning that got "compressed away" before the
         # next iter saw the context.
         iters: List[Dict[str, Any]] = []
+        # Store-and-append architecture for KV-cache stability:
+        #   • system_prompt_str and user_prefix_str are built ONCE at loop
+        #     start and reused literally on every iteration — never rebuilt.
+        #   • log_appendage_str grows by literal string append in lockstep
+        #     with the log list. We never reformat past entries.
+        #   • Each iter's user message = user_prefix_str + log_appendage_str
+        #     + trailer. All three are stored strings; the only operation
+        #     between iterations is concatenation of stored pieces.
+        # This guarantees a byte-stable prefix across iterations so the
+        # backend's KV cache hits on every iter past the first.
+        now_str = datetime.now().astimezone().strftime("%A, %B %d %Y, %I:%M %p %Z")
+        system_prompt_str = self._build_react_system_prompt(
+            source, orientation, now_str, recall=recall, concerns=concerns)
+        user_prefix_str = self._build_react_user_prefix(source, user_text)
+        log_appendage_str = ""
+        trailer = "\nEmit next action:"
+
+        def _append_log(label: str, content: str) -> None:
+            """Lockstep append: list and string grow together. The string
+            format must match what _build_react_user_prefix would have
+            rendered for these entries (LABEL:\\nCONTENT\\n)."""
+            nonlocal log_appendage_str
+            log.append((label, content))
+            log_appendage_str += f"{label}:\n{content}\n"
+
         for i in range(REACT_MAX_ITERS):
             pre_log_len = len(log)
-            prompt = self._build_react_prompt(source, user_text, orientation, log, recall=recall, concerns=concerns)
-            sys_msg = prompt[0]['content']
-            usr_msg = prompt[1]['content']
+            usr_msg = user_prefix_str + log_appendage_str + trailer
+            prompt = [
+                {'role': 'system', 'content': system_prompt_str},
+                {'role': 'user', 'content': usr_msg},
+            ]
             self._emit_status('thinking…')
             try:
                 raw = self.backend.chat(prompt, max_tokens=2048, temperature=0.7,
                                         cot_profile='none')
             except Exception as e:
                 logger.error(f"[{self.character_name}] ReAct iter {i+1} LLM failed: {e}")
-                iters.append({'system': sys_msg, 'user': usr_msg,
+                iters.append({'system': system_prompt_str, 'user': usr_msg,
                               'raw': f'(LLM call failed: {e})', 'appended': []})
                 reply = self._react_fallback_synthesis(log, str(e))
                 self._clear_status()
                 return reply, log, iters, 'llm_error'
 
-            iters.append({'system': sys_msg, 'user': usr_msg, 'raw': raw or '',
+            iters.append({'system': system_prompt_str, 'user': usr_msg, 'raw': raw or '',
                           'appended': []})
 
             action = self._parse_react_action(raw)
             if action is None:
                 logger.warning(f"[{self.character_name}] ReAct iter {i+1}: unparseable: {raw[:160]!r}")
                 self._emit_status('parse failed, retrying…')
-                log.append(('NOTE', "Previous output was prose, not JSON. The user's task above is "
-                            "unanswered. Do NOT apologize — emit ONE JSON action now to address it."))
+                _append_log('NOTE', "Previous output was prose, not JSON. The user's task above is "
+                            "unanswered. Do NOT apologize — emit ONE JSON action now to address it.")
                 iters[-1]['appended'] = log[pre_log_len:]
                 continue
 
@@ -2429,7 +2512,7 @@ class ChatLoop:
 
             self._emit_status(f'using {tool}…')
             binding = f'$step{i+1}'
-            log.append((f'ACTION {i+1}', json.dumps(action)))
+            _append_log(f'ACTION {i+1}', json.dumps(action))
 
             if tool == 'process_text':
                 src = self._resolve_react_value(action.get('source', ''), log)
@@ -2445,7 +2528,7 @@ class ChatLoop:
             else:
                 obs = f"unknown tool {tool!r}; available: process_text, search, fetch_text, respond"
 
-            log.append((binding, obs))
+            _append_log(binding, obs)
             iters[-1]['appended'] = log[pre_log_len:]
             logger.info(f"[{self.character_name}] ReAct iter {i+1}: {tool} → {binding} ({len(obs)} chars)")
 
