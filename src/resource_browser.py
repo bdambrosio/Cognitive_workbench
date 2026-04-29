@@ -1190,12 +1190,23 @@ class ResourceBrowser:
             const desc = concern.concern_description || concern.description || '';
             const status = concern.status || (isUser ? 'open' : '?');
             const weight = concern.weight;
+            const weightFmt = (typeof weight === 'number') ? weight.toFixed(3) : weight;
             const category = concern.category || '';
             const origin = concern.origin || '';
             const rationale = concern.status_rationale || '';
             const history = concern.history_summary || '';
             const recency = concern.recency || '';
             const created = concern.created || concern.created_at || '';
+            // Phase B firing fields (chat-mode concerns)
+            const cadence = concern.cadence_days;
+            const lifetime = concern.lifetime_days;
+            const instruction = concern.instruction || '';
+            const lastFired = concern.last_fired_at || '';
+            const provenance = concern.provenance || '';
+            const seed = concern.seed === true;
+            const fmtDays = (d) => (d === null || d === undefined) ? '∞'
+                                 : (d < 1 ? `${(d*24).toFixed(1)}h`
+                                          : (d % 1 === 0 ? `${d}d` : `${d.toFixed(1)}d`));
 
             // Build action buttons based on type
             let actions = '';
@@ -1241,16 +1252,36 @@ class ResourceBrowser:
                         <h2 style="margin:0;font-size:16px;color:#d4d4d4">${label}</h2>
                         <div style="margin-top:6px">
                             <span style="color:${statusColor};font-size:11px;text-transform:uppercase;letter-spacing:0.5px">${status}</span>
-                            ${weight !== undefined ? `<span style="color:#888;font-size:11px;margin-left:10px">weight: ${weight}</span>` : ''}
+                            ${weight !== undefined ? `<span style="color:#888;font-size:11px;margin-left:10px">weight: ${weightFmt}</span>` : ''}
                             ${category ? `<span style="color:#888;font-size:11px;margin-left:10px">category: ${category}</span>` : ''}
                             ${origin ? `<span style="color:#888;font-size:11px;margin-left:10px">origin: ${origin}</span>` : ''}
+                            ${seed ? `<span style="color:#dcdcaa;font-size:11px;margin-left:10px">seed</span>` : ''}
                         </div>
+                        ${(cadence !== undefined || lifetime !== undefined) ? `
+                            <div style="margin-top:4px">
+                                <span style="color:#888;font-size:11px">cadence: ${fmtDays(cadence)}</span>
+                                <span style="color:#888;font-size:11px;margin-left:10px">lifetime: ${fmtDays(lifetime)}</span>
+                                ${provenance ? `<span style="color:#888;font-size:11px;margin-left:10px">provenance: ${provenance}</span>` : ''}
+                            </div>
+                        ` : ''}
                     </div>
 
                     <div style="margin-bottom:12px">
                         <div style="color:#888;font-size:10px;text-transform:uppercase;margin-bottom:4px">Description</div>
                         <div style="color:#d4d4d4;font-size:12px;line-height:1.5">${desc || '(none)'}</div>
                     </div>
+
+                    ${instruction ? `
+                        <div style="margin-bottom:12px">
+                            <div style="color:#888;font-size:10px;text-transform:uppercase;margin-bottom:4px">Impulse (action when this concern fires)</div>
+                            <div style="color:#d4d4d4;font-size:12px;line-height:1.5;font-style:italic">${instruction}</div>
+                        </div>
+                    ` : (cadence !== undefined && cadence !== null ? `
+                        <div style="margin-bottom:12px">
+                            <div style="color:#888;font-size:10px;text-transform:uppercase;margin-bottom:4px">Impulse</div>
+                            <div style="color:#666;font-size:12px;line-height:1.5;font-style:italic">(no instruction — concern won't fire)</div>
+                        </div>
+                    ` : '')}
 
                     ${rationale ? `
                         <div style="margin-bottom:12px">
@@ -1266,10 +1297,11 @@ class ResourceBrowser:
                         </div>
                     ` : ''}
 
-                    ${created || recency ? `
+                    ${created || recency || lastFired ? `
                         <div style="color:#888;font-size:10px;margin-bottom:12px">
                             ${created ? `created: ${created}` : ''}
-                            ${recency ? ` · recency: ${recency}` : ''}
+                            ${recency ? ` · last engaged: ${recency}` : ''}
+                            ${lastFired ? ` · last fired: ${lastFired}` : ''}
                         </div>
                     ` : ''}
 
