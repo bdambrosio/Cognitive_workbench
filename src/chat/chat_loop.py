@@ -79,17 +79,37 @@ _CONCERNS_COLLECTION_NAME = "concerns"
 _CONCERN_CATEGORIES = ('one_shot', 'durable', 'derived')
 _CONCERN_STATUSES = ('active', 'satisfied', 'abandoned')
 
-# Decay tau in days, per concern category. Effective weight at read time
-# is exp(-(now - last_engaged_at) / tau), starting from 1.0 at engagement.
-# Recall hits refresh last_engaged_at. When effective weight drops below
-# the satisfied threshold, the concern transitions from active to satisfied
-# (lazy — computed on read, no background sweep).
-_CONCERN_DECAY_TAU_DAYS = {
-    'one_shot': 1.0,    # ~3 days to drop below 0.05
-    'derived':  7.0,    # ~3 weeks to drop below 0.05
-    'durable':  30.0,   # ~3 months to drop below 0.05
+# Two independent per-concern parameters drive the lifecycle:
+#
+#   cadence_days  — firing rhythm. When (now - last_engaged_at) >=
+#                   cadence_days, the concern wants attention and fires
+#                   once (until engagement resets the cycle). null →
+#                   doesn't fire autonomously.
+#   lifetime_days — decay tau. Effective weight = exp(-Δdays / lifetime).
+#                   Below _CONCERN_SATISFIED_THRESHOLD → status flips to
+#                   satisfied (lazy, on read). null → immortal.
+#
+# Cadence and lifetime are NOT the same. A daily concern (S&P 500) wants
+# to fire every day but may legitimately persist for weeks if the user
+# takes a vacation. Lifetime should generally be 3-10× cadence.
+#
+# Defaults below apply at creation when reflection doesn't emit explicit
+# values — and at read time as fallback for legacy concerns missing the
+# field. Seed concerns get cadence=null + lifetime=null (immortal, no fire).
+_CONCERN_DEFAULT_CADENCE_DAYS = {
+    'one_shot': None,    # no autonomous fire
+    'derived':  None,    # no autonomous fire
+    'durable':  30.0,    # monthly fire by default
+}
+_CONCERN_DEFAULT_LIFETIME_DAYS = {
+    'one_shot': 0.5,     # ~12 hours to satisfied
+    'derived':  2.0,     # ~5 days to satisfied
+    'durable':  120.0,   # ~10 months without engagement
 }
 _CONCERN_SATISFIED_THRESHOLD = 0.1
+# Sanity bounds applied to LLM-emitted values before storage.
+_CONCERN_CADENCE_MIN_DAYS, _CONCERN_CADENCE_MAX_DAYS = 0.05, 365.0
+_CONCERN_LIFETIME_MIN_DAYS, _CONCERN_LIFETIME_MAX_DAYS = 0.1, 3650.0
 # Top-N active concerns surfaced into the system prompt always-on (in
 # addition to anything semantic-recall fishes out). Bounded so the prompt
 # can't blow up as the corpus grows.
@@ -690,7 +710,9 @@ class ChatLoop:
         don't already exist. Each seed gets a stable named-note slot so
         re-init is idempotent. Seed concerns carry seed=True and are
         immune to decay-induced satisfaction (they're architectural
-        baseline, not ephemeral user-derived content)."""
+        baseline, not ephemeral user-derived content). YAML may specify
+        cadence_days, lifetime_days, instruction per seed; otherwise
+        seed concerns default to immortal + no fire."""
         seeds = character_config.get('concerns') or []
         if not isinstance(seeds, list) or not self._concerns_collection_id:
             return
@@ -708,7 +730,10 @@ class ChatLoop:
             if name in self.resource_manager.named_notes:
                 continue  # Already seeded; preserve any edits
             self._add_concern(text, category=category, entity=entity,
-                              provenance='asserted', seed=True, name=name)
+                              provenance='asserted', seed=True, name=name,
+                              cadence_days=seed.get('cadence_days'),
+                              lifetime_days=seed.get('lifetime_days'),
+                              instruction=seed.get('instruction'))
 
     def _find_similar_concern(self, text: str,
                               threshold: float = _CONCERN_RECURRENCE_THRESHOLD
@@ -748,6 +773,7 @@ class ChatLoop:
     def _promote_existing_concern(self, note_id: str) -> str:
         """Apply recurrence-promotion rules in place:
           - last_engaged_at always refreshed (the recurrence IS engagement)
+          - last_fired_at cleared (engagement opens a new firing cycle)
           - status: satisfied → active (revival)
           - category: one_shot → durable (intensity promotion)
           - durable / derived: category unchanged (no de-promotion)
@@ -757,21 +783,77 @@ class ChatLoop:
             return note_id
         props = note.setdefault('properties', {})
         props['last_engaged_at'] = datetime.now(timezone.utc).isoformat()
+        props['last_fired_at'] = None
         if props.get('status') == 'satisfied':
             props['status'] = 'active'
         if props.get('category') == 'one_shot':
             props['category'] = 'durable'
         return note_id
 
+    @staticmethod
+    def _clamp_optional(value: Any, lo: float, hi: float) -> Optional[float]:
+        """Clamp a numeric value into [lo, hi]; pass None through."""
+        if value is None:
+            return None
+        try:
+            v = float(value)
+        except (TypeError, ValueError):
+            return None
+        return max(lo, min(hi, v))
+
+    @staticmethod
+    def _resolve_cadence_days(properties: Dict[str, Any]) -> Optional[float]:
+        """Read cadence_days from a concern note, falling back to category
+        default for legacy notes missing the field. Seed concerns default
+        to null (no fire) regardless of category."""
+        if 'cadence_days' in properties:
+            raw = properties.get('cadence_days')
+            if raw is None:
+                return None
+            try:
+                return float(raw)
+            except (TypeError, ValueError):
+                pass
+        if properties.get('seed'):
+            return None
+        return _CONCERN_DEFAULT_CADENCE_DAYS.get(
+            properties.get('category', 'durable'))
+
+    @staticmethod
+    def _resolve_lifetime_days(properties: Dict[str, Any]) -> Optional[float]:
+        """Read lifetime_days from a concern note, falling back to category
+        default for legacy notes. Seed concerns default to null (immortal)."""
+        if 'lifetime_days' in properties:
+            raw = properties.get('lifetime_days')
+            if raw is None:
+                return None
+            try:
+                return float(raw)
+            except (TypeError, ValueError):
+                pass
+        if properties.get('seed'):
+            return None
+        return _CONCERN_DEFAULT_LIFETIME_DAYS.get(
+            properties.get('category', 'durable'), 120.0)
+
     def _add_concern(self, text: str, category: str = 'durable',
                      entity: str = 'User', provenance: str = 'asserted',
-                     seed: bool = False, name: str = '') -> Optional[str]:
+                     seed: bool = False, name: str = '',
+                     cadence_days: Optional[float] = None,
+                     lifetime_days: Optional[float] = None,
+                     instruction: Optional[str] = None) -> Optional[str]:
         """Create a new concern note and add it to the concerns Collection,
         OR — if a near-twin already exists — refresh and promote/revive
         the existing note instead. Returns the resulting note_id (newly
         created or pre-existing), or None on failure. Held under
         _faiss_lock for the FAISS-touching span; pre-add similarity check
-        also serializes through the same lock."""
+        also serializes through the same lock.
+
+        cadence_days and lifetime_days are independent: cadence drives
+        firing rhythm, lifetime drives decay-to-satisfied. Either or both
+        may be None. instruction (the action to take when this concern
+        fires) is required for fireable concerns; null instruction means
+        the concern never fires regardless of cadence."""
         if not self._concerns_collection_id:
             return None
         text = (text or "").strip()
@@ -781,6 +863,21 @@ class ChatLoop:
             category = 'durable'
         if provenance not in ('asserted', 'inferred'):
             provenance = 'inferred' if category == 'derived' else 'asserted'
+
+        # Apply category defaults if caller didn't specify; seed concerns
+        # default to null on both axes (immortal, no autonomous fire).
+        if cadence_days is None and not seed:
+            cadence_days = _CONCERN_DEFAULT_CADENCE_DAYS.get(category)
+        if lifetime_days is None and not seed:
+            lifetime_days = _CONCERN_DEFAULT_LIFETIME_DAYS.get(category)
+        # Clamp LLM-emitted values into sane ranges.
+        cadence_days = self._clamp_optional(cadence_days,
+                                            _CONCERN_CADENCE_MIN_DAYS,
+                                            _CONCERN_CADENCE_MAX_DAYS)
+        lifetime_days = self._clamp_optional(lifetime_days,
+                                             _CONCERN_LIFETIME_MIN_DAYS,
+                                             _CONCERN_LIFETIME_MAX_DAYS)
+        instruction = (str(instruction).strip() if instruction else '') or None
 
         # Recurrence check. Skipped for seed concerns (those go in
         # deterministic named-note slots and shouldn't get folded into
@@ -804,6 +901,10 @@ class ChatLoop:
                         "provenance": provenance,
                         "seed": bool(seed),
                         "last_engaged_at": now_iso,
+                        "last_fired_at": None,
+                        "cadence_days": cadence_days,
+                        "lifetime_days": lifetime_days,
+                        "instruction": instruction,
                     },
                 )
                 if not success or not note_id:
@@ -819,12 +920,19 @@ class ChatLoop:
             logger.warning(f"[{self.character_name}] _add_concern failed: {e}")
             return None
 
-    @staticmethod
-    def _concern_decayed_weight(properties: Dict[str, Any]) -> float:
-        """Weight = exp(-Δdays / tau) where Δ is now − last_engaged_at and
-        tau depends on category. Returns 0.0 for malformed timestamps."""
+    @classmethod
+    def _concern_decayed_weight(cls, properties: Dict[str, Any]) -> float:
+        """Effective weight = exp(-Δdays / lifetime_days). Δ is now −
+        last_engaged_at. lifetime_days=None means immortal (returns 1.0).
+        Falls back to category default for legacy notes lacking the field.
+        Returns 0.0 for malformed timestamps."""
         import math
         try:
+            lifetime = cls._resolve_lifetime_days(properties)
+            if lifetime is None:
+                return 1.0   # immortal (seed concerns, etc.)
+            if lifetime <= 0:
+                return 1.0
             last_iso = properties.get('last_engaged_at') or properties.get('created_at')
             if not last_iso:
                 return 0.0
@@ -832,11 +940,7 @@ class ChatLoop:
             if last.tzinfo is None:
                 last = last.replace(tzinfo=timezone.utc)
             delta_days = (datetime.now(timezone.utc) - last).total_seconds() / 86400.0
-            cat = str(properties.get('category', 'durable') or 'durable').lower()
-            tau = _CONCERN_DECAY_TAU_DAYS.get(cat, _CONCERN_DECAY_TAU_DAYS['durable'])
-            if tau <= 0:
-                return 1.0
-            return math.exp(-max(0.0, delta_days) / tau)
+            return math.exp(-max(0.0, delta_days) / lifetime)
         except Exception:
             return 0.0
 
@@ -855,13 +959,15 @@ class ChatLoop:
         return True
 
     def _refresh_concern_engagement(self, note_id: str) -> None:
-        """Reset last_engaged_at to now for one concern note. Called when
-        a concern surfaces via semantic recall."""
+        """Reset last_engaged_at to now and clear last_fired_at, opening a
+        new firing cycle. Called when a concern surfaces via semantic
+        recall — engagement is the signal that closes the previous cycle."""
         note = self.resource_manager.get_resource(note_id)
         if not note:
             return
         props = note.setdefault('properties', {})
         props['last_engaged_at'] = datetime.now(timezone.utc).isoformat()
+        props['last_fired_at'] = None
 
     def _iter_active_concerns(self) -> List[Tuple[str, Dict[str, Any], float]]:
         """Iterate the concerns collection and return (note_id, note,
@@ -985,6 +1091,81 @@ class ChatLoop:
         props['status'] = new_status
         return True, None
 
+    def _check_and_fire_concerns(self, source: str) -> List[Tuple[str, str, str]]:
+        """Per-turn firing pass. For each active concern with a non-null
+        cadence and instruction whose cadence has elapsed since the last
+        engagement, raise an impulse. Phase B-display: prints to the CLI
+        but does NOT inject into the ReAct loop. Returns a list of
+        (note_id, text, instruction) tuples for any concerns that fired
+        (used by the smoke test; production callers can ignore).
+
+        Sets last_fired_at on each fired concern so we don't re-fire on
+        the next turn within the same engagement cycle. Engagement (recall
+        hit, recurrence promotion) refreshes last_engaged_at past
+        last_fired_at, opening the next firing cycle.
+        """
+        if not self._concerns_collection_id:
+            return []
+        coll = self.resource_manager.get_resource(self._concerns_collection_id)
+        if not coll:
+            return []
+        note_ids = (coll.get('properties') or {}).get('content', []) or []
+        now = datetime.now(timezone.utc)
+        fired: List[Tuple[str, str, str]] = []
+        for nid in note_ids:
+            note = self.resource_manager.get_resource(nid)
+            if not note:
+                continue
+            props = note.get('properties') or {}
+            if props.get('status') != 'active':
+                continue
+            cadence = self._resolve_cadence_days(props)
+            if cadence is None:
+                continue   # no autonomous fire (one_shot/derived/seed)
+            instruction = props.get('instruction')
+            if not instruction:
+                continue   # no action to take; skip
+            last_engaged_str = props.get('last_engaged_at') or props.get('created_at')
+            if not last_engaged_str:
+                continue
+            try:
+                last_engaged = datetime.fromisoformat(str(last_engaged_str))
+                if last_engaged.tzinfo is None:
+                    last_engaged = last_engaged.replace(tzinfo=timezone.utc)
+            except Exception:
+                continue
+            elapsed_days = (now - last_engaged).total_seconds() / 86400.0
+            if elapsed_days < float(cadence):
+                continue
+            # Already fired this engagement cycle? last_fired_at is set
+            # when we fire and cleared on engagement (recall hit, recurrence
+            # promotion). A non-null value here means: same cycle, skip.
+            if props.get('last_fired_at'):
+                continue
+            text = str(props.get('content', '') or '').strip()
+            fired.append((nid, text, str(instruction)))
+            props['last_fired_at'] = now.isoformat()
+        for _nid, text, instruction in fired:
+            self._emit_impulse(text, instruction)
+        return fired
+
+    def _emit_impulse(self, concern_text: str, instruction: str) -> None:
+        """Print a concern-fired impulse to the CLI as a permanent line
+        (not transient — distinct from the ReAct status helpers, which
+        overwrite themselves). Falls back to logger.info when stdout
+        isn't a TTY so the signal is preserved in non-interactive runs."""
+        msg = f"concern: {concern_text} — impulse: {instruction}"
+        if not sys.stdout.isatty():
+            logger.info(f"[{self.character_name}] {msg}")
+            return
+        try:
+            line = (f"\n{self._STATUS_DIM}[{self.character_name}] "
+                    f"{msg}{self._STATUS_RESET}\n")
+            sys.stdout.write(line)
+            sys.stdout.flush()
+        except Exception:
+            pass
+
     # Reflection prompt: extract durable episodic specifics from the latest
     # exchange. Two-stage decision:
     #   (a) Frame check. If the exchange is a hypothetical / role-play /
@@ -1026,25 +1207,46 @@ class ChatLoop:
         "Capture concerns at THREE granularities:\n"
         "- `one_shot`: a specific request the user made that has a clear "
         "completion (\"look up X\", \"draft me an email about Y\"). Decays "
-        "fast.\n"
+        "fast. Does NOT fire autonomously — fulfilled this turn.\n"
         "- `durable`: an ongoing directive {entity} expects {character} to "
         "uphold over time (\"keep me posted on X\", \"help me think through "
-        "my dissertation\"). Decays slowly.\n"
+        "my dissertation\"). FIRES per its cadence; provide cadence_days "
+        "and instruction.\n"
         "- `derived`: something {character} noticed worth tracking that the "
-        "user did NOT explicitly request (\"user keeps coming back to topic "
-        "X\"). Use sparingly — only when there's substantive evidence in the "
-        "exchange.\n"
+        "user did NOT explicitly request. Does NOT fire autonomously — "
+        "lives as background context. Use sparingly.\n"
         "SKIP from concerns:\n"
         "- Modifiers like \"be brief\" / \"don't use emoji\" — those go to "
         "memories as preferences, not concerns.\n"
         "- Items already covered by an existing concern in the system prompt.\n"
         "- Speculative inferences without textual support.\n\n"
+        "For each concern, ALSO include (optional, but strongly preferred "
+        "for durable concerns):\n"
+        "- `cadence_days` (number|null): how often the concern wants to "
+        "fire. Reflects the rhythm of the underlying signal:\n"
+        "    daily event (S&P close, weather): 1\n"
+        "    weekly check-in (project, hobby): 7\n"
+        "    annual event (birthday): 365\n"
+        "    one_shot/derived: null (don't fire autonomously)\n"
+        "- `lifetime_days` (number|null): how long {entity}'s interest in "
+        "this topic plausibly persists without re-engagement. SHOULD BE "
+        "3-10× cadence. null means immortal (no auto-prune). Examples:\n"
+        "    daily-fire concern: 14-30 (couple weeks of grace)\n"
+        "    weekly-fire concern: 60-180 (months)\n"
+        "    annual-fire concern: null\n"
+        "- `instruction` (string): the action {character} takes when this "
+        "concern fires. Required for durable; optional otherwise. "
+        "Phrased as a directive {character} could execute. Examples:\n"
+        "    \"Search for today's S&P 500 close and summarize the move.\"\n"
+        "    \"Check in on dissertation prep — ask if anything's blocking.\"\n\n"
         "Output ONLY this JSON shape — nothing else:\n"
         "  {{\"frame\": \"<hypothetical|roleplay|counterfactual|instructional|none>\", "
         "\"memories\": [{{\"text\": \"<≤200 chars, third-person about {entity}>\", "
         "\"category\": \"<fact|preference|commitment>\"}}, …], "
         "\"concerns\": [{{\"text\": \"<≤200 chars, action-oriented "
-        "third-person directive>\", \"category\": \"<one_shot|durable|derived>\"}}, …]}}\n"
+        "third-person directive>\", \"category\": \"<one_shot|durable|derived>\", "
+        "\"cadence_days\": <number|null>, \"lifetime_days\": <number|null>, "
+        "\"instruction\": \"<directive {character} could execute>\"}}, …]}}\n"
         "If nothing qualifies (or frame≠none): "
         "{{\"frame\": \"<value>\", \"memories\": [], \"concerns\": []}}. No prose."
     )
@@ -1115,15 +1317,20 @@ class ChatLoop:
                     mems_written.append(text)
 
             cons_written: List[str] = []
-            for text, category in raw_concerns:
+            for c in raw_concerns:
+                text = c.get('text', '')
                 if len(text) > 240:
                     text = text[:240].rstrip()
+                category = c.get('category', 'durable')
                 # Concerns derived by reflection: provenance follows category.
                 # one_shot/durable typically come from explicit user requests
                 # (asserted); derived is by definition inferred.
                 provenance = 'inferred' if category == 'derived' else 'asserted'
                 if self._add_concern(text, category=category, entity=source,
-                                     provenance=provenance, seed=False):
+                                     provenance=provenance, seed=False,
+                                     cadence_days=c.get('cadence_days'),
+                                     lifetime_days=c.get('lifetime_days'),
+                                     instruction=c.get('instruction')):
                     cons_written.append(text)
 
             if mems_written or cons_written:
@@ -1138,49 +1345,75 @@ class ChatLoop:
 
     @staticmethod
     def _parse_reflection_payload(payload: Any
-                                  ) -> Tuple[str, List[Tuple[str, str]], List[Tuple[str, str]]]:
-        """Normalize reflection output to (frame, memories, concerns) where
-        each list contains (text, category) tuples.
+                                  ) -> Tuple[str, List[Tuple[str, str]], List[Dict[str, Any]]]:
+        """Normalize reflection output to (frame, memories, concerns).
+        memories: list of (text, category) tuples.
+        concerns: list of dicts with keys text, category, cadence_days,
+                  lifetime_days, instruction (any may be missing/None).
 
         Accepts:
-          - New envelope: {"frame": "...", "memories": [...], "concerns": [...]}
-            with each list of {text, category} dicts (or bare strings).
-          - Legacy envelope without `concerns`: still parses, concerns=[].
+          - Full envelope: {"frame": "...", "memories": [...], "concerns": [...]}
+            with each concern dict carrying text, category, cadence_days,
+            lifetime_days, instruction.
+          - Older envelope where concerns lack the cadence/lifetime/
+            instruction fields — fields default to None.
           - Bare list of strings: assumed frame=none, treated as memories.
         Anything else returns ('unknown', [], []) — caller treats non-`none`
         frame as a suppression signal so this fails safe.
         """
 
-        def _normalize_items(raw: Any, allowed: Tuple[str, ...],
-                             default_cat: str) -> List[Tuple[str, str]]:
+        def _normalize_memories(raw: Any) -> List[Tuple[str, str]]:
             out: List[Tuple[str, str]] = []
             if not isinstance(raw, list):
                 return out
             for item in raw:
                 if isinstance(item, str) and item.strip():
-                    out.append((item.strip(), default_cat))
+                    out.append((item.strip(), 'fact'))
                 elif isinstance(item, dict):
                     t = str(item.get('text', '') or '').strip()
-                    c = str(item.get('category', default_cat) or default_cat).strip().lower()
-                    if c not in allowed:
-                        c = default_cat
+                    c = str(item.get('category', 'fact') or 'fact').strip().lower()
+                    if c not in _MEMORY_CATEGORIES:
+                        c = 'fact'
                     if t:
                         out.append((t, c))
             return out
 
-        # Old shape — bare list. Assume frame=none.
+        def _normalize_concerns(raw: Any) -> List[Dict[str, Any]]:
+            out: List[Dict[str, Any]] = []
+            if not isinstance(raw, list):
+                return out
+            for item in raw:
+                if isinstance(item, str) and item.strip():
+                    out.append({'text': item.strip(), 'category': 'durable',
+                                'cadence_days': None, 'lifetime_days': None,
+                                'instruction': None})
+                elif isinstance(item, dict):
+                    t = str(item.get('text', '') or '').strip()
+                    if not t:
+                        continue
+                    c = str(item.get('category', 'durable') or 'durable').strip().lower()
+                    if c not in _CONCERN_CATEGORIES:
+                        c = 'durable'
+                    cad = item.get('cadence_days')
+                    life = item.get('lifetime_days')
+                    instr = item.get('instruction')
+                    out.append({
+                        'text': t, 'category': c,
+                        'cadence_days': cad if cad is not None else None,
+                        'lifetime_days': life if life is not None else None,
+                        'instruction': str(instr).strip() if instr else None,
+                    })
+            return out
+
+        # Old shape — bare list. Assume frame=none, all memories.
         if isinstance(payload, list):
-            return (_REFLECT_FRAME_OK,
-                    _normalize_items(payload, _MEMORY_CATEGORIES, 'fact'),
-                    [])
+            return (_REFLECT_FRAME_OK, _normalize_memories(payload), [])
 
         # New envelope.
         if isinstance(payload, dict):
             frame = str(payload.get('frame', '') or '').strip().lower() or 'unknown'
-            mems = _normalize_items(payload.get('memories', []),
-                                    _MEMORY_CATEGORIES, 'fact')
-            cons = _normalize_items(payload.get('concerns', []),
-                                    _CONCERN_CATEGORIES, 'durable')
+            mems = _normalize_memories(payload.get('memories', []))
+            cons = _normalize_concerns(payload.get('concerns', []))
             return (frame, mems, cons)
 
         return ('unknown', [], [])
@@ -1723,6 +1956,11 @@ class ChatLoop:
             'created': props.get('created_at', ''),
             'last_engaged_at': props.get('last_engaged_at', ''),
             'recency': props.get('last_engaged_at', ''),
+            # Phase B firing parameters (visible in the browser, not yet editable)
+            'cadence_days': self._resolve_cadence_days(props),
+            'lifetime_days': self._resolve_lifetime_days(props),
+            'instruction': props.get('instruction'),
+            'last_fired_at': props.get('last_fired_at'),
         }
 
     def _all_concerns_split(self) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
@@ -2358,6 +2596,10 @@ class ChatLoop:
         # also reinforce engagement) + top-N by current weight (always-on
         # budget). Rendered as a separate block above the memories block.
         concerns = self._get_concerns_for_prompt(text)
+        # Concern firing: any active concern whose cadence has elapsed and
+        # has an instruction raises a visible impulse line on the CLI.
+        # Phase B-display only — does NOT inject into the ReAct loop.
+        self._check_and_fire_concerns(source)
 
         log: List[Tuple[str, str]] = []
         iters: List[Dict[str, Any]] = []

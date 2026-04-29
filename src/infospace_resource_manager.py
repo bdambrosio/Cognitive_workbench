@@ -970,7 +970,8 @@ class InfospaceResourceManager:
             logger.warning(f"Failed to compute Note metadata: {e}")
         
         # Merge allowed extra properties (tool_metadata: internal only, planner/tools have no access)
-        allowed_fields = {'kind', 'category', 'status', 'provenance', 'last_engaged_at', 'seed',
+        allowed_fields = {'kind', 'category', 'status', 'provenance', 'last_engaged_at',
+                          'last_fired_at', 'cadence_days', 'lifetime_days', 'instruction', 'seed',
                           'parent_id', 'order', 'span', 'section', 'source', 'entity', 'edge',
                           'exclude_from_index', 'tool_metadata', 'placeholder'}
         for key in allowed_fields:
