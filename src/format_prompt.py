@@ -8,6 +8,7 @@ from PyQt6.QtGui import QFont, QTextCursor, QKeySequence, QClipboard, QShortcut
 from PyQt6.QtGui import QTextDocument
 from pathlib import Path
 import json
+import re
 import sys
 import os
 import re
@@ -641,11 +642,18 @@ layout.addWidget(load_trace_button)
 load_trace_button.clicked.connect(load_trace_section)
 
 
+_CHAT_TRACE_HEADER_RE = re.compile(
+    r'^(?:\[\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}[^\]]*\]|Chat session:)'
+)
+
+
 def load_chat_trace_section():
     """Load section(s) of chat_trace_{agent}.txt — written by the chat ReAct
     loop, one section per turn. Mirrors load_trace_section's UI but reads
-    a different file pattern and recognizes 'Chat session:' as the section
-    marker."""
+    a different file pattern. Section markers:
+      • new format: a line that begins '[YYYY-MM-DD HH:MM:SS UTC] source=…'
+      • legacy format: a line that begins 'Chat session:'
+    Both forms recognized so old + new entries in the same file both load."""
     trace_dir = Path(__file__).parent / "logs"
 
     dialog = QDialog(window)
@@ -702,14 +710,16 @@ def load_chat_trace_section():
         QMessageBox.critical(window, "Error", f"Failed to read trace file: {str(e)}")
         return
 
-    # Each turn's section starts with the "Chat session:" header line.
+    # Each turn's section starts with either a bracketed-timestamp header
+    # (new format) or 'Chat session:' (legacy). Walk in reverse so the
+    # most-recent turn is first in match_indices.
     match_indices = []
     for i in range(len(trace_lines) - 1, -1, -1):
-        if trace_lines[i].startswith("Chat session:"):
+        if _CHAT_TRACE_HEADER_RE.match(trace_lines[i]):
             match_indices.append(i)
 
     if not match_indices:
-        QMessageBox.warning(window, "Error", "No 'Chat session:' header found in chat trace file.")
+        QMessageBox.warning(window, "Error", "No turn header found in chat trace file.")
         return
 
     if len(match_indices) < num_sections:

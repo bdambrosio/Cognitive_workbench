@@ -130,6 +130,18 @@ _CONCERN_RECURRENCE_THRESHOLD = 0.8
 # is raw page text — but bounded so a single fetch can't blow the prompt.
 _FETCH_TEXT_OBS_CAP = 8000
 
+# Reasoning history (awareness feed): per-turn ReAct trace persisted as a
+# Note in the `reasoning_history` collection. Last N entries surface in the
+# user-message prefix between conversation history and current input. Most
+# recent _REASONING_HISTORY_FULL render in full; older ones render as a
+# compressed action-sequence digest. Ring-bounded — older traces beyond
+# _REASONING_HISTORY_RING_SIZE are pruned at write time.
+_REASONING_HISTORY_COLLECTION_NAME = "reasoning_history"
+_REASONING_HISTORY_RING_SIZE = 50    # on-disk cap
+_REASONING_HISTORY_RECENT = 6        # surfaced in the prompt
+_REASONING_HISTORY_FULL = 3          # of those, how many in full vs compressed
+_REASONING_HISTORY_OBS_CAP = 1000    # per-iter observation cap in stored trace
+
 # Per-iteration auto-binding: $step1, $step2, ... names the result of each
 # action so subsequent actions can reference it. Scoped to the current turn
 # only — does not leak into conversation history or the next turn's loop.
@@ -457,6 +469,12 @@ class ChatLoop:
         self._init_concerns()
         self._seed_concerns_from_config(character_config)
 
+        # ---- Reasoning history (awareness feed) ----
+        # Per-turn ReAct traces persisted here. Last N render in the
+        # user-message prefix as Jill's awareness of her own prior thinking.
+        self._reasoning_history_collection_id: Optional[str] = None
+        self._init_reasoning_history()
+
         # ---- Zenoh wiring ----
         self._inbox: "queue.Queue[dict]" = queue.Queue()
         self._zenoh_session = None
@@ -766,6 +784,27 @@ class ChatLoop:
             self._concerns_collection_id = cid
         except Exception as e:
             logger.warning(f"[{self.character_name}] _init_concerns failed: {e}")
+
+    def _init_reasoning_history(self) -> None:
+        """Get-or-create the reasoning_history Collection. Per-turn ReAct
+        traces land here as Notes; the last N surface in the user-message
+        prefix as Jill's awareness of her own prior thinking. No semantic
+        index for v1 — read pattern is recency-only."""
+        try:
+            cid = self.resource_manager.named_collections.get(_REASONING_HISTORY_COLLECTION_NAME)
+            if not cid:
+                success, cid, err, _ = self.resource_manager.create_collection(
+                    self.character_name, [], "list", "chat-loop", "",
+                    _REASONING_HISTORY_COLLECTION_NAME,
+                    {"kind": "reasoning_history"},
+                )
+                if not success or not cid:
+                    logger.warning(f"[{self.character_name}] create reasoning_history collection failed: {err}")
+                    return
+            self.resource_manager.mark_persistent(cid, self.character_name)
+            self._reasoning_history_collection_id = cid
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] _init_reasoning_history failed: {e}")
 
     @staticmethod
     def _seed_concern_name(idx: int) -> str:
@@ -2488,26 +2527,33 @@ class ChatLoop:
             "around the JSON is discarded and the loop will retry. Output "
             "begins with `{` and ends with `}`.\n"
             "\n"
+            "Every emission MUST include a `thought` field: ONE TERSE "
+            "SENTENCE supporting your action choice. Not narration of the "
+            "user's intent, not a summary of the conversation, not "
+            "throwaway filler — the actual one-line reason for picking "
+            "THIS action over the alternatives. The thought is preserved "
+            "verbatim into your future-turn awareness feed.\n"
+            "\n"
             "You do NOT know: current weather, recent news, current prices, "
             "or anything requiring fresh information. For time-sensitive or "
             "fact-specific questions, your first action is `search`.\n"
             "\n"
             "Tools (each emission picks ONE):\n"
-            "1. `{\"tool\": \"process_text\", \"source\": <string|$stepN>, \"instruction\": <string>}` — "
+            "1. `{\"thought\": \"<one terse sentence>\", \"tool\": \"process_text\", \"source\": <string|$stepN>, \"instruction\": <string>}` — "
             "LLM pass over text in context. Use to formulate queries, render results in your voice, extract info.\n"
-            "2. `{\"tool\": \"search\", \"query\": <string|$stepN>}` — web search (digested synthesis + sources).\n"
-            "3. `{\"tool\": \"fetch_text\", \"url\": <string|$stepN>}` — full text from a single URL "
+            "2. `{\"thought\": \"<one terse sentence>\", \"tool\": \"search\", \"query\": <string|$stepN>}` — web search (digested synthesis + sources).\n"
+            "3. `{\"thought\": \"<one terse sentence>\", \"tool\": \"fetch_text\", \"url\": <string|$stepN>}` — full text from a single URL "
             "(or local file path). Use when a search hit looks promising and the snippet isn't enough; "
             "always pass the result through process_text before responding.\n"
-            "4. `{\"tool\": \"respond\", \"text\": <string|$stepN>}` — final reply, exits loop. "
+            "4. `{\"thought\": \"<one terse sentence>\", \"tool\": \"respond\", \"text\": <string|$stepN>}` — final reply, exits loop. "
             "Must be in your voice; pass search/fetch results through process_text first or write the reply yourself.\n"
             "\n"
             "Each action's result auto-binds to `$step1, $step2, …` (per-turn scope).\n"
             "\n"
             "Worked example. User: 'what's the weather in Berkeley tomorrow?'\n"
-            "  Iter 1: `{\"tool\": \"search\", \"query\": \"Berkeley CA weather forecast tomorrow\"}` → $step1\n"
-            "  Iter 2: `{\"tool\": \"process_text\", \"source\": \"$step1\", \"instruction\": \"answer the user in your voice in 1-2 sentences, citing the source domain\"}` → $step2\n"
-            "  Iter 3: `{\"tool\": \"respond\", \"text\": \"$step2\"}` → loop exits.\n"
+            "  Iter 1: `{\"thought\": \"Need fresh weather data — search first.\", \"tool\": \"search\", \"query\": \"Berkeley CA weather forecast tomorrow\"}` → $step1\n"
+            "  Iter 2: `{\"thought\": \"Search synthesis is decent; render in my voice with source.\", \"tool\": \"process_text\", \"source\": \"$step1\", \"instruction\": \"answer the user in your voice in 1-2 sentences, citing the source domain\"}` → $step2\n"
+            "  Iter 3: `{\"thought\": \"Processed answer is ready — send it.\", \"tool\": \"respond\", \"text\": \"$step2\"}` → loop exits.\n"
             "\n"
             "Output ONLY one JSON object. No prose, no apology, no explanation."
         )
@@ -2528,6 +2574,15 @@ class ChatLoop:
             for t in history:
                 who = source if t.get('direction') == 'in' else self.character_name
                 parts.append(f"{who}: {t.get('text', '')}")
+            parts.append("")
+        # Awareness feed: prior ReAct traces (Jill's own thinking from
+        # recent turns) sit between conversation history and current
+        # input. Read once per loop entry — same store-and-append
+        # discipline as conversation history: byte-stable across
+        # iterations within the loop, fresh on the next loop.
+        reasoning_block = self._get_reasoning_history_block()
+        if reasoning_block:
+            parts.append(reasoning_block)
             parts.append("")
         parts.append("## Current user input")
         parts.append(user_text)
@@ -2690,99 +2745,182 @@ class ChatLoop:
                            final_response: str,
                            exit_reason: str,
                            recall: Optional[List[Tuple[str, str]]] = None) -> None:
-        """Append one ReAct session to logs/chat_trace_{character}.txt.
-
-        Captures only the reasoning loop — recall context, system prompt,
-        initial context, per-iteration emissions/appends, final response.
-        Post-turn side effects (discourse update, reflection / memories
-        written) are NOT in the trace; they're side outputs of the turn,
-        not part of the response-generation context.
-
-        Called immediately after the ReAct loop completes (before the slow
-        post-turn LLM calls) so format_prompt has access to the trace
-        without waiting on reflection.
-
-        format_prompt.py 'Load Chat Trace' reads this file by section.
-        """
+        """Append one ReAct session to logs/chat_trace_{character}.txt
+        as the literal byte-stream that was sent to the LLM, with no
+        editorial annotation. Each iteration is one (USER, ASSISTANT)
+        pair; the SYSTEM message is shown once (it's byte-stable across
+        iterations). A single dim header line per turn carries minimal
+        metadata (timestamp / source / iters / exit) so multiple turns
+        in the same file are separable, and that's it."""
         try:
             from pathlib import Path
             log_dir = Path(__file__).resolve().parent.parent / 'logs'
             log_dir.mkdir(exist_ok=True)
             trace_path = log_dir / f'chat_trace_{self.character_name}.txt'
             ts = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
-            sep = '=' * 80
-            sub = '-' * 80
             n_iters = len(iters)
-            n_recall = len(recall or [])
-            lines = [
-                '', sep,
-                f'Chat session: {ts}',
-                f'Source: {source}',
-                f'User input: {user_text}',
-                f'Iterations: {n_iters}',
-                f'Recall hits: {n_recall}',
-                f'Exit: {exit_reason}',
-                f'Final response length: {len(final_response)} chars',
-                sep, '',
+            lines: List[str] = [
+                '',
+                '=' * 80,
+                f'[{ts}] source={source} iters={n_iters} exit={exit_reason}',
+                '=' * 80,
+                '',
             ]
-
-            if recall:
-                lines.append(sub)
-                lines.append('>>> RECALL HITS (auto-RAG over memories collection)')
-                lines.append(sub)
-                for text, cat in recall:
-                    lines.append(f'[{cat}] {text}')
-                lines.append('')
-
             if iters:
                 first = iters[0]
-                lines.append(sub)
-                lines.append('>>> SYSTEM PROMPT (sent verbatim every iteration)')
-                lines.append(sub)
+                lines.append('SYSTEM:')
                 lines.append(first.get('system', ''))
                 lines.append('')
-                lines.append(sub)
-                lines.append('>>> INITIAL CONTEXT (iter-1 user message; working log empty)')
-                lines.append(sub)
-                lines.append(first.get('user', ''))
-                lines.append('')
-
-                for idx, it in enumerate(iters):
-                    lines.append(sub)
-                    lines.append(f'>>> ITERATION {idx + 1} — MODEL RAW EMISSION (thought + tool call)')
-                    lines.append(sub)
+                for it in iters:
+                    lines.append('USER:')
+                    lines.append(it.get('user', ''))
+                    lines.append('')
+                    lines.append('ASSISTANT:')
                     lines.append(it.get('raw', ''))
                     lines.append('')
-
-                    appended = it.get('appended', []) or []
-                    lines.append(sub)
-                    lines.append(f'>>> ITERATION {idx + 1} — APPENDED TO CONTEXT FOR NEXT ITER')
-                    lines.append(sub)
-                    if not appended:
-                        # respond exit, or LLM-error before any append
-                        if exit_reason == 'respond' and idx == n_iters - 1:
-                            lines.append('(respond — loop exits, nothing appended)')
-                        elif exit_reason == 'llm_error' and idx == n_iters - 1:
-                            lines.append('(LLM call failed — nothing appended)')
-                        else:
-                            lines.append('(nothing appended)')
-                    else:
-                        for label, content in appended:
-                            lines.append(f'{label}:')
-                            lines.append(str(content))
-                            lines.append('')
-                    lines.append('')
-
-            lines.append(sub)
-            lines.append('>>> FINAL RESPONSE TO USER')
-            lines.append(sub)
-            lines.append(final_response)
-            lines.append('')
-            lines.append(sep)
             with open(trace_path, 'a', encoding='utf-8') as f:
                 f.write('\n'.join(lines) + '\n')
         except Exception as e:
             logger.warning(f"[{self.character_name}] react trace write failed: {e}")
+
+    # ------------------------------------------------------------------
+    # Reasoning history (awareness feed)
+    # ------------------------------------------------------------------
+
+    def _write_reasoning_history(self, source: str, user_text: str,
+                                  iters: List[Dict[str, Any]],
+                                  final_response: str,
+                                  exit_reason: str,
+                                  autonomous: bool = False) -> None:
+        """Persist one ReAct turn's trace into the reasoning_history
+        collection. Note content is the rendered full trace (used as the
+        prompt-side full form). Properties carry a one-line compressed
+        digest (used when this trace ages out of the full window) plus
+        metadata. Ring-prunes oldest entries when the collection grows
+        past _REASONING_HISTORY_RING_SIZE."""
+        if not self._reasoning_history_collection_id:
+            return
+        try:
+            actions: List[str] = []
+            iter_lines: List[str] = []
+            for idx, it in enumerate(iters):
+                raw = it.get('raw', '') or ''
+                thought = ''
+                action_summary = (raw or '').strip()
+                tool = '?'
+                try:
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, dict):
+                        thought = str(parsed.get('thought', '') or '').strip()
+                        tool = str(parsed.get('tool', '?') or '?')
+                        action_summary = json.dumps(
+                            {k: v for k, v in parsed.items() if k != 'thought'},
+                            ensure_ascii=False)
+                except Exception:
+                    pass
+                actions.append(tool)
+
+                obs_text = ''
+                for label, content in (it.get('appended') or []):
+                    if isinstance(label, str) and label.startswith('$step'):
+                        s = str(content or '')
+                        if len(s) > _REASONING_HISTORY_OBS_CAP:
+                            s = s[:_REASONING_HISTORY_OBS_CAP] + '… [truncated]'
+                        obs_text = s
+                        break
+
+                iter_lines.append(f"  ITER {idx + 1}:")
+                if thought:
+                    iter_lines.append(f"    thought: {thought}")
+                iter_lines.append(f"    action:  {action_summary}")
+                if obs_text:
+                    iter_lines.append(f"    obs:     {obs_text}")
+
+            header_label = '(autonomous)' if autonomous else f'({source})'
+            header = f"INPUT {header_label}: {user_text}"
+            full_lines = [header] + iter_lines
+            if final_response:
+                resp = final_response
+                if len(resp) > _REASONING_HISTORY_OBS_CAP:
+                    resp = resp[:_REASONING_HISTORY_OBS_CAP] + '… [truncated]'
+                full_lines.append(f"  RESPONSE: {resp}")
+            full_trace = "\n".join(full_lines)
+
+            user_short = user_text if len(user_text) <= 60 else user_text[:57] + '…'
+            compressed = (
+                f"{header_label} '{user_short}' → "
+                + (" → ".join(actions) if actions else "(no actions)")
+            )
+
+            success, note_id, err, _ = self.resource_manager.create_note(
+                self.character_name, full_trace, "text", "chat-loop",
+                source or "", "",
+                {
+                    "kind": "reasoning_trace",
+                    "user_text": user_text,
+                    "autonomous": bool(autonomous),
+                    "exit_reason": exit_reason,
+                    "n_iters": len(iters),
+                    "compressed": compressed,
+                },
+            )
+            if not success or not note_id:
+                logger.warning(
+                    f"[{self.character_name}] reasoning_history note create failed: {err}")
+                return
+            self.resource_manager.add_to_collection(
+                self._reasoning_history_collection_id, note_id,
+                self.character_name, operation='add')
+            self.resource_manager.mark_persistent(note_id, self.character_name)
+
+            # Ring-prune oldest entries if we've exceeded the cap.
+            coll = self.resource_manager.get_resource(self._reasoning_history_collection_id)
+            note_ids = ((coll or {}).get('properties') or {}).get('content', []) or []
+            if len(note_ids) > _REASONING_HISTORY_RING_SIZE:
+                excess = len(note_ids) - _REASONING_HISTORY_RING_SIZE
+                for old_id in note_ids[:excess]:
+                    try:
+                        self.resource_manager.delete_resource(old_id)
+                    except Exception:
+                        pass
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] _write_reasoning_history failed: {e}")
+
+    def _get_reasoning_history_block(self) -> str:
+        """Build the ## Recent reasoning block for the user-message prefix.
+        Returns '' when there's nothing to surface. Last
+        _REASONING_HISTORY_RECENT entries are read; the most recent
+        _REASONING_HISTORY_FULL render in full, older render compressed."""
+        if not self._reasoning_history_collection_id:
+            return ''
+        coll = self.resource_manager.get_resource(self._reasoning_history_collection_id)
+        if not coll:
+            return ''
+        note_ids = (coll.get('properties') or {}).get('content', []) or []
+        if not note_ids:
+            return ''
+        recent = note_ids[-_REASONING_HISTORY_RECENT:]
+        sections: List[str] = []
+        n = len(recent)
+        full_threshold = max(0, n - _REASONING_HISTORY_FULL)
+        for idx, nid in enumerate(recent):
+            note = self.resource_manager.get_resource(nid)
+            if not note:
+                continue
+            props = note.get('properties') or {}
+            offset_label = f"trace -{n - idx}"
+            if idx >= full_threshold:
+                content = str(props.get('content', '') or '').strip()
+                if content:
+                    sections.append(f"### {offset_label} (full)\n{content}")
+            else:
+                compressed = str(props.get('compressed', '') or '').strip()
+                if compressed:
+                    sections.append(f"### {offset_label}: {compressed}")
+        if not sections:
+            return ''
+        return ("## Recent reasoning (my own ReAct traces from prior turns)\n"
+                + "\n\n".join(sections))
 
     def _react_fallback_synthesis(self, log: List[Tuple[str, str]], fail_reason: str = '') -> str:
         """Force a Jill-voice reply when respond never fired."""
@@ -2900,6 +3038,14 @@ class ChatLoop:
         if iters:
             self._write_react_trace(
                 source, text, log, iters, reply, exit_reason, recall=recall)
+            # Awareness feed: persist this turn's trace into
+            # reasoning_history so the next turn's prompt prefix can
+            # surface it. Same iters list — different store, different
+            # render. Both autonomous and user-driven turns write here:
+            # all reasoning is Jill's.
+            self._write_reasoning_history(
+                source, text, iters, reply, exit_reason,
+                autonomous=autonomous)
 
         # Post-turn work (discourse + reflection + close + persist) is
         # ~5-15s of LLM calls and conceptually a side effect of the turn.

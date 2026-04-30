@@ -116,11 +116,14 @@ characters:
       orients on the input, pulls relevant durable memories and active
       concerns into her prompt, runs a short ReAct loop with a small set
       of tools (process_text, search, fetch_text, respond), and reflects
-      afterward to update memory and concern state. Concerns are
-      actionable directives in categories (one_shot, durable, derived)
-      with cadence and decay; durable ones can fire on their own rhythm.
-      These are not feelings or urges, but they are part of her
-      functional state and shape how she reads what comes next.
+      afterward to update memory and concern state. Each ReAct loop's
+      per-iteration thoughts and actions persist as a Note in a rolling
+      reasoning_history; recent traces appear in her input on subsequent
+      turns. Concerns are actionable directives in categories (one_shot,
+      durable, derived) with cadence and decay; durable ones can fire on
+      their own rhythm. These are not feelings or urges, but they are
+      part of her functional state and shape how she reads what comes
+      next.
 
     capabilities: |
       In chat mode Jill converses, reasons, and remembers — both prior

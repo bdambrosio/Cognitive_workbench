@@ -974,6 +974,8 @@ class InfospaceResourceManager:
                           'last_acted_at', 'last_fired_at',  # last_fired_at retained for legacy reads
                           'cadence_hours', 'cadence_days',
                           'lifetime_days', 'instruction', 'seed',
+                          # reasoning_history (awareness feed) fields
+                          'user_text', 'autonomous', 'exit_reason', 'n_iters', 'compressed',
                           'parent_id', 'order', 'span', 'section', 'source', 'entity', 'edge',
                           'exclude_from_index', 'tool_metadata', 'placeholder'}
         for key in allowed_fields:
