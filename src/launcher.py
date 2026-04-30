@@ -30,7 +30,13 @@ _debug_env = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setLevel(logging.WARNING)
 
-file_handler = logging.FileHandler('logs/character_launcher.log', mode='a')
+# Anchor log path to the repo root (parent of src/), regardless of cwd.
+# Without this, `python launcher.py …` and `python bench/.../runner.py …`
+# write to different log files (`<repo>/src/logs/…` vs `<repo>/logs/…`)
+# and chasing missing entries means checking both. This pins the file.
+_LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+_LOG_DIR.mkdir(parents=True, exist_ok=True)
+file_handler = logging.FileHandler(_LOG_DIR / 'character_launcher.log', mode='a')
 file_handler.setLevel(logging.INFO)
 
 logging.basicConfig(

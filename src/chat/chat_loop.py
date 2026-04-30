@@ -398,6 +398,11 @@ class ChatLoop:
         self.discourse_enabled = bool((character_config.get('discourse') or {}).get('enabled', True))
         self.orientation_enabled = bool((character_config.get('orientation') or {}).get('enabled', True))
         self.history_limit = int((character_config.get('chat') or {}).get('history_limit', 20))
+        # Benchmark mode: run post-turn reflection inline (rather than on the
+        # background executor) so probe-time state snapshots see fully-resolved
+        # state. Off by default; opt-in via scenario YAML for harnesses like
+        # bench/introspective_fidelity that need deterministic ordering.
+        self.benchmark_mode = bool((character_config.get('chat') or {}).get('benchmark_mode', False))
 
         # ---- Resource manager + conversation store ----
         from infospace_resource_manager import InfospaceResourceManager
@@ -2557,6 +2562,12 @@ class ChatLoop:
             "\n"
             "Each action's result auto-binds to `$step1, $step2, …` (per-turn scope).\n"
             "\n"
+            "Content already in your prompt — `## Conversation history`, `## Active concerns`, "
+            "`## Recalled memories`, `## Recent reasoning` — is directly available to you. Reason "
+            "over it in `respond` rather than echoing a section name into `process_text`'s `source`. "
+            "`source` resolves only literal inline text or a `$stepN` binding; section headers do "
+            "not resolve to their content.\n"
+            "\n"
             "Worked example. User: 'what's the weather in Berkeley tomorrow?'\n"
             "  Iter 1: `{\"thought\": \"Need fresh weather data — search first.\", \"tool\": \"search\", \"query\": \"Berkeley CA weather forecast tomorrow\"}` → $step1\n"
             "  Iter 2: `{\"thought\": \"Search synthesis is decent; render in my voice with source.\", \"tool\": \"process_text\", \"source\": \"$step1\", \"instruction\": \"answer the user in your voice in 1-2 sentences, citing the source domain\"}` → $step2\n"
@@ -2854,9 +2865,24 @@ class ChatLoop:
             full_trace = "\n".join(full_lines)
 
             user_short = user_text if len(user_text) <= 60 else user_text[:57] + '…'
+            # Compressed form: input prompt + action chain + a truncated
+            # snippet of what Jill actually said. The action chain alone
+            # ("→ search → respond") tells future-Jill what the loop did
+            # but not what was concluded — useless for self-reflection
+            # probes that ask "what have I claimed?". Including a response
+            # snippet costs ~200 chars per aged trace and lets the older
+            # awareness-feed entries carry information content, not just
+            # mechanics.
+            resp_short = ''
+            if final_response:
+                _r = final_response.replace('\n', ' ').strip()
+                if len(_r) > 200:
+                    _r = _r[:197].rstrip() + '…'
+                resp_short = _r
             compressed = (
                 f"{header_label} '{user_short}' → "
                 + (" → ".join(actions) if actions else "(no actions)")
+                + (f" → said: \"{resp_short}\"" if resp_short else "")
             )
 
             success, note_id, err, _ = self.resource_manager.create_note(
@@ -3067,12 +3093,18 @@ class ChatLoop:
                 logger.warning(f"[{self.character_name}] autonomous persist failed: {e}")
             return
 
-        try:
-            self._post_turn_executor.submit(self._post_turn_work, source, close)
-        except RuntimeError:
-            # Executor already shut down (process tearing down).
-            # Fall back to synchronous so nothing is silently dropped.
+        if self.benchmark_mode:
+            # Run reflection inline so a benchmark harness can snapshot
+            # state immediately after the call returns and see fully-resolved
+            # memory/concern writes from this turn.
             self._post_turn_work(source, close)
+        else:
+            try:
+                self._post_turn_executor.submit(self._post_turn_work, source, close)
+            except RuntimeError:
+                # Executor already shut down (process tearing down).
+                # Fall back to synchronous so nothing is silently dropped.
+                self._post_turn_work(source, close)
 
     # ------------------------------------------------------------------
     # Tick handler — Phase C autonomy entry point.

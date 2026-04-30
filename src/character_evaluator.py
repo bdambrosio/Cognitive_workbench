@@ -409,7 +409,7 @@ def _llm_evaluate(
     try:
         result = llm_generate(
             messages=[system_prompt, user_prompt],
-            max_tokens=256,
+            max_tokens=1024,
             temperature=0.2,
             is_json=True,
         )
@@ -425,10 +425,25 @@ def _llm_evaluate(
             lines = text.split("\n")
             lines = [l for l in lines if not l.strip().startswith("```")]
             text = "\n".join(lines).strip()
-        return json.loads(text)
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as e:
+            # Common LLM-JSON drift (unquoted keys, trailing commas, missing
+            # braces) — try the shared tolerant repair before giving up.
+            from utils.json_utils import repair_json_string
+            repaired = repair_json_string(text)
+            if isinstance(repaired, dict):
+                logger.info(
+                    f"Character evaluator: repaired malformed JSON "
+                    f"(direct parse failed: {e})")
+                return repaired
+            logger.warning(
+                f"Character evaluator JSON unparseable ({e}); raw output "
+                f"(first 600 chars): {text[:600]!r}")
+            return None
 
     except Exception as e:
-        logger.warning(f"Character evaluator LLM parse error: {e}")
+        logger.warning(f"Character evaluator LLM call error: {e}")
         return None
 
 

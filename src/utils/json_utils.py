@@ -1,7 +1,10 @@
 """JSON repair helpers for tolerant parsing of LLM output."""
 
 import json
+import logging
 from typing import Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 
 def repair_json_string(json_str: str) -> Optional[Dict]:
@@ -29,6 +32,31 @@ def repair_json_string(json_str: str) -> Optional[Dict]:
     # Remove markdown code fences if present
     response = response.replace("```json", "").replace("```", "").strip()
 
+    # Strip markdown bold/italic emphasis markers (`**`, `__`) that some
+    # instruction-tuned models leak into structured output, e.g.
+    # `{"a": 1, **"b": 2,**}`. String-aware: only stripped outside of
+    # double-quoted JSON strings, so legitimate `**` inside string values
+    # is preserved.
+    if "**" in response or "__" in response:
+        out = []
+        i = 0
+        in_string = False
+        while i < len(response):
+            c = response[i]
+            if c == '"' and (i == 0 or response[i-1] != '\\'):
+                in_string = not in_string
+                out.append(c)
+                i += 1
+                continue
+            if not in_string and (
+                response[i:i+2] == "**" or response[i:i+2] == "__"
+            ):
+                i += 2
+                continue
+            out.append(c)
+            i += 1
+        response = ''.join(out)
+
     # Pre-process: Evaluate arithmetic expressions in numeric fields before parsing
     # This handles cases like {"yaw": 1.0236+3.14159} which are invalid JSON
     def eval_arithmetic_in_json(text):
@@ -52,8 +80,8 @@ def repair_json_string(json_str: str) -> Optional[Dict]:
                     result = ast.literal_eval(expr)
                     if isinstance(result, (int, float)):
                         return f'"{key}": {result}'
-                except (ValueError, SyntaxError, TypeError):
-                    pass
+                except (ValueError, SyntaxError, TypeError) as e:
+                    logger.debug(f"repair_json_string: arithmetic eval failed for {expr!r}: {e}")
 
             # Return original if evaluation fails
             return match.group(0)
@@ -66,8 +94,8 @@ def repair_json_string(json_str: str) -> Optional[Dict]:
     # Try direct parse first
     try:
         return json.loads(response)
-    except json.JSONDecodeError:
-        pass
+    except json.JSONDecodeError as e:
+        logger.debug(f"repair_json_string: direct parse failed ({e}); attempting repair")
 
     # Repair attempt 1: Extract JSON if not at start
     if not response.startswith('{') and '{' in response:
@@ -110,23 +138,49 @@ def repair_json_string(json_str: str) -> Optional[Dict]:
         response = response[:json_end]
         try:
             return json.loads(response)
-        except json.JSONDecodeError:
-            pass
+        except json.JSONDecodeError as e:
+            logger.debug(f"repair_json_string: brace-truncation parse failed ({e})")
 
     # Repair attempt 4: Add missing closing braces
     if brace_count > 0:
         response = response + ('}' * brace_count)
         try:
             return json.loads(response)
-        except json.JSONDecodeError:
-            pass
+        except json.JSONDecodeError as e:
+            logger.debug(f"repair_json_string: missing-brace fill parse failed ({e})")
 
     # Repair attempt 5: Strip trailing extra braces
     while response.endswith('}}'):
         trimmed = response[:-1]
         try:
             return json.loads(trimmed)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            logger.debug(f"repair_json_string: trailing-brace strip parse failed ({e})")
             response = trimmed
 
+    # Repair attempt 6: Quote bareword keys ({key: 1} → {"key": 1}).
+    # Matches a bareword that follows `{` or `,` (with optional whitespace)
+    # and is followed by `:`. This is a regex-only pass — it doesn't track
+    # string boundaries, so a value-string containing `, foo:` could be
+    # mis-rewritten. Acceptable as a last-resort heuristic; LLM output
+    # rarely contains such strings, and earlier attempts already covered
+    # the common shapes.
+    import re
+    quoted = re.sub(
+        r'([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)(\s*:)',
+        r'\1"\2"\3',
+        response,
+    )
+    # Also strip trailing commas before } or ], which often co-occur
+    # with unquoted keys in the same drift class.
+    quoted = re.sub(r',(\s*[}\]])', r'\1', quoted)
+    if quoted != response:
+        try:
+            return json.loads(quoted)
+        except json.JSONDecodeError as e:
+            logger.debug(f"repair_json_string: bareword-key quoting parse failed ({e})")
+
+    logger.debug(
+        f"repair_json_string: all repair attempts exhausted; returning None. "
+        f"Input head: {json_str[:200]!r}")
     return None
