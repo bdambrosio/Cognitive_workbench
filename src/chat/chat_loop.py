@@ -2426,15 +2426,15 @@ class ChatLoop:
         parts: List[str] = []
         parts.append(f"You are {self.character_name}, speaking in first person.")
         if self.persona:
-            parts.append("## Persona\n" + self.persona)
+            parts.append("## Persona (from character config)\n" + self.persona)
         if self.capabilities:
-            parts.append("## Capabilities (chat-only mode)\n" + self.capabilities)
+            parts.append("## Capabilities (from character config; chat-only mode)\n" + self.capabilities)
         if self.setting:
-            parts.append("## Setting\n" + self.setting)
+            parts.append("## Setting (from character config)\n" + self.setting)
         companion = self._companion_state.get(source, '').strip()
         if companion:
             parts.append(
-                f"## Companion model of {source} (fair-witness texture, not a brief to flatter)\n"
+                f"## Companion model of {source} (rolling LLM reflection; fair-witness texture, not a brief to flatter)\n"
                 f"{companion}"
             )
         if concerns:
@@ -2456,7 +2456,7 @@ class ChatLoop:
                 tag = f"{cat}, {badge}" if badge else cat
                 con_lines.append(f"- [{tag}] {text}")
             parts.append(
-                f"## Active concerns (instructions to keep ready to advance)\n"
+                f"## Active concerns (from YAML seeds + post-turn reflection + semantic recall; instructions to keep ready to advance)\n"
                 f"one_shot = a specific request to fulfill once; durable = "
                 f"ongoing directive (with a firing rhythm); derived = "
                 f"something Jill noticed worth tracking. Status badges on "
@@ -2499,7 +2499,7 @@ class ChatLoop:
                 )
         disc = self._discourse_state.get(source, '').strip()
         if disc:
-            parts.append("## Outstanding discourse objects\n" + disc)
+            parts.append("## Outstanding discourse objects (from periodic reflection)\n" + disc)
         if orientation:
             parts.append(orientation)
         return "\n\n".join(parts)
@@ -2520,7 +2520,7 @@ class ChatLoop:
                                    concerns: Optional[List[Tuple[str, str]]] = None) -> str:
         base = self._build_system_prompt(source, orientation, recall=recall, concerns=concerns)
         react = (
-            f"\n\n## Now\n{now_str}\n"
+            f"\n\n## Now (system clock)\n{now_str}\n"
             "\n"
             "## ReAct Tool Loop — READ FIRST\n"
             "Each emission is ONE JSON action object — nothing else. Prose "
@@ -2570,7 +2570,7 @@ class ChatLoop:
         if history and history[-1].get('direction') == 'in' and str(history[-1].get('text', '')) == user_text:
             history = history[:-1]
         if history:
-            parts.append("## Conversation history")
+            parts.append("## Conversation history (verbatim session turns)")
             for t in history:
                 who = source if t.get('direction') == 'in' else self.character_name
                 parts.append(f"{who}: {t.get('text', '')}")
@@ -2587,7 +2587,7 @@ class ChatLoop:
         parts.append("## Current user input")
         parts.append(user_text)
         parts.append("")
-        parts.append("## Working log")
+        parts.append("## Working log (this loop's actions and observations)")
         return "\n".join(parts) + "\n"
 
     # --- ReAct status line (CLI feedback during the loop) -----------------

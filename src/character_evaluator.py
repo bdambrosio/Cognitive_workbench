@@ -175,7 +175,7 @@ def build_orientation_summary(
     posture = _derive_posture(action, epistemic_line, concern_line)
 
     # Build the block
-    lines = ["## ORIENTATION (how to approach this exchange)"]
+    lines = ["## ORIENTATION (from per-turn evaluator; how to approach this exchange)"]
     if concern_line:
         lines.append(f"- Relevant agent concerns: {concern_line}")
     if uc != "none":
