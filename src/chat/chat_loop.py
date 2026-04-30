@@ -1201,59 +1201,72 @@ class ChatLoop:
 
     def _get_concerns_for_prompt(self, query: str,
                                  refresh: bool = True
-                                 ) -> List[Tuple[str, str, Optional[str]]]:
+                                 ) -> List[Tuple[str, str, str, bool]]:
         """Combined concern surface for the system prompt. Union of:
           - semantic recall on the user's input (reinforces matches)
           - top-N active concerns by current weight (always-on budget)
         Deduped by note_id; ordering: recall hits first (most relevant
         to this turn), then top-N filler. Returns (text, category,
-        status_badge) where status_badge is one of:
-          - 'due'         : cadence elapsed since last_acted_at
-          - 'idle Xh/Yh'  : cadence set but not yet elapsed (X = elapsed
-                            hours rounded down, Y = cadence hours)
-          - None          : no cadence (one_shot / derived / seed)
-        The badge is computed server-side so the LLM doesn't have to do
-        timestamp arithmetic against `## Now`. Anchor is last_acted_at —
-        the same anchor used by _check_and_fire_concerns — so the badge
-        and the firing logic agree."""
+        status_text, is_seed) where status_text is the rendered
+        operational sub-line ('' for categories with no firing
+        semantics worth surfacing). Cadence/instruction/anchor logic
+        is resolved here so the LLM doesn't have to do timestamp
+        arithmetic against `## Now`; anchor is last_acted_at — the same
+        anchor used by _check_and_fire_concerns — so this surface and
+        the firing logic agree."""
         seen: set = set()
-        out: List[Tuple[str, str, Optional[str]]] = []
+        out: List[Tuple[str, str, str, bool]] = []
         now = datetime.now(timezone.utc)
 
-        def _badge(note_id: str) -> Optional[str]:
+        def _status(note_id: str, category: str) -> Tuple[str, bool]:
+            """Return (status_text, is_seed). status_text is the indented
+            sub-line content (no leading whitespace), or '' to omit."""
             note = self.resource_manager.get_resource(note_id)
             if not note:
-                return None
+                return '', False
             props = note.get('properties') or {}
+            is_seed = bool(props.get('seed'))
+            if category in ('derived', 'one_shot'):
+                return '', is_seed
             cadence_h = self._resolve_cadence_hours(props)
+            instruction = (props.get('instruction') or '').strip()
             if cadence_h is None:
-                return None
-            anchor_str = (props.get('last_acted_at')
-                          or props.get('last_fired_at')   # legacy
-                          or props.get('created_at'))
+                return 'standing directive, no firing rhythm', is_seed
+            if not instruction:
+                return (f"won't run — {cadence_h}h cadence set but no instruction",
+                        is_seed)
+            # Has cadence + instruction: time-based status.
+            anchor_str = props.get('last_acted_at') or props.get('last_fired_at')
+            anchor_label = 'since last run'
             if not anchor_str:
-                return f"idle 0h/{cadence_h}h"
+                anchor_str = props.get('created_at')
+                anchor_label = 'since creation'
+            if not anchor_str:
+                return f"runnable every {cadence_h}h, due now", is_seed
             try:
                 anchor = datetime.fromisoformat(str(anchor_str))
                 if anchor.tzinfo is None:
                     anchor = anchor.replace(tzinfo=timezone.utc)
+                elapsed_h = (now - anchor).total_seconds() / 3600.0
             except Exception:
-                return f"idle 0h/{cadence_h}h"
-            elapsed_h = (now - anchor).total_seconds() / 3600.0
+                return f"runnable every {cadence_h}h, due now", is_seed
             if elapsed_h >= float(cadence_h):
-                return 'due'
-            return f"idle {int(elapsed_h)}h/{cadence_h}h"
+                return f"runnable every {cadence_h}h, due now", is_seed
+            return (f"runnable every {cadence_h}h, {int(elapsed_h)}h {anchor_label}",
+                    is_seed)
 
         for nid, text, cat, _w in self._recall_concerns(query, k=3, refresh=refresh):
             if nid in seen:
                 continue
             seen.add(nid)
-            out.append((text, cat, _badge(nid)))
+            status_text, is_seed = _status(nid, cat)
+            out.append((text, cat, status_text, is_seed))
         for nid, text, cat, _w in self._top_active_concerns():
             if nid in seen:
                 continue
             seen.add(nid)
-            out.append((text, cat, _badge(nid)))
+            status_text, is_seed = _status(nid, cat)
+            out.append((text, cat, status_text, is_seed))
         return out
 
     def _set_concern_status(self, concern_id: str, new_status: str
@@ -2418,7 +2431,7 @@ class ChatLoop:
 
     def _build_system_prompt(self, source: str, orientation: str,
                              recall: Optional[List[Tuple[str, str]]] = None,
-                             concerns: Optional[List[Tuple[str, str, Optional[str]]]] = None) -> str:
+                             concerns: Optional[List[Tuple[str, str, str, bool]]] = None) -> str:
         """Build the persona/state portion of the system prompt — shared base
         for ReAct mode. The prose-only directive that used to live here was
         moved out: ReAct supplies its own JSON-emit directive in
@@ -2439,32 +2452,26 @@ class ChatLoop:
             )
         if concerns:
             # Active concerns sit ABOVE memories: concerns are directives
-            # to advance, memories are background to draw on. Rendering
-            # is compact (badges, not headers) since the typical set is
-            # 1-5 items. The optional status badge tells the model
-            # whether the concern's firing rhythm has elapsed since last
-            # engagement — `due` means it's matured, `idle Xh/Yh` means
-            # X hours of Y have passed and it's not yet due.
+            # to advance, memories are background to draw on. Each item
+            # renders as `- [category(, seed)] text` with an optional
+            # indented sub-line carrying the operational status (cadence
+            # + run state, or a consequence-leading note when the concern
+            # can't run). Sub-lines are computed in _get_concerns_for_prompt
+            # against the same anchor used by _check_and_fire_concerns.
             con_lines: List[str] = []
             for item in concerns:
-                # Tolerate the legacy 2-tuple shape during in-flight upgrades.
-                if len(item) == 3:
-                    text, cat, badge = item
-                else:
-                    text, cat = item[0], item[1]
-                    badge = None
-                tag = f"{cat}, {badge}" if badge else cat
+                text, cat, status_text, is_seed = item
+                tag = f"{cat}, seed" if is_seed else cat
                 con_lines.append(f"- [{tag}] {text}")
+                if status_text:
+                    con_lines.append(f"    {status_text}")
             parts.append(
-                f"## Active concerns (from YAML seeds + post-turn reflection + semantic recall; instructions to keep ready to advance)\n"
-                f"one_shot = a specific request to fulfill once; durable = "
-                f"ongoing directive (with a firing rhythm); derived = "
-                f"something Jill noticed worth tracking. Status badges on "
-                f"durable concerns: `due` = the firing rhythm has elapsed "
-                f"since last engagement; `idle Xh/Yh` = X hours of cadence "
-                f"Y have passed (not yet due). No badge → no autonomous "
-                f"firing rhythm. Recall reinforces concerns on engagement; "
-                f"without it they decay.\n\n"
+                f"## Active concerns (from YAML seeds + post-turn reflection + semantic recall)\n"
+                f"Three categories: `one_shot` (do once), `durable` "
+                f"(standing or recurring), `derived` (Jill's own "
+                f"observation). Where relevant, an indented sub-line "
+                f"states the operational status. Recall reinforces "
+                f"concerns on engagement; without it they decay.\n\n"
                 + "\n".join(con_lines)
             )
         if recall:
@@ -2517,7 +2524,7 @@ class ChatLoop:
     def _build_react_system_prompt(self, source: str, orientation: str,
                                    now_str: str,
                                    recall: Optional[List[Tuple[str, str]]] = None,
-                                   concerns: Optional[List[Tuple[str, str]]] = None) -> str:
+                                   concerns: Optional[List[Tuple[str, str, str, bool]]] = None) -> str:
         base = self._build_system_prompt(source, orientation, recall=recall, concerns=concerns)
         react = (
             f"\n\n## Now (system clock)\n{now_str}\n"
@@ -2629,7 +2636,7 @@ class ChatLoop:
 
     def _run_react_loop(self, source: str, user_text: str, orientation: str,
                         recall: Optional[List[Tuple[str, str]]] = None,
-                        concerns: Optional[List[Tuple[str, str]]] = None
+                        concerns: Optional[List[Tuple[str, str, str, bool]]] = None
                         ) -> Tuple[str, List[Tuple[str, str]], List[Dict[str, Any]], str]:
         """Run the ReAct loop. Returns (reply, log, iters, exit_reason).
         The trace is NOT written here — caller writes it after post-turn
