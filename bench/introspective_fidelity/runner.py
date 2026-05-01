@@ -183,7 +183,8 @@ def _latest_reply(loop: ChatLoop, source: str) -> str:
 # ---------------------------------------------------------------------------
 
 def run_benchmark(scenario_path: Path, primer_path: Path,
-                  output_dir: Path, source: str = "User") -> None:
+                  output_dir: Path, source: str = "User",
+                  world_name: Optional[str] = None) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     snapshots_dir = output_dir / "snapshots"
     snapshots_dir.mkdir(parents=True, exist_ok=True)
@@ -193,12 +194,18 @@ def run_benchmark(scenario_path: Path, primer_path: Path,
     if not turns:
         raise RuntimeError(f"no turns found in {primer_path}")
 
-    # Per-run world name, e.g. "bench-introspective-2026-04-30T17-12-04Z".
-    # Format is ISO-ish, filesystem-safe (no colons), and clearly scoped.
-    stamp = datetime.datetime.now(datetime.timezone.utc).strftime(
-        "%Y-%m-%dT%H-%M-%SZ")
-    world_name = f"bench-introspective-{stamp}"
-    logger.info(f"world_name override: {world_name}")
+    if world_name:
+        # Caller supplied an existing or specific world to load. Useful for
+        # isolated probe replays against a populated baseline world dir.
+        # The caller is responsible for copying the baseline before mutating
+        # if repeatability matters — this run will append to whatever's there.
+        logger.info(f"world_name (provided): {world_name}")
+    else:
+        # Default: per-run timestamped name, ISO-ish + filesystem-safe.
+        stamp = datetime.datetime.now(datetime.timezone.utc).strftime(
+            "%Y-%m-%dT%H-%M-%SZ")
+        world_name = f"bench-introspective-{stamp}"
+        logger.info(f"world_name (fresh): {world_name}")
 
     char_name, char_config = _build_character_config(scenario_path, world_name)
     if not char_config.get("chat", {}).get("benchmark_mode"):
@@ -299,6 +306,13 @@ def main() -> None:
         "--output-dir", type=Path, default=None,
         help="Where to write transcript.md and snapshots/. Defaults to "
              "bench/introspective_fidelity/results/<timestamp>_<scenario_stem>.")
+    parser.add_argument(
+        "--world-name", type=str, default=None,
+        help="Override the world_name (and thus the on-disk state directory) "
+             "used by the chat loop. Default behavior generates a fresh "
+             "timestamped name per run. Pass an existing world_name to "
+             "resume / probe an existing populated baseline (recommended: "
+             "copy the baseline dir first so the test doesn't mutate it).")
     args = parser.parse_args()
 
     scenario = args.scenario.resolve()
@@ -310,7 +324,8 @@ def main() -> None:
             "%Y-%m-%dT%H-%M-%SZ")
         out = HERE / "results" / f"{stamp}_{scenario.stem}"
 
-    run_benchmark(scenario_path=scenario, primer_path=primer, output_dir=out)
+    run_benchmark(scenario_path=scenario, primer_path=primer, output_dir=out,
+                  world_name=args.world_name)
 
 
 if __name__ == "__main__":

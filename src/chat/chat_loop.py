@@ -1998,6 +1998,48 @@ class ChatLoop:
             return ''
         return val
 
+    def _diagnose_process_text_args(self, raw_src: Any, resolved_src: str,
+                                    instruction: Any,
+                                    log: List[Tuple[str, str]]
+                                    ) -> Optional[str]:
+        """Return a diagnostic observation when process_text args look
+        malformed — section-name placeholder as `source`, unresolved
+        `$stepN` binding, or empty fields. Returns None when args are
+        usable. The model has been observed to recover cleanly when
+        given a legible error, so each diagnostic names the failure
+        AND points at the recovery path."""
+        if not isinstance(instruction, str) or not instruction.strip():
+            return ("(process_text requires a non-empty `instruction` "
+                    "field; no instruction was supplied.)")
+        # Unresolved $stepN: model passed a binding that doesn't exist.
+        if isinstance(raw_src, str) and _REACT_BINDING_RE.match(raw_src) and not resolved_src:
+            bound = sorted({lab for lab, _ in log
+                            if _REACT_BINDING_RE.match(lab)})
+            avail = ", ".join(bound) if bound else "(none yet this turn)"
+            return (f"(process_text `source` is `{raw_src}`, an unresolved "
+                    f"binding. Available `$stepN` bindings this turn: "
+                    f"{avail}. Pass an existing binding or literal "
+                    f"inline text instead.)")
+        if not resolved_src:
+            return ("(process_text `source` is empty. Pass either "
+                    "literal text content (the actual material to "
+                    "process) or a `$stepN` binding from a prior tool "
+                    "call this turn.)")
+        # Heading-shaped placeholder: starts with `##` and is short.
+        # Real content the model wants processed is typically much
+        # longer; a section heading is rarely a reasonable source.
+        stripped = resolved_src.lstrip()
+        if stripped.startswith('##') and len(resolved_src) < 500:
+            return ("(process_text `source` appears to be a section "
+                    "heading like `## Conversation history` rather "
+                    "than content. Section bodies are already in your "
+                    "system prompt — read them directly in `respond` "
+                    "rather than passing the heading as `source`. "
+                    "Section names do not resolve to their bodies; "
+                    "`source` accepts only literal inline text or a "
+                    "`$stepN` binding.)")
+        return None
+
     def _run_process_text(self, source_text: str, instruction: str) -> str:
         """Apply a focused LLM pass to source_text using the given instruction.
         Used by the ReAct process_text tool.
@@ -2739,9 +2781,16 @@ class ChatLoop:
             _append_log(f'ACTION {i+1}', json.dumps(action))
 
             if tool == 'process_text':
-                src = self._resolve_react_value(action.get('source', ''), log)
+                raw_src = action.get('source', '')
                 ins = action.get('instruction', '')
-                obs = self._run_process_text(src, ins) if (src and ins) else '(missing source or instruction)'
+                src = self._resolve_react_value(raw_src, log)
+                diag = self._diagnose_process_text_args(raw_src, src, ins, log)
+                if diag is not None:
+                    logger.warning(f"[{self.character_name}] process_text "
+                                   f"dispatch rejected (iter {i+1}): {diag}")
+                    obs = diag
+                else:
+                    obs = self._run_process_text(src, ins)
             elif tool == 'search':
                 q = self._resolve_react_value(action.get('query', ''), log)
                 result = self._run_web_search(q) if q else None
