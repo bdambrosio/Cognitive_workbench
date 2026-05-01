@@ -319,6 +319,7 @@ def evaluate(
     llm_generate: Optional[Callable] = None,
     target_goal_id: Optional[str] = None,
     narrator_persona: str = "",
+    narrator_self_model: str = "",
     companion_state: str = "",
 ) -> Dict[str, Any]:
     """
@@ -343,6 +344,7 @@ def evaluate(
             recent_context, activity_state, llm_generate,
             target_goal_id=target_goal_id,
             narrator_persona=narrator_persona,
+            narrator_self_model=narrator_self_model,
             companion_state=companion_state,
         )
 
@@ -369,6 +371,7 @@ def _llm_evaluate(
     *,
     target_goal_id: Optional[str] = None,
     narrator_persona: str = "",
+    narrator_self_model: str = "",
     companion_state: str = "",
 ) -> Optional[Dict[str, Any]]:
     """Call the LLM and parse the compact JSON response."""
@@ -377,14 +380,27 @@ def _llm_evaluate(
         user_concerns_block=_format_user_concerns_block(user_concerns),
         goals_block=_format_goals_block(goals_compact, target_goal_id=target_goal_id),
     )
+    backdrop_blocks: List[str] = []
     if narrator_persona and str(narrator_persona).strip():
-        system_prompt = (
+        backdrop_blocks.append(
             "NARRATOR STANCE (the agent that consumes your assessment reads "
             "from the stance below; respect its restraints — e.g. do not "
             "infer drives or pathology the stance disclaims):\n\n"
-            f"{str(narrator_persona).strip()}\n\n"
-            "---\n\n"
-        ) + system_prompt
+            f"{str(narrator_persona).strip()}"
+        )
+    if narrator_self_model and str(narrator_self_model).strip():
+        backdrop_blocks.append(
+            "AGENT ARCHITECTURE (the consumer's structural account of "
+            "itself, including its access boundary; let this anchor your "
+            "epistemic and posture decisions — when an event targets the "
+            "inaccessible side of the boundary, the posture should direct "
+            "the agent to name the boundary in its own terms rather than "
+            "describe trace-level operations as if they explained "
+            "substrate-level outputs):\n\n"
+            f"{str(narrator_self_model).strip()}"
+        )
+    if backdrop_blocks:
+        system_prompt = "\n\n".join(backdrop_blocks) + "\n\n---\n\n" + system_prompt
     companion_section = ""
     if companion_state and str(companion_state).strip():
         companion_section = (

@@ -499,24 +499,47 @@ UPDATE GUIDANCE:
 End your response with:
 </end>
 """
-def _prepend_narrator_stance(prompt: str, narrator_persona: str) -> str:
+def _prepend_narrator_stance(prompt: str, narrator_persona: str,
+                              narrator_self_model: str = "") -> str:
     """Prepend a stance block to a reflection prompt when a narrator persona
     is supplied. Reflection products (discourse state, companion model) are
     consumed by an agent with a particular voice and stance; surfacing that
     stance to the generator keeps the artifact from being written in a
-    register the consumer would have to disclaim. Empty persona is a no-op,
-    preserving the prior behavior of every existing call site."""
-    if not narrator_persona or not str(narrator_persona).strip():
+    register the consumer would have to disclaim.
+
+    Optionally also prepends the agent's self-model (architectural account,
+    access boundary, roster of inbound reflection products) as a parallel
+    block. The persona block is voice/stance discipline; the self-model
+    block is architectural ground truth — what the consuming agent can and
+    cannot authentically claim about its own operation. Reflection
+    generators that know the access boundary can produce posture and
+    artifacts that anchor in boundary-language ("downstream of weights you
+    cannot inspect") rather than trace-level descriptions.
+
+    Empty inputs are no-ops, preserving prior behavior of every existing
+    call site."""
+    blocks = []
+    if narrator_persona and str(narrator_persona).strip():
+        blocks.append(
+            "NARRATOR STANCE (this artifact will be read by an agent with "
+            "the stance below; produce content the agent could use without "
+            "disclaiming — don't write characterizations that contradict the "
+            "stance, and respect any restraints it imposes):\n\n"
+            f"{str(narrator_persona).strip()}"
+        )
+    if narrator_self_model and str(narrator_self_model).strip():
+        blocks.append(
+            "AGENT ARCHITECTURE (the consumer's structural account of "
+            "itself, including its access boundary; produce content "
+            "consistent with what the agent can and cannot authentically "
+            "claim about its own operation — when an artifact would touch "
+            "the inaccessible side of the boundary, anchor in the boundary's "
+            "language rather than describing trace-level operations):\n\n"
+            f"{str(narrator_self_model).strip()}"
+        )
+    if not blocks:
         return prompt
-    block = (
-        "NARRATOR STANCE (this artifact will be read by an agent with the "
-        "stance below; produce content the agent could use without "
-        "disclaiming — don't write characterizations that contradict the "
-        "stance, and respect any restraints it imposes):\n\n"
-        f"{str(narrator_persona).strip()}\n\n"
-        "---\n\n"
-    )
-    return block + prompt
+    return "\n\n".join(blocks) + "\n\n---\n\n" + prompt
 
 
 class DiscourseTracker:
@@ -558,7 +581,7 @@ class DiscourseTracker:
           formatted_turns.append(f"{turn['source']}: {turn['text']}")
       return '\n'.join(formatted_turns)
 
-    def analyze_segment(self, dialog, start=0, end=None, previous_discourse_state="", tom="", narrator_persona=""):
+    def analyze_segment(self, dialog, start=0, end=None, previous_discourse_state="", tom="", narrator_persona="", narrator_self_model=""):
         if end is None:
             end = len(dialog) - 1
         segment = self.format_segment(dialog, start, end)
@@ -574,7 +597,7 @@ class DiscourseTracker:
         }
         for key, value in bindings.items():
             prompt = prompt.replace(f"{{{{${key}}}}}", str(value))
-        prompt = _prepend_narrator_stance(prompt, narrator_persona)
+        prompt = _prepend_narrator_stance(prompt, narrator_persona, narrator_self_model)
         
         response = self.llm_generate(
             messages=[prompt],
@@ -646,7 +669,7 @@ class DiscourseTracker:
 
         return response_text
 
-    def update_companion_from_discourse_segment(self, dialog, character_name, start=0, end=None, discourse_state="", previous_companion_state="", narrator_persona=""):
+    def update_companion_from_discourse_segment(self, dialog, character_name, start=0, end=None, discourse_state="", previous_companion_state="", narrator_persona="", narrator_self_model=""):
         if end is None:
             end = len(dialog) - 1
         segment = self.format_segment(dialog, start, end)
@@ -662,7 +685,7 @@ class DiscourseTracker:
         }
         for key, value in bindings.items():
             prompt = prompt.replace(f"{{{{${key}}}}}", str(value))
-        prompt = _prepend_narrator_stance(prompt, narrator_persona)
+        prompt = _prepend_narrator_stance(prompt, narrator_persona, narrator_self_model)
 
         response = self.llm_generate(
             messages=[prompt],

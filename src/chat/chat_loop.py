@@ -2413,6 +2413,7 @@ class ChatLoop:
                 dialog, start=0, end=len(dialog) - 1,
                 previous_discourse_state=prev_disc, tom='',
                 narrator_persona=self.persona,
+                narrator_self_model=self.self_model,
             )
             if new_disc:
                 self._discourse_state[entity] = str(new_disc)
@@ -2429,6 +2430,7 @@ class ChatLoop:
                 discourse_state=self._discourse_state.get(entity, ''),
                 previous_companion_state=prev_comp,
                 narrator_persona=self.persona,
+                narrator_self_model=self.self_model,
             )
             if new_comp and len(str(new_comp).strip()) > 20:
                 self._companion_state[entity] = str(new_comp)
@@ -2478,6 +2480,7 @@ class ChatLoop:
                 activity_state='chat-only (no autonomous activity)',
                 llm_generate=self._make_llm_callable('triage'),
                 narrator_persona=self.persona,
+                narrator_self_model=self.self_model,
                 companion_state=companion,
             )
             return build_orientation_summary(assessment, event_content=text)
