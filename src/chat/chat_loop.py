@@ -393,6 +393,11 @@ class ChatLoop:
         self.persona = str(character_config.get('character', '')).strip()
         self.capabilities = str(character_config.get('capabilities', '')).strip()
         self.setting = str(character_config.get('setting', '')).strip()
+        # Self-model: structural account of what the agent is (machinery,
+        # access boundary, roster of inbound reflection products). Distinct
+        # from persona (voice/stance) — voice and architecture evolve
+        # independently and pinning them in the same field would couple them.
+        self.self_model = str(character_config.get('self_model', '')).strip()
 
         # ---- Feature flags (on by default per project decision) ----
         self.discourse_enabled = bool((character_config.get('discourse') or {}).get('enabled', True))
@@ -2407,6 +2412,7 @@ class ChatLoop:
             new_disc = tracker.analyze_segment(
                 dialog, start=0, end=len(dialog) - 1,
                 previous_discourse_state=prev_disc, tom='',
+                narrator_persona=self.persona,
             )
             if new_disc:
                 self._discourse_state[entity] = str(new_disc)
@@ -2422,6 +2428,7 @@ class ChatLoop:
                 dialog, character_name=entity, start=0, end=len(dialog) - 1,
                 discourse_state=self._discourse_state.get(entity, ''),
                 previous_companion_state=prev_comp,
+                narrator_persona=self.persona,
             )
             if new_comp and len(str(new_comp).strip()) > 20:
                 self._companion_state[entity] = str(new_comp)
@@ -2448,14 +2455,30 @@ class ChatLoop:
                 'event_id': uuid.uuid4().hex[:12],
                 'timestamp': datetime.now(timezone.utc).isoformat(),
             }
+            # Pass current active concerns so the evaluator can do real
+            # relevance assessment. Concern text serves double duty as id
+            # (truncated) and description — the evaluator emits matches as
+            # `<id>:<level>` and the rendered orientation surfaces those
+            # ids verbatim, so a meaningful slug lets Jill see *which*
+            # concern the input activates.
+            char_concerns: List[Dict[str, str]] = []
+            for _nid, note, _w in self._iter_active_concerns():
+                ctext = str((note.get('properties') or {}).get('content', '') or '').strip()
+                if not ctext:
+                    continue
+                slug = ctext[:60].replace('\n', ' ').strip()
+                char_concerns.append({'id': slug, 'description': ctext})
+            companion = self._companion_state.get(source, '').strip()
             assessment = evaluate(
                 event=event,
-                character_concerns=[],
+                character_concerns=char_concerns,
                 user_concerns=[],
                 goals_compact=[],
                 recent_context=recent_str,
                 activity_state='chat-only (no autonomous activity)',
                 llm_generate=self._make_llm_callable('triage'),
+                narrator_persona=self.persona,
+                companion_state=companion,
             )
             return build_orientation_summary(assessment, event_content=text)
         except Exception as e:
@@ -2487,6 +2510,8 @@ class ChatLoop:
         parts.append(f"You are {self.character_name}, speaking in first person.")
         if self.persona:
             parts.append("## Persona (from character config)\n" + self.persona)
+        if self.self_model:
+            parts.append("## Self-model (from character config; what I am, not who)\n" + self.self_model)
         if self.capabilities:
             parts.append("## Capabilities (from character config; chat-only mode)\n" + self.capabilities)
         if self.setting:

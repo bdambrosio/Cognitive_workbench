@@ -7,12 +7,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from character_evaluator import (
     DEFAULT_CHARACTER_CONCERNS,
-    IDLE_ORIENTATION_POLICY,
     build_event_dict,
     build_orientation_summary,
     evaluate,
     _expand_llm_result,
-    _content_touches_idle,
     _format_concerns_block,
     _format_user_concerns_block,
     _format_goals_block,
@@ -289,29 +287,9 @@ def test_orientation_summary_empty_when_no_assessment():
     assert build_orientation_summary(None) == ""
 
 
-def test_orientation_summary_idle_hint():
-    """When content asks about idle behavior, idle policy should appear."""
-    llm_output = {
-        "matters": "yes",
-        "concerns": ["attend_to_user:moderate"],
-        "goal_relevance": "none",
-        "urgency": "none",
-        "novelty": "moderate",
-        "persistence": "none",
-        "retention": "session",
-        "action": "inform_user",
-        "rationale": "User asking about idle behavior",
-        "epistemic": "none",
-    }
-    assessment = _expand_llm_result(llm_output, "t2", "user_text", "2025-01-01T00:00:00Z",
-                                     DEFAULT_CHARACTER_CONCERNS, None)
-    summary = build_orientation_summary(assessment, "What do you do when you have nothing to do?")
-    assert "Idle orientation" in summary
-    assert "reviewing unresolved concerns" in summary
-
-
-def test_orientation_summary_no_idle_for_normal_chat():
-    """Normal conversation should NOT include idle policy."""
+def test_orientation_summary_uses_llm_posture_when_present():
+    """When the LLM emits a posture string, the orientation block surfaces
+    it directly rather than falling back to the deterministic mapping."""
     llm_output = {
         "matters": "yes",
         "concerns": ["attend_to_user:moderate"],
@@ -323,16 +301,10 @@ def test_orientation_summary_no_idle_for_normal_chat():
         "action": "inform_user",
         "rationale": "User asking about weather",
         "epistemic": "none",
+        "posture": "answer plainly with current conditions; no preamble",
     }
     assessment = _expand_llm_result(llm_output, "t3", "user_text", "2025-01-01T00:00:00Z",
                                      DEFAULT_CHARACTER_CONCERNS, None)
     summary = build_orientation_summary(assessment, "What's the weather like?")
-    assert "Idle orientation" not in summary
-
-
-def test_content_touches_idle():
-    assert _content_touches_idle("What do you do when you're not busy?")
-    assert _content_touches_idle("Do you have any free time activities?")
-    assert _content_touches_idle("What happens during downtime?")
-    assert not _content_touches_idle("Summarize the quarterly report")
-    assert not _content_touches_idle("Hi Jill, how are you?")
+    assert "answer plainly with current conditions" in summary
+    assert "ORIENTATION" in summary

@@ -197,121 +197,79 @@ CONVERSATION SEGMENT:
 
 TASK: Update the discourse state based on this segment. Provide a complete updated state, not just changes.
 
-OUTPUT FORMAT:
+OUTPUT FORMAT (use these exact section headers — plain text only, no markdown headers (`#`), no bolding (`**`), no horizontal rules (`---`); do not invent new sections or rename existing ones):
 
-DISCOURSE STATE (Turns {{$start_turn}}-{{$end_turn}}):
+DISCOURSE STATE (segment {{$start_turn}}-{{$end_turn}}):
 
-#ACTIVE COMMITMENTS:
-List each distinct commitment with: [Direction] Content (Turn, strength)
+ACTIVE COMMITMENTS:
+List each distinct commitment as: [Direction] Content (strength, temporal scope)
 - Direction: [Self → Other], [Other → Self], or [Mutual]
 - Strength: firm, tentative, conditional
-- Include temporal scope: immediate, by [date/time], ongoing
+- Temporal scope: immediate, by [date/time], or ongoing
+- DO NOT list ongoing self-actions that have a cadence + instruction — those are concerns, not commitments. Commitments are interpersonal promises and joint actions, not architectural facts about how the system operates.
+- Drop commitments not referenced or reaffirmed in the last ~30 turns.
 - If no active commitments, write "[none]"
 
 Example:
-- [Self → Other] I'll deliver draft report by Friday EOD 
-- [Other → Self] He will review within 2 days if I send by Friday
-- [Mutual] Check in with each other every 10 minutes
-##
+- [Self → Other] Deliver draft report by Friday EOD (firm, by Fri EOD)
+- [Other → Self] Review draft within 2 days of receipt (firm, conditional on timely send)
+- [Mutual] Check in every 10 minutes (firm, ongoing)
 
-#CURRENT AGREEMENTS:
-Describe each agreement in natural language. Include what was agreed, when it was established, and any conditions.
+CURRENT AGREEMENTS:
+Describe each shared frame, definition, or joint plan in natural language. State what was agreed and any conditions. Use "(this segment)" for items established in the current segment and "(established earlier)" for items carried forward — do not include specific turn numbers.
 - If no current agreements, write "[none]"
 
 Example:
-Head northwest for 30 minutes to find creek, then follow it back to parking lot (established T13-20). If creek not found within time limit, stop and reassess plan.
+Navigate northwest for 30 minutes to locate the creek, then follow it back to the parking lot (this segment). If the creek is not found within the time limit, stop and reassess.
 
-#UNRESOLVED ISSUES:
-List issues that remain contested, undecided, or need follow-up. Include turn where raised and brief description.
-- Drop issues if: not mentioned in 20+ turns, superseded by decision, or conversation moved to different topic
-- If no unresolved issues, write "[none]"
-
-Example:
-- Choice of output format - PDF vs HTML
-- Budget allocation concerns
-
-#KEY DECISIONS MADE:
-List significant decisions reached in this segment. Include what was decided and what it replaced/resolved.
-- Focus on decisions that close previously open questions or establish direction
+KEY DECISIONS MADE:
+List significant decisions that close a previously open question or establish direction. Each entry: Adopted/Rejected/Added: <decision> (this segment | established earlier), <what it resolves or replaces>.
+- Distinguish actual decisions from emergent conventions or restatements of existing behavior — those do not belong here.
+- Drop decisions not referenced or reaffirmed in the last ~30 turns.
 - If no new decisions, write "[none in this segment]"
 
 Example:
-- Adopted: creek-retracing via northwest bearing (T4-9), resolves navigation approach
-- Rejected: downhill strategy (T1-2), deemed too risky of getting more lost
-- Added: 30-minute time limit as safety mechanism (T13)
-
-#STATUS:
-One-sentence summary of overall discourse state and phase.
-
-Examples:
-- "Execution phase - aligned and proceeding with agreed plan"
-- "Planning phase - multiple proposals under consideration, no consensus yet"
-- "Conflict phase - core disagreement about approach, attempting resolution"
-- "Information gathering phase - clarifying facts before deciding"
+- Adopted: creek-retracing via northwest bearing (this segment), resolves navigation approach
+- Rejected: downhill strategy (this segment), deemed too risky
+- Added: 30-minute time limit as safety mechanism (this segment)
 
 INSTRUCTIONS:
 
-1. COMPLETENESS: Provide the full updated state, including items from previous state that remain active.
-   - Drop items that are completed, superseded, or no longer relevant
-   - Don't mark items as "reaffirmed" or "unchanged" - just list what's currently active
+1. COMPLETENESS: Provide the full updated state, including items from previous state that remain active. Drop items that are completed, superseded, no longer relevant, or older than the ~30-turn pruning rule.
 
-2. UPDATES: 
-   - Mark new commitments/agreements with (NEW) if helpful for clarity
-   - Update status of existing items (e.g., if commitment was fulfilled or agreement modified)
-   - Remove items that are completed or superseded during the course of the discourse, or are no longer relevant
-
+2. FORMAT STABILITY: Use the section headers exactly as shown. Plain text only. Do not add `#` headers, `**bold**`, horizontal rules, or `(NEW)` markers — the segment range in the section header makes recency clear.
 
 3. INTERPRETATION:
-   - Use ToM context to assess commitment strength (is "I'll try" firm or tentative?)
-   - Consider speaker reliability when evaluating whether something is truly agreed
-   - Note when commitments are conditional on other commitments
-   - Distinguish between proposals (suggestions) and commitments (binding promises)
+   - Use ToM context (when present) to assess commitment strength.
+   - Consider speaker reliability when evaluating whether something is truly agreed.
+   - Note when commitments are conditional (use "conditional on" phrasing).
+   - Distinguish proposals (suggestions) from commitments (binding promises).
 
-4. DEPENDENCIES:
-   - Note when commitments depend on other commitments (use "conditional on" phrasing)
-   - Track decision chains (Decision B resolves Issue A, enables Commitment C)
+4. AMBIGUITY:
+   - If uncertain whether something is a commitment or a statement of intent, err toward inclusion but mark strength=tentative.
+   - When in doubt about what was agreed, reflect the ambiguity in your description.
 
-5. AMBIGUITY:
-   - If uncertain whether something is a commitment or just a statement of intent, err on side of inclusion but note tentative strength
-   - If unclear whether an issue is resolved, keep it in unresolved issues
-   - When in doubt about what was agreed, reflect the ambiguity in your description
-
-6. TEMPORAL TRACKING:
-   - Always include turn numbers for traceability
-   - For ongoing commitments, note when they were established
-   - For time-bound commitments, include the deadline
-
-7. CONSOLIDATION GUIDANCE:
-- Combine closely related commitments into single entries
-- Focus on distinct actionable obligations, not every utterance
-- Avoid meta-commentary like "reaffirmed" or "strengthened" - just state the commitment
-- Distinguish commitments (will do X) from mental states (trust, believe). Only include actual commitments here.
-   - If multiple commitments/agreements cover similar ground, consider whether they should be consolidated
-   - If a decision supersedes earlier issues/proposals, note this explicitly
+5. CONSOLIDATION:
+   - Combine closely related commitments into single entries.
+   - Focus on distinct actionable obligations, not every utterance.
+   - Distinguish commitments (will do X) from mental states (trust, believe). Only commitments here.
 
 ###EXAMPLE OUTPUT:
 
-DISCOURSE STATE (Turns {{$start_turn}} - {{$end_turn}}):
+DISCOURSE STATE (segment 13-20):
 
 ACTIVE COMMITMENTS:
-- [Other → Self] Will keep Samantha updated on thinking, no withholding information (T10, firm, ongoing)
-- [Other → Self] Will set 30-minute timer to track reassessment point (T14, firm, immediate)
-- [Mutual] Check in with each other every 10 minutes during hike (T18, firm, ongoing)
+- [Other → Self] Keep Samantha updated on thinking, no withholding (firm, ongoing)
+- [Other → Self] Set 30-minute timer to track reassessment point (firm, immediate)
+- [Mutual] Check in every 10 minutes during hike (firm, ongoing)
 
 CURRENT AGREEMENTS:
-Navigate northwest for 30 minutes to find the creek, then follow it southwest back to where we crossed it (established T13-20). If creek not found or heard within 30 minutes, stop and reassess the plan. Both parties will share observations and concerns transparently during the hike.
-
-UNRESOLVED ISSUES:
-[none]
+Navigate northwest for 30 minutes to locate the creek, then follow it southwest back to the crossing (this segment). If the creek is not found within 30 minutes, stop and reassess. Both parties share observations transparently.
 
 KEY DECISIONS MADE:
-- Rejected: downhill water-following strategy (T1-2), concern it would lead deeper into valley
-- Adopted: creek-retracing approach using compass bearing (T4-9), based on memory of crossing creek earlier
-- Added: 30-minute time limit as safety check (T13), prevents walking too far if wrong direction
-- Added: 10-minute check-in intervals (T18), addresses transparency and trust concerns
-
-STATUS:
-Execution phase - fully aligned on plan, trust concerns addressed, ready to proceed with navigation attempt.
+- Rejected: downhill water-following strategy (this segment), risk of going deeper into valley
+- Adopted: creek-retracing via compass bearing (this segment), based on prior crossing memory
+- Added: 30-minute time limit as safety check (this segment)
 ###END EXAMPLE OUTPUT
 """
 
@@ -506,7 +464,7 @@ CURRENT CHAPTER:
 [The arc they appear to be in — the throughline behind day-to-day moments. Updates slowly. 1-2 sentences.]
 
 STATE OF MIND:
-[Mood, energy, stress, and direction of travel. Refresh every conversation. Note both the observed signal and the inference drawn from it. 1-2 sentences.]
+[How the person is engaging right now — posture, register, and direction of travel (e.g., probing for failure modes, exploring an idea, pressing a decision, working through a definition). Affect (mood, energy, stress) only when there is direct textual evidence; otherwise stay on operational mode rather than inferring inner state. Refresh every conversation. Note the observed signal and the inference drawn from it. 1-2 sentences.]
 
 WHAT MATTERS TO THEM:
 [Values and commitments visible from what they have actually said and done. Slow-moving — carry forward unless new evidence revises it. 1-2 sentences.]
@@ -518,7 +476,7 @@ ON THEIR MIND:
 [The handful of open loops, people, or unresolved questions recurring lately. Append new, prune stale. 1-2 sentences or a short list.]
 
 HOW TO BE USEFUL RIGHT NOW:
-[What mode genuinely serves them — challenger, executor, sounding board, fact-checker, quiet witness. Include where pushback, skepticism, or refusal-to-validate is called for, not just accommodation. 1-2 sentences.]
+[The stance that genuinely serves them, described in prose — not a single role-label. Include specific don'ts: where default modes (solution-mode taxonomies, helpful-assistant accommodation, premature reassurance) would land badly, name that. Where pushback, skepticism, or refusal-to-validate is called for, name it. 1-2 sentences.]
 
 UPDATE GUIDANCE:
 
@@ -541,6 +499,26 @@ UPDATE GUIDANCE:
 End your response with:
 </end>
 """
+def _prepend_narrator_stance(prompt: str, narrator_persona: str) -> str:
+    """Prepend a stance block to a reflection prompt when a narrator persona
+    is supplied. Reflection products (discourse state, companion model) are
+    consumed by an agent with a particular voice and stance; surfacing that
+    stance to the generator keeps the artifact from being written in a
+    register the consumer would have to disclaim. Empty persona is a no-op,
+    preserving the prior behavior of every existing call site."""
+    if not narrator_persona or not str(narrator_persona).strip():
+        return prompt
+    block = (
+        "NARRATOR STANCE (this artifact will be read by an agent with the "
+        "stance below; produce content the agent could use without "
+        "disclaiming — don't write characterizations that contradict the "
+        "stance, and respect any restraints it imposes):\n\n"
+        f"{str(narrator_persona).strip()}\n\n"
+        "---\n\n"
+    )
+    return block + prompt
+
+
 class DiscourseTracker:
     def __init__(self, llm_generate: Callable, self_character_name: str, other_character_name: str):
         self.llm_generate = llm_generate
@@ -580,11 +558,11 @@ class DiscourseTracker:
           formatted_turns.append(f"{turn['source']}: {turn['text']}")
       return '\n'.join(formatted_turns)
 
-    def analyze_segment(self, dialog, start=0, end=None, previous_discourse_state="", tom=""):
+    def analyze_segment(self, dialog, start=0, end=None, previous_discourse_state="", tom="", narrator_persona=""):
         if end is None:
             end = len(dialog) - 1
         segment = self.format_segment(dialog, start, end)
-        
+
         # Apply bindings to template
         prompt = DISCOURSE_ANALYSIS_TEMPLATE
         bindings = {
@@ -596,6 +574,7 @@ class DiscourseTracker:
         }
         for key, value in bindings.items():
             prompt = prompt.replace(f"{{{{${key}}}}}", str(value))
+        prompt = _prepend_narrator_stance(prompt, narrator_persona)
         
         response = self.llm_generate(
             messages=[prompt],
@@ -667,7 +646,7 @@ class DiscourseTracker:
 
         return response_text
 
-    def update_companion_from_discourse_segment(self, dialog, character_name, start=0, end=None, discourse_state="", previous_companion_state=""):
+    def update_companion_from_discourse_segment(self, dialog, character_name, start=0, end=None, discourse_state="", previous_companion_state="", narrator_persona=""):
         if end is None:
             end = len(dialog) - 1
         segment = self.format_segment(dialog, start, end)
@@ -683,6 +662,7 @@ class DiscourseTracker:
         }
         for key, value in bindings.items():
             prompt = prompt.replace(f"{{{{${key}}}}}", str(value))
+        prompt = _prepend_narrator_stance(prompt, narrator_persona)
 
         response = self.llm_generate(
             messages=[prompt],

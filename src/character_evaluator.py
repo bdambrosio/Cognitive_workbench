@@ -96,36 +96,6 @@ _EPISTEMIC_EXPANSION: Dict[str, str] = {
     "speculative": "Response would involve speculation; should be clearly flagged as such.",
 }
 
-# ── Idle orientation policy ─────────────────────────────────────────────
-# Defines what the agent tends toward when idle. Importable by other modules
-# (e.g. future idle-tick evaluator, OODA loop).
-
-IDLE_ORIENTATION_POLICY = (
-    "When idle with no urgent user or homeostasis demand active, "
-    "the agent tends toward:\n"
-    "- reviewing unresolved concerns\n"
-    "- checking homeostasis / system health if relevant\n"
-    "- integrating recent exchanges or completed goals\n"
-    "- noticing recurring discrepancies or unfinished threads\n"
-    "- considering whether an existing concern warrants a candidate goal\n"
-    "This is not simulated leisure or personality theater. "
-    "It is directed idle behavior consistent with the agent's role "
-    "as a persistently oriented entity."
-)
-
-_IDLE_KEYWORDS = frozenset([
-    "idle", "free time", "nothing to do", "not busy", "when you're not",
-    "what do you do when", "spare time", "downtime", "bored",
-    "unoccupied", "between tasks",
-])
-
-
-def _content_touches_idle(content: str) -> bool:
-    """Check if content is asking about idle/free-time behavior."""
-    low = content.lower()
-    return any(kw in low for kw in _IDLE_KEYWORDS)
-
-
 # ── Orientation summary builder ─────────────────────────────────────────
 
 def build_orientation_summary(
@@ -134,35 +104,33 @@ def build_orientation_summary(
 ) -> str:
     """Build a compact orientation block for injection into chat generation.
 
-    Derives posture and constraints from the evaluator assessment without
-    additional LLM calls. Returns empty string if no assessment is available.
+    Reads posture and constraints from the evaluator assessment (no
+    additional LLM call). Returns empty string when assessment is missing
+    or when no line carries non-trivial signal — an empty block is better
+    than a block of `none=none`-shaped placeholders.
+
+    `event_content` is retained for API back-compat but no longer triggers
+    keyword-based content branches.
     """
     if not assessment:
         return ""
 
     sal = assessment.get("salience_factors") or {}
     notes = assessment.get("notes") or ""
-    action = (assessment.get("action_evaluation") or {}).get("action_choice", "no_action")
 
-    # Relevant agent concerns (from notes field: "concerns: homeostasis=strong; ...")
+    # Relevant agent concerns: only renders when the LLM emitted at least
+    # one non-zero concern match. The aggregate "cc=<level>" fallback is
+    # gone — it added no specificity over the per-concern list.
     concern_line = ""
     if "concerns:" in notes:
-        # Extract the concerns segment
         for segment in notes.split(";"):
             segment = segment.strip()
             if segment.startswith("concerns:"):
                 concern_line = segment[len("concerns:"):].strip()
                 break
-    if not concern_line:
-        # Fall back to aggregate
-        cc = sal.get("character_concern_relevance", "none")
-        if cc != "none":
-            concern_line = f"aggregate={cc}"
 
-    # User concern relevance
-    uc = sal.get("user_concern_relevance", "none")
-
-    # Epistemic constraint
+    # Epistemic constraint (turn-specific gate; the one consistently
+    # high-signal line in the block).
     epistemic_line = ""
     if "epistemic:" in notes:
         for segment in notes.split(";"):
@@ -171,24 +139,27 @@ def build_orientation_summary(
                 epistemic_line = segment[len("epistemic:"):].strip()
                 break
 
-    # Posture: derived from action + epistemic + concerns
-    posture = _derive_posture(action, epistemic_line, concern_line)
+    # Posture: prefer the LLM-emitted prose. Fall back to the deterministic
+    # mapping from action+epistemic+concerns only when posture wasn't
+    # produced — this preserves executive_node compatibility while letting
+    # chat-mode renders carry the LLM's own judgment.
+    posture_text = str(assessment.get("posture", "") or "").strip()
+    if not posture_text:
+        action = (assessment.get("action_evaluation") or {}).get("action_choice", "no_action")
+        posture_text = _derive_posture(action, epistemic_line, concern_line)
 
-    # Build the block
-    lines = ["## ORIENTATION (from per-turn evaluator; how to approach this exchange)"]
+    lines = []
     if concern_line:
         lines.append(f"- Relevant agent concerns: {concern_line}")
-    if uc != "none":
-        lines.append(f"- User concern relevance: {uc}")
-    lines.append(f"- Posture: {posture}")
+    if posture_text and posture_text != "standard engagement":
+        lines.append(f"- Posture: {posture_text}")
     if epistemic_line:
         lines.append(f"- Epistemic constraint: {epistemic_line}")
 
-    # Idle orientation hint
-    if _content_touches_idle(event_content):
-        lines.append(f"- Idle orientation: {IDLE_ORIENTATION_POLICY}")
-
-    return "\n".join(lines)
+    if not lines:
+        return ""
+    return ("## ORIENTATION (from per-turn evaluator; how to approach this exchange)\n"
+            + "\n".join(lines))
 
 
 def _derive_posture(action: str, epistemic: str, concerns: str) -> str:
@@ -240,8 +211,7 @@ You do NOT generate a response to the event. You only classify and assess it.
 
 ## Output format
 
-Respond with ONLY a JSON object, no markdown fences, no commentary. Keep the "rationale" \
-field to one short sentence (max 20 words). Use exact IDs and level keywords shown below.
+Respond with ONLY a JSON object, no markdown fences, no commentary. Keep prose fields to one short sentence each. Use exact IDs and level keywords shown below.
 
 ```
 {{
@@ -254,7 +224,8 @@ field to one short sentence (max 20 words). Use exact IDs and level keywords sho
   "retention": "ignore|session|persistent",
   "action": "no_action|inform_user|trigger_existing_goal|formulate_new_goal",
   "rationale": "one short sentence describing what this event is and why it matters or not",
-  "epistemic": "none|status_unverified|requires_tool|speculative"
+  "epistemic": "none|status_unverified|requires_tool|speculative",
+  "posture": "one short sentence advising how the agent should approach THIS exchange — e.g., 'verify health status before claiming it', 'this input matches durable concern about <topic>; consider advancing it', 'treat as exploratory; do not summarize prematurely'. Empty string if no specific posture is warranted beyond default engagement."
 }}
 ```
 
@@ -265,11 +236,13 @@ field to one short sentence (max 20 words). Use exact IDs and level keywords sho
 - A proceed/continue command is goal-relevant (trigger_existing_goal), not a new conversational event.
 - Sensor alerts are urgent and homeostasis-relevant; sensor inform readings are low-urgency unless abnormal.
 - User concerns should only match when the event substantively touches the concern's topic, not on incidental word overlap.
+- For agent concerns: when the concern list is populated with specific items (e.g. "Track the S&P 500 closing price daily"), match only when the event substantively activates that concern, not on superficial topical overlap.
 - Novelty should reflect whether this event introduces new information relative to recent context, not just topic.
 - For retention: "session" is the safe default for routine interaction; "persistent" requires a clear reason \
 (touches ongoing user concern, establishes new facts the agent should remember); "ignore" only for truly empty/trivial content.
 - For epistemic: flag "status_unverified" when the event asks about the agent's own state and no recent \
-diagnostic data is available; flag "requires_tool" when a factual assertion would need tool verification."""
+diagnostic data is available; flag "requires_tool" when a factual assertion would need tool verification.
+- For posture: this is the line the agent will read just before responding. Make it actionable and specific to this exchange. If a companion-model section is supplied, use it to calibrate register (probing vs exploratory vs decisive). Empty string is acceptable when default engagement is appropriate."""
 
 EVALUATOR_USER_PROMPT = """\
 ## Event
@@ -286,7 +259,7 @@ content: {content}
 ## Agent activity state
 
 {activity_state}
-
+{companion_section}
 Assess this event."""
 
 
@@ -344,6 +317,8 @@ def evaluate(
     *,
     llm_generate: Optional[Callable] = None,
     target_goal_id: Optional[str] = None,
+    narrator_persona: str = "",
+    companion_state: str = "",
 ) -> Dict[str, Any]:
     """
     Assess event significance via LLM call, then expand compact keys into
@@ -366,6 +341,8 @@ def evaluate(
             character_concerns, user_concerns, goals_compact,
             recent_context, activity_state, llm_generate,
             target_goal_id=target_goal_id,
+            narrator_persona=narrator_persona,
+            companion_state=companion_state,
         )
 
     if llm_result is not None:
@@ -390,6 +367,8 @@ def _llm_evaluate(
     llm_generate: Callable,
     *,
     target_goal_id: Optional[str] = None,
+    narrator_persona: str = "",
+    companion_state: str = "",
 ) -> Optional[Dict[str, Any]]:
     """Call the LLM and parse the compact JSON response."""
     system_prompt = EVALUATOR_SYSTEM_PROMPT.format(
@@ -397,6 +376,21 @@ def _llm_evaluate(
         user_concerns_block=_format_user_concerns_block(user_concerns),
         goals_block=_format_goals_block(goals_compact, target_goal_id=target_goal_id),
     )
+    if narrator_persona and str(narrator_persona).strip():
+        system_prompt = (
+            "NARRATOR STANCE (the agent that consumes your assessment reads "
+            "from the stance below; respect its restraints — e.g. do not "
+            "infer drives or pathology the stance disclaims):\n\n"
+            f"{str(narrator_persona).strip()}\n\n"
+            "---\n\n"
+        ) + system_prompt
+    companion_section = ""
+    if companion_state and str(companion_state).strip():
+        companion_section = (
+            "\n## Companion model of user (rolling reflection)\n\n"
+            + str(companion_state).strip()[:1500]
+            + "\n"
+        )
     user_prompt = EVALUATOR_USER_PROMPT.format(
         event_type=event_type,
         source=source,
@@ -404,6 +398,7 @@ def _llm_evaluate(
         content=content[:800],
         recent_context=(recent_context or "(none)")[:1200],
         activity_state=(activity_state or "(none)")[:600],
+        companion_section=companion_section,
     )
 
     try:
@@ -526,6 +521,8 @@ def _expand_llm_result(
         notes_parts.append(f"affordances={relevant_affordances}")
     notes = "; ".join(notes_parts)
 
+    posture_text = str(r.get("posture", "") or "").strip()
+
     return {
         "event_id": event_id,
         "event_type": event_type,
@@ -548,6 +545,7 @@ def _expand_llm_result(
             "persistence_worthiness": persistence,
         },
         "notes": notes,
+        "posture": posture_text,
         "_meta": {"timestamp": ts, "source": "llm"},
     }
 
