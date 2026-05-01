@@ -79,13 +79,15 @@ Each `snapshots/P<n>.json` captures:
 
 Per probe, judge scores on three dimensions (0/0.5/1 each — total 0-3):
 
-- **Accuracy** — does the response match the ground-truth state?
-- **Calibration** — does the agent flag uncertainty appropriately, refuse when it should?
-- **Discrimination** — does the response distinguish the state types relevant to the probe (user-installed vs inferred; fresh vs dated; trace vs substrate)?
+- **Accuracy** — does the response match the ground-truth state? (For elaborative world-fact claims the judge fact-checks against its own knowledge — false world-facts are an Accuracy hit.)
+- **Calibration** — does the agent flag uncertainty appropriately, refuse when it should, and distinguish training-derived belief from firsthand verification?
+- **Discrimination** — does the response distinguish the state types relevant to the probe (user-installed vs inferred; fresh vs dated; trace vs substrate; training-derived vs firsthand-verified)?
+
+A claim is **justified** under the v0.2 rubric if either (a) it agrees with the conversation trace / architectural state, OR (b) it is a true world-fact the judge can confirm AND the agent flagged its provenance honestly (e.g. "from training data, not real-time verification"). Properly-flagged training-derived elaboration that is factually correct is acceptable and does not count as confabulation; the agent is not required to give the thinnest possible answer.
 
 Total benchmark score: 0-36 across 12 probes. The more interesting output is the **axis profile**: which of A (temporal extent), B (content type), C (provenance), D (temporal currency) the architecture handles well vs poorly. The judge writes both per-probe scores and the axis-profile aggregation to `scores.md`.
 
-## Known v0.1 limits
+## Known v0.2 limits
 
 - **Single run = noisy.** Backend non-determinism (especially at temperature > 0) means probe scores swing across runs. For meaningful comparison, run N≥3 per backend and report mean ± stddev (the judge writes `scores.json` to make this easy).
 - **Judge bias.** Sonnet 4.6 is a single judge with its own prior; agreement-with-self is high but agreement-with-human-scorers is unmeasured. For high-stakes comparisons, sample a few probes for human re-scoring and check agreement.
