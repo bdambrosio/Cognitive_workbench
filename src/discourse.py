@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 _cli_mode = os.getenv('CWB_CLI_MODE', '') == '1'
 
 # File handler with INFO level (full logging)
-file_handler = logging.FileHandler('logs/discourse.log', mode='w')
+file_handler = logging.FileHandler('logs/discourse_module.log', mode='w')
 file_handler.setLevel(logging.INFO)
 
 _handlers = [file_handler]

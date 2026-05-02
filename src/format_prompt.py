@@ -647,38 +647,121 @@ _CHAT_TRACE_HEADER_RE = re.compile(
 )
 
 
+_FORMAT_PROMPT_STATE_FILE = Path.home() / ".cw_format_prompt.json"
+
+
+def _scenarios_dir() -> Path:
+    """Project-root scenarios/ — sibling of src/."""
+    return Path(__file__).resolve().parent.parent / "scenarios"
+
+
+def _list_worlds_with_traces(scenarios_dir: Path) -> list:
+    """Worlds (dirs under scenarios/) that contain at least one agent
+    memory dir with a chat_trace.txt. Sorted, mtime-descending so the
+    most recently active world floats to the top."""
+    if not scenarios_dir.is_dir():
+        return []
+    candidates = []
+    for world_dir in scenarios_dir.iterdir():
+        if not world_dir.is_dir():
+            continue
+        for trace in world_dir.glob("*/memory/chat_trace.txt"):
+            candidates.append((trace.stat().st_mtime, world_dir.name))
+            break
+    candidates.sort(reverse=True)
+    seen = set()
+    out = []
+    for _, name in candidates:
+        if name not in seen:
+            seen.add(name)
+            out.append(name)
+    return out
+
+
+def _list_agents_in_world(scenarios_dir: Path, world: str) -> list:
+    """Agent names under scenarios/<world>/ that have a memory/chat_trace.txt."""
+    world_dir = scenarios_dir / world
+    if not world_dir.is_dir():
+        return []
+    return sorted(
+        d.name for d in world_dir.iterdir()
+        if d.is_dir() and (d / "memory" / "chat_trace.txt").exists()
+    )
+
+
+def _load_format_prompt_state() -> dict:
+    try:
+        if _FORMAT_PROMPT_STATE_FILE.exists():
+            return json.loads(_FORMAT_PROMPT_STATE_FILE.read_text())
+    except Exception:
+        pass
+    return {}
+
+
+def _save_format_prompt_state(state: dict) -> None:
+    try:
+        _FORMAT_PROMPT_STATE_FILE.write_text(json.dumps(state, indent=2))
+    except Exception:
+        pass
+
+
 def load_chat_trace_section():
-    """Load section(s) of chat_trace_{agent}.txt — written by the chat ReAct
-    loop, one section per turn. Mirrors load_trace_section's UI but reads
-    a different file pattern. Section markers:
+    """Load section(s) of <world>/<agent>/memory/chat_trace.txt — written
+    by the chat ReAct loop, one section per turn. Mirrors load_trace_section's
+    UI but reads a different file pattern. Section markers:
       • new format: a line that begins '[YYYY-MM-DD HH:MM:SS UTC] source=…'
       • legacy format: a line that begins 'Chat session:'
-    Both forms recognized so old + new entries in the same file both load."""
-    trace_dir = Path(__file__).parent / "logs"
+    Both forms recognized so old + new entries in the same file both load.
+    World and agent selections are session-sticky via ~/.cw_format_prompt.json."""
+    scenarios_dir = _scenarios_dir()
+    state = _load_format_prompt_state()
 
     dialog = QDialog(window)
     dialog.setWindowTitle("Load Chat Trace Sections")
     dialog_layout = QVBoxLayout()
 
+    world_label = QLabel("World:")
+    dialog_layout.addWidget(world_label)
+    world_combo = QComboBox()
+    world_combo.setEditable(True)
+    worlds = _list_worlds_with_traces(scenarios_dir)
+    for w in worlds:
+        world_combo.addItem(w)
+    last_world = state.get("world")
+    if last_world and last_world in worlds:
+        world_combo.setCurrentText(last_world)
+    elif worlds:
+        world_combo.setCurrentIndex(0)
+    dialog_layout.addWidget(world_combo)
+
     agent_label = QLabel("Agent name:")
     dialog_layout.addWidget(agent_label)
     agent_combo = QComboBox()
     agent_combo.setEditable(True)
-    if trace_dir.exists():
-        for f in sorted(trace_dir.glob("chat_trace_*.txt")):
-            agent = f.stem.replace("chat_trace_", "")
-            if agent and agent not in [agent_combo.itemText(i) for i in range(agent_combo.count())]:
-                agent_combo.addItem(agent)
-    if agent_combo.count() == 0:
-        agent_combo.addItems(["Jill"])
-    agent_combo.setCurrentIndex(0)
+
+    def _refresh_agents():
+        agent_combo.clear()
+        for a in _list_agents_in_world(scenarios_dir, world_combo.currentText().strip()):
+            agent_combo.addItem(a)
+        if agent_combo.count() == 0:
+            agent_combo.addItem("Jill")
+        last_agent = state.get("agent")
+        if last_agent:
+            idx = agent_combo.findText(last_agent)
+            if idx >= 0:
+                agent_combo.setCurrentIndex(idx)
+
+    _refresh_agents()
+    world_combo.currentTextChanged.connect(lambda _: _refresh_agents())
     dialog_layout.addWidget(agent_combo)
 
     label = QLabel("How many turns (sections) to load?")
     dialog_layout.addWidget(label)
     combo = QComboBox()
     combo.addItems(["1", "2", "3", "4", "5", "10"])
-    combo.setCurrentIndex(0)
+    last_n = str(state.get("num_sections", "1"))
+    idx = combo.findText(last_n)
+    combo.setCurrentIndex(idx if idx >= 0 else 0)
     dialog_layout.addWidget(combo)
 
     button_layout = QHBoxLayout()
@@ -695,9 +778,14 @@ def load_chat_trace_section():
     if dialog.exec() != QDialog.DialogCode.Accepted:
         return
 
+    world_name = world_combo.currentText().strip()
     agent_name = agent_combo.currentText().strip() or "Jill"
     num_sections = int(combo.currentText())
-    trace_file_path = trace_dir / f"chat_trace_{agent_name}.txt"
+    _save_format_prompt_state({
+        "world": world_name, "agent": agent_name, "num_sections": num_sections,
+    })
+
+    trace_file_path = scenarios_dir / world_name / agent_name / "memory" / "chat_trace.txt"
 
     if not trace_file_path.exists():
         QMessageBox.critical(window, "Error", f"Chat trace file not found: {trace_file_path}")

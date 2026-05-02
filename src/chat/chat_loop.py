@@ -52,7 +52,7 @@ REACT_MAX_ITERS = 8
 
 # Tools the model can emit. Validated structurally in _parse_react_action;
 # the dispatcher in _run_react_loop knows how to run each.
-_REACT_TOOLS = ('process_text', 'search', 'fetch_text', 'respond')
+_REACT_TOOLS = ('process_text', 'search', 'fetch_text', 'remember', 'respond')
 
 # Per-character collection holding episodic specifics across conversations.
 # Auto-RAG searches this on every turn; post-turn reflection writes to it.
@@ -262,7 +262,18 @@ class _ChatBackend:
                 'messages': convo,
             }
             if sys_parts:
-                body['system'] = "\n\n".join(sys_parts)
+                # Mark the system block as cacheable. Cuts per-call input
+                # cost ~90% on cache hits (5-min ephemeral TTL); pays a 25%
+                # write premium on the first call. Wins are largest for
+                # the judge (12 sequential calls share an identical rubric)
+                # and the ReAct inner loop (same system across 2-3 iters
+                # within a turn). Below ~1024 tokens the marker is ignored
+                # and we just pay base price, so no downside on short calls.
+                body['system'] = [{
+                    'type': 'text',
+                    'text': "\n\n".join(sys_parts),
+                    'cache_control': {'type': 'ephemeral'},
+                }]
             if stops:
                 body['stop_sequences'] = stops
             headers = {
@@ -282,9 +293,15 @@ class _ChatBackend:
                 if isinstance(b, dict) and b.get('type') == 'text'
             )
             try:
+                usage = data.get('usage') or {}
                 logger.info(
-                    "<llm-raw> route=anthropic stop=%s text=%s",
+                    "<llm-raw> route=anthropic stop=%s "
+                    "in=%s cache_write=%s cache_read=%s out=%s text=%s",
                     data.get('stop_reason'),
+                    usage.get('input_tokens'),
+                    usage.get('cache_creation_input_tokens'),
+                    usage.get('cache_read_input_tokens'),
+                    usage.get('output_tokens'),
                     json.dumps(text, ensure_ascii=False),
                 )
             except Exception:
@@ -1718,6 +1735,13 @@ class ChatLoop:
             f"cognitive/{self.character_name}/control/concern_manage",
             self._handle_concern_manage_query,
         )
+        # Direct subagent invocation — bypasses Jill's ReAct loop. Used by
+        # `/remember <query>` in the CLI to test/inspect the active-recall
+        # subagent without spending a full Jill turn.
+        self._remember_q = self._zenoh_session.declare_queryable(
+            f"cognitive/{self.character_name}/remember",
+            self._handle_remember_query,
+        )
 
         logger.info(
             f"[{self.character_name}] chat zenoh ready "
@@ -2289,6 +2313,28 @@ class ChatLoop:
                 user_concerns.append(self._serialize_concern(nid, note, is_user_kind=True))
         return (user_concerns, derived_concerns)
 
+    def _handle_remember_query(self, query) -> None:
+        """Direct invocation of the active-recall subagent. Payload:
+        {"query": "<natural-language question>"}. Returns {"success": bool,
+        "answer": "<synthesized answer>", "trace_dir": "<path>"}. Bypasses
+        Jill's ReAct loop — used by `/remember` in the CLI for test/inspect."""
+        try:
+            payload_bytes = query.payload.to_bytes() if query.payload else b'{}'
+            params = json.loads(payload_bytes.decode('utf-8')) if payload_bytes else {}
+            q_text = str(params.get('query', '') or '').strip()
+            if not q_text:
+                self._reply(query, {'success': False, 'error': 'empty query'})
+                return
+            answer = self._run_remember(q_text)
+            self._reply(query, {
+                'success': True,
+                'answer': answer,
+                'trace_dir': str(self._subagent_traces_dir()),
+            })
+        except Exception as e:
+            logger.error(f"[{self.character_name}] remember query failed: {e}")
+            self._reply(query, {'success': False, 'error': str(e)})
+
     def _handle_concerns_query(self, query) -> None:
         try:
             user_concerns, derived_concerns = self._all_concerns_split()
@@ -2418,6 +2464,7 @@ class ChatLoop:
             if new_disc:
                 self._discourse_state[entity] = str(new_disc)
                 self._save_state_note('discourse_state', entity, str(new_disc))
+                self._write_state_snapshot('discourse_state', entity, str(new_disc))
 
             # Companion model — fair-witness texture for the chat reply.
             # Runs per-turn here (rather than only at dialog close as in
@@ -2435,6 +2482,7 @@ class ChatLoop:
             if new_comp and len(str(new_comp).strip()) > 20:
                 self._companion_state[entity] = str(new_comp)
                 self._save_state_note('companion_state', entity, str(new_comp))
+                self._write_state_snapshot('companion_state', entity, str(new_comp))
         except Exception as e:
             logger.warning(f'[{self.character_name}] discourse update failed: {e}')
 
@@ -2627,7 +2675,12 @@ class ChatLoop:
             "3. `{\"thought\": \"<one terse sentence>\", \"tool\": \"fetch_text\", \"url\": <string|$stepN>}` — full text from a single URL "
             "(or local file path). Use when a search hit looks promising and the snippet isn't enough; "
             "always pass the result through process_text before responding.\n"
-            "4. `{\"thought\": \"<one terse sentence>\", \"tool\": \"respond\", \"text\": <string|$stepN>}` — final reply, exits loop. "
+            "4. `{\"thought\": \"<one terse sentence>\", \"tool\": \"remember\", \"query\": <string>}` — active recall over your "
+            "own memory: full reasoning trace, conversation history, current companion model, current discourse "
+            "state. Use when the user asks about prior turns, your earlier reasoning, or persistent state that "
+            "may not be in your current prompt. The query is opaque to you — a subagent reads the files and "
+            "returns a synthesized answer in `$stepN`.\n"
+            "5. `{\"thought\": \"<one terse sentence>\", \"tool\": \"respond\", \"text\": <string|$stepN>}` — final reply, exits loop. "
             "Must be in your voice; pass search/fetch results through process_text first or write the reply yourself.\n"
             "\n"
             "Three sources of content in this loop, each attributable when asked about provenance: "
@@ -2826,8 +2879,11 @@ class ChatLoop:
             elif tool == 'fetch_text':
                 u = self._resolve_react_value(action.get('url', ''), log)
                 obs = self._run_fetch_text(u)
+            elif tool == 'remember':
+                q = self._resolve_react_value(action.get('query', ''), log)
+                obs = self._run_remember(q)
             else:
-                obs = f"unknown tool {tool!r}; available: process_text, search, fetch_text, respond"
+                obs = f"unknown tool {tool!r}; available: process_text, search, fetch_text, remember, respond"
 
             _append_log(binding, obs)
             iters[-1]['appended'] = log[pre_log_len:]
@@ -2838,24 +2894,111 @@ class ChatLoop:
         self._clear_status()
         return reply, log, iters, 'max_iters'
 
+    def _memory_dir(self) -> 'Path':
+        """Per-world per-agent memory directory — substrate the active-recall
+        subagent will read. Layout: scenarios/<world>/<agent>/memory/.
+        Derived from resource_manager.base_dir (which is
+        scenarios/<world>/resources/<agent>/ once the resource manager
+        applies its per-agent scoping) by going up two levels and over.
+        Created on first write by callers."""
+        from pathlib import Path
+        return (
+            self.resource_manager.base_dir.parent.parent
+            / self.character_name / 'memory'
+        )
+
+    def _subagent_traces_dir(self) -> 'Path':
+        """Where the active-recall subagent writes its per-call traces.
+        Peer of memory/, NOT under it — keeps subsequent recall calls from
+        reading their own prior traces as substrate. Layout:
+        scenarios/<world>/<agent>/subagent_traces/."""
+        return self._memory_dir().parent / 'subagent_traces'
+
+    def _run_remember(self, query: str) -> str:
+        """Backend for the ReAct `remember` tool. Delegates to the
+        active-recall subagent (chat.remember.remember), which runs its
+        own thin ReAct loop over the memory dir. Returns the synthesized
+        answer string, suitable for binding to $stepN. Subagent's full
+        per-call trace lands under subagent_traces/ for debugging."""
+        if not query or not str(query).strip():
+            return "(remember: empty query)"
+        try:
+            from chat.remember import remember as _remember
+            return _remember(
+                query=str(query),
+                memory_dir=self._memory_dir(),
+                llm_backend=self.backend,
+                trace_dir=self._subagent_traces_dir(),
+            )
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] remember subagent raised: {e}")
+            return f"(remember error: {e})"
+
+    def _append_conversation_entry(self, direction: str, entity: str,
+                                   text: str, meta: str = '') -> None:
+        """Append one conversation entry (incoming or outgoing) to
+        <memory>/conversation.txt as plain timestamped prose. One section
+        per message. The active-recall subagent reads this for queries
+        about what was said this session and prior."""
+        try:
+            mem_dir = self._memory_dir()
+            mem_dir.mkdir(parents=True, exist_ok=True)
+            path = mem_dir / 'conversation.txt'
+            ts = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
+            arrow = '->' if direction == 'in' else '<-'
+            header = f'[{ts}] {entity} {arrow} {self.character_name}'
+            if meta:
+                header += f' ({meta})'
+            block = '\n'.join([
+                '',
+                '=' * 80,
+                header,
+                '=' * 80,
+                (text or '').rstrip(),
+                '',
+            ])
+            with open(path, 'a', encoding='utf-8') as f:
+                f.write(block + '\n')
+        except Exception as e:
+            logger.warning(
+                f"[{self.character_name}] conversation log append "
+                f"({direction}/{entity}) failed: {e}"
+            )
+
+    def _write_state_snapshot(self, kind: str, entity: str, content: str) -> None:
+        """Write a current-value state snapshot to memory as raw .txt,
+        overwriting any prior version. Used for companion_state and
+        discourse_state — LLM-emitted prose with section headers, kept
+        as plain text so the subagent can grep them naturally. mtime
+        provides the 'last updated' timestamp."""
+        try:
+            mem_dir = self._memory_dir()
+            mem_dir.mkdir(parents=True, exist_ok=True)
+            path = mem_dir / f'{kind}_{entity}.txt'
+            path.write_text(content, encoding='utf-8')
+        except Exception as e:
+            logger.warning(
+                f"[{self.character_name}] state snapshot write "
+                f"({kind}/{entity}) failed: {e}"
+            )
+
     def _write_react_trace(self, source: str, user_text: str,
                            log: List[Tuple[str, str]],
                            iters: List[Dict[str, Any]],
                            final_response: str,
                            exit_reason: str,
                            recall: Optional[List[Tuple[str, str]]] = None) -> None:
-        """Append one ReAct session to logs/chat_trace_{character}.txt
-        as the literal byte-stream that was sent to the LLM, with no
-        editorial annotation. Each iteration is one (USER, ASSISTANT)
-        pair; the SYSTEM message is shown once (it's byte-stable across
-        iterations). A single dim header line per turn carries minimal
-        metadata (timestamp / source / iters / exit) so multiple turns
-        in the same file are separable, and that's it."""
+        """Append one ReAct session to <memory>/chat_trace.txt as the
+        literal byte-stream that was sent to the LLM, with no editorial
+        annotation. Each iteration is one (USER, ASSISTANT) pair; the
+        SYSTEM message is shown once (it's byte-stable across iterations).
+        A single dim header line per turn carries minimal metadata
+        (timestamp / source / iters / exit) so multiple turns in the same
+        file are separable, and that's it."""
         try:
-            from pathlib import Path
-            log_dir = Path(__file__).resolve().parent.parent / 'logs'
-            log_dir.mkdir(exist_ok=True)
-            trace_path = log_dir / f'chat_trace_{self.character_name}.txt'
+            mem_dir = self._memory_dir()
+            mem_dir.mkdir(parents=True, exist_ok=True)
+            trace_path = mem_dir / 'chat_trace.txt'
             ts = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
             n_iters = len(iters)
             lines: List[str] = [
@@ -3094,6 +3237,8 @@ class ChatLoop:
         """
         if not autonomous:
             self.store.record_incoming(source, text, close=close)
+            self._append_conversation_entry(
+                'in', source, text, meta=f'close={close}')
 
         if not text:
             if close:
@@ -3134,6 +3279,8 @@ class ChatLoop:
 
         act_type = 'auto_say' if autonomous else 'say'
         self.store.record_outgoing(source, reply, act_type=act_type, close=close)
+        self._append_conversation_entry(
+            'out', source, reply, meta=f'act={act_type} close={close}')
         self._publish_say(reply)
         logger.info(f"[{self.character_name}] -> {source} ({act_type}): {reply!r}")
 

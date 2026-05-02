@@ -82,32 +82,6 @@ def _print_info(text: str):
 # Formatters for structured data
 # ---------------------------------------------------------------------------
 
-def _format_task_row(t: dict) -> str:
-    name = t.get('_note_name', '?')
-    status = t.get('status', '?')
-    phase = t.get('phase', '')
-    intention = (t.get('intention', '') or '')[:80]
-    is_active = ' *' if t.get('_is_active') else ''
-    sc = {
-        'proposed': C.YELLOW, 'in_progress': C.GREEN, 'active': C.GREEN,
-        'completed': C.DIM, 'abandoned': C.RED, 'interrupted': C.MAGENTA,
-    }.get(status, '')
-    return f"  {C.BOLD}{name}{C.RESET}{is_active}  {sc}{status}{C.RESET}/{phase}  {intention}"
-
-
-def _format_goal_row(g: dict) -> str:
-    gid = g.get('goal_id', '?')
-    name = g.get('name', '')[:40]
-    status = g.get('status', '?')
-    mode = g.get('schedule_mode', '?')
-    exec_mode = g.get('execution_mode', '')
-    running = g.get('is_running', False)
-    sc = {'ready': C.GREEN, 'running': C.CYAN, 'paused': C.YELLOW, 'completed': C.DIM}.get(status, '')
-    run_mark = f' {C.CYAN}[running]{C.RESET}' if running else ''
-    exec_tag = f' {exec_mode}' if exec_mode else ''
-    return f"  {C.BOLD}{gid}{C.RESET}  {sc}{status}{C.RESET}  {mode}{exec_tag}{run_mark}  {name}"
-
-
 def _format_concern_row(concern: dict, activation: dict = None) -> str:
     label = concern.get('label') or concern.get('concern_label', '?')
     cid = concern.get('concern_id', '')
@@ -118,36 +92,6 @@ def _format_concern_row(concern: dict, activation: dict = None) -> str:
         act_val = activation.get('activation', 0)
         act_info = f'  act={act_val:.2f}'
     return f"  {C.BOLD}{cid}{C.RESET}  {label}  w={weight}  {status}{act_info}"
-
-
-def _format_task_detail(t: dict) -> str:
-    lines = [f"{C.BOLD}Task: {t.get('_note_name', '?')}{C.RESET}"]
-    for key in ('task_wip_id', 'status', 'phase', 'intention', 'proposal_reason',
-                'linked_concern_id', 'created', 'updated'):
-        val = t.get(key)
-        if val:
-            lines.append(f"  {key}: {val}")
-    milestones = t.get('milestones_completed', [])
-    if milestones:
-        lines.append(f"  milestones_completed: {len(milestones)}")
-        for m in milestones[-3:]:
-            lines.append(f"    - {m}")
-    current = t.get('current_milestone')
-    if current:
-        lines.append(f"  current_milestone: {current}")
-    return '\n'.join(lines)
-
-
-def _format_goal_detail(g: dict) -> str:
-    lines = [f"{C.BOLD}Goal: {g.get('goal_id', '?')}{C.RESET}"]
-    for key in ('name', 'status', 'schedule_mode', 'execution_mode', 'is_running',
-                'goal_text', 'last_result', 'primary_product', 'created', 'updated',
-                'run_at', 'last_run_date'):
-        val = g.get(key)
-        if val is not None and val != '':
-            display = str(val)[:200] if key in ('last_result', 'primary_product') else val
-            lines.append(f"  {key}: {display}")
-    return '\n'.join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -187,97 +131,6 @@ def _parse_command(line: str) -> Optional[dict]:
     cmd = parts[0].lower()
     args = parts[1:]
 
-    # -- Goals --
-    if cmd == 'goal' and args:
-        sub = args[0].lower()
-        rest = args[1:]
-
-        if sub == 'add' and rest:
-            return {'cmd': '/goal add', 'goal_text': ' '.join(rest)}
-        if sub == 'run' and rest:
-            d = {'cmd': '/goal run', 'goal_id': rest[0]}
-            if len(rest) > 1 and rest[1] in ('replan', 'replay'):
-                d['execution_mode'] = rest[1]
-            return d
-        if sub == 'terminate' and rest:
-            return {'cmd': '/goal terminate', 'goal_id': rest[0]}
-        if sub == 'rename' and rest:
-            if len(rest) >= 2:
-                return {'cmd': '/goal rename', 'goal_id': rest[0], 'name': ' '.join(rest[1:])}
-            return {'cmd': '_interactive', 'type': 'goal_rename', 'goal_id': rest[0]}
-        if sub == 'edit' and rest:
-            if len(rest) >= 2:
-                return {'cmd': '/goal edit', 'goal_id': rest[0], 'goal_text': ' '.join(rest[1:])}
-            return {'cmd': '_interactive', 'type': 'goal_edit', 'goal_id': rest[0]}
-        if sub in ('delete', 'remove') and rest:
-            return {'cmd': '/goal delete', 'goal_id': rest[0]}
-        if sub == 'mode' and len(rest) >= 2:
-            d = {'cmd': '/goal mode', 'goal_id': rest[0], 'schedule_mode': rest[1]}
-            if len(rest) > 2:
-                d['run_at'] = rest[2]
-            return d
-        if sub == 'exec' and len(rest) >= 2:
-            return {'cmd': '/goal exec', 'goal_id': rest[0], 'execution_mode': rest[1]}
-        if sub == 'plan':
-            # /goal plan <id>, /goal plan show <id>, /goal plan edit <id>, /goal plan approve <id>
-            if not rest:
-                _print_error("Usage: /goal plan [show|edit|approve] <goal_id>")
-                return None
-            if rest[0] in ('show', 'edit', 'load', 'approve', 'review', 'commit'):
-                if len(rest) < 2:
-                    _print_error(f"Usage: /goal plan {rest[0]} <goal_id>")
-                    return None
-                return {'cmd': f'/goal plan {rest[0]}', 'goal_id': rest[1]}
-            # /goal plan <id>  →  shorthand for show
-            return {'cmd': '/goal plan', 'goal_id': rest[0]}
-        if sub == 'cache' and rest:
-            # /goal cache clear <id> or /goal cache <id>
-            if rest[0] == 'clear' and len(rest) > 1:
-                return {'cmd': '/goal cache clear', 'goal_id': rest[1]}
-            return {'cmd': '/goal cache clear', 'goal_id': rest[0]}
-        if sub == 'show' and rest:
-            return {'cmd': '_query', 'query': 'goal_show', 'goal_id': rest[0]}
-        _print_error(f"Usage: /goal <add|run|terminate|rename|edit|delete|mode|exec|cache|plan|show> ...")
-        return None
-
-    # -- Tasks --
-    if cmd == 'task' and args:
-        sub = args[0].lower()
-        rest = args[1:]
-
-        if sub == 'add' and rest:
-            return {'cmd': '/task add', 'intention': ' '.join(rest)}
-        if sub == 'propose':
-            return {'cmd': '/task propose'}
-        if sub == 'approve' and rest:
-            d = {'cmd': '/task approve', 'note_name': rest[0]}
-            if len(rest) > 1:
-                d['intention'] = ' '.join(rest[1:])
-            return d
-        if sub == 'edit' and rest:
-            if len(rest) >= 2:
-                return {'cmd': '/task edit', 'note_name': rest[0], 'intention': ' '.join(rest[1:])}
-            return {'cmd': '_interactive', 'type': 'task_edit', 'note_name': rest[0]}
-        if sub == 'abandon' and rest:
-            d = {'cmd': '/task abandon', 'note_name': rest[0]}
-            if len(rest) > 1:
-                d['reason'] = ' '.join(rest[1:])
-            return d
-        if sub == 'delete' and rest:
-            return {'cmd': '/task delete', 'note_name': rest[0]}
-        if sub == 'interrupt' and rest:
-            return {'cmd': '/task interrupt', 'note_name': rest[0]}
-        if sub == 'run' and rest:
-            return {'cmd': '/task run', 'note_name': rest[0]}
-        if sub == 'cooldown' and rest:
-            d = {'cmd': '/task cooldown', 'note_name': rest[0]}
-            d['cooldown_seconds'] = int(rest[1]) if len(rest) > 1 else 300
-            return d
-        if sub == 'show' and rest:
-            return {'cmd': '_query', 'query': 'task_show', 'note_name': rest[0]}
-        _print_error(f"Usage: /task <add|propose|approve|edit|abandon|delete|interrupt|run|cooldown|show> ...")
-        return None
-
     # -- Concerns --
     if cmd == 'concern' and args:
         sub = args[0].lower()
@@ -301,45 +154,8 @@ def _parse_command(line: str) -> Optional[dict]:
         return None
 
     # -- System --
-    if cmd == 'stop':
-        return {'cmd': '/stop'}
-    if cmd == 'continuous':
-        return {'cmd': '/continuous'}
-    if cmd == 'llm':
-        return {'cmd': '/llm'}
-    if cmd == 'autonomy':
-        if not args:
-            return {'cmd': '/autonomy'}
-        sub = args[0].lower()
-        if sub in ('on', 'off', 'toggle'):
-            return {'cmd': '/autonomy', 'action': sub}
-        _print_error("Usage: /autonomy <on|off>")
-        return None
-    if cmd == 'delay' and args:
-        return {'cmd': '/delay', 'delay': float(args[0])}
-    if cmd == 'scheduler':
-        if not args:
-            return {'cmd': '/scheduler'}
-        sub = args[0].lower()
-        if sub in ('on', 'off'):
-            return {'cmd': '/scheduler', 'action': sub}
-        if sub == 'interval' and len(args) > 1:
-            return {'cmd': '/scheduler', 'action': 'interval', 'interval': float(args[1])}
-        return {'cmd': '/scheduler'}
-    if cmd == 'clear' and args:
-        return {'cmd': '/clear', 'target': args[0]}
-    if cmd == 'save':
-        return {'cmd': '/save'}
     if cmd == 'shutdown':
         return {'cmd': '/shutdown'}
-    if cmd == 'bye':
-        return {'cmd': '/bye'}
-    if cmd == 'done':
-        return {'cmd': '/done'}
-    if cmd == 'next':
-        return {'cmd': '/next'}
-    if cmd == 'action' and args:
-        return {'cmd': '/action', 'json_text': ' '.join(args)}
 
     # -- Notes --
     if cmd == 'note' and args:
@@ -349,27 +165,17 @@ def _parse_command(line: str) -> Optional[dict]:
         # /note <id> as shorthand for /note show <id>
         return {'cmd': '_query', 'query': 'note_show', 'resource_id': args[0]}
 
-    # -- Interpret (experimental LLM command parsing) --
-    if cmd == 'interpret':
+    # -- Remember (direct subagent query, bypasses Jill's ReAct loop) --
+    if cmd == 'remember':
         if not args:
-            _print_error("Usage: /interpret <text to interpret>")
+            _print_error("Usage: /remember <natural-language query>")
             return None
-        return {'cmd': '_interpret', 'text': ' '.join(args)}
+        return {'cmd': '_query', 'query': 'remember', 'text': ' '.join(args)}
 
     # -- Read-only queries (handled locally, not sent to command channel) --
-    if cmd == 'tasks':
-        return {'cmd': '_query', 'query': 'tasks'}
-    if cmd == 'goals':
-        return {'cmd': '_query', 'query': 'goals'}
     if cmd == 'concerns':
         owner = args[0] if args else None
         return {'cmd': '_query', 'query': 'concerns', 'owner': owner}
-    if cmd == 'triage':
-        return {'cmd': '_query', 'query': 'triage'}
-    if cmd == 'status':
-        return {'cmd': '_query', 'query': 'status'}
-    if cmd == 'ooda':
-        return {'cmd': '_query', 'query': 'ooda'}
     if cmd == 'help':
         return {'cmd': '_query', 'query': 'help'}
     if cmd == 'verbose':
@@ -380,8 +186,6 @@ def _parse_command(line: str) -> Optional[dict]:
         return {'cmd': '_char', 'name': args[0] if args else ''}
     if cmd == 'ui':
         return {'cmd': '_open', 'url': 'http://localhost:3000'}
-    if cmd in ('tasks-ui', 'tasksui'):
-        return {'cmd': '_open', 'url': 'http://localhost:3002'}
     if cmd == 'resources':
         return {'cmd': '_open', 'url': 'http://localhost:3001'}
 
@@ -396,57 +200,7 @@ def _parse_command(line: str) -> Optional[dict]:
 def _handle_query(session, character: str, data: dict, state: dict):
     query = data.get('query')
 
-    if query == 'tasks':
-        result = _zenoh_get(session, f"cognitive/{character}/task_wips")
-        if not result or not result.get('success'):
-            _print_info("No task data available.")
-            return
-        tasks = result.get('tasks', [])
-        if not tasks:
-            _print_info("No tasks.")
-            return
-        _print_info(f"Tasks for {character} ({len(tasks)}):")
-        for t in tasks:
-            print(_format_task_row(t))
-
-    elif query == 'task_show':
-        name = data.get('note_name', '')
-        if not name.startswith('_task_wip_'):
-            name = f'_task_wip_{name}'
-        result = _zenoh_get(session, f"cognitive/{character}/task_wips")
-        if not result:
-            return
-        for t in result.get('tasks', []):
-            if t.get('_note_name') == name:
-                print(_format_task_detail(t))
-                return
-        _print_error(f"Task '{name}' not found.")
-
-    elif query == 'goals':
-        result = _zenoh_get(session, f"cognitive/{character}/scheduled_goals")
-        if not result or not result.get('success'):
-            _print_info("No goal data available.")
-            return
-        goals = result.get('goals', [])
-        if not goals:
-            _print_info("No goals.")
-            return
-        _print_info(f"Goals for {character} ({len(goals)}):")
-        for g in goals:
-            print(_format_goal_row(g))
-
-    elif query == 'goal_show':
-        gid = data.get('goal_id', '')
-        result = _zenoh_get(session, f"cognitive/{character}/scheduled_goals")
-        if not result:
-            return
-        for g in result.get('goals', []):
-            if g.get('goal_id') == gid:
-                print(_format_goal_detail(g))
-                return
-        _print_error(f"Goal '{gid}' not found.")
-
-    elif query == 'concerns':
+    if query == 'concerns':
         owner_filter = data.get('owner')
         result = _zenoh_get(session, f"cognitive/{character}/concerns")
         if not result or not result.get('success'):
@@ -481,81 +235,6 @@ def _handle_query(session, character: str, data: dict, state: dict):
         if not uc and not dc:
             _print_info("No concerns.")
 
-    elif query == 'triage':
-        result = _zenoh_get(session, f"cognitive/{character}/triage_status")
-        if not result or not result.get('success'):
-            _print_info("No triage data available.")
-            return
-        _print_info("Triage status:")
-        for key, val in result.items():
-            if key == 'success':
-                continue
-            print(f"  {key}: {val}")
-
-    elif query == 'status':
-        _print_info(f"Active character: {C.BOLD}{character}{C.RESET}")
-        _print_info(f"Verbose: {state.get('verbose', False)}")
-        agent_state = state.get('agent_state', {})
-        if agent_state:
-            mode = agent_state.get('mode', '?')
-            paused = agent_state.get('paused', False)
-            continuous = agent_state.get('continuous_mode', False)
-            llm = agent_state.get('llm_mode', '?')
-            dialog = agent_state.get('active_dialog', False)
-            parts = [f"mode={mode}"]
-            if paused:
-                parts.append(f"{C.YELLOW}paused{C.RESET}")
-            if continuous:
-                parts.append(f"{C.GREEN}continuous{C.RESET}")
-            parts.append(f"llm={llm}")
-            if dialog:
-                parts.append(f"{C.CYAN}in dialog{C.RESET}")
-            print(f"  {', '.join(parts)}")
-            goal_id = agent_state.get('current_goal_id', '')
-            goal_name = agent_state.get('current_goal_name', '')
-            goal_text = agent_state.get('current_goal_text', '')
-            goal_src = agent_state.get('current_goal_id_source', '')
-            active_sched = agent_state.get('active_scheduled_goal_id', '')
-            goal_running = agent_state.get('is_goal_running', False)
-            if goal_name:
-                label = goal_text or goal_name
-                if len(label) > 120:
-                    label = label[:117] + '...'
-                gid_tag = f"{C.CYAN}{goal_id}{C.RESET}  " if goal_id else ''
-                # Diagnostic suffix: surface dual-id confusion when we're
-                # showing a Goal-instance id rather than a scheduled-goal id,
-                # or when the active scheduled-goal pointer is stale.
-                src_note = ''
-                if goal_src == 'stale_active':
-                    src_note = f"  {C.YELLOW}[stale active_scheduled_goal_id={active_sched}, record not found]{C.RESET}"
-                elif goal_src == 'goal_instance':
-                    src_note = f"  {C.DIM}[Goal-instance id; not a scheduled-goal record]{C.RESET}"
-                print(f"  {C.GREEN}Running goal:{C.RESET} {gid_tag}{C.BOLD}{goal_name}{C.RESET} — {label}{src_note}")
-            else:
-                # No running goal: say so explicitly rather than going silent.
-                worker_alive = " (worker thread alive but no goal bound)" if goal_running else ""
-                print(f"  {C.DIM}Active goal: none{worker_alive}{C.RESET}")
-        else:
-            print(f"  {C.DIM}(no state received yet){C.RESET}")
-
-    elif query == 'ooda':
-        result = _zenoh_get(session, f"cognitive/{character}/ooda_feed")
-        if not result or not result.get('success'):
-            _print_info("No OODA feed data available.")
-            return
-        events = result.get('events', [])
-        if not events:
-            _print_info("No recent OODA events.")
-            return
-        _print_info(f"Recent OODA events ({len(events)}):")
-        for ev in events[-10:]:
-            ts = ev.get('timestamp', '')
-            if ts:
-                ts = ts.split('T')[1][:8] if 'T' in ts else ts
-            phase = ev.get('phase', '')
-            summary = ev.get('summary', ev.get('text', ''))[:100]
-            print(f"  {C.DIM}{ts}{C.RESET} {C.BOLD}{phase}{C.RESET} {summary}")
-
     elif query == 'note_show':
         resource_id = data.get('resource_id', '')
         # Normalize: accept "3940" or "Note_3940"
@@ -583,6 +262,36 @@ def _handle_query(session, character: str, data: dict, state: dict):
         else:
             _print_info("(empty)")
 
+    elif query == 'remember':
+        q_text = data.get('text', '').strip()
+        if not q_text:
+            _print_error("Usage: /remember <query>")
+            return
+        _print_info(f"→ remember: {q_text} (subagent runs up to 10 iters; may take a minute)")
+        payload = json.dumps({'query': q_text}).encode('utf-8')
+        result = None
+        try:
+            for reply in session.get(
+                f"cognitive/{character}/remember",
+                payload=payload, timeout=120.0,
+            ):
+                if hasattr(reply, 'ok') and reply.ok is not None:
+                    result = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    break
+        except Exception as e:
+            _print_error(f"Query failed: {e}")
+            return
+        if not result:
+            _print_error("(no response — subagent may have timed out, or chat loop isn't reachable)")
+            return
+        if not result.get('success'):
+            _print_error(result.get('error', 'remember query failed'))
+            return
+        print(result.get('answer', '(no answer)'))
+        trace_dir = result.get('trace_dir')
+        if trace_dir:
+            _print_info(f"(full subagent trace under {trace_dir})")
+
     elif query == 'verbose':
         state['verbose'] = not state.get('verbose', False)
         _print_system(f"Verbose mode: {'on' if state['verbose'] else 'off'}")
@@ -591,266 +300,11 @@ def _handle_query(session, character: str, data: dict, state: dict):
         _print_help()
 
 
-# ---------------------------------------------------------------------------
-# /interpret — experimental LLM command parsing
-# ---------------------------------------------------------------------------
-
-# Command vocabulary for the LLM prompt (static — matches the registry)
-_COMMAND_VOCABULARY = """\
-/goal add <goal_text>          Create a new goal (does NOT run it)
-/goal run <goal_id> [replan|replay]  Execute goal (override mode)
-/goal terminate <goal_id>      Stop a running goal
-/goal rename <goal_id> <name>  Rename a goal
-/goal edit <goal_id> <text>    Update goal text
-/goal delete <goal_id>         Delete a goal
-/goal mode <goal_id> <mode>    Set schedule: manual|auto|recurring|daily
-/goal cache clear <goal_id>    Clear cached plan
-/task add <intention>           Create a new task
-/task propose                   Propose task from conversation context
-/task approve <note_name>       Approve a proposed task
-/task edit <note_name> <text>   Edit task intention
-/task abandon <note_name>       Abandon a task
-/task delete <note_name>        Delete task
-/task interrupt <note_name>     Pause active task
-/task run <note_name>           Run task now (clear cooldown)
-/task cooldown <name> <secs>    Set cooldown seconds
-/concern close <id>             Close a user concern
-/concern reopen <id>            Reopen a user concern
-/concern resolve <id>           Satisfy a derived concern
-/concern delete <id>            Delete a concern
-/concern activate <id>          Reactivate a derived concern
-/stop                           Halt current execution
-/continuous                     Toggle continuous mode
-/llm                            Toggle LLM (primary/alt)
-/autonomy on|off                Enable/disable autonomous goal submission
-/delay <seconds>                Set turn delay
-/scheduler on|off               Enable/disable goal scheduler
-/scheduler interval <secs>      Set scheduler check interval
-/clear <target>                 Clear: world-model|map|transients|persistents
-/save                           Save all data
-/shutdown                       Save and shutdown
-/bye                            End conversation
-/note <id>                      Show note content"""
-
-
-def _interpret_text(session, character: str, text: str) -> Optional[Dict]:
-    """Use LLM to interpret free-form text as /commands or chat.
-
-    Returns the parsed interpretation dict, or None on failure.
-    """
-
-    # Gather current state for context
-    goals_data = _zenoh_get(session, f"cognitive/{character}/concerns")  # for concern IDs
-    goals_result = _zenoh_get(session, f"cognitive/{character}/scheduled_goals")
-    tasks_result = _zenoh_get(session, f"cognitive/{character}/task_wips")
-
-    # Build goals context
-    goals_ctx = "None"
-    if goals_result and goals_result.get('success'):
-        lines = []
-        for g in goals_result.get('goals', []):
-            gid = g.get('goal_id', '?')
-            name = g.get('name', '')[:60]
-            status = g.get('status', '?')
-            running = ' [RUNNING]' if g.get('is_running') else ''
-            lines.append(f"  {gid} [{status}]{running} \"{name}\"")
-        if lines:
-            goals_ctx = '\n'.join(lines)
-
-    # Build tasks context
-    tasks_ctx = "None"
-    if tasks_result and tasks_result.get('success'):
-        lines = []
-        for t in tasks_result.get('tasks', []):
-            name = t.get('_note_name', '?')
-            status = t.get('status', '?')
-            lifecycle = t.get('lifecycle', '')
-            intention = (t.get('intention', '') or '')[:60]
-            active = ' [ACTIVE]' if t.get('_is_active') else ''
-            lines.append(f"  {name} [{status}/{lifecycle}]{active} \"{intention}\"")
-        if lines:
-            tasks_ctx = '\n'.join(lines)
-
-    # Build concerns context
-    concerns_ctx = "None"
-    if goals_data and goals_data.get('success'):
-        lines = []
-        for c in goals_data.get('user_concerns', []):
-            cid = c.get('concern_id', '')
-            label = c.get('label', '')
-            status = c.get('status', '')
-            lines.append(f"  {cid} [user, {status}] \"{label}\"")
-        for c in goals_data.get('derived_concerns', []):
-            cid = c.get('concern_id', '')
-            label = c.get('concern_label', '')
-            status = c.get('status', '')
-            lines.append(f"  {cid} [derived, {status}] \"{label}\"")
-        if lines:
-            concerns_ctx = '\n'.join(lines)
-
-    prompt = f"""\
-You are a command interpreter for a cognitive agent system. Given user text,
-determine if it contains one or more system commands, or if it is conversational
-chat directed at the agent.
-
-RULES:
-- Only emit commands from the vocabulary below. Do not invent commands.
-- Resolve references like "the weather goal" or "goal 1" to actual goal_ids from
-  the current state. If you cannot resolve a reference, treat the text as chat.
-- Default to chat when uncertain. False command detection is worse than missed detection.
-- A single input may map to multiple commands (e.g., "stop and save" → two commands).
-- Requests like "tell me about X" or "what do you think about X" are chat, not commands.
-- Requests like "check email" or "run the health check" are /goal run if a matching goal exists,
-  or /goal add with "run": true if the user seems to want something new done immediately.
-  (Plain /goal add creates a goal without running it — only use that when the user explicitly says
-  something like "just add a goal to..." without asking for immediate action.)
-- "make it so" or "do it" with no prior conversational context suggesting a specific action is chat.
-
-COMMAND VOCABULARY:
-{_COMMAND_VOCABULARY}
-
-CURRENT GOALS:
-{goals_ctx}
-
-CURRENT TASKS:
-{tasks_ctx}
-
-CURRENT CONCERNS:
-{concerns_ctx}
-
-USER TEXT: "{text}"
-
-Respond with a JSON object. Examples:
-{{"interpretation": "command", "commands": [{{"cmd": "/goal run", "goal_id": "goal_2"}}]}}
-{{"interpretation": "command", "commands": [{{"cmd": "/stop"}}, {{"cmd": "/save"}}]}}
-{{"interpretation": "chat", "text": "How are you feeling today?"}}
-{{"interpretation": "command", "commands": [{{"cmd": "/goal add", "goal_text": "research quantum computing breakthroughs", "run": true}}]}}
-
-JSON response:"""
-
-    # Call LLM via Zenoh queryable
-    messages = [
-        {'role': 'user', 'content': prompt},
-    ]
-    payload = json.dumps({
-        'messages': messages,
-        'max_tokens': 500,
-        'temperature': 0.1,
-        'is_json': True,
-    })
-
-    _print_info(f"Interpreting: \"{text}\"")
-    try:
-        result = None
-        for reply in session.get(f"cognitive/{character}/llm/generate",
-                                  payload=payload.encode('utf-8'), timeout=30.0):
-            if hasattr(reply, 'ok') and reply.ok is not None:
-                result = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                break
-
-        if not result or not result.get('success'):
-            _print_error(f"LLM call failed: {result.get('error', 'no response') if result else 'timeout'}")
-            return None
-
-        llm_text = result.get('text', '')
-        # LLM may return pre-parsed dict (when is_json=True) or raw string
-        if isinstance(llm_text, dict):
-            interpretation = llm_text
-        else:
-            llm_text = str(llm_text).strip()
-            # Handle cases where LLM wraps in markdown code blocks
-            if llm_text.startswith('```'):
-                llm_text = llm_text.split('\n', 1)[-1].rsplit('```', 1)[0].strip()
-            try:
-                interpretation = json.loads(llm_text)
-            except json.JSONDecodeError:
-                _print_error(f"LLM returned invalid JSON: {llm_text[:200]}")
-                return None
-
-        return interpretation
-
-    except Exception as e:
-        _print_error(f"Interpret failed: {e}")
-        return None
-
-
-def _format_commands(commands: List[Dict]) -> str:
-    """Format a list of interpreted commands for display.
-
-    Shows commands as they would actually be executed (positional args),
-    not as keyword=value pairs.
-    """
-    parts = []
-    for cmd_data in commands:
-        cmd = cmd_data.get('cmd', '?')
-        args_parts = []
-        for k, v in cmd_data.items():
-            if k != 'cmd':
-                args_parts.append(str(v))
-        args_str = ' '.join(args_parts)
-        parts.append(f"  {C.BOLD}{cmd}{C.RESET} {args_str}")
-    return '\n'.join(parts)
-
-
-def _handle_interpret(session, character: str, text: str):
-    """Use LLM to interpret free-form text and display results (for /interpret command)."""
-    interpretation = _interpret_text(session, character, text)
-    if interpretation is None:
-        return
-
-    interp_type = interpretation.get('interpretation', 'unknown')
-
-    if interp_type == 'chat':
-        orig = interpretation.get('text', text)
-        _print_info(f"  → {C.CYAN}chat{C.RESET}: \"{orig}\"")
-    elif interp_type == 'command':
-        commands = interpretation.get('commands', [])
-        if not commands:
-            _print_info(f"  → {C.CYAN}chat{C.RESET} (no commands extracted)")
-            return
-        _print_info(f"  → {C.GREEN}{len(commands)} command(s):{C.RESET}")
-        print(_format_commands(commands))
-    else:
-        _print_info(f"  → {C.YELLOW}unknown interpretation{C.RESET}")
-
-
 def _print_help():
     print(f"""{C.BOLD}Cognitive Workbench CLI{C.RESET}
 
-{C.BOLD}Input:{C.RESET}  Type naturally — input is interpreted as commands or chat automatically.
-        Commands are shown for confirmation (Enter to run, anything else to cancel).
-
-{C.BOLD}Tasks:{C.RESET}
-  /tasks                         List all tasks
-  /task show <name>              Show task detail
-  /task add <intention>          Create a new task
-  /task propose                  Propose task from conversation
-  /task approve <name> [text]    Approve proposed task
-  /task edit <name> <text>       Edit task intention
-  /task abandon <name> [reason]  Abandon task
-  /task delete <name>            Delete task
-  /task interrupt <name>         Pause task
-  /task run <name>               Run task now (clear cooldown)
-  /task cooldown <name> [secs]   Set cooldown (default 300s)
-
-{C.BOLD}Goals:{C.RESET}
-  /goals                         List all goals
-  /goal show <id>                Show goal detail
-  /goal add <text>               Create new goal (does NOT run it)
-  /goal run <id> [replan|replay]  Execute goal now (override mode)
-  /goal terminate <id>           Stop a running goal
-  /goal rename <id> <name>       Rename goal
-  /goal edit <id> <text>         Update goal text
-  /goal delete <id>              Delete goal
-  /goal mode <id> <mode> [time]  Set schedule mode (manual|auto|recurring|daily)
-  /goal exec <id> <mode>         Set execution mode (replan|replay)
-  /goal cache clear <id>         Clear cached plan
-  /goal plan <id>                Show cached plan steps
-  /goal plan edit <id>           Write plan to file for editing
-  /goal plan load <id>           Load edited plan from file
-  /goal plan approve <id>        Approve plan (set replay mode)
-  /goal plan review <id>         Generate review bundle for analysis
-  /goal plan commit <id>         Load + approve + inject learnings + run
+{C.BOLD}Input:{C.RESET}  Plain text is sent to the active character as chat.
+        Slash commands (below) are dispatched directly.
 
 {C.BOLD}Concerns:{C.RESET}
   /concerns [owner]              List concerns (owner: User, <character>, or all)
@@ -862,41 +316,23 @@ def _print_help():
   /concern weight <id> <0-1>     Set concern weight
   /concern revisit <id> <hours>  Set revisit hours
 
-{C.BOLD}System:{C.RESET}
-  /stop                          Halt current execution
-  /continuous                    Toggle continuous execution
-  /llm                           Toggle LLM mode (primary/alt)
-  /autonomy [on|off]             Enable/disable autonomous goal submission
-  /delay <seconds>               Set turn delay
-  /scheduler [on|off|interval N] Goal scheduler config
-  /clear <target>                Clear (world-model|map|transients|persistents)
-  /save                          Save all data
-  /shutdown                      Save and shutdown
-  /bye                           End conversation
-  /action <json>                 Execute a direct JSON action
-
 {C.BOLD}Notes:{C.RESET}
   /note <id>                     Show note content (e.g. /note 3940)
 
-{C.BOLD}Info:{C.RESET}
-  /status                        Show system status
-  /triage                        Show triage pipeline status
-  /ooda                          Show recent OODA events
+{C.BOLD}Memory:{C.RESET}
+  /remember <query>              Active-recall subagent query (reads agent's memory dir)
 
 {C.BOLD}Navigation:{C.RESET}
-  @<agent> /<command>             Send command to a specific agent (e.g. @offline /stop)
+  @<agent> /<command>            Send command to a specific agent
   /char <name>                   Switch active character
   /ui                            Open web UI in browser
-  /tasks-ui                      Open task manager in browser
   /resources                     Open resource browser in browser
   /verbose                       Toggle verbose mode
   /help                          Show this help
 
-{C.BOLD}Experimental:{C.RESET}
-  /interpret <text>              LLM-parse text into /commands (display only, no execute)
-
-{C.BOLD}Note:{C.RESET} Plain text is auto-interpreted. If commands are detected, confirm with
-Enter to execute or type anything to cancel. Chat is sent directly to the agent.""")
+{C.BOLD}System:{C.RESET}
+  /shutdown                      Save and shutdown
+  Ctrl+D                         Exit CLI""")
 
 
 # ---------------------------------------------------------------------------
@@ -1100,86 +536,6 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
                 # Local queries
                 if cmd == '_query':
                     _handle_query(zenoh_session, active_character, parsed, state)
-                    continue
-
-                # LLM-based command interpretation (experimental)
-                if cmd == '_interpret':
-                    _handle_interpret(zenoh_session, active_character, parsed['text'])
-                    continue
-
-                # Interactive commands (fetch current value, prompt to edit)
-                if cmd == '_interactive':
-                    itype = parsed.get('type')
-                    try:
-                        if itype == 'goal_edit':
-                            gid = parsed['goal_id']
-                            result = _zenoh_get(zenoh_session, f"cognitive/{active_character}/scheduled_goals")
-                            current_text = ''
-                            if result:
-                                for g in result.get('goals', []):
-                                    if g.get('goal_id') == gid:
-                                        current_text = g.get('goal_text', '')
-                                        break
-                            new_text = session.prompt(
-                                HTML(f'<aaa fg="ansicyan">goal text for {gid}:</aaa> '),
-                                default=current_text,
-                            )
-                            if new_text.strip() and new_text.strip() != current_text:
-                                command_publisher.put(json.dumps({
-                                    'cmd': '/goal edit', 'goal_id': gid,
-                                    'goal_text': new_text.strip(), 'source': 'User',
-                                }))
-                                _print_info(f"→ /goal edit {gid}")
-                            else:
-                                _print_info("(no change)")
-
-                        elif itype == 'goal_rename':
-                            gid = parsed['goal_id']
-                            result = _zenoh_get(zenoh_session, f"cognitive/{active_character}/scheduled_goals")
-                            current_name = ''
-                            if result:
-                                for g in result.get('goals', []):
-                                    if g.get('goal_id') == gid:
-                                        current_name = g.get('name', '')
-                                        break
-                            new_name = session.prompt(
-                                HTML(f'<aaa fg="ansicyan">name for {gid}:</aaa> '),
-                                default=current_name,
-                            )
-                            if new_name.strip() and new_name.strip() != current_name:
-                                command_publisher.put(json.dumps({
-                                    'cmd': '/goal rename', 'goal_id': gid,
-                                    'name': new_name.strip(), 'source': 'User',
-                                }))
-                                _print_info(f"→ /goal rename {gid}")
-                            else:
-                                _print_info("(no change)")
-
-                        elif itype == 'task_edit':
-                            note_name = parsed['note_name']
-                            if not note_name.startswith('_task_wip_'):
-                                note_name = f'_task_wip_{note_name}'
-                            result = _zenoh_get(zenoh_session, f"cognitive/{active_character}/task_wips")
-                            current_intention = ''
-                            if result:
-                                for t in result.get('tasks', []):
-                                    if t.get('_note_name') == note_name:
-                                        current_intention = t.get('intention', '')
-                                        break
-                            new_intention = session.prompt(
-                                HTML(f'<aaa fg="ansicyan">intention for {note_name}:</aaa> '),
-                                default=current_intention,
-                            )
-                            if new_intention.strip() and new_intention.strip() != current_intention:
-                                command_publisher.put(json.dumps({
-                                    'cmd': '/task edit', 'note_name': note_name,
-                                    'intention': new_intention.strip(), 'source': 'User',
-                                }))
-                                _print_info(f"→ /task edit {note_name}")
-                            else:
-                                _print_info("(no change)")
-                    except (EOFError, KeyboardInterrupt):
-                        _print_info("(cancelled)")
                     continue
 
                 # Character switch

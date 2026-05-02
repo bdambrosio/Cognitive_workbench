@@ -321,7 +321,15 @@ def run_agent(name: str, config: dict, runtime, tokenizer, shutdown_event: threa
 
     node = None
     try:
-        from executive_node import ZenohExecutiveNode
+        try:
+            from executive_node import ZenohExecutiveNode
+        except ImportError as e:
+            logger.error(
+                f"Cannot start non-chat character {name!r}: OODA mode is no "
+                f"longer supported in this build (executive_node not "
+                f"importable: {e}). Use a chat-mode scenario instead."
+            )
+            return
         logger.info(f"Starting agent thread: {name}")
         node = ZenohExecutiveNode(character_name=name, character_config=config, runtime=runtime, tokenizer=tokenizer)
         # Hand the shared shutdown event to the node so its sensor threads
