@@ -478,6 +478,14 @@ ON THEIR MIND:
 HOW TO BE USEFUL RIGHT NOW:
 [The stance that genuinely serves them, described in prose — not a single role-label. Include specific don'ts: where default modes (solution-mode taxonomies, helpful-assistant accommodation, premature reassurance) would land badly, name that. Where pushback, skepticism, or refusal-to-validate is called for, name it. 1-2 sentences.]
 
+OBSERVED DEFAULTS:
+[Patterns the user has shown for how the agent should fill gaps when their requests are underspecified. Each entry is a (dimension, default) pair — the dimension is the class of recurring decision the agent has to make (e.g., "ranking axis," "audience for explanations," "ask-vs-assume," "depth of self-audit"); the default is the user's preferred resolution of that dimension. Anchor each entry in evidence — a stated preference, a correction, or a clear pattern across multiple instances. Slow-moving: add or revise only on direct evidence; do not infer defaults from a single observation or from the absence of pushback. 1-5 entries; if no defaults have been observed yet, write "[none yet]".
+
+Example entries (these are illustrative — extract real ones from the segment):
+- Ranking axis on prioritization requests: surface the chosen axis explicitly rather than silent-default. Evidence: user pushback when agent ranked a list without naming the criterion.
+- Ask-vs-assume on ambiguous instructions: state-and-proceed (name interpretation, answer, invite correction) rather than ask-first. Evidence: user has accepted stated interpretations across multiple turns.
+- Self-audit depth when asked about grounding: enumerate multiple specific items rather than gesture at general limits. Evidence: user marked thin self-audits as insufficient.]
+
 UPDATE GUIDANCE:
 
 - HONEST WITNESS: Record what is actually there, including anything unflattering or inconvenient — circular reasoning, avoidance, contradictions, requests for validation, mood crashes, evasion of a topic. Do not soften and do not omit. The companion model exists to help, and help requires seeing clearly.
@@ -486,9 +494,11 @@ UPDATE GUIDANCE:
 
 - EVIDENCE: Ground every claim in what was actually said or done. Distinguish observation from inference ("said X" vs. "seems Y because of X"). Prefer "unclear yet" to invented texture. Trajectory claims ("lifting", "sinking") also need evidence.
 
+- DEFAULTS: Each OBSERVED DEFAULTS entry must be a (dimension, default) pair, not a personality trait, value statement, or stated preference. Dimension = a class of recurring decision (the *kind* of gap, not the surface utterance). Default = the user's preferred resolution of that gap. Anchor in evidence: a stated preference, a correction, or a clear pattern across multiple instances — single observations and absence of pushback are NOT evidence. Stated preferences that modify response shape ("be brief") belong in Preferences (recalled memories), not here; this field is specifically for gap-fill calibration. Distinct from HOW THEY THINK & WORK (which describes the user's own cognitive style); this field describes how the agent should handle ambiguity given what this user has shown. When evidence revises a default (user overrides a previously-observed pattern), update the entry rather than accumulate contradictions.
+
 - VALIDATION-SEEKING: If the segment shows the person presenting a frame and looking for agreement with it, record that under HOW TO BE USEFUL (e.g. "appears to be checking a frame, not asking for analysis — pushback may be more useful than concurrence"). Do not silently ratify the frame inside the model itself.
 
-- CADENCE: CURRENT CHAPTER, STATE OF MIND, ON THEIR MIND, and HOW TO BE USEFUL change often. WHAT MATTERS and HOW THEY THINK rarely do. If a slow-moving field has no new evidence, carry the previous text forward unchanged.
+- CADENCE: CURRENT CHAPTER, STATE OF MIND, ON THEIR MIND, and HOW TO BE USEFUL change often. WHAT MATTERS, HOW THEY THINK, and OBSERVED DEFAULTS rarely do. If a slow-moving field has no new evidence, carry the previous text forward unchanged.
 
 - VOICE: Plain, specific, low-affect. Not clinical, not warm, not flattering. Notes a fair witness would write for their own future use.
 
