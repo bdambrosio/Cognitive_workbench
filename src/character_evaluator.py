@@ -148,9 +148,13 @@ def build_orientation_summary(
         action = (assessment.get("action_evaluation") or {}).get("action_choice", "no_action")
         posture_text = _derive_posture(action, epistemic_line, concern_line)
 
+    read_of_input = str(assessment.get("read_of_input", "") or "").strip()
+
     lines = []
     if concern_line:
         lines.append(f"- Relevant agent concerns: {concern_line}")
+    if read_of_input:
+        lines.append(f"- Read of input: {read_of_input}")
     if posture_text and posture_text != "standard engagement":
         lines.append(f"- Posture: {posture_text}")
     if epistemic_line:
@@ -225,6 +229,7 @@ Respond with ONLY a JSON object, no markdown fences, no commentary. Keep prose f
   "action": "no_action|inform_user|trigger_existing_goal|formulate_new_goal",
   "rationale": "one short sentence describing what this event is and why it matters or not",
   "epistemic": "none|status_unverified|requires_tool|speculative",
+  "read_of_input": "one short phrase parsing what the user is doing in this turn — e.g., 'asking a factual question about themselves', 'venting about work; not soliciting advice', 'requesting an opinion on X', 'making a status update', 'proposing a plan and inviting reaction'. Resolve referents explicitly: first-person pronouns ('I', 'me', 'my') in the user's input refer to the USER, not to you. Empty string only when the input is too trivial to warrant explicit parsing.",
   "posture": "one short sentence advising how the agent should approach THIS exchange — e.g., 'verify health status before claiming it', 'this input matches durable concern about <topic>; consider advancing it', 'treat as exploratory; do not summarize prematurely'. Empty string if no specific posture is warranted beyond default engagement."
 }}
 ```
@@ -242,6 +247,7 @@ Respond with ONLY a JSON object, no markdown fences, no commentary. Keep prose f
 (touches ongoing user concern, establishes new facts the agent should remember); "ignore" only for truly empty/trivial content.
 - For epistemic: flag "status_unverified" when the event asks about the agent's own state and no recent \
 diagnostic data is available; flag "requires_tool" when a factual assertion would need tool verification.
+- For read_of_input: this is the agent's parse of what the user is doing in this turn. It is consumed by the agent right before generation and is meant to prevent recipient-design failures — most importantly, mistaking a question about the user for a question about the agent. Always resolve first-person pronouns to the user. When the user's intent is non-obvious (vent vs. solicit advice; literal vs. rhetorical question; assertion vs. proposal), name the most plausible read in one phrase rather than leaving it implicit.
 - For posture: this is the line the agent will read just before responding. Make it actionable and specific to this exchange. If a companion-model section is supplied, use it to calibrate register (probing vs exploratory vs decisive). Empty string is acceptable when default engagement is appropriate.
 - Concern-surfacing as posture: scan the agent concerns block for items whose status sub-line says `due now` (runnable cadence has elapsed). When such a concern exists AND the current exchange offers a natural opening (turn boundary, thematic adjacency, brief reply, or topic pause), the same one-sentence posture should include a short surfacing clause — e.g., "answer the weather question directly; after the answer, briefly note that the durable concern about <topic> is due and ask whether to act on it." Bias strongly toward NOT surfacing: an unsurfaced relevant concern is far less costly than a turn-by-turn nag. Do NOT surface a concern that was already raised in the recent context, that has no obvious opening this turn, or that fires only on architectural cadence (e.g. periodic data reports — those go through the autonomous tick path, not the chat reply). This is a mention, not a leading question; the agent's persona forbids questions designed to elicit agreement with a frame it has already chosen.
 - Calibration via OBSERVED DEFAULTS: if the input has a load-bearing dimension that's underspecified (e.g. what axis to rank by, what level of detail, who the audience is, ask-vs-assume on ambiguous instructions), check the companion-model section for relevant `OBSERVED DEFAULTS` entries. (a) If a relevant default exists and the request looks typical: the posture can apply it silently. (b) If a relevant default exists but the request looks atypical (override signals in the input, or contextual mismatch): the posture should direct the agent to name its interpretation in one short clause before proceeding. (c) If no relevant default exists, OR there is no companion-model section yet (cold start): the posture should direct the agent to state-and-proceed — name the interpretation, answer, invite correction. (d) If misinterpretation would be costly or irreversible (the request implies an action that's hard to undo): direct the agent to ask before proceeding instead of state-and-proceed. State-and-proceed is the chat-mode default; "ask first" is reserved for high-cost cases."""
@@ -540,6 +546,7 @@ def _expand_llm_result(
     notes = "; ".join(notes_parts)
 
     posture_text = str(r.get("posture", "") or "").strip()
+    read_of_input_text = str(r.get("read_of_input", "") or "").strip()
 
     return {
         "event_id": event_id,
@@ -564,6 +571,7 @@ def _expand_llm_result(
         },
         "notes": notes,
         "posture": posture_text,
+        "read_of_input": read_of_input_text,
         "_meta": {"timestamp": ts, "source": "llm"},
     }
 

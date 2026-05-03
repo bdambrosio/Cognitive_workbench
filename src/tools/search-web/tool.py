@@ -26,7 +26,16 @@ from urllib.parse import urlparse
 import requests
 import warnings
 
-from infospace_executor import InfospaceExecutor
+# infospace_executor was the planner-side runtime; the chat ReAct loop
+# bypasses it and calls llm_search() directly. Keep the import optional so
+# this module loads in chat-only builds. The InfospaceExecutor type is used
+# only as an annotation on `_fail`/`_success`/`tool()` (the planner-facing
+# entry point); when the executor is gone, those signatures degrade to
+# `Any`, but they are not callable from chat-only mode anyway.
+try:
+    from infospace_executor import InfospaceExecutor
+except ImportError:
+    InfospaceExecutor = Any  # type: ignore[assignment,misc]
 
 # ------------------------------
 # Logging

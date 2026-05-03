@@ -1935,24 +1935,25 @@ class ChatLoop:
 
     def _run_fetch_text(self, url: str) -> str:
         """Fetch+extract text from a URL (or Note/Collection ID, or local
-        absolute path). Returns text capped to _FETCH_TEXT_OBS_CAP chars
-        for the ReAct working log. Returns a `(fetch_text …)` failure
-        marker on any error so the model sees the failure cleanly."""
+        absolute path). Returns an OK:/EMPTY:/ERROR: prefixed observation
+        per the ReAct tool-observation convention (see _run_react_loop
+        comment block). Successful text is capped to _FETCH_TEXT_OBS_CAP
+        chars for the ReAct working log."""
         if not url:
-            return '(fetch_text: empty url)'
+            return 'EMPTY: fetch_text url was empty'
         fetch = self._get_fetch_text_tool()
         if fetch is None:
-            return '(fetch_text: tool unavailable)'
+            return 'ERROR: fetch_text tool unavailable (failed to load — see warning log)'
         try:
             result = fetch(url, executor=self._FetchTextStubExecutor,
                            resource_manager=self.resource_manager)
         except Exception as e:
             logger.warning(f"[{self.character_name}] fetch_text raised: {e}")
-            return f'(fetch_text error: {e})'
+            return f'ERROR: fetch_text raised: {e}'
         if not isinstance(result, dict):
-            return '(fetch_text: unexpected return shape)'
+            return 'ERROR: fetch_text returned unexpected shape'
         if result.get('status') != 'success':
-            return f"(fetch_text failed: {result.get('reason') or 'unknown'})"
+            return f"ERROR: fetch_text failed: {result.get('reason') or 'unknown'}"
         # The tool returns a JSON-encoded blob in `value` and a parsed dict
         # in `extra`. Prefer `extra` for the text field.
         extra = result.get('extra') or {}
@@ -1970,10 +1971,10 @@ class ChatLoop:
             except Exception:
                 text = str(value).strip()
         if not text:
-            return '(fetch_text: no text extracted)'
+            return f'EMPTY: fetch_text extracted no text from {url}'
         if len(text) > _FETCH_TEXT_OBS_CAP:
             text = text[:_FETCH_TEXT_OBS_CAP].rstrip() + f"\n…[truncated at {_FETCH_TEXT_OBS_CAP} chars]"
-        return text
+        return 'OK: ' + text
 
     # ------------------------------------------------------------------
     # ReAct loop — single-action-per-iteration tool use for chat.
@@ -2048,42 +2049,41 @@ class ChatLoop:
                                     instruction: Any,
                                     log: List[Tuple[str, str]]
                                     ) -> Optional[str]:
-        """Return a diagnostic observation when process_text args look
+        """Return a diagnostic reason string when process_text args look
         malformed — section-name placeholder as `source`, unresolved
         `$stepN` binding, or empty fields. Returns None when args are
-        usable. The model has been observed to recover cleanly when
-        given a legible error, so each diagnostic names the failure
-        AND points at the recovery path."""
+        usable. Caller (the ReAct dispatch) wraps the returned reason
+        with the ERROR: prefix, so emit naked sentences here. Each
+        diagnostic names the failure AND points at the recovery path —
+        the model has been observed to recover cleanly when given a
+        legible error."""
         if not isinstance(instruction, str) or not instruction.strip():
-            return ("(process_text requires a non-empty `instruction` "
-                    "field; no instruction was supplied.)")
+            return ("requires a non-empty `instruction` field; "
+                    "no instruction was supplied.")
         # Unresolved $stepN: model passed a binding that doesn't exist.
         if isinstance(raw_src, str) and _REACT_BINDING_RE.match(raw_src) and not resolved_src:
             bound = sorted({lab for lab, _ in log
                             if _REACT_BINDING_RE.match(lab)})
             avail = ", ".join(bound) if bound else "(none yet this turn)"
-            return (f"(process_text `source` is `{raw_src}`, an unresolved "
-                    f"binding. Available `$stepN` bindings this turn: "
-                    f"{avail}. Pass an existing binding or literal "
-                    f"inline text instead.)")
+            return (f"`source` is `{raw_src}`, an unresolved binding. "
+                    f"Available `$stepN` bindings this turn: {avail}. "
+                    f"Pass an existing binding or literal inline text instead.")
         if not resolved_src:
-            return ("(process_text `source` is empty. Pass either "
-                    "literal text content (the actual material to "
-                    "process) or a `$stepN` binding from a prior tool "
-                    "call this turn.)")
+            return ("`source` is empty. Pass either literal text content "
+                    "(the actual material to process) or a `$stepN` binding "
+                    "from a prior tool call this turn.")
         # Heading-shaped placeholder: starts with `##` and is short.
         # Real content the model wants processed is typically much
         # longer; a section heading is rarely a reasonable source.
         stripped = resolved_src.lstrip()
         if stripped.startswith('##') and len(resolved_src) < 500:
-            return ("(process_text `source` appears to be a section "
-                    "heading like `## Conversation history` rather "
-                    "than content. Section bodies are already in your "
-                    "system prompt — read them directly in `respond` "
-                    "rather than passing the heading as `source`. "
-                    "Section names do not resolve to their bodies; "
-                    "`source` accepts only literal inline text or a "
-                    "`$stepN` binding.)")
+            return ("`source` appears to be a section heading like "
+                    "`## Conversation history` rather than content. "
+                    "Section bodies are already in your system prompt — "
+                    "read them directly in `respond` rather than passing "
+                    "the heading as `source`. Section names do not "
+                    "resolve to their bodies; `source` accepts only "
+                    "literal inline text or a `$stepN` binding.")
         return None
 
     def _run_process_text(self, source_text: str, instruction: str) -> str:
@@ -2130,8 +2130,11 @@ class ChatLoop:
             )
         except Exception as e:
             logger.warning(f"[{self.character_name}] process_text failed: {e}")
-            return f"(process_text error: {e})"
-        return (result or '').strip()
+            return f"ERROR: process_text raised: {e}"
+        text = (result or '').strip()
+        if not text:
+            return 'EMPTY: process_text produced no output'
+        return 'OK: ' + text
 
     @staticmethod
     def _format_react_search_observation(search_result: Dict[str, Any]) -> str:
@@ -2700,6 +2703,17 @@ class ChatLoop:
             "5. `{\"thought\": \"<one terse sentence>\", \"tool\": \"respond\", \"text\": <string|$stepN>}` — final reply, exits loop. "
             "Must be in your voice; pass search/fetch results through process_text first or write the reply yourself.\n"
             "\n"
+            "## Observation format\n"
+            "Each tool result (the text bound to `$stepN`) starts with one of three tags:\n"
+            "  `OK: <content>`     — tool succeeded; content follows\n"
+            "  `EMPTY: <reason>`   — tool ran cleanly but produced no usable result\n"
+            "  `ERROR: <reason>`   — tool failed (unavailable / raised / malformed args)\n"
+            "Treat ERROR as a hard signal: the tool is currently broken — do NOT retry the "
+            "same call. Treat EMPTY as a soft signal: reformulating the call (different query, "
+            "different URL) may help, but do not loop blindly. The tag is informational — when "
+            "you reuse `$stepN` in a downstream action or in `respond`, the tag is part of the "
+            "string; strip it or extract just the content as needed.\n"
+            "\n"
             "Three sources of content in this loop, each attributable when asked about provenance: "
             "(a) Substrate output (your own): text you write inline within an action — `thought`, "
             "`process_text` `instruction`, or inline `respond.text` — is produced by you in this "
@@ -2878,6 +2892,22 @@ class ChatLoop:
             binding = f'$step{i+1}'
             _append_log(f'ACTION {i+1}', json.dumps(action))
 
+            # ----------------------------------------------------------
+            # Tool-observation convention (KISS, prose-only, no runtime
+            # layering). Every observation string emitted by a tool starts
+            # with one of three prefixes so the ReAct LLM can discriminate
+            # success from failure without keyword-spotting:
+            #   OK: <content>     — tool succeeded, content follows
+            #   EMPTY: <reason>   — tool ran without error but produced no
+            #                       usable result (no search hits; remember
+            #                       found nothing; empty argument)
+            #   ERROR: <reason>   — tool failed (unavailable, raised,
+            #                       returned malformed). Treat as "this
+            #                       tool is currently broken" — do not
+            #                       retry the same call.
+            # New tools must follow the same convention. See src/chat/
+            # AGENTS.md for the author-facing rule.
+            # ----------------------------------------------------------
             if tool == 'process_text':
                 raw_src = action.get('source', '')
                 ins = action.get('instruction', '')
@@ -2886,13 +2916,25 @@ class ChatLoop:
                 if diag is not None:
                     logger.warning(f"[{self.character_name}] process_text "
                                    f"dispatch rejected (iter {i+1}): {diag}")
-                    obs = diag
+                    # Diagnose returns a free-form reason — wrap as ERROR
+                    # so the agent treats it the same as any other tool
+                    # failure rather than mistaking it for content.
+                    obs = f'ERROR: process_text rejected: {diag}'
                 else:
                     obs = self._run_process_text(src, ins)
             elif tool == 'search':
                 q = self._resolve_react_value(action.get('query', ''), log)
-                result = self._run_web_search(q) if q else None
-                obs = self._format_react_search_observation(result) if result else '(search failed or empty query)'
+                if not q:
+                    obs = 'EMPTY: search query was empty'
+                elif self._get_llm_search() is None:
+                    obs = 'ERROR: search-web tool unavailable (failed to load — see warning log)'
+                else:
+                    result = self._run_web_search(q)
+                    if result:
+                        obs = 'OK: ' + self._format_react_search_observation(result)
+                    else:
+                        obs = (f'EMPTY: search returned no results for "{q}" '
+                               '(or transient API failure — see warning log)')
             elif tool == 'fetch_text':
                 u = self._resolve_react_value(action.get('url', ''), log)
                 obs = self._run_fetch_text(u)
@@ -2900,7 +2942,8 @@ class ChatLoop:
                 q = self._resolve_react_value(action.get('query', ''), log)
                 obs = self._run_remember(q)
             else:
-                obs = f"unknown tool {tool!r}; available: process_text, search, fetch_text, remember, respond"
+                obs = (f"ERROR: unknown tool {tool!r}; available: "
+                       "process_text, search, fetch_text, remember, respond")
 
             _append_log(binding, obs)
             iters[-1]['appended'] = log[pre_log_len:]
@@ -2934,14 +2977,15 @@ class ChatLoop:
     def _run_remember(self, query: str) -> str:
         """Backend for the ReAct `remember` tool. Delegates to the
         active-recall subagent (chat.remember.remember), which runs its
-        own thin ReAct loop over the memory dir. Returns the synthesized
-        answer string, suitable for binding to $stepN. Subagent's full
-        per-call trace lands under subagent_traces/ for debugging."""
+        own thin ReAct loop over the memory dir. Returns an OK:/EMPTY:/
+        ERROR: prefixed observation per the ReAct tool-observation
+        convention. Subagent's full per-call trace lands under
+        subagent_traces/ for debugging."""
         if not query or not str(query).strip():
-            return "(remember: empty query)"
+            return "EMPTY: remember query was empty"
         try:
             from chat.remember import remember as _remember
-            return _remember(
+            answer = _remember(
                 query=str(query),
                 memory_dir=self._memory_dir(),
                 llm_backend=self.backend,
@@ -2949,7 +2993,11 @@ class ChatLoop:
             )
         except Exception as e:
             logger.warning(f"[{self.character_name}] remember subagent raised: {e}")
-            return f"(remember error: {e})"
+            return f"ERROR: remember subagent raised: {e}"
+        text = str(answer or '').strip()
+        if not text:
+            return 'EMPTY: remember subagent produced no answer'
+        return 'OK: ' + text
 
     def _append_conversation_entry(self, direction: str, entity: str,
                                    text: str, meta: str = '') -> None:
