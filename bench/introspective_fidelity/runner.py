@@ -41,10 +41,14 @@ SRC_DIR = REPO_ROOT / "src"
 # (infospace_resource_manager, conversation_store, character_evaluator,
 # etc.) live in src/ as top-level modules, so src/ must be on sys.path.
 sys.path.insert(0, str(SRC_DIR))
+# HERE on the path so `from baseline import BaselineChatAgent` resolves
+# to bench/introspective_fidelity/baseline.py (peer of this file).
+sys.path.insert(0, str(HERE))
 
 # Imports below depend on src/ being importable.
 from chat.chat_loop import ChatLoop  # noqa: E402
 from launcher import parse_characters  # noqa: E402
+from baseline import BaselineChatAgent  # noqa: E402
 
 logger = logging.getLogger("bench.introspective_fidelity")
 
@@ -118,29 +122,32 @@ def _snapshot_concerns(loop: ChatLoop) -> List[Dict[str, Any]]:
     return out
 
 
-def _snapshot_reasoning_history(loop: ChatLoop) -> List[Dict[str, Any]]:
-    """Dump the full reasoning_history collection. Ground truth for
-    P1/P3/P5/P6/P7/P9/P11."""
-    rid = getattr(loop, "_reasoning_history_collection_id", None)
-    if not rid:
+def _snapshot_reasoning_history(loop: 'Any') -> List[Dict[str, Any]]:
+    """Dump all per-turn records from <memory>/reasoning_trace.jsonl.
+    Ground truth for trace-related probes (P1/P3/P5/P6/P7/P9/P11). For
+    BaselineChatAgent (no memory_dir, no trace file), returns []."""
+    try:
+        mem_dir_fn = getattr(loop, '_memory_dir', None)
+        if mem_dir_fn is None:
+            return []
+        path = mem_dir_fn() / 'reasoning_trace.jsonl'
+    except Exception:
         return []
-    coll = loop.resource_manager.get_resource(rid)
-    if not coll:
+    if not path.is_file():
         return []
-    note_ids = (coll.get("properties") or {}).get("content", []) or []
     out: List[Dict[str, Any]] = []
-    for nid in note_ids:
-        note = loop.resource_manager.get_resource(nid)
-        if not note:
-            continue
-        props = note.get("properties") or {}
-        out.append({
-            "note_id": nid,
-            "content": props.get("content", ""),
-            "compressed": props.get("compressed", ""),
-            "timestamp": props.get("timestamp"),
-            "source": props.get("source"),
-        })
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            for line in f:
+                s = line.strip()
+                if not s:
+                    continue
+                try:
+                    out.append(json.loads(s))
+                except json.JSONDecodeError:
+                    continue
+    except Exception:
+        return []
     return out
 
 
@@ -154,12 +161,41 @@ def _snapshot_discourse_and_companion(loop: ChatLoop, source: str
     }
 
 
+def _snapshot_conversation_history(loop: 'Any', source: str
+                                    ) -> List[Dict[str, str]]:
+    """Dump verbatim conversation history (all turns, both directions) for
+    `source`. Ground truth for any probe whose answer should be checkable
+    against what was actually said in the session.
+
+    Both ChatLoop and BaselineChatAgent expose `loop.store.get_recent_turns(
+    source, limit, scope)`, so this works uniformly. For the baseline this
+    is the only ground-truth surface (concerns/reasoning_history/discourse
+    are all empty); for ChatLoop it's redundant with reasoning_history but
+    cheap to include and lets the judge cross-check user-input claims
+    without parsing reasoning_trace headers."""
+    try:
+        store = getattr(loop, 'store', None)
+        if store is None:
+            return []
+        turns = store.get_recent_turns(source, limit=999, scope='all') or []
+    except Exception:
+        return []
+    out: List[Dict[str, str]] = []
+    for t in turns:
+        out.append({
+            "direction": str(t.get("direction", "")),
+            "text": str(t.get("text", "")),
+        })
+    return out
+
+
 def _snapshot_all(loop: ChatLoop, source: str) -> Dict[str, Any]:
     return {
         "captured_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "concerns": _snapshot_concerns(loop),
         "reasoning_history": _snapshot_reasoning_history(loop),
         "discourse_and_companion": _snapshot_discourse_and_companion(loop, source),
+        "conversation_history": _snapshot_conversation_history(loop, source),
     }
 
 
@@ -184,7 +220,9 @@ def _latest_reply(loop: ChatLoop, source: str) -> str:
 
 def run_benchmark(scenario_path: Path, primer_path: Path,
                   output_dir: Path, source: str = "User",
-                  world_name: Optional[str] = None) -> None:
+                  world_name: Optional[str] = None,
+                  baseline: bool = False,
+                  baseline_prompt_path: Optional[Path] = None) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     snapshots_dir = output_dir / "snapshots"
     snapshots_dir.mkdir(parents=True, exist_ok=True)
@@ -208,19 +246,39 @@ def run_benchmark(scenario_path: Path, primer_path: Path,
         logger.info(f"world_name (fresh): {world_name}")
 
     char_name, char_config = _build_character_config(scenario_path, world_name)
-    if not char_config.get("chat", {}).get("benchmark_mode"):
-        logger.warning(
-            "scenario does not set chat.benchmark_mode=true; reflection "
-            "will run on the background executor and probe-time snapshots "
-            "may miss in-flight writes")
-
-    # Instantiate ChatLoop without calling .run() — Zenoh stays closed.
-    loop = ChatLoop(character_name=char_name, character_config=char_config)
+    if baseline:
+        # Baseline build: bypass ChatLoop entirely. Use the LLM config from
+        # the scenario YAML so the backend is matched, but ignore all other
+        # scenario knobs (persona, self_model, concerns, sensors, benchmark_mode).
+        # System prompt comes from --baseline-prompt (default: empty / generic).
+        sys_prompt = ""
+        if baseline_prompt_path:
+            sys_prompt = Path(baseline_prompt_path).read_text().strip()
+        logger.info(
+            f"baseline mode: agent=BaselineChatAgent, "
+            f"system_prompt={'<empty>' if not sys_prompt else f'{baseline_prompt_path}'}"
+        )
+        loop = BaselineChatAgent(
+            llm_config=(char_config.get("llm_config") or {}),
+            system_prompt=sys_prompt,
+            character_name=char_name,
+        )
+    else:
+        if not char_config.get("chat", {}).get("benchmark_mode"):
+            logger.warning(
+                "scenario does not set chat.benchmark_mode=true; reflection "
+                "will run on the background executor and probe-time snapshots "
+                "may miss in-flight writes")
+        # Instantiate ChatLoop without calling .run() — Zenoh stays closed.
+        loop = ChatLoop(character_name=char_name, character_config=char_config)
 
     transcript_lines: List[str] = []
     transcript_lines.append(f"# Introspective Fidelity Benchmark — transcript")
     transcript_lines.append("")
     transcript_lines.append(f"- scenario: `{scenario_path.name}`")
+    transcript_lines.append(f"- agent: `{'baseline' if baseline else 'jill'}`")
+    if baseline and baseline_prompt_path:
+        transcript_lines.append(f"- baseline_prompt: `{baseline_prompt_path}`")
     transcript_lines.append(f"- world_name: `{world_name}`")
     transcript_lines.append(f"- character: `{char_name}`")
     transcript_lines.append(f"- backend: `{(char_config.get('llm_config') or {}).get('server', '?')}` "
@@ -313,19 +371,49 @@ def main() -> None:
              "timestamped name per run. Pass an existing world_name to "
              "resume / probe an existing populated baseline (recommended: "
              "copy the baseline dir first so the test doesn't mutate it).")
+    parser.add_argument(
+        "--baseline", action="store_true",
+        help="Run the bench against a minimal BaselineChatAgent instead of "
+             "ChatLoop. Same LLM backend (taken from --scenario's llm_config), "
+             "no concerns / reasoning_history / discourse / companion / tools / "
+             "reflection. Used to isolate the architectural contribution from "
+             "the LLM contribution.")
+    parser.add_argument(
+        "--baseline-prompt", type=Path,
+        default=HERE / "baseline_prompts" / "jill_persona.txt",
+        help="Path to a text file containing the baseline's system prompt. "
+             "Default is baseline_prompts/jill_persona.txt — Jill's persona "
+             "block (with the same 'You are Jill, speaking in first person' "
+             "+ '## Persona' wrapper Jill's own system prompt uses) and "
+             "nothing else. This is the cleanest architectural ablation: "
+             "same persona, no self_model / capabilities / setting / "
+             "concerns / recalled memories / companion / discourse / "
+             "orientation / reasoning history / ReAct tool loop. Pass "
+             "baseline_prompts/generic.txt for a neutral 'helpful assistant' "
+             "prompt instead, or any custom path. Pass an empty path to send "
+             "no system prompt at all. Only used when --baseline is set. "
+             "Note: jill_persona.txt is a static snapshot — if the persona "
+             "in jill-chat.yaml is updated, regenerate the file to keep the "
+             "baseline matched.")
     args = parser.parse_args()
 
     scenario = args.scenario.resolve()
     primer = args.primer.resolve()
+    baseline_prompt_path = args.baseline_prompt.resolve() if args.baseline_prompt else None
     if args.output_dir:
         out = args.output_dir.resolve()
     else:
         stamp = datetime.datetime.now(datetime.timezone.utc).strftime(
             "%Y-%m-%dT%H-%M-%SZ")
-        out = HERE / "results" / f"{stamp}_{scenario.stem}"
+        # Prefix baseline runs so result dirs are self-describing and don't
+        # mix with Jill runs in the listing (which all carry the scenario stem).
+        agent_tag = "baseline_" if args.baseline else ""
+        out = HERE / "results" / f"{stamp}_{agent_tag}{scenario.stem}"
 
     run_benchmark(scenario_path=scenario, primer_path=primer, output_dir=out,
-                  world_name=args.world_name)
+                  world_name=args.world_name,
+                  baseline=args.baseline,
+                  baseline_prompt_path=baseline_prompt_path)
 
 
 if __name__ == "__main__":

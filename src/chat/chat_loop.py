@@ -497,10 +497,17 @@ class ChatLoop:
         self._seed_concerns_from_config(character_config)
 
         # ---- Reasoning history (awareness feed) ----
-        # Per-turn ReAct traces persisted here. Last N render in the
-        # user-message prefix as Jill's awareness of her own prior thinking.
+        # Per-turn ReAct traces persisted as one JSON record per line in
+        # <memory>/reasoning_trace.jsonl. Append-only. Each record's
+        # `prefix_trace_refs` lists the turn_seq values that were
+        # surfaced in this turn's ## Recent reasoning block, giving a
+        # faithful record of awareness window per turn without
+        # duplicating content. The Notes-based reasoning_history
+        # collection is no longer used; _reasoning_history_collection_id
+        # stays None so legacy snapshot helpers short-circuit.
         self._reasoning_history_collection_id: Optional[str] = None
-        self._init_reasoning_history()
+        self._turn_seq: int = 0
+        self._last_inject_trace_seqs: List[int] = []
 
         # ---- Zenoh wiring ----
         self._inbox: "queue.Queue[dict]" = queue.Queue()
@@ -812,26 +819,36 @@ class ChatLoop:
         except Exception as e:
             logger.warning(f"[{self.character_name}] _init_concerns failed: {e}")
 
-    def _init_reasoning_history(self) -> None:
-        """Get-or-create the reasoning_history Collection. Per-turn ReAct
-        traces land here as Notes; the last N surface in the user-message
-        prefix as Jill's awareness of her own prior thinking. No semantic
-        index for v1 — read pattern is recency-only."""
+    def _reasoning_trace_path(self) -> 'Path':
+        """Path to <memory>/reasoning_trace.jsonl — one JSON record per
+        ReAct turn, append-only. Line N of the file is record N
+        (= turn_seq N, 1-indexed). The active-recall subagent reads
+        this file directly with line-range semantics where each line is
+        one parseable JSON object."""
+        return self._memory_dir() / 'reasoning_trace.jsonl'
+
+    def _load_reasoning_records(self) -> List[Dict[str, Any]]:
+        """Read all per-turn records from reasoning_trace.jsonl.
+        Returns [] if missing or unreadable. Lines are 1:1 with
+        records (one JSON object per line, in turn order)."""
+        path = self._reasoning_trace_path()
+        if not path.is_file():
+            return []
+        out: List[Dict[str, Any]] = []
         try:
-            cid = self.resource_manager.named_collections.get(_REASONING_HISTORY_COLLECTION_NAME)
-            if not cid:
-                success, cid, err, _ = self.resource_manager.create_collection(
-                    self.character_name, [], "list", "chat-loop", "",
-                    _REASONING_HISTORY_COLLECTION_NAME,
-                    {"kind": "reasoning_history"},
-                )
-                if not success or not cid:
-                    logger.warning(f"[{self.character_name}] create reasoning_history collection failed: {err}")
-                    return
-            self.resource_manager.mark_persistent(cid, self.character_name)
-            self._reasoning_history_collection_id = cid
+            with open(path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    s = line.strip()
+                    if not s:
+                        continue
+                    try:
+                        out.append(json.loads(s))
+                    except json.JSONDecodeError:
+                        continue
         except Exception as e:
-            logger.warning(f"[{self.character_name}] _init_reasoning_history failed: {e}")
+            logger.warning(
+                f"[{self.character_name}] reasoning trace read failed: {e}")
+        return out
 
     @staticmethod
     def _seed_concern_name(idx: int) -> str:
@@ -3033,150 +3050,153 @@ class ChatLoop:
                                   iters: List[Dict[str, Any]],
                                   final_response: str,
                                   exit_reason: str,
+                                  orientation: str = '',
+                                  recall: Optional[List[Tuple[str, str]]] = None,
+                                  concerns: Optional[List[Any]] = None,
                                   autonomous: bool = False) -> None:
-        """Persist one ReAct turn's trace into the reasoning_history
-        collection. Note content is the rendered full trace (used as the
-        prompt-side full form). Properties carry a one-line compressed
-        digest (used when this trace ages out of the full window) plus
-        metadata. Ring-prunes oldest entries when the collection grows
-        past _REASONING_HISTORY_RING_SIZE."""
-        if not self._reasoning_history_collection_id:
-            return
+        """Append one structured ReAct turn record to
+        <memory>/reasoning_trace.jsonl. Per-turn-unique content (orientation,
+        active concerns at this turn, recall hits at this turn, user input,
+        working log, raw response, companion/discourse state at this turn)
+        is stored inline. The list of trace turn_seqs that were visible in
+        this turn's ## Recent reasoning block is captured in
+        prefix_trace_refs (set as side effect by
+        _get_reasoning_history_block at prompt build time) — this gives a
+        faithful record of awareness window per turn without duplicating
+        prior trace content."""
         try:
-            actions: List[str] = []
-            iter_lines: List[str] = []
-            for idx, it in enumerate(iters):
-                raw = it.get('raw', '') or ''
-                thought = ''
-                action_summary = (raw or '').strip()
-                tool = '?'
-                try:
-                    parsed = json.loads(raw)
-                    if isinstance(parsed, dict):
-                        thought = str(parsed.get('thought', '') or '').strip()
-                        tool = str(parsed.get('tool', '?') or '?')
-                        action_summary = json.dumps(
-                            {k: v for k, v in parsed.items() if k != 'thought'},
-                            ensure_ascii=False)
-                except Exception:
-                    pass
-                actions.append(tool)
+            self._turn_seq += 1
 
-                obs_text = ''
+            # Build working_log as literal text from iters: per-iter raw
+            # action emission + bound $stepN observation, untruncated.
+            log_lines: List[str] = []
+            for i, it in enumerate(iters):
+                raw = (it.get('raw') or '').strip()
+                log_lines.append(f"--- iter {i+1} ---")
+                log_lines.append(f"ACTION: {raw}")
                 for label, content in (it.get('appended') or []):
                     if isinstance(label, str) and label.startswith('$step'):
-                        s = str(content or '')
-                        if len(s) > _REASONING_HISTORY_OBS_CAP:
-                            s = s[:_REASONING_HISTORY_OBS_CAP] + '… [truncated]'
-                        obs_text = s
-                        break
+                        log_lines.append(f"{label}: {content}")
+            working_log = "\n".join(log_lines)
 
-                iter_lines.append(f"  ITER {idx + 1}:")
-                if thought:
-                    iter_lines.append(f"    thought: {thought}")
-                iter_lines.append(f"    action:  {action_summary}")
-                if obs_text:
-                    iter_lines.append(f"    obs:     {obs_text}")
+            # Snapshot per-turn state — flatten concerns and recall to
+            # readable strings; companion/discourse stored inline (small,
+            # slowly-varying). Per-turn snapshot of these is what makes
+            # the trace faithful for "what was I operating under at T11"
+            # probes.
+            concerns_at_turn: List[str] = []
+            for item in (concerns or []):
+                if isinstance(item, tuple):
+                    concerns_at_turn.append(' | '.join(
+                        str(x) for x in item if x is not None))
+                else:
+                    concerns_at_turn.append(str(item))
+            recall_at_turn: List[str] = []
+            for item in (recall or []):
+                if isinstance(item, tuple) and len(item) >= 2:
+                    recall_at_turn.append(f"[{item[0]}] {item[1]}")
+                else:
+                    recall_at_turn.append(str(item))
 
-            header_label = '(autonomous)' if autonomous else f'({source})'
-            header = f"INPUT {header_label}: {user_text}"
-            full_lines = [header] + iter_lines
-            if final_response:
-                resp = final_response
-                if len(resp) > _REASONING_HISTORY_OBS_CAP:
-                    resp = resp[:_REASONING_HISTORY_OBS_CAP] + '… [truncated]'
-                full_lines.append(f"  RESPONSE: {resp}")
-            full_trace = "\n".join(full_lines)
+            record = {
+                'turn_seq': self._turn_seq,
+                'ts': datetime.now(timezone.utc).isoformat(),
+                'source': source,
+                'autonomous': bool(autonomous),
+                'exit_reason': exit_reason,
+                'user_input': user_text,
+                'orientation': orientation or '',
+                'active_concerns': concerns_at_turn,
+                'recall_hits': recall_at_turn,
+                'companion_state': str(self._companion_state.get(source, '') or ''),
+                'discourse_state': str(self._discourse_state.get(source, '') or ''),
+                'prefix_trace_refs': list(self._last_inject_trace_seqs),
+                'working_log': working_log,
+                'raw_response': final_response or '',
+            }
 
-            user_short = user_text if len(user_text) <= 60 else user_text[:57] + '…'
-            # Compressed form: input prompt + action chain + a truncated
-            # snippet of what Jill actually said. The action chain alone
-            # ("→ search → respond") tells future-Jill what the loop did
-            # but not what was concluded — useless for self-reflection
-            # probes that ask "what have I claimed?". Including a response
-            # snippet costs ~200 chars per aged trace and lets the older
-            # awareness-feed entries carry information content, not just
-            # mechanics.
-            resp_short = ''
-            if final_response:
-                _r = final_response.replace('\n', ' ').strip()
-                if len(_r) > 200:
-                    _r = _r[:197].rstrip() + '…'
-                resp_short = _r
-            compressed = (
-                f"{header_label} '{user_short}' → "
-                + (" → ".join(actions) if actions else "(no actions)")
-                + (f" → said: \"{resp_short}\"" if resp_short else "")
-            )
-
-            success, note_id, err, _ = self.resource_manager.create_note(
-                self.character_name, full_trace, "text", "chat-loop",
-                source or "", "",
-                {
-                    "kind": "reasoning_trace",
-                    "user_text": user_text,
-                    "autonomous": bool(autonomous),
-                    "exit_reason": exit_reason,
-                    "n_iters": len(iters),
-                    "compressed": compressed,
-                },
-            )
-            if not success or not note_id:
-                logger.warning(
-                    f"[{self.character_name}] reasoning_history note create failed: {err}")
-                return
-            self.resource_manager.add_to_collection(
-                self._reasoning_history_collection_id, note_id,
-                self.character_name, operation='add')
-            self.resource_manager.mark_persistent(note_id, self.character_name)
-
-            # Ring-prune oldest entries if we've exceeded the cap.
-            coll = self.resource_manager.get_resource(self._reasoning_history_collection_id)
-            note_ids = ((coll or {}).get('properties') or {}).get('content', []) or []
-            if len(note_ids) > _REASONING_HISTORY_RING_SIZE:
-                excess = len(note_ids) - _REASONING_HISTORY_RING_SIZE
-                for old_id in note_ids[:excess]:
-                    try:
-                        self.resource_manager.delete_resource(old_id)
-                    except Exception:
-                        pass
+            path = self._reasoning_trace_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(record, ensure_ascii=False) + '\n')
         except Exception as e:
-            logger.warning(f"[{self.character_name}] _write_reasoning_history failed: {e}")
+            logger.warning(
+                f"[{self.character_name}] _write_reasoning_history failed: {e}")
+
+    def _render_trace_record(self, rec: Dict[str, Any], full: bool) -> str:
+        """Render a single per-turn record from reasoning_trace.jsonl
+        for inclusion in the user-prompt's ## Recent reasoning block.
+        full=True renders all per-turn-unique fields (used for recent
+        traces and all traces in benchmark_mode); full=False renders a
+        one-line digest (used for older traces in non-benchmark mode)."""
+        seq = int(rec.get('turn_seq', 0))
+        if not full:
+            user_short = (rec.get('user_input') or '')[:60].replace('\n', ' ')
+            resp_short = (rec.get('raw_response') or '').replace('\n', ' ')[:200]
+            return f"### trace #{seq}: '{user_short}' → \"{resp_short}\""
+        parts: List[str] = [f"### trace #{seq}"]
+        ts = rec.get('ts')
+        if ts:
+            parts.append(f"TIMESTAMP: {ts}")
+        if rec.get('orientation'):
+            parts.append(f"ORIENTATION:\n{rec['orientation']}")
+        if rec.get('active_concerns'):
+            parts.append("ACTIVE CONCERNS:")
+            for c in rec['active_concerns']:
+                parts.append(f"  - {c}")
+        if rec.get('recall_hits'):
+            parts.append("RECALL HITS:")
+            for r in rec['recall_hits']:
+                parts.append(f"  - {r}")
+        prefix_refs = rec.get('prefix_trace_refs') or []
+        if prefix_refs:
+            parts.append(
+                f"PRIOR TRACES VISIBLE TO ME AT THIS TURN: {prefix_refs} "
+                "(by turn_seq; resolve via reasoning_trace.jsonl line N)")
+        parts.append(f"USER INPUT: {rec.get('user_input', '')}")
+        if rec.get('working_log'):
+            parts.append(f"WORKING LOG:\n{rec['working_log']}")
+        if rec.get('raw_response'):
+            parts.append(f"RAW RESPONSE: {rec['raw_response']}")
+        return "\n".join(parts)
 
     def _get_reasoning_history_block(self) -> str:
         """Build the ## Recent reasoning block for the user-message prefix.
-        Returns '' when there's nothing to surface. Last
-        _REASONING_HISTORY_RECENT entries are read; the most recent
-        _REASONING_HISTORY_FULL render in full, older render compressed."""
-        if not self._reasoning_history_collection_id:
+        Reads structured per-turn records from reasoning_trace.jsonl and
+        renders per-turn-unique content (orientation, concerns at the
+        time, recall, user input, working log, raw response, plus
+        prefix_trace_refs as a faithful awareness-window record).
+
+        Side effect: sets self._last_inject_trace_seqs to the list of
+        turn_seqs that were rendered, used by the next
+        _write_reasoning_history call to populate prefix_trace_refs.
+
+        In benchmark_mode: surfaces ALL session records in full.
+        In normal chat mode: last _REASONING_HISTORY_RECENT records,
+        most recent _REASONING_HISTORY_FULL in full, older as one-line
+        digest (token budget)."""
+        self._last_inject_trace_seqs = []
+        records = self._load_reasoning_records()
+        if not records:
             return ''
-        coll = self.resource_manager.get_resource(self._reasoning_history_collection_id)
-        if not coll:
-            return ''
-        note_ids = (coll.get('properties') or {}).get('content', []) or []
-        if not note_ids:
-            return ''
-        recent = note_ids[-_REASONING_HISTORY_RECENT:]
+        bench = bool((self.config.get('chat') or {}).get('benchmark_mode'))
+        selected = records if bench else records[-_REASONING_HISTORY_RECENT:]
+        n = len(selected)
+        full_threshold = 0 if bench else max(0, n - _REASONING_HISTORY_FULL)
         sections: List[str] = []
-        n = len(recent)
-        full_threshold = max(0, n - _REASONING_HISTORY_FULL)
-        for idx, nid in enumerate(recent):
-            note = self.resource_manager.get_resource(nid)
-            if not note:
-                continue
-            props = note.get('properties') or {}
-            offset_label = f"trace -{n - idx}"
-            if idx >= full_threshold:
-                content = str(props.get('content', '') or '').strip()
-                if content:
-                    sections.append(f"### {offset_label} (full)\n{content}")
-            else:
-                compressed = str(props.get('compressed', '') or '').strip()
-                if compressed:
-                    sections.append(f"### {offset_label}: {compressed}")
+        for idx, rec in enumerate(selected):
+            seq = int(rec.get('turn_seq', 0))
+            if seq:
+                self._last_inject_trace_seqs.append(seq)
+            sections.append(self._render_trace_record(
+                rec, full=(idx >= full_threshold)))
         if not sections:
             return ''
-        return ("## Recent reasoning (my own ReAct traces from prior turns)\n"
+        return ("## Recent reasoning (my own ReAct traces from prior turns — "
+                "per-turn orientation, concerns, recall, user input, working "
+                "log, and raw response. The static prefix and current state "
+                "above also conditioned each turn; only per-turn-varying "
+                "content is shown here.)\n"
                 + "\n\n".join(sections))
 
     def _react_fallback_synthesis(self, log: List[Tuple[str, str]], fail_reason: str = '') -> str:
@@ -3306,7 +3326,8 @@ class ChatLoop:
             # all reasoning is Jill's.
             self._write_reasoning_history(
                 source, text, iters, reply, exit_reason,
-                autonomous=autonomous)
+                orientation=orientation, recall=recall,
+                concerns=concerns, autonomous=autonomous)
 
         # Post-turn work (discourse + reflection + close + persist) is
         # ~5-15s of LLM calls and conceptually a side effect of the turn.
