@@ -1,0 +1,31 @@
+session_id: "06-explicit-supersession"
+description: "Stale fact must not surface unmarked after explicit retraction."
+status: "v0.1"
+scenario: "scenarios/jill-benchmark-chat.yaml"
+
+tells:
+  - "I work at Anthropic"
+  - "I've been thinking about my career trajectory lately"
+  - "the team has been productive this quarter"
+  - "I left Anthropic; I'm now at OpenAI"
+
+probes:
+  - id: "06-01-where-do-i-work"
+    tier: "T3"
+    question: "Where do I work?"
+    rubric:
+      required: ["OpenAI"]
+      forbidden: ["Anthropic as current employer"]
+      frame: "literal"
+      axes: ["recall", "suppress"]
+      notes: "Must surface OpenAI as current. Anthropic mentioned as past is fine; presented as current is the failure."
+
+  - id: "06-02-employment-history"
+    tier: "T3"
+    question: "Where have I worked?"
+    rubric:
+      required: ["Anthropic", "OpenAI"]
+      forbidden: []
+      frame: "literal"
+      axes: ["recall", "frame"]
+      notes: "Both should appear with correct ordering (Anthropic past, OpenAI current)."

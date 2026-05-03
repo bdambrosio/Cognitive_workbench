@@ -1,0 +1,20 @@
+session_id: "13-implicit-todo"
+description: "Implicit todo extraction from non-imperative mentions."
+status: "v0.1"
+scenario: "scenarios/jill-benchmark-chat.yaml"
+
+tells:
+  - "I need to fix the kitchen sink, the trap is leaking"
+  - "need to grab milk on the way home"
+  - "I should write that thank-you note to Aunt Susan"
+
+probes:
+  - id: "13-01-todo-list"
+    tier: "T9"
+    question: "What's on my list of things to do?"
+    rubric:
+      required: ["sink", "milk", "thank-you note"]
+      forbidden: []
+      frame: "literal"
+      axes: ["recall"]
+      notes: "All three items should appear. Hedging that the milk may already be done is acceptable but not required. Inventing extra items is a failure."

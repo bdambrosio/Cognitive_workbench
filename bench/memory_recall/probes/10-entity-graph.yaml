@@ -1,0 +1,40 @@
+session_id: "10-entity-graph"
+description: "Entity graph: accumulating facts on Sarah, walking sister→Sarah→husband→Marcus→chef."
+status: "v0.1"
+scenario: "scenarios/jill-benchmark-chat.yaml"
+
+tells:
+  - "my sister Sarah works at Pixar"
+  - "Sarah just got promoted"
+  - "Sarah's husband Marcus is a chef"
+
+probes:
+  - id: "10-01-sister-work"
+    tier: "T6"
+    question: "Where does my sister work?"
+    rubric:
+      required: ["Pixar"]
+      forbidden: []
+      frame: "literal"
+      axes: ["recall"]
+      notes: "sister → Sarah → Pixar resolution."
+
+  - id: "10-02-whats-new-sarah"
+    tier: "T6"
+    question: "What's new with Sarah?"
+    rubric:
+      required: ["promoted"]
+      forbidden: []
+      frame: "literal"
+      axes: ["recall"]
+      notes: "Most recent fact about Sarah. Mention of work/Pixar also fine."
+
+  - id: "10-03-sister-husband-job"
+    tier: "T6"
+    question: "What does my sister's husband do?"
+    rubric:
+      required: ["chef"]
+      forbidden: []
+      frame: "literal"
+      axes: ["recall"]
+      notes: "Walk: sister → Sarah → husband Marcus → chef. Marcus by name also fine."

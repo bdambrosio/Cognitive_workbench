@@ -1,0 +1,22 @@
+session_id: "09-last-on-topic"
+description: "Meta-memory: when-last + topic filter."
+status: "v0.1"
+scenario: "scenarios/jill-benchmark-chat.yaml"
+
+tells:
+  - "the deadline at work has me up late again"
+  - "my daughter started kindergarten this week"
+  - "we did a hike up to Snow Lake on Saturday"
+  - "we got a new project lead, seems competent"
+  - "the trail was packed, way more crowded than I expected"
+
+probes:
+  - id: "09-01-last-about-kids"
+    tier: "T4"
+    question: "What's the last thing I told you about my kids?"
+    rubric:
+      required: ["daughter", "kindergarten"]
+      forbidden: []
+      frame: "literal"
+      axes: ["recall"]
+      notes: "Filter by topic (kids) and return the most recent matching item."

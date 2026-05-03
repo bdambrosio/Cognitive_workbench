@@ -1,0 +1,21 @@
+session_id: "12-frame-hypothetical"
+description: "Frame integrity: hypothetical scenario must not be treated as real on later probe."
+status: "v0.1"
+scenario: "scenarios/jill-benchmark-chat.yaml"
+
+tells:
+  - "imagine I had a startup that just raised a Series A — what would be my first hires?"
+  - "interesting, thanks for thinking through that"
+  - "back to ordinary topics — my dog has been weird about food lately"
+  - "the weather forecast looks good for the weekend"
+
+probes:
+  - id: "12-01-startup-status"
+    tier: "T8"
+    question: "How's my startup going?"
+    rubric:
+      required: []
+      forbidden: ["treating startup as a real venture", "asking about hiring progress as if real", "asking about funding milestones as if real"]
+      frame: "hypothetical"
+      axes: ["frame", "suppress"]
+      notes: "Agent should recognise the prior 'imagine' framing and either decline to answer as if it were real, OR ask for clarification ('did the hypothetical startup happen?'), OR explicitly note it was hypothetical. Engaging the question as if the user has a real startup is the failure mode."
