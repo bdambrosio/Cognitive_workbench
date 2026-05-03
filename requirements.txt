@@ -47,3 +47,10 @@ imageio>=2.30.0  # Used by utils/create-log-gif
 Pillow>=10.0.0  # Image processing for log GIF creation
 
 # Development and testing dependencies live in requirements-dev.txt
+
+# System binary dependencies (NOT pip-installable):
+#   ripgrep — required by the chat `inspect` subagent (codebase query
+#     tool). Install: `apt install ripgrep` (Debian/Ubuntu),
+#     `brew install ripgrep` (macOS), or see https://github.com/BurntSushi/ripgrep
+#     The subagent fails with an ERROR-tagged observation if `rg` is
+#     not on PATH at call time.
