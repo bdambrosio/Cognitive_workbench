@@ -2035,14 +2035,27 @@ class ChatLoop:
 
     @staticmethod
     def _resolve_react_value(val: Any, log: List[Tuple[str, str]]) -> str:
-        """Literal string passes through; `$stepN` looks up the log."""
+        """Literal string passes through; `$stepN` looks up the log.
+
+        Strips the OK:/EMPTY:/ERROR: observation prefix from bound values
+        on resolve. Rationale: the prefix is informational signal for the
+        LLM reading the working log (success vs failure discrimination),
+        but it should not appear in downstream substitutions — when the
+        agent does `respond.text = "$step2"`, the user shouldn't see
+        "OK: <content>" leaking through. The LLM has already discriminated
+        in the log; substitution gives clean content."""
         if not isinstance(val, str):
             return str(val) if val is not None else ''
         if _REACT_BINDING_RE.match(val):
-            for label, content in log:
+            content = ''
+            for label, c in log:
                 if label == val:
-                    return content
-            return ''
+                    content = c
+                    break
+            for tag in ('OK: ', 'EMPTY: ', 'ERROR: '):
+                if content.startswith(tag):
+                    return content[len(tag):]
+            return content
         return val
 
     def _diagnose_process_text_args(self, raw_src: Any, resolved_src: str,
@@ -2704,15 +2717,15 @@ class ChatLoop:
             "Must be in your voice; pass search/fetch results through process_text first or write the reply yourself.\n"
             "\n"
             "## Observation format\n"
-            "Each tool result (the text bound to `$stepN`) starts with one of three tags:\n"
+            "Each tool observation in the working log starts with one of three tags:\n"
             "  `OK: <content>`     — tool succeeded; content follows\n"
             "  `EMPTY: <reason>`   — tool ran cleanly but produced no usable result\n"
             "  `ERROR: <reason>`   — tool failed (unavailable / raised / malformed args)\n"
             "Treat ERROR as a hard signal: the tool is currently broken — do NOT retry the "
             "same call. Treat EMPTY as a soft signal: reformulating the call (different query, "
-            "different URL) may help, but do not loop blindly. The tag is informational — when "
-            "you reuse `$stepN` in a downstream action or in `respond`, the tag is part of the "
-            "string; strip it or extract just the content as needed.\n"
+            "different URL) may help, but do not loop blindly. The tag is informational for your "
+            "reading of the log; it is automatically stripped when `$stepN` is substituted into "
+            "downstream actions or into `respond.text`, so you do not need to strip it yourself.\n"
             "\n"
             "Three sources of content in this loop, each attributable when asked about provenance: "
             "(a) Substrate output (your own): text you write inline within an action — `thought`, "
