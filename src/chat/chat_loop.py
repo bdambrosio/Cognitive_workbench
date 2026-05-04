@@ -3135,7 +3135,7 @@ class ChatLoop:
             ]
             self._emit_status('thinking…')
             try:
-                raw = self.backend.chat(prompt, max_tokens=2048, temperature=0.7,
+                raw = self.backend.chat(prompt, max_tokens=4096, temperature=0.7,
                                         cot_profile='none')
             except Exception as e:
                 logger.error(f"[{self.character_name}] ReAct iter {i+1} LLM failed: {e}")
@@ -3619,7 +3619,7 @@ class ChatLoop:
         try:
             result = self.backend.chat(
                 [{'role': 'system', 'content': sys_msg}, {'role': 'user', 'content': user_msg}],
-                max_tokens=1024, temperature=0.7, cot_profile='none')
+                max_tokens=2048, temperature=0.7, cot_profile='none')
             return (result or '').strip() or "(could not synthesize)"
         except Exception as e:
             return f"(trouble formulating a response: {e})"
@@ -3670,7 +3670,7 @@ class ChatLoop:
             raw = self.backend.chat(
                 [{'role': 'system', 'content': sys_msg},
                  {'role': 'user', 'content': user_msg}],
-                max_tokens=400, temperature=0.2, cot_profile='none')
+                max_tokens=600, temperature=0.2, cot_profile='none')
         except Exception as e:
             logger.warning(f"[{self.character_name}] successor synth LLM failed: {e}")
             return None
