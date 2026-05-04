@@ -73,7 +73,7 @@ _CONCERN_INSTRUCTION_NARROWNESS_RULE = (
 
 # Tools the model can emit. Validated structurally in _parse_react_action;
 # the dispatcher in _run_react_loop knows how to run each.
-_REACT_TOOLS = ('process_text', 'search', 'fetch_text', 'remember', 'inspect', 'respond')
+_REACT_TOOLS = ('process_text', 'search', 'fetch_text', 'remember', 'inspect', 'security', 'respond')
 
 # Shared Anthropic Sonnet model id. Used by tools and subagents that
 # require a strong backend independent of Jill's per-scenario llm_config
@@ -2970,7 +2970,15 @@ class ChatLoop:
             "Use when the user asks how you work, where something is implemented, what a module does, or "
             "to verify a claim about your own code. The query is opaque to you — phrase it as a natural-language "
             "question (e.g. \"where is the ReAct dispatch defined?\", \"what tools does the chat loop wire up?\").\n"
-            "6. `{\"thought\": \"<one terse sentence>\", \"tool\": \"respond\", \"text\": <string|$stepN>}` — final reply, exits loop. "
+            "6. `{\"thought\": \"<one terse sentence>\", \"tool\": \"security\", \"query\": <string>}` — investigate "
+            "LAN / local-system network state. A separate subagent (read-only typed primitives: nmap host "
+            "discovery + service scan, ss/ip for sockets/routes/arp/interfaces; targets restricted to RFC1918 "
+            "ranges; Sonnet-backed) runs the probes and returns a synthesized answer. Use when the user asks "
+            "about LAN hosts, what's listening locally, what services a host exposes, suspicious activity "
+            "on the network, or routing/interface state. v0.1 does NOT do traffic capture or IDS log inspection. "
+            "Phrase as a natural-language question (e.g. \"what hosts are on my LAN at 192.168.1.0/24?\", "
+            "\"what TCP ports am I listening on?\", \"what's my default gateway?\").\n"
+            "7. `{\"thought\": \"<one terse sentence>\", \"tool\": \"respond\", \"text\": <string|$stepN>}` — final reply, exits loop. "
             "Must be in your voice; pass search/fetch results through process_text first or write the reply yourself.\n"
             "\n"
             "## Observation format\n"
@@ -3221,10 +3229,13 @@ class ChatLoop:
             elif tool == 'inspect':
                 q = self._resolve_react_value(action.get('query', ''), log)
                 obs = self._run_inspect(q)
+            elif tool == 'security':
+                q = self._resolve_react_value(action.get('query', ''), log)
+                obs = self._run_security(q)
             else:
                 obs = (f"ERROR: unknown tool {tool!r}; available: "
                        "process_text, search, fetch_text, remember, "
-                       "inspect, respond")
+                       "inspect, security, respond")
 
             _append_log(binding, obs)
             iters[-1]['appended'] = log[pre_log_len:]
@@ -3345,6 +3356,71 @@ class ChatLoop:
         text = str(answer or '').strip()
         if not text:
             return 'EMPTY: inspect subagent produced no answer'
+        return 'OK: ' + text
+
+    def _security_traces_dir(self) -> 'Path':
+        """Where the security (network-investigation) subagent writes its
+        per-call traces. Sibling of inspect_traces/ — kept separate so
+        per-tool debugging stays clean. Layout:
+        scenarios/<world>/<agent>/security_traces/."""
+        return self._memory_dir().parent / 'security_traces'
+
+    def _get_security_backend(self):
+        """Lazy-load the Sonnet backend used by the security subagent.
+        Cached per-instance. Same rationale as inspect: investigation
+        reasoning benefits from a strong model independent of Jill's
+        per-scenario llm_config. Returns None when CLAUDE_API_KEY is
+        absent; the caller surfaces ERROR-tagged observation."""
+        if hasattr(self, '_security_backend_cached'):
+            return self._security_backend_cached
+        if not os.environ.get('CLAUDE_API_KEY'):
+            logger.warning(
+                f"[{self.character_name}] security tool unavailable: "
+                "CLAUDE_API_KEY not set")
+            self._security_backend_cached = None
+            return None
+        try:
+            self._security_backend_cached = _ChatBackend(
+                server='anthropic',
+                model=CLAUDE_SONNET_MODEL,
+                base_url='https://api.anthropic.com',
+                is_reasoning=False,
+                api_key='CLAUDE_API_KEY',
+            )
+        except Exception as e:
+            logger.warning(
+                f"[{self.character_name}] security backend init failed: {e}")
+            self._security_backend_cached = None
+        return self._security_backend_cached
+
+    def _run_security(self, query: str) -> str:
+        """Backend for the ReAct `security` tool. Delegates to the
+        network-security investigation subagent (chat.security.security),
+        which runs its own thin ReAct loop with read-only typed primitives
+        (discover, scan_services, system_state via nmap + iproute2).
+        Returns an OK:/EMPTY:/ERROR: prefixed observation per the ReAct
+        tool-observation convention. Sonnet-backed; per-call traces under
+        security_traces/."""
+        if not query or not str(query).strip():
+            return "EMPTY: security query was empty"
+        backend = self._get_security_backend()
+        if backend is None:
+            return ("ERROR: security subagent unavailable "
+                    "(CLAUDE_API_KEY not set or backend init failed — "
+                    "see warning log)")
+        try:
+            from chat.security import security as _security
+            answer = _security(
+                query=str(query),
+                llm_backend=backend,
+                trace_dir=self._security_traces_dir(),
+            )
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] security subagent raised: {e}")
+            return f"ERROR: security subagent raised: {e}"
+        text = str(answer or '').strip()
+        if not text:
+            return 'EMPTY: security subagent produced no answer'
         return 'OK: ' + text
 
     def _append_conversation_entry(self, direction: str, entity: str,
