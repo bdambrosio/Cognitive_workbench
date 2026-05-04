@@ -258,14 +258,28 @@ class ResourceBrowser:
         return {'success': False, 'error': 'No response from executive_node for concerns'}
 
     def manage_concern_via_zenoh(self, character: str, params: Dict) -> Dict:
-        """Publish a concern management command to executive_node."""
+        """Send a concern management command to the chat loop and wait
+        for a typed reply. The chat-side handler is registered as a
+        queryable, so we use session.get (not session.put — that would
+        be a fire-and-forget publish to a topic with no subscriber)."""
         key = f"cognitive/{character}/control/concern_manage"
         payload = json.dumps(params).encode('utf-8')
+
+        from zenoh import QueryTarget, ConsolidationMode
         try:
-            self.session.put(key, payload)
-            return {'success': True}
+            for reply in self.session.get(
+                key, payload=payload,
+                target=QueryTarget.BEST_MATCHING,
+                consolidation=ConsolidationMode.NONE,
+                timeout=5.0,
+            ):
+                if reply.ok:
+                    return json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
         except Exception as e:
             return {'success': False, 'error': str(e)}
+
+        return {'success': False,
+                'error': f'No response from {character} for concern_manage'}
 
     def get_html(self) -> str:
         """Generate HTML UI."""

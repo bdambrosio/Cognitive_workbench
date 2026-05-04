@@ -2470,9 +2470,10 @@ class ChatLoop:
             self._reply(query, {'success': False, 'error': str(e)})
 
     def _handle_concern_manage_query(self, query) -> None:
-        """Browser → chat: status transitions, cadence edit, hard delete.
+        """Browser → chat: status transitions, cadence edit, hard delete,
+        bulk wipe.
         Payload: {"concern_id": "Note_X", "action": "close|reopen|satisfy|
-                  abandon|activate|delete|set_cadence_hours",
+                  abandon|activate|delete|set_cadence_hours|wipe_non_seed",
                   "type": "user|derived",
                   "value": <int or null>}  # required for set_cadence_hours
 
@@ -2480,15 +2481,61 @@ class ChatLoop:
         `delete` is a hard delete (the browser confirms with a dialog
         first); status actions go through _set_concern_status;
         set_cadence_hours snaps the value to the allowed bucket and
-        writes to the concern note."""
+        writes to the concern note. `wipe_non_seed` hard-deletes every
+        concern whose `seed` property is False and does not require a
+        concern_id."""
         try:
             payload_bytes = query.payload.to_bytes() if query.payload else b'{}'
             params = json.loads(payload_bytes.decode('utf-8')) if payload_bytes else {}
-            concern_id = str(params.get('concern_id', '') or '').strip()
             action = str(params.get('action', '') or '').strip().lower()
-            if not concern_id or not action:
+            if not action:
                 self._reply(query, {'success': False,
-                                    'error': "missing concern_id or action"})
+                                    'error': "missing action"})
+                return
+
+            # Bulk wipe — does not require concern_id. Walks the concerns
+            # collection and hard-deletes every note whose `seed` flag is
+            # False. Seeds stay (they're architectural baseline).
+            if action == 'wipe_non_seed':
+                deleted: List[str] = []
+                kept_seed: List[str] = []
+                errors: List[str] = []
+                if self._concerns_collection_id:
+                    coll = self.resource_manager.get_resource(self._concerns_collection_id)
+                    note_ids = list(((coll or {}).get('properties') or {}).get('content', []) or [])
+                    for nid in note_ids:
+                        note = self.resource_manager.get_resource(nid)
+                        if not note:
+                            continue
+                        props = note.get('properties') or {}
+                        if bool(props.get('seed')):
+                            kept_seed.append(nid)
+                            continue
+                        ok, err = self.resource_manager.delete_resource(nid)
+                        if ok:
+                            deleted.append(nid)
+                        else:
+                            errors.append(f"{nid}: {err}")
+                if deleted:
+                    self._persist_to_disk()
+                logger.info(
+                    f"[{self.character_name}] wipe_non_seed: deleted "
+                    f"{len(deleted)}, kept {len(kept_seed)} seed, "
+                    f"{len(errors)} errors")
+                self._reply(query, {
+                    'success': True,
+                    'deleted_ids': deleted,
+                    'deleted_count': len(deleted),
+                    'kept_seed_ids': kept_seed,
+                    'kept_seed_count': len(kept_seed),
+                    'errors': errors,
+                })
+                return
+
+            concern_id = str(params.get('concern_id', '') or '').strip()
+            if not concern_id:
+                self._reply(query, {'success': False,
+                                    'error': "missing concern_id"})
                 return
 
             # Hard delete — the browser confirms first.

@@ -174,6 +174,11 @@ def _parse_command(line: str) -> Optional[dict]:
 
     # -- Read-only queries (handled locally, not sent to command channel) --
     if cmd == 'concerns':
+        # Subcommand: /concerns wipe → bulk-delete every non-seed concern.
+        # Routed locally through the concern_manage queryable rather than
+        # the (currently unsubscribed) command channel.
+        if args and args[0].lower() == 'wipe':
+            return {'cmd': '_query', 'query': 'concerns_wipe'}
         owner = args[0] if args else None
         return {'cmd': '_query', 'query': 'concerns', 'owner': owner}
     if cmd == 'help':
@@ -262,6 +267,36 @@ def _handle_query(session, character: str, data: dict, state: dict):
         else:
             _print_info("(empty)")
 
+    elif query == 'concerns_wipe':
+        _print_info(f"→ wiping non-seed concerns from {character} …")
+        payload = json.dumps({'action': 'wipe_non_seed'}).encode('utf-8')
+        result = None
+        try:
+            for reply in session.get(
+                f"cognitive/{character}/control/concern_manage",
+                payload=payload, timeout=10.0,
+            ):
+                if hasattr(reply, 'ok') and reply.ok is not None:
+                    result = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    break
+        except Exception as e:
+            _print_error(f"Wipe failed: {e}")
+            return
+        if not result:
+            _print_error("(no response — chat loop may not be reachable)")
+            return
+        if not result.get('success'):
+            _print_error(result.get('error', 'wipe failed'))
+            return
+        n_deleted = result.get('deleted_count', 0)
+        n_kept = result.get('kept_seed_count', 0)
+        errors = result.get('errors') or []
+        _print_info(f"Deleted {n_deleted} non-seed concern(s); kept {n_kept} seed concern(s).")
+        if errors:
+            _print_error(f"{len(errors)} error(s) during wipe:")
+            for e in errors:
+                _print_error(f"  {e}")
+
     elif query == 'remember':
         q_text = data.get('text', '').strip()
         if not q_text:
@@ -308,6 +343,7 @@ def _print_help():
 
 {C.BOLD}Concerns:{C.RESET}
   /concerns [owner]              List concerns (owner: User, <character>, or all)
+  /concerns wipe                 Hard-delete every non-seed concern (seeds preserved)
   /concern close <id>            Close a user concern
   /concern reopen <id>           Reopen a user concern
   /concern resolve <id>          Resolve/satisfy a derived concern
