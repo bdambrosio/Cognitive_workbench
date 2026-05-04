@@ -3335,6 +3335,7 @@ class ChatLoop:
                 'source': source,
                 'autonomous': bool(autonomous),
                 'exit_reason': exit_reason,
+                'iters': len(iters or []),
                 'user_input': user_text,
                 'orientation': orientation or '',
                 'active_concerns': concerns_at_turn,
@@ -3813,7 +3814,10 @@ class ChatLoop:
                     last = recs[-1]
                     outcome['react_iters'] = int(last.get('iters', 0) or 0)
                     outcome['react_exit_reason'] = last.get('exit_reason', '')
-                    reply = str(last.get('reply', '') or '')
+                    # Trace stores the synthesized response under
+                    # `raw_response`; previously this read `reply` and
+                    # always came back empty.
+                    reply = str(last.get('raw_response', '') or '')
                     outcome['response_chars'] = len(reply)
                     outcome['response_brief'] = reply[:200]
             except Exception as e:
