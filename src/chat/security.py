@@ -10,9 +10,9 @@ reasoning is opaque to her trace but written to security_traces/ for
 debugging.
 
 Architectural notes:
-- Backend hardcoded to Sonnet (caller passes a Sonnet-configured
-  _ChatBackend), independent of Jill's per-scenario llm_config —
-  security reasoning needs depth.
+- Backend is whatever the caller passes — by default this is the main
+  character's backend (self.backend in chat_loop), so per-scenario YAML
+  decides the model. No per-subagent backend overrides.
 - Primitives are intentionally minimal and read-only:
   discover (nmap host discovery), scan_services (nmap -sV),
   system_state (ss / ip), respond.
@@ -338,7 +338,8 @@ def security(query: str, llm_backend, trace_dir: Path) -> str:
     Args:
         query: natural-language question about LAN/system network state.
         llm_backend: a _ChatBackend instance used to generate actions.
-            Caller is responsible for using a strong model (Sonnet).
+            By convention this is the main character backend; the
+            per-scenario llm_config decides the model.
         trace_dir: where to write the per-call subagent trace.
     """
     if not query or not query.strip():

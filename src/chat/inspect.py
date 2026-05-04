@@ -8,9 +8,9 @@ to her trace, but written to a per-call trace file under inspect_traces/
 for debugging.
 
 Architectural notes:
-- Backend hardcoded to Sonnet (caller passes a Sonnet-configured
-  _ChatBackend), independent of Jill's per-scenario llm_config — code
-  reasoning needs a stronger model than memory recall.
+- Backend is whatever the caller passes — by default this is the main
+  character's backend (self.backend in chat_loop), so per-scenario YAML
+  decides the model. No per-subagent backend overrides.
 - Primitives are intentionally minimal and read-only: list, read (with
   optional line range), grep (via ripgrep), respond.
 - All file paths resolve within repo_root; path traversal AND symlink
@@ -381,7 +381,8 @@ def inspect(query: str, repo_root: Path, llm_backend,
         repo_root: directory the subagent is geofenced to (typically
             src/). All file primitives reject paths outside this root.
         llm_backend: a _ChatBackend instance used to generate actions.
-            Caller is responsible for using a strong model (Sonnet).
+            By convention this is the main character backend; the
+            per-scenario llm_config decides the model.
         trace_dir: where to write the per-call subagent trace.
     """
     if not query or not query.strip():

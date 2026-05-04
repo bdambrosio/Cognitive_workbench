@@ -75,13 +75,6 @@ _CONCERN_INSTRUCTION_NARROWNESS_RULE = (
 # the dispatcher in _run_react_loop knows how to run each.
 _REACT_TOOLS = ('process_text', 'search', 'fetch_text', 'remember', 'inspect', 'security', 'respond')
 
-# Shared Anthropic Sonnet model id. Used by tools and subagents that
-# require a strong backend independent of Jill's per-scenario llm_config
-# (e.g. the inspect codebase-query subagent). Bench-side judges
-# (introspective_fidelity, memory_recall) keep their own JUDGE_MODEL
-# literals for now — consolidation is a trivial follow-up.
-CLAUDE_SONNET_MODEL = "claude-sonnet-4-6"
-
 # Per-character collection holding episodic specifics across conversations.
 # Auto-RAG searches this on every turn; post-turn reflection writes to it.
 _MEMORIES_COLLECTION_NAME = "memories"
@@ -2965,19 +2958,19 @@ class ChatLoop:
             "may not be in your current prompt. The query is opaque to you — a subagent reads the files and "
             "returns a synthesized answer in `$stepN`.\n"
             "5. `{\"thought\": \"<one terse sentence>\", \"tool\": \"inspect\", \"query\": <string>}` — query your own "
-            "codebase. A separate subagent (geofenced read-only to `src/`, list/read/grep primitives, "
-            "Sonnet-backed) navigates the source and returns a synthesized answer with file:line citations. "
-            "Use when the user asks how you work, where something is implemented, what a module does, or "
-            "to verify a claim about your own code. The query is opaque to you — phrase it as a natural-language "
-            "question (e.g. \"where is the ReAct dispatch defined?\", \"what tools does the chat loop wire up?\").\n"
+            "codebase. A separate subagent (geofenced read-only to `src/`, list/read/grep primitives) navigates "
+            "the source and returns a synthesized answer with file:line citations. Use when the user asks how "
+            "you work, where something is implemented, what a module does, or to verify a claim about your own "
+            "code. The query is opaque to you — phrase it as a natural-language question (e.g. \"where is the "
+            "ReAct dispatch defined?\", \"what tools does the chat loop wire up?\").\n"
             "6. `{\"thought\": \"<one terse sentence>\", \"tool\": \"security\", \"query\": <string>}` — investigate "
             "LAN / local-system network state. A separate subagent (read-only typed primitives: nmap host "
             "discovery + service scan, ss/ip for sockets/routes/arp/interfaces; targets restricted to RFC1918 "
-            "ranges; Sonnet-backed) runs the probes and returns a synthesized answer. Use when the user asks "
-            "about LAN hosts, what's listening locally, what services a host exposes, suspicious activity "
-            "on the network, or routing/interface state. v0.1 does NOT do traffic capture or IDS log inspection. "
-            "Phrase as a natural-language question (e.g. \"what hosts are on my LAN at 192.168.1.0/24?\", "
-            "\"what TCP ports am I listening on?\", \"what's my default gateway?\").\n"
+            "ranges) runs the probes and returns a synthesized answer. Use when the user asks about LAN hosts, "
+            "what's listening locally, what services a host exposes, suspicious activity on the network, or "
+            "routing/interface state. v0.1 does NOT do traffic capture or IDS log inspection. Phrase as a "
+            "natural-language question (e.g. \"what hosts are on my LAN at 192.168.1.0/24?\", \"what TCP ports "
+            "am I listening on?\", \"what's my default gateway?\").\n"
             "7. `{\"thought\": \"<one terse sentence>\", \"tool\": \"respond\", \"text\": <string|$stepN>}` — final reply, exits loop. "
             "Must be in your voice; pass search/fetch results through process_text first or write the reply yourself.\n"
             "\n"
@@ -3298,56 +3291,26 @@ class ChatLoop:
         scenarios/<world>/<agent>/inspect_traces/."""
         return self._memory_dir().parent / 'inspect_traces'
 
-    def _get_inspect_backend(self):
-        """Lazy-load the Sonnet backend used by the inspect subagent.
-        Cached per-instance after first use. The inspect subagent
-        deliberately uses Sonnet rather than Jill's configured backend —
-        codebase reasoning is harder than memory recall and benefits
-        from a strong model. Returns None when CLAUDE_API_KEY is absent;
-        the caller surfaces ERROR-tagged observation."""
-        if hasattr(self, '_inspect_backend_cached'):
-            return self._inspect_backend_cached
-        if not os.environ.get('CLAUDE_API_KEY'):
-            logger.warning(
-                f"[{self.character_name}] inspect tool unavailable: "
-                "CLAUDE_API_KEY not set")
-            self._inspect_backend_cached = None
-            return None
-        try:
-            self._inspect_backend_cached = _ChatBackend(
-                server='anthropic',
-                model=CLAUDE_SONNET_MODEL,
-                base_url='https://api.anthropic.com',
-                is_reasoning=False,
-                api_key='CLAUDE_API_KEY',
-            )
-        except Exception as e:
-            logger.warning(
-                f"[{self.character_name}] inspect backend init failed: {e}")
-            self._inspect_backend_cached = None
-        return self._inspect_backend_cached
-
     def _run_inspect(self, query: str) -> str:
         """Backend for the ReAct `inspect` tool. Delegates to the
         codebase-inspection subagent (chat.inspect.inspect), which runs
         its own thin ReAct loop over src/ with read-only primitives
         (list, read, grep via ripgrep). Returns an OK:/EMPTY:/ERROR:
         prefixed observation per the ReAct tool-observation convention.
-        Sonnet-backed; per-call traces under inspect_traces/."""
+
+        Uses Jill's main backend (self.backend) — the same model the
+        outer ReAct loop runs on. Per-scenario YAML decides the model;
+        no per-subagent backend overrides. Per-call traces under
+        inspect_traces/."""
         if not query or not str(query).strip():
             return "EMPTY: inspect query was empty"
-        backend = self._get_inspect_backend()
-        if backend is None:
-            return ("ERROR: inspect subagent unavailable "
-                    "(CLAUDE_API_KEY not set or backend init failed — "
-                    "see warning log)")
         try:
             from chat.inspect import inspect as _inspect
             from pathlib import Path as _Path
             answer = _inspect(
                 query=str(query),
                 repo_root=_Path(_SRC_DIR),
-                llm_backend=backend,
+                llm_backend=self.backend,
                 trace_dir=self._inspect_traces_dir(),
             )
         except Exception as e:
@@ -3365,54 +3328,23 @@ class ChatLoop:
         scenarios/<world>/<agent>/security_traces/."""
         return self._memory_dir().parent / 'security_traces'
 
-    def _get_security_backend(self):
-        """Lazy-load the Sonnet backend used by the security subagent.
-        Cached per-instance. Same rationale as inspect: investigation
-        reasoning benefits from a strong model independent of Jill's
-        per-scenario llm_config. Returns None when CLAUDE_API_KEY is
-        absent; the caller surfaces ERROR-tagged observation."""
-        if hasattr(self, '_security_backend_cached'):
-            return self._security_backend_cached
-        if not os.environ.get('CLAUDE_API_KEY'):
-            logger.warning(
-                f"[{self.character_name}] security tool unavailable: "
-                "CLAUDE_API_KEY not set")
-            self._security_backend_cached = None
-            return None
-        try:
-            self._security_backend_cached = _ChatBackend(
-                server='anthropic',
-                model=CLAUDE_SONNET_MODEL,
-                base_url='https://api.anthropic.com',
-                is_reasoning=False,
-                api_key='CLAUDE_API_KEY',
-            )
-        except Exception as e:
-            logger.warning(
-                f"[{self.character_name}] security backend init failed: {e}")
-            self._security_backend_cached = None
-        return self._security_backend_cached
-
     def _run_security(self, query: str) -> str:
         """Backend for the ReAct `security` tool. Delegates to the
         network-security investigation subagent (chat.security.security),
         which runs its own thin ReAct loop with read-only typed primitives
         (discover, scan_services, system_state via nmap + iproute2).
         Returns an OK:/EMPTY:/ERROR: prefixed observation per the ReAct
-        tool-observation convention. Sonnet-backed; per-call traces under
-        security_traces/."""
+        tool-observation convention.
+
+        Uses Jill's main backend (self.backend) — see _run_inspect for
+        rationale. Per-call traces under security_traces/."""
         if not query or not str(query).strip():
             return "EMPTY: security query was empty"
-        backend = self._get_security_backend()
-        if backend is None:
-            return ("ERROR: security subagent unavailable "
-                    "(CLAUDE_API_KEY not set or backend init failed — "
-                    "see warning log)")
         try:
             from chat.security import security as _security
             answer = _security(
                 query=str(query),
-                llm_backend=backend,
+                llm_backend=self.backend,
                 trace_dir=self._security_traces_dir(),
             )
         except Exception as e:
