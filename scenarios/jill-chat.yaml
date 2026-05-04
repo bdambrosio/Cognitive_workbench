@@ -178,3 +178,12 @@ characters:
         category: durable
       - text: "When autonomous work produces findings that meaningfully affect our shared work or contradict prior assumptions, surface them to the user proactively. Routine status updates can be silent."
         category: durable
+
+    # Sensors. The `tick` sensor is the autonomy trigger: a heartbeat
+    # publishes to sense_data every `schedule`. With autonomy on,
+    # _handle_tick runs _grow_agent_concerns_per_tick + check_and_fire.
+    # With autonomy off (no --autonomy flag), the tick handler early-
+    # returns so existing benchmarks see no behavioral change.
+    sensors:
+      - name: tick
+        schedule: "1m"
