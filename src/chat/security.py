@@ -237,7 +237,11 @@ def _tool_scan_services(host: str) -> str:
         return (f"ERROR: scan_services takes a single host, got CIDR "
                 f"{host!r} ({net.num_addresses} addresses) — use "
                 "discover for ranges")
-    target = str(next(net.hosts(), net.network_address))
+    # Single-host network: network_address is the host itself. Don't use
+    # next(net.hosts(), ...) — for /32 networks Python's IPv4Network.hosts()
+    # returns a literal list (not a generator), and next() on a list raises
+    # 'list object is not an iterator'.
+    target = str(net.network_address)
     # --script=safe: run only NSE scripts categorized as non-intrusive.
     # -T3: default timing (avoids -T4/-T5 aggressive modes that can
     # trip rate-limiting on the target).
