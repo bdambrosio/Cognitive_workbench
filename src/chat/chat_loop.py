@@ -47,8 +47,29 @@ logger = logging.getLogger('chat_loop')
 
 
 # ReAct loop: maximum iterations per turn before forcing a fallback
-# synthesis. Typical turns are 1-4 iters; cap exists to bound runaway loops.
-REACT_MAX_ITERS = 8
+# synthesis. Empirically (263 chat turns audited 2026-05-03) p95 is 2
+# iters and the cap had never been hit — raised 8→12 to add headroom
+# for hypothetical multi-tool sequences and more ambitious autonomous
+# concerns without introducing room for runaway loops to wander. 12
+# also matches inspect's inner cap, removing the asymmetry where the
+# outer loop had fewer iters than each subagent it could invoke.
+REACT_MAX_ITERS = 12
+
+# Concern-instruction authoring rubric. Each fired concern dispatches
+# one ReAct loop capped at REACT_MAX_ITERS — an instruction that can't
+# be completed in that budget hits the max-iters fallback (which spawns
+# a successor concern). The fallback exists as a safety net, not a
+# crutch: authoring should default to narrow, single-step instructions.
+# This canonical wording is referenced from the reflection prompt so
+# the rubric and the budget stay in sync.
+_CONCERN_INSTRUCTION_NARROWNESS_RULE = (
+    f"Each `instruction` must be narrow enough to complete in roughly "
+    f"{REACT_MAX_ITERS} ReAct iterations (one tool call per iter, plus a "
+    f"final respond). Write single concrete actions (\"look up X and "
+    f"summarize the result\"), not omnibus directives (\"investigate the "
+    f"entire topic of Y\"). If the natural work is broader, pick the "
+    f"most-immediate slice — successor concerns can carry the rest."
+)
 
 # Tools the model can emit. Validated structurally in _parse_react_action;
 # the dispatcher in _run_react_loop knows how to run each.
@@ -106,10 +127,15 @@ _CONCERN_STATUSES = ('active', 'satisfied', 'abandoned')
 # values — and at read time as fallback for legacy concerns missing the
 # field. Seed concerns get cadence=null + lifetime=null (immortal, no fire).
 # cadence_hours allowlist: 1h, 2h, 4h, 8h, 12h, 1d, 1wk.
+#
+# All non-seed types fire autonomously by default (gated globally by
+# launcher --autonomy). one_shot picks the shortest cadence so the work
+# happens promptly and then transitions to satisfied; durable/derived
+# ride the daily rhythm.
 _CONCERN_CADENCE_HOURS_ALLOWED = (1, 2, 4, 8, 12, 24, 168)
 _CONCERN_DEFAULT_CADENCE_HOURS = {
-    'one_shot': None,    # no autonomous fire
-    'derived':  None,    # no autonomous fire
+    'one_shot': 1,       # fire on next tick, then mark satisfied
+    'derived':  24,      # daily fire by default
     'durable':  24,      # daily fire by default
 }
 _CONCERN_DEFAULT_LIFETIME_DAYS = {
@@ -120,6 +146,13 @@ _CONCERN_DEFAULT_LIFETIME_DAYS = {
 _CONCERN_SATISFIED_THRESHOLD = 0.1
 # Lifetime sanity bounds (still in days).
 _CONCERN_LIFETIME_MIN_DAYS, _CONCERN_LIFETIME_MAX_DAYS = 0.1, 3650.0
+# Successor-concern depth cap. When a fired concern's ReAct loop hits
+# REACT_MAX_ITERS, the fallback path can spawn a successor concern with
+# the narrowed remainder of the work. To prevent slow-motion infinite
+# loops, depth is capped — a chain of original → successor → successor
+# is the most we'll ever produce automatically. Beyond that, the fallback
+# response just stands and the user can re-engage manually.
+_CONCERN_SUCCESSOR_MAX_DEPTH = 2
 # Top-N active concerns surfaced into the system prompt always-on (in
 # addition to anything semantic-recall fishes out). Bounded so the prompt
 # can't blow up as the corpus grows.
@@ -432,6 +465,12 @@ class ChatLoop:
         # state. Off by default; opt-in via scenario YAML for harnesses like
         # bench/introspective_fidelity that need deterministic ordering.
         self.benchmark_mode = bool((character_config.get('chat') or {}).get('benchmark_mode', False))
+        # Autonomous concern firing (Phase C). Off by default so existing
+        # benchmarks and chat scenarios behave identically — only flips on
+        # when the launcher is invoked with --autonomy. Gated at the
+        # _handle_tick entry; everything else (cadence math, concern
+        # types) is unaffected by the flag.
+        self._autonomy_enabled = bool(character_config.get('autonomy_enabled', False))
 
         # ---- Resource manager + conversation store ----
         from infospace_resource_manager import InfospaceResourceManager
@@ -834,6 +873,28 @@ class ChatLoop:
         one parseable JSON object."""
         return self._memory_dir() / 'reasoning_trace.jsonl'
 
+    def _autonomy_log_path(self) -> 'Path':
+        """Path to <memory>/autonomy.jsonl — one JSON record per
+        autonomous-fire event (fire/deferred). Append-only, separate
+        from reasoning_trace.jsonl so 'what has Jill been doing on her
+        own?' is grep-able as a clean stream."""
+        return self._memory_dir() / 'autonomy.jsonl'
+
+    def _write_autonomy_event(self, event: Dict[str, Any]) -> None:
+        """Append one event record to autonomy.jsonl. Stamps `ts` and
+        `character` if not already set. Best-effort — failures log a
+        warning but don't disrupt the autonomous turn."""
+        path = self._autonomy_log_path()
+        record = dict(event)
+        record.setdefault('ts', datetime.now(timezone.utc).isoformat())
+        record.setdefault('character', self.character_name)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(record, ensure_ascii=False) + '\n')
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] autonomy.jsonl write failed: {e}")
+
     def _load_reasoning_records(self) -> List[Dict[str, Any]]:
         """Read all per-turn records from reasoning_trace.jsonl.
         Returns [] if missing or unreadable. Lines are 1:1 with
@@ -1026,7 +1087,10 @@ class ChatLoop:
                      seed: bool = False, name: str = '',
                      cadence_hours: Optional[int] = None,
                      lifetime_days: Optional[float] = None,
-                     instruction: Optional[str] = None) -> Optional[str]:
+                     instruction: Optional[str] = None,
+                     skip_recurrence: bool = False,
+                     extra_properties: Optional[Dict[str, Any]] = None
+                     ) -> Optional[str]:
         """Create a new concern note and add it to the concerns Collection,
         OR — if a near-twin already exists — refresh and promote/revive
         the existing note instead. Returns the resulting note_id (newly
@@ -1039,7 +1103,13 @@ class ChatLoop:
         drives decay-to-satisfied (in days). Either or both may be None.
         instruction (the action to take when this concern fires) is
         required for fireable concerns; null instruction means the
-        concern never fires regardless of cadence."""
+        concern never fires regardless of cadence.
+
+        skip_recurrence bypasses the similarity merge — used for
+        successor concerns, which would otherwise fold into the parent.
+        extra_properties merges into the note's properties dict (e.g.
+        successor_of, successor_depth).
+        """
         if not self._concerns_collection_id:
             return None
         text = (text or "").strip()
@@ -1065,31 +1135,35 @@ class ChatLoop:
 
         # Recurrence check. Skipped for seed concerns (those go in
         # deterministic named-note slots and shouldn't get folded into
-        # arbitrary user-derived twins).
-        if not seed:
+        # arbitrary user-derived twins) and for successors (continuation
+        # of the parent — would otherwise merge back into it).
+        if not seed and not skip_recurrence:
             existing = self._find_similar_concern(text)
             if existing:
                 return self._promote_existing_concern(existing)
 
         now_iso = datetime.now(timezone.utc).isoformat()
+        properties: Dict[str, Any] = {
+            "kind": "concern",
+            "category": category,
+            "status": "active",
+            "entity": entity,
+            "provenance": provenance,
+            "seed": bool(seed),
+            "last_engaged_at": now_iso,
+            "last_acted_at": None,
+            "cadence_hours": cadence_hours,
+            "lifetime_days": lifetime_days,
+            "instruction": instruction,
+        }
+        if extra_properties:
+            properties.update(extra_properties)
         try:
             with self._faiss_lock:
                 success, note_id, err, _ = self.resource_manager.create_note(
                     self.character_name, text, "text", "chat-loop", entity or "",
                     name or "",
-                    {
-                        "kind": "concern",
-                        "category": category,
-                        "status": "active",
-                        "entity": entity,
-                        "provenance": provenance,
-                        "seed": bool(seed),
-                        "last_engaged_at": now_iso,
-                        "last_acted_at": None,
-                        "cadence_hours": cadence_hours,
-                        "lifetime_days": lifetime_days,
-                        "instruction": instruction,
-                    },
+                    properties,
                 )
                 if not success or not note_id:
                     logger.warning(f"[{self.character_name}] concern create failed: {err}")
@@ -1459,16 +1533,20 @@ class ChatLoop:
         "ACTIONABLE INSTRUCTION {character} should be ready to advance — "
         "something she can reasonably take action on, not a fact or modifier. "
         "Capture concerns at THREE granularities:\n"
-        "- `one_shot`: a specific request the user made that has a clear "
-        "completion (\"look up X\", \"draft me an email about Y\"). Decays "
-        "fast. Does NOT fire autonomously — fulfilled this turn.\n"
+        "- `one_shot`: a specific request with a clear completion (\"look up "
+        "X\", \"draft me an email about Y\"). Decays fast. If the request "
+        "was already fulfilled in this exchange, leave `instruction` null "
+        "so it logs without re-firing; if the request explicitly defers "
+        "work for later, set `instruction` and it will fire on the next "
+        "tick.\n"
         "- `durable`: an ongoing directive {entity} expects {character} to "
         "uphold over time (\"keep me posted on X\", \"help me think through "
         "my dissertation\"). FIRES per its cadence; provide cadence_hours "
         "and instruction.\n"
         "- `derived`: something {character} noticed worth tracking that the "
-        "user did NOT explicitly request. Does NOT fire autonomously — "
-        "lives as background context. Use sparingly.\n"
+        "user did NOT explicitly request. Use sparingly. Provide instruction "
+        "ONLY if recurring action is genuinely warranted; otherwise leave "
+        "instruction null so it stays as background context without firing.\n"
         "SKIP from concerns:\n"
         "- Modifiers like \"be brief\" / \"don't use emoji\" — those go to "
         "memories as preferences, not concerns.\n"
@@ -1482,7 +1560,7 @@ class ChatLoop:
         "    several-times-a-day (active project, ongoing task): 4 or 8\n"
         "    twice-daily / daily event (S&P close, daily roundup): 12 or 24\n"
         "    weekly check-in (project, hobby): 168\n"
-        "    one_shot or derived: null (no autonomous fire)\n"
+        "    null is allowed for any category — means \"don't fire on a cadence.\"\n"
         "- `lifetime_days` (number|null): decay tau in DAYS — how long "
         "{entity}'s interest in this topic plausibly persists without "
         "re-engagement. Should be several times the cadence. null = "
@@ -1495,14 +1573,16 @@ class ChatLoop:
         "Examples:\n"
         "    \"Search for today's S&P 500 close and summarize the move.\"\n"
         "    \"Check in on dissertation prep — ask if anything's blocking.\"\n"
-        "    \"Pull recent papers on multi-agent coordination from arxiv.\"\n\n"
+        "    \"Pull recent papers on multi-agent coordination from arxiv.\"\n"
+        "{narrowness_rule}\n\n"
         "**REQUIRED for category=durable**: cadence_hours MUST be one of the "
         "allowed values, lifetime_days MUST be a number, instruction MUST be "
         "a non-empty string. A durable concern without these fields cannot "
         "fire and is operationally useless. Do not skip them.\n"
-        "**For one_shot and derived**: cadence_hours and instruction may be "
-        "null (those categories don't fire autonomously). lifetime_days "
-        "should still be a number to drive decay; null is also acceptable.\n\n"
+        "**For one_shot and derived**: any of cadence_hours, instruction, and "
+        "lifetime_days may be null. A null `instruction` means the concern "
+        "is logged but never fires — the right choice when the request was "
+        "already handled or no recurring action is warranted.\n\n"
         "Output ONLY this JSON shape — nothing else:\n"
         "  {{\"frame\": \"<hypothetical|roleplay|counterfactual|instructional|none>\",\n"
         "   \"memories\": [{{\"text\": \"...\", \"category\": \"fact|preference|commitment\"}}, ...],\n"
@@ -1540,7 +1620,8 @@ class ChatLoop:
             # we already track. Compact: text + category badge.
             existing_concerns = self._top_active_concerns(n=10)
             sys_msg = self._REFLECT_SYS.format(
-                character=self.character_name, entity=source)
+                character=self.character_name, entity=source,
+                narrowness_rule=_CONCERN_INSTRUCTION_NARROWNESS_RULE)
             user_parts = []
             if companion:
                 user_parts.append(
@@ -2768,13 +2849,18 @@ class ChatLoop:
         across iterations so KV cache hits, only the log grows). Ends with
         '## Working log\\n' so the first appended entry sits below the header."""
         parts: List[str] = []
-        history = self.store.get_recent_turns(source, limit=self.history_limit, scope='all')
+        # On autonomous turns, source is the character itself (the
+        # originator), but the conversation we want surfaced is still the
+        # User dialogue — fall back to 'User' when source is self so the
+        # ReAct loop sees the same context the user-driven path would.
+        history_entity = 'User' if source == self.character_name else source
+        history = self.store.get_recent_turns(history_entity, limit=self.history_limit, scope='all')
         if history and history[-1].get('direction') == 'in' and str(history[-1].get('text', '')) == user_text:
             history = history[:-1]
         if history:
             parts.append("## Conversation history (verbatim session turns)")
             for t in history:
-                who = source if t.get('direction') == 'in' else self.character_name
+                who = history_entity if t.get('direction') == 'in' else self.character_name
                 parts.append(f"{who}: {t.get('text', '')}")
             parts.append("")
         # Awareness feed: prior ReAct traces (Jill's own thinking from
@@ -3363,6 +3449,97 @@ class ChatLoop:
         except Exception as e:
             return f"(trouble formulating a response: {e})"
 
+    def _maybe_spawn_successor_concern(self, parent_id: str, parent_instruction: str,
+                                       log: List[Tuple[str, str]]) -> Optional[str]:
+        """When an autonomous ReAct loop hits max_iters, decide whether
+        to spawn a successor concern carrying the narrowed remainder of
+        the work. Returns the new concern's id, or None if no successor
+        was spawned (work complete, depth cap reached, parse/LLM failure,
+        or LLM judged the remainder not worth pursuing).
+
+        Successor depth is capped at _CONCERN_SUCCESSOR_MAX_DEPTH so
+        chains can't run away. The successor is created with skip_recurrence
+        so it doesn't fold back into the parent via similarity merge.
+        """
+        parent = self.resource_manager.get_resource(parent_id)
+        if not parent:
+            return None
+        parent_props = parent.get('properties') or {}
+        parent_depth = int(parent_props.get('successor_depth', 0) or 0)
+        if parent_depth >= _CONCERN_SUCCESSOR_MAX_DEPTH:
+            logger.info(
+                f"[{self.character_name}] successor cap reached for {parent_id} "
+                f"(depth={parent_depth}); standing on fallback response.")
+            return None
+        # Show the synthesizer enough log to judge what's left, but not
+        # so much it drowns in detail. Last 10 entries, content trimmed.
+        tail = log[-10:] if len(log) > 10 else log
+        summary = "\n".join(f"{label}: {content[:300]}" for label, content in tail)
+        sys_msg = (
+            f"You evaluate whether a {self.character_name}-side ReAct loop "
+            "completed its instruction. The loop ran to its iteration cap "
+            "without emitting a final `respond` action. Decide: did the "
+            "work substantively complete (just missing the wrap-up), or "
+            "is real work left? If left, what is the narrow next slice "
+            "(one ReAct loop's worth, ~12 tool calls) that should run "
+            "next?\n\nRespond ONLY with JSON, no prose, no markdown."
+        )
+        user_msg = (
+            f"Original instruction: {parent_instruction}\n\n"
+            f"ReAct working log (last entries):\n{summary}\n\n"
+            "JSON shapes:\n"
+            "  {\"complete\": true}                                  ← work substantively done\n"
+            "  {\"complete\": false, \"next_slice\": \"<imperative>\"}  ← real work remains"
+        )
+        try:
+            raw = self.backend.chat(
+                [{'role': 'system', 'content': sys_msg},
+                 {'role': 'user', 'content': user_msg}],
+                max_tokens=400, temperature=0.2, cot_profile='none')
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] successor synth LLM failed: {e}")
+            return None
+        # Parse: tolerate code-fenced JSON.
+        s = (raw or '').strip()
+        if s.startswith('```'):
+            s = s.strip('`').strip()
+            if s.lower().startswith('json'):
+                s = s[4:].strip()
+        try:
+            data = json.loads(s)
+        except json.JSONDecodeError as e:
+            logger.warning(
+                f"[{self.character_name}] successor JSON parse failed: {e}; "
+                f"raw={raw[:200]!r}")
+            return None
+        if not isinstance(data, dict) or data.get('complete'):
+            return None
+        next_slice = str(data.get('next_slice') or '').strip()
+        if not next_slice:
+            return None
+        # Successor inherits the parent's surface text + a depth tag so it
+        # reads coherently in the active-concerns surface.
+        parent_text = str(parent_props.get('content', '') or parent.get('text', '') or '').strip()
+        new_depth = parent_depth + 1
+        succ_text = (f"{parent_text} — continuation (depth {new_depth})"
+                     if parent_text else f"continuation of {parent_id} (depth {new_depth})")
+        new_id = self._add_concern(
+            text=succ_text, category='derived', entity='User',
+            provenance='inferred', seed=False, name='',
+            cadence_hours=1, lifetime_days=0.5, instruction=next_slice,
+            skip_recurrence=True,
+            extra_properties={
+                'successor_of': parent_id,
+                'successor_depth': new_depth,
+            },
+        )
+        if not new_id:
+            return None
+        logger.info(
+            f"[{self.character_name}] spawned successor concern {new_id} for "
+            f"{parent_id} (depth {new_depth}): {next_slice[:120]!r}")
+        return new_id
+
     # ------------------------------------------------------------------
     # Per-turn handling
     # ------------------------------------------------------------------
@@ -3457,6 +3634,25 @@ class ChatLoop:
                 note.setdefault('properties', {})['last_acted_at'] = (
                     datetime.now(timezone.utc).isoformat())
 
+        # Successor-concern spawn. When an autonomous ReAct loop hits its
+        # iter cap, the work likely isn't done — synthesize what's left
+        # into a narrow successor concern so the next tick can pick up
+        # where this one left off (capped by _CONCERN_SUCCESSOR_MAX_DEPTH).
+        if autonomous and autonomous_concern_id and exit_reason == 'max_iters':
+            try:
+                succ_id = self._maybe_spawn_successor_concern(
+                    autonomous_concern_id, text, log)
+                if succ_id:
+                    self._write_autonomy_event({
+                        'event': 'successor_spawned',
+                        'parent_concern_id': autonomous_concern_id,
+                        'successor_concern_id': succ_id,
+                    })
+            except Exception as e:
+                logger.warning(
+                    f"[{self.character_name}] successor spawn failed for "
+                    f"{autonomous_concern_id}: {e}")
+
         # Trace write goes immediately after publish, before any slow
         # post-turn LLM work, so format_prompt can read the reasoning
         # trace without waiting on discourse/reflection. Skipped if we
@@ -3502,22 +3698,34 @@ class ChatLoop:
 
     # ------------------------------------------------------------------
     # Tick handler — Phase C autonomy entry point.
-    # Triggered by the `tick` sensor's heartbeat. Runs check_and_fire
-    # without emitting Phase B impulses (we'll surface fires via the
-    # autonomous-act path), then dispatches up to _AUTONOMOUS_FIRE_CAP
-    # concerns through the standard ReAct pipeline. Surplus concerns
-    # remain due (last_acted_at unchanged) and will be picked up on
-    # the next tick.
+    # Triggered by the `tick` sensor's heartbeat. Gated by
+    # self._autonomy_enabled (launcher --autonomy); when off, this is a
+    # no-op so existing benchmarks and chat scenarios behave identically.
+    # When on: runs check_and_fire without emitting Phase B impulses
+    # (we'll surface fires via the autonomous-act path), then dispatches
+    # up to _AUTONOMOUS_FIRE_CAP concerns through the standard ReAct
+    # pipeline. Surplus concerns remain due (last_acted_at unchanged)
+    # and will be picked up on the next tick.
+    #
+    # The trigger gate (_check_and_fire_concerns) is deliberately
+    # LLM-free — pure cadence arithmetic — so this path stays cheap on
+    # ticks where nothing is due. Do not introduce LLM calls into the
+    # tick→fire decision; reasoning happens inside the ReAct loop a
+    # fired concern dispatches, gated by cadence.
     # ------------------------------------------------------------------
 
     _AUTONOMOUS_FIRE_CAP = 2
 
     def _handle_tick(self) -> None:
-        """Per-tick autonomy pass. Identifies due concerns, runs up to
-        _AUTONOMOUS_FIRE_CAP ReAct loops on their instructions, prints
-        a CLI preamble per fire and a deferral note if any are dropped.
+        """Per-tick autonomy pass. No-op when --autonomy is off.
+        When on: identifies due concerns, runs up to _AUTONOMOUS_FIRE_CAP
+        ReAct loops on their instructions, prints a CLI preamble + coda
+        per fire, a deferral note if any are dropped, and appends one
+        JSONL record per event to <memory>/autonomy.jsonl.
         """
-        fired = self._check_and_fire_concerns('User', emit_impulse=False)
+        if not self._autonomy_enabled:
+            return
+        fired = self._check_and_fire_concerns(self.character_name, emit_impulse=False)
         if not fired:
             return
         # Cap dispatch; the rest stay due (last_acted_at unchanged) and
@@ -3536,8 +3744,15 @@ class ChatLoop:
                 else:
                     logger.info(
                         f"[{self.character_name}] {len(deferred)} concern(s) deferred to next tick")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"[{self.character_name}] deferred-print failed: {e}")
+            for nid, text, instruction in deferred:
+                self._write_autonomy_event({
+                    'event': 'deferred',
+                    'concern_id': nid,
+                    'concern_text': text,
+                    'instruction': instruction,
+                })
 
         for nid, text, instruction in to_run:
             # CLI preamble: tell the user what's about to happen before
@@ -3556,16 +3771,75 @@ class ChatLoop:
                     sys.stdout.flush()
                 else:
                     logger.info(f"[{self.character_name}] {preamble}")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"[{self.character_name}] preamble-print failed: {e}")
+
+            started_at = datetime.now(timezone.utc)
+            outcome: Dict[str, Any] = {
+                'event': 'fire',
+                'concern_id': nid,
+                'concern_text': text,
+                'instruction': instruction,
+                'started_at': started_at.isoformat(),
+            }
             try:
+                # source=self.character_name marks this turn as agent-
+                # originated; `_process_user_turn` skips record_incoming
+                # on autonomous=True so no fake user message is logged.
+                # The conversation history surfaced into the prompt is
+                # still the User dialogue (see _build_react_user_prefix).
                 self._process_user_turn(
-                    source='User', text=instruction, close=False,
+                    source=self.character_name, text=instruction, close=False,
                     autonomous=True, autonomous_concern_id=nid)
+                outcome['terminated'] = 'ok'
             except Exception as e:
                 logger.error(f"[{self.character_name}] autonomous fire failed for {nid}: {e}")
                 import traceback
                 traceback.print_exc()
+                outcome['terminated'] = 'crashed'
+                outcome['error'] = str(e)
+
+            finished_at = datetime.now(timezone.utc)
+            outcome['finished_at'] = finished_at.isoformat()
+            outcome['duration_s'] = round((finished_at - started_at).total_seconds(), 2)
+
+            # Pull the just-written reasoning trace tail to enrich the
+            # autonomy record (iters, exit_reason, response). Best effort
+            # — if the trace can't be read, the JSONL line still has the
+            # core fields.
+            try:
+                recs = self._load_reasoning_records()
+                if recs:
+                    last = recs[-1]
+                    outcome['react_iters'] = int(last.get('iters', 0) or 0)
+                    outcome['react_exit_reason'] = last.get('exit_reason', '')
+                    reply = str(last.get('reply', '') or '')
+                    outcome['response_chars'] = len(reply)
+                    outcome['response_brief'] = reply[:200]
+            except Exception as e:
+                logger.warning(f"[{self.character_name}] autonomy-trace read failed: {e}")
+
+            self._write_autonomy_event(outcome)
+
+            # Post-fire CLI coda: closes the visual loop the preamble opens.
+            iters_n = outcome.get('react_iters', '?')
+            term = outcome.get('react_exit_reason') or outcome.get('terminated', '?')
+            dur = outcome.get('duration_s', '?')
+            brief = (outcome.get('response_brief') or '').replace('\n', ' ')
+            if len(brief) > 80:
+                brief = brief[:77] + '…'
+            coda = f"auto-fire complete: {iters_n} iters, {dur}s, {term} — {brief}"
+            try:
+                if sys.stdout.isatty():
+                    sys.stdout.write(
+                        f"{self._STATUS_DIM}[{self.character_name}] "
+                        f"{coda}{self._STATUS_RESET}\n"
+                    )
+                    sys.stdout.flush()
+                else:
+                    logger.info(f"[{self.character_name}] {coda}")
+            except Exception as e:
+                logger.warning(f"[{self.character_name}] coda-print failed: {e}")
 
     # ------------------------------------------------------------------
     # Sensor wiring — mirrors executive_node._start_sensors. Reads the

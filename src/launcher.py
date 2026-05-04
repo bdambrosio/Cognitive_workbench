@@ -365,6 +365,10 @@ def main():
     parser.add_argument('--ui-port', type=int, default=3000, help='Port for web UI (default: 3000)')
     parser.add_argument('--resource-browser', action='store_true', help='Launch Resource Browser (port 3001)')
     parser.add_argument('--cli', action='store_true', help='Launch interactive CLI chat interface')
+    parser.add_argument('--autonomy', action='store_true',
+                        help='Enable autonomous concern firing in chat mode (off by default; '
+                             'when off, the tick handler is a no-op so benchmarks and chat '
+                             'scenarios behave identically regardless of active concerns).')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     args = parser.parse_args()
 
@@ -405,6 +409,7 @@ def main():
     for _name, cfg in characters:
         cfg['is_infospace'] = True
         cfg['map_name'] = world_name
+        cfg['autonomy_enabled'] = bool(args.autonomy)
 
     if args.list_only:
         print("Characters:")
