@@ -99,53 +99,67 @@ _MEMORY_CATEGORIES = ('fact', 'preference', 'commitment')
 # missing one we'll re-encounter.
 _REFLECT_FRAME_OK = 'none'
 
-# Per-character collection holding actionable directives to keep on hand —
-# distinct from memories (which are stable specifics to recall). A concern
-# is something Jill can reasonably expect to act on as an instruction;
-# preferences (modifiers like "be brief") stay in memories.
-_CONCERNS_COLLECTION_NAME = "concerns"
-_CONCERN_CATEGORIES = ('one_shot', 'durable', 'derived')
+# ===== Concerns: two collections, asymmetric dynamics =====
+#
+# Concerns split into two collections that share infrastructure but
+# carry different semantics and different update rhythms.
+#
+#   user_concerns: "what the user cares about." Models the user's current
+#       preoccupations. Strength decays each user turn (recall-driven —
+#       if it doesn't come up, we stop tracking it). Bumped when user
+#       input semantic-matches the concern. Pruned below threshold.
+#       Surfaces in the prompt adjacent to companion. Does NOT fire
+#       autonomously — its job is to shape Jill's responses to requests
+#       by being recalled when relevant.
+#
+#   agent_concerns: "what I (Jill) want to act on." Pressure-driven.
+#       Activation grows each tick at a rate derived from rhythm_hours;
+#       decremented on service (autonomous fire). Fires when activation
+#       >= threshold AND the concern carries an instruction. Seeds live
+#       here as architectural baseline (seed=True) and source derived
+#       agent_concerns via reflection.
+#
+# The asymmetry — strength decays, activation grows — is the real point:
+# user models are recall-driven (silence implies disinterest); agent action
+# is pressure-driven (silence implies untended work).
+_AGENT_CONCERNS_COLLECTION_NAME = "agent_concerns"
+_USER_CONCERNS_COLLECTION_NAME  = "user_concerns"
 _CONCERN_STATUSES = ('active', 'satisfied', 'abandoned')
 
-# Two independent per-concern parameters drive the lifecycle:
+# ----- user_concerns dynamics -----
+# strength ∈ [0, 1]. Decay applied at user-turn entry. Bump applied
+# when input similarity >= bump threshold. Pruned below prune threshold.
+_USER_CONCERN_DECAY_PER_TURN  = 0.05   # strength lost per user turn
+_USER_CONCERN_BUMP_THRESHOLD  = 0.5    # similarity ≥ this counts as a hit
+_USER_CONCERN_BUMP_AMOUNT     = 0.30   # gained per hit (capped at 1.0)
+_USER_CONCERN_PRUNE_THRESHOLD = 0.10   # delete below this
+_USER_CONCERN_PROMPT_BUDGET   = 5      # top-K by strength surfaced
+
+# ----- agent_concerns dynamics -----
+# activation ∈ [0, 1]. Grows each tick proportional to elapsed wall-
+# clock time. Decremented on service per exit_reason. Fires when
+# activation ≥ fire threshold AND instruction is non-null AND status
+# is active. Floored at 0; capped at 1.
+_AGENT_CONCERN_FIRE_THRESHOLD   = 0.70 # activation ≥ this allows fire
+_AGENT_CONCERN_SERVICE_FULL     = 0.60 # decrement on respond exit
+_AGENT_CONCERN_SERVICE_PARTIAL  = 0.25 # decrement on max_iters exit
+_AGENT_CONCERN_PROMPT_BUDGET    = 5    # top-M by activation surfaced
+
+# rhythm_hours: declared target fire interval. Used at concern creation
+# to derive activation growth-per-elapsed-hour:
+#   growth_per_hour = (FIRE_THRESHOLD - POST_SERVICE_FLOOR) / rhythm_hours
+# where POST_SERVICE_FLOOR ≈ FIRE_THRESHOLD - SERVICE_FULL.
+# A concern with rhythm_hours=24 fires roughly daily after full service.
 #
-#   cadence_hours — firing rhythm in hours, drawn from a fixed allowlist
-#                   ({1,2,4,8,12,24,168}). When (now - last_engaged_at) >=
-#                   cadence_hours, the concern wants attention and fires
-#                   once (until engagement resets the cycle). null →
-#                   doesn't fire autonomously.
-#   lifetime_days — decay tau. Effective weight = exp(-Δdays / lifetime).
-#                   Below _CONCERN_SATISFIED_THRESHOLD → status flips to
-#                   satisfied (lazy, on read). null → immortal.
-#
-# Cadence and lifetime are NOT the same. A daily concern (S&P 500) wants
-# to fire every day but may legitimately persist for weeks if the user
-# takes a vacation. Lifetime should generally be several times the cadence
-# (note unit mismatch: cadence is hours, lifetime is days).
-#
-# Defaults below apply at creation when reflection doesn't emit explicit
-# values — and at read time as fallback for legacy concerns missing the
-# field. Seed concerns get cadence=null + lifetime=null (immortal, no fire).
-# cadence_hours allowlist: 1h, 2h, 4h, 8h, 12h, 1d, 1wk.
-#
-# All non-seed types fire autonomously by default (gated globally by
-# launcher --autonomy). one_shot picks the shortest cadence so the work
-# happens promptly and then transitions to satisfied; durable/derived
-# ride the daily rhythm.
-_CONCERN_CADENCE_HOURS_ALLOWED = (1, 2, 4, 8, 12, 24, 168)
-_CONCERN_DEFAULT_CADENCE_HOURS = {
-    'one_shot': 1,       # fire on next tick, then mark satisfied
-    'derived':  24,      # daily fire by default
-    'durable':  24,      # daily fire by default
-}
-_CONCERN_DEFAULT_LIFETIME_DAYS = {
-    'one_shot': 0.5,     # ~12 hours to satisfied
-    'derived':  2.0,     # ~5 days to satisfied
-    'durable':  120.0,   # ~10 months without engagement
-}
-_CONCERN_SATISFIED_THRESHOLD = 0.1
-# Lifetime sanity bounds (still in days).
-_CONCERN_LIFETIME_MIN_DAYS, _CONCERN_LIFETIME_MAX_DAYS = 0.1, 3650.0
+# Allowlist matches the legacy cadence values. Default is weekly (168h)
+# — chosen to err toward not firing too much when reflection lacks
+# rhythm signal (typical for seed-derived self-orientation concerns).
+# rhythm_source provenance ('external'|'urgency'|'default') is recorded
+# on the note so we can audit how often the default fires versus
+# reflection-extracted rhythms.
+_AGENT_CONCERN_RHYTHM_HOURS_ALLOWED = (1, 2, 4, 8, 12, 24, 168)
+_AGENT_CONCERN_DEFAULT_RHYTHM_HOURS = 168    # weekly default
+
 # Successor-concern depth cap. When a fired concern's ReAct loop hits
 # REACT_MAX_ITERS, the fallback path can spawn a successor concern with
 # the narrowed remainder of the work. To prevent slow-motion infinite
@@ -153,18 +167,50 @@ _CONCERN_LIFETIME_MIN_DAYS, _CONCERN_LIFETIME_MAX_DAYS = 0.1, 3650.0
 # is the most we'll ever produce automatically. Beyond that, the fallback
 # response just stands and the user can re-engage manually.
 _CONCERN_SUCCESSOR_MAX_DEPTH = 2
-# Top-N active concerns surfaced into the system prompt always-on (in
-# addition to anything semantic-recall fishes out). Bounded so the prompt
-# can't blow up as the corpus grows.
-_CONCERN_ALWAYS_ON_BUDGET = 5
-# Similarity threshold for recurrence detection. A candidate concern
-# whose top match in the concerns collection exceeds this value is
-# treated as the same concern: we refresh + possibly promote/revive
-# the existing note rather than create a near-duplicate. Tuned high
-# (vs the 0.5 used for surfacing recall) because a false merge silently
-# loses specificity, while a missed merge just creates a sibling that
-# can be merged manually.
+# Similarity threshold for recurrence detection on creation. A candidate
+# concern whose top match in its collection exceeds this value is treated
+# as the same concern: we refresh / promote the existing note rather
+# than create a near-duplicate. Tuned high vs the 0.5 used for surfacing
+# recall because a false merge silently loses specificity while a missed
+# merge just creates a sibling that can be merged manually.
 _CONCERN_RECURRENCE_THRESHOLD = 0.8
+
+
+# --- Legacy aliases (in-flight rename; will be removed once dynamics rewrite lands)
+_CONCERN_CATEGORIES = ('one_shot', 'durable', 'derived')
+_CONCERN_CADENCE_HOURS_ALLOWED = _AGENT_CONCERN_RHYTHM_HOURS_ALLOWED
+_CONCERN_DEFAULT_CADENCE_HOURS = {'one_shot': 1, 'derived': 24, 'durable': 24}
+_CONCERN_DEFAULT_LIFETIME_DAYS = {'one_shot': 0.5, 'derived': 2.0, 'durable': 120.0}
+_CONCERN_SATISFIED_THRESHOLD = 0.1
+_CONCERN_LIFETIME_MIN_DAYS, _CONCERN_LIFETIME_MAX_DAYS = 0.1, 3650.0
+_CONCERN_ALWAYS_ON_BUDGET = _AGENT_CONCERN_PROMPT_BUDGET
+
+
+def _agent_concern_growth_for_elapsed(rhythm_hours: float, elapsed_hours: float) -> float:
+    """Activation growth proportional to elapsed wall-clock hours.
+
+    A concern with rhythm_hours=24 (daily target) grows from POST_SERVICE_FLOOR
+    to FIRE_THRESHOLD over 24 elapsed hours. Independent of tick frequency —
+    uses real elapsed time, so changing the tick schedule doesn't shift the
+    firing rhythm.
+    """
+    if rhythm_hours <= 0 or elapsed_hours <= 0:
+        return 0.0
+    floor = max(0.0, _AGENT_CONCERN_FIRE_THRESHOLD - _AGENT_CONCERN_SERVICE_FULL)
+    span = _AGENT_CONCERN_FIRE_THRESHOLD - floor
+    return span * (elapsed_hours / float(rhythm_hours))
+
+
+def _snap_rhythm_hours(value) -> int:
+    """Snap a rhythm_hours value to the nearest allowed bucket. Returns
+    the default when value is None / unparseable / out of range."""
+    try:
+        v = float(value) if value is not None else None
+    except (TypeError, ValueError):
+        v = None
+    if v is None or v <= 0:
+        return _AGENT_CONCERN_DEFAULT_RHYTHM_HOURS
+    return min(_AGENT_CONCERN_RHYTHM_HOURS_ALLOWED, key=lambda b: abs(b - v))
 # Trim observation text from fetch_text before it lands in the working log.
 # Bigger than search synthesis (which is already digested) since fetch_text
 # is raw page text — but bounded so a single fetch can't blow the prompt.
@@ -531,15 +577,18 @@ class ChatLoop:
         self._memories_collection_id: Optional[str] = None
         self._init_memories()
 
-        # ---- Concerns (actionable directives, separate from memories) ----
-        # A 'concerns' Collection holds standalone instructions Jill should
-        # be ready to advance — distinct from preferences (modifiers) and
-        # facts (specifics). Lifecycle: active → satisfied via lazy decay,
-        # → abandoned only via explicit user revocation. Seeded from the
-        # YAML `concerns:` block on first launch; reflection adds derived
-        # concerns at turn end; recall surfaces them in the system prompt.
-        self._concerns_collection_id: Optional[str] = None
-        self._init_concerns()
+        # ---- Concerns: two collections, asymmetric dynamics ----
+        # agent_concerns: pressure-driven action drivers. Activation grows
+        # per-tick at a rhythm-derived rate, decremented on service. Fires
+        # when activation crosses threshold AND has an instruction. Seeded
+        # from the YAML `concerns:` block.
+        # user_concerns: model of what user cares about. Strength decays
+        # per turn, bumped on input similarity. Never fires; surfaces in
+        # the prompt to inform responses.
+        self._agent_concerns_collection_id: Optional[str] = None
+        self._user_concerns_collection_id: Optional[str] = None
+        self._init_agent_concerns()
+        self._init_user_concerns()
         self._seed_concerns_from_config(character_config)
 
         # ---- Reasoning history (awareness feed) ----
@@ -845,25 +894,47 @@ class ChatLoop:
     # concerns (architectural baseline from YAML, immune to decay).
     # ------------------------------------------------------------------
 
-    def _init_concerns(self) -> None:
-        """Get-or-create the concerns Collection, mark it persistent,
+    def _init_agent_concerns(self) -> None:
+        """Get-or-create the agent_concerns Collection, mark it persistent,
         ensure semantic index exists. Idempotent across restarts."""
         try:
-            cid = self.resource_manager.named_collections.get(_CONCERNS_COLLECTION_NAME)
+            cid = self.resource_manager.named_collections.get(_AGENT_CONCERNS_COLLECTION_NAME)
             if not cid:
                 success, cid, err, _ = self.resource_manager.create_collection(
                     self.character_name, [], "list", "chat-loop", "",
-                    _CONCERNS_COLLECTION_NAME,
-                    {"kind": "concerns"},
+                    _AGENT_CONCERNS_COLLECTION_NAME,
+                    {"kind": "agent_concerns"},
                 )
                 if not success or not cid:
-                    logger.warning(f"[{self.character_name}] create concerns collection failed: {err}")
+                    logger.warning(f"[{self.character_name}] create agent_concerns collection failed: {err}")
                     return
             self.resource_manager.mark_persistent(cid, self.character_name)
             self.resource_manager.index_collection(self.character_name, cid, index_type='semantic')
-            self._concerns_collection_id = cid
+            self._agent_concerns_collection_id = cid
         except Exception as e:
-            logger.warning(f"[{self.character_name}] _init_concerns failed: {e}")
+            logger.warning(f"[{self.character_name}] _init_agent_concerns failed: {e}")
+
+    def _init_user_concerns(self) -> None:
+        """Get-or-create the user_concerns Collection, mark it persistent,
+        ensure semantic index exists. Distinct from agent_concerns:
+        decays per turn, bumped by user-input similarity, never fires
+        autonomously. Idempotent across restarts."""
+        try:
+            cid = self.resource_manager.named_collections.get(_USER_CONCERNS_COLLECTION_NAME)
+            if not cid:
+                success, cid, err, _ = self.resource_manager.create_collection(
+                    self.character_name, [], "list", "chat-loop", "",
+                    _USER_CONCERNS_COLLECTION_NAME,
+                    {"kind": "user_concerns"},
+                )
+                if not success or not cid:
+                    logger.warning(f"[{self.character_name}] create user_concerns collection failed: {err}")
+                    return
+            self.resource_manager.mark_persistent(cid, self.character_name)
+            self.resource_manager.index_collection(self.character_name, cid, index_type='semantic')
+            self._user_concerns_collection_id = cid
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] _init_user_concerns failed: {e}")
 
     def _reasoning_trace_path(self) -> 'Path':
         """Path to <memory>/reasoning_trace.jsonl — one JSON record per
@@ -920,18 +991,21 @@ class ChatLoop:
 
     @staticmethod
     def _seed_concern_name(idx: int) -> str:
-        return f"chat:concern:seed:{idx}"
+        return f"chat:agent_concern:seed:{idx}"
 
     def _seed_concerns_from_config(self, character_config: dict) -> None:
-        """Instantiate concerns listed under YAML key `concerns:` if they
-        don't already exist. Each seed gets a stable named-note slot so
-        re-init is idempotent. Seed concerns carry seed=True and are
-        immune to decay-induced satisfaction (they're architectural
-        baseline, not ephemeral user-derived content). YAML may specify
-        cadence_hours, lifetime_days, instruction per seed; otherwise
-        seed concerns default to immortal + no fire."""
+        """Instantiate seed concerns listed under YAML key `concerns:`.
+        Seeds become agent_concerns with seed=True. They source derived
+        agent_concerns via reflection and also carry their own instruction
+        (if any) for direct firing. Idempotent — each seed gets a stable
+        named-note slot.
+
+        YAML may specify `rhythm_hours` (preferred) or legacy
+        `cadence_hours` per seed; default is weekly (168h). `instruction`
+        is optional — without it the concern accumulates activation but
+        never fires (it's a source for derived concerns)."""
         seeds = character_config.get('concerns') or []
-        if not isinstance(seeds, list) or not self._concerns_collection_id:
+        if not isinstance(seeds, list) or not self._agent_concerns_collection_id:
             return
         for idx, seed in enumerate(seeds):
             if not isinstance(seed, dict):
@@ -939,42 +1013,41 @@ class ChatLoop:
             text = str(seed.get('text', '') or '').strip()
             if not text:
                 continue
-            category = str(seed.get('category', 'durable') or 'durable').lower()
-            if category not in _CONCERN_CATEGORIES:
-                category = 'durable'
             entity = str(seed.get('entity', 'User') or 'User')
             name = self._seed_concern_name(idx)
             if name in self.resource_manager.named_notes:
-                continue  # Already seeded; preserve any edits
-            # Accept either cadence_hours (new) or legacy cadence_days
-            # (×24) from seed YAML — same fallback logic _resolve_cadence_hours
-            # uses at read time.
-            cad_h = seed.get('cadence_hours')
-            if cad_h is None and seed.get('cadence_days') is not None:
+                continue   # Already seeded; preserve any edits
+            rhythm_h = seed.get('rhythm_hours')
+            if rhythm_h is None:
+                rhythm_h = seed.get('cadence_hours')   # legacy field
+            if rhythm_h is None and seed.get('cadence_days') is not None:
                 try:
-                    cad_h = float(seed.get('cadence_days')) * 24.0
+                    rhythm_h = float(seed.get('cadence_days')) * 24.0
                 except (TypeError, ValueError):
-                    cad_h = None
-            self._add_concern(text, category=category, entity=entity,
-                              provenance='asserted', seed=True, name=name,
-                              cadence_hours=cad_h,
-                              lifetime_days=seed.get('lifetime_days'),
-                              instruction=seed.get('instruction'))
+                    rhythm_h = None
+            self._add_agent_concern(
+                text, entity=entity, provenance='asserted', seed=True,
+                name=name, rhythm_hours=rhythm_h, rhythm_source='external',
+                instruction=seed.get('instruction'))
 
-    def _find_similar_concern(self, text: str,
+    # ------------------------------------------------------------------
+    # Concern creation: shared note-create path + per-collection helpers.
+    # ------------------------------------------------------------------
+
+    def _find_similar_concern(self, text: str, collection_id: Optional[str],
                               threshold: float = _CONCERN_RECURRENCE_THRESHOLD
                               ) -> Optional[str]:
-        """Find the top semantically-similar existing concern whose
-        similarity meets `threshold`. Returns the source note_id, or None
-        if no match. Excludes abandoned concerns (the user explicitly
-        revoked them — recurrence shouldn't auto-revive). Active and
-        satisfied are both eligible; the caller decides what to do."""
-        if not self._concerns_collection_id or not text:
+        """Find the top semantically-similar existing concern in
+        `collection_id` whose similarity meets `threshold`. Returns the
+        source note_id, or None. Excludes abandoned concerns. Caller
+        decides what to do with active vs satisfied matches (per-class
+        promote/bump logic differs)."""
+        if not collection_id or not text:
             return None
         try:
             with self._faiss_lock:
                 ok, results, _ = self.resource_manager.search_collection(
-                    self.character_name, self._concerns_collection_id, text,
+                    self.character_name, collection_id, text,
                     mode='semantic', limit=1, threshold=threshold)
             if not ok or not results:
                 return None
@@ -996,28 +1069,31 @@ class ChatLoop:
             logger.warning(f"[{self.character_name}] _find_similar_concern failed: {e}")
             return None
 
-    def _promote_existing_concern(self, note_id: str) -> str:
-        """Apply recurrence-promotion rules in place:
-          - last_engaged_at always refreshed (the recurrence IS user engagement —
-            drives decay)
-          - last_acted_at refreshed too — user-driven recurrence also resets
-            the cadence clock so we don't autonomously re-fire something the
-            user just engaged with
-          - status: satisfied → active (revival)
-          - category: one_shot → durable (intensity promotion)
-          - durable / derived: category unchanged (no de-promotion)
-        Returns the same note_id so callers have a uniform shape."""
+    def _promote_existing_agent_concern(self, note_id: str) -> str:
+        """Recurrence: revive a near-twin agent_concern rather than
+        creating a duplicate. status: satisfied → active. Activation
+        left as-is so existing pressure is preserved; the user's
+        re-engagement is for the topic, not against the queue."""
         note = self.resource_manager.get_resource(note_id)
         if not note:
             return note_id
         props = note.setdefault('properties', {})
-        now_iso = datetime.now(timezone.utc).isoformat()
-        props['last_engaged_at'] = now_iso
-        props['last_acted_at'] = now_iso
         if props.get('status') == 'satisfied':
             props['status'] = 'active'
-        if props.get('category') == 'one_shot':
-            props['category'] = 'durable'
+        return note_id
+
+    def _bump_existing_user_concern(self, note_id: str) -> str:
+        """Recurrence: bump strength on a near-twin user_concern rather
+        than creating a duplicate."""
+        note = self.resource_manager.get_resource(note_id)
+        if not note:
+            return note_id
+        props = note.setdefault('properties', {})
+        s = float(props.get('strength', 0.0) or 0.0)
+        props['strength'] = min(1.0, s + _USER_CONCERN_BUMP_AMOUNT)
+        props['last_bumped_at'] = datetime.now(timezone.utc).isoformat()
+        if props.get('status') != 'active':
+            props['status'] = 'active'
         return note_id
 
     @staticmethod
@@ -1031,457 +1107,390 @@ class ChatLoop:
             return None
         return max(lo, min(hi, v))
 
-    @staticmethod
-    def _snap_cadence_hours(value: Any) -> Optional[int]:
-        """Coerce a cadence value to the nearest allowed hours bucket
-        ({1,2,4,8,12,24,168}). null/None/non-numeric → None (no fire)."""
-        if value is None:
-            return None
-        try:
-            v = float(value)
-        except (TypeError, ValueError):
-            return None
-        if v <= 0:
-            return None
-        return min(_CONCERN_CADENCE_HOURS_ALLOWED, key=lambda b: abs(b - v))
-
     @classmethod
-    def _resolve_cadence_hours(cls, properties: Dict[str, Any]) -> Optional[int]:
-        """Read cadence_hours from a concern note, falling back to (a)
-        legacy cadence_days converted to hours and snapped to allowed
-        bucket, then (b) category default. Seed concerns default to null
-        (no fire) regardless of category."""
-        if 'cadence_hours' in properties and properties.get('cadence_hours') is not None:
-            return cls._snap_cadence_hours(properties.get('cadence_hours'))
-        # Legacy migration: pre-rename notes carry cadence_days (float).
-        if 'cadence_days' in properties and properties.get('cadence_days') is not None:
+    def _resolve_rhythm_hours(cls, properties: Dict[str, Any]) -> int:
+        """Read rhythm_hours from an agent_concern note. Falls back to
+        legacy `cadence_hours` (current data) and `cadence_days` (older
+        migration). Always returns a value from the allowed bucket;
+        defaults to weekly when nothing usable is on the note."""
+        raw = properties.get('rhythm_hours')
+        if raw is None:
+            raw = properties.get('cadence_hours')
+        if raw is None and properties.get('cadence_days') is not None:
             try:
-                hours = float(properties['cadence_days']) * 24.0
-                return cls._snap_cadence_hours(hours)
+                raw = float(properties['cadence_days']) * 24.0
             except (TypeError, ValueError):
-                pass
-        if properties.get('seed'):
+                raw = None
+        return _snap_rhythm_hours(raw)
+
+    def _create_concern_note(self, text: str, name: str, entity: str,
+                             properties: Dict[str, Any],
+                             collection_id: str) -> Optional[str]:
+        """Shared note creation path. create_note + mark_persistent +
+        add_to_collection, all under _faiss_lock."""
+        try:
+            with self._faiss_lock:
+                success, note_id, err, _ = self.resource_manager.create_note(
+                    self.character_name, text, "text", "chat-loop",
+                    entity or "", name or "", properties)
+                if not success or not note_id:
+                    logger.warning(
+                        f"[{self.character_name}] concern create failed: {err}")
+                    return None
+                self.resource_manager.mark_persistent(note_id, self.character_name)
+                ok, _, add_err = self.resource_manager.add_to_collection(
+                    collection_id, note_id, self.character_name)
+                if not ok:
+                    logger.warning(
+                        f"[{self.character_name}] concern add_to_collection failed: {add_err}")
+                return note_id
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] _create_concern_note failed: {e}")
             return None
-        return _CONCERN_DEFAULT_CADENCE_HOURS.get(
-            properties.get('category', 'durable'))
 
-    @staticmethod
-    def _resolve_lifetime_days(properties: Dict[str, Any]) -> Optional[float]:
-        """Read lifetime_days from a concern note, falling back to category
-        default for legacy notes. Seed concerns default to null (immortal)."""
-        if 'lifetime_days' in properties:
-            raw = properties.get('lifetime_days')
-            if raw is None:
-                return None
-            try:
-                return float(raw)
-            except (TypeError, ValueError):
-                pass
-        if properties.get('seed'):
-            return None
-        return _CONCERN_DEFAULT_LIFETIME_DAYS.get(
-            properties.get('category', 'durable'), 120.0)
+    def _add_agent_concern(self, text: str, entity: str = 'User',
+                           provenance: str = 'asserted', seed: bool = False,
+                           name: str = '',
+                           rhythm_hours: Optional[int] = None,
+                           rhythm_source: str = 'default',
+                           instruction: Optional[str] = None,
+                           skip_recurrence: bool = False,
+                           extra_properties: Optional[Dict[str, Any]] = None
+                           ) -> Optional[str]:
+        """Create an agent_concern. Activation starts at 0; per-tick
+        growth is proportional to elapsed wall-clock / rhythm_hours.
+        Fires when activation ≥ _AGENT_CONCERN_FIRE_THRESHOLD AND
+        instruction is non-null. Seeds carry seed=True; their activation
+        still grows but they won't fire without an instruction.
 
-    def _add_concern(self, text: str, category: str = 'durable',
-                     entity: str = 'User', provenance: str = 'asserted',
-                     seed: bool = False, name: str = '',
-                     cadence_hours: Optional[int] = None,
-                     lifetime_days: Optional[float] = None,
-                     instruction: Optional[str] = None,
-                     skip_recurrence: bool = False,
-                     extra_properties: Optional[Dict[str, Any]] = None
-                     ) -> Optional[str]:
-        """Create a new concern note and add it to the concerns Collection,
-        OR — if a near-twin already exists — refresh and promote/revive
-        the existing note instead. Returns the resulting note_id (newly
-        created or pre-existing), or None on failure. Held under
-        _faiss_lock for the FAISS-touching span; pre-add similarity check
-        also serializes through the same lock.
-
-        cadence_hours and lifetime_days are independent: cadence drives
-        firing rhythm (in hours, snapped to {1,2,4,8,12,24,168}), lifetime
-        drives decay-to-satisfied (in days). Either or both may be None.
-        instruction (the action to take when this concern fires) is
-        required for fireable concerns; null instruction means the
-        concern never fires regardless of cadence.
-
-        skip_recurrence bypasses the similarity merge — used for
-        successor concerns, which would otherwise fold into the parent.
-        extra_properties merges into the note's properties dict (e.g.
-        successor_of, successor_depth).
-        """
-        if not self._concerns_collection_id:
+        skip_recurrence bypasses similarity merge — used by successor
+        concerns. extra_properties merges into the note's properties
+        (e.g. successor_of, successor_depth)."""
+        if not self._agent_concerns_collection_id:
             return None
         text = (text or "").strip()
         if not text:
             return None
-        if category not in _CONCERN_CATEGORIES:
-            category = 'durable'
-        if provenance not in ('asserted', 'inferred'):
-            provenance = 'inferred' if category == 'derived' else 'asserted'
-
-        # Apply category defaults if caller didn't specify; seed concerns
-        # default to null on both axes (immortal, no autonomous fire).
-        if cadence_hours is None and not seed:
-            cadence_hours = _CONCERN_DEFAULT_CADENCE_HOURS.get(category)
-        if lifetime_days is None and not seed:
-            lifetime_days = _CONCERN_DEFAULT_LIFETIME_DAYS.get(category)
-        # Snap cadence to allowed bucket; clamp lifetime into sane range.
-        cadence_hours = self._snap_cadence_hours(cadence_hours)
-        lifetime_days = self._clamp_optional(lifetime_days,
-                                             _CONCERN_LIFETIME_MIN_DAYS,
-                                             _CONCERN_LIFETIME_MAX_DAYS)
+        rhythm_hours = _snap_rhythm_hours(rhythm_hours)
         instruction = (str(instruction).strip() if instruction else '') or None
-
-        # Recurrence check. Skipped for seed concerns (those go in
-        # deterministic named-note slots and shouldn't get folded into
-        # arbitrary user-derived twins) and for successors (continuation
-        # of the parent — would otherwise merge back into it).
+        if rhythm_source not in ('external', 'urgency', 'default'):
+            rhythm_source = 'default'
+        if provenance not in ('asserted', 'inferred'):
+            provenance = 'asserted'
         if not seed and not skip_recurrence:
-            existing = self._find_similar_concern(text)
+            existing = self._find_similar_concern(
+                text, self._agent_concerns_collection_id)
             if existing:
-                return self._promote_existing_concern(existing)
-
+                return self._promote_existing_agent_concern(existing)
         now_iso = datetime.now(timezone.utc).isoformat()
         properties: Dict[str, Any] = {
-            "kind": "concern",
-            "category": category,
+            "kind": "agent_concern",
             "status": "active",
             "entity": entity,
             "provenance": provenance,
             "seed": bool(seed),
-            "last_engaged_at": now_iso,
-            "last_acted_at": None,
-            "cadence_hours": cadence_hours,
-            "lifetime_days": lifetime_days,
             "instruction": instruction,
+            "rhythm_hours": rhythm_hours,
+            "rhythm_source": rhythm_source,
+            "activation": 0.0,
+            "last_activation_update_at": now_iso,
+            "last_fired_at": None,
         }
         if extra_properties:
             properties.update(extra_properties)
+        return self._create_concern_note(
+            text, name, entity, properties,
+            self._agent_concerns_collection_id)
+
+    def _add_user_concern(self, text: str, entity: str = 'User',
+                          name: str = '',
+                          initial_strength: float = 1.0,
+                          skip_recurrence: bool = False,
+                          extra_properties: Optional[Dict[str, Any]] = None
+                          ) -> Optional[str]:
+        """Create a user_concern. Strength starts at initial_strength
+        (1.0 default). Decays each user turn; bumped on similarity hit;
+        pruned below threshold. Never fires."""
+        if not self._user_concerns_collection_id:
+            return None
+        text = (text or "").strip()
+        if not text:
+            return None
+        if not skip_recurrence:
+            existing = self._find_similar_concern(
+                text, self._user_concerns_collection_id)
+            if existing:
+                return self._bump_existing_user_concern(existing)
+        now_iso = datetime.now(timezone.utc).isoformat()
+        s = max(0.0, min(1.0, float(initial_strength)))
+        properties: Dict[str, Any] = {
+            "kind": "user_concern",
+            "status": "active",
+            "entity": entity,
+            "strength": s,
+            "last_bumped_at": now_iso,
+        }
+        if extra_properties:
+            properties.update(extra_properties)
+        return self._create_concern_note(
+            text, name, entity, properties,
+            self._user_concerns_collection_id)
+
+    # ------------------------------------------------------------------
+    # Per-tick / per-turn dynamics. Pure arithmetic — no LLM in these
+    # paths. Called from _handle_tick (growth, fire-check) and
+    # _process_user_turn (decay, bump). Cheap enough to run every
+    # tick / every turn without throttling.
+    # ------------------------------------------------------------------
+
+    def _grow_agent_concerns_per_tick(self) -> None:
+        """Apply elapsed-time growth to every active agent_concern.
+        activation += growth_for_elapsed(rhythm_hours, Δhours). Caps
+        at 1.0; updates last_activation_update_at."""
+        if not self._agent_concerns_collection_id:
+            return
+        coll = self.resource_manager.get_resource(self._agent_concerns_collection_id)
+        if not coll:
+            return
+        note_ids = (coll.get('properties') or {}).get('content', []) or []
+        now = datetime.now(timezone.utc)
+        for nid in note_ids:
+            note = self.resource_manager.get_resource(nid)
+            if not note:
+                continue
+            props = note.setdefault('properties', {})
+            if props.get('status') != 'active':
+                continue
+            rhythm_h = self._resolve_rhythm_hours(props)
+            last_str = (props.get('last_activation_update_at')
+                        or props.get('created_at'))
+            try:
+                last = datetime.fromisoformat(str(last_str)) if last_str else now
+                if last.tzinfo is None:
+                    last = last.replace(tzinfo=timezone.utc)
+            except (TypeError, ValueError):
+                last = now
+            elapsed_h = max(0.0, (now - last).total_seconds() / 3600.0)
+            growth = _agent_concern_growth_for_elapsed(rhythm_h, elapsed_h)
+            a = float(props.get('activation', 0.0) or 0.0)
+            props['activation'] = min(1.0, a + growth)
+            props['last_activation_update_at'] = now.isoformat()
+
+    def _decay_user_concerns_per_turn(self) -> None:
+        """Apply per-turn strength decay to active user_concerns. Hard-
+        deletes any concern that falls below the prune threshold (a
+        topic the user hasn't engaged with for ~18 turns at default
+        rates)."""
+        if not self._user_concerns_collection_id:
+            return
+        coll = self.resource_manager.get_resource(self._user_concerns_collection_id)
+        if not coll:
+            return
+        note_ids = list((coll.get('properties') or {}).get('content', []) or [])
+        pruned: List[str] = []
+        for nid in note_ids:
+            note = self.resource_manager.get_resource(nid)
+            if not note:
+                continue
+            props = note.setdefault('properties', {})
+            if props.get('status') != 'active':
+                continue
+            s = float(props.get('strength', 1.0) or 0.0)
+            s = max(0.0, s - _USER_CONCERN_DECAY_PER_TURN)
+            props['strength'] = s
+            if s < _USER_CONCERN_PRUNE_THRESHOLD:
+                ok, err = self.resource_manager.delete_resource(nid)
+                if ok:
+                    pruned.append(nid)
+                else:
+                    logger.warning(
+                        f"[{self.character_name}] user_concern prune failed for "
+                        f"{nid}: {err}")
+        if pruned:
+            logger.info(
+                f"[{self.character_name}] pruned {len(pruned)} user_concern(s) "
+                f"below strength threshold")
+
+    def _bump_user_concerns_on_input(self, text: str) -> None:
+        """Semantic-search user_concerns for input similarity; bump
+        strength on each hit above threshold. Cheap (one FAISS query)
+        and called once per user-turn entry."""
+        if not self._user_concerns_collection_id or not text:
+            return
         try:
             with self._faiss_lock:
-                success, note_id, err, _ = self.resource_manager.create_note(
-                    self.character_name, text, "text", "chat-loop", entity or "",
-                    name or "",
-                    properties,
-                )
-                if not success or not note_id:
-                    logger.warning(f"[{self.character_name}] concern create failed: {err}")
-                    return None
-                self.resource_manager.mark_persistent(note_id, self.character_name)
-                ok, _, add_err = self.resource_manager.add_to_collection(
-                    self._concerns_collection_id, note_id, self.character_name)
-                if not ok:
-                    logger.warning(f"[{self.character_name}] concern add_to_collection failed: {add_err}")
-                return note_id
+                ok, results, _ = self.resource_manager.search_collection(
+                    self.character_name, self._user_concerns_collection_id,
+                    text, mode='semantic',
+                    limit=_USER_CONCERN_PROMPT_BUDGET * 2,
+                    threshold=_USER_CONCERN_BUMP_THRESHOLD)
+            if not ok or not results:
+                return
+            now_iso = datetime.now(timezone.utc).isoformat()
+            for r in results:
+                if not isinstance(r, dict):
+                    continue
+                meta = r.get('metadata') or {}
+                nid = meta.get('source_note_id')
+                if not nid:
+                    continue
+                note = self.resource_manager.get_resource(nid)
+                if not note:
+                    continue
+                props = note.setdefault('properties', {})
+                if props.get('status') != 'active':
+                    continue
+                s = float(props.get('strength', 0.0) or 0.0)
+                props['strength'] = min(1.0, s + _USER_CONCERN_BUMP_AMOUNT)
+                props['last_bumped_at'] = now_iso
         except Exception as e:
-            logger.warning(f"[{self.character_name}] _add_concern failed: {e}")
-            return None
+            logger.warning(
+                f"[{self.character_name}] _bump_user_concerns_on_input failed: {e}")
 
-    @classmethod
-    def _concern_decayed_weight(cls, properties: Dict[str, Any]) -> float:
-        """Effective weight = exp(-Δdays / lifetime_days). Δ is now −
-        last_engaged_at. lifetime_days=None means immortal (returns 1.0).
-        Falls back to category default for legacy notes lacking the field.
-        Returns 0.0 for malformed timestamps."""
-        import math
-        try:
-            lifetime = cls._resolve_lifetime_days(properties)
-            if lifetime is None:
-                return 1.0   # immortal (seed concerns, etc.)
-            if lifetime <= 0:
-                return 1.0
-            last_iso = properties.get('last_engaged_at') or properties.get('created_at')
-            if not last_iso:
-                return 0.0
-            last = datetime.fromisoformat(str(last_iso))
-            if last.tzinfo is None:
-                last = last.replace(tzinfo=timezone.utc)
-            delta_days = (datetime.now(timezone.utc) - last).total_seconds() / 86400.0
-            return math.exp(-max(0.0, delta_days) / lifetime)
-        except Exception:
-            return 0.0
-
-    def _maybe_transition_to_satisfied(self, note: Dict[str, Any], weight: float) -> bool:
-        """Lazy transition: if weight is below threshold and this isn't a
-        seed concern, mark active → satisfied in place. Returns True if
-        the transition fired (caller should skip surfacing this concern)."""
-        props = note.get('properties') or {}
-        if props.get('status') != 'active':
-            return props.get('status') != 'active'
-        if props.get('seed'):
-            return False
-        if weight >= _CONCERN_SATISFIED_THRESHOLD:
-            return False
-        props['status'] = 'satisfied'
-        return True
-
-    def _refresh_concern_engagement(self, note_id: str) -> None:
-        """Bump last_engaged_at AND last_acted_at to now. Called when a
-        concern surfaces via semantic recall on a USER-driven turn —
-        engagement is both a decay reset (last_engaged_at) and a
-        cadence reset (last_acted_at: the user just brought it up,
-        treat it as addressed for this cycle so we don't autonomously
-        re-fire it)."""
+    def _service_agent_concern(self, note_id: str, exit_reason: str) -> None:
+        """Decrement activation on service. Called after autonomous fire
+        completes. exit_reason determines decrement size:
+          'respond'   → full service (ReAct ran to completion)
+          'max_iters' → partial (work continued via successor concern)
+          others      → no decrement (fire didn't really happen)
+        Activation floors at 0; last_fired_at recorded so we have a
+        fire history independent of the activation curve."""
         note = self.resource_manager.get_resource(note_id)
         if not note:
             return
         props = note.setdefault('properties', {})
-        now_iso = datetime.now(timezone.utc).isoformat()
-        props['last_engaged_at'] = now_iso
-        props['last_acted_at'] = now_iso
+        if exit_reason == 'respond':
+            decrement = _AGENT_CONCERN_SERVICE_FULL
+        elif exit_reason == 'max_iters':
+            decrement = _AGENT_CONCERN_SERVICE_PARTIAL
+        else:
+            decrement = 0.0
+        if decrement > 0:
+            a = float(props.get('activation', 0.0) or 0.0)
+            props['activation'] = max(0.0, a - decrement)
+        props['last_fired_at'] = datetime.now(timezone.utc).isoformat()
 
-    def _iter_active_concerns(self) -> List[Tuple[str, Dict[str, Any], float]]:
-        """Iterate the concerns collection and return (note_id, note,
-        weight) for every active concern. Performs lazy decay transitions
-        as a side effect — after this call, any concern whose decayed
-        weight fell below the threshold has its status flipped to
-        satisfied (except seed concerns)."""
-        if not self._concerns_collection_id:
+    # ------------------------------------------------------------------
+    # Surfacing helpers — top-K iteration over each collection for
+    # prompt rendering and resource_browser queries.
+    # ------------------------------------------------------------------
+
+    def _iter_active_agent_concerns(self) -> List[Tuple[str, Dict[str, Any], float]]:
+        """Iterate active agent_concerns: (note_id, note, activation)."""
+        if not self._agent_concerns_collection_id:
             return []
-        coll = self.resource_manager.get_resource(self._concerns_collection_id)
+        coll = self.resource_manager.get_resource(self._agent_concerns_collection_id)
         if not coll:
             return []
-        note_ids = (coll.get('properties') or {}).get('content', []) or []
         out: List[Tuple[str, Dict[str, Any], float]] = []
-        for nid in note_ids:
+        for nid in (coll.get('properties') or {}).get('content', []) or []:
             note = self.resource_manager.get_resource(nid)
             if not note:
                 continue
             props = note.get('properties') or {}
             if props.get('status') != 'active':
                 continue
-            w = self._concern_decayed_weight(props)
-            if self._maybe_transition_to_satisfied(note, w):
-                continue
-            out.append((nid, note, w))
+            a = float(props.get('activation', 0.0) or 0.0)
+            out.append((nid, note, a))
         return out
 
-    def _top_active_concerns(self, n: int = _CONCERN_ALWAYS_ON_BUDGET
-                             ) -> List[Tuple[str, str, str, float]]:
-        """Return up to n active concerns ranked by current decayed
-        weight, descending. Tuple shape: (note_id, text, category, weight).
-        No reinforcement — top-N surfacing alone doesn't refresh engagement."""
-        active = self._iter_active_concerns()
-        active.sort(key=lambda t: t[2], reverse=True)
-        out: List[Tuple[str, str, str, float]] = []
-        for nid, note, w in active[:max(0, n)]:
+    def _iter_active_user_concerns(self) -> List[Tuple[str, Dict[str, Any], float]]:
+        """Iterate active user_concerns: (note_id, note, strength)."""
+        if not self._user_concerns_collection_id:
+            return []
+        coll = self.resource_manager.get_resource(self._user_concerns_collection_id)
+        if not coll:
+            return []
+        out: List[Tuple[str, Dict[str, Any], float]] = []
+        for nid in (coll.get('properties') or {}).get('content', []) or []:
+            note = self.resource_manager.get_resource(nid)
+            if not note:
+                continue
             props = note.get('properties') or {}
-            text = str(props.get('content', '') or '').strip()
+            if props.get('status') != 'active':
+                continue
+            s = float(props.get('strength', 0.0) or 0.0)
+            out.append((nid, note, s))
+        return out
+
+    def _top_active_agent_concerns(self, n: int = _AGENT_CONCERN_PROMPT_BUDGET
+                                   ) -> List[Tuple[str, str, float, Dict[str, Any]]]:
+        """Top-n agent_concerns by activation, descending. Tuple:
+        (note_id, text, activation, props)."""
+        active = self._iter_active_agent_concerns()
+        active.sort(key=lambda t: t[2], reverse=True)
+        out: List[Tuple[str, str, float, Dict[str, Any]]] = []
+        for nid, note, a in active[:max(0, n)]:
+            props = note.get('properties') or {}
+            text = str(props.get('content', '') or note.get('text', '') or '').strip()
             if not text:
                 continue
-            cat = str(props.get('category', 'durable') or 'durable')
-            out.append((nid, text, cat, w))
+            out.append((nid, text, a, props))
         return out
 
-    def _recall_concerns(self, query: str, k: int = 3,
-                         threshold: float = 0.5,
-                         refresh: bool = True
-                         ) -> List[Tuple[str, str, str, float]]:
-        """Semantic recall over the concerns collection. Returns (note_id,
-        text, category, weight) tuples for active matches.
-
-        refresh=True (default): hits refresh last_engaged_at and
-        last_acted_at — semantics for USER-driven turns where the user
-        engaging with a topic is both decay reset and cadence reset.
-        refresh=False: read-only — for autonomous turns (tick-driven),
-        which must NOT be conflated with user engagement.
-        """
-        if not self._concerns_collection_id or not query:
-            return []
-        try:
-            with self._faiss_lock:
-                ok, results, err = self.resource_manager.search_collection(
-                    self.character_name, self._concerns_collection_id, query,
-                    mode='semantic', limit=k, threshold=threshold)
-            if not ok or not results:
-                return []
-            out: List[Tuple[str, str, str, float]] = []
-            for r in results:
-                if not isinstance(r, dict):
-                    continue
-                doc = r.get('document')
-                if not isinstance(doc, str) or not doc.strip():
-                    continue
-                meta = r.get('metadata') or {}
-                note_id = meta.get('source_note_id')
-                if not note_id:
-                    continue
-                note = self.resource_manager.get_resource(note_id)
-                if not note:
-                    continue
-                props = note.get('properties') or {}
-                if props.get('status') != 'active':
-                    continue
-                # Reinforce on user-driven turns only.
-                if refresh:
-                    self._refresh_concern_engagement(note_id)
-                w = self._concern_decayed_weight(note.get('properties') or {})
-                cat = str(props.get('category', 'durable') or 'durable')
-                out.append((note_id, doc.strip(), cat, w))
-            return out
-        except Exception as e:
-            logger.warning(f"[{self.character_name}] _recall_concerns failed: {e}")
-            return []
-
-    def _get_concerns_for_prompt(self, query: str,
-                                 refresh: bool = True
-                                 ) -> List[Tuple[str, str, str, bool]]:
-        """Combined concern surface for the system prompt. Union of:
-          - semantic recall on the user's input (reinforces matches)
-          - top-N active concerns by current weight (always-on budget)
-        Deduped by note_id; ordering: recall hits first (most relevant
-        to this turn), then top-N filler. Returns (text, category,
-        status_text, is_seed) where status_text is the rendered
-        operational sub-line ('' for categories with no firing
-        semantics worth surfacing). Cadence/instruction/anchor logic
-        is resolved here so the LLM doesn't have to do timestamp
-        arithmetic against `## Now`; anchor is last_acted_at — the same
-        anchor used by _check_and_fire_concerns — so this surface and
-        the firing logic agree."""
-        seen: set = set()
-        out: List[Tuple[str, str, str, bool]] = []
-        now = datetime.now(timezone.utc)
-
-        def _status(note_id: str, category: str) -> Tuple[str, bool]:
-            """Return (status_text, is_seed). status_text is the indented
-            sub-line content (no leading whitespace), or '' to omit."""
-            note = self.resource_manager.get_resource(note_id)
-            if not note:
-                return '', False
+    def _top_active_user_concerns(self, n: int = _USER_CONCERN_PROMPT_BUDGET
+                                  ) -> List[Tuple[str, str, float, Dict[str, Any]]]:
+        """Top-n user_concerns by strength, descending. Tuple:
+        (note_id, text, strength, props)."""
+        active = self._iter_active_user_concerns()
+        active.sort(key=lambda t: t[2], reverse=True)
+        out: List[Tuple[str, str, float, Dict[str, Any]]] = []
+        for nid, note, s in active[:max(0, n)]:
             props = note.get('properties') or {}
-            is_seed = bool(props.get('seed'))
-            if category in ('derived', 'one_shot'):
-                return '', is_seed
-            cadence_h = self._resolve_cadence_hours(props)
-            instruction = (props.get('instruction') or '').strip()
-            if cadence_h is None:
-                return 'standing directive, no firing rhythm', is_seed
-            if not instruction:
-                return (f"won't run — {cadence_h}h cadence set but no instruction",
-                        is_seed)
-            # Has cadence + instruction: time-based status.
-            anchor_str = props.get('last_acted_at') or props.get('last_fired_at')
-            anchor_label = 'since last run'
-            if not anchor_str:
-                anchor_str = props.get('created_at')
-                anchor_label = 'since creation'
-            if not anchor_str:
-                return f"runnable every {cadence_h}h, due now", is_seed
-            try:
-                anchor = datetime.fromisoformat(str(anchor_str))
-                if anchor.tzinfo is None:
-                    anchor = anchor.replace(tzinfo=timezone.utc)
-                elapsed_h = (now - anchor).total_seconds() / 3600.0
-            except Exception:
-                return f"runnable every {cadence_h}h, due now", is_seed
-            if elapsed_h >= float(cadence_h):
-                return f"runnable every {cadence_h}h, due now", is_seed
-            return (f"runnable every {cadence_h}h, {int(elapsed_h)}h {anchor_label}",
-                    is_seed)
-
-        for nid, text, cat, _w in self._recall_concerns(query, k=3, refresh=refresh):
-            if nid in seen:
+            text = str(props.get('content', '') or note.get('text', '') or '').strip()
+            if not text:
                 continue
-            seen.add(nid)
-            status_text, is_seed = _status(nid, cat)
-            out.append((text, cat, status_text, is_seed))
-        for nid, text, cat, _w in self._top_active_concerns():
-            if nid in seen:
-                continue
-            seen.add(nid)
-            status_text, is_seed = _status(nid, cat)
-            out.append((text, cat, status_text, is_seed))
+            out.append((nid, text, s, props))
         return out
 
     def _set_concern_status(self, concern_id: str, new_status: str
                             ) -> Tuple[bool, Optional[str]]:
-        """Manual status transition (for browser-driven abandon/close).
-        Returns (ok, error_message)."""
+        """Manual status transition (browser-driven abandon/close).
+        Accepts notes from either collection — kind check covers
+        agent_concern, user_concern, and legacy 'concern'."""
         if new_status not in _CONCERN_STATUSES:
             return False, f"invalid status {new_status!r}"
         note = self.resource_manager.get_resource(concern_id)
         if not note:
             return False, f"concern {concern_id} not found"
         props = note.get('properties') or {}
-        if props.get('kind') != 'concern':
+        if props.get('kind') not in ('concern', 'agent_concern', 'user_concern'):
             return False, f"{concern_id} is not a concern"
         props['status'] = new_status
         return True, None
 
-    def _check_and_fire_concerns(self, source: str,
-                                  emit_impulse: bool = True
-                                  ) -> List[Tuple[str, str, str]]:
-        """Identify concerns whose cadence has elapsed since last_acted_at.
-        Returns a list of (note_id, text, instruction) tuples for each due
-        concern with a non-null instruction.
+    # ------------------------------------------------------------------
+    # Fire gate — deterministic, no LLM. Walks active agent_concerns
+    # and returns those whose activation has crossed _AGENT_CONCERN_
+    # FIRE_THRESHOLD AND have a non-null instruction. Service decrement
+    # is applied separately via _service_agent_concern after the
+    # autonomous run completes.
+    # ------------------------------------------------------------------
 
-        Cadence anchor is last_acted_at (with last_fired_at as legacy
-        fallback for migration, then created_at). Recall hits and
-        recurrence promotion bump last_acted_at, so user-driven engagement
-        also resets the cadence clock.
-
-        Side effects:
-          - emit_impulse=True: print a Phase B-display impulse line per
-            fired concern, then bump last_acted_at to now (the impulse
-            surfacing counts as a cadence reset so the same impulse
-            doesn't repeat on every subsequent turn).
-          - emit_impulse=False: caller (e.g. tick handler) will decide
-            when to bump last_acted_at — typically only after the
-            autonomous ReAct run succeeds.
-        """
-        if not self._concerns_collection_id:
-            return []
-        coll = self.resource_manager.get_resource(self._concerns_collection_id)
-        if not coll:
-            return []
-        note_ids = (coll.get('properties') or {}).get('content', []) or []
-        now = datetime.now(timezone.utc)
+    def _check_and_fire_agent_concerns(self) -> List[Tuple[str, str, str]]:
+        """Identify agent_concerns ready to fire. Pure arithmetic over
+        activation + instruction presence + status. Returns (note_id,
+        text, instruction) tuples sorted by activation desc so the
+        most-pressured concerns fire first when the per-tick cap
+        bites."""
+        active = self._iter_active_agent_concerns()
+        active.sort(key=lambda t: t[2], reverse=True)
         fired: List[Tuple[str, str, str]] = []
-        for nid in note_ids:
-            note = self.resource_manager.get_resource(nid)
-            if not note:
+        for nid, note, a in active:
+            if a < _AGENT_CONCERN_FIRE_THRESHOLD:
                 continue
             props = note.get('properties') or {}
-            if props.get('status') != 'active':
-                continue
-            cadence_hours = self._resolve_cadence_hours(props)
-            if cadence_hours is None:
-                continue   # no autonomous fire (one_shot/derived/seed)
             instruction = props.get('instruction')
             if not instruction:
-                continue   # no action to take; skip
-            anchor_str = (props.get('last_acted_at')
-                          or props.get('last_fired_at')   # legacy migration
-                          or props.get('created_at'))
-            if not anchor_str:
                 continue
-            try:
-                anchor = datetime.fromisoformat(str(anchor_str))
-                if anchor.tzinfo is None:
-                    anchor = anchor.replace(tzinfo=timezone.utc)
-            except Exception:
-                continue
-            elapsed_hours = (now - anchor).total_seconds() / 3600.0
-            if elapsed_hours < float(cadence_hours):
-                continue
-            text = str(props.get('content', '') or '').strip()
+            text = str(props.get('content', '') or note.get('text', '') or '').strip()
             fired.append((nid, text, str(instruction)))
-            if emit_impulse:
-                # Phase B-display path: bump last_acted_at on impulse so
-                # we don't reprint the same line on every subsequent user
-                # turn within the same cadence cycle.
-                props['last_acted_at'] = now.isoformat()
-        if emit_impulse:
-            for _nid, text, instruction in fired:
-                self._emit_impulse(text, instruction)
         return fired
 
     def _emit_impulse(self, concern_text: str, instruction: str) -> None:
-        """Print a concern-fired impulse to the CLI as a permanent line
-        (not transient — distinct from the ReAct status helpers, which
-        overwrite themselves). Falls back to logger.info when stdout
-        isn't a TTY so the signal is preserved in non-interactive runs."""
+        """Print a concern-fired impulse. Retained for possible future
+        Phase B-style use; the autonomous-fire path uses preamble +
+        coda directly rather than this helper."""
         msg = f"concern: {concern_text} — impulse: {instruction}"
         if not sys.stdout.isatty():
             logger.info(f"[{self.character_name}] {msg}")
@@ -1491,8 +1500,8 @@ class ChatLoop:
                     f"{msg}{self._STATUS_RESET}\n")
             sys.stdout.write(line)
             sys.stdout.flush()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] _emit_impulse failed: {e}")
 
     # Reflection prompt: extract durable episodic specifics from the latest
     # exchange. Two-stage decision:
@@ -1618,7 +1627,7 @@ class ChatLoop:
             companion = self._companion_state.get(source, '').strip()
             # Show the LLM the active concerns so it doesn't re-derive ones
             # we already track. Compact: text + category badge.
-            existing_concerns = self._top_active_concerns(n=10)
+            existing_concerns = self._top_active_agent_concerns(n=10)
             sys_msg = self._REFLECT_SYS.format(
                 character=self.character_name, entity=source,
                 narrowness_rule=_CONCERN_INSTRUCTION_NARROWNESS_RULE)
@@ -1628,7 +1637,10 @@ class ChatLoop:
                     "## Existing companion model (do NOT re-extract from this; "
                     "use only to avoid duplicates)\n" + companion)
             if existing_concerns:
-                lines = [f"- [{cat}] {text}" for _nid, text, cat, _w in existing_concerns]
+                lines = []
+                for _nid, text, activation, props in existing_concerns:
+                    cat = props.get('category', 'agent') or 'agent'
+                    lines.append(f"- [{cat}] {text}")
                 user_parts.append(
                     "## Existing active concerns (do NOT re-emit; emit only "
                     "NEW concerns this exchange surfaced)\n" + "\n".join(lines))
@@ -1685,15 +1697,19 @@ class ChatLoop:
                 if len(text) > 240:
                     text = text[:240].rstrip()
                 category = c.get('category', 'durable')
-                # Concerns derived by reflection: provenance follows category.
-                # one_shot/durable typically come from explicit user requests
-                # (asserted); derived is by definition inferred.
+                # Provisional adapter for the legacy reflection schema:
+                # treat all reflection-emitted concerns as agent_concerns.
+                # The reflection prompt rewrite (item 6) will replace this
+                # with explicit user_concerns / agent_concerns channels.
                 provenance = 'inferred' if category == 'derived' else 'asserted'
-                if self._add_concern(text, category=category, entity=source,
-                                     provenance=provenance, seed=False,
-                                     cadence_hours=c.get('cadence_hours'),
-                                     lifetime_days=c.get('lifetime_days'),
-                                     instruction=c.get('instruction')):
+                rhythm_h = c.get('rhythm_hours')
+                if rhythm_h is None:
+                    rhythm_h = c.get('cadence_hours')
+                if self._add_agent_concern(
+                        text, entity=source, provenance=provenance,
+                        seed=False, rhythm_hours=rhythm_h,
+                        rhythm_source='external' if rhythm_h else 'default',
+                        instruction=c.get('instruction')):
                     cons_written.append(text)
 
             if mems_written or cons_written:
@@ -2390,9 +2406,18 @@ class ChatLoop:
             'concern_description': text,
             'description': text,
             # State + lifecycle
-            'category': props.get('category', 'durable'),
+            'category': props.get('category', 'durable'),  # legacy field; may be empty for new notes
+            'kind': props.get('kind', 'concern'),
             'status': status,
-            'weight': self._concern_decayed_weight(props),
+            # Browser displays a single 'weight' bar — pick activation
+            # for agent_concerns, strength for user_concerns. Both are
+            # in [0,1] so the visual scale is consistent.
+            'weight': float(
+                (props.get('activation') if props.get('kind') == 'agent_concern'
+                 else props.get('strength') if props.get('kind') == 'user_concern'
+                 else 0.0) or 0.0),
+            'activation': props.get('activation'),
+            'strength': props.get('strength'),
             'provenance': props.get('provenance', 'asserted'),
             'origin': 'seed' if props.get('seed') else 'reflection',
             'seed': bool(props.get('seed', False)),
@@ -2400,39 +2425,51 @@ class ChatLoop:
             'created_at': props.get('created_at', ''),
             'created': props.get('created_at', ''),
             'last_engaged_at': props.get('last_engaged_at', ''),
-            'recency': props.get('last_engaged_at', ''),
-            # Phase B firing parameters. cadence_hours is editable from the
-            # browser via the concern_manage `set_cadence_hours` action.
-            'cadence_hours': self._resolve_cadence_hours(props),
-            'cadence_hours_allowed': list(_CONCERN_CADENCE_HOURS_ALLOWED),
-            'lifetime_days': self._resolve_lifetime_days(props),
+            'last_bumped_at': props.get('last_bumped_at', ''),
+            'recency': (props.get('last_bumped_at')
+                        or props.get('last_engaged_at', '')),
+            # Firing parameters (agent_concerns only; user_concerns ignore).
+            # rhythm_hours editable via concern_manage set_rhythm_hours.
+            'rhythm_hours': self._resolve_rhythm_hours(props),
+            'rhythm_source': props.get('rhythm_source', 'default'),
+            'rhythm_hours_allowed': list(_AGENT_CONCERN_RHYTHM_HOURS_ALLOWED),
+            # Legacy aliases retained so the browser UI keeps rendering
+            # while we refactor it in item 7.
+            'cadence_hours': self._resolve_rhythm_hours(props),
+            'cadence_hours_allowed': list(_AGENT_CONCERN_RHYTHM_HOURS_ALLOWED),
+            'lifetime_days': None,
             'instruction': props.get('instruction'),
-            'last_acted_at': (props.get('last_acted_at')
-                              or props.get('last_fired_at')   # legacy migration
+            'last_acted_at': (props.get('last_fired_at')
+                              or props.get('last_acted_at')   # legacy
                               or None),
+            'last_fired_at': props.get('last_fired_at'),
         }
 
     def _all_concerns_split(self) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """Iterate the concerns collection and split by category for the
-        browser API. No status filtering — browser shows all states."""
-        if not self._concerns_collection_id:
-            return ([], [])
-        coll = self.resource_manager.get_resource(self._concerns_collection_id)
-        if not coll:
-            return ([], [])
-        note_ids = (coll.get('properties') or {}).get('content', []) or []
-        user_concerns: List[Dict[str, Any]] = []
-        derived_concerns: List[Dict[str, Any]] = []
-        for nid in note_ids:
-            note = self.resource_manager.get_resource(nid)
-            if not note:
-                continue
-            cat = (note.get('properties') or {}).get('category', 'durable')
-            if cat == 'derived':
-                derived_concerns.append(self._serialize_concern(nid, note, is_user_kind=False))
-            else:
-                user_concerns.append(self._serialize_concern(nid, note, is_user_kind=True))
-        return (user_concerns, derived_concerns)
+        """Iterate both concern collections for the browser API. Returns
+        (user_concerns, agent_concerns) — keyed at the API layer as
+        user_concerns / derived_concerns for back-compat with the
+        existing UI tabs (rename to come in item 7). No status filter:
+        browser shows all states."""
+        user_out: List[Dict[str, Any]] = []
+        agent_out: List[Dict[str, Any]] = []
+        if self._user_concerns_collection_id:
+            coll = self.resource_manager.get_resource(self._user_concerns_collection_id)
+            if coll:
+                for nid in (coll.get('properties') or {}).get('content', []) or []:
+                    note = self.resource_manager.get_resource(nid)
+                    if not note:
+                        continue
+                    user_out.append(self._serialize_concern(nid, note, is_user_kind=True))
+        if self._agent_concerns_collection_id:
+            coll = self.resource_manager.get_resource(self._agent_concerns_collection_id)
+            if coll:
+                for nid in (coll.get('properties') or {}).get('content', []) or []:
+                    note = self.resource_manager.get_resource(nid)
+                    if not note:
+                        continue
+                    agent_out.append(self._serialize_concern(nid, note, is_user_kind=False))
+        return (user_out, agent_out)
 
     def _handle_remember_query(self, query) -> None:
         """Direct invocation of the active-recall subagent. Payload:
@@ -2500,15 +2537,22 @@ class ChatLoop:
                 deleted: List[str] = []
                 kept_seed: List[str] = []
                 errors: List[str] = []
-                if self._concerns_collection_id:
-                    coll = self.resource_manager.get_resource(self._concerns_collection_id)
+                # Walk both collections. Agent_concerns: keep seeds.
+                # User_concerns: no seeds exist (none authored from YAML),
+                # so all get wiped.
+                for coll_id, keep_seeds in (
+                        (self._agent_concerns_collection_id, True),
+                        (self._user_concerns_collection_id, False)):
+                    if not coll_id:
+                        continue
+                    coll = self.resource_manager.get_resource(coll_id)
                     note_ids = list(((coll or {}).get('properties') or {}).get('content', []) or [])
                     for nid in note_ids:
                         note = self.resource_manager.get_resource(nid)
                         if not note:
                             continue
                         props = note.get('properties') or {}
-                        if bool(props.get('seed')):
+                        if keep_seeds and bool(props.get('seed')):
                             kept_seed.append(nid)
                             continue
                         ok, err = self.resource_manager.delete_resource(nid)
@@ -2550,19 +2594,28 @@ class ChatLoop:
                                         'error': err or f'delete failed for {concern_id}'})
                 return
 
-            # Cadence edit from the browser combo-box.
-            if action == 'set_cadence_hours':
+            # Rhythm edit from the browser combo-box. Accepts both the
+            # new action name and the legacy 'set_cadence_hours' so the
+            # browser UI keeps working through item-7 refactor.
+            if action in ('set_rhythm_hours', 'set_cadence_hours'):
                 note = self.resource_manager.get_resource(concern_id)
-                if not note or (note.get('properties') or {}).get('kind') != 'concern':
+                kind = (note.get('properties') or {}).get('kind') if note else None
+                if not note or kind not in ('concern', 'agent_concern'):
                     self._reply(query, {'success': False,
-                                        'error': f"{concern_id} is not a concern"})
+                                        'error': f"{concern_id} is not an agent_concern"})
                     return
-                snapped = self._snap_cadence_hours(params.get('value'))
-                note['properties']['cadence_hours'] = snapped
+                snapped = _snap_rhythm_hours(params.get('value'))
+                note['properties']['rhythm_hours'] = snapped
+                # Reset the activation update anchor so the new rhythm
+                # takes effect from now (otherwise a long-stalled note
+                # would jump immediately).
+                note['properties']['last_activation_update_at'] = (
+                    datetime.now(timezone.utc).isoformat())
                 self._persist_to_disk()
                 self._reply(query, {'success': True,
-                                    'message': f'{concern_id} cadence_hours → {snapped}',
-                                    'cadence_hours': snapped})
+                                    'message': f'{concern_id} rhythm_hours → {snapped}',
+                                    'rhythm_hours': snapped,
+                                    'cadence_hours': snapped})  # legacy alias
                 return
 
             # Status transitions — map browser vocabulary to chat statuses.
@@ -2680,7 +2733,7 @@ class ChatLoop:
             # ids verbatim, so a meaningful slug lets Jill see *which*
             # concern the input activates.
             char_concerns: List[Dict[str, str]] = []
-            for _nid, note, _w in self._iter_active_concerns():
+            for _nid, note, _a in self._iter_active_agent_concerns():
                 ctext = str((note.get('properties') or {}).get('content', '') or '').strip()
                 if not ctext:
                     continue
@@ -2720,7 +2773,8 @@ class ChatLoop:
 
     def _build_system_prompt(self, source: str, orientation: str,
                              recall: Optional[List[Tuple[str, str]]] = None,
-                             concerns: Optional[List[Tuple[str, str, str, bool]]] = None) -> str:
+                             agent_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None,
+                             user_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None) -> str:
         """Build the persona/state portion of the system prompt — shared base
         for ReAct mode. The prose-only directive that used to live here was
         moved out: ReAct supplies its own JSON-emit directive in
@@ -2741,29 +2795,53 @@ class ChatLoop:
                 f"## Companion model of {source} (rolling LLM reflection; fair-witness texture, not a brief to flatter)\n"
                 f"{companion}"
             )
-        if concerns:
-            # Active concerns sit ABOVE memories: concerns are directives
-            # to advance, memories are background to draw on. Each item
-            # renders as `- [category(, seed)] text` with an optional
-            # indented sub-line carrying the operational status (cadence
-            # + run state, or a consequence-leading note when the concern
-            # can't run). Sub-lines are computed in _get_concerns_for_prompt
-            # against the same anchor used by _check_and_fire_concerns.
-            con_lines: List[str] = []
-            for item in concerns:
-                text, cat, status_text, is_seed = item
-                tag = f"{cat}, seed" if is_seed else cat
-                con_lines.append(f"- [{tag}] {text}")
-                if status_text:
-                    con_lines.append(f"    {status_text}")
+        # User concerns sit adjacent to companion — they're a structured
+        # part of the user model. Decay each turn; bumped on similarity
+        # match with input. Surface what user has been tracking, ranked
+        # by current strength.
+        if user_concerns:
+            uc_lines: List[str] = []
+            for _nid, text, strength, _props in user_concerns:
+                uc_lines.append(f"- [{strength:.2f}] {text}")
             parts.append(
-                f"## Active concerns (from YAML seeds + post-turn reflection + semantic recall)\n"
-                f"Three categories: `one_shot` (do once), `durable` "
-                f"(standing or recurring), `derived` (Jill's own "
-                f"observation). Where relevant, an indented sub-line "
-                f"states the operational status. Recall reinforces "
-                f"concerns on engagement; without it they decay.\n\n"
-                + "\n".join(con_lines)
+                f"## What {source} has been tracking (user_concerns, ranked by strength)\n"
+                "Topics user has surfaced or returned to recently. Strength "
+                "decays each turn unless user touches the topic again. Use "
+                "to inform responses; do not act on these autonomously.\n\n"
+                + "\n".join(uc_lines)
+            )
+        # Agent concerns sit before memories: directives to advance, not
+        # background context. Each item renders with current activation
+        # so Jill can see how close to firing each one is. Seeds are
+        # constitutional (sources for derived concerns), distinguished
+        # by tag. instruction-bearing concerns fire when activation
+        # crosses threshold.
+        if agent_concerns:
+            ac_lines: List[str] = []
+            for _nid, text, activation, props in agent_concerns:
+                tags = []
+                if props.get('seed'):
+                    tags.append('seed')
+                if props.get('successor_of'):
+                    tags.append(f"successor d{props.get('successor_depth', 1)}")
+                tag_str = f", {','.join(tags)}" if tags else ''
+                ac_lines.append(f"- [{activation:.2f}{tag_str}] {text}")
+                instr = (props.get('instruction') or '').strip()
+                rhythm = props.get('rhythm_hours')
+                if instr and rhythm:
+                    ac_lines.append(
+                        f"    fires every ~{rhythm}h when activation crosses "
+                        f"{_AGENT_CONCERN_FIRE_THRESHOLD:.2f}: {instr[:120]}")
+                elif not instr:
+                    ac_lines.append(
+                        "    standing concern, no instruction (won't fire)")
+            parts.append(
+                f"## My active concerns (agent_concerns, ranked by activation)\n"
+                "Pressure-driven: activation grows over wall-clock time at "
+                "each concern's rhythm; firing decrements it. Concerns "
+                "without an instruction don't fire — they shape what I "
+                "attend to without driving action.\n\n"
+                + "\n".join(ac_lines)
             )
         if recall:
             # Episodic specifics retrieved from prior conversations. Distinct
@@ -2815,8 +2893,11 @@ class ChatLoop:
     def _build_react_system_prompt(self, source: str, orientation: str,
                                    now_str: str,
                                    recall: Optional[List[Tuple[str, str]]] = None,
-                                   concerns: Optional[List[Tuple[str, str, str, bool]]] = None) -> str:
-        base = self._build_system_prompt(source, orientation, recall=recall, concerns=concerns)
+                                   agent_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None,
+                                   user_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None) -> str:
+        base = self._build_system_prompt(
+            source, orientation, recall=recall,
+            agent_concerns=agent_concerns, user_concerns=user_concerns)
         react = (
             f"\n\n## Now (system clock)\n{now_str}\n"
             "\n"
@@ -2964,7 +3045,8 @@ class ChatLoop:
 
     def _run_react_loop(self, source: str, user_text: str, orientation: str,
                         recall: Optional[List[Tuple[str, str]]] = None,
-                        concerns: Optional[List[Tuple[str, str, str, bool]]] = None
+                        agent_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None,
+                        user_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None
                         ) -> Tuple[str, List[Tuple[str, str]], List[Dict[str, Any]], str]:
         """Run the ReAct loop. Returns (reply, log, iters, exit_reason).
         The trace is NOT written here — caller writes it after post-turn
@@ -2995,7 +3077,8 @@ class ChatLoop:
         # backend's KV cache hits on every iter past the first.
         now_str = datetime.now().astimezone().strftime("%A, %B %d %Y, %I:%M %p %Z")
         system_prompt_str = self._build_react_system_prompt(
-            source, orientation, now_str, recall=recall, concerns=concerns)
+            source, orientation, now_str, recall=recall,
+            agent_concerns=agent_concerns, user_concerns=user_concerns)
         user_prefix_str = self._build_react_user_prefix(source, user_text)
         log_appendage_str = ""
         trailer = "\nEmit next action:"
@@ -3330,7 +3413,8 @@ class ChatLoop:
                                   exit_reason: str,
                                   orientation: str = '',
                                   recall: Optional[List[Tuple[str, str]]] = None,
-                                  concerns: Optional[List[Any]] = None,
+                                  agent_concerns: Optional[List[Any]] = None,
+                                  user_concerns: Optional[List[Any]] = None,
                                   autonomous: bool = False) -> None:
         """Append one structured ReAct turn record to
         <memory>/reasoning_trace.jsonl. Per-turn-unique content (orientation,
@@ -3362,13 +3446,21 @@ class ChatLoop:
             # slowly-varying). Per-turn snapshot of these is what makes
             # the trace faithful for "what was I operating under at T11"
             # probes.
+            # Concerns snapshot: flatten each list to "[kind activation/strength] text"
+            # so the trace stays human-grep-able without losing the asymmetry.
             concerns_at_turn: List[str] = []
-            for item in (concerns or []):
-                if isinstance(item, tuple):
-                    concerns_at_turn.append(' | '.join(
-                        str(x) for x in item if x is not None))
+            for item in (agent_concerns or []):
+                if isinstance(item, tuple) and len(item) >= 3:
+                    _nid, text, weight = item[0], item[1], item[2]
+                    concerns_at_turn.append(f"[agent {weight:.2f}] {text}")
                 else:
-                    concerns_at_turn.append(str(item))
+                    concerns_at_turn.append(f"[agent] {item}")
+            for item in (user_concerns or []):
+                if isinstance(item, tuple) and len(item) >= 3:
+                    _nid, text, weight = item[0], item[1], item[2]
+                    concerns_at_turn.append(f"[user {weight:.2f}] {text}")
+                else:
+                    concerns_at_turn.append(f"[user] {item}")
             recall_at_turn: List[str] = []
             for item in (recall or []):
                 if isinstance(item, tuple) and len(item) >= 2:
@@ -3571,14 +3663,24 @@ class ChatLoop:
         new_depth = parent_depth + 1
         succ_text = (f"{parent_text} — continuation (depth {new_depth})"
                      if parent_text else f"continuation of {parent_id} (depth {new_depth})")
-        new_id = self._add_concern(
-            text=succ_text, category='derived', entity='User',
-            provenance='inferred', seed=False, name='',
-            cadence_hours=1, lifetime_days=0.5, instruction=next_slice,
+        # Successor: same kind as parent (agent_concern). Fast rhythm
+        # so the remainder runs promptly. Pre-loaded activation so it
+        # fires on the next tick without waiting for full growth from
+        # 0 — successors carry the parent's not-quite-finished work.
+        new_id = self._add_agent_concern(
+            text=succ_text, entity='User', provenance='inferred',
+            seed=False, name='',
+            rhythm_hours=1, rhythm_source='urgency',
+            instruction=next_slice,
             skip_recurrence=True,
             extra_properties={
                 'successor_of': parent_id,
                 'successor_depth': new_depth,
+                # Prime activation just below threshold so the next tick's
+                # growth pushes it over without making the spawn itself
+                # eligible (avoids re-firing in the same tick window).
+                'activation': max(0.0,
+                                  _AGENT_CONCERN_FIRE_THRESHOLD - 0.1),
             },
         )
         if not new_id:
@@ -3635,28 +3737,34 @@ class ChatLoop:
                 self.store.close_dialog(source)
             return
 
+        # User-turn dynamics for user_concerns: decay all strengths,
+        # then bump those that semantic-match this input. Skipped on
+        # autonomous turns (the agent talking to itself doesn't shift
+        # the user model). Order: decay first so a fresh mention's
+        # full bump prevails over the same-turn decay step.
+        if not autonomous:
+            self._decay_user_concerns_per_turn()
+            self._bump_user_concerns_on_input(text)
+
         orientation = self._orientation_summary(source, text)
         # Auto-RAG: pull top-k durable memories that match this turn's input.
         # Injected next to the Companion block in the system prompt; no ReAct
         # tool call required. Cheap miss (one embedding query).
         recall = self._recall(text, k=3)
-        # Active concerns: combined surface of semantic-recall hits (which
-        # reinforce engagement on user turns) + top-N by current weight
-        # (always-on budget). On autonomous turns, recall is read-only —
-        # autonomous use must NOT register as user engagement.
-        concerns = self._get_concerns_for_prompt(text, refresh=not autonomous)
-        # Concern firing (Phase B-display): user-turn impulses. Skipped on
-        # autonomous turns — _handle_tick has already identified what fired
-        # and is the path that's running this turn.
-        if not autonomous:
-            self._check_and_fire_concerns(source)
+        # Concerns surface: user_concerns (top by strength) + agent_concerns
+        # (top by activation). Two separate lists — the prompt builder
+        # renders each in its own section. No firing on user turns;
+        # autonomous fires happen on tick via _handle_tick.
+        agent_concerns = self._top_active_agent_concerns()
+        user_concerns = self._top_active_user_concerns()
 
         log: List[Tuple[str, str]] = []
         iters: List[Dict[str, Any]] = []
         exit_reason = 'crashed'
         try:
             reply, log, iters, exit_reason = self._run_react_loop(
-                source, text, orientation, recall=recall, concerns=concerns)
+                source, text, orientation, recall=recall,
+                agent_concerns=agent_concerns, user_concerns=user_concerns)
         except Exception as e:
             logger.error(f"[{self.character_name}] ReAct loop crashed: {e}")
             import traceback
@@ -3674,13 +3782,11 @@ class ChatLoop:
         self._publish_say(reply)
         logger.info(f"[{self.character_name}] -> {source} ({act_type}): {reply!r}")
 
-        # Bump last_acted_at on the fired concern AFTER successful reply
-        # publication — the autonomous run has now actually executed.
-        if autonomous and autonomous_concern_id and exit_reason != 'crashed':
-            note = self.resource_manager.get_resource(autonomous_concern_id)
-            if note:
-                note.setdefault('properties', {})['last_acted_at'] = (
-                    datetime.now(timezone.utc).isoformat())
+        # Service the fired agent_concern AFTER successful reply
+        # publication. Decrements activation per exit_reason and stamps
+        # last_fired_at — the autonomous run has now actually executed.
+        if autonomous and autonomous_concern_id:
+            self._service_agent_concern(autonomous_concern_id, exit_reason)
 
         # Successor-concern spawn. When an autonomous ReAct loop hits its
         # iter cap, the work likely isn't done — synthesize what's left
@@ -3716,7 +3822,8 @@ class ChatLoop:
             self._write_reasoning_history(
                 source, text, iters, reply, exit_reason,
                 orientation=orientation, recall=recall,
-                concerns=concerns, autonomous=autonomous)
+                agent_concerns=agent_concerns, user_concerns=user_concerns,
+                autonomous=autonomous)
 
         # Post-turn work (discourse + reflection + close + persist) is
         # ~5-15s of LLM calls and conceptually a side effect of the turn.
@@ -3749,31 +3856,35 @@ class ChatLoop:
     # Triggered by the `tick` sensor's heartbeat. Gated by
     # self._autonomy_enabled (launcher --autonomy); when off, this is a
     # no-op so existing benchmarks and chat scenarios behave identically.
-    # When on: runs check_and_fire without emitting Phase B impulses
-    # (we'll surface fires via the autonomous-act path), then dispatches
-    # up to _AUTONOMOUS_FIRE_CAP concerns through the standard ReAct
-    # pipeline. Surplus concerns remain due (last_acted_at unchanged)
-    # and will be picked up on the next tick.
+    # When on: grows agent_concern activations, identifies any whose
+    # activation has crossed _AGENT_CONCERN_FIRE_THRESHOLD AND have an
+    # instruction, then dispatches up to _AUTONOMOUS_FIRE_CAP concerns
+    # through the standard ReAct pipeline. Surplus concerns stay above
+    # threshold and surface on the next tick.
     #
-    # The trigger gate (_check_and_fire_concerns) is deliberately
-    # LLM-free — pure cadence arithmetic — so this path stays cheap on
-    # ticks where nothing is due. Do not introduce LLM calls into the
+    # Both the growth pass and the fire-check are deliberately LLM-free
+    # — pure activation arithmetic — so this path stays cheap on ticks
+    # where nothing is due. Do not introduce LLM calls into the
     # tick→fire decision; reasoning happens inside the ReAct loop a
-    # fired concern dispatches, gated by cadence.
+    # fired concern dispatches, gated by activation threshold.
     # ------------------------------------------------------------------
 
     _AUTONOMOUS_FIRE_CAP = 2
 
     def _handle_tick(self) -> None:
         """Per-tick autonomy pass. No-op when --autonomy is off.
-        When on: identifies due concerns, runs up to _AUTONOMOUS_FIRE_CAP
-        ReAct loops on their instructions, prints a CLI preamble + coda
-        per fire, a deferral note if any are dropped, and appends one
-        JSONL record per event to <memory>/autonomy.jsonl.
+        When on: grows activations, identifies fire-eligible concerns,
+        runs up to _AUTONOMOUS_FIRE_CAP ReAct loops on their instructions,
+        prints a CLI preamble + coda per fire, a deferral note if any are
+        dropped, and appends one JSONL record per event to
+        <memory>/autonomy.jsonl.
         """
         if not self._autonomy_enabled:
             return
-        fired = self._check_and_fire_concerns(self.character_name, emit_impulse=False)
+        # Grow first, then check — ensures activations reflect elapsed
+        # time before the fire decision.
+        self._grow_agent_concerns_per_tick()
+        fired = self._check_and_fire_agent_concerns()
         if not fired:
             return
         # Cap dispatch; the rest stay due (last_acted_at unchanged) and
