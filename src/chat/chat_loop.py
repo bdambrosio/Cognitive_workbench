@@ -1517,7 +1517,7 @@ class ChatLoop:
     # fresh re-read" — names, places, commitments, stable preferences.
     _REFLECT_SYS = (
         "You watch chats between {character} and {entity}. Your job has "
-        "three stages.\n\n"
+        "four stages.\n\n"
         "STAGE 1 — Frame check. Classify the latest exchange as one of:\n"
         "- `hypothetical`: 'imagine that…', 'suppose…', 'what if…'\n"
         "- `roleplay`: user asked {character} to take on a persona, character, or voice\n"
@@ -1525,8 +1525,9 @@ class ChatLoop:
         "- `instructional`: user is teaching {character} how to behave, not stating facts\n"
         "- `none`: a real exchange where statements about {entity}, the world, or "
         "agreements between you carry their literal weight\n"
-        "If the frame is anything other than `none`, return memories=[] AND "
-        "concerns=[]. When in doubt, prefer the more conservative classification.\n\n"
+        "If the frame is anything other than `none`, return all three lists "
+        "empty (memories, user_concerns, agent_concerns). When in doubt, "
+        "prefer the more conservative classification.\n\n"
         "STAGE 2 — Memories. If frame is `none`, extract stable specifics "
         "that should survive into FUTURE conversations.\n"
         "CAPTURE as memories:\n"
@@ -1538,96 +1539,115 @@ class ChatLoop:
         "- Pleasantries, mood, conversational tone (companion handles these).\n"
         "- Anything already in the companion model verbatim.\n"
         "- One-off questions with no stable signal.\n\n"
-        "STAGE 3 — Concerns. Distinct from memories. A concern is an "
-        "ACTIONABLE INSTRUCTION {character} should be ready to advance — "
-        "something she can reasonably take action on, not a fact or modifier. "
-        "Capture concerns at THREE granularities:\n"
-        "- `one_shot`: a specific request with a clear completion (\"look up "
-        "X\", \"draft me an email about Y\"). Decays fast. If the request "
-        "was already fulfilled in this exchange, leave `instruction` null "
-        "so it logs without re-firing; if the request explicitly defers "
-        "work for later, set `instruction` and it will fire on the next "
-        "tick.\n"
-        "- `durable`: an ongoing directive {entity} expects {character} to "
-        "uphold over time (\"keep me posted on X\", \"help me think through "
-        "my dissertation\"). FIRES per its cadence; provide cadence_hours "
-        "and instruction.\n"
-        "- `derived`: something {character} noticed worth tracking that the "
-        "user did NOT explicitly request. Use sparingly. Provide instruction "
-        "ONLY if recurring action is genuinely warranted; otherwise leave "
-        "instruction null so it stays as background context without firing.\n"
-        "SKIP from concerns:\n"
-        "- Modifiers like \"be brief\" / \"don't use emoji\" — those go to "
-        "memories as preferences, not concerns.\n"
-        "- Items already covered by an existing concern in the system prompt.\n"
-        "- Speculative inferences without textual support.\n\n"
-        "For EVERY concern, emit these three additional fields:\n"
-        "- `cadence_hours` (int|null): firing rhythm in hours. MUST be one of "
-        "the allowed values {{1, 2, 4, 8, 12, 24, 168}}. Pick the rhythm of "
-        "the underlying signal, not how often you'd nag the user. Examples:\n"
-        "    hourly check (intraday market move, breaking news): 1 or 2\n"
-        "    several-times-a-day (active project, ongoing task): 4 or 8\n"
-        "    twice-daily / daily event (S&P close, daily roundup): 12 or 24\n"
-        "    weekly check-in (project, hobby): 168\n"
-        "    null is allowed for any category — means \"don't fire on a cadence.\"\n"
-        "- `lifetime_days` (number|null): decay tau in DAYS — how long "
-        "{entity}'s interest in this topic plausibly persists without "
-        "re-engagement. Should be several times the cadence. null = "
-        "immortal. Examples:\n"
-        "    daily-fire concern (cadence_hours=24): 14-30\n"
-        "    weekly-fire concern (cadence_hours=168): 60-180\n"
-        "    annual-fire concern: null\n"
-        "- `instruction` (string|null): what {character} does when this "
-        "concern fires. A directive she could execute, in the imperative. "
-        "Examples:\n"
+        "STAGE 3 — User concerns. Topics {entity} is currently preoccupied "
+        "with, has surfaced repeatedly, or has explicitly asked {character} "
+        "to attend to. DISTINCT from memories: a memory is a stable fact "
+        "({entity}'s brother is named Joe); a user_concern is an active "
+        "preoccupation ({entity} is investigating concerns redesign).\n"
+        "User concerns DO NOT fire autonomously. Their job is to inform "
+        "{character}'s responses by surfacing in the prompt when relevant. "
+        "Strength decays each turn unless reinforced by the user touching "
+        "the topic again — so capture liberally; the runtime prunes what's "
+        "not engaged.\n"
+        "CAPTURE as user_concerns:\n"
+        "- Active investigations / current preoccupations evidenced this turn\n"
+        "- Topics user keeps returning to across exchanges\n"
+        "- Things user explicitly said they're tracking or thinking about\n"
+        "SKIP from user_concerns:\n"
+        "- Stable identity facts (those go to memories)\n"
+        "- One-off questions with no preoccupation signal\n"
+        "- Items already covered by an existing user_concern in the prompt\n"
+        "Schema per user_concern: just `text` (≤120 chars). Strength is "
+        "set to 1.0 by the runtime — don't include strength in your output.\n\n"
+        "STAGE 4 — Agent concerns. {character}'s OWN action queue: things "
+        "{character} should be ready to advance. Authored from user "
+        "requests with explicit deferred action, OR from seed concerns + "
+        "observed context where {character} would benefit from periodic "
+        "attention. DISTINCT from user_concerns: agent_concerns drive "
+        "{character}'s autonomous action; user_concerns shape responses.\n"
+        "Agent concerns FIRE autonomously when their activation grows past "
+        "threshold AND they carry an instruction. Activation grows on a "
+        "per-concern rhythm (rhythm_hours); each fire decrements activation.\n"
+        "CAPTURE as agent_concerns:\n"
+        "- User explicitly asked {character} to do/track something ongoing\n"
+        "- User stated a deferred action ('remind me about X tomorrow')\n"
+        "- {character} noticed a pattern that genuinely warrants recurring "
+        "attention (use sparingly — most observations belong in memories or "
+        "user_concerns, not as agent_concerns)\n"
+        "SKIP from agent_concerns:\n"
+        "- Modifiers like 'be brief' / 'don't use emoji' (memories→preferences)\n"
+        "- Items already covered by an existing agent_concern in the prompt\n"
+        "- Speculative inferences without textual support\n"
+        "- Requests the user-driven turn already fulfilled this exchange — "
+        "skip them entirely rather than logging an unfireable record\n"
+        "Schema per agent_concern:\n"
+        "- `text` (≤120 chars): short summary of what the concern is about.\n"
+        "- `instruction` (string|null): imperative directive {character} "
+        "executes when this concern fires. null = the concern is logged "
+        "for context but never fires. Examples:\n"
         "    \"Search for today's S&P 500 close and summarize the move.\"\n"
-        "    \"Check in on dissertation prep — ask if anything's blocking.\"\n"
         "    \"Pull recent papers on multi-agent coordination from arxiv.\"\n"
+        "- `rhythm_hours` (int|null): target fire interval in hours. MUST be "
+        "one of {{1, 2, 4, 8, 12, 24, 168}} or null. Pick from the underlying "
+        "signal, not how often you'd nag the user:\n"
+        "    hourly events (breaking news, intraday): 1 or 2\n"
+        "    several-times-a-day work / project: 4 or 8\n"
+        "    daily event (S&P close, daily roundup): 12 or 24\n"
+        "    weekly check-in (project, hobby): 168\n"
+        "    null = no autonomous fire (concern still logs).\n"
+        "- `rhythm_source` (\"external\"|\"urgency\"|\"default\"):\n"
+        "    `external` if user specified rhythm or topic has natural cadence\n"
+        "    `urgency` if user signaled importance ('track this closely')\n"
+        "    `default` if you guessed (default to 168 / weekly when guessing)\n"
         "{narrowness_rule}\n\n"
-        "**REQUIRED for category=durable**: cadence_hours MUST be one of the "
-        "allowed values, lifetime_days MUST be a number, instruction MUST be "
-        "a non-empty string. A durable concern without these fields cannot "
-        "fire and is operationally useless. Do not skip them.\n"
-        "**For one_shot and derived**: any of cadence_hours, instruction, and "
-        "lifetime_days may be null. A null `instruction` means the concern "
-        "is logged but never fires — the right choice when the request was "
-        "already handled or no recurring action is warranted.\n\n"
-        "Output ONLY this JSON shape — nothing else:\n"
+        "Output ONLY this JSON shape — nothing else, no prose:\n"
         "  {{\"frame\": \"<hypothetical|roleplay|counterfactual|instructional|none>\",\n"
         "   \"memories\": [{{\"text\": \"...\", \"category\": \"fact|preference|commitment\"}}, ...],\n"
-        "   \"concerns\": [{{\"text\": \"...\", \"category\": \"one_shot|durable|derived\",\n"
-        "                  \"cadence_hours\": <int from {{1,2,4,8,12,24,168}}|null>,\n"
-        "                  \"lifetime_days\": <number|null>,\n"
-        "                  \"instruction\": \"<imperative directive>|null\"}}, ...]}}\n\n"
-        "WORKED EXAMPLE. {entity} just said: \"Please keep an eye on S&P 500 "
+        "   \"user_concerns\": [{{\"text\": \"...\"}}, ...],\n"
+        "   \"agent_concerns\": [{{\n"
+        "     \"text\": \"...\",\n"
+        "     \"instruction\": \"<imperative>|null\",\n"
+        "     \"rhythm_hours\": <int|null>,\n"
+        "     \"rhythm_source\": \"external|urgency|default\"\n"
+        "   }}, ...]}}\n\n"
+        "WORKED EXAMPLE 1. {entity}: \"Please keep an eye on S&P 500 "
         "closes — I want to hear about them every day.\"\n"
-        "Correct output:\n"
-        "{{\"frame\": \"none\", \"memories\": [], \"concerns\": [{{\n"
-        "  \"text\": \"Track the S&P 500 closing price daily.\",\n"
-        "  \"category\": \"durable\",\n"
-        "  \"cadence_hours\": 24,\n"
-        "  \"lifetime_days\": 14,\n"
-        "  \"instruction\": \"Search for today's S&P 500 close and summarize the day's move.\"\n"
-        "}}]}}\n"
-        "If nothing qualifies (or frame≠none): "
-        "{{\"frame\": \"<value>\", \"memories\": [], \"concerns\": []}}. No prose."
+        "Output:\n"
+        "{{\"frame\": \"none\", \"memories\": [],\n"
+        "  \"user_concerns\": [{{\"text\": \"S&P 500 daily performance\"}}],\n"
+        "  \"agent_concerns\": [{{\n"
+        "    \"text\": \"Track S&P 500 closing price daily.\",\n"
+        "    \"instruction\": \"Search for today's S&P 500 close and summarize the day's move.\",\n"
+        "    \"rhythm_hours\": 24,\n"
+        "    \"rhythm_source\": \"external\"\n"
+        "  }}]}}\n\n"
+        "WORKED EXAMPLE 2. {entity}: \"I'm thinking about how concerns and "
+        "tasks differ.\" (Just thinking aloud — no action requested.)\n"
+        "Output (user_concern only; no agent_concern since no action):\n"
+        "{{\"frame\": \"none\", \"memories\": [],\n"
+        "  \"user_concerns\": [{{\"text\": \"concerns vs tasks distinction\"}}],\n"
+        "  \"agent_concerns\": []}}\n\n"
+        "If frame≠none or nothing qualifies: return the envelope with all "
+        "three lists empty."
     )
 
-    def _reflect_and_remember(self, source: str) -> Tuple[List[str], List[str]]:
-        """Run a single reflection LLM call over the latest exchange; for any
-        memories AND concerns returned, persist them. Returns (memories_written,
-        concerns_written). Failure-tolerant: any error path returns ([], [])."""
+    def _reflect_and_remember(self, source: str) -> Tuple[List[str], List[str], List[str]]:
+        """Run a single reflection LLM call over the latest exchange; persist
+        memories, user_concerns, agent_concerns. Returns the three written-text
+        lists. Failure-tolerant: any error path returns three empty lists."""
         if not self._memories_collection_id:
-            return ([], [])
+            return ([], [], [])
         try:
             dialog = self._build_dialog(source, limit=4)
             if not dialog:
-                return ([], [])
+                return ([], [], [])
             convo = "\n".join(f"{t['source']}: {t['text']}" for t in dialog)
             companion = self._companion_state.get(source, '').strip()
-            # Show the LLM the active concerns so it doesn't re-derive ones
-            # we already track. Compact: text + category badge.
-            existing_concerns = self._top_active_agent_concerns(n=10)
+            # Show the LLM the existing concerns from BOTH collections so it
+            # doesn't re-derive ones we already track. Two compact sections,
+            # one per collection.
+            existing_agent = self._top_active_agent_concerns(n=10)
+            existing_user = self._top_active_user_concerns(n=10)
             sys_msg = self._REFLECT_SYS.format(
                 character=self.character_name, entity=source,
                 narrowness_rule=_CONCERN_INSTRUCTION_NARROWNESS_RULE)
@@ -1636,53 +1656,52 @@ class ChatLoop:
                 user_parts.append(
                     "## Existing companion model (do NOT re-extract from this; "
                     "use only to avoid duplicates)\n" + companion)
-            if existing_concerns:
-                lines = []
-                for _nid, text, activation, props in existing_concerns:
-                    cat = props.get('category', 'agent') or 'agent'
-                    lines.append(f"- [{cat}] {text}")
+            if existing_user:
+                lines = [f"- {text}" for _nid, text, _s, _p in existing_user]
                 user_parts.append(
-                    "## Existing active concerns (do NOT re-emit; emit only "
-                    "NEW concerns this exchange surfaced)\n" + "\n".join(lines))
+                    "## Existing user_concerns (do NOT re-emit; emit only "
+                    "NEW user_concerns this exchange surfaced)\n" + "\n".join(lines))
+            if existing_agent:
+                lines = [f"- {text}" for _nid, text, _a, _p in existing_agent]
+                user_parts.append(
+                    "## Existing agent_concerns (do NOT re-emit; emit only "
+                    "NEW agent_concerns this exchange surfaced)\n" + "\n".join(lines))
             user_parts.append("## Latest exchange\n" + convo)
             user_parts.append(
-                "Return the JSON object now (keys: frame, memories, concerns). "
-                "Both lists empty if frame≠none or nothing qualifies.")
+                "Return the JSON object now (keys: frame, memories, "
+                "user_concerns, agent_concerns). All lists empty if frame≠none "
+                "or nothing qualifies.")
             result = self._llm_generate(
                 [{'role': 'system', 'content': sys_msg},
                  {'role': 'user', 'content': "\n\n".join(user_parts)}],
                 max_tokens=4096, temperature=0.3, is_json=True,
                 cot_profile='none')
             if not result.success:
-                return ([], [])
+                return ([], [], [])
             payload = result.text
-            # Diagnostic: log the raw payload so we can see whether the LLM
-            # is emitting cadence_days / lifetime_days / instruction or
-            # silently dropping them (which forces category-default fallback
-            # and an unfireable concern).
             try:
                 _preview = json.dumps(payload) if not isinstance(payload, str) else payload
             except Exception:
                 _preview = repr(payload)
             logger.info(f"[{self.character_name}] reflection raw: {_preview[:800]}")
-            # Salvage: cloud LLMs may return text instead of parsed JSON.
             if isinstance(payload, str):
                 stripped = payload.strip()
                 if stripped.startswith(('{', '[')):
                     try:
                         payload = json.loads(stripped)
                     except Exception:
-                        return ([], [])
+                        return ([], [], [])
                 else:
-                    return ([], [])
+                    return ([], [], [])
 
-            frame, raw_memories, raw_concerns = self._parse_reflection_payload(payload)
+            frame, raw_memories, raw_user_concerns, raw_agent_concerns = (
+                self._parse_reflection_payload(payload))
 
             if frame != _REFLECT_FRAME_OK:
                 logger.info(
                     f"[{self.character_name}] reflection suppressed "
-                    f"(frame={frame!r}) — no memories/concerns written")
-                return ([], [])
+                    f"(frame={frame!r}) — nothing written")
+                return ([], [], [])
 
             mems_written: List[str] = []
             for text, category in raw_memories:
@@ -1691,57 +1710,57 @@ class ChatLoop:
                 if self._remember(text, entity=source, category=category):
                     mems_written.append(text)
 
-            cons_written: List[str] = []
-            for c in raw_concerns:
+            user_cons_written: List[str] = []
+            for text in raw_user_concerns:
+                if len(text) > 240:
+                    text = text[:240].rstrip()
+                if self._add_user_concern(text, entity=source):
+                    user_cons_written.append(text)
+
+            agent_cons_written: List[str] = []
+            for c in raw_agent_concerns:
                 text = c.get('text', '')
                 if len(text) > 240:
                     text = text[:240].rstrip()
-                category = c.get('category', 'durable')
-                # Provisional adapter for the legacy reflection schema:
-                # treat all reflection-emitted concerns as agent_concerns.
-                # The reflection prompt rewrite (item 6) will replace this
-                # with explicit user_concerns / agent_concerns channels.
-                provenance = 'inferred' if category == 'derived' else 'asserted'
-                rhythm_h = c.get('rhythm_hours')
-                if rhythm_h is None:
-                    rhythm_h = c.get('cadence_hours')
                 if self._add_agent_concern(
-                        text, entity=source, provenance=provenance,
-                        seed=False, rhythm_hours=rhythm_h,
-                        rhythm_source='external' if rhythm_h else 'default',
+                        text, entity=source,
+                        provenance='asserted',
+                        seed=False,
+                        rhythm_hours=c.get('rhythm_hours'),
+                        rhythm_source=c.get('rhythm_source') or 'default',
                         instruction=c.get('instruction')):
-                    cons_written.append(text)
+                    agent_cons_written.append(text)
 
-            if mems_written or cons_written:
+            if mems_written or user_cons_written or agent_cons_written:
                 logger.info(
                     f"[{self.character_name}] reflection wrote "
                     f"{len(mems_written)} memory(s), "
-                    f"{len(cons_written)} concern(s) from {source}")
-            return (mems_written, cons_written)
+                    f"{len(user_cons_written)} user_concern(s), "
+                    f"{len(agent_cons_written)} agent_concern(s) from {source}")
+            return (mems_written, user_cons_written, agent_cons_written)
         except Exception as e:
             logger.warning(f"[{self.character_name}] _reflect_and_remember failed: {e}")
-            return ([], [])
+            return ([], [], [])
 
     @staticmethod
-    def _parse_reflection_payload(payload: Any
-                                  ) -> Tuple[str, List[Tuple[str, str]], List[Dict[str, Any]]]:
-        """Normalize reflection output to (frame, memories, concerns).
+    def _parse_reflection_payload(
+            payload: Any
+    ) -> Tuple[str, List[Tuple[str, str]], List[str], List[Dict[str, Any]]]:
+        """Normalize reflection output to (frame, memories, user_concerns,
+        agent_concerns).
         memories: list of (text, category) tuples.
-        concerns: list of dicts with keys text, category, cadence_hours,
-                  lifetime_days, instruction (any may be missing/None).
+        user_concerns: list of text strings (no fields beyond text).
+        agent_concerns: list of dicts with keys text, instruction,
+                        rhythm_hours, rhythm_source (any may be missing/None).
 
         Accepts:
-          - Full envelope: {"frame": "...", "memories": [...], "concerns": [...]}
-            with each concern dict carrying text, category, cadence_hours,
-            lifetime_days, instruction.
-          - Older envelope where concerns lack the cadence/lifetime/
-            instruction fields — fields default to None.
-          - Legacy envelope where concerns carried cadence_days instead
-            of cadence_hours — value is converted (×24) and snapped to
-            the allowed bucket downstream.
+          - New envelope: {"frame", "memories", "user_concerns", "agent_concerns"}
+          - Legacy envelope with single "concerns" key (single-channel design):
+            all concerns are routed to agent_concerns; cadence_hours field is
+            read as rhythm_hours.
           - Bare list of strings: assumed frame=none, treated as memories.
-        Anything else returns ('unknown', [], []) — caller treats non-`none`
-        frame as a suppression signal so this fails safe.
+        Anything else returns ('unknown', [], [], []) — caller treats
+        non-`none` frame as suppression so this fails safe.
         """
 
         def _normalize_memories(raw: Any) -> List[Tuple[str, str]]:
@@ -1760,52 +1779,68 @@ class ChatLoop:
                         out.append((t, c))
             return out
 
-        def _normalize_concerns(raw: Any) -> List[Dict[str, Any]]:
+        def _normalize_user_concerns(raw: Any) -> List[str]:
+            out: List[str] = []
+            if not isinstance(raw, list):
+                return out
+            for item in raw:
+                if isinstance(item, str) and item.strip():
+                    out.append(item.strip())
+                elif isinstance(item, dict):
+                    t = str(item.get('text', '') or '').strip()
+                    if t:
+                        out.append(t)
+            return out
+
+        def _normalize_agent_concerns(raw: Any) -> List[Dict[str, Any]]:
             out: List[Dict[str, Any]] = []
             if not isinstance(raw, list):
                 return out
             for item in raw:
                 if isinstance(item, str) and item.strip():
-                    out.append({'text': item.strip(), 'category': 'durable',
-                                'cadence_hours': None, 'lifetime_days': None,
-                                'instruction': None})
+                    out.append({'text': item.strip(), 'instruction': None,
+                                'rhythm_hours': None, 'rhythm_source': 'default'})
                 elif isinstance(item, dict):
                     t = str(item.get('text', '') or '').strip()
                     if not t:
                         continue
-                    c = str(item.get('category', 'durable') or 'durable').strip().lower()
-                    if c not in _CONCERN_CATEGORIES:
-                        c = 'durable'
-                    # Accept new cadence_hours or legacy cadence_days (×24);
-                    # snapping to the allowed bucket happens in _add_concern.
-                    cad_h = item.get('cadence_hours')
-                    if cad_h is None and item.get('cadence_days') is not None:
-                        try:
-                            cad_h = float(item.get('cadence_days')) * 24.0
-                        except (TypeError, ValueError):
-                            cad_h = None
-                    life = item.get('lifetime_days')
                     instr = item.get('instruction')
+                    rhythm_h = item.get('rhythm_hours')
+                    if rhythm_h is None:
+                        rhythm_h = item.get('cadence_hours')   # legacy field
+                    if rhythm_h is None and item.get('cadence_days') is not None:
+                        try:
+                            rhythm_h = float(item.get('cadence_days')) * 24.0
+                        except (TypeError, ValueError):
+                            rhythm_h = None
+                    src = str(item.get('rhythm_source', 'default') or 'default').strip().lower()
+                    if src not in ('external', 'urgency', 'default'):
+                        src = 'default'
                     out.append({
-                        'text': t, 'category': c,
-                        'cadence_hours': cad_h if cad_h is not None else None,
-                        'lifetime_days': life if life is not None else None,
+                        'text': t,
                         'instruction': str(instr).strip() if instr else None,
+                        'rhythm_hours': rhythm_h,
+                        'rhythm_source': src,
                     })
             return out
 
         # Old shape — bare list. Assume frame=none, all memories.
         if isinstance(payload, list):
-            return (_REFLECT_FRAME_OK, _normalize_memories(payload), [])
+            return (_REFLECT_FRAME_OK, _normalize_memories(payload), [], [])
 
-        # New envelope.
         if isinstance(payload, dict):
             frame = str(payload.get('frame', '') or '').strip().lower() or 'unknown'
             mems = _normalize_memories(payload.get('memories', []))
-            cons = _normalize_concerns(payload.get('concerns', []))
-            return (frame, mems, cons)
+            user_cons = _normalize_user_concerns(payload.get('user_concerns', []))
+            # Prefer the new agent_concerns field; fall back to legacy
+            # single-channel `concerns` (route to agent collection).
+            agent_cons_raw = payload.get('agent_concerns')
+            if agent_cons_raw is None:
+                agent_cons_raw = payload.get('concerns', [])
+            agent_cons = _normalize_agent_concerns(agent_cons_raw)
+            return (frame, mems, user_cons, agent_cons)
 
-        return ('unknown', [], [])
+        return ('unknown', [], [], [])
 
     # ------------------------------------------------------------------
     # Zenoh wiring
