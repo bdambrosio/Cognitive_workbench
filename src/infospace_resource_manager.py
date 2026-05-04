@@ -974,6 +974,16 @@ class InfospaceResourceManager:
                           'last_acted_at', 'last_fired_at',  # last_fired_at retained for legacy reads
                           'cadence_hours', 'cadence_days',
                           'lifetime_days', 'instruction', 'seed',
+                          # Phase-A asymmetric concern dynamics — agent_concerns
+                          # use activation/rhythm_hours/rhythm_source/last_activation_update_at,
+                          # user_concerns use strength/last_bumped_at, and
+                          # successor concerns use successor_of/successor_depth.
+                          # Without these the fields are silently dropped at
+                          # create_note time and notes load with activation=null.
+                          'activation', 'last_activation_update_at',
+                          'rhythm_hours', 'rhythm_source',
+                          'strength', 'last_bumped_at',
+                          'successor_of', 'successor_depth',
                           # reasoning_history (awareness feed) fields
                           'user_text', 'autonomous', 'exit_reason', 'n_iters', 'compressed',
                           'parent_id', 'order', 'span', 'section', 'source', 'entity', 'edge',
