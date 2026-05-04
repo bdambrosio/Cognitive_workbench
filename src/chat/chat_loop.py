@@ -826,6 +826,20 @@ class ChatLoop:
                     self._memories_collection_id, note_id, self.character_name)
                 if not ok:
                     logger.warning(f"[{self.character_name}] memory add_to_collection failed: {add_err}")
+                # Trace: append to memories.jsonl for provenance audit and
+                # remember-subagent visibility. Trigger is hardcoded
+                # 'reflection' since that's currently the sole writer; if
+                # other writers appear (manual /remember, autonomous), pass
+                # trigger as a parameter instead.
+                self._write_memory_event({
+                    'event': 'write',
+                    'note_id': note_id,
+                    'text': text,
+                    'category': category,
+                    'entity': entity,
+                    'source_turn_seq': getattr(self, '_turn_seq', None),
+                    'trigger': 'reflection',
+                })
                 return note_id
         except Exception as e:
             logger.warning(f"[{self.character_name}] _remember failed: {e}")
@@ -958,6 +972,30 @@ class ChatLoop:
                 f.write(json.dumps(record, ensure_ascii=False) + '\n')
         except Exception as e:
             logger.warning(f"[{self.character_name}] autonomy.jsonl write failed: {e}")
+
+    def _memories_log_path(self) -> 'Path':
+        """Path to <memory>/memories.jsonl — one JSON record per memory
+        write. Append-only, separate from the live memories collection so
+        provenance audit + temporal queries don't require iterating the
+        Notes store. The `remember` subagent can grep this file for
+        questions like 'when did I learn X?' or 'what memories were
+        written from yesterday's turns?'."""
+        return self._memory_dir() / 'memories.jsonl'
+
+    def _write_memory_event(self, event: Dict[str, Any]) -> None:
+        """Append one event record to memories.jsonl. Stamps `ts` and
+        `character` if not already set. Best-effort — failures log a
+        warning but don't disrupt the write that triggered the event."""
+        path = self._memories_log_path()
+        record = dict(event)
+        record.setdefault('ts', datetime.now(timezone.utc).isoformat())
+        record.setdefault('character', self.character_name)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(record, ensure_ascii=False) + '\n')
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] memories.jsonl write failed: {e}")
 
     def _load_reasoning_records(self) -> List[Dict[str, Any]]:
         """Read all per-turn records from reasoning_trace.jsonl.
