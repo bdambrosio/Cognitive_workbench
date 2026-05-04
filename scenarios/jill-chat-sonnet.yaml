@@ -166,4 +166,4 @@ characters:
     # per tick; the rest defer to the next tick).
     sensors:
       - name: tick
-        schedule: "30m"
+        schedule: "1m"

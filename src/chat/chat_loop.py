@@ -3946,7 +3946,7 @@ class ChatLoop:
 
                 kind = msg.get('kind', 'user')
                 if kind == 'tick':
-                    logger.info(f"[{self.character_name}] <- tick")
+                    logger.debug(f"[{self.character_name}] <- tick")
                     try:
                         self._handle_tick()
                     except Exception as e:
