@@ -1167,15 +1167,26 @@ class ResourceBrowser:
                     const label = c.concern_label || cid;
                     const status = c.status || '?';
                     const desc = c.concern_description || '';
+                    // Activation: prefer the new field directly on the concern
+                    // record (agent_concerns carry .activation), fall back to
+                    // the legacy executive activations map, then to weight.
+                    const isSeed = c.seed === true;
+                    const directAct = (typeof c.activation === 'number') ? c.activation : null;
                     const act = activations[cid] || {};
-                    const activation = act.activation || 0;
+                    const activation = directAct !== null
+                        ? directAct
+                        : (typeof act.activation === 'number' ? act.activation
+                           : (typeof c.weight === 'number' ? c.weight : 0));
                     const trend = act.trend || 'stable';
                     const trendIcon = trend === 'rising' ? '↑' : trend === 'falling' ? '↓' : '→';
                     const statusColor = status === 'active' ? '#4ec9b0' : status === 'satisfied' ? '#569cd6' : status === 'abandoned' ? '#888' : '#ce9178';
                     const barColor = activation > 0.7 ? '#ce9178' : activation > 0.4 ? '#dcdcaa' : '#4ec9b0';
+                    const seedBadge = isSeed
+                        ? `<span style="color:#dcdcaa;font-size:9px;margin-left:6px;border:1px solid #5a4a30;padding:0 3px;border-radius:2px">SEED</span>`
+                        : '';
                     return `<div class="resource-item" onclick="showConcernDetail(${JSON.stringify(c).replace(/"/g, '&quot;')}, 'derived')" style="padding:4px 6px;margin:1px 0;cursor:pointer">
                         <div style="display:flex;justify-content:space-between;align-items:center">
-                            <span style="color:#d4d4d4;font-size:11px">${label}</span>
+                            <span style="color:#d4d4d4;font-size:11px">${label}${seedBadge}</span>
                             <span style="color:${statusColor};font-size:9px">${status} ${trendIcon}</span>
                         </div>
                         <div style="color:#888;font-size:10px;margin-top:2px">${desc.substring(0,80)}${desc.length > 80 ? '...' : ''}</div>
@@ -1277,16 +1288,18 @@ class ResourceBrowser:
                             ${origin ? `<span style="color:#888;font-size:11px;margin-left:10px">origin: ${origin}</span>` : ''}
                             ${seed ? `<span style="color:#dcdcaa;font-size:11px;margin-left:10px">seed</span>` : ''}
                         </div>
-                        ${(cadenceHours !== undefined || lifetime !== undefined) ? `
+                        ${(cadenceHours !== undefined) ? `
                             <div style="margin-top:4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-                                <span style="color:#888;font-size:11px">cadence:</span>
+                                <span style="color:#888;font-size:11px">rhythm:</span>
                                 <select onchange="setCadenceHours('${cid}', this.value, '${type}')" style="background:#2d2d2d;color:#d4d4d4;border:1px solid #3e3e42;font-size:11px;padding:1px 4px">
                                     <option value="" ${cadenceHours === null || cadenceHours === undefined ? 'selected' : ''}>(none — won't fire)</option>
                                     ${cadenceAllowed.map(h =>
                                         `<option value="${h}" ${cadenceHours === h ? 'selected' : ''}>${fmtHours(h)}</option>`
                                     ).join('')}
                                 </select>
-                                <span style="color:#888;font-size:11px">lifetime: ${fmtDays(lifetime)}</span>
+                                ${concern.rhythm_source ? `<span style="color:#888;font-size:11px">source: ${concern.rhythm_source}</span>` : ''}
+                                ${typeof concern.activation === 'number' ? `<span style="color:#888;font-size:11px">activation: ${concern.activation.toFixed(3)}</span>` : ''}
+                                ${typeof concern.strength === 'number' ? `<span style="color:#888;font-size:11px">strength: ${concern.strength.toFixed(3)}</span>` : ''}
                                 ${provenance ? `<span style="color:#888;font-size:11px">provenance: ${provenance}</span>` : ''}
                             </div>
                         ` : ''}
