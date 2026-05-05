@@ -37,6 +37,26 @@ def _ts():
     return datetime.now().strftime('%H:%M:%S')
 
 
+def _elapsed_since(iso_str: str) -> str:
+    """Render elapsed time since an ISO timestamp as "12s" / "3m 14s" /
+    "1h 22m". Returns the raw string on parse failure so /status never
+    silently swallows a malformed timestamp."""
+    try:
+        from datetime import timezone
+        t = datetime.fromisoformat(str(iso_str))
+        if t.tzinfo is None:
+            t = t.replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        secs = max(0, int((now - t).total_seconds()))
+    except Exception:
+        return str(iso_str)
+    if secs < 60:
+        return f"{secs}s"
+    if secs < 3600:
+        return f"{secs // 60}m {secs % 60}s"
+    return f"{secs // 3600}h {(secs % 3600) // 60}m"
+
+
 # ---------------------------------------------------------------------------
 # Output helpers
 # ---------------------------------------------------------------------------
@@ -184,6 +204,10 @@ def _parse_command(line: str) -> Optional[dict]:
         return {'cmd': '_query', 'query': 'clear_external_repo'}
     if cmd == 'external-repo':
         return {'cmd': '_query', 'query': 'get_external_repo'}
+
+    # -- Status (is the agent ready for new input?) --
+    if cmd == 'status':
+        return {'cmd': '_query', 'query': 'status'}
 
     # -- Read-only queries (handled locally, not sent to command channel) --
     if cmd == 'concerns':
@@ -383,6 +407,36 @@ def _handle_query(session, character: str, data: dict, state: dict):
             else:
                 _print_info("external_repo: (none)")
 
+    elif query == 'status':
+        result = _zenoh_get(session, f"cognitive/{character}/status")
+        if not result:
+            _print_error("(no response — chat loop may not be reachable)")
+            return
+        if not result.get('success'):
+            _print_error(result.get('error', 'status query failed'))
+            return
+        ready = result.get('ready', False)
+        action = result.get('action', '?')
+        if ready:
+            _print_info(f"{C.BOLD}{character} is ready{C.RESET}  ({action})")
+        else:
+            _print_info(f"{C.BOLD}{character} is busy{C.RESET}: {action}")
+            ct = result.get('current_turn') or {}
+            started = ct.get('started_at')
+            if started:
+                _print_info(f"  started: {_elapsed_since(started)} ago")
+            preview = ct.get('text_preview')
+            if preview:
+                _print_info(f"  input: {preview!r}")
+        if result.get('post_turn_busy') and ready:
+            _print_info(f"  (post-turn reflection still running)")
+        backlog = int(result.get('inbox_backlog', 0) or 0)
+        if backlog:
+            _print_info(f"  inbox backlog: {backlog}")
+        last = result.get('last_reply_at')
+        if last:
+            _print_info(f"  last reply: {_elapsed_since(last)} ago")
+
     elif query == 'verbose':
         state['verbose'] = not state.get('verbose', False)
         _print_system(f"Verbose mode: {'on' if state['verbose'] else 'off'}")
@@ -426,6 +480,9 @@ def _print_help():
   /resources                     Open resource browser in browser
   /verbose                       Toggle verbose mode
   /help                          Show this help
+
+{C.BOLD}State:{C.RESET}
+  /status                        Show whether the agent is ready for new input
 
 {C.BOLD}System:{C.RESET}
   /shutdown                      Save and shutdown

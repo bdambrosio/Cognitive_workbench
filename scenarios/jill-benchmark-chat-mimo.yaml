@@ -36,7 +36,7 @@ characters:
     llm_config:
       server: local
       model: "mimo-v2.5"
-      base_url: https://api.xiaomimimo.com/v1
+      base_url: https://token-plan-sgp.xiaomimimo.com/v1
       api_key: "XIAOMI_API_KEY"
       is_reasoning_model: false
 

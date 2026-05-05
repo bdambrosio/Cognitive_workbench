@@ -609,6 +609,17 @@ class ChatLoop:
             thread_name_prefix=f'chat-{character_name}-postturn',
         )
 
+        # ---- Turn-state tracking (for /status) ----
+        # _current_turn is set at _process_user_turn entry and cleared
+        # immediately after _publish_say — so /status reports "ready" as
+        # soon as the user has seen the reply, even though trace writes
+        # and post-turn reflection may still be in progress. Reads are
+        # not locked: writes are single-field assigns and a momentarily
+        # stale read is acceptable for a status surface.
+        self._current_turn: Optional[Dict[str, Any]] = None
+        self._post_turn_busy: bool = False
+        self._last_reply_at: Optional[str] = None
+
         # ---- Long-term memory (cross-conversation, per-character) ----
         # A 'memories' Collection holds episodic specifics that should
         # survive past the rolling Companion summary. Auto-RAG queries it
@@ -2080,6 +2091,12 @@ class ChatLoop:
             f"cognitive/{self.character_name}/control/external_repo",
             self._handle_external_repo_query,
         )
+        # Status (/status): is Jill ready for new input, currently
+        # processing a turn, or running autonomous work?
+        self._status_q = self._zenoh_session.declare_queryable(
+            f"cognitive/{self.character_name}/status",
+            self._handle_status_query,
+        )
 
         logger.info(
             f"[{self.character_name}] chat zenoh ready "
@@ -2708,6 +2725,55 @@ class ChatLoop:
             })
         except Exception as e:
             logger.error(f"[{self.character_name}] remember query failed: {e}")
+            self._reply(query, {'success': False, 'error': str(e)})
+
+    def _handle_status_query(self, query) -> None:
+        """Report whether Jill is ready for new input. Payload is empty
+        (or {}). Response shape:
+          {
+            success: True,
+            ready: bool,                # True iff no turn currently in flight
+            action: str,                # human-readable description
+            current_turn: dict | null,  # kind/source/text_preview/started_at
+            post_turn_busy: bool,       # discourse + reflection still running
+            inbox_backlog: int,         # queued user/tick items
+            last_reply_at: str | null,  # ISO timestamp of last published reply
+            character: str,
+          }
+        ready=True does NOT require post-turn reflection to have finished —
+        Jill accepts new input while reflection runs in parallel. The
+        /status caller can render post_turn_busy as informational context."""
+        try:
+            ct = self._current_turn  # snapshot the dict reference
+            ready = ct is None
+            if ct is not None:
+                kind = ct.get('kind')
+                src = ct.get('source', '?')
+                if kind == 'autonomous':
+                    cid = ct.get('autonomous_concern_id') or '(no concern_id)'
+                    action = f"running autonomous turn ({cid})"
+                else:
+                    action = f"processing user input from {src}"
+            elif self._post_turn_busy:
+                action = "idle (post-turn reflection still running)"
+            else:
+                action = "idle"
+            try:
+                backlog = self._inbox.qsize()
+            except Exception:
+                backlog = 0
+            self._reply(query, {
+                'success': True,
+                'ready': ready,
+                'action': action,
+                'current_turn': ct,
+                'post_turn_busy': self._post_turn_busy,
+                'inbox_backlog': backlog,
+                'last_reply_at': self._last_reply_at,
+                'character': self.character_name,
+            })
+        except Exception as e:
+            logger.error(f"[{self.character_name}] status query failed: {e}")
             self._reply(query, {'success': False, 'error': str(e)})
 
     def _handle_external_repo_query(self, query) -> None:
@@ -4057,6 +4123,19 @@ class ChatLoop:
     # Per-turn handling
     # ------------------------------------------------------------------
 
+    def _post_turn_work_tracked(self, source: str, close: bool) -> None:
+        """Wrapper around _post_turn_work that toggles _post_turn_busy
+        for /status visibility. Always clears the flag on exit, success
+        or failure. _post_turn_busy is set EITHER here at entry OR by
+        the caller right before submit() — both flag-on points are
+        idempotent. Clear is centralized here in finally so the flag
+        can't get stuck if _post_turn_work raises."""
+        self._post_turn_busy = True
+        try:
+            self._post_turn_work(source, close)
+        finally:
+            self._post_turn_busy = False
+
     def _post_turn_work(self, source: str, close: bool) -> None:
         """Background side-effect job for one turn: discourse update,
         reflection (memory writes), optional dialog close, autosave.
@@ -4090,6 +4169,29 @@ class ChatLoop:
         skip post-turn reflection/discourse (no user side to model from),
         and bump last_acted_at on the fired concern after success.
         """
+        # Mark the turn in flight for /status. Cleared immediately after
+        # _publish_say so a fresh user input isn't blocked-on-status by
+        # the trace-write / post-turn reflection that follows. Use a
+        # try/finally so a crash mid-turn doesn't leave _current_turn
+        # set forever.
+        self._current_turn = {
+            'kind': 'autonomous' if autonomous else 'user',
+            'source': source,
+            'text_preview': (text or '')[:120],
+            'started_at': datetime.now(timezone.utc).isoformat(),
+            'autonomous_concern_id': autonomous_concern_id,
+        }
+        try:
+            self._process_user_turn_inner(
+                source, text, close,
+                autonomous=autonomous,
+                autonomous_concern_id=autonomous_concern_id)
+        finally:
+            self._current_turn = None
+
+    def _process_user_turn_inner(self, source: str, text: str, close: bool,
+                                 autonomous: bool = False,
+                                 autonomous_concern_id: Optional[str] = None) -> None:
         if not autonomous:
             self.store.record_incoming(source, text, close=close)
             self._append_conversation_entry(
@@ -4143,6 +4245,7 @@ class ChatLoop:
         self._append_conversation_entry(
             'out', source, reply, meta=f'act={act_type} close={close}')
         self._publish_say(reply)
+        self._last_reply_at = datetime.now(timezone.utc).isoformat()
         logger.info(f"[{self.character_name}] -> {source} ({act_type}): {reply!r}")
 
         # Service the fired agent_concern AFTER successful reply
@@ -4205,14 +4308,16 @@ class ChatLoop:
             # Run reflection inline so a benchmark harness can snapshot
             # state immediately after the call returns and see fully-resolved
             # memory/concern writes from this turn.
-            self._post_turn_work(source, close)
+            self._post_turn_work_tracked(source, close)
         else:
             try:
-                self._post_turn_executor.submit(self._post_turn_work, source, close)
+                self._post_turn_busy = True
+                self._post_turn_executor.submit(
+                    self._post_turn_work_tracked, source, close)
             except RuntimeError:
                 # Executor already shut down (process tearing down).
                 # Fall back to synchronous so nothing is silently dropped.
-                self._post_turn_work(source, close)
+                self._post_turn_work_tracked(source, close)
 
     # ------------------------------------------------------------------
     # Tick handler — Phase C autonomy entry point.
