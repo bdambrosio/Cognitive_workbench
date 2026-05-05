@@ -316,7 +316,19 @@ class _ChatBackend:
              stops: Optional[List[str]] = None,
              is_json: bool = False,
              cot_profile: Optional[str] = None,
-             enable_thinking: Optional[bool] = None) -> str:
+             enable_thinking: Optional[bool] = None,
+             reasoning_effort: Optional[str] = None) -> str:
+        # Per-call reasoning_effort override. Only takes effect when the
+        # scenario already declared a baseline (self.reasoning_effort is
+        # not None) — the field is a reasoning-model concept; we don't
+        # send it to non-reasoning backends. Validation matches __init__.
+        if reasoning_effort is not None:
+            eff = str(reasoning_effort).strip().lower()
+            if eff not in ('low', 'medium', 'high'):
+                raise RuntimeError(
+                    f"_ChatBackend.chat: reasoning_effort must be "
+                    f"low|medium|high, got {reasoning_effort!r}")
+            reasoning_effort = eff
         stops = stops or []
         if self._cloud_llm is not None:
             from Messages import SystemMessage, UserMessage, AssistantMessage
@@ -410,8 +422,14 @@ class _ChatBackend:
             body['model'] = self.model
         if stops:
             body['stop'] = stops
+        # Reasoning effort: scenario-declared baseline, optionally
+        # overridden per call. Only sent when scenario declared a baseline
+        # (self.reasoning_effort is not None) — non-reasoning models
+        # would just ignore it but no point shipping it.
         if self.reasoning_effort is not None:
-            body['reasoning_effort'] = self.reasoning_effort
+            effective = (reasoning_effort if reasoning_effort is not None
+                         else self.reasoning_effort)
+            body['reasoning_effort'] = effective
 
         # Skip grammar / chat_template_kwargs when going to a cloud endpoint
         # (signaled by api_key being set). Cloud providers reject those
@@ -638,7 +656,8 @@ class ChatLoop:
     def _llm_generate(self, messages, bindings=None, max_tokens=400,
                       temperature=0.7, stops=None, is_json=False,
                       cot_profile: Optional[str] = None,
-                      enable_thinking: Optional[bool] = None) -> SimpleNamespace:
+                      enable_thinking: Optional[bool] = None,
+                      reasoning_effort: Optional[str] = None) -> SimpleNamespace:
         """Callable conforming to the convention used by character_evaluator
         and discourse: list-of-strings positional roles. Returns
         SimpleNamespace(success, text, error).
@@ -671,6 +690,7 @@ class ChatLoop:
                 is_json=is_json,
                 cot_profile=cot_profile,
                 enable_thinking=enable_thinking,
+                reasoning_effort=reasoning_effort,
             )
             if not text:
                 return SimpleNamespace(success=False, text='', error='empty response')
@@ -691,26 +711,37 @@ class ChatLoop:
 
     # Per-profile max_tokens floor. Caller-supplied max_tokens may be tuned
     # for non-reasoning models (e.g. character_evaluator hardcodes 256 for a
-    # ~150-token JSON envelope); reasoning models (Qwen3.6, gpt-oss-120B,
-    # DeepSeek-R1) burn 1000-3000+ tokens on free thinking before producing
-    # the answer, and structured reflection outputs (companion/discourse/ToM)
-    # are themselves 800-1500 tokens, so the combined budget needs ~6-8K.
-    # Floor set above the worst case to avoid finish_reason=length truncating
-    # mid-thought (when that happens with no </think> close, the backend
-    # returns empty and the reflection pass drops the update).
+    # ~150-token JSON envelope); reasoning models burn far more on the
+    # analysis channel before producing the final-channel answer:
+    #   - Qwen3.6: ~1000-3000 free-thinking tokens
+    #   - gpt-oss-120B at reasoning_effort=medium on long reflection
+    #     prompts (companion/discourse): commonly 5000-10000 analysis
+    #     tokens before the final-channel structured output begins
+    # Combined with the 800-1500 tokens of structured output the
+    # reflection templates ask for, the worst-case budget is ~12-15K.
+    # Floor set above that to avoid finish_reason=length truncating
+    # mid-analysis — when that happens, vLLM's reasoning parser leaves
+    # `content` empty (analysis went to reasoning_content but no final
+    # channel emitted), the backend returns '', and the reflection pass
+    # drops the update with "Discourse/Companion update failed".
     _PROFILE_TOKEN_FLOOR = {
-        'triage': 8192,
-        'none': 8192,    # covers discourse extract + revise_belief callables
+        'triage': 16384,
+        'none': 16384,   # covers discourse extract + revise_belief callables
     }
 
     def _make_llm_callable(self, cot_profile: Optional[str],
-                           enable_thinking: Optional[bool] = None):
+                           enable_thinking: Optional[bool] = None,
+                           reasoning_effort: Optional[str] = None):
         """Return an llm_generate-shaped callable bound to a CoT profile.
 
         Used to hand profile-tagged callables to consumers (character_evaluator,
         DiscourseTracker) that don't know about profiles or thinking themselves.
         `enable_thinking=False` suppresses <think> auto-prefix at the chat
-        template level (Qwen3.6 and similar).
+        template level (Qwen3.6 and similar). `reasoning_effort` overrides
+        the scenario's baseline reasoning_effort for every call routed
+        through this callable — used to set reflection passes (companion/
+        discourse) to `low` while leaving the ReAct main loop at the
+        scenario's baseline (typically `medium`).
         """
         floor = self._PROFILE_TOKEN_FLOOR.get(cot_profile or '', 0)
 
@@ -721,7 +752,8 @@ class ChatLoop:
                                       temperature=temperature,
                                       stops=stops, is_json=is_json,
                                       cot_profile=cot_profile,
-                                      enable_thinking=enable_thinking)
+                                      enable_thinking=enable_thinking,
+                                      reasoning_effort=reasoning_effort)
         return _gen
 
     # ------------------------------------------------------------------
@@ -2905,7 +2937,17 @@ class ChatLoop:
             # permissive-answer pattern leaks thinking into the output, which
             # then contaminates state notes and re-injects into chat_reply's
             # system prompt on subsequent turns.
-            tracker.llm_generate = self._make_llm_callable('none')
+            #
+            # reasoning_effort=low: these reflection passes produce
+            # structured-text output (commitments / agreements / decisions
+            # / companion sections) from a long prompt — synthesis, not
+            # novel reasoning. Medium effort burns analysis tokens that
+            # don't improve output but DO push the final-channel output
+            # past max_tokens, leaving content empty and the update
+            # marked as failed. Override to low; ReAct main loop keeps
+            # the scenario's medium baseline.
+            tracker.llm_generate = self._make_llm_callable(
+                'none', reasoning_effort='low')
             new_disc = tracker.analyze_segment(
                 dialog, start=0, end=len(dialog) - 1,
                 previous_discourse_state=prev_disc, tom='',
@@ -2922,7 +2964,8 @@ class ChatLoop:
             # executive_node) because chat-mode sessions rarely emit `close`,
             # and the template is built to self-prune slow-moving fields.
             prev_comp = self._companion_state.get(entity, '')
-            tracker.llm_generate = self._make_llm_callable('none')
+            tracker.llm_generate = self._make_llm_callable(
+                'none', reasoning_effort='low')
             new_comp = tracker.update_companion_from_discourse_segment(
                 dialog, character_name=entity, start=0, end=len(dialog) - 1,
                 discourse_state=self._discourse_state.get(entity, ''),

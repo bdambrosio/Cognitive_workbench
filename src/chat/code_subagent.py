@@ -28,6 +28,11 @@ Architectural notes:
   inside git checkouts and skips binaries by default. Required at
   runtime; absence produces an ERROR observation rather than a silent
   fallback so the failure is loud.
+- read refuses gitignored paths (via `git check-ignore`) so all three
+  primitives respect the same boundary. The geofence (_safe_resolve)
+  is the authoritative path-traversal layer; the gitignore check is an
+  additional discipline layer keeping generated / runtime artifacts
+  out of read output.
 """
 
 from __future__ import annotations
@@ -237,6 +242,36 @@ def _is_git_checkout(repo_root: Path) -> bool:
     return shutil.which('git') is not None
 
 
+def _is_gitignored(repo_root: Path, target: Path) -> bool:
+    """Return True if `target` is gitignored relative to repo_root.
+    Used by `_tool_read` so the read primitive respects the same
+    gitignore boundary that list (via `git ls-files -co
+    --exclude-standard`) and grep (ripgrep, which respects .gitignore
+    by default in git checkouts) already do.
+
+    Returns False — fail-open — when:
+      - repo_root isn't a git checkout, or
+      - the git binary is unavailable, or
+      - `git check-ignore` itself errors (rare; transient git issues).
+    The geofence (`_safe_resolve`) is the authoritative path-traversal
+    boundary; this is an additional discipline layer to keep generated/
+    runtime artifacts out of read output."""
+    if not _is_git_checkout(repo_root):
+        return False
+    try:
+        proc = subprocess.run(
+            ['git', 'check-ignore', '--quiet', '--', str(target)],
+            cwd=str(repo_root.resolve()),
+            capture_output=True, timeout=5.0, check=False,
+        )
+    except Exception as e:
+        logger.warning(f"code_subagent: git check-ignore failed: {e}")
+        return False
+    # Exit 0 = ignored. Exit 1 = not ignored. Exit 128 = error / not in
+    # repo. Treat anything other than 0 as not-ignored (fail-open).
+    return proc.returncode == 0
+
+
 # ---------------------------------------------------------------------------
 # Tool: list
 # ---------------------------------------------------------------------------
@@ -351,6 +386,10 @@ def _tool_read(repo_root: Path, name: str,
     path = _safe_resolve(repo_root, name, must_be_file=True)
     if path is None:
         return f"ERROR: read invalid or out-of-scope file: {name!r}"
+    if _is_gitignored(repo_root, path):
+        return (f"ERROR: read refused: {name} is gitignored "
+                f"(generated or runtime artifact, not source). list and "
+                f"grep already hide such files; pick a tracked file.")
     try:
         with open(path, 'r', encoding='utf-8', errors='replace') as f:
             lines = f.readlines()

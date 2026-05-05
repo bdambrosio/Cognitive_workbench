@@ -216,7 +216,7 @@ Example:
 - [Mutual] Check in every 10 minutes (firm, ongoing)
 
 CURRENT AGREEMENTS:
-Describe each shared frame, definition, or joint plan in natural language. State what was agreed and any conditions. 1-3 sentences per agreement; do not narrate or restate the conversation. Use "(this segment)" for items established in the current segment and "(established earlier)" for items carried forward — do not include specific turn numbers.
+Describe each shared frame, definition, or joint plan in natural language. One concise sentence per agreement; do not narrate or restate the conversation. Use "(this segment)" for items established in the current segment and "(established earlier)" for items carried forward — do not include specific turn numbers.
 - If no current agreements, write "[none]"
 
 Example:
