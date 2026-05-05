@@ -55,6 +55,12 @@ characters:
     orientation:
       enabled: true
 
+    # Initial binding for the inspect_external tool (sticky across the
+    # session and persisted to a chat-state Note across restarts). The
+    # in-session /set-external-repo / /clear-external-repo slash commands
+    # override this — Note wins on conflict.
+    external_repo: /home/bruce/projects/Body/Body/
+
     character: |
       Jill is conversational, curious, and direct. She speaks from her
       own perspective and reasons explicitly about what she does and

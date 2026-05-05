@@ -28,8 +28,9 @@ import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
+from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
@@ -73,7 +74,7 @@ _CONCERN_INSTRUCTION_NARROWNESS_RULE = (
 
 # Tools the model can emit. Validated structurally in _parse_react_action;
 # the dispatcher in _run_react_loop knows how to run each.
-_REACT_TOOLS = ('process_text', 'search', 'fetch_text', 'remember', 'inspect', 'security', 'respond')
+_REACT_TOOLS = ('process_text', 'search', 'fetch_text', 'remember', 'inspect', 'inspect_external', 'security', 'respond')
 
 # Per-character collection holding episodic specifics across conversations.
 # Auto-RAG searches this on every turn; post-turn reflection writes to it.
@@ -257,12 +258,23 @@ class _ChatBackend:
 
     def __init__(self, server: str, model: str, base_url: str,
                  is_reasoning: Optional[bool] = None,
-                 api_key: Optional[str] = None):
+                 api_key: Optional[str] = None,
+                 reasoning_effort: Optional[str] = None):
         self.server = (server or 'local').lower()
         self.model = model or ''
         self.base_url = (base_url or 'http://127.0.0.1:5000').rstrip('/')
         if self.base_url.endswith('/v1'):
             self.base_url = self.base_url[:-3]
+        # OpenAI-style reasoning effort dial. gpt-oss harmony serving
+        # accepts "low"|"medium"|"high"; vLLM with the gpt-oss reasoning
+        # parser respects the field. Forwarded only on the local OAI path
+        # below — Anthropic and the legacy cloud_llm route ignore it.
+        eff = (reasoning_effort or '').strip().lower() or None
+        if eff is not None and eff not in ('low', 'medium', 'high'):
+            raise RuntimeError(
+                f"_ChatBackend: reasoning_effort must be low|medium|high, "
+                f"got {reasoning_effort!r}")
+        self.reasoning_effort = eff
         # New unified path: api_key field is the NAME of an env var. We
         # resolve it once at init so a missing env var fails loudly here
         # (with the var name) instead of silently 401-ing on first call.
@@ -398,6 +410,8 @@ class _ChatBackend:
             body['model'] = self.model
         if stops:
             body['stop'] = stops
+        if self.reasoning_effort is not None:
+            body['reasoning_effort'] = self.reasoning_effort
 
         # Skip grammar / chat_template_kwargs when going to a cloud endpoint
         # (signaled by api_key being set). Cloud providers reject those
@@ -483,6 +497,7 @@ class ChatLoop:
             base_url=llm_cfg.get('vllm_url') or llm_cfg.get('base_url') or 'http://127.0.0.1:5000',
             is_reasoning=llm_cfg.get('is_reasoning_model'),
             api_key=llm_cfg.get('api_key'),
+            reasoning_effort=llm_cfg.get('reasoning_effort'),
         )
 
         # ---- Persona ----
@@ -548,7 +563,20 @@ class ChatLoop:
         self._discourse_trackers: Dict[str, Any] = {}
         self._discourse_state: Dict[str, str] = {}
         self._companion_state: Dict[str, str] = {}
+        # External-repo binding for the inspect_external tool. Sticky for
+        # the session (and across restarts via Note). Single bound dir at
+        # a time; switching wipes prior binding. None when no repo is
+        # bound — in that state, inspect_external is not advertised in
+        # the ReAct system prompt and calls return ERROR.
+        self._external_repo: Optional[Path] = None
         self._restore_chat_state_from_notes()
+        # YAML default — applied only if no Note-restored binding took
+        # effect. Note wins on conflict (the user's last in-session set
+        # is more authoritative than the scenario default).
+        if self._external_repo is None:
+            yaml_repo = (character_config.get('external_repo') or '').strip()
+            if yaml_repo:
+                self._set_external_repo(yaml_repo, persist=True)
 
         # ---- Concurrency primitives (must precede anything FAISS-touching) ----
         # _faiss_lock serializes the one cross-thread FAISS race: main
@@ -663,12 +691,16 @@ class ChatLoop:
 
     # Per-profile max_tokens floor. Caller-supplied max_tokens may be tuned
     # for non-reasoning models (e.g. character_evaluator hardcodes 256 for a
-    # ~150-token JSON envelope); Qwen3.6-class reasoning models burn 1000-3000
-    # tokens on free thinking before producing the answer, so floors are
-    # generous to avoid finish_reason=length truncating mid-thought.
+    # ~150-token JSON envelope); reasoning models (Qwen3.6, gpt-oss-120B,
+    # DeepSeek-R1) burn 1000-3000+ tokens on free thinking before producing
+    # the answer, and structured reflection outputs (companion/discourse/ToM)
+    # are themselves 800-1500 tokens, so the combined budget needs ~6-8K.
+    # Floor set above the worst case to avoid finish_reason=length truncating
+    # mid-thought (when that happens with no </think> close, the backend
+    # returns empty and the reflection pass drops the update).
     _PROFILE_TOKEN_FLOOR = {
-        'triage': 4096,
-        'none': 4096,    # covers discourse extract + revise_belief callables
+        'triage': 8192,
+        'none': 8192,    # covers discourse extract + revise_belief callables
     }
 
     def _make_llm_callable(self, cot_profile: Optional[str],
@@ -718,6 +750,70 @@ class ChatLoop:
         except Exception as e:
             logger.warning(f"[{self.character_name}] _save_state_note failed: {e}")
 
+    def _delete_state_note(self, kind: str, entity: str) -> None:
+        """Remove a chat-state Note by name, if present. Idempotent."""
+        try:
+            name = self._state_note_name(kind, entity)
+            note_id = self.resource_manager.named_notes.get(name)
+            if not note_id:
+                return
+            self.resource_manager.remove_resource(note_id, self.character_name)
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] _delete_state_note failed: {e}")
+
+    # ------------------------------------------------------------------
+    # External-repo binding for the inspect_external tool.
+    # Single sticky binding per character; persisted as a chat-state Note
+    # (kind=external_repo, entity=default) so it survives restarts.
+    # ------------------------------------------------------------------
+
+    _EXTERNAL_REPO_ENTITY = "default"
+
+    def _set_external_repo(self, path: str, *, persist: bool) -> Tuple[bool, str]:
+        """Bind an external repo for the inspect_external tool. Validates
+        that the path exists and is a directory. Returns (success, msg).
+        When persist=True, writes the Note so the binding survives
+        restart (used for both YAML defaults and slash-command sets)."""
+        candidate = Path(str(path or '').strip()).expanduser()
+        if not candidate.is_dir():
+            return (False, f"path is not a directory: {candidate}")
+        try:
+            resolved = candidate.resolve()
+        except Exception as e:
+            return (False, f"resolve failed: {e}")
+        self._external_repo = resolved
+        if persist:
+            self._save_state_note("external_repo",
+                                  self._EXTERNAL_REPO_ENTITY, str(resolved))
+            self._persist_to_disk()
+        logger.info(f"[{self.character_name}] external_repo bound: {resolved}")
+        return (True, str(resolved))
+
+    def _clear_external_repo(self) -> bool:
+        """Clear the external-repo binding. Returns True if a binding was
+        cleared, False if nothing was bound. Idempotent."""
+        had = self._external_repo is not None
+        self._external_repo = None
+        self._delete_state_note("external_repo", self._EXTERNAL_REPO_ENTITY)
+        self._persist_to_disk()
+        if had:
+            logger.info(f"[{self.character_name}] external_repo cleared")
+        return had
+
+    def _get_external_repo(self) -> Optional[Path]:
+        """Return the current binding, validating that the path still
+        exists. Auto-clears the binding if it's gone stale (the directory
+        was deleted or moved between sessions/calls)."""
+        if self._external_repo is None:
+            return None
+        if not self._external_repo.is_dir():
+            logger.warning(
+                f"[{self.character_name}] external_repo {self._external_repo} "
+                f"no longer exists; auto-clearing binding")
+            self._clear_external_repo()
+            return None
+        return self._external_repo
+
     def _restore_chat_state_from_notes(self) -> None:
         """Re-populate _discourse_state and _companion_state from named notes
         that were persisted in a previous session. Stale chat:tom_state:* notes
@@ -740,12 +836,29 @@ class ChatLoop:
                     self._discourse_state[entity] = content
                 elif kind == "companion_state":
                     self._companion_state[entity] = content
+                elif kind == "external_repo":
+                    # Validate at restore time: if the bound path no
+                    # longer exists, drop the Note and leave _external_repo
+                    # unset rather than carry a broken binding into the
+                    # session.
+                    candidate = Path(content.strip())
+                    if candidate.is_dir():
+                        self._external_repo = candidate.resolve()
+                    else:
+                        logger.warning(
+                            f"[{self.character_name}] bound external_repo "
+                            f"{candidate} no longer exists; clearing")
+                        self._delete_state_note("external_repo", entity)
             if self._discourse_state or self._companion_state:
                 logger.info(
                     f"[{self.character_name}] restored chat state: "
                     f"{len(self._discourse_state)} discourse, "
                     f"{len(self._companion_state)} companion entries"
                 )
+            if self._external_repo is not None:
+                logger.info(
+                    f"[{self.character_name}] restored external_repo "
+                    f"binding: {self._external_repo}")
         except Exception as e:
             logger.warning(f"[{self.character_name}] _restore_chat_state_from_notes failed: {e}")
 
@@ -1705,7 +1818,7 @@ class ChatLoop:
             result = self._llm_generate(
                 [{'role': 'system', 'content': sys_msg},
                  {'role': 'user', 'content': "\n\n".join(user_parts)}],
-                max_tokens=4096, temperature=0.3, is_json=True,
+                max_tokens=8192, temperature=0.3, is_json=True,
                 cot_profile='none')
             if not result.success:
                 return ([], [], [])
@@ -1928,6 +2041,12 @@ class ChatLoop:
         self._remember_q = self._zenoh_session.declare_queryable(
             f"cognitive/{self.character_name}/remember",
             self._handle_remember_query,
+        )
+        # External-repo binding control. CLI emits set / clear / get;
+        # response carries the resolved path or an error.
+        self._external_repo_q = self._zenoh_session.declare_queryable(
+            f"cognitive/{self.character_name}/control/external_repo",
+            self._handle_external_repo_query,
         )
 
         logger.info(
@@ -2309,7 +2428,7 @@ class ChatLoop:
             result = self.backend.chat(
                 [{'role': 'system', 'content': sys_msg},
                  {'role': 'user', 'content': user_msg}],
-                max_tokens=2048, temperature=0.4, cot_profile='none',
+                max_tokens=4096, temperature=0.4, cot_profile='none',
             )
         except Exception as e:
             logger.warning(f"[{self.character_name}] process_text failed: {e}")
@@ -2557,6 +2676,51 @@ class ChatLoop:
             })
         except Exception as e:
             logger.error(f"[{self.character_name}] remember query failed: {e}")
+            self._reply(query, {'success': False, 'error': str(e)})
+
+    def _handle_external_repo_query(self, query) -> None:
+        """Bind / unbind / inspect the external-repo binding for this
+        chat session. Payload: {"action": "set|clear|get", "path": "..."}.
+        Responses:
+          set  → {success, path}                  on success
+                 {success: false, error: "..."}  on failure (e.g. bad path)
+          clear → {success, was_bound: bool, path: <prior or null>}
+          get   → {success, path: <str or null>}"""
+        try:
+            payload_bytes = query.payload.to_bytes() if query.payload else b'{}'
+            params = json.loads(payload_bytes.decode('utf-8')) if payload_bytes else {}
+            action = str(params.get('action') or '').strip().lower()
+            if action == 'set':
+                path_arg = str(params.get('path') or '').strip()
+                if not path_arg:
+                    self._reply(query, {'success': False, 'error': 'missing path'})
+                    return
+                ok, msg = self._set_external_repo(path_arg, persist=True)
+                if ok:
+                    self._reply(query, {'success': True, 'path': msg})
+                else:
+                    self._reply(query, {'success': False, 'error': msg})
+            elif action == 'clear':
+                prior = self._external_repo
+                was_bound = self._clear_external_repo()
+                self._reply(query, {
+                    'success': True,
+                    'was_bound': was_bound,
+                    'path': str(prior) if prior else None,
+                })
+            elif action == 'get':
+                bound = self._get_external_repo()
+                self._reply(query, {
+                    'success': True,
+                    'path': str(bound) if bound else None,
+                })
+            else:
+                self._reply(query, {
+                    'success': False,
+                    'error': f'unknown action {action!r}; expected set|clear|get',
+                })
+        except Exception as e:
+            logger.error(f"[{self.character_name}] external_repo query failed: {e}")
             self._reply(query, {'success': False, 'error': str(e)})
 
     def _handle_concerns_query(self, query) -> None:
@@ -2853,6 +3017,18 @@ class ChatLoop:
             parts.append("## Self-model (from character config; what I am, not who)\n" + self.self_model)
         if self.capabilities:
             parts.append("## Capabilities (from character config; chat-only mode)\n" + self.capabilities)
+        # When an external repo is bound for the session, append a single
+        # capabilities line so the persona-level account reflects what the
+        # ReAct surface actually exposes. Self-model is intentionally left
+        # alone — external code is environment, not substrate.
+        external_repo = self._get_external_repo()
+        if external_repo is not None:
+            parts.append(
+                f"## External repo (bound for this session)\n"
+                f"She can also navigate the project repo at `{external_repo}` "
+                f"via the inspect_external tool — same list/read/grep "
+                f"primitives as inspect, different geofence. This is reading "
+                f"an external codebase as documentation, not introspection.")
         if self.setting:
             parts.append("## Setting (from character config)\n" + self.setting)
         companion = self._companion_state.get(source, '').strip()
@@ -2956,6 +3132,60 @@ class ChatLoop:
     # direct prose reply.
     # ------------------------------------------------------------------
 
+    def _build_react_tool_catalog(self) -> str:
+        """Build the numbered tool list shown in the ReAct system prompt.
+        Conditionally includes inspect_external — and the bound external
+        repo path — only when an external_repo is currently bound. Numbers
+        shift accordingly; the model handles both layouts fine."""
+        tools: List[str] = [
+            "`{\"thought\": \"<one terse sentence>\", \"tool\": \"process_text\", \"source\": <string|$stepN>, \"instruction\": <string>}` — "
+            "LLM pass over text in context. Use to formulate queries, render results in your voice, extract info.",
+            "`{\"thought\": \"<one terse sentence>\", \"tool\": \"search\", \"query\": <string|$stepN>}` — "
+            "web search (digested synthesis + sources).",
+            "`{\"thought\": \"<one terse sentence>\", \"tool\": \"fetch_text\", \"url\": <string|$stepN>}` — "
+            "full text from a single URL (or local file path). Use when a search hit looks promising and the "
+            "snippet isn't enough; always pass the result through process_text before responding.",
+            "`{\"thought\": \"<one terse sentence>\", \"tool\": \"remember\", \"query\": <string>}` — "
+            "active recall over your own memory: full reasoning trace, conversation history, current companion "
+            "model, current discourse state. Use when the user asks about prior turns, your earlier reasoning, "
+            "or persistent state that may not be in your current prompt. The query is opaque to you — a subagent "
+            "reads the files and returns a synthesized answer in `$stepN`.",
+            "`{\"thought\": \"<one terse sentence>\", \"tool\": \"inspect\", \"query\": <string>}` — "
+            "query your own codebase. A separate subagent (geofenced read-only to `src/`, list/read/grep "
+            "primitives) navigates the source and returns a synthesized answer with file:line citations. Use "
+            "when the user asks how you work, where something is implemented, what a module does, or to verify "
+            "a claim about your own code. The query is opaque to you — phrase it as a natural-language question "
+            "(e.g. \"where is the ReAct dispatch defined?\", \"what tools does the chat loop wire up?\").",
+        ]
+        external_repo = self._get_external_repo()
+        if external_repo is not None:
+            tools.append(
+                "`{\"thought\": \"<one terse sentence>\", \"tool\": \"inspect_external\", \"query\": <string>}` — "
+                f"query the external project repo currently bound to this session: `{external_repo}`. "
+                "Same primitives as `inspect` (list/read/grep), different geofence — this is reading an external "
+                "codebase as documentation, not introspection of your own substrate. Use when the user asks "
+                "questions about THAT project (its code, README, structure, behavior). Phrase as a "
+                "natural-language question (e.g. \"how does this project structure its modules?\", "
+                "\"what does the README say about installation?\", \"where is the main entry point?\")."
+            )
+        tools.append(
+            "`{\"thought\": \"<one terse sentence>\", \"tool\": \"security\", \"query\": <string>}` — "
+            "investigate LAN / local-system network state. A separate subagent (read-only typed primitives: "
+            "nmap host discovery + service scan, ss/ip for sockets/routes/arp/interfaces; targets restricted to "
+            "RFC1918 ranges) runs the probes and returns a synthesized answer. Use when the user asks about LAN "
+            "hosts, what's listening locally, what services a host exposes, suspicious activity on the network, "
+            "or routing/interface state. v0.1 does NOT do traffic capture or IDS log inspection. Phrase as a "
+            "natural-language question (e.g. \"what hosts are on my LAN at 192.168.1.0/24?\", \"what TCP ports "
+            "am I listening on?\", \"what's my default gateway?\")."
+        )
+        tools.append(
+            "`{\"thought\": \"<one terse sentence>\", \"tool\": \"respond\", \"text\": <string|$stepN>}` — "
+            "final reply, exits loop. Must be in your voice; pass search/fetch results through process_text "
+            "first or write the reply yourself."
+        )
+        numbered = "\n".join(f"{i}. {t}" for i, t in enumerate(tools, start=1))
+        return "Tools (each emission picks ONE):\n" + numbered + "\n"
+
     def _build_react_system_prompt(self, source: str, orientation: str,
                                    now_str: str,
                                    recall: Optional[List[Tuple[str, str]]] = None,
@@ -2983,35 +3213,8 @@ class ChatLoop:
             "or anything requiring fresh information. For time-sensitive or "
             "fact-specific questions, your first action is `search`.\n"
             "\n"
-            "Tools (each emission picks ONE):\n"
-            "1. `{\"thought\": \"<one terse sentence>\", \"tool\": \"process_text\", \"source\": <string|$stepN>, \"instruction\": <string>}` — "
-            "LLM pass over text in context. Use to formulate queries, render results in your voice, extract info.\n"
-            "2. `{\"thought\": \"<one terse sentence>\", \"tool\": \"search\", \"query\": <string|$stepN>}` — web search (digested synthesis + sources).\n"
-            "3. `{\"thought\": \"<one terse sentence>\", \"tool\": \"fetch_text\", \"url\": <string|$stepN>}` — full text from a single URL "
-            "(or local file path). Use when a search hit looks promising and the snippet isn't enough; "
-            "always pass the result through process_text before responding.\n"
-            "4. `{\"thought\": \"<one terse sentence>\", \"tool\": \"remember\", \"query\": <string>}` — active recall over your "
-            "own memory: full reasoning trace, conversation history, current companion model, current discourse "
-            "state. Use when the user asks about prior turns, your earlier reasoning, or persistent state that "
-            "may not be in your current prompt. The query is opaque to you — a subagent reads the files and "
-            "returns a synthesized answer in `$stepN`.\n"
-            "5. `{\"thought\": \"<one terse sentence>\", \"tool\": \"inspect\", \"query\": <string>}` — query your own "
-            "codebase. A separate subagent (geofenced read-only to `src/`, list/read/grep primitives) navigates "
-            "the source and returns a synthesized answer with file:line citations. Use when the user asks how "
-            "you work, where something is implemented, what a module does, or to verify a claim about your own "
-            "code. The query is opaque to you — phrase it as a natural-language question (e.g. \"where is the "
-            "ReAct dispatch defined?\", \"what tools does the chat loop wire up?\").\n"
-            "6. `{\"thought\": \"<one terse sentence>\", \"tool\": \"security\", \"query\": <string>}` — investigate "
-            "LAN / local-system network state. A separate subagent (read-only typed primitives: nmap host "
-            "discovery + service scan, ss/ip for sockets/routes/arp/interfaces; targets restricted to RFC1918 "
-            "ranges) runs the probes and returns a synthesized answer. Use when the user asks about LAN hosts, "
-            "what's listening locally, what services a host exposes, suspicious activity on the network, or "
-            "routing/interface state. v0.1 does NOT do traffic capture or IDS log inspection. Phrase as a "
-            "natural-language question (e.g. \"what hosts are on my LAN at 192.168.1.0/24?\", \"what TCP ports "
-            "am I listening on?\", \"what's my default gateway?\").\n"
-            "7. `{\"thought\": \"<one terse sentence>\", \"tool\": \"respond\", \"text\": <string|$stepN>}` — final reply, exits loop. "
-            "Must be in your voice; pass search/fetch results through process_text first or write the reply yourself.\n"
-            "\n"
+            + self._build_react_tool_catalog()
+            + "\n"
             "## Observation format\n"
             "Each tool observation in the working log starts with one of three tags:\n"
             "  `OK: <content>`     — tool succeeded; content follows\n"
@@ -3174,7 +3377,7 @@ class ChatLoop:
             ]
             self._emit_status('thinking…')
             try:
-                raw = self.backend.chat(prompt, max_tokens=4096, temperature=0.7,
+                raw = self.backend.chat(prompt, max_tokens=8192, temperature=0.7,
                                         cot_profile='none')
             except Exception as e:
                 logger.error(f"[{self.character_name}] ReAct iter {i+1} LLM failed: {e}")
@@ -3260,13 +3463,21 @@ class ChatLoop:
             elif tool == 'inspect':
                 q = self._resolve_react_value(action.get('query', ''), log)
                 obs = self._run_inspect(q)
+            elif tool == 'inspect_external':
+                q = self._resolve_react_value(action.get('query', ''), log)
+                obs = self._run_inspect_external(q)
             elif tool == 'security':
                 q = self._resolve_react_value(action.get('query', ''), log)
                 obs = self._run_security(q)
             else:
-                obs = (f"ERROR: unknown tool {tool!r}; available: "
-                       "process_text, search, fetch_text, remember, "
-                       "inspect, security, respond")
+                # Tool list shown to the model on bad emission. Don't
+                # advertise inspect_external when nothing is bound — keeps
+                # the surface honest about what's actually available.
+                avail = ("process_text, search, fetch_text, remember, "
+                         "inspect, security, respond")
+                if self._get_external_repo() is not None:
+                    avail = avail.replace("inspect, ", "inspect, inspect_external, ")
+                obs = f"ERROR: unknown tool {tool!r}; available: {avail}"
 
             _append_log(binding, obs)
             iters[-1]['appended'] = log[pre_log_len:]
@@ -3331,8 +3542,8 @@ class ChatLoop:
 
     def _run_inspect(self, query: str) -> str:
         """Backend for the ReAct `inspect` tool. Delegates to the
-        codebase-inspection subagent (chat.inspect.inspect), which runs
-        its own thin ReAct loop over src/ with read-only primitives
+        codebase-inspection subagent (chat.code_subagent.inspect), which
+        runs its own thin ReAct loop over src/ with read-only primitives
         (list, read, grep via ripgrep). Returns an OK:/EMPTY:/ERROR:
         prefixed observation per the ReAct tool-observation convention.
 
@@ -3343,11 +3554,10 @@ class ChatLoop:
         if not query or not str(query).strip():
             return "EMPTY: inspect query was empty"
         try:
-            from chat.inspect import inspect as _inspect
-            from pathlib import Path as _Path
+            from chat.code_subagent import inspect as _inspect
             answer = _inspect(
                 query=str(query),
-                repo_root=_Path(_SRC_DIR),
+                repo_root=Path(_SRC_DIR),
                 llm_backend=self.backend,
                 trace_dir=self._inspect_traces_dir(),
             )
@@ -3357,6 +3567,35 @@ class ChatLoop:
         text = str(answer or '').strip()
         if not text:
             return 'EMPTY: inspect subagent produced no answer'
+        return 'OK: ' + text
+
+    def _run_inspect_external(self, query: str) -> str:
+        """Backend for the ReAct `inspect_external` tool. Delegates to the
+        same subagent loop as `inspect`, geofenced to the bound external
+        repo (see _set_external_repo / _get_external_repo). Returns ERROR
+        if no repo is currently bound — the system prompt only advertises
+        this tool when a binding exists, so a call here without binding
+        means the model fabricated the tool."""
+        if not query or not str(query).strip():
+            return "EMPTY: inspect_external query was empty"
+        repo = self._get_external_repo()
+        if repo is None:
+            return ("ERROR: no external repo is bound for this session "
+                    "(use /set-external-repo <path> first)")
+        try:
+            from chat.code_subagent import inspect_external as _inspect_external
+            answer = _inspect_external(
+                query=str(query),
+                repo_root=repo,
+                llm_backend=self.backend,
+                trace_dir=self._inspect_traces_dir(),
+            )
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] inspect_external subagent raised: {e}")
+            return f"ERROR: inspect_external subagent raised: {e}"
+        text = str(answer or '').strip()
+        if not text:
+            return 'EMPTY: inspect_external subagent produced no answer'
         return 'OK: ' + text
 
     def _security_traces_dir(self) -> 'Path':
@@ -3665,7 +3904,7 @@ class ChatLoop:
         try:
             result = self.backend.chat(
                 [{'role': 'system', 'content': sys_msg}, {'role': 'user', 'content': user_msg}],
-                max_tokens=2048, temperature=0.7, cot_profile='none')
+                max_tokens=4096, temperature=0.7, cot_profile='none')
             return (result or '').strip() or "(could not synthesize)"
         except Exception as e:
             return f"(trouble formulating a response: {e})"
@@ -3716,7 +3955,7 @@ class ChatLoop:
             raw = self.backend.chat(
                 [{'role': 'system', 'content': sys_msg},
                  {'role': 'user', 'content': user_msg}],
-                max_tokens=600, temperature=0.2, cot_profile='none')
+                max_tokens=4096, temperature=0.2, cot_profile='none')
         except Exception as e:
             logger.warning(f"[{self.character_name}] successor synth LLM failed: {e}")
             return None

@@ -494,7 +494,7 @@ def remember(query: str, memory_dir: Path, llm_backend,
             {'role': 'user', 'content': _build_user_msg()},
         ]
         try:
-            raw = llm_backend.chat(messages, max_tokens=600, temperature=0.2)
+            raw = llm_backend.chat(messages, max_tokens=4096, temperature=0.2)
         except Exception as e:
             logger.warning(f"remember: llm call failed at iter {i+1}: {e}")
             answer = f"(remember: llm error at iter {i+1}: {e})"

@@ -1,11 +1,16 @@
 """Codebase-inspection subagent — a thin, persona-less ReAct loop that
 answers queries about a source tree by reading files within a fixed root.
 
-Used by Jill's chat ReAct loop via the `inspect` tool. From Jill's vantage,
-an `inspect` call is one step: she emits a query string, gets a synthesized
-answer back. The subagent's internal multi-iteration reasoning is opaque
-to her trace, but written to a per-call trace file under inspect_traces/
-for debugging.
+Two entry points share the same loop, parser, and primitives:
+
+  - inspect(...)          — self-introspection over the agent's own src/.
+  - inspect_external(...) — read an external project repo bound for the
+                            session (sticky binding via Note + YAML).
+
+Both go through Jill's ReAct loop. The ReAct LLM picks tools by referent
+("about myself" → inspect, "about <named repo>" → inspect_external) and
+calls them with the same shape ({tool, query}); the geofence and prompt
+framing differ, the rest is shared.
 
 Architectural notes:
 - Backend is whatever the caller passes — by default this is the main
@@ -15,9 +20,14 @@ Architectural notes:
   optional line range), grep (via ripgrep), respond.
 - All file paths resolve within repo_root; path traversal AND symlink
   escape are rejected.
-- grep shells out to `rg` (ripgrep). Required at runtime; absence
-  produces an ERROR observation rather than a silent fallback so the
-  failure is loud.
+- list is git-aware when repo_root is a git checkout (uses
+  `git ls-files -co --exclude-standard` so tracked + uncommitted-not-
+  ignored files are visible, gitignored noise is hidden). Falls back to
+  raw filesystem with a small deny-list for non-git directories.
+- grep shells out to `rg` (ripgrep), which already respects .gitignore
+  inside git checkouts and skips binaries by default. Required at
+  runtime; absence produces an ERROR observation rather than a silent
+  fallback so the failure is loud.
 """
 
 from __future__ import annotations
@@ -29,7 +39,7 @@ import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -38,24 +48,54 @@ _MAX_READ_CHARS = 10_000
 _MAX_GREP_HITS = 50
 _MAX_LIST_ENTRIES = 200
 
-# Files / dirs the LLM should never need to navigate. Filter at list time
-# so the subagent doesn't waste iterations on cache or compiled artifacts.
+# Filesystem-fallback deny list (used when repo_root isn't a git checkout).
+# Inside git checkouts, .gitignore handles this and the deny list is
+# unused. Names match common cache / build / vendored-deps directories
+# across language ecosystems.
 _LIST_DENY_NAMES = {
     '__pycache__', '.git', '.mypy_cache', '.pytest_cache', '.ruff_cache',
-    'node_modules',
+    'node_modules', '.venv', 'venv', 'dist', 'build', 'target',
+    '.next', '.cache', '.tox',
 }
 _LIST_DENY_SUFFIXES = ('.pyc', '.pyo', '.so', '.bak', '.faiss', '.meta')
 
 
-def _build_system_prompt(repo_root: Path) -> str:
+# ---------------------------------------------------------------------------
+# System prompt
+# ---------------------------------------------------------------------------
+
+def _build_system_prompt(repo_root: Path, mode: str) -> str:
     """Static system prompt — describes the subagent's role, the geofence
     root, and read-strategy discipline for code. Stable across all calls
-    in a session, caches well on the anthropic route."""
+    in a session, caches well on the anthropic route.
+
+    `mode` is 'self' (the agent's own substrate) or 'external' (a project
+    repo bound for this session). The two differ only in the framing line
+    above the geofence; primitives and discipline are identical.
+    """
+    if mode == 'external':
+        framing = (
+            "You are a codebase-inspection subagent. You answer questions "
+            "about an external project repo by reading its files. You have "
+            "no persona, no goals beyond the current query, and no memory "
+            "of your own past calls — each invocation is independent.\n"
+            "\n"
+            "This is an external project, not your own substrate. Read it "
+            "as documentation: when the question is about overall shape "
+            "or unfamiliar terrain, list the root and read README.md / "
+            "similar top-level docs first; then drill in. The repo's "
+            "conventions may not match anything in your training — verify "
+            "by reading."
+        )
+    else:
+        framing = (
+            "You are a codebase-inspection subagent. You answer questions "
+            "about a source tree by reading its files. You have no persona, "
+            "no goals beyond the current query, and no memory of your own "
+            "past calls — each invocation is independent."
+        )
     return (
-        "You are a codebase-inspection subagent. You answer questions "
-        "about a source tree by reading its files. You have no persona, "
-        "no goals beyond the current query, and no memory of your own "
-        "past calls — each invocation is independent.\n"
+        f"{framing}\n"
         "\n"
         f"Repo root (geofence): {repo_root}\n"
         "All file paths are relative to this root. Navigation outside "
@@ -88,8 +128,8 @@ def _build_system_prompt(repo_root: Path) -> str:
         "optional, defaults to repo root. Pass a relative subdir "
         "(e.g. `chat`, `tools/search-web`) to navigate deeper. "
         "Output: one entry per line, format `<name>\\t<size_or_DIR>` "
-        "for each file/subdir; cache and compiled-artifact names are "
-        "filtered out.\n"
+        "for each file/subdir; in git checkouts, gitignored entries "
+        "are hidden automatically.\n"
         '2. {"thought": "...", "tool": "read", "file": "<relative_path>", '
         '"start_line": <int?>, "end_line": <int?>} — read a file. Omit '
         "start_line/end_line to read the whole file (capped at ~10K "
@@ -133,6 +173,10 @@ def _build_system_prompt(repo_root: Path) -> str:
     )
 
 
+# ---------------------------------------------------------------------------
+# Path resolution and helpers
+# ---------------------------------------------------------------------------
+
 def _safe_resolve(repo_root: Path, name: str,
                   must_be_dir: bool = False,
                   must_be_file: bool = False) -> Optional[Path]:
@@ -141,7 +185,6 @@ def _safe_resolve(repo_root: Path, name: str,
     if name is None:
         return None
     name = str(name).strip()
-    # Empty / dot-only refers to the root itself.
     if name in ('', '.', './'):
         candidate = repo_root.resolve()
     else:
@@ -153,7 +196,6 @@ def _safe_resolve(repo_root: Path, name: str,
         root = repo_root.resolve()
     except Exception:
         return None
-    # Inclusive: candidate may equal root (when name is empty/dot).
     try:
         candidate.relative_to(root)
     except ValueError:
@@ -174,9 +216,7 @@ def _rel_to_root(repo_root: Path, p: Path) -> str:
 
 
 def _is_hidden_or_denied(p: Path) -> bool:
-    """Filter for list output: hide caches, compiled artifacts, hidden
-    dotfiles. Symlinks pointing outside the geofence are caught earlier
-    by _safe_resolve; here we only filter for noise reduction."""
+    """Filesystem-fallback filter for non-git directories."""
     if p.name.startswith('.'):
         return True
     if p.name in _LIST_DENY_NAMES:
@@ -186,11 +226,96 @@ def _is_hidden_or_denied(p: Path) -> bool:
     return False
 
 
+def _is_git_checkout(repo_root: Path) -> bool:
+    """True if `<repo_root>/.git` exists (as a dir for a normal checkout
+    or as a file for a worktree). The `git` binary is also required."""
+    try:
+        if not (repo_root / '.git').exists():
+            return False
+    except Exception:
+        return False
+    return shutil.which('git') is not None
+
+
+# ---------------------------------------------------------------------------
+# Tool: list
+# ---------------------------------------------------------------------------
+
+def _list_via_git(repo_root: Path, target: Path) -> Optional[List[Tuple[str, bool]]]:
+    """List entries directly under `target` using git ls-files. Returns a
+    list of (name, is_dir) sorted (dirs first, then files, both alphabetic),
+    or None if the git invocation failed.
+
+    Strategy: `git ls-files -co --exclude-standard` lists tracked +
+    cached + untracked-not-ignored files relative to repo_root. We filter
+    to entries whose first path segment under `target` is the entry, and
+    derive directories from prefixes."""
+    rel_target = _rel_to_root(repo_root, target)
+    prefix = '' if rel_target in ('.', '') else rel_target.rstrip('/') + '/'
+    try:
+        proc = subprocess.run(
+            ['git', 'ls-files', '-co', '--exclude-standard', '--', '.'],
+            cwd=str(repo_root.resolve()),
+            capture_output=True, text=True, timeout=10.0, check=False,
+        )
+    except Exception as e:
+        logger.warning(f"code_subagent: git ls-files failed: {e}")
+        return None
+    if proc.returncode != 0:
+        return None
+    files: set = set()
+    dirs: set = set()
+    for raw in (proc.stdout or '').splitlines():
+        path = raw.strip()
+        if not path:
+            continue
+        if prefix and not path.startswith(prefix):
+            continue
+        rest = path[len(prefix):]
+        if not rest:
+            continue
+        head, sep, _tail = rest.partition('/')
+        if sep:
+            dirs.add(head)
+        else:
+            files.add(head)
+    rows: List[Tuple[str, bool]] = []
+    for d in sorted(dirs, key=str.lower):
+        rows.append((d, True))
+    for f in sorted(files, key=str.lower):
+        rows.append((f, False))
+    return rows
+
+
 def _tool_list(repo_root: Path, path: Optional[str]) -> str:
     target = _safe_resolve(repo_root, path or '', must_be_dir=True)
     if target is None:
         return f"ERROR: list invalid or out-of-scope path: {path!r}"
-    rows = []
+    rel = _rel_to_root(repo_root, target) or '.'
+
+    rows: List[str] = []
+    if _is_git_checkout(repo_root):
+        git_rows = _list_via_git(repo_root, target)
+        if git_rows is not None:
+            for name, is_dir in git_rows:
+                if is_dir:
+                    rows.append(f"{name}/\tDIR")
+                else:
+                    full = target / name
+                    try:
+                        size = full.stat().st_size
+                    except Exception:
+                        size = 0
+                    rows.append(f"{name}\t{size} bytes")
+                if len(rows) >= _MAX_LIST_ENTRIES:
+                    rows.append(f"(list capped at {_MAX_LIST_ENTRIES} entries)")
+                    break
+            if not rows:
+                return f"OK: {rel}/\n(empty)"
+            return f"OK: {rel}/\n" + "\n".join(rows)
+        # Fall through to filesystem on git failure.
+
+    # Filesystem fallback (non-git or git invocation failed).
     try:
         entries = sorted(target.iterdir(),
                          key=lambda p: (not p.is_dir(), p.name.lower()))
@@ -210,11 +335,14 @@ def _tool_list(repo_root: Path, path: Optional[str]) -> str:
         if len(rows) >= _MAX_LIST_ENTRIES:
             rows.append(f"(list capped at {_MAX_LIST_ENTRIES} entries)")
             break
-    rel = _rel_to_root(repo_root, target) or '.'
     if not rows:
         return f"OK: {rel}/\n(empty after filtering)"
     return f"OK: {rel}/\n" + "\n".join(rows)
 
+
+# ---------------------------------------------------------------------------
+# Tool: read
+# ---------------------------------------------------------------------------
 
 def _tool_read(repo_root: Path, name: str,
                start_line: Optional[int], end_line: Optional[int]) -> str:
@@ -246,6 +374,11 @@ def _tool_read(repo_root: Path, name: str,
     return 'OK: ' + out
 
 
+# ---------------------------------------------------------------------------
+# Tool: grep (ripgrep — already respects .gitignore inside git checkouts
+# and skips binaries by default)
+# ---------------------------------------------------------------------------
+
 def _tool_grep(repo_root: Path, pattern: str,
                path: Optional[str]) -> str:
     if not pattern:
@@ -259,9 +392,7 @@ def _tool_grep(repo_root: Path, pattern: str,
     cmd = [
         'rg',
         '--line-number',
-        '--with-filename',     # always emit path:line:content (single-file
-                               # grep otherwise omits the filename, which
-                               # would be inconsistent with directory mode)
+        '--with-filename',
         '--no-heading',
         '--color=never',
         f'--max-count={_MAX_GREP_HITS}',
@@ -285,14 +416,11 @@ def _tool_grep(repo_root: Path, pattern: str,
         return "ERROR: grep timed out (>20s) — narrow the pattern or scope"
     except Exception as e:
         return f"ERROR: grep failed to launch: {e}"
-    # rg exit codes: 0 = matches, 1 = no matches, 2 = error.
     if proc.returncode == 1:
         return f"EMPTY: no matches for pattern {pattern!r} in {path or '.'}"
     if proc.returncode != 0:
         msg = (proc.stderr or '').strip().splitlines()[:3]
         return f"ERROR: grep returned {proc.returncode}: " + ' | '.join(msg)
-    # Rewrite absolute paths to repo-relative for stable output across
-    # invocations and to keep observation lines short.
     root_str = str(repo_root.resolve())
     out_lines: List[str] = []
     total = 0
@@ -313,6 +441,10 @@ def _tool_grep(repo_root: Path, pattern: str,
         return f"EMPTY: no matches for pattern {pattern!r} in {path or '.'}"
     return 'OK: ' + "\n".join(out_lines)
 
+
+# ---------------------------------------------------------------------------
+# Loop core
+# ---------------------------------------------------------------------------
 
 def _parse_action(raw: str) -> Optional[Dict[str, Any]]:
     s = (raw or '').strip()
@@ -335,14 +467,15 @@ def _parse_action(raw: str) -> Optional[Dict[str, Any]]:
 
 def _write_trace(trace_dir: Path, query: str,
                  iters: List[Dict[str, Any]], answer: str,
-                 exit_reason: str) -> Optional[Path]:
+                 exit_reason: str, mode: str) -> Optional[Path]:
     try:
         trace_dir.mkdir(parents=True, exist_ok=True)
         ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H-%M-%SZ')
-        path = trace_dir / f'inspect_{ts}.txt'
+        prefix = 'inspect_external' if mode == 'external' else 'inspect'
+        path = trace_dir / f'{prefix}_{ts}.txt'
         lines = [
             '=' * 80,
-            f'[inspect] {ts} exit={exit_reason} iters={len(iters)}',
+            f'[{prefix}] {ts} exit={exit_reason} iters={len(iters)}',
             '=' * 80,
             f'Query: {query}',
             '',
@@ -365,32 +498,21 @@ def _write_trace(trace_dir: Path, query: str,
         path.write_text('\n'.join(lines), encoding='utf-8')
         return path
     except Exception as e:
-        logger.warning(f"inspect: trace write failed: {e}")
+        logger.warning(f"code_subagent: trace write failed: {e}")
         return None
 
 
-def inspect(query: str, repo_root: Path, llm_backend,
-            trace_dir: Path) -> str:
-    """Run the codebase-inspection subagent. Returns the synthesized
-    answer string, suitable for binding to a $stepN observation in
-    Jill's parent ReAct loop. Side effect: writes a per-call trace file
-    under trace_dir.
-
-    Args:
-        query: natural-language question about the codebase.
-        repo_root: directory the subagent is geofenced to (typically
-            src/). All file primitives reject paths outside this root.
-        llm_backend: a _ChatBackend instance used to generate actions.
-            By convention this is the main character backend; the
-            per-scenario llm_config decides the model.
-        trace_dir: where to write the per-call subagent trace.
-    """
+def _inspect_loop(query: str, repo_root: Path, llm_backend,
+                  trace_dir: Path, *, mode: str) -> str:
+    """Shared loop core. `mode` selects prompt framing and trace filename
+    prefix; primitives, parser, and budgets are identical."""
+    label = 'inspect_external' if mode == 'external' else 'inspect'
     if not query or not query.strip():
-        return "(inspect: empty query)"
+        return f"({label}: empty query)"
     repo_root = Path(repo_root)
     if not repo_root.is_dir():
-        return f"(inspect: repo_root does not exist: {repo_root})"
-    sys_prompt = _build_system_prompt(repo_root)
+        return f"({label}: repo_root does not exist: {repo_root})"
+    sys_prompt = _build_system_prompt(repo_root, mode)
     user_prefix = f"Query: {query.strip()}\n\n## Working log\n"
     log_lines: List[str] = []
     iters: List[Dict[str, Any]] = []
@@ -407,10 +529,10 @@ def inspect(query: str, repo_root: Path, llm_backend,
             {'role': 'user', 'content': _build_user_msg()},
         ]
         try:
-            raw = llm_backend.chat(messages, max_tokens=800, temperature=0.2)
+            raw = llm_backend.chat(messages, max_tokens=4096, temperature=0.2)
         except Exception as e:
-            logger.warning(f"inspect: llm call failed at iter {i+1}: {e}")
-            answer = f"(inspect: llm error at iter {i+1}: {e})"
+            logger.warning(f"{label}: llm call failed at iter {i+1}: {e}")
+            answer = f"({label}: llm error at iter {i+1}: {e})"
             exit_reason = 'llm_error'
             break
 
@@ -454,8 +576,48 @@ def inspect(query: str, repo_root: Path, llm_backend,
         log_lines.append('')
 
     if exit_reason == 'max_iters' and not answer:
-        answer = ("(inspect: hit max iterations without responding; "
+        answer = (f"({label}: hit max iterations without responding; "
                   "consider narrowing the query)")
 
-    _write_trace(trace_dir, query, iters, answer, exit_reason)
+    _write_trace(trace_dir, query, iters, answer, exit_reason, mode)
     return answer
+
+
+# ---------------------------------------------------------------------------
+# Public entry points
+# ---------------------------------------------------------------------------
+
+def inspect(query: str, repo_root: Path, llm_backend,
+            trace_dir: Path) -> str:
+    """Self-introspection: navigate the agent's own codebase under
+    `repo_root` (typically src/) and answer the query.
+
+    Args:
+        query: natural-language question about the codebase.
+        repo_root: directory the subagent is geofenced to. All file
+            primitives reject paths outside this root.
+        llm_backend: a _ChatBackend instance used to generate actions.
+            By convention this is the main character backend; the
+            per-scenario llm_config decides the model.
+        trace_dir: where to write the per-call subagent trace.
+    """
+    return _inspect_loop(query, Path(repo_root), llm_backend, Path(trace_dir),
+                         mode='self')
+
+
+def inspect_external(query: str, repo_root: Path, llm_backend,
+                     trace_dir: Path) -> str:
+    """External-codebase inspection: navigate a project repo bound for
+    this session (sticky binding via `/set-external-repo` or the YAML
+    `external_repo` field). Same primitives as `inspect`, neutral
+    prompt framing — this is reading documentation, not introspection.
+
+    Args:
+        query: natural-language question about the external repo.
+        repo_root: bound external repo root.
+        llm_backend: same conventions as `inspect`.
+        trace_dir: where to write the per-call subagent trace (same
+            directory as `inspect`; filename prefix differentiates).
+    """
+    return _inspect_loop(query, Path(repo_root), llm_backend, Path(trace_dir),
+                         mode='external')

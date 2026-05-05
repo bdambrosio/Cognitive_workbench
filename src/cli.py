@@ -172,6 +172,19 @@ def _parse_command(line: str) -> Optional[dict]:
             return None
         return {'cmd': '_query', 'query': 'remember', 'text': ' '.join(args)}
 
+    # -- External-repo binding (sticky across session; sets the geofence
+    # for the inspect_external tool). One repo at a time per character.
+    if cmd == 'set-external-repo':
+        if not args:
+            _print_error("Usage: /set-external-repo <absolute-path-to-repo>")
+            return None
+        return {'cmd': '_query', 'query': 'set_external_repo',
+                'path': ' '.join(args)}
+    if cmd == 'clear-external-repo':
+        return {'cmd': '_query', 'query': 'clear_external_repo'}
+    if cmd == 'external-repo':
+        return {'cmd': '_query', 'query': 'get_external_repo'}
+
     # -- Read-only queries (handled locally, not sent to command channel) --
     if cmd == 'concerns':
         # Subcommand: /concerns wipe → bulk-delete every non-seed concern.
@@ -327,6 +340,49 @@ def _handle_query(session, character: str, data: dict, state: dict):
         if trace_dir:
             _print_info(f"(full subagent trace under {trace_dir})")
 
+    elif query in ('set_external_repo', 'clear_external_repo', 'get_external_repo'):
+        action_map = {
+            'set_external_repo': 'set',
+            'clear_external_repo': 'clear',
+            'get_external_repo': 'get',
+        }
+        action = action_map[query]
+        body: dict = {'action': action}
+        if action == 'set':
+            body['path'] = data.get('path', '')
+        payload = json.dumps(body).encode('utf-8')
+        result = None
+        try:
+            for reply in session.get(
+                f"cognitive/{character}/control/external_repo",
+                payload=payload, timeout=5.0,
+            ):
+                if hasattr(reply, 'ok') and reply.ok is not None:
+                    result = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    break
+        except Exception as e:
+            _print_error(f"external_repo query failed: {e}")
+            return
+        if not result:
+            _print_error("(no response — chat loop may not be reachable)")
+            return
+        if not result.get('success'):
+            _print_error(result.get('error', 'external_repo command failed'))
+            return
+        if action == 'set':
+            _print_info(f"external_repo bound: {result.get('path')}")
+        elif action == 'clear':
+            if result.get('was_bound'):
+                _print_info(f"external_repo cleared (was: {result.get('path')})")
+            else:
+                _print_info("external_repo was not bound; nothing to clear")
+        else:  # get
+            p = result.get('path')
+            if p:
+                _print_info(f"external_repo: {p}")
+            else:
+                _print_info("external_repo: (none)")
+
     elif query == 'verbose':
         state['verbose'] = not state.get('verbose', False)
         _print_system(f"Verbose mode: {'on' if state['verbose'] else 'off'}")
@@ -357,6 +413,11 @@ def _print_help():
 
 {C.BOLD}Memory:{C.RESET}
   /remember <query>              Active-recall subagent query (reads agent's memory dir)
+
+{C.BOLD}External code:{C.RESET}
+  /set-external-repo <path>      Bind a project repo for the inspect_external tool
+  /clear-external-repo           Unbind the external repo
+  /external-repo                 Show the currently bound external repo (if any)
 
 {C.BOLD}Navigation:{C.RESET}
   @<agent> /<command>            Send command to a specific agent

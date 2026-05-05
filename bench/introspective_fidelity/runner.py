@@ -90,35 +90,52 @@ def _build_character_config(scenario_path: Path, world_name_override: str
 
 def _snapshot_concerns(loop: ChatLoop) -> List[Dict[str, Any]]:
     """Dump all concerns (active, satisfied, abandoned) with full
-    metadata. Ground truth for P2/P3/P4."""
-    cid = loop._concerns_collection_id
-    if not cid:
-        return []
-    coll = loop.resource_manager.get_resource(cid)
-    if not coll:
-        return []
-    note_ids = (coll.get("properties") or {}).get("content", []) or []
+    metadata. Ground truth for P2/P3/P4.
+
+    ChatLoop splits concerns into user_concerns and agent_concerns; iterate
+    both. `category` is set from `kind` so the judge's existing
+    `c.get('category')` display keeps working."""
     out: List[Dict[str, Any]] = []
-    for nid in note_ids:
-        note = loop.resource_manager.get_resource(nid)
-        if not note:
+    for cid in (getattr(loop, '_user_concerns_collection_id', None),
+                getattr(loop, '_agent_concerns_collection_id', None)):
+        if not cid:
             continue
-        props = note.get("properties") or {}
-        out.append({
-            "note_id": nid,
-            "text": props.get("content", ""),
-            "category": props.get("category", "durable"),
-            "status": props.get("status", "active"),
-            "provenance": props.get("provenance"),
-            "seed": bool(props.get("seed", False)),
-            "cadence_hours": loop._resolve_cadence_hours(props),
-            "lifetime_days": loop._resolve_lifetime_days(props),
-            "instruction": props.get("instruction"),
-            "weight": loop._concern_decayed_weight(props),
-            "created_at": props.get("created_at"),
-            "last_engaged_at": props.get("last_engaged_at"),
-            "last_acted_at": props.get("last_acted_at"),
-        })
+        coll = loop.resource_manager.get_resource(cid)
+        if not coll:
+            continue
+        note_ids = (coll.get("properties") or {}).get("content", []) or []
+        for nid in note_ids:
+            note = loop.resource_manager.get_resource(nid)
+            if not note:
+                continue
+            props = note.get("properties") or {}
+            kind = props.get("kind", "concern")
+            weight_src = (props.get("activation") if kind == "agent_concern"
+                          else props.get("strength"))
+            cadence = (loop._resolve_rhythm_hours(props)
+                       if hasattr(loop, "_resolve_rhythm_hours")
+                       else props.get("rhythm_hours"))
+            out.append({
+                "note_id": nid,
+                "text": props.get("content", ""),
+                "kind": kind,
+                "category": kind,
+                "status": props.get("status", "active"),
+                "provenance": props.get("provenance"),
+                "seed": bool(props.get("seed", False)),
+                "cadence_hours": cadence,
+                "rhythm_hours": cadence,
+                "rhythm_source": props.get("rhythm_source"),
+                "instruction": props.get("instruction"),
+                "weight": float(weight_src or 0.0),
+                "activation": props.get("activation"),
+                "strength": props.get("strength"),
+                "created_at": props.get("created_at"),
+                "last_engaged_at": props.get("last_engaged_at"),
+                "last_bumped_at": props.get("last_bumped_at"),
+                "last_acted_at": (props.get("last_fired_at")
+                                  or props.get("last_acted_at")),
+            })
     return out
 
 

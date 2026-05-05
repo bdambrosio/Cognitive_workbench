@@ -202,7 +202,7 @@ OUTPUT FORMAT (use these exact section headers — plain text only, no markdown 
 DISCOURSE STATE (segment {{$start_turn}}-{{$end_turn}}):
 
 ACTIVE COMMITMENTS:
-List each distinct commitment as: [Direction] Content (strength, temporal scope)
+List each distinct commitment as a single line: [Direction] Content (strength, temporal scope). One commitment per line, no sub-bullets, no commentary.
 - Direction: [Self → Other], [Other → Self], or [Mutual]
 - Strength: firm, tentative, conditional
 - Temporal scope: immediate, by [date/time], or ongoing
@@ -216,14 +216,14 @@ Example:
 - [Mutual] Check in every 10 minutes (firm, ongoing)
 
 CURRENT AGREEMENTS:
-Describe each shared frame, definition, or joint plan in natural language. State what was agreed and any conditions. Use "(this segment)" for items established in the current segment and "(established earlier)" for items carried forward — do not include specific turn numbers.
+Describe each shared frame, definition, or joint plan in natural language. State what was agreed and any conditions. 1-3 sentences per agreement; do not narrate or restate the conversation. Use "(this segment)" for items established in the current segment and "(established earlier)" for items carried forward — do not include specific turn numbers.
 - If no current agreements, write "[none]"
 
 Example:
 Navigate northwest for 30 minutes to locate the creek, then follow it back to the parking lot (this segment). If the creek is not found within the time limit, stop and reassess.
 
 KEY DECISIONS MADE:
-List significant decisions that close a previously open question or establish direction. Each entry: Adopted/Rejected/Added: <decision> (this segment | established earlier), <what it resolves or replaces>.
+List significant decisions that close a previously open question or establish direction. One decision per line: Adopted/Rejected/Added: <decision> (this segment | established earlier), <what it resolves or replaces>. No sub-bullets, no commentary.
 - Distinguish actual decisions from emergent conventions or restatements of existing behavior — those do not belong here.
 - Drop decisions not referenced or reaffirmed in the last ~30 turns.
 - If no new decisions, write "[none in this segment]"
@@ -271,6 +271,10 @@ KEY DECISIONS MADE:
 - Adopted: creek-retracing via compass bearing (this segment), based on prior crossing memory
 - Added: 30-minute time limit as safety check (this segment)
 ###END EXAMPLE OUTPUT
+
+Emit the three sections above and nothing else: no preamble, no postscript, no commentary on your own output.
+End your response with:
+</end>
 """
 
 TOM_UPDATE_TEMPLATE ="""You are updating a Theory of Mind model - your assessment of what the other person knows, wants, can do, and how reliable they are. 
@@ -747,8 +751,12 @@ Where TYPE is: commitment, monitoring, or activity
 
 Examples:
 commitment|Give Joe water from the spring
-activity|Explore surroundings with Joe to find way out  
+activity|Explore surroundings with Joe to find way out
 monitoring|Check that Joe is participating in exploration
+
+Emit only TYPE|ACTION lines, one per line, no preamble, no commentary, no trailing prose.
+End your response with:
+</end>
 
 Output:"""
     

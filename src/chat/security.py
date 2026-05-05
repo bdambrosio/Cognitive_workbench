@@ -365,7 +365,7 @@ def security(query: str, llm_backend, trace_dir: Path) -> str:
             {'role': 'user', 'content': _build_user_msg()},
         ]
         try:
-            raw = llm_backend.chat(messages, max_tokens=800, temperature=0.2)
+            raw = llm_backend.chat(messages, max_tokens=4096, temperature=0.2)
         except Exception as e:
             logger.warning(f"security: llm call failed at iter {i+1}: {e}")
             answer = f"(security: llm error at iter {i+1}: {e})"
