@@ -304,6 +304,13 @@ class _ChatBackend:
         if self._api_key_value is None and self.server in ('openrouter', 'openai'):
             from utils.llm_api import LLM
             self._cloud_llm = LLM(server_name=self.server, model_name=self.model)
+        # Cloud routing flag, exposed for callers that need to vary
+        # behavior by backend kind (e.g. ChatLoop's per-profile token
+        # floors, which must be looser on local engines that lump
+        # reasoning + visible output into one budget).
+        self.is_cloud = (self._api_key_value is not None
+                         or self._cloud_llm is not None
+                         or self.server == 'anthropic')
         if is_reasoning is None:
             self.is_reasoning = is_reasoning_model(self.model)
         else:
@@ -420,7 +427,16 @@ class _ChatBackend:
         }
         if self.model:
             body['model'] = self.model
-        if stops:
+        # Wire-level `stop` field. xAI grok-4.3 hard-rejects this
+        # parameter (400 "Model grok-4.3 does not support parameter
+        # stop"); the rest of the OpenAI-compat ecosystem accepts it.
+        # Skip on cloud paths and rely on (a) prompt-level discipline —
+        # the reflection templates explicitly require an "</end>" marker
+        # and forbid postscripts — plus (b) the client-side stop-marker
+        # truncation just before return below, which replicates the
+        # server-side cutoff for any model whose compliance slips.
+        # Local engines (llama-server, SGLang) keep the safety belt.
+        if stops and not self.is_cloud:
             body['stop'] = stops
         # Reasoning effort: scenario-declared baseline, optionally
         # overridden per call. Only sent when scenario declared a baseline
@@ -435,8 +451,7 @@ class _ChatBackend:
         # (signaled by api_key being set). Cloud providers reject those
         # fields; locally-served engines (llama-server, SGLangAPIServer)
         # accept them.
-        is_cloud = self._api_key_value is not None
-        if not is_cloud:
+        if not self.is_cloud:
             grammar = resolve_profile(cot_profile) if self.is_reasoning else None
             if grammar:
                 # llama-server accepts `grammar`; SGLangAPIServer (our wrapper)
@@ -456,7 +471,13 @@ class _ChatBackend:
             headers['Authorization'] = f'Bearer {self._api_key_value}'
 
         resp = requests.post(url, headers=headers, json=body, timeout=120)
-        resp.raise_for_status()
+        if not resp.ok:
+            # Surface the provider's actual error reason (xAI/OpenAI return
+            # JSON like {"error":{"message":"...","type":"..."}}); requests'
+            # default HTTPError only carries the status line.
+            raise RuntimeError(
+                f'{resp.status_code} {resp.reason} for {url}: '
+                f'{resp.text[:1000]}')
         data = resp.json()
         choices = data.get('choices') or []
         if not choices:
@@ -490,6 +511,23 @@ class _ChatBackend:
                 text = text.split('</think>', 1)[1].lstrip()
             elif text.lstrip().startswith('<think>'):
                 text = ''
+        # Client-side stop emulation. On cloud paths we suppressed
+        # body['stop'] above (xAI grok-4.3 rejects it); on local paths
+        # the server already truncated and the markers won't appear
+        # here — so this loop is idempotent. Replicates the server's
+        # truncate-at-first-stop behavior so the prompt's "</end>"
+        # anchor still drops trailing prose regardless of whether the
+        # provider honored the wire field.
+        if stops and isinstance(text, str):
+            earliest = -1
+            for s in stops:
+                if not s:
+                    continue
+                idx = text.find(s)
+                if idx != -1 and (earliest == -1 or idx < earliest):
+                    earliest = idx
+            if earliest != -1:
+                text = text[:earliest]
         return text or ''
 
 
@@ -723,7 +761,11 @@ class ChatLoop:
     # Per-profile max_tokens floor. Caller-supplied max_tokens may be tuned
     # for non-reasoning models (e.g. character_evaluator hardcodes 256 for a
     # ~150-token JSON envelope); reasoning models burn far more on the
-    # analysis channel before producing the final-channel answer:
+    # analysis channel before producing the final-channel answer.
+    #
+    # Local floor (LOCAL): max_tokens budgets BOTH reasoning and visible
+    # output on locally-served reasoning engines (vLLM, llama-server,
+    # SGLang), so the cap has to absorb thinking-channel burn:
     #   - Qwen3.6: ~1000-3000 free-thinking tokens
     #   - gpt-oss-120B at reasoning_effort=medium on long reflection
     #     prompts (companion/discourse): commonly 5000-10000 analysis
@@ -735,9 +777,21 @@ class ChatLoop:
     # `content` empty (analysis went to reasoning_content but no final
     # channel emitted), the backend returns '', and the reflection pass
     # drops the update with "Discourse/Companion update failed".
-    _PROFILE_TOKEN_FLOOR = {
+    #
+    # Cloud floor (CLOUD): xAI / OpenAI / Anthropic meter reasoning
+    # tokens *separately* from visible output — `max_tokens` (or
+    # `max_completion_tokens`) caps visible output only. The reflection
+    # templates target ~2-3K plain-text output, so a tight cloud cap
+    # bounds blast radius if the model ignores the prompt's "no
+    # postscript" rule and runs on (we already drop wire-level `stop`
+    # on cloud paths).
+    _PROFILE_TOKEN_FLOOR_LOCAL = {
         'triage': 16384,
         'none': 16384,   # covers discourse extract + revise_belief callables
+    }
+    _PROFILE_TOKEN_FLOOR_CLOUD = {
+        'triage': 2048,  # triage emits a small JSON envelope
+        'none': 4096,    # discourse / companion target ~2-3K visible output
     }
 
     def _make_llm_callable(self, cot_profile: Optional[str],
@@ -754,7 +808,10 @@ class ChatLoop:
         discourse) to `low` while leaving the ReAct main loop at the
         scenario's baseline (typically `medium`).
         """
-        floor = self._PROFILE_TOKEN_FLOOR.get(cot_profile or '', 0)
+        floor_table = (self._PROFILE_TOKEN_FLOOR_CLOUD
+                       if self.backend.is_cloud
+                       else self._PROFILE_TOKEN_FLOOR_LOCAL)
+        floor = floor_table.get(cot_profile or '', 0)
 
         def _gen(messages, bindings=None, max_tokens=400, temperature=0.7,
                  stops=None, is_json=False):
@@ -2809,6 +2866,39 @@ class ChatLoop:
                 backlog = self._inbox.qsize()
             except Exception:
                 backlog = 0
+            # Log file inventory. We can't just walk this process's
+            # handlers — resource_browser.py is a sibling subprocess with
+            # its own logging config, and the launcher / discourse / chat
+            # modules race basicConfig(force=True) and resolve relative
+            # paths against cwd. Easier and more honest: scan both known
+            # log dirs (<repo>/logs and <repo>/src/logs) for *.log files
+            # and let the caller see mtimes to judge which are this run.
+            log_files: List[Dict[str, Any]] = []
+            try:
+                repo_root = Path(__file__).resolve().parent.parent.parent
+                candidates = [repo_root / 'logs', repo_root / 'src' / 'logs']
+                seen = set()
+                for d in candidates:
+                    if not d.is_dir():
+                        continue
+                    for p in sorted(d.glob('*.log')):
+                        rp = str(p.resolve())
+                        if rp in seen:
+                            continue
+                        seen.add(rp)
+                        try:
+                            st = p.stat()
+                            log_files.append({
+                                'path': rp,
+                                'size': st.st_size,
+                                'mtime': datetime.fromtimestamp(
+                                    st.st_mtime, tz=timezone.utc).isoformat(),
+                            })
+                        except OSError as _e:
+                            logger.warning(
+                                f"[{self.character_name}] stat {p} failed: {_e}")
+            except Exception as _e:
+                logger.warning(f"[{self.character_name}] log-file probe failed: {_e}")
             self._reply(query, {
                 'success': True,
                 'ready': ready,
@@ -2818,6 +2908,12 @@ class ChatLoop:
                 'inbox_backlog': backlog,
                 'last_reply_at': self._last_reply_at,
                 'character': self.character_name,
+                'log_files': log_files,
+                'backend': {
+                    'server': self.backend.server,
+                    'base_url': self.backend.base_url,
+                    'model': self.backend.model,
+                },
             })
         except Exception as e:
             logger.error(f"[{self.character_name}] status query failed: {e}")

@@ -87,6 +87,10 @@ Pick a scenario based on the backend you want:
   export CLAUDE_API_KEY="sk-ant-..."
   ```
 - **MIMO cloud** (or any OpenAI-compatible endpoint): `scenarios/jill-chat-mimo.yaml` is the template. Set the env var named in `api_key`.
+- **xAI Grok (grok-4.3)**: `scenarios/jill-chat-xai.yaml`. Set `XAI_API_KEY` in your environment.
+  ```bash
+  export XAI_API_KEY="xai-..."
+  ```
 - **Local llama.cpp / SGLang / generic OpenAI-compatible**: `scenarios/jill-chat.yaml`. Default points at `http://127.0.0.1:5000`; edit `base_url` for your local server.
 
 ### 3. Run
@@ -128,6 +132,7 @@ Used to inspect what the agent is carrying across turns and to manually prune/ed
 | `jill-chat.yaml` | OpenAI-compatible local server | Default; `base_url` defaults to `http://127.0.0.1:5000` |
 | `jill-chat-vllm.yaml` | vLLM (local GPU) | Set `vllm_model_path` |
 | `jill-chat-mimo.yaml` | MIMO cloud (unified `api_key` form) | Generic OpenAI-compat cloud route |
+| `jill-chat-xai.yaml` | xAI Grok (`grok-4.3`) | OpenAI-compat; `stop` is suppressed on cloud, `reasoning_effort` baseline=medium |
 | `jill-chat-sonnet.yaml` | Anthropic Claude Sonnet 4.6 | Native Messages API |
 | `jill-benchmark-chat.yaml` | Local OpenAI-compat | Benchmark harness — frozen scripted session |
 | `jill-benchmark-chat-sonnet.yaml` | Anthropic Claude Sonnet 4.6 | Benchmark harness, cloud variant |

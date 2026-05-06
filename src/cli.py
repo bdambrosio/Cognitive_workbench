@@ -436,6 +436,24 @@ def _handle_query(session, character: str, data: dict, state: dict):
         last = result.get('last_reply_at')
         if last:
             _print_info(f"  last reply: {_elapsed_since(last)} ago")
+        backend = result.get('backend') or {}
+        if backend:
+            _print_info(
+                f"  backend: {backend.get('server','?')}@"
+                f"{backend.get('base_url','?')} model={backend.get('model') or '(default)'}"
+            )
+        log_files = result.get('log_files') or []
+        if log_files:
+            _print_info("  logs:")
+            for entry in log_files:
+                if isinstance(entry, dict):
+                    path = entry.get('path', '?')
+                    mtime = entry.get('mtime', '')
+                    size = entry.get('size', 0)
+                    age = _elapsed_since(mtime) if mtime else '?'
+                    _print_info(f"    {path}  ({size}B, {age} ago)")
+                else:
+                    _print_info(f"    {entry}")
 
     elif query == 'verbose':
         state['verbose'] = not state.get('verbose', False)
