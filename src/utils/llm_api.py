@@ -20,7 +20,9 @@ logger.setLevel(logging.INFO)
 
 # Add file handler
 try:
-    _log_dir = os.path.join(os.path.dirname(__file__), '..', 'logs')
+    # __file__ is <repo>/src/utils/llm_api.py — go up two to <repo>/logs/
+    # so we share the canonical log dir with launcher / discourse / etc.
+    _log_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'logs')
     os.makedirs(_log_dir, exist_ok=True)
     _log_path = os.path.join(_log_dir, 'llm_api.log')
     _file_handler = logging.FileHandler(_log_path, mode='a')

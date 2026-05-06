@@ -442,18 +442,9 @@ def _handle_query(session, character: str, data: dict, state: dict):
                 f"  backend: {backend.get('server','?')}@"
                 f"{backend.get('base_url','?')} model={backend.get('model') or '(default)'}"
             )
-        log_files = result.get('log_files') or []
-        if log_files:
-            _print_info("  logs:")
-            for entry in log_files:
-                if isinstance(entry, dict):
-                    path = entry.get('path', '?')
-                    mtime = entry.get('mtime', '')
-                    size = entry.get('size', 0)
-                    age = _elapsed_since(mtime) if mtime else '?'
-                    _print_info(f"    {path}  ({size}B, {age} ago)")
-                else:
-                    _print_info(f"    {entry}")
+        log_dir = result.get('log_dir')
+        if log_dir:
+            _print_info(f"  logs: {log_dir}/")
 
     elif query == 'verbose':
         state['verbose'] = not state.get('verbose', False)

@@ -21,10 +21,11 @@ import os
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setLevel(logging.WARNING)
 
-# File handler with INFO level (full logging) – ensure logs dir exists relative to this file
+# File handler with INFO level (full logging). Anchor to <repo>/logs/
+# (parent of src/) so all logs land in one place regardless of cwd.
 handlers_list = [console_handler]
 try:
-    _log_dir = os.path.join(os.path.dirname(__file__), 'logs')
+    _log_dir = os.path.join(os.path.dirname(__file__), '..', 'logs')
     os.makedirs(_log_dir, exist_ok=True)
     _log_path = os.path.join(_log_dir, 'executive_node.log')
     file_handler = logging.FileHandler(_log_path, mode='a')

@@ -27,8 +27,15 @@ if TYPE_CHECKING:
 # Configure logging with unbuffered output
 _cli_mode = os.getenv('CWB_CLI_MODE', '') == '1'
 
-# File handler with INFO level (full logging)
-file_handler = logging.FileHandler('logs/discourse_module.log', mode='w')
+# File handler with INFO level (full logging). Path is anchored to the
+# repo root so logs land in <repo>/logs/ regardless of cwd — without
+# this pin, running from src/ writes to src/logs/ while running from
+# the repo root writes to logs/, and chasing missing entries means
+# checking both directories.
+from pathlib import Path as _Path
+_LOG_DIR = _Path(__file__).resolve().parent.parent / "logs"
+_LOG_DIR.mkdir(parents=True, exist_ok=True)
+file_handler = logging.FileHandler(_LOG_DIR / 'discourse_module.log', mode='w')
 file_handler.setLevel(logging.INFO)
 
 _handlers = [file_handler]

@@ -31,7 +31,11 @@ import os
 logger = logging.getLogger(__name__)
 _cli_mode = str(os.getenv('CWB_CLI_MODE', '')).lower() == '1'
 
-file_handler = logging.FileHandler('logs/fastapi_action_display.log')
+# Anchor log path to the repo root (<repo>/logs/) regardless of cwd —
+# matches the convention used by launcher.py / discourse.py / etc.
+_LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+_LOG_DIR.mkdir(parents=True, exist_ok=True)
+file_handler = logging.FileHandler(_LOG_DIR / 'fastapi_action_display.log')
 file_handler.setLevel(logging.DEBUG)
 
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')

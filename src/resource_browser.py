@@ -22,7 +22,11 @@ import uvicorn
 
 _console_handler = logging.StreamHandler()
 _console_handler.setLevel(logging.WARNING)
-_file_handler = logging.FileHandler('logs/resource_browser.log', mode='w')
+# Anchor log path to the repo root so we land in <repo>/logs/ no
+# matter where the launcher subprocess starts us from.
+_LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+_LOG_DIR.mkdir(parents=True, exist_ok=True)
+_file_handler = logging.FileHandler(_LOG_DIR / 'resource_browser.log', mode='w')
 _file_handler.setLevel(logging.INFO)
 _formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 _console_handler.setFormatter(_formatter)

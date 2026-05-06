@@ -2866,39 +2866,13 @@ class ChatLoop:
                 backlog = self._inbox.qsize()
             except Exception:
                 backlog = 0
-            # Log file inventory. We can't just walk this process's
-            # handlers — resource_browser.py is a sibling subprocess with
-            # its own logging config, and the launcher / discourse / chat
-            # modules race basicConfig(force=True) and resolve relative
-            # paths against cwd. Easier and more honest: scan both known
-            # log dirs (<repo>/logs and <repo>/src/logs) for *.log files
-            # and let the caller see mtimes to judge which are this run.
-            log_files: List[Dict[str, Any]] = []
-            try:
-                repo_root = Path(__file__).resolve().parent.parent.parent
-                candidates = [repo_root / 'logs', repo_root / 'src' / 'logs']
-                seen = set()
-                for d in candidates:
-                    if not d.is_dir():
-                        continue
-                    for p in sorted(d.glob('*.log')):
-                        rp = str(p.resolve())
-                        if rp in seen:
-                            continue
-                        seen.add(rp)
-                        try:
-                            st = p.stat()
-                            log_files.append({
-                                'path': rp,
-                                'size': st.st_size,
-                                'mtime': datetime.fromtimestamp(
-                                    st.st_mtime, tz=timezone.utc).isoformat(),
-                            })
-                        except OSError as _e:
-                            logger.warning(
-                                f"[{self.character_name}] stat {p} failed: {_e}")
-            except Exception as _e:
-                logger.warning(f"[{self.character_name}] log-file probe failed: {_e}")
+            # Canonical log directory. All in-process loggers and
+            # subprocess loggers (resource_browser, fastapi_action_display,
+            # discourse, llm_api, executive_node via templates) are pinned
+            # to <repo>/logs/ — see launcher.py / discourse.py / etc.
+            # Single line, one place to look.
+            log_dir = str(
+                Path(__file__).resolve().parent.parent.parent / 'logs')
             self._reply(query, {
                 'success': True,
                 'ready': ready,
@@ -2908,7 +2882,7 @@ class ChatLoop:
                 'inbox_backlog': backlog,
                 'last_reply_at': self._last_reply_at,
                 'character': self.character_name,
-                'log_files': log_files,
+                'log_dir': log_dir,
                 'backend': {
                     'server': self.backend.server,
                     'base_url': self.backend.base_url,
