@@ -12,9 +12,13 @@ from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 from urllib.parse import urljoin, urlparse
 from html.parser import HTMLParser
+from typing import Any
 import pymupdf
 import warnings
-from infospace_executor import InfospaceExecutor
+# InfospaceExecutor was removed with the OODA cleanup. The runtime
+# `executor` argument is now duck-typed: callers (e.g. chat_loop's
+# _FetchTextStubExecutor) just need a _create_uniform_return method.
+# Annotations widened to Any to keep the signatures honest about that.
 
 from utils.grobid import parse_pdf_grobid
 
@@ -40,7 +44,7 @@ logger = logging.getLogger(__name__)
 warnings.filterwarnings('ignore', category=UserWarning, module='unstructured')
 
 
-def _fail(executor: InfospaceExecutor, reason: str, value: str | None = None, extra: dict | None = None):
+def _fail(executor: Any, reason: str, value: str | None = None, extra: dict | None = None):
     return executor._create_uniform_return(
         "failed",
         value=value or reason,
@@ -49,7 +53,7 @@ def _fail(executor: InfospaceExecutor, reason: str, value: str | None = None, ex
     )
 
 
-def _success(executor: InfospaceExecutor, result: str, extra: dict | None = None):
+def _success(executor: Any, result: str, extra: dict | None = None):
     return executor._create_uniform_return("success", value=result, extra=extra)
 
 
@@ -66,7 +70,7 @@ def tool(url_or_content: str, runtime=None, **kwargs) -> str:
     Returns:
         JSON string with text, format, metadata, page_count (if PDF), char_count
     """
-    executor: InfospaceExecutor = kwargs.get("executor")
+    executor: Any = kwargs.get("executor")
     if not executor:
         return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
 
@@ -151,9 +155,9 @@ def tool(url_or_content: str, runtime=None, **kwargs) -> str:
             return _fail(executor, f"Invalid URL or content: {url_or_content[:100]}")
         
         # Download and detect format
-        content, content_type, final_url = _download_from_url(url)
+        content, content_type, final_url, dl_reason = _download_from_url(url)
         if not content:
-            return _fail(executor, f"Failed to download from {url}")
+            return _fail(executor, f"Failed to download from {url}: {dl_reason or 'unknown'}")
     
     # Now detect format and extract (common for both file and URL)
     file_format = _detect_format(content, content_type, final_url)
@@ -252,32 +256,41 @@ def _normalize_url(url: str) -> str:
 
 
 def _download_from_url(url: str) -> tuple:
-    """Download content from URL. Returns (content_bytes, content_type, final_url)."""
+    """Download content from URL. Returns (content_bytes, content_type,
+    final_url, reason). On success, reason is None; on failure, content
+    and content_type are None and reason is a short string the caller
+    can surface to the LLM observation. The error reason matters for
+    ReAct: a generic "failed to download" prevents the model from
+    judging whether to retry differently (e.g., URLError on basic-auth-
+    in-URL → caller might extract creds and inject a header instead)."""
     headers = {'User-Agent': 'Mozilla/5.0 (compatible; CognitiveWorkbench/1.0)'}
-    
+
     # Add HuggingFace authentication if URL is from HuggingFace and token is available
     if 'huggingface.co' in url:
         hf_token = os.getenv('HF_TOKEN') or os.getenv('HUGGINGFACE_TOKEN')
         if hf_token:
             headers['Authorization'] = f'Bearer {hf_token}'
-    
+
     try:
         request = Request(url, headers=headers)
         response = urlopen(request, timeout=30)
         content = response.read()
         content_type = response.headers.get('Content-Type', '').lower()
         final_url = response.url or url
-        
-        return content, content_type, final_url
+
+        return content, content_type, final_url, None
     except HTTPError as e:
-        logger.error(f"HTTP {e.code} {e.reason} for {url}")
-        return None, None, url
+        reason = f"HTTP {e.code} {e.reason}"
+        logger.error(f"{reason} for {url}")
+        return None, None, url, reason
     except URLError as e:
-        logger.error(f"URL error: {e.reason} for {url}")
-        return None, None, url
+        reason = f"URLError: {e.reason}"
+        logger.error(f"{reason} for {url}")
+        return None, None, url, reason
     except Exception as e:
-        logger.error(f"Download failed: {str(e)} for {url}")
-        return None, None, url
+        reason = f"{type(e).__name__}: {e}"
+        logger.error(f"Download failed: {reason} for {url}")
+        return None, None, url, reason
 
 
 def _detect_format(content: bytes, content_type: str, url: str) -> str:

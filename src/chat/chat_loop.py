@@ -1001,45 +1001,92 @@ class ChatLoop:
             logger.warning(f"[{self.character_name}] _remember failed: {e}")
             return None
 
+    # Recency-bias parameters for _recall. The penalty is multiplicative
+    # and saturates: a brand-new memory gets factor 1.0; an ancient memory
+    # asymptotes to factor (1 - _RECALL_RECENCY_MAX_PENALTY). With the
+    # current values (max=0.20, tau=14d), a 100%-relevant 30-day-old
+    # memory loses ~17% to age — enough that two memories tied within
+    # ~0.05 similarity flip toward the newer, but not enough to demote a
+    # strong topical match in favor of an irrelevant fresh one.
+    _RECALL_RECENCY_MAX_PENALTY = 0.20
+    _RECALL_RECENCY_TAU_DAYS = 14.0
+
+    def _recency_adjust(self, score: float, created_at_iso: Optional[str]) -> float:
+        """Apply a saturating age penalty so recall ties break toward
+        newer memories. Stable facts older than ~6 weeks lose at most
+        ~20% of score; iteration-accumulation stops promoting outdated
+        playbook revisions over fresh ones. Failure-tolerant: any
+        parse/arithmetic error returns the raw score unchanged."""
+        if not created_at_iso:
+            return score
+        try:
+            import math
+            t = datetime.fromisoformat(str(created_at_iso))
+            if t.tzinfo is None:
+                t = t.replace(tzinfo=timezone.utc)
+            age_days = max(
+                0.0,
+                (datetime.now(timezone.utc) - t).total_seconds() / 86400.0)
+            factor = 1.0 - self._RECALL_RECENCY_MAX_PENALTY * (
+                1.0 - math.exp(-age_days / self._RECALL_RECENCY_TAU_DAYS))
+            return score * factor
+        except Exception:
+            return score
+
     def _recall(self, query: str, k: int = 3, threshold: float = 0.5
                 ) -> List[Tuple[str, str]]:
         """Semantic search over the memories Collection. Returns ranked
         (text, category) tuples, highest score first. Category is read
         from the source note's properties; pre-taxonomy memories without
         a category default to 'fact'. Empty list on miss / not yet
-        indexed / any error."""
+        indexed / any error.
+
+        Re-ranks by recency-adjusted score: fetch up to 2*k candidates
+        from FAISS, apply a saturating age penalty (see _recency_adjust),
+        then return the top-k. Raw similarity still dominates — recency
+        only flips ties within the same topical band."""
         if not self._memories_collection_id or not query:
             return []
         try:
+            fetch = max(k * 2, 6)
             with self._faiss_lock:
                 ok, results, err = self.resource_manager.search_collection(
                     self.character_name, self._memories_collection_id, query,
-                    mode='semantic', limit=k, threshold=threshold)
+                    mode='semantic', limit=fetch, threshold=threshold)
             if not ok or not results:
                 return []
-            out: List[Tuple[str, str]] = []
+            scored: List[Tuple[float, str, str]] = []
             for r in results:
                 if not isinstance(r, dict):
                     continue
                 doc = r.get('document')
                 if not isinstance(doc, str) or not doc.strip():
                     continue
-                # Map chunk back to source note to read its category.
+                # Map chunk back to source note for category + created_at.
                 # Chunks store source_note_id in metadata (per
-                # _index_note_chunks). Missing note → fall back to 'fact'.
+                # _index_note_chunks). Missing note → fall back to 'fact'
+                # category, no recency adjustment (created_at unknown).
                 # No lock needed for this lookup — get_resource is a dict
                 # read, not a FAISS operation.
                 cat = 'fact'
+                created_at: Optional[str] = None
                 meta = r.get('metadata') or {}
                 note_id = meta.get('source_note_id')
                 if note_id:
                     note = self.resource_manager.get_resource(note_id)
                     if note:
-                        raw = (note.get('properties') or {}).get('category')
+                        props = note.get('properties') or {}
+                        raw = props.get('category')
                         if isinstance(raw, str) and raw in _MEMORY_CATEGORIES:
                             cat = raw
-                out.append((doc.strip(), cat))
-            return out
+                        ca = props.get('created_at')
+                        if isinstance(ca, str):
+                            created_at = ca
+                base_score = float(r.get('score') or 0.0)
+                adj = self._recency_adjust(base_score, created_at)
+                scored.append((adj, doc.strip(), cat))
+            scored.sort(key=lambda x: x[0], reverse=True)
+            return [(text, cat) for _adj, text, cat in scored[:k]]
         except Exception as e:
             logger.warning(f"[{self.character_name}] _recall failed: {e}")
             return []

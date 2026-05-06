@@ -3,14 +3,16 @@ Word count tool - example Python tool.
 """
 
 from typing import Any, Dict
-from infospace_executor import InfospaceExecutor
+# InfospaceExecutor was removed with the OODA cleanup. The runtime
+# `executor` argument is now duck-typed: callers just need a
+# _create_uniform_return method. Annotations widened to Any.
 
 
-def _fail(executor: InfospaceExecutor, reason: str, extra: Dict[str, Any] | None = None):
+def _fail(executor: Any, reason: str, extra: Dict[str, Any] | None = None):
     return executor._create_uniform_return("failed", value=reason, reason=reason, extra=extra)
 
 
-def _success(executor: InfospaceExecutor, value: str, extra: Dict[str, Any] | None = None):
+def _success(executor: Any, value: str, extra: Dict[str, Any] | None = None):
     return executor._create_uniform_return("success", value=value, extra=extra)
 
 
@@ -25,7 +27,7 @@ def tool(value, runtime=None, **kwargs):
     Returns:
         String with word count
     """
-    executor: InfospaceExecutor = kwargs.get("executor")
+    executor: Any = kwargs.get("executor")
     if not executor:
         return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
 
