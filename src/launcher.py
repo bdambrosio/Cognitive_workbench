@@ -294,6 +294,36 @@ def launch_resource_browser(world_label: str, character: str = "") -> Optional[s
         return None
 
 
+def launch_telegram_bridge(character: str) -> Optional[subprocess.Popen]:
+    """Spawn telegram_bridge.py as a sibling subprocess.
+
+    The bridge is opt-in (--telegram); we fail loudly here rather than
+    after launch if the env vars are missing, so the user finds out
+    immediately rather than from a silently-not-replying bot.
+    """
+    if not os.getenv('TELEGRAM_BOT_TOKEN', '').strip():
+        logger.error(
+            "Telegram bridge requested but TELEGRAM_BOT_TOKEN is not set; "
+            "skipping. Export the bot token from @BotFather and retry."
+        )
+        return None
+    if not os.getenv('TELEGRAM_ALLOWED_CHAT_IDS', '').strip():
+        logger.error(
+            "Telegram bridge requested but TELEGRAM_ALLOWED_CHAT_IDS is "
+            "empty; skipping. The allowlist is the only authorization "
+            "boundary — refusing to start a publicly-DM-able bridge."
+        )
+        return None
+    try:
+        cmd = [sys.executable, 'telegram_bridge.py', '--character', character]
+        proc = subprocess.Popen(cmd)
+        logger.info(f"Telegram bridge launched (character={character})")
+        return proc
+    except Exception as e:
+        logger.error(f"Failed to launch Telegram bridge: {e}")
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Agent thread
 # ---------------------------------------------------------------------------
@@ -364,6 +394,11 @@ def main():
     parser.add_argument('--ui', action='store_true', help='Launch FastAPI web UI')
     parser.add_argument('--ui-port', type=int, default=3000, help='Port for web UI (default: 3000)')
     parser.add_argument('--resource-browser', action='store_true', help='Launch Resource Browser (port 3001)')
+    parser.add_argument('--telegram', action='store_true',
+                        help='Launch Telegram bridge subprocess (requires '
+                             'TELEGRAM_BOT_TOKEN and TELEGRAM_ALLOWED_CHAT_IDS '
+                             'env vars; relays inbound DMs to the primary '
+                             'character and forwards outbound say events back)')
     parser.add_argument('--cli', action='store_true', help='Launch interactive CLI chat interface')
     parser.add_argument('--autonomy', action='store_true',
                         help='Enable autonomous concern firing in chat mode (off by default; '
@@ -434,6 +469,11 @@ def main():
     if args.resource_browser:
         primary_character = characters[0][0] if characters else ""
         proc = launch_resource_browser(world_name, character=primary_character)
+        if proc:
+            service_procs.append(proc)
+    if args.telegram:
+        primary_character = characters[0][0] if characters else ""
+        proc = launch_telegram_bridge(character=primary_character)
         if proc:
             service_procs.append(proc)
 

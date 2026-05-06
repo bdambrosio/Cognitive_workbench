@@ -104,6 +104,7 @@ python3 launcher.py ../scenarios/jill-chat-sonnet.yaml --cli --resource-browser
 Flags:
 - `--cli` — interactive CLI chat
 - `--resource-browser` — opens the Resource Browser web UI on port 3001 for inspecting Notes, Collections, and Concerns
+- `--telegram` — launch a Telegram bridge subprocess so you can chat with the agent from your phone and receive autonomous alerts as DMs (see [Telegram bridge](#telegram-bridge))
 
 ### 4. (Optional) Browser automation
 
@@ -115,6 +116,37 @@ cargo install agent-browser
 ```
 
 Skip if you don't need browser automation — search and fetch_text work without it.
+
+## Telegram bridge
+
+Optional sidecar subprocess (`src/telegram_bridge.py`, launched by `--telegram`) that gives the agent a second channel beyond the local CLI:
+
+- **Outbound alerts.** Autonomous concerns that fire while you're away from the keyboard (e.g. battery alarm, market move) push to Telegram as a DM — works for unattended/remote agent instances too.
+- **Inbound chat.** DM the bot from any device; messages are forwarded as user input through the same `cognitive/{character}/sense_data` topic the CLI uses, and the agent's reply comes back on the same Telegram thread.
+
+The bridge holds a long-poll connection to `api.telegram.org` (no inbound port, no webhook). It's hard-gated on a chat-ID allowlist — non-allowlisted senders are silently dropped, group/channel chats refused outright. No chat-loop changes were needed; new channels are pure pub/sub bridges on the existing topics.
+
+### Setup
+
+1. Install Telegram on your phone, sign in with your phone number, and **enable two-step verification** (Privacy and Security → Two-Step Verification). This is your only defense against SIM-swap takeover of the agent's remote-control channel.
+2. In Telegram, message `@BotFather` → `/newbot` and follow the prompts. BotFather replies with a bot token.
+3. Find your numeric Telegram user ID by messaging `@userinfobot`, or by sending any message to your new bot and then hitting `https://api.telegram.org/bot<TOKEN>/getUpdates` — the `from.id` field in the response is your chat ID.
+4. Export both as environment variables (e.g. in `~/.bashrc`):
+   ```bash
+   export TELEGRAM_BOT_TOKEN="<token from BotFather>"
+   export TELEGRAM_ALLOWED_CHAT_IDS="<your numeric ID>"   # comma-separated for multiple
+   ```
+5. Launch with `--telegram`:
+   ```bash
+   python3 launcher.py jill-chat-xai.yaml --cli --resource-browser --telegram --autonomy
+   ```
+
+The bridge logs to `<repo>/logs/telegram_bridge.log` — startup confirmation, allowlist drops, and per-message inbound activity all land there. If `/start` from your phone gets a reply but plain messages don't seem to reach the agent, check that log first.
+
+### Caveats
+
+- **Tool authority.** Mobile-Jill currently has the same tool access as desktop-Jill. If you want the remote channel restricted to a curated subset, that's a separate (not-yet-built) per-character policy.
+- **Cloud safety filters.** xAI's `grok-4.3` has aggressive data-leakage filtering that can 403 on prompts heavy with infrastructure context (IPs, credentials, internal IDs in accumulated memory). If you hit `SAFETY_CHECK_TYPE_DATA_LEAKAGE` regularly on a domain like network monitoring, switch that scenario to a different backend (Anthropic, MIMO, or a local model) — the bridge is backend-agnostic.
 
 ## Resource Browser
 
