@@ -991,26 +991,6 @@ class FastAPIActionDisplayNode:
                 logger.error(f"Error in goal_remove: {e}")
                 return {"success": False, "message": str(e)}
 
-        @self.app.post("/api/control/clear_world_model")
-        async def clear_world_model():
-            """Clear world model."""
-            try:
-                if self.active_character_name is None:
-                    return {"success": False, "message": "No character available yet"}
-                
-                logger.info(f"🗑️ Clear world model command received")
-                
-                # Publish clear world model command
-                topic = f"cognitive/{self.active_character_name}/control/clear_world_model"
-                publisher = self.session.declare_publisher(topic)
-                publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
-                logger.info(f"🗑️ Clear world model command sent to {self.active_character_name}")
-                
-                return {"success": True, "message": "World model clear command sent"}
-            except Exception as e:
-                logger.error(f"Error in clear_world_model: {e}")
-                return {"success": False, "message": f"Error: {str(e)}"}
-        
         @self.app.post("/api/control/clear_map")
         async def clear_map():
             """Clear map."""
@@ -1551,20 +1531,6 @@ Generated: {generated_at}
             except Exception as e:
                 logger.error(f"Error getting triage status: {e}")
                 return {"success": False, "message": str(e)}
-
-        @self.app.get("/api/ooda_feed/{character}")
-        async def get_ooda_feed(character: str):
-            """Get recent OODA event feed for a character."""
-            try:
-                selector = f"cognitive/{character}/ooda_feed"
-                replies = self.session.get(selector, timeout=2.0)
-                for reply in replies:
-                    if hasattr(reply, 'ok') and reply.ok is not None:
-                        return json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                return {"success": True, "events": []}
-            except Exception as e:
-                logger.error(f"Error getting ooda feed: {e}")
-                return {"success": False, "events": []}
 
         @self.app.get("/api/characters")
         async def get_characters():
@@ -2636,7 +2602,6 @@ Generated: {generated_at}
                 <div class="character-data-tabs" id="characterDataTabs">
                     <div class="character-data-tab active" data-tab="plan">Plan</div>
                     <div class="character-data-tab" data-tab="bindings">Bindings</div>
-                    <div class="character-data-tab" data-tab="state">OODA</div>
                     <div class="character-data-tab" data-tab="tasks">Schedule</div>
                     <div class="character-data-tab" data-tab="taskwips">Tasks</div>
                 </div>
@@ -2657,15 +2622,6 @@ Generated: {generated_at}
                         <div id="bindingsList">
                             <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
                                 No bindings available.
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- OODA tab content -->
-                    <div class="character-data-panel" id="statePanel">
-                        <div id="oodaStateDisplay" style="padding: 8px 10px;">
-                            <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
-                                Select a character to view OODA feed
                             </div>
                         </div>
                     </div>
@@ -2947,8 +2903,6 @@ Generated: {generated_at}
                 
                 if (data.type === 'action') {
                     addActionEntry(data);
-                    // Push-refresh OODA feed if OODA tab is active
-                    scheduleOodaRefresh();
                     // Check if this is an announcement to create a character tab
                     if (data.action_type === 'announcement') {
                         createCharacterTab(data.character);
@@ -3145,11 +3099,6 @@ Generated: {generated_at}
                 // Load bindings list
                 const character = activeCharacter || 'Jill';
                 loadBindingsList(character);
-            } else if (tabName === 'state') {
-                document.getElementById('statePanel').classList.add('active');
-                // Load OODA feed
-                const character = activeCharacter || 'Jill';
-                loadOodaFeed(character);
             } else if (tabName === 'tasks') {
                 document.getElementById('schedulerPanel').classList.add('active');
                 const character = activeCharacter || 'Jill';
@@ -4091,35 +4040,6 @@ Generated: {generated_at}
         async function toggleContinuousFromPanel() {
             await toggleContinuous();
             updateControlPanelContinuousButton();
-        }
-        
-        async function clearWorldModel() {
-            if (!confirm('Are you sure you want to clear the World Model? This cannot be undone.')) {
-                return;
-            }
-            
-            const statusDiv = document.getElementById('controlPanelStatus');
-            statusDiv.style.display = 'block';
-            statusDiv.innerHTML = '<span style="color: #888;">Clearing world model...</span>';
-            
-            try {
-                const response = await fetch('/api/control/clear_world_model', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    statusDiv.innerHTML = '<span style="color: #4ecdc4;">✓ World model cleared successfully</span>';
-                } else {
-                    statusDiv.innerHTML = `<span style="color: #ff6b6b;">✗ Error: ${result.message || 'Unknown error'}</span>`;
-                }
-            } catch (error) {
-                statusDiv.innerHTML = `<span style="color: #ff6b6b;">✗ Error: ${error.message}</span>`;
-            }
         }
         
         async function clearMap() {
@@ -5252,52 +5172,6 @@ Generated: {generated_at}
             }
         }
 
-        // updateWorldStateDisplay removed — replaced by OODA feed
-        
-        async function loadOodaFeed(character) {
-            const stateDiv = document.getElementById('oodaStateDisplay');
-            if (!stateDiv) return;
-            stateDiv.innerHTML = '<div style="color: #f39c12; text-align: center; padding: 20px;">Loading...</div>';
-            try {
-                const response = await fetch(`/api/ooda_feed/${encodeURIComponent(character)}`);
-                const result = await response.json();
-                if (!result.success) {
-                    stateDiv.innerHTML = `<div style="color: #ff4757; padding: 10px;">Error: ${result.message || 'Unknown'}</div>`;
-                    return;
-                }
-                renderOodaFeed(result.events || []);
-            } catch (error) {
-                stateDiv.innerHTML = `<div style="color: #ff4757; padding: 10px;">Error: ${error.message}</div>`;
-            }
-        }
-
-        function renderOodaFeed(events) {
-            const stateDiv = document.getElementById('oodaStateDisplay');
-            if (!stateDiv) return;
-            const recent = events.slice(-30).reverse();
-            if (!recent.length) {
-                stateDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No OODA events yet.</div>';
-                return;
-            }
-            let html = '<div style="font-family: monospace; font-size: 11px; max-height: 600px; overflow-y: auto;">';
-            recent.forEach(e => {
-                const time = e.timestamp ? (e.timestamp.split('T')[1] || e.timestamp) : '';
-                const bumps = e.concern_bumps || '';
-                const src = (e.source || '').replace('sensor:', 'S:');
-                html += '<div style="padding:2px 0;border-bottom:1px solid #333">';
-                html += `<span style="color:#666">${escapeHtml(time)}</span> `;
-                html += `<span style="color:#4ec9b0">${escapeHtml(src)}</span> `;
-                html += `<span style="color:#dbb86d">${escapeHtml(e.classification || '')}</span>`;
-                html += ` \\u2192 <span style="color:#6ddb6d">${escapeHtml(e.action_taken || '')}</span>`;
-                if (bumps) {
-                    html += `<div style="color:#888;padding-left:8px;font-size:10px">${escapeHtml(bumps)}</div>`;
-                }
-                html += '</div>';
-            });
-            html += '</div>';
-            stateDiv.innerHTML = html;
-        }
-        
         async function executeGoal(goalName) {
             const character = activeCharacter || 'Jill';
             
@@ -5373,23 +5247,6 @@ Generated: {generated_at}
             } catch (error) {
                 listDiv.innerHTML = `<div style="color: #ff4757; text-align: center; padding: 20px;">❌ Error: ${error.message}</div>`;
             }
-        }
-        
-        // loadSavedPlansList removed — Plans tab removed
-
-        // Debounced OODA feed refresh — triggered by WebSocket action messages
-        let _oodaRefreshTimer = null;
-        function scheduleOodaRefresh() {
-            // Only refresh if OODA tab is active
-            const stateTab = document.querySelector('.character-data-tab[data-tab="state"]');
-            if (!stateTab || !stateTab.classList.contains('active')) return;
-            // Debounce: coalesce rapid actions into one refresh
-            if (_oodaRefreshTimer) clearTimeout(_oodaRefreshTimer);
-            _oodaRefreshTimer = setTimeout(() => {
-                _oodaRefreshTimer = null;
-                const character = activeCharacter || 'Jill';
-                loadOodaFeed(character);
-            }, 2000);
         }
         
         function shutdownWithSave() {
@@ -5753,7 +5610,6 @@ Generated: {generated_at}
                 <h3 style="color: #d4d4d4; font-size: 16px; margin-bottom: 10px;">Clear Data</h3>
                 <p style="color: #888; font-size: 12px; margin-bottom: 15px;">⚠️ These actions cannot be undone</p>
                 
-                <button onclick="clearWorldModel()" style="width: 100%; padding: 12px; margin-bottom: 10px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">🗑️ Clear World Model</button>
                 <button onclick="clearMap()" style="width: 100%; padding: 12px; margin-bottom: 10px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">🗑️ Clear Map</button>
                 <button onclick="clearTransients()" style="width: 100%; padding: 12px; margin-bottom: 10px; background: #ff9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">🗑️ Clear Transients</button>
                 <button onclick="clearPersistents()" style="width: 100%; padding: 12px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">🗑️ Clear Persistents</button>
