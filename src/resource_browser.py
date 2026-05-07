@@ -1314,17 +1314,16 @@ class ResourceBrowser:
                         <div style="color:#d4d4d4;font-size:12px;line-height:1.5">${desc || '(none)'}</div>
                     </div>
 
-                    ${instruction ? `
+                    ${(cadenceHours !== undefined) ? `
                         <div style="margin-bottom:12px">
-                            <div style="color:#888;font-size:10px;text-transform:uppercase;margin-bottom:4px">Impulse (action when this concern fires)</div>
-                            <div style="color:#d4d4d4;font-size:12px;line-height:1.5;font-style:italic">${instruction}</div>
+                            <div style="color:#888;font-size:10px;text-transform:uppercase;margin-bottom:4px">Instruction (procedure run when this concern fires; multi-line OK)</div>
+                            <textarea id="instr-${cid}" rows="6" style="width:100%;background:#1e1e1e;color:#d4d4d4;border:1px solid #3e3e42;font-family:ui-monospace,monospace;font-size:12px;line-height:1.5;padding:6px;box-sizing:border-box;resize:vertical">${htmlEscape(instruction)}</textarea>
+                            <div style="margin-top:4px;display:flex;align-items:center;gap:8px">
+                                <button onclick="setInstruction('${cid}', '${type}')" style="background:#2d2d2d;color:#d4d4d4;border:1px solid #3e3e42;font-size:11px;padding:2px 10px;cursor:pointer">Save</button>
+                                ${instruction ? '' : '<span style="color:#666;font-size:11px">(empty — concern will not fire)</span>'}
+                            </div>
                         </div>
-                    ` : (cadenceHours !== undefined && cadenceHours !== null ? `
-                        <div style="margin-bottom:12px">
-                            <div style="color:#888;font-size:10px;text-transform:uppercase;margin-bottom:4px">Impulse</div>
-                            <div style="color:#666;font-size:12px;line-height:1.5;font-style:italic">(no instruction — concern won't fire)</div>
-                        </div>
-                    ` : '')}
+                    ` : ''}
 
                     ${rationale ? `
                         <div style="margin-bottom:12px">
@@ -1387,6 +1386,47 @@ class ResourceBrowser:
                 }
             } catch (e) {
                 alert('Action failed: ' + e.message);
+            }
+        }
+
+        // Minimal HTML escaping so multi-line instructions with `<`, `>`,
+        // or `</textarea>` content don't break the editor element. Not a
+        // full XSS shield — concerns are authored by the user or by Jill,
+        // not external input — just element-boundary correctness.
+        function htmlEscape(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        async function setInstruction(concernId, type) {
+            // Read the textarea, post raw text. Backend writes verbatim
+            // to concern.properties.instruction (empty string → null so
+            // the concern stops firing rather than firing with no body).
+            const ta = document.getElementById(`instr-${concernId}`);
+            if (!ta) return;
+            const value = ta.value;
+            const character = window.characterName || '';
+            if (!character) {
+                alert('No character context');
+                return;
+            }
+            try {
+                const resp = await fetch(`/api/concern/${character}/manage`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({concern_id: concernId, action: 'set_instruction',
+                                          type: type, value: value}),
+                });
+                const data = await resp.json();
+                if (!data.success) {
+                    alert('set instruction failed: ' + (data.error || 'unknown error'));
+                    return;
+                }
+                loadConcerns();
+            } catch (e) {
+                alert('set instruction failed: ' + e.message);
             }
         }
 

@@ -984,6 +984,9 @@ class InfospaceResourceManager:
                           'rhythm_hours', 'rhythm_source',
                           'strength', 'last_bumped_at',
                           'successor_of', 'successor_depth',
+                          # Memory polarity: 'positive' (default) or
+                          # 'negative' for explicit dispreferences.
+                          'polarity',
                           # reasoning_history (awareness feed) fields
                           'user_text', 'autonomous', 'exit_reason', 'n_iters', 'compressed',
                           'parent_id', 'order', 'span', 'section', 'source', 'entity', 'edge',

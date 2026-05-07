@@ -56,140 +56,7 @@ logger = logging.getLogger('discourse')
 map_types = None
 
 
-DISCOURSE_TEMPLATE="""You are analyzing a conversation to identify discourse objects - the structured elements that speakers create through dialogue.
-
-CONVERSATION SEGMENT:
-{{$recent_turns}}
-
-TASK: Extract all discourse objects created in this exchange. For each object, provide:
-
-1. OBJECT_ID: unique identifier (format: obj_[timestamp]_[type]_[number])
-2. TYPE: exactly one of:
-   - commitment: promise, offer, pledge, agreement to do something
-   - question: explicit question or implicit uncertainty needing resolution
-   - position: stance, claim, or assertion about how things are/should be
-   - topic: subject matter introduced for discussion
-   - proposal: suggestion for action or decision
-   - agreement: mutual acceptance of a proposition or plan
-   - disagreement: explicit rejection or contradiction
-   - request: ask for information or action (not a question about the world)
-   - information: factual information or data
-
-3. CREATOR: who introduced it (format: "self" or "other" or "joint")
-
-4. TURN_NUMBER: which turn introduced it (integer)
-
-5. CONTENT_SUMMARY: concise description of the object (1-2 sentences max)
-
-6. DIRECTED_AT: who is the object addressed to ("self", "other", "mutual", "none")
-
-7. STATUS: current state:
-   - pending: awaiting response/resolution
-   - accepted: acknowledged/agreed by recipient
-   - rejected: explicitly declined/disagreed
-   - resolved: question answered, issue settled
-   - active: commitment in force, topic under discussion
-   - abandoned: dropped without resolution
-   
-8. DEPENDENCIES: list of OBJECT_IDs this depends on (empty list if none)
-
-9. ATTRIBUTES: type-specific fields:
-   For commitments:
-     - temporal_scope: when (immediate/by_date/ongoing/conditional)
-     - strength: confidence level (firm/tentative/conditional)
-   For questions:
-     - answer_type: what kind of answer (yes_no/factual/explanation/preference)
-   For positions:
-     - evidence_provided: was justification given (true/false)
-   For proposals:
-     - decision_required: does this need explicit acceptance (true/false)
-
-OUTPUT FORMAT (valid JSON only):
-{
-  "objects": [
-    {
-      "object_id": "obj_1696534821_commitment_1",
-      "type": "commitment",
-      "creator": "self",
-      "turn_number": 3,
-      "content_summary": "Will deliver the draft report by Friday EOD",
-      "directed_at": "other",
-      "status": "active",
-      "dependencies": [],
-      "attributes": {
-        "temporal_scope": "by_date",
-        "strength": "firm"
-      }
-    },
-    {
-      "object_id": "obj_1696534822_question_1",
-      "type": "question",
-      "creator": "other",
-      "turn_number": 4,
-      "content_summary": "Asked whether the report should include quarterly breakdown",
-      "directed_at": "self",
-      "status": "pending",
-      "dependencies": ["obj_1696534821_commitment_1"],
-      "attributes": {
-        "answer_type": "yes_no"
-      }
-    }
-  ],
-  "metadata": {
-    "turns_analyzed": 5,
-    "reflection_timestamp": "2025-10-05T14:30:00Z"
-  }
-}
-
-IMPORTANT INSTRUCTIONS:
-- Only extract objects explicitly created in THIS segment, not prior context
-- If an object is referenced but was created earlier, note it in dependencies but don't re-extract
-- Distinguish between implicit objects (position implied by argument) and explicit ones
-- When status is ambiguous, prefer "pending" over "active"
-- If multiple people co-create an object (e.g., reaching agreement), use "joint" as creator
-- Include ALL object types present, even if some categories are empty
-- Ensure object_id is truly unique by including timestamp
-
-###################### END OF TEMPLATE ######################
-
-EXISTING OBJECTS IN CURRENT DISCOURSE:
-{{$current_objects}}
-
-EXISTING OBJECTS FROM PRIOR CONVERSATIONS WITH THIS PERSON:
-{{$relevant_historical_objects}}
-
-CONVERSATION SEGMENT:
-{{$recent_turns}}
-
-TASK: For each discourse object in this segment, determine:
-- Is this a NEW object? → extract as before
-- Is this a REFERENCE to existing object? → provide object_id only
-- Is this an UPDATE to existing object? → provide object_id + updated fields
-
-OUTPUT FORMAT:
-{
-  "new_objects": "...as specified above...",
-  "references": [
-    {
-      "object_id": "obj_1696534805_commitment_1",
-      "turn_number": 7,
-      "reference_type": "fulfillment|reminder|query|challenge"
-    }
-  ],
-  "updates": [
-    {
-      "object_id": "obj_1696534800_proposal_1", 
-      "turn_number": 8,
-      "updated_fields": {
-        "status": "accepted",
-        "content_summary": "Proposal to launch feature in 6 weeks (revised from 4)"
-      }
-    }
-  ]
-}
-"""
-
-DISCOURSE_ANALYSIS_TEMPLATE="""You are analyzing a conversation segment to track discourse state - the structural elements of what has been said, committed, and agreed upon.
+DISCOURSE_ANALYSIS_TEMPLATE="""You are analyzing a conversation segment to track discourse state - the shared frames, agreements, and decisions that have been established through dialogue.
 
 PREVIOUS DISCOURSE STATE:
 {{$previous_discourse_state}}
@@ -197,7 +64,7 @@ PREVIOUS DISCOURSE STATE:
 CURRENT THEORY OF MIND MODEL:
 {{$current_tom_model}}
 
-Note: The ToM model provides context for interpreting ambiguous statements. For example, "I'll try" from someone with high reliability may constitute a firm commitment, while the same phrase from someone with low reliability may be a hedge. Use this context to inform your interpretation, but remain grounded in what was actually said.
+Note: The ToM model provides context for interpreting ambiguous statements. For example, a tentative-sounding agreement from a high-reliability speaker may be a settled position, while an emphatic claim from a low-reliability one may be a hedge. Use this context to inform your interpretation, but remain grounded in what was actually said.
 
 CONVERSATION SEGMENT:
 {{$conversation_turns}}
@@ -207,20 +74,6 @@ TASK: Update the discourse state based on this segment. Provide a complete updat
 OUTPUT FORMAT (use these exact section headers — plain text only, no markdown headers (`#`), no bolding (`**`), no horizontal rules (`---`); do not invent new sections or rename existing ones):
 
 DISCOURSE STATE (segment {{$start_turn}}-{{$end_turn}}):
-
-ACTIVE COMMITMENTS:
-List each distinct commitment as a single line: [Direction] Content (strength, temporal scope). One commitment per line, no sub-bullets, no commentary.
-- Direction: [Self → Other], [Other → Self], or [Mutual]
-- Strength: firm, tentative, conditional
-- Temporal scope: immediate, by [date/time], or ongoing
-- DO NOT list ongoing self-actions that have a cadence + instruction — those are concerns, not commitments. Commitments are interpersonal promises and joint actions, not architectural facts about how the system operates.
-- Drop commitments not referenced or reaffirmed in the last ~30 turns.
-- If no active commitments, write "[none]"
-
-Example:
-- [Self → Other] Deliver draft report by Friday EOD (firm, by Fri EOD)
-- [Other → Self] Review draft within 2 days of receipt (firm, conditional on timely send)
-- [Mutual] Check in every 10 minutes (firm, ongoing)
 
 CURRENT AGREEMENTS:
 Describe each shared frame, definition, or joint plan in natural language. One concise sentence per agreement; do not narrate or restate the conversation. Use "(this segment)" for items established in the current segment and "(established earlier)" for items carried forward — do not include specific turn numbers.
@@ -242,33 +95,24 @@ Example:
 
 INSTRUCTIONS:
 
-1. COMPLETENESS: Provide the full updated state, including items from previous state that remain active. Drop items that are completed, superseded, no longer relevant, or older than the ~30-turn pruning rule.
+1. COMPLETENESS: Provide the full updated state, including items from previous state that remain active. Drop items that are completed, superseded, no longer relevant, or older than the ~30-turn pruning rule. If the previous state contains a legacy `ACTIVE COMMITMENTS:` section, omit it entirely from the new output — that section has been retired.
 
 2. FORMAT STABILITY: Use the section headers exactly as shown. Plain text only. Do not add `#` headers, `**bold**`, horizontal rules, or `(NEW)` markers — the segment range in the section header makes recency clear.
 
 3. INTERPRETATION:
-   - Use ToM context (when present) to assess commitment strength.
    - Consider speaker reliability when evaluating whether something is truly agreed.
-   - Note when commitments are conditional (use "conditional on" phrasing).
-   - Distinguish proposals (suggestions) from commitments (binding promises).
+   - Distinguish stable shared frames from one-off remarks.
 
 4. AMBIGUITY:
-   - If uncertain whether something is a commitment or a statement of intent, err toward inclusion but mark strength=tentative.
    - When in doubt about what was agreed, reflect the ambiguity in your description.
 
 5. CONSOLIDATION:
-   - Combine closely related commitments into single entries.
-   - Focus on distinct actionable obligations, not every utterance.
-   - Distinguish commitments (will do X) from mental states (trust, believe). Only commitments here.
+   - Combine closely related agreements into single entries.
+   - Focus on distinct shared positions, not every utterance.
 
 ###EXAMPLE OUTPUT:
 
 DISCOURSE STATE (segment 13-20):
-
-ACTIVE COMMITMENTS:
-- [Other → Self] Keep Samantha updated on thinking, no withholding (firm, ongoing)
-- [Other → Self] Set 30-minute timer to track reassessment point (firm, immediate)
-- [Mutual] Check in every 10 minutes during hike (firm, ongoing)
 
 CURRENT AGREEMENTS:
 Navigate northwest for 30 minutes to locate the creek, then follow it southwest back to the crossing (this segment). If the creek is not found within 30 minutes, stop and reassess. Both parties share observations transparently.
@@ -279,7 +123,7 @@ KEY DECISIONS MADE:
 - Added: 30-minute time limit as safety check (this segment)
 ###END EXAMPLE OUTPUT
 
-Emit the three sections above and nothing else: no preamble, no postscript, no commentary on your own output.
+Emit the two sections above and nothing else: no preamble, no postscript, no commentary on your own output.
 End your response with:
 </end>
 """

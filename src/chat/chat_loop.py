@@ -1001,10 +1001,13 @@ class ChatLoop:
             logger.warning(f"[{self.character_name}] _init_memories failed: {e}")
 
     def _remember(self, text: str, entity: str = "",
-                  category: str = 'fact') -> Optional[str]:
+                  category: str = 'fact',
+                  polarity: str = 'positive') -> Optional[str]:
         """Persist one memory string into the memories Collection. Returns
         the new note_id, or None on failure. `category` is one of
-        _MEMORY_CATEGORIES; unknown values coerce to 'fact'.
+        _MEMORY_CATEGORIES; unknown values coerce to 'fact'. `polarity`
+        is 'positive' (default) or 'negative' — negatives are explicit
+        rejections / dispreferences.
 
         Held under _faiss_lock for the FAISS-touching span (create_note
         indexes the new note, add_to_collection updates the memories
@@ -1019,6 +1022,8 @@ class ChatLoop:
             return None
         if category not in _MEMORY_CATEGORIES:
             category = 'fact'
+        if polarity not in ('positive', 'negative'):
+            polarity = 'positive'
         try:
             with self._faiss_lock:
                 success, note_id, err, _ = self.resource_manager.create_note(
@@ -1027,6 +1032,7 @@ class ChatLoop:
                     {
                         "kind": "memory",
                         "category": category,
+                        "polarity": polarity,
                         "entity": entity,
                         "created_at": datetime.now(timezone.utc).isoformat(),
                     },
@@ -1049,6 +1055,7 @@ class ChatLoop:
                     'note_id': note_id,
                     'text': text,
                     'category': category,
+                    'polarity': polarity,
                     'entity': entity,
                     'source_turn_seq': getattr(self, '_turn_seq', None),
                     'trigger': 'reflection',
@@ -1091,12 +1098,13 @@ class ChatLoop:
             return score
 
     def _recall(self, query: str, k: int = 3, threshold: float = 0.5
-                ) -> List[Tuple[str, str]]:
+                ) -> List[Tuple[str, str, str]]:
         """Semantic search over the memories Collection. Returns ranked
-        (text, category) tuples, highest score first. Category is read
-        from the source note's properties; pre-taxonomy memories without
-        a category default to 'fact'. Empty list on miss / not yet
-        indexed / any error.
+        (text, category, polarity) tuples, highest score first. Category
+        is read from the source note's properties; pre-taxonomy memories
+        without a category default to 'fact'. Polarity is 'positive' or
+        'negative'; pre-J memories without a polarity default to
+        'positive'. Empty list on miss / not yet indexed / any error.
 
         Re-ranks by recency-adjusted score: fetch up to 2*k candidates
         from FAISS, apply a saturating age penalty (see _recency_adjust),
@@ -1112,20 +1120,21 @@ class ChatLoop:
                     mode='semantic', limit=fetch, threshold=threshold)
             if not ok or not results:
                 return []
-            scored: List[Tuple[float, str, str]] = []
+            scored: List[Tuple[float, str, str, str]] = []
             for r in results:
                 if not isinstance(r, dict):
                     continue
                 doc = r.get('document')
                 if not isinstance(doc, str) or not doc.strip():
                     continue
-                # Map chunk back to source note for category + created_at.
-                # Chunks store source_note_id in metadata (per
+                # Map chunk back to source note for category + polarity +
+                # created_at. Chunks store source_note_id in metadata (per
                 # _index_note_chunks). Missing note → fall back to 'fact'
-                # category, no recency adjustment (created_at unknown).
+                # category, 'positive' polarity, no recency adjustment.
                 # No lock needed for this lookup — get_resource is a dict
                 # read, not a FAISS operation.
                 cat = 'fact'
+                pol = 'positive'
                 created_at: Optional[str] = None
                 meta = r.get('metadata') or {}
                 note_id = meta.get('source_note_id')
@@ -1136,14 +1145,17 @@ class ChatLoop:
                         raw = props.get('category')
                         if isinstance(raw, str) and raw in _MEMORY_CATEGORIES:
                             cat = raw
+                        raw_pol = props.get('polarity')
+                        if isinstance(raw_pol, str) and raw_pol in ('positive', 'negative'):
+                            pol = raw_pol
                         ca = props.get('created_at')
                         if isinstance(ca, str):
                             created_at = ca
                 base_score = float(r.get('score') or 0.0)
                 adj = self._recency_adjust(base_score, created_at)
-                scored.append((adj, doc.strip(), cat))
+                scored.append((adj, doc.strip(), cat, pol))
             scored.sort(key=lambda x: x[0], reverse=True)
-            return [(text, cat) for _adj, text, cat in scored[:k]]
+            return [(text, cat, pol) for _adj, text, cat, pol in scored[:k]]
         except Exception as e:
             logger.warning(f"[{self.character_name}] _recall failed: {e}")
             return []
@@ -1778,22 +1790,6 @@ class ChatLoop:
             fired.append((nid, text, str(instruction)))
         return fired
 
-    def _emit_impulse(self, concern_text: str, instruction: str) -> None:
-        """Print a concern-fired impulse. Retained for possible future
-        Phase B-style use; the autonomous-fire path uses preamble +
-        coda directly rather than this helper."""
-        msg = f"concern: {concern_text} — impulse: {instruction}"
-        if not sys.stdout.isatty():
-            logger.info(f"[{self.character_name}] {msg}")
-            return
-        try:
-            line = (f"\n{self._STATUS_DIM}[{self.character_name}] "
-                    f"{msg}{self._STATUS_RESET}\n")
-            sys.stdout.write(line)
-            sys.stdout.flush()
-        except Exception as e:
-            logger.warning(f"[{self.character_name}] _emit_impulse failed: {e}")
-
     # Reflection prompt: extract durable episodic specifics from the latest
     # exchange. Two-stage decision:
     #   (a) Frame check. If the exchange is a hypothetical / role-play /
@@ -1826,9 +1822,19 @@ class ChatLoop:
         "- Long-running project/work context → category=`fact`\n"
         "- Stable preferences expressed plainly (modifiers, not actions) → category=`preference`\n"
         "- Specific commitments or follow-ups agreed → category=`commitment`\n"
+        "- Things {entity} explicitly REJECTED, ruled out, or said they "
+        "do NOT want → same categories as above, but set "
+        "`polarity`=`negative`. Phrase the text negatively (e.g. "
+        "\"User rejected ChromaDB as the vector store\" / \"Does NOT "
+        "want emoji in replies\"). Default polarity is `positive`; only "
+        "set `negative` for explicit dispreference.\n"
         "SKIP from memories:\n"
         "- Pleasantries, mood, conversational tone (companion handles these).\n"
         "- Anything already in the companion model verbatim.\n"
+        "- Anything semantically equivalent to an item shown in "
+        "\"## Existing memories\" below — do not re-emit a memory we "
+        "already hold. Emit only what is genuinely new or refines a prior "
+        "fact in a way the existing wording does not capture.\n"
         "- One-off questions with no stable signal.\n\n"
         "STAGE 3 — User concerns. Topics {entity} is currently preoccupied "
         "with, has surfaced repeatedly, or has explicitly asked {character} "
@@ -1873,11 +1879,20 @@ class ChatLoop:
         "skip them entirely rather than logging an unfireable record\n"
         "Schema per agent_concern:\n"
         "- `text` (≤120 chars): short summary of what the concern is about.\n"
-        "- `instruction` (string|null): imperative directive {character} "
-        "executes when this concern fires. null = the concern is logged "
-        "for context but never fires. Examples:\n"
+        "- `instruction` (string|null): the procedure {character} executes "
+        "when this concern fires. null = the concern is logged for context "
+        "but never fires. Usually a one-line imperative, but when the user "
+        "DICTATES a multi-step procedure (URL templates, ranges, output "
+        "rules, edge cases), capture the FULL spec verbatim — multi-paragraph "
+        "instructions are encouraged in that case. The autonomous fire path "
+        "passes this string straight to the ReAct loop, so anything you write "
+        "here is what {character} will see when she executes. Examples:\n"
         "    \"Search for today's S&P 500 close and summarize the move.\"\n"
         "    \"Pull recent papers on multi-agent coordination from arxiv.\"\n"
+        "    \"Query http://192.168.68.56:8086/query?db=pv&q=SELECT last(\\\"value\\\"),"
+        " time FROM \\\"voltage\\\" WHERE time > now() - 15m GROUP BY *. Healthy "
+        "range 51.5–57.5V. Flag if stale (>10m) or out of range. Silent on "
+        "healthy for auto-checks; manual checks always report raw values.\"\n"
         "- `rhythm_hours` (int|null): target fire interval in hours. MUST be "
         "one of {{1, 2, 4, 8, 12, 24, 168}} or null. Pick from the underlying "
         "signal, not how often you'd nag the user:\n"
@@ -1893,7 +1908,7 @@ class ChatLoop:
         "{narrowness_rule}\n\n"
         "Output ONLY this JSON shape — nothing else, no prose:\n"
         "  {{\"frame\": \"<hypothetical|roleplay|counterfactual|instructional|none>\",\n"
-        "   \"memories\": [{{\"text\": \"...\", \"category\": \"fact|preference|commitment\"}}, ...],\n"
+        "   \"memories\": [{{\"text\": \"...\", \"category\": \"fact|preference|commitment\", \"polarity\": \"positive|negative\"}}, ...],\n"
         "   \"user_concerns\": [{{\"text\": \"...\"}}, ...],\n"
         "   \"agent_concerns\": [{{\n"
         "     \"text\": \"...\",\n"
@@ -1939,6 +1954,13 @@ class ChatLoop:
             # one per collection.
             existing_agent = self._top_active_agent_concerns(n=10)
             existing_user = self._top_active_user_concerns(n=10)
+            # Memory neighbors near the dialog topic — used by the LLM to
+            # avoid re-emitting a memory we already hold (write-time
+            # dedupe). Threshold lower than auto-RAG (0.4 vs 0.5) and
+            # k larger (8 vs 3) because false-positives here suppress a
+            # write that *might* be redundant; false-negatives produce a
+            # duplicate. Suppression is the cheaper failure mode.
+            existing_memories = self._recall(convo, k=8, threshold=0.4)
             sys_msg = self._REFLECT_SYS.format(
                 character=self.character_name, entity=source,
                 narrowness_rule=_CONCERN_INSTRUCTION_NARROWNESS_RULE)
@@ -1947,6 +1969,15 @@ class ChatLoop:
                 user_parts.append(
                     "## Existing companion model (do NOT re-extract from this; "
                     "use only to avoid duplicates)\n" + companion)
+            if existing_memories:
+                mem_lines = []
+                for text, cat, pol in existing_memories:
+                    marker = '[avoid] ' if pol == 'negative' else ''
+                    mem_lines.append(f"- ({cat}) {marker}{text}")
+                user_parts.append(
+                    "## Existing memories (do NOT re-emit anything "
+                    "semantically equivalent to these; emit only NEW or "
+                    "genuinely-refining memories)\n" + "\n".join(mem_lines))
             if existing_user:
                 lines = [f"- {text}" for _nid, text, _s, _p in existing_user]
                 user_parts.append(
@@ -1995,10 +2026,11 @@ class ChatLoop:
                 return ([], [], [])
 
             mems_written: List[str] = []
-            for text, category in raw_memories:
+            for text, category, polarity in raw_memories:
                 if len(text) > 240:
                     text = text[:240].rstrip()
-                if self._remember(text, entity=source, category=category):
+                if self._remember(text, entity=source, category=category,
+                                  polarity=polarity):
                     mems_written.append(text)
 
             user_cons_written: List[str] = []
@@ -2036,10 +2068,11 @@ class ChatLoop:
     @staticmethod
     def _parse_reflection_payload(
             payload: Any
-    ) -> Tuple[str, List[Tuple[str, str]], List[str], List[Dict[str, Any]]]:
+    ) -> Tuple[str, List[Tuple[str, str, str]], List[str], List[Dict[str, Any]]]:
         """Normalize reflection output to (frame, memories, user_concerns,
         agent_concerns).
-        memories: list of (text, category) tuples.
+        memories: list of (text, category, polarity) tuples. Polarity is
+                  'positive' (default) or 'negative'.
         user_concerns: list of text strings (no fields beyond text).
         agent_concerns: list of dicts with keys text, instruction,
                         rhythm_hours, rhythm_source (any may be missing/None).
@@ -2054,20 +2087,23 @@ class ChatLoop:
         non-`none` frame as suppression so this fails safe.
         """
 
-        def _normalize_memories(raw: Any) -> List[Tuple[str, str]]:
-            out: List[Tuple[str, str]] = []
+        def _normalize_memories(raw: Any) -> List[Tuple[str, str, str]]:
+            out: List[Tuple[str, str, str]] = []
             if not isinstance(raw, list):
                 return out
             for item in raw:
                 if isinstance(item, str) and item.strip():
-                    out.append((item.strip(), 'fact'))
+                    out.append((item.strip(), 'fact', 'positive'))
                 elif isinstance(item, dict):
                     t = str(item.get('text', '') or '').strip()
                     c = str(item.get('category', 'fact') or 'fact').strip().lower()
                     if c not in _MEMORY_CATEGORIES:
                         c = 'fact'
+                    p = str(item.get('polarity', 'positive') or 'positive').strip().lower()
+                    if p not in ('positive', 'negative'):
+                        p = 'positive'
                     if t:
-                        out.append((t, c))
+                        out.append((t, c, p))
             return out
 
         def _normalize_user_concerns(raw: Any) -> List[str]:
@@ -3039,6 +3075,37 @@ class ChatLoop:
                                         'error': err or f'delete failed for {concern_id}'})
                 return
 
+            # Instruction edit from the browser textarea. Empty / whitespace-
+            # only input → null so the concern stops firing, matching the
+            # reflection-side null convention (a concern with no instruction
+            # is logged for context but never fires). Whitespace-trimming is
+            # surface-only; intentional internal blank lines are preserved.
+            if action == 'set_instruction':
+                note = self.resource_manager.get_resource(concern_id)
+                kind = (note.get('properties') or {}).get('kind') if note else None
+                if not note or kind not in ('concern', 'agent_concern'):
+                    self._reply(query, {'success': False,
+                                        'error': f"{concern_id} is not an agent_concern"})
+                    return
+                raw = params.get('value')
+                if raw is None:
+                    new_instr: Optional[str] = None
+                else:
+                    s = str(raw)
+                    new_instr = s if s.strip() else None
+                note['properties']['instruction'] = new_instr
+                self._persist_to_disk()
+                preview = (new_instr or '')[:80].replace('\n', ' ')
+                logger.info(
+                    f"[{self.character_name}] {concern_id} instruction set "
+                    f"({len(new_instr or '')} chars): {preview!r}")
+                self._reply(query, {
+                    'success': True,
+                    'message': f'{concern_id} instruction updated',
+                    'instruction_chars': len(new_instr or ''),
+                })
+                return
+
             # Rhythm edit from the browser combo-box. Accepts both the
             # new action name and the legacy 'set_cadence_hours' so the
             # browser UI keeps working through item-7 refactor.
@@ -3228,7 +3295,7 @@ class ChatLoop:
     }
 
     def _build_system_prompt(self, source: str, orientation: str,
-                             recall: Optional[List[Tuple[str, str]]] = None,
+                             recall: Optional[List[Tuple[str, str, str]]] = None,
                              agent_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None,
                              user_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None) -> str:
         """Build the persona/state portion of the system prompt — shared base
@@ -3316,11 +3383,15 @@ class ChatLoop:
             # from the rolling Companion summary: these are durable items
             # that should not decay with style. Rendered grouped by
             # category so the model can treat each group on its own terms.
+            # Negative-polarity items (explicit rejections / dispreferences)
+            # are prefixed `[avoid] ` so the model treats them as boundaries
+            # rather than positive facts.
             grouped: Dict[str, List[str]] = {c: [] for c in _MEMORY_CATEGORIES}
-            for text, cat in recall:
+            for text, cat, pol in recall:
                 if cat not in grouped:
                     cat = 'fact'
-                grouped[cat].append(text)
+                marker = '[avoid] ' if pol == 'negative' else ''
+                grouped[cat].append(f"{marker}{text}")
 
             body_lines: List[str] = []
             for cat in self._CATEGORY_RENDER_ORDER:
@@ -3338,7 +3409,9 @@ class ChatLoop:
                     f"## Recalled memories (from prior conversations with {source})\n"
                     "Preferences shape how to respond; commitments are open "
                     "agreements that may need follow-up; facts are background "
-                    "specifics about " + source + ".\n\n"
+                    "specifics about " + source + ". Items marked `[avoid]` "
+                    "are explicit rejections — do not act on them as if "
+                    "they were positive preferences.\n\n"
                     + "\n".join(body_lines)
                 )
         disc = self._discourse_state.get(source, '').strip()
@@ -3414,7 +3487,7 @@ class ChatLoop:
 
     def _build_react_system_prompt(self, source: str, orientation: str,
                                    now_str: str,
-                                   recall: Optional[List[Tuple[str, str]]] = None,
+                                   recall: Optional[List[Tuple[str, str, str]]] = None,
                                    agent_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None,
                                    user_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None) -> str:
         base = self._build_system_prompt(
@@ -3547,7 +3620,7 @@ class ChatLoop:
             pass
 
     def _run_react_loop(self, source: str, user_text: str, orientation: str,
-                        recall: Optional[List[Tuple[str, str]]] = None,
+                        recall: Optional[List[Tuple[str, str, str]]] = None,
                         agent_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None,
                         user_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None
                         ) -> Tuple[str, List[Tuple[str, str]], List[Dict[str, Any]], str]:
@@ -3911,7 +3984,7 @@ class ChatLoop:
                            iters: List[Dict[str, Any]],
                            final_response: str,
                            exit_reason: str,
-                           recall: Optional[List[Tuple[str, str]]] = None) -> None:
+                           recall: Optional[List[Tuple[str, str, str]]] = None) -> None:
         """Append one ReAct session to <memory>/chat_trace.txt as the
         literal byte-stream that was sent to the LLM, with no editorial
         annotation. Each iteration is one (USER, ASSISTANT) pair; the
@@ -3958,7 +4031,7 @@ class ChatLoop:
                                   final_response: str,
                                   exit_reason: str,
                                   orientation: str = '',
-                                  recall: Optional[List[Tuple[str, str]]] = None,
+                                  recall: Optional[List[Tuple[str, str, str]]] = None,
                                   agent_concerns: Optional[List[Any]] = None,
                                   user_concerns: Optional[List[Any]] = None,
                                   autonomous: bool = False) -> None:
@@ -4500,8 +4573,7 @@ class ChatLoop:
 
         for nid, text, instruction in to_run:
             # CLI preamble: tell the user what's about to happen before
-            # the autonomous reply lands. Same dim-text style as Phase B
-            # impulses so the visual signature is consistent.
+            # the autonomous reply lands.
             preamble = (
                 f"auto-firing concern: {text}\n"
                 f"        → {instruction}"
