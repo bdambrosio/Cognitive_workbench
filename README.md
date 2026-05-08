@@ -215,11 +215,36 @@ scenarios/<world>/<agent>/
 └── subagent_traces/                   # per-call remember-subagent debug traces
 ```
 
+## Self-awareness benchmarks
+
+Two benches under `bench/` measure how well the agent reports on, and
+predicts the behavior of, its own architectural state — *not* whether
+it is conscious, sentient, or has phenomenal experience. We use the
+phrase "operational self-awareness" to keep the scope narrow:
+
+- **Tier-1** (`bench/introspective_fidelity/`) — 12 probes scored on
+  Accuracy / Calibration / Discrimination against the architecture's
+  ground truth (concerns, reasoning history, discourse state). Recent
+  Jill on Gemma 4 31B: **29 / 36** with reflection, 25 / 36 with the
+  persona's self-model paragraph stripped.
+- **Tier-4** (`bench/counterfactual_self_prediction/`) — diff-in-diff:
+  does the agent's predicted behavioral *shift* under a defined
+  perturbation match the actual shift? v0.3, 3-run aggregate:
+  PAIR-03 (tool-constraint awareness) **3/3 perfect**; PAIR-01
+  (source-trust) and PAIR-05 (substrate boundary) produce real but
+  noisier signal — see the note for what the Δ-pattern means.
+
+A perfect score on either bench is not evidence for consciousness or
+inner experience. See **[`docs/self-awareness-benchmarks.md`](docs/self-awareness-benchmarks.md)** for the full scope statement, recent
+results, and the v0.2 → v0.3 design lesson on why "hypothetical-framed
+question + direct request" is not the same as a counterfactual probe.
+
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
 | **[Background](BACKGROUND.md)** | Research motivation and philosophy |
+| **[Self-awareness benchmarks](docs/self-awareness-benchmarks.md)** | Tier-1 and Tier-4 benches; explicit non-claim about consciousness; recent results |
 | **[Tool Development](docs/TOOL_DEVELOPMENT_GUIDE.md)** | Creating new tools (`Skill.md` + `tool.py`) |
 | **[Contributor Guidelines](src/AGENTS.md)** | Code style, testing, commit conventions |
 
