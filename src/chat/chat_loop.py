@@ -316,7 +316,20 @@ class _ChatBackend:
         else:
             self.is_reasoning = bool(is_reasoning)
 
-    def chat(self, messages: List[Dict[str, str]],
+    @property
+    def supports_image_input(self) -> bool:
+        """True when the active route can carry image_url content parts.
+        Route 4 (unified OpenAI-compat: vLLM, llama-server, xAI, OpenAI
+        with api_key) handles them natively. Anthropic uses a different
+        content-block shape; the legacy cloud_llm path may not handle
+        list content. Both rejected for v1."""
+        if self.server == 'anthropic':
+            return False
+        if self._cloud_llm is not None:
+            return False
+        return True
+
+    def chat(self, messages: List[Dict[str, Any]],
              max_tokens: int = 600,
              temperature: float = 0.7,
              top_p: float = 1.0,
@@ -2261,18 +2274,29 @@ class ChatLoop:
         source = "User"
         text = ""
         close = False
+        image_url: Optional[str] = None
         if isinstance(content, str):
             try:
                 inner = json.loads(content)
                 source = inner.get('source', source)
                 text = inner.get('text', '')
                 close = bool(inner.get('close', False))
+                img = inner.get('image')
+                if isinstance(img, dict):
+                    url = img.get('url')
+                    if isinstance(url, str) and url:
+                        image_url = url
             except Exception:
                 text = content
         elif isinstance(content, dict):
             source = content.get('source', source)
             text = content.get('text', '')
             close = bool(content.get('close', False))
+            img = content.get('image')
+            if isinstance(img, dict):
+                url = img.get('url')
+                if isinstance(url, str) and url:
+                    image_url = url
 
         # Sensor dispatch: source is e.g. 'sensor:tick'. Recognized sensors
         # become typed events on the inbox; unknown sensors fall through to
@@ -2281,10 +2305,13 @@ class ChatLoop:
             self._inbox.put({'kind': 'tick'})
             return
 
-        if not text and not close:
+        if not text and not close and not image_url:
             return
 
-        self._inbox.put({'kind': 'user', 'source': source, 'text': text, 'close': close})
+        msg: Dict[str, Any] = {'kind': 'user', 'source': source, 'text': text, 'close': close}
+        if image_url:
+            msg['image_url'] = image_url
+        self._inbox.put(msg)
 
     def _publish_say(self, text: str) -> None:
         if not self._action_pub:
@@ -3622,7 +3649,8 @@ class ChatLoop:
     def _run_react_loop(self, source: str, user_text: str, orientation: str,
                         recall: Optional[List[Tuple[str, str, str]]] = None,
                         agent_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None,
-                        user_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None
+                        user_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None,
+                        image_url: Optional[str] = None
                         ) -> Tuple[str, List[Tuple[str, str]], List[Dict[str, Any]], str]:
         """Run the ReAct loop. Returns (reply, log, iters, exit_reason).
         The trace is NOT written here — caller writes it after post-turn
@@ -3670,9 +3698,25 @@ class ChatLoop:
         for i in range(REACT_MAX_ITERS):
             pre_log_len = len(log)
             usr_msg = user_prefix_str + log_appendage_str + trailer
+            # When the turn carries an image, every iter sends a
+            # multimodal content array (text first per vLLM's expected
+            # ordering, then image_url). The image must persist across
+            # iters: ReAct's parse-failure retry path drops back into
+            # iter 2+, and if the image were missing there, the model
+            # confabulates against its own prior text. Byte-stable image
+            # tokens across iters still let vLLM prefix-cache the text.
+            # No-image turns keep the plain-string content shape exactly
+            # as before — wire format byte-identical to pre-multimodal.
+            if image_url:
+                user_content: Any = [
+                    {'type': 'text', 'text': usr_msg},
+                    {'type': 'image_url', 'image_url': {'url': image_url}},
+                ]
+            else:
+                user_content = usr_msg
             prompt = [
                 {'role': 'system', 'content': system_prompt_str},
-                {'role': 'user', 'content': usr_msg},
+                {'role': 'user', 'content': user_content},
             ]
             self._emit_status('thinking…')
             try:
@@ -3806,6 +3850,36 @@ class ChatLoop:
         reading their own prior traces as substrate. Layout:
         scenarios/<world>/<agent>/subagent_traces/."""
         return self._memory_dir().parent / 'subagent_traces'
+
+    _DATA_URI_RE = re.compile(r'^data:(image/[a-zA-Z0-9.+-]+);base64,(.+)$', re.DOTALL)
+
+    def _persist_image_url(self, image_url: str) -> Optional[str]:
+        """Write a data-URI-encoded image to <memory>/images/<sha>.<ext>
+        once (deduped by sha256) and return the relative path string.
+        Returns None for http(s) URLs (the URL itself is the trace
+        identifier; we don't fetch). Raises on a malformed data URI."""
+        if image_url.startswith(('http://', 'https://')):
+            return None
+        m = self._DATA_URI_RE.match(image_url)
+        if not m:
+            raise ValueError("image_url is neither http(s) URL nor a base64 data URI")
+        mime, b64 = m.group(1), m.group(2)
+        import base64, hashlib
+        try:
+            raw = base64.b64decode(b64, validate=False)
+        except Exception as e:
+            raise ValueError(f"data URI base64 decode failed: {e}")
+        sha = hashlib.sha256(raw).hexdigest()
+        ext = {
+            'image/png': 'png', 'image/jpeg': 'jpg', 'image/jpg': 'jpg',
+            'image/gif': 'gif', 'image/webp': 'webp',
+        }.get(mime.lower(), 'bin')
+        img_dir = self._memory_dir() / 'images'
+        img_dir.mkdir(parents=True, exist_ok=True)
+        out = img_dir / f'{sha}.{ext}'
+        if not out.exists():
+            out.write_bytes(raw)
+        return str(out)
 
     def _run_remember(self, query: str) -> str:
         """Backend for the ReAct `remember` tool. Delegates to the
@@ -3984,7 +4058,8 @@ class ChatLoop:
                            iters: List[Dict[str, Any]],
                            final_response: str,
                            exit_reason: str,
-                           recall: Optional[List[Tuple[str, str, str]]] = None) -> None:
+                           recall: Optional[List[Tuple[str, str, str]]] = None,
+                           image_ref: Optional[str] = None) -> None:
         """Append one ReAct session to <memory>/chat_trace.txt as the
         literal byte-stream that was sent to the LLM, with no editorial
         annotation. Each iteration is one (USER, ASSISTANT) pair; the
@@ -3998,10 +4073,13 @@ class ChatLoop:
             trace_path = mem_dir / 'chat_trace.txt'
             ts = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
             n_iters = len(iters)
+            header = f'[{ts}] source={source} iters={n_iters} exit={exit_reason}'
+            if image_ref:
+                header += f' image={image_ref}'
             lines: List[str] = [
                 '',
                 '=' * 80,
-                f'[{ts}] source={source} iters={n_iters} exit={exit_reason}',
+                header,
                 '=' * 80,
                 '',
             ]
@@ -4034,7 +4112,8 @@ class ChatLoop:
                                   recall: Optional[List[Tuple[str, str, str]]] = None,
                                   agent_concerns: Optional[List[Any]] = None,
                                   user_concerns: Optional[List[Any]] = None,
-                                  autonomous: bool = False) -> None:
+                                  autonomous: bool = False,
+                                  image_ref: Optional[str] = None) -> None:
         """Append one structured ReAct turn record to
         <memory>/reasoning_trace.jsonl. Per-turn-unique content (orientation,
         active concerns at this turn, recall hits at this turn, user input,
@@ -4104,6 +4183,8 @@ class ChatLoop:
                 'working_log': working_log,
                 'raw_response': final_response or '',
             }
+            if image_ref:
+                record['image_ref'] = image_ref
 
             path = self._reasoning_trace_path()
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -4144,6 +4225,8 @@ class ChatLoop:
                 f"PRIOR TRACES VISIBLE TO ME AT THIS TURN: {prefix_refs} "
                 "(by turn_seq; resolve via reasoning_trace.jsonl line N)")
         parts.append(f"USER INPUT: {rec.get('user_input', '')}")
+        if rec.get('image_ref'):
+            parts.append(f"IMAGE ATTACHED: {rec['image_ref']}")
         if rec.get('working_log'):
             parts.append(f"WORKING LOG:\n{rec['working_log']}")
         if rec.get('raw_response'):
@@ -4350,7 +4433,8 @@ class ChatLoop:
 
     def _process_user_turn(self, source: str, text: str, close: bool,
                            autonomous: bool = False,
-                           autonomous_concern_id: Optional[str] = None) -> None:
+                           autonomous_concern_id: Optional[str] = None,
+                           image_url: Optional[str] = None) -> None:
         """Drive one turn through the ReAct loop. The autonomous path
         (autonomous=True) reuses the same prompt construction so Jill's
         voice stays consistent and traces share format. Divergences are
@@ -4375,13 +4459,45 @@ class ChatLoop:
             self._process_user_turn_inner(
                 source, text, close,
                 autonomous=autonomous,
-                autonomous_concern_id=autonomous_concern_id)
+                autonomous_concern_id=autonomous_concern_id,
+                image_url=image_url)
         finally:
             self._current_turn = None
 
     def _process_user_turn_inner(self, source: str, text: str, close: bool,
                                  autonomous: bool = False,
-                                 autonomous_concern_id: Optional[str] = None) -> None:
+                                 autonomous_concern_id: Optional[str] = None,
+                                 image_url: Optional[str] = None) -> None:
+        # Reject image input early when the active backend route can't
+        # carry it (Anthropic native, legacy cloud_llm). Bail before any
+        # state mutation; let the user retry without the image.
+        if image_url and not self.backend.supports_image_input:
+            warn = (f"backend {self.backend.server!r} does not currently "
+                    f"support image input — switch backends or omit the image.")
+            logger.warning(f"[{self.character_name}] {warn}")
+            self._publish_say(f"[{self.character_name}] {warn}")
+            return
+
+        # Empty-caption default: if an image arrived with no caption,
+        # supply a directive so iter 1 has something to react to. CLI
+        # already injects this; the safety net covers other transports.
+        if image_url and not text:
+            text = "Describe this image."
+
+        # Persist image once on first arrival (data URIs only — http(s)
+        # URLs are referenced as-is). Returns either a sha-keyed local
+        # path (for the trace) or None.
+        image_ref: Optional[str] = None
+        if image_url:
+            try:
+                image_ref = self._persist_image_url(image_url)
+            except Exception as e:
+                logger.warning(f"[{self.character_name}] image persist failed: {e}")
+                image_ref = None
+            if image_ref is None and image_url.startswith(('http://', 'https://')):
+                # URL passthrough — trace stores the URL itself.
+                image_ref = image_url
+
         if not autonomous:
             self.store.record_incoming(source, text, close=close)
             self._append_conversation_entry(
@@ -4419,7 +4535,8 @@ class ChatLoop:
         try:
             reply, log, iters, exit_reason = self._run_react_loop(
                 source, text, orientation, recall=recall,
-                agent_concerns=agent_concerns, user_concerns=user_concerns)
+                agent_concerns=agent_concerns, user_concerns=user_concerns,
+                image_url=image_url)
         except Exception as e:
             logger.error(f"[{self.character_name}] ReAct loop crashed: {e}")
             import traceback
@@ -4469,7 +4586,8 @@ class ChatLoop:
         # never entered the ReAct loop (pre-loop crash above).
         if iters:
             self._write_react_trace(
-                source, text, log, iters, reply, exit_reason, recall=recall)
+                source, text, log, iters, reply, exit_reason, recall=recall,
+                image_ref=image_ref)
             # Awareness feed: persist this turn's trace into
             # reasoning_history so the next turn's prompt prefix can
             # surface it. Same iters list — different store, different
@@ -4479,7 +4597,7 @@ class ChatLoop:
                 source, text, iters, reply, exit_reason,
                 orientation=orientation, recall=recall,
                 agent_concerns=agent_concerns, user_concerns=user_concerns,
-                autonomous=autonomous)
+                autonomous=autonomous, image_ref=image_ref)
 
         # Post-turn work (discourse + reflection + close + persist) is
         # ~5-15s of LLM calls and conceptually a side effect of the turn.
@@ -4598,6 +4716,18 @@ class ChatLoop:
                 'instruction': instruction,
                 'started_at': started_at.isoformat(),
             }
+            # Imperative wrapper. Without it, instruction bodies written
+            # as reference docs ("InfluxDB lives at...") get acknowledged
+            # rather than executed. The framing forces "act now" and
+            # supplies the firing mode for instructions that branch on it.
+            wrapped_instruction = (
+                f"A concern of mine has fired: {text}\n"
+                f"Mode: autonomous\n\n"
+                f"Execute the following procedure now and produce the "
+                f"appropriate output. If the procedure specifies silence "
+                f"under some condition, stay silent.\n\n"
+                f"{instruction}"
+            )
             try:
                 # source=self.character_name marks this turn as agent-
                 # originated; `_process_user_turn` skips record_incoming
@@ -4605,7 +4735,7 @@ class ChatLoop:
                 # The conversation history surfaced into the prompt is
                 # still the User dialogue (see _build_react_user_prefix).
                 self._process_user_turn(
-                    source=self.character_name, text=instruction, close=False,
+                    source=self.character_name, text=wrapped_instruction, close=False,
                     autonomous=True, autonomous_concern_id=nid)
                 outcome['terminated'] = 'ok'
             except Exception as e:
@@ -4775,10 +4905,12 @@ class ChatLoop:
                 source = msg.get('source', 'User')
                 text = msg.get('text', '')
                 close = bool(msg.get('close', False))
-                logger.info(f"[{self.character_name}] <- {source}: {text!r} (close={close})")
+                image_url = msg.get('image_url')
+                img_tag = ' [+image]' if image_url else ''
+                logger.info(f"[{self.character_name}] <- {source}: {text!r} (close={close}){img_tag}")
 
                 try:
-                    self._process_user_turn(source, text, close)
+                    self._process_user_turn(source, text, close, image_url=image_url)
                 except Exception as e:
                     logger.error(f"[{self.character_name}] turn handling crashed: {e}")
                     import traceback

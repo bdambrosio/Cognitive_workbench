@@ -210,10 +210,9 @@ ToM updates are triggered by conversation archival (`/done`, `/next`, `/bye`, or
 
 Conversations are tracked by `conversation_store.py` with per-entity dialog management. Key features:
 
-- **Dialog lifecycle**: turns accumulate in a "conversation" Collection until closed by `/done`, `/next`, `/bye`, or shutdown
-- **Archival**: on close, turns are synthesized into a summary, added to `conversation_history`, and original turn notes are deleted
-- **Prior session backfill**: when the current session has few turns, `get_entity_context()` backfills with prior session summaries (proportional to empty slots, capped at 5)
-- **Concern-weighted context**: `get_themed_context()` retrieves conversation history organized by user concern weights
+- **Dialog lifecycle**: turns accumulate in a "conversation" Collection; `close_dialog` flips per-entity state.
+- **Bounded retention**: the in-memory collection is trimmed to the most recent 50 turn Notes after each append (older Notes are deleted). The on-disk `conversation.txt` remains the canonical full history and is the substrate the `remember` subagent searches.
+- **Recent-turns surface**: `get_recent_turns(entity, limit=20)` feeds the prompt's `## Conversation history` block and the discourse/companion tracker. Both consumers read at most ~20 turns, comfortably under the retention cap.
 
 ## Reflection and Learning
 

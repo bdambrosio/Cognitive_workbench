@@ -7,7 +7,17 @@ Runtime-only dialog state is tracked in memory.
 
 import json
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
+
+
+# Cap on how many conversation turn Notes the in-memory collection
+# retains. Older Notes are trimmed (and the underlying Notes deleted)
+# after each append. The on-disk conversation.txt remains the canonical
+# full history; the in-memory collection only feeds the rolling
+# last-N-turns prompt window and discourse tracking, both of which read
+# at most ~20 turns. 50 leaves headroom above the read window without
+# unbounded RAM/persist growth.
+_CONVERSATION_RETENTION = 50
 
 
 class ConversationStore:
@@ -23,8 +33,6 @@ class ConversationStore:
         self._current_dialog_id: Dict[str, str] = {}
         self._active_dialogs: Dict[str, bool] = {}
         self._dialog_turn_counts: Dict[str, int] = {}
-        # Called with (entity, dialog_id, note_ids) when a dialog is closed
-        self._archive_callback: Optional[Callable[[str, str, List[str]], None]] = None
 
     def initialize(self) -> bool:
         """Ensure conversation collection exists."""
@@ -88,7 +96,29 @@ class ConversationStore:
         if not added:
             self.logger.warning(f'Failed to add conversation turn note to collection: {add_error}')
             return False
+        self._trim_collection()
         return True
+
+    def _trim_collection(self, retain: int = _CONVERSATION_RETENTION) -> None:
+        """Drop oldest Notes from the conversation collection beyond the
+        retention cap, deleting the underlying Note resources too. The
+        collection content list is insertion-ordered (oldest first) per
+        add_to_collection's append semantics, so [:-retain] is the
+        oldest tail to drop. Best-effort — failures log and continue."""
+        try:
+            collection_id = self._ensure_conversation_collection()
+            if not collection_id:
+                return
+            collection = self.resource_manager.get_resource(collection_id)
+            if not collection:
+                return
+            current = (collection.get("properties") or {}).get("content") or []
+            if not isinstance(current, list) or len(current) <= retain:
+                return
+            to_remove = current[:-retain]
+            self._remove_notes_from_collection(to_remove, delete_notes=True)
+        except Exception as e:
+            self.logger.warning(f'conversation collection trim failed: {e}')
 
     def record_incoming(self, source: str, text: str, close: bool = False) -> bool:
         entity = self._normalize_entity(source)
@@ -133,48 +163,17 @@ class ConversationStore:
         return ok
 
     def close_dialog(self, entity_name: str = "User") -> None:
-        """Close dialog with entity, archive its turns, then remove them from conversation collection."""
+        """Mark the entity's dialog inactive and clear per-entity dialog
+        bookkeeping. Turn Notes themselves are not touched here — they
+        live in the conversation collection until trimmed by the
+        retention cap (see _trim_collection)."""
         entity = self._normalize_entity(entity_name)
         dialog_id = self._current_dialog_id.get(entity)
         if not self._active_dialogs.get(entity) and not dialog_id:
             return  # Nothing to close
-
         self._active_dialogs[entity] = False
-
-        # Collect note IDs belonging to this dialog and trigger archival
-        if dialog_id and self._archive_callback:
-            note_ids = self._get_dialog_note_ids(dialog_id)
-            if note_ids:
-                try:
-                    self._archive_callback(entity, dialog_id, note_ids)
-                    self._remove_notes_from_collection(note_ids)
-                except Exception as e:
-                    self.logger.error(f'Error during dialog archive for {entity}/{dialog_id}: {e}')
-
-        # Clear dialog tracking for this entity
         self._current_dialog_id.pop(entity, None)
         self._dialog_turn_counts[entity] = 0
-
-    def _get_dialog_note_ids(self, dialog_id: str) -> List[str]:
-        """Return note IDs in the conversation collection that belong to a specific dialog_id."""
-        collection_id = self._ensure_conversation_collection()
-        if not collection_id:
-            return []
-        collection = self.resource_manager.get_resource(collection_id)
-        if not collection:
-            return []
-        note_ids = collection.get("properties", {}).get("content", [])
-        if not isinstance(note_ids, list):
-            return []
-
-        matched = []
-        for note_id in note_ids:
-            if not isinstance(note_id, str) or not note_id.startswith("Note_"):
-                continue
-            turn = self._parse_turn_note(note_id)
-            if turn and turn.get("dialog_id") == dialog_id:
-                matched.append(note_id)
-        return matched
 
     def _remove_notes_from_collection(self, note_ids_to_remove: List[str],
                                       collection_name: str = "conversation",
@@ -299,176 +298,3 @@ class ConversationStore:
         if limit <= 0:
             return []
         return turns[-limit:]
-
-    # ── Conversation history (archived summaries) ──────────────────
-
-    def get_history_notes(self) -> List[Dict[str, Any]]:
-        """Return all notes in conversation_history with their IDs and properties.
-
-        Each returned dict has keys: note_id, content, concern_id, timestamp.
-        """
-        collection_id = self.resource_manager.named_collections.get("conversation_history")
-        if not collection_id:
-            return []
-        collection = self.resource_manager.get_resource(collection_id)
-        if not collection:
-            return []
-        note_ids = collection.get("properties", {}).get("content", [])
-        if not isinstance(note_ids, list):
-            return []
-
-        entries = []
-        for note_id in note_ids:
-            if not isinstance(note_id, str) or not note_id.startswith("Note_"):
-                continue
-            resource = self.resource_manager.get_resource(note_id)
-            if not resource:
-                continue
-            props = resource.get("properties", {})
-            content = props.get("content", "")
-            entries.append({
-                "note_id": note_id,
-                "content": content if isinstance(content, str) else str(content),
-                "concern_id": props.get("concern_id"),
-                "goal_id": props.get("goal_id"),
-                "timestamp": props.get("timestamp", props.get("created_at", "")),
-            })
-        return entries
-
-    def tag_note_concern(self, note_id: str, concern_id: str) -> bool:
-        """Tag a note with a concern_id in its properties."""
-        resource = self.resource_manager.get_resource(note_id)
-        if not resource:
-            return False
-        resource.get("properties", {})["concern_id"] = concern_id
-        return True
-
-    def tag_note_goal(self, note_id: str, goal_id: str) -> bool:
-        """Tag a note with a goal_id in its properties."""
-        resource = self.resource_manager.get_resource(note_id)
-        if not resource:
-            return False
-        resource.get("properties", {})["goal_id"] = goal_id
-        return True
-
-    def get_themed_context(self, concerns: List[Dict], max_total_chars: int = 3000) -> str:
-        """Build conversation context organized by concern themes.
-
-        Args:
-            concerns: List of concern dicts from the concern model (must have
-                      concern_id, concern_label, weight, status, history_summary,
-                      history_note_ids).
-            max_total_chars: Budget for the entire themed context block.
-
-        Returns:
-            Formatted string ready for inclusion in a prompt.
-        """
-        history_notes = self.get_history_notes()
-
-        # Index history notes by note_id for quick lookup
-        notes_by_id = {n["note_id"]: n for n in history_notes}
-
-        # --- Pool C: last 2 history entries for recency (any theme) ---
-        last_two = history_notes[-2:] if len(history_notes) >= 2 else list(history_notes)
-        last_two_ids = {n["note_id"] for n in last_two}
-
-        # --- Pool A+B: concern-based entries ---
-        # Score and rank open concerns
-        active_concerns = [c for c in concerns if c.get("status") == "open"]
-        active_concerns.sort(key=lambda c: float(c.get("weight", 0)), reverse=True)
-        top_concerns = active_concerns[:5]
-
-        # Budget allocation
-        recency_budget = min(800, max_total_chars // 3)
-        theme_budget = max_total_chars - recency_budget
-
-        parts = []
-
-        # Recency section
-        if last_two:
-            parts.append("## RECENT CONVERSATIONS (for continuity)")
-            for entry in last_two:
-                text = entry["content"][:recency_budget // max(len(last_two), 1)]
-                parts.append(f"  {text}")
-
-        # Theme section
-        if top_concerns:
-            per_concern_budget = theme_budget // max(len(top_concerns), 1)
-            parts.append("\n## CONVERSATION THEMES")
-            for concern in top_concerns:
-                cid = concern.get("concern_id", "")
-                label = concern.get("concern_label", "unknown")
-                weight = concern.get("weight", 0)
-                history_summary = concern.get("history_summary", "")
-                history_note_ids = concern.get("history_note_ids", [])
-
-                section_parts = []
-                section_parts.append(f"### {label} (weight: {weight:.1f})")
-
-                chars_used = 0
-
-                # Pool A: rolled-up history_summary
-                if history_summary:
-                    truncated = history_summary[:per_concern_budget // 2]
-                    section_parts.append(f"  {truncated}")
-                    chars_used += len(truncated)
-
-                # Pool B: unconsolidated entries for this concern
-                remaining = per_concern_budget - chars_used
-                for nid in history_note_ids:
-                    if nid in last_two_ids:
-                        continue  # already in recency section
-                    note = notes_by_id.get(nid)
-                    if note and remaining > 0:
-                        text = note["content"][:remaining]
-                        section_parts.append(f"  {text}")
-                        remaining -= len(text)
-
-                parts.append("\n".join(section_parts))
-
-        return "\n".join(parts) if parts else ""
-
-    def get_entity_context(self, entity_name: str, limit: int = 20, scope: str = "all") -> Dict[str, Any]:
-        entity = self._normalize_entity(entity_name)
-        all_turns = self._get_all_entity_turns(entity)
-        turns = self.get_recent_turns(entity, limit=limit, scope=scope)
-        dialog_ids = [str(t.get("dialog_id", "")) for t in all_turns if t.get("dialog_id")]
-        unique_dialog_ids = set(dialog_ids)
-
-        # Backfill with prior session summaries when current conversation is short.
-        # Proportional: fewer current turns → more backfill, capped at 5.
-        prior_summaries = []
-        available_slots = limit - len(turns)
-        if available_slots > 3:
-            backfill_count = min(available_slots // 3, 5)
-            try:
-                history_notes = self.get_history_notes()
-                if history_notes:
-                    # Most recent summaries first
-                    history_notes.sort(
-                        key=lambda h: h.get("timestamp", ""), reverse=True)
-                    for h in history_notes[:backfill_count]:
-                        content = h.get("content", "")
-                        if content and len(content) > 20:
-                            entry = {
-                                "source": "prior_session",
-                                "text": content[:500],
-                                "timestamp": h.get("timestamp", ""),
-                                "note_id": h.get("note_id", ""),
-                            }
-                            if h.get("goal_id"):
-                                entry["goal_id"] = h["goal_id"]
-                            prior_summaries.append(entry)
-            except Exception:
-                pass
-
-        return {
-            "entity_name": entity,
-            "conversation_history": turns,
-            "prior_session_summaries": prior_summaries,
-            "full_history_count": len(all_turns),
-            "dialog_count": len(unique_dialog_ids),
-            "active_dialog": bool(self._active_dialogs.get(entity, False)),
-            "last_interaction_type": "text" if all_turns else "none",
-            "scope": scope
-        }

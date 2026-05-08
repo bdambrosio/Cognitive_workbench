@@ -136,6 +136,108 @@ def _zenoh_put(session, key_expr: str, payload: dict):
 
 
 # ---------------------------------------------------------------------------
+# Image input helpers (/img <path|url> [caption], /paste [caption])
+# ---------------------------------------------------------------------------
+
+_DEFAULT_IMAGE_CAPTION = "Describe this image."
+
+
+def _detect_clipboard_reader() -> Optional[List[str]]:
+    """Best-available command vector that reads PNG bytes from the system
+    clipboard to stdout. Wayland preferred when both are present (X11
+    clipboard on a Wayland session is XWayland and usually empty for
+    images). Returns None if no supported tool is found."""
+    import os
+    import shutil
+    if os.environ.get('WAYLAND_DISPLAY') and shutil.which('wl-paste'):
+        return ['wl-paste', '-t', 'image/png']
+    if os.environ.get('DISPLAY') and shutil.which('xclip'):
+        return ['xclip', '-selection', 'clipboard', '-t', 'image/png', '-o']
+    return None
+
+
+def _bytes_to_data_uri(data: bytes, mime: str) -> str:
+    import base64
+    return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
+
+
+def _sniff_image_mime(head: bytes) -> Optional[str]:
+    """Magic-byte sniff. Returns the MIME or None if it doesn't look
+    like a recognized image format. Used in preference to extension
+    sniffing because drag-dropped paths can have any extension."""
+    if head.startswith(b'\x89PNG\r\n\x1a\n'):
+        return 'image/png'
+    if head.startswith(b'\xff\xd8\xff'):
+        return 'image/jpeg'
+    if head[:6] in (b'GIF87a', b'GIF89a'):
+        return 'image/gif'
+    if head.startswith(b'RIFF') and head[8:12] == b'WEBP':
+        return 'image/webp'
+    return None
+
+
+def _path_to_data_uri(path: str) -> str:
+    import os
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"not a file: {path}")
+    with open(path, 'rb') as f:
+        data = f.read()
+    mime = _sniff_image_mime(data[:16])
+    if mime is None:
+        raise ValueError(f"not a recognized image format: {path}")
+    return _bytes_to_data_uri(data, mime)
+
+
+def _clipboard_to_data_uri() -> str:
+    import subprocess
+    cmd = _detect_clipboard_reader()
+    if cmd is None:
+        raise RuntimeError(
+            "no clipboard reader found — install wl-clipboard (Wayland) "
+            "or xclip (X11)")
+    try:
+        result = subprocess.run(cmd, capture_output=True, timeout=5)
+    except Exception as e:
+        raise RuntimeError(f"clipboard read failed: {e}")
+    if result.returncode != 0:
+        stderr = (result.stderr or b'').decode('utf-8', errors='replace').strip()
+        raise RuntimeError(
+            f"clipboard has no image (run after a screenshot/image copy). "
+            f"reader said: {stderr or 'no detail'}")
+    data = result.stdout or b''
+    mime = _sniff_image_mime(data[:16])
+    if mime is None:
+        raise RuntimeError("clipboard payload is not a recognized image format")
+    return _bytes_to_data_uri(data, mime)
+
+
+def _parse_img_args(rest: str) -> tuple:
+    """Split '/img <path-or-url> [caption...]' into (url_or_path, caption).
+    Uses shlex so drag-dropped paths with quoted whitespace survive.
+    Caption is everything after the first token, joined with spaces and
+    stripped. Empty caption falls back to _DEFAULT_IMAGE_CAPTION at the
+    call site."""
+    import shlex
+    try:
+        tokens = shlex.split(rest)
+    except ValueError as e:
+        raise ValueError(f"could not parse /img args (unbalanced quotes?): {e}")
+    if not tokens:
+        raise ValueError("usage: /img <path-or-url> [caption]")
+    return tokens[0], ' '.join(tokens[1:]).strip()
+
+
+def _build_image_envelope_inner(text: str, image_url: str) -> str:
+    """Inner-content JSON for sense_data — same shape as the text-only
+    path plus an optional image field."""
+    return json.dumps({
+        'source': 'User',
+        'text': text,
+        'image': {'url': image_url},
+    })
+
+
+# ---------------------------------------------------------------------------
 # Command parser
 # ---------------------------------------------------------------------------
 
@@ -477,6 +579,10 @@ def _print_help():
 {C.BOLD}Memory:{C.RESET}
   /remember <query>              Active-recall subagent query (reads agent's memory dir)
 
+{C.BOLD}Image input:{C.RESET}
+  /img <path|url> [caption]      Send an image (local file or URL) with optional caption
+  /paste [caption]               Send the image currently in the system clipboard
+
 {C.BOLD}External code:{C.RESET}
   /set-external-repo <path>      Bind a project repo for the inspect_external tool
   /clear-external-repo           Unbind the external repo
@@ -527,6 +633,8 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
     from prompt_toolkit.history import FileHistory
     from prompt_toolkit.formatted_text import HTML
     from prompt_toolkit.patch_stdout import patch_stdout
+    from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.keys import Keys
 
     active_character = character_names[0]
 
@@ -636,12 +744,30 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
     # Banner
     print()
     print(f"{C.BOLD}Cognitive Workbench CLI{C.RESET}")
-    print(f"Character: {C.CYAN}{active_character}{C.RESET}  |  Type /help for commands  |  Ctrl+D to exit")
+    print(f"Character: {C.CYAN}{active_character}{C.RESET}  |  Type /help for commands  |  /img <path|url> [caption], /paste [caption] for image  |  Alt+Enter for newline  |  Ctrl+D to exit")
     print()
 
     import os
     history_path = os.path.expanduser('~/.cognitive_workbench_history')
-    session = PromptSession(history=FileHistory(str(history_path)))
+
+    # Multiline prompt: Enter submits, Alt+Enter inserts a newline. Default
+    # single-line mode would bind Enter to submit and offer no way to enter
+    # a newline at all — no Alt+Enter, no Esc+Enter, nothing.
+    kb = KeyBindings()
+
+    @kb.add(Keys.Enter)
+    def _(event):
+        event.current_buffer.validate_and_handle()
+
+    @kb.add(Keys.Escape, Keys.Enter)
+    def _(event):
+        event.current_buffer.insert_text('\n')
+
+    session = PromptSession(
+        history=FileHistory(str(history_path)),
+        multiline=True,
+        key_bindings=kb,
+    )
     last_ctrl_c = 0.0
 
     try:
@@ -664,6 +790,51 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
 
             line = line.strip()
             if not line:
+                continue
+
+            # /img and /paste are CLI-local: they build a sense_data
+            # envelope (like a normal text turn) rather than a command.
+            # Intercept here so the generic command parser doesn't
+            # see them. Active-character-only — @agent retargeting
+            # isn't supported in v1.
+            if line.startswith('/img ') or line == '/img' or line.startswith('/paste'):
+                head, _, rest = line.partition(' ')
+                head = head.strip()
+                rest = rest.strip()
+                try:
+                    if head == '/img':
+                        if not rest:
+                            _print_error("usage: /img <path-or-url> [caption]")
+                            continue
+                        target, caption = _parse_img_args(rest)
+                        if target.startswith(('http://', 'https://')):
+                            image_url = target
+                        else:
+                            image_url = _path_to_data_uri(target)
+                    elif head == '/paste':
+                        # Whole rest (after /paste) is the caption.
+                        caption = rest
+                        image_url = _clipboard_to_data_uri()
+                    else:
+                        _print_error(f"unknown image command: {head}")
+                        continue
+                except (FileNotFoundError, ValueError, RuntimeError) as e:
+                    _print_error(str(e))
+                    continue
+
+                if not caption:
+                    caption = _DEFAULT_IMAGE_CAPTION
+
+                sense_data = {
+                    'timestamp': datetime.now().isoformat(),
+                    'sequence_id': 0,
+                    'mode': 'text',
+                    'content': _build_image_envelope_inner(caption, image_url),
+                }
+                sense_publisher.put(json.dumps(sense_data))
+                # Don't echo the data URI; it can be megabytes.
+                tag = 'url' if image_url.startswith(('http://', 'https://')) else 'data-uri'
+                _print_info(f"→ sent to {active_character} (image: {tag}, caption: {caption!r})")
                 continue
 
             # Slash-command (with optional @agent targeting)
