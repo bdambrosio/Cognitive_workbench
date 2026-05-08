@@ -7,9 +7,10 @@
 #     ordering for probe-time state snapshots)
 #   - world_config.world_name     → placeholder; the runner overrides
 #     with a per-run timestamped name so each run starts clean
-#   - setting:                    → adds a benchmark directive
-#     suppressing search / fetch_text (fictional content; the user
-#     supplies all facts directly)
+#   - setting:                    → adds a benchmark directive flagging
+#     fictional content. As of v0.3 of cspred, tool gating is realized
+#     at the schema level via chat.omitted_tools (set per-cell by the
+#     runner), not via prose veto in this block.
 #
 # Persona, capabilities, seed concerns, and tick sensor mirror
 # jill-chat.yaml verbatim. Keep in sync unless intentionally diverging.
@@ -27,10 +28,9 @@ setting: |
   and persistent concerns. No continuous OODA, no scheduled task
   pipeline, no live sensor processing.
 
-  This is a structured benchmark session. Do not use the `search` or
-  `fetch_text` tools — the user provides all facts directly, and any
-  ticker, colleague, or event mentioned is fictional and not
-  externally verifiable. Use `process_text` and `respond` only.
+  This is a structured benchmark session. Tickers, colleagues, and
+  events mentioned by the user are fictional and not externally
+  verifiable; the user provides all facts directly.
 
 characters:
   Jill:

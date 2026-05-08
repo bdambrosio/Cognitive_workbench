@@ -1,35 +1,55 @@
 #!/usr/bin/env python3
-"""Counterfactual Self-Prediction Benchmark — runner (v0.1).
+"""Counterfactual Self-Prediction Benchmark — runner (v0.3).
 
 Tier-4 benchmark for the operational-self-awareness ladder. Drives, for
-each pair in primer.yaml, two independent ChatLoop instances:
-  - predict-arm: shared prefix turns + predict_probe → records prediction
-  - enact-arm:   shared prefix turns + enact_stimulus → records actual
-                 behavior
+each pair in primer.yaml, FOUR independent ChatLoop instances (one per
+cell):
+  - predict_base: default state; probe asks the question.
+  - predict_cf:   default state; probe wraps the question with the
+                  perturbation description.
+  - enact_base:   default state; stimulus is the direct request.
+  - enact_cf:     perturbed state per `perturbation.op`+`params`;
+                  stimulus identical to enact_base.
 
-Each arm runs in its own fresh world directory (per-run timestamp + pair
-id + arm tag) so the arms don't contaminate each other. State snapshots
-are captured in both arms at the divergence turn for the judge to score.
+Each cell runs in its own fresh world directory (per-run timestamp +
+pair id + cell label) so cells don't contaminate each other. State
+snapshots are captured at probe/stimulus time for the judge to score.
+The judge computes Δ-match and Δ-specificity over the four cells; see
+README and primer.yaml header.
+
+Supported perturbation ops:
+  - omit_tools         (params.tools=[<tool names>]) — filters the
+                        ReAct catalog at the schema level via
+                        chat.omitted_tools.
+  - drop_prefix_turn   (params.turn_index=N) — drops the Nth prefix
+                        turn (0-indexed).
+  - strip_self_model   (no params) — clears character.self_model field
+                        before ChatLoop construction.
+  - disable_concern_pathway / suppress_companion_model — pending; pair
+                        should be marked pending:true in primer.yaml
+                        until the runtime hook lands. Runner skips
+                        pending pairs with a warning.
 
 Usage:
     python bench/counterfactual_self_prediction/runner.py \\
         --scenario scenarios/jill-benchmark-chat.yaml
 
 The runner reuses the snapshot helpers from
-bench/introspective_fidelity/runner.py in spirit (copy, not import) — once
-both benches are stable we can extract a shared bench/_chat_harness.py.
-For now duplication beats premature abstraction.
+bench/introspective_fidelity/runner.py in spirit (copy, not import) —
+once both benches are stable we can extract a shared
+bench/_chat_harness.py.
 """
 
 from __future__ import annotations
 
 import argparse
+import copy
 import datetime
 import json
 import logging
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
@@ -45,6 +65,9 @@ from launcher import parse_characters  # noqa: E402
 logger = logging.getLogger("bench.counterfactual_self_prediction")
 
 
+CELL_LABELS = ("predict_base", "predict_cf", "enact_base", "enact_cf")
+
+
 # ---------------------------------------------------------------------------
 # YAML loading + scenario config
 # ---------------------------------------------------------------------------
@@ -55,7 +78,7 @@ def _load_yaml(path: Path) -> dict:
 
 
 def _build_character_config(scenario_path: Path, world_name_override: str
-                            ) -> tuple[str, dict]:
+                            ) -> Tuple[str, dict]:
     """Load scenario YAML and return (character_name, merged_config) for
     the single chat character. Replicates launcher.parse_characters' merge
     so per-character llm_config wins over top-level, then forces
@@ -74,6 +97,59 @@ def _build_character_config(scenario_path: Path, world_name_override: str
             f"{len(chat_chars)}"
         )
     return chat_chars[0]
+
+
+# ---------------------------------------------------------------------------
+# Perturbations
+# ---------------------------------------------------------------------------
+
+def _apply_perturbation(char_config: dict,
+                        prefix_turns: List[str],
+                        perturbation: Dict[str, Any]
+                        ) -> Tuple[dict, List[str]]:
+    """Return (modified_char_config, modified_prefix_turns) reflecting
+    the perturbation's op + params. char_config is mutated in place
+    (caller is expected to pass a deepcopy when isolation matters)."""
+    op = perturbation.get("op")
+    params = perturbation.get("params") or {}
+
+    if op == "omit_tools":
+        tools = list(params.get("tools") or [])
+        if not tools:
+            raise ValueError(
+                f"omit_tools requires non-empty params.tools (got {params!r})")
+        chat_block = dict(char_config.get("chat") or {})
+        existing = list(chat_block.get("omitted_tools") or [])
+        chat_block["omitted_tools"] = existing + [
+            t for t in tools if t not in existing]
+        char_config["chat"] = chat_block
+        return char_config, prefix_turns
+
+    if op == "drop_prefix_turn":
+        idx = params.get("turn_index")
+        if not isinstance(idx, int):
+            raise ValueError(
+                f"drop_prefix_turn requires int params.turn_index "
+                f"(got {params!r})")
+        if idx < 0 or idx >= len(prefix_turns):
+            raise ValueError(
+                f"drop_prefix_turn: turn_index={idx} out of range "
+                f"(have {len(prefix_turns)} prefix turns)")
+        new_prefix = list(prefix_turns)
+        new_prefix.pop(idx)
+        return char_config, new_prefix
+
+    if op == "strip_self_model":
+        char_config["self_model"] = ""
+        return char_config, prefix_turns
+
+    if op in ("disable_concern_pathway", "suppress_companion_model"):
+        raise NotImplementedError(
+            f"perturbation op '{op}' requires a runtime hook that has not "
+            f"yet been implemented; mark the pair pending:true in "
+            f"primer.yaml until the hook lands")
+
+    raise ValueError(f"unknown perturbation op: {op!r}")
 
 
 # ---------------------------------------------------------------------------
@@ -196,27 +272,38 @@ def _latest_reply(loop: ChatLoop, source: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Single-arm driver
+# Single-cell driver
 # ---------------------------------------------------------------------------
 
-def _run_arm(scenario_path: Path,
-             world_name: str,
-             prefix_turns: List[str],
-             divergence_turn: str,
-             arm_dir: Path,
-             source: str,
-             arm_label: str,
-             pair_id: str,
-             divergence_id: str) -> Dict[str, Any]:
-    """Run one arm: instantiate ChatLoop, send prefix turns, send the
-    divergence turn, snapshot at divergence-time, write transcript.
+def _run_cell(scenario_path: Path,
+              world_name: str,
+              prefix_turns: List[str],
+              probe_or_stimulus: str,
+              cell_dir: Path,
+              source: str,
+              cell_label: str,
+              pair_id: str,
+              perturbation: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Run one cell of a pair: instantiate ChatLoop (with perturbation
+    applied to char_config + prefix when perturbation is not None), send
+    prefix turns, send the probe/stimulus, snapshot at probe time, write
+    transcript.
 
-    Returns the divergence-turn snapshot (with `probe` block populated)
-    so the caller can persist it where convenient."""
-    arm_dir.mkdir(parents=True, exist_ok=True)
+    Returns the snapshot (with `probe` block populated) so the caller
+    can persist it where convenient."""
+    cell_dir.mkdir(parents=True, exist_ok=True)
 
     char_name, char_config = _build_character_config(scenario_path, world_name)
-    if not char_config.get("chat", {}).get("benchmark_mode"):
+
+    cell_prefix = list(prefix_turns)
+    if perturbation is not None:
+        # parse_characters returns a fresh tree per call, but deepcopy
+        # to be defensive against future caching.
+        char_config = copy.deepcopy(char_config)
+        char_config, cell_prefix = _apply_perturbation(
+            char_config, cell_prefix, perturbation)
+
+    if not (char_config.get("chat") or {}).get("benchmark_mode"):
         logger.warning(
             "scenario does not set chat.benchmark_mode=true; reflection runs "
             "on the background executor and the divergence-time snapshot "
@@ -225,25 +312,32 @@ def _run_arm(scenario_path: Path,
     loop = ChatLoop(character_name=char_name, character_config=char_config)
 
     transcript_lines: List[str] = []
-    transcript_lines.append(f"# Counterfactual Self-Prediction — {pair_id} / {arm_label}")
+    transcript_lines.append(
+        f"# Counterfactual Self-Prediction — {pair_id} / {cell_label}")
     transcript_lines.append("")
     transcript_lines.append(f"- scenario: `{scenario_path.name}`")
     transcript_lines.append(f"- world_name: `{world_name}`")
     transcript_lines.append(f"- character: `{char_name}`")
-    transcript_lines.append(f"- backend: `{(char_config.get('llm_config') or {}).get('server', '?')}` "
-                            f"`{(char_config.get('llm_config') or {}).get('model', '')}`")
-    transcript_lines.append(f"- arm: `{arm_label}`")
-    transcript_lines.append(f"- started: {datetime.datetime.now(datetime.timezone.utc).isoformat()}")
+    transcript_lines.append(
+        f"- backend: `{(char_config.get('llm_config') or {}).get('server', '?')}` "
+        f"`{(char_config.get('llm_config') or {}).get('model', '')}`")
+    transcript_lines.append(f"- cell: `{cell_label}`")
+    if perturbation is not None:
+        transcript_lines.append(
+            f"- perturbation: `{perturbation.get('name')}` "
+            f"(op=`{perturbation.get('op')}`, params=`{perturbation.get('params')}`)")
+    transcript_lines.append(
+        f"- started: {datetime.datetime.now(datetime.timezone.utc).isoformat()}")
     transcript_lines.append("")
 
     snapshot: Dict[str, Any] = {}
     try:
-        for i, text in enumerate(prefix_turns, start=1):
+        for i, text in enumerate(cell_prefix, start=1):
             text = (text or "").strip()
             if not text:
                 continue
             tid = f"PREFIX-{i:02d}"
-            print(f"\n=== {pair_id}/{arm_label}/{tid} ===", flush=True)
+            print(f"\n=== {pair_id}/{cell_label}/{tid} ===", flush=True)
             print(f"User: {text}", flush=True)
             loop._process_user_turn(source=source, text=text, close=False)
             reply = _latest_reply(loop, source)
@@ -260,15 +354,16 @@ def _run_arm(scenario_path: Path,
             transcript_lines.append(reply)
             transcript_lines.append("")
 
-        # Divergence turn — predict_probe or enact_stimulus.
-        text = (divergence_turn or "").strip()
-        print(f"\n=== {pair_id}/{arm_label}/{divergence_id} ===", flush=True)
+        # Probe / stimulus turn.
+        text = (probe_or_stimulus or "").strip()
+        probe_id = cell_label.upper()
+        print(f"\n=== {pair_id}/{cell_label}/{probe_id} ===", flush=True)
         print(f"User: {text}", flush=True)
         loop._process_user_turn(source=source, text=text, close=False)
         reply = _latest_reply(loop, source)
         print(f"\n{char_name}: {reply}", flush=True)
 
-        transcript_lines.append(f"## {divergence_id} ({arm_label})")
+        transcript_lines.append(f"## {probe_id} ({cell_label})")
         transcript_lines.append("")
         transcript_lines.append("**User:**")
         transcript_lines.append("")
@@ -281,13 +376,18 @@ def _run_arm(scenario_path: Path,
 
         snapshot = _snapshot_all(loop, source)
         snapshot["probe"] = {
-            "id": divergence_id,
-            "arm": arm_label,
+            "id": probe_id,
+            "cell": cell_label,
             "pair_id": pair_id,
             "user_text": text,
             "agent_reply": reply,
+            "perturbation_applied": (
+                None if perturbation is None
+                else {"name": perturbation.get("name"),
+                      "op": perturbation.get("op"),
+                      "params": perturbation.get("params")}),
         }
-        with open(arm_dir / "snapshot.json", "w") as f:
+        with open(cell_dir / "snapshot.json", "w") as f:
             json.dump(snapshot, f, indent=2, default=str)
         transcript_lines.append("_(state snapshot: snapshot.json)_")
         transcript_lines.append("")
@@ -301,7 +401,7 @@ def _run_arm(scenario_path: Path,
         except Exception as e:
             logger.warning(f"final persist failed: {e}")
 
-    (arm_dir / "transcript.md").write_text("\n".join(transcript_lines))
+    (cell_dir / "transcript.md").write_text("\n".join(transcript_lines))
     return snapshot
 
 
@@ -313,57 +413,78 @@ def _run_pair(scenario_path: Path,
               pair: Dict[str, Any],
               run_stamp: str,
               pair_dir: Path,
-              source: str) -> Dict[str, Any]:
-    """Run both arms of a pair and write a pair-level summary.json
-    convenient for the judge."""
+              source: str) -> Optional[Dict[str, Any]]:
+    """Run all four cells of a pair and write a pair-level summary.json.
+    Returns None if the pair is pending (skipped)."""
     pair_id = pair.get("id", "PAIR-?")
+
+    if pair.get("pending"):
+        reason = (pair.get("pending_reason") or "").strip()
+        logger.warning(
+            f"{pair_id}: SKIPPED (pending=true). Reason: "
+            f"{reason if reason else '(no reason given)'}")
+        return None
+
     intent = (pair.get("intent") or "").strip()
     axes = pair.get("axes")
     option_set = pair.get("option_set") or []
     notes_for_judge = (pair.get("notes_for_judge") or "").strip()
 
+    perturbation = pair.get("perturbation") or None
+    if perturbation is None:
+        raise RuntimeError(
+            f"{pair_id}: missing perturbation block (required in v0.3)")
+
     prefix_blocks = pair.get("prefix") or []
     prefix_turns = [(b.get("text") or "") for b in prefix_blocks]
-    predict_probe = pair.get("predict_probe") or ""
-    enact_stimulus = pair.get("enact_stimulus") or ""
-    if not predict_probe.strip() or not enact_stimulus.strip():
+
+    cells = pair.get("cells") or {}
+    missing = [c for c in CELL_LABELS if c not in cells]
+    if missing:
         raise RuntimeError(
-            f"{pair_id}: both predict_probe and enact_stimulus are required"
-        )
+            f"{pair_id}: missing cell(s) {missing}; v0.3 requires all four "
+            f"of {CELL_LABELS}")
 
     pair_dir.mkdir(parents=True, exist_ok=True)
-    predict_dir = pair_dir / "predict"
-    enact_dir = pair_dir / "enact"
-
     safe_pair = pair_id.replace("/", "-").replace(" ", "_")
-    predict_world = f"bench-cspred-{run_stamp}-{safe_pair}-predict"
-    enact_world = f"bench-cspred-{run_stamp}-{safe_pair}-enact"
 
-    print(f"\n>>> Pair {pair_id} — predict-arm world={predict_world}", flush=True)
-    predict_snap = _run_arm(
-        scenario_path=scenario_path,
-        world_name=predict_world,
-        prefix_turns=prefix_turns,
-        divergence_turn=predict_probe,
-        arm_dir=predict_dir,
-        source=source,
-        arm_label="predict",
-        pair_id=pair_id,
-        divergence_id="PRED",
-    )
+    cell_text: Dict[str, str] = {}
+    for label in CELL_LABELS:
+        spec = cells[label] or {}
+        # predict cells use 'probe', enact cells use 'stimulus'.
+        text = spec.get("probe") if label.startswith("predict") else spec.get("stimulus")
+        if not (text or "").strip():
+            raise RuntimeError(
+                f"{pair_id}: cell {label} missing "
+                f"{'probe' if label.startswith('predict') else 'stimulus'}")
+        cell_text[label] = text
 
-    print(f"\n>>> Pair {pair_id} — enact-arm world={enact_world}", flush=True)
-    enact_snap = _run_arm(
-        scenario_path=scenario_path,
-        world_name=enact_world,
-        prefix_turns=prefix_turns,
-        divergence_turn=enact_stimulus,
-        arm_dir=enact_dir,
-        source=source,
-        arm_label="enact",
-        pair_id=pair_id,
-        divergence_id="ENACT",
-    )
+    # cf cells get the perturbation; base cells do not.
+    cell_perturbation: Dict[str, Optional[Dict[str, Any]]] = {
+        "predict_base": None,
+        "predict_cf": None,         # perturbation lives in the question text, not state
+        "enact_base": None,
+        "enact_cf": perturbation,   # perturbation operative in runtime
+    }
+
+    snapshots: Dict[str, Dict[str, Any]] = {}
+    cell_worlds: Dict[str, str] = {}
+    for label in CELL_LABELS:
+        world = f"bench-cspred-{run_stamp}-{safe_pair}-{label}"
+        cell_worlds[label] = world
+        cell_dir = pair_dir / label
+        print(f"\n>>> Pair {pair_id} — cell {label} world={world}", flush=True)
+        snapshots[label] = _run_cell(
+            scenario_path=scenario_path,
+            world_name=world,
+            prefix_turns=prefix_turns,
+            probe_or_stimulus=cell_text[label],
+            cell_dir=cell_dir,
+            source=source,
+            cell_label=label,
+            pair_id=pair_id,
+            perturbation=cell_perturbation[label],
+        )
 
     summary = {
         "pair_id": pair_id,
@@ -371,15 +492,19 @@ def _run_pair(scenario_path: Path,
         "intent": intent,
         "option_set": option_set,
         "notes_for_judge": notes_for_judge,
-        "predict": {
-            "world_name": predict_world,
-            "user_text": predict_snap.get("probe", {}).get("user_text", ""),
-            "agent_reply": predict_snap.get("probe", {}).get("agent_reply", ""),
+        "perturbation": {
+            "name": perturbation.get("name"),
+            "op": perturbation.get("op"),
+            "params": perturbation.get("params"),
+            "describe_in_predict_cf": perturbation.get("describe_in_predict_cf", ""),
         },
-        "enact": {
-            "world_name": enact_world,
-            "user_text": enact_snap.get("probe", {}).get("user_text", ""),
-            "agent_reply": enact_snap.get("probe", {}).get("agent_reply", ""),
+        "cells": {
+            label: {
+                "world_name": cell_worlds[label],
+                "user_text": snapshots[label].get("probe", {}).get("user_text", ""),
+                "agent_reply": snapshots[label].get("probe", {}).get("agent_reply", ""),
+            }
+            for label in CELL_LABELS
         },
     }
     with open(pair_dir / "summary.json", "w") as f:
@@ -413,11 +538,15 @@ def run_benchmark(scenario_path: Path, primer_path: Path, output_dir: Path,
         "%Y-%m-%dT%H-%M-%SZ")
 
     summaries: List[Dict[str, Any]] = []
+    skipped: List[str] = []
     for pair in pairs:
         pair_id = pair.get("id", "PAIR-?")
         pair_dir = output_dir / pair_id.replace("/", "-").replace(" ", "_")
         summary = _run_pair(scenario_path, pair, run_stamp, pair_dir, source)
-        summaries.append(summary)
+        if summary is None:
+            skipped.append(pair_id)
+        else:
+            summaries.append(summary)
 
     index = {
         "run_stamp": run_stamp,
@@ -425,11 +554,14 @@ def run_benchmark(scenario_path: Path, primer_path: Path, output_dir: Path,
         "primer": primer_path.name,
         "n_pairs": len(summaries),
         "pairs": [s["pair_id"] for s in summaries],
+        "skipped_pending": skipped,
     }
     with open(output_dir / "run_index.json", "w") as f:
         json.dump(index, f, indent=2, default=str)
     print(f"\nRun complete: {output_dir}")
-    print(f"  pairs: {[s['pair_id'] for s in summaries]}")
+    print(f"  pairs ran: {[s['pair_id'] for s in summaries]}")
+    if skipped:
+        print(f"  pairs skipped (pending): {skipped}")
 
 
 def main() -> None:
@@ -440,7 +572,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(
         description="Drive the counterfactual-self-prediction benchmark "
-                    "in-process against a chat scenario.")
+                    "(v0.3 diff-in-diff) in-process against a chat scenario.")
     parser.add_argument(
         "--scenario", type=Path, required=True,
         help="Path to a chat-mode scenario YAML (e.g. "
@@ -456,7 +588,8 @@ def main() -> None:
     parser.add_argument(
         "--pairs", nargs="+", default=None,
         help="Subset of pair IDs to run (e.g. --pairs PAIR-01 PAIR-03). "
-             "Default: all pairs in the primer.")
+             "Default: all pairs in the primer (pending pairs are still "
+             "skipped within the filter).")
     parser.add_argument(
         "--runs", type=int, default=1,
         help="Number of independent runs of the full pair set. N=1 (default) "

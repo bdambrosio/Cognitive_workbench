@@ -594,6 +594,15 @@ class ChatLoop:
         # _handle_tick entry; everything else (cadence math, concern
         # types) is unaffected by the flag.
         self._autonomy_enabled = bool(character_config.get('autonomy_enabled', False))
+        # Schema-level affordance gate. Tool names listed here are filtered
+        # out of the ReAct tool catalog (and any related guidance) so the
+        # agent's affordance representation matches what's actually
+        # available. Used by the cspred bench's cf-cells to enforce
+        # tool-axis perturbations at the schema level rather than via
+        # contradictory prose. Empty/absent → no filtering.
+        self._omitted_tools: List[str] = list(
+            (character_config.get('chat') or {}).get('omitted_tools') or []
+        )
 
         # ---- Resource manager + conversation store ----
         from infospace_resource_manager import InfospaceResourceManager
@@ -3461,40 +3470,48 @@ class ChatLoop:
     def _build_react_tool_catalog(self) -> str:
         """Build the numbered tool list shown in the ReAct system prompt.
         Conditionally includes inspect_external — and the bound external
-        repo path — only when an external_repo is currently bound. Numbers
-        shift accordingly; the model handles both layouts fine."""
-        tools: List[str] = [
-            "`{\"thought\": \"<one terse sentence>\", \"tool\": \"process_text\", \"source\": <string|$stepN>, \"instruction\": <string>}` — "
-            "LLM pass over text in context. Use to formulate queries, render results in your voice, extract info.",
-            "`{\"thought\": \"<one terse sentence>\", \"tool\": \"search\", \"query\": <string|$stepN>}` — "
-            "web search (digested synthesis + sources).",
-            "`{\"thought\": \"<one terse sentence>\", \"tool\": \"fetch_text\", \"url\": <string|$stepN>}` — "
-            "full text from a single URL (or local file path). Use when a search hit looks promising and the "
-            "snippet isn't enough; always pass the result through process_text before responding.",
-            "`{\"thought\": \"<one terse sentence>\", \"tool\": \"remember\", \"query\": <string>}` — "
-            "active recall over your own memory: full reasoning trace, conversation history, current companion "
-            "model, current discourse state. Use when the user asks about prior turns, your earlier reasoning, "
-            "or persistent state that may not be in your current prompt. The query is opaque to you — a subagent "
-            "reads the files and returns a synthesized answer in `$stepN`.",
-            "`{\"thought\": \"<one terse sentence>\", \"tool\": \"inspect\", \"query\": <string>}` — "
-            "query your own codebase. A separate subagent (geofenced read-only to `src/`, list/read/grep "
-            "primitives) navigates the source and returns a synthesized answer with file:line citations. Use "
-            "when the user asks how you work, where something is implemented, what a module does, or to verify "
-            "a claim about your own code. The query is opaque to you — phrase it as a natural-language question "
-            "(e.g. \"where is the ReAct dispatch defined?\", \"what tools does the chat loop wire up?\").",
+        repo path — only when an external_repo is currently bound. Tools
+        whose name appears in self._omitted_tools (set per scenario via
+        chat.omitted_tools, used by the cspred bench cf-cells) are
+        filtered out so the affordance representation matches what is
+        actually invokable. Numbers shift accordingly; the model handles
+        all layouts fine."""
+        tools: List[Tuple[str, str]] = [
+            ("process_text",
+             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"process_text\", \"source\": <string|$stepN>, \"instruction\": <string>}` — "
+             "LLM pass over text in context. Use to formulate queries, render results in your voice, extract info."),
+            ("search",
+             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"search\", \"query\": <string|$stepN>}` — "
+             "web search (digested synthesis + sources)."),
+            ("fetch_text",
+             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"fetch_text\", \"url\": <string|$stepN>}` — "
+             "full text from a single URL (or local file path). Use when a search hit looks promising and the "
+             "snippet isn't enough; always pass the result through process_text before responding."),
+            ("remember",
+             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"remember\", \"query\": <string>}` — "
+             "active recall over your own memory: full reasoning trace, conversation history, current companion "
+             "model, current discourse state. Use when the user asks about prior turns, your earlier reasoning, "
+             "or persistent state that may not be in your current prompt. The query is opaque to you — a subagent "
+             "reads the files and returns a synthesized answer in `$stepN`."),
+            ("inspect",
+             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"inspect\", \"query\": <string>}` — "
+             "query your own codebase. A separate subagent (geofenced read-only to `src/`, list/read/grep "
+             "primitives) navigates the source and returns a synthesized answer with file:line citations. Use "
+             "when the user asks how you work, where something is implemented, what a module does, or to verify "
+             "a claim about your own code. The query is opaque to you — phrase it as a natural-language question "
+             "(e.g. \"where is the ReAct dispatch defined?\", \"what tools does the chat loop wire up?\")."),
         ]
         external_repo = self._get_external_repo()
         if external_repo is not None:
-            tools.append(
+            tools.append(("inspect_external",
                 "`{\"thought\": \"<one terse sentence>\", \"tool\": \"inspect_external\", \"query\": <string>}` — "
                 f"query the external project repo currently bound to this session: `{external_repo}`. "
                 "Same primitives as `inspect` (list/read/grep), different geofence — this is reading an external "
                 "codebase as documentation, not introspection of your own substrate. Use when the user asks "
                 "questions about THAT project (its code, README, structure, behavior). Phrase as a "
                 "natural-language question (e.g. \"how does this project structure its modules?\", "
-                "\"what does the README say about installation?\", \"where is the main entry point?\")."
-            )
-        tools.append(
+                "\"what does the README say about installation?\", \"where is the main entry point?\")."))
+        tools.append(("security",
             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"security\", \"query\": <string>}` — "
             "investigate LAN / local-system network state. A separate subagent (read-only typed primitives: "
             "nmap host discovery + service scan, ss/ip for sockets/routes/arp/interfaces; targets restricted to "
@@ -3502,14 +3519,20 @@ class ChatLoop:
             "hosts, what's listening locally, what services a host exposes, suspicious activity on the network, "
             "or routing/interface state. v0.1 does NOT do traffic capture or IDS log inspection. Phrase as a "
             "natural-language question (e.g. \"what hosts are on my LAN at 192.168.1.0/24?\", \"what TCP ports "
-            "am I listening on?\", \"what's my default gateway?\")."
-        )
-        tools.append(
+            "am I listening on?\", \"what's my default gateway?\")."))
+        tools.append(("respond",
             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"respond\", \"text\": <string|$stepN>}` — "
             "final reply, exits loop. Must be in your voice; pass search/fetch results through process_text "
-            "first or write the reply yourself."
-        )
-        numbered = "\n".join(f"{i}. {t}" for i, t in enumerate(tools, start=1))
+            "first or write the reply yourself."))
+
+        omitted = set(self._omitted_tools or [])
+        if omitted:
+            kept = [(name, descr) for name, descr in tools if name not in omitted]
+            dropped = [name for name, _ in tools if name in omitted]
+            logger.info(f"[{self.character_name}] _build_react_tool_catalog: omitted_tools active, dropped={dropped}")
+            tools = kept
+
+        numbered = "\n".join(f"{i}. {descr}" for i, (_, descr) in enumerate(tools, start=1))
         return "Tools (each emission picks ONE):\n" + numbered + "\n"
 
     def _build_react_system_prompt(self, source: str, orientation: str,
@@ -3520,6 +3543,20 @@ class ChatLoop:
         base = self._build_system_prompt(
             source, orientation, recall=recall,
             agent_concerns=agent_concerns, user_concerns=user_concerns)
+        search_omitted = 'search' in (self._omitted_tools or [])
+        if search_omitted:
+            fresh_info_guidance = (
+                "You do NOT know: current weather, recent news, current "
+                "prices, or anything requiring fresh information. You have "
+                "no live-data tool available this session; if asked for "
+                "fresh information, say so plainly rather than guessing.\n"
+            )
+        else:
+            fresh_info_guidance = (
+                "You do NOT know: current weather, recent news, current prices, "
+                "or anything requiring fresh information. For time-sensitive or "
+                "fact-specific questions, your first action is `search`.\n"
+            )
         react = (
             f"\n\n## Now (system clock)\n{now_str}\n"
             "\n"
@@ -3535,10 +3572,8 @@ class ChatLoop:
             "THIS action over the alternatives. The thought is preserved "
             "verbatim into your future-turn awareness feed.\n"
             "\n"
-            "You do NOT know: current weather, recent news, current prices, "
-            "or anything requiring fresh information. For time-sensitive or "
-            "fact-specific questions, your first action is `search`.\n"
-            "\n"
+            + fresh_info_guidance
+            + "\n"
             + self._build_react_tool_catalog()
             + "\n"
             "## Observation format\n"
@@ -3564,12 +3599,13 @@ class ChatLoop:
             "`source`; `source` resolves only literal inline text or a `$stepN` binding, never a "
             "section header.\n"
             "\n"
-            "Worked example. User: 'what's the weather in Berkeley tomorrow?'\n"
-            "  Iter 1: `{\"thought\": \"Need fresh weather data — search first.\", \"tool\": \"search\", \"query\": \"Berkeley CA weather forecast tomorrow\"}` → $step1\n"
-            "  Iter 2: `{\"thought\": \"Search synthesis is decent; render in my voice with source.\", \"tool\": \"process_text\", \"source\": \"$step1\", \"instruction\": \"answer the user in your voice in 1-2 sentences, citing the source domain\"}` → $step2\n"
-            "  Iter 3: `{\"thought\": \"Processed answer is ready — send it.\", \"tool\": \"respond\", \"text\": \"$step2\"}` → loop exits.\n"
-            "\n"
-            "Output ONLY one JSON object. No prose, no apology, no explanation."
+            + ("" if search_omitted else
+               "Worked example. User: 'what's the weather in Berkeley tomorrow?'\n"
+               "  Iter 1: `{\"thought\": \"Need fresh weather data — search first.\", \"tool\": \"search\", \"query\": \"Berkeley CA weather forecast tomorrow\"}` → $step1\n"
+               "  Iter 2: `{\"thought\": \"Search synthesis is decent; render in my voice with source.\", \"tool\": \"process_text\", \"source\": \"$step1\", \"instruction\": \"answer the user in your voice in 1-2 sentences, citing the source domain\"}` → $step2\n"
+               "  Iter 3: `{\"thought\": \"Processed answer is ready — send it.\", \"tool\": \"respond\", \"text\": \"$step2\"}` → loop exits.\n"
+               "\n")
+            + "Output ONLY one JSON object. No prose, no apology, no explanation."
         )
         return base + react
 

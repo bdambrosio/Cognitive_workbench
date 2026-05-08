@@ -19,10 +19,9 @@ setting: |
   and persistent concerns. No continuous OODA, no scheduled task
   pipeline, no live sensor processing.
 
-  This is a structured benchmark session. Do not use the `search` or
-  `fetch_text` tools — the user provides all facts directly, and any
-  ticker, colleague, or event mentioned is fictional and not
-  externally verifiable. Use `process_text` and `respond` only.
+  This is a structured benchmark session. Tickers, colleagues, and
+  events mentioned by the user are fictional and not externally
+  verifiable; the user provides all facts directly.
 
 characters:
   Jill:
