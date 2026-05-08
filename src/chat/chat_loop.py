@@ -4544,6 +4544,13 @@ class ChatLoop:
             reply = f"[{self.character_name}] I had trouble generating a reply: {e}"
 
         reply = (reply or '').strip()
+        # Autonomous silence is a first-class outcome: a fired concern with a
+        # "Silent on healthy" instruction (e.g. PV monitor) intentionally
+        # produces no reply on the happy path. Skip the Telegram/Zenoh push
+        # in that case — there's no user waiting for an ack — but keep the
+        # "(no reply)" rewrite for the trace/store/CLI coda so /status and
+        # autonomy logs still show that the concern fired and ran clean.
+        intentionally_silent = autonomous and not reply
         if not reply:
             reply = "(no reply)"
 
@@ -4551,7 +4558,8 @@ class ChatLoop:
         self.store.record_outgoing(source, reply, act_type=act_type, close=close)
         self._append_conversation_entry(
             'out', source, reply, meta=f'act={act_type} close={close}')
-        self._publish_say(reply)
+        if not intentionally_silent:
+            self._publish_say(reply)
         self._last_reply_at = datetime.now(timezone.utc).isoformat()
         logger.info(f"[{self.character_name}] -> {source} ({act_type}): {reply!r}")
 
