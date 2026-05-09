@@ -56,11 +56,17 @@ import yaml
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parent.parent
 SRC_DIR = REPO_ROOT / "src"
+INTROSPECTIVE_DIR = REPO_ROOT / "bench" / "introspective_fidelity"
 
 sys.path.insert(0, str(SRC_DIR))
+# BaselineChatAgent lives in bench/introspective_fidelity/baseline.py; reuse
+# rather than duplicate. Universal Tier-4 pairs run against either ChatLoop
+# (full Jill) or BaselineChatAgent (capability-described chat agent).
+sys.path.insert(0, str(INTROSPECTIVE_DIR))
 
 from chat.chat_loop import ChatLoop  # noqa: E402
 from launcher import parse_characters  # noqa: E402
+from baseline import BaselineChatAgent  # noqa: E402
 
 logger = logging.getLogger("bench.counterfactual_self_prediction")
 
@@ -283,11 +289,19 @@ def _run_cell(scenario_path: Path,
               source: str,
               cell_label: str,
               pair_id: str,
-              perturbation: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    """Run one cell of a pair: instantiate ChatLoop (with perturbation
-    applied to char_config + prefix when perturbation is not None), send
-    prefix turns, send the probe/stimulus, snapshot at probe time, write
-    transcript.
+              perturbation: Optional[Dict[str, Any]],
+              baseline: bool = False,
+              baseline_prompt: str = "") -> Dict[str, Any]:
+    """Run one cell of a pair: instantiate ChatLoop (or BaselineChatAgent
+    in baseline mode) with perturbation applied to char_config + prefix
+    when perturbation is not None, send prefix turns, send the probe /
+    stimulus, snapshot at probe time, write transcript.
+
+    Baseline mode uses the same backend as Jill (from scenario llm_config)
+    but bypasses ChatLoop entirely — no concerns / reasoning history /
+    discourse / companion / tools / reflection. Perturbations that mutate
+    Jill-specific char_config surfaces (omit_tools, strip_self_model)
+    silently no-op against baseline; drop_prefix_turn works uniformly.
 
     Returns the snapshot (with `probe` block populated) so the caller
     can persist it where convenient."""
@@ -303,13 +317,19 @@ def _run_cell(scenario_path: Path,
         char_config, cell_prefix = _apply_perturbation(
             char_config, cell_prefix, perturbation)
 
-    if not (char_config.get("chat") or {}).get("benchmark_mode"):
-        logger.warning(
-            "scenario does not set chat.benchmark_mode=true; reflection runs "
-            "on the background executor and the divergence-time snapshot "
-            "may miss in-flight writes")
-
-    loop = ChatLoop(character_name=char_name, character_config=char_config)
+    if baseline:
+        loop = BaselineChatAgent(
+            llm_config=(char_config.get("llm_config") or {}),
+            system_prompt=baseline_prompt,
+            character_name=char_name,
+        )
+    else:
+        if not (char_config.get("chat") or {}).get("benchmark_mode"):
+            logger.warning(
+                "scenario does not set chat.benchmark_mode=true; reflection runs "
+                "on the background executor and the divergence-time snapshot "
+                "may miss in-flight writes")
+        loop = ChatLoop(character_name=char_name, character_config=char_config)
 
     transcript_lines: List[str] = []
     transcript_lines.append(
@@ -318,6 +338,7 @@ def _run_cell(scenario_path: Path,
     transcript_lines.append(f"- scenario: `{scenario_path.name}`")
     transcript_lines.append(f"- world_name: `{world_name}`")
     transcript_lines.append(f"- character: `{char_name}`")
+    transcript_lines.append(f"- agent: `{'baseline' if baseline else 'jill'}`")
     transcript_lines.append(
         f"- backend: `{(char_config.get('llm_config') or {}).get('server', '?')}` "
         f"`{(char_config.get('llm_config') or {}).get('model', '')}`")
@@ -413,7 +434,9 @@ def _run_pair(scenario_path: Path,
               pair: Dict[str, Any],
               run_stamp: str,
               pair_dir: Path,
-              source: str) -> Optional[Dict[str, Any]]:
+              source: str,
+              baseline: bool = False,
+              baseline_prompt: str = "") -> Optional[Dict[str, Any]]:
     """Run all four cells of a pair and write a pair-level summary.json.
     Returns None if the pair is pending (skipped)."""
     pair_id = pair.get("id", "PAIR-?")
@@ -484,6 +507,8 @@ def _run_pair(scenario_path: Path,
             cell_label=label,
             pair_id=pair_id,
             perturbation=cell_perturbation[label],
+            baseline=baseline,
+            baseline_prompt=baseline_prompt,
         )
 
     summary = {
@@ -518,7 +543,9 @@ def _run_pair(scenario_path: Path,
 
 def run_benchmark(scenario_path: Path, primer_path: Path, output_dir: Path,
                   source: str = "User",
-                  only_pairs: Optional[List[str]] = None) -> None:
+                  only_pairs: Optional[List[str]] = None,
+                  baseline: bool = False,
+                  baseline_prompt: str = "") -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     primer = _load_yaml(primer_path)
@@ -542,7 +569,8 @@ def run_benchmark(scenario_path: Path, primer_path: Path, output_dir: Path,
     for pair in pairs:
         pair_id = pair.get("id", "PAIR-?")
         pair_dir = output_dir / pair_id.replace("/", "-").replace(" ", "_")
-        summary = _run_pair(scenario_path, pair, run_stamp, pair_dir, source)
+        summary = _run_pair(scenario_path, pair, run_stamp, pair_dir, source,
+                            baseline=baseline, baseline_prompt=baseline_prompt)
         if summary is None:
             skipped.append(pair_id)
         else:
@@ -597,6 +625,22 @@ def main() -> None:
              "wraps each run in results/<stamp>_<scenario>_xN/run-NN/ and "
              "writes a parent run_index.json — judge.py auto-detects the "
              "multi-run layout and aggregates.")
+    parser.add_argument(
+        "--baseline", action="store_true",
+        help="Run the bench against a minimal BaselineChatAgent instead of "
+             "ChatLoop. Same LLM backend (taken from scenario llm_config), "
+             "no concerns / reasoning_history / discourse / companion / "
+             "tools / reflection. Universal pairs (ones using "
+             "drop_prefix_turn over a prefix turn baseline can also process) "
+             "produce signal; Jill-specific perturbations (omit_tools, "
+             "strip_self_model) silently no-op against baseline and "
+             "trigger the baseline-validity gate at scoring time.")
+    parser.add_argument(
+        "--baseline-prompt", type=Path, default=None,
+        help="Path to a system-prompt text file used as baseline's "
+             "system_prompt. Defaults to empty (raw chat). Recommended: "
+             "bench/introspective_fidelity/baseline_prompts/"
+             "assistant_capabilities.txt for a fair-fight chat product.")
     args = parser.parse_args()
 
     if args.runs < 1:
@@ -607,13 +651,26 @@ def main() -> None:
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime(
         "%Y-%m-%dT%H-%M-%SZ")
 
+    baseline_prompt_text = ""
+    if args.baseline_prompt:
+        baseline_prompt_text = Path(args.baseline_prompt).read_text().strip()
+    if args.baseline:
+        logger.info(
+            f"baseline mode: agent=BaselineChatAgent, "
+            f"system_prompt="
+            f"{'<empty>' if not baseline_prompt_text else f'{args.baseline_prompt}'}"
+        )
+    suffix_tag = "baseline_" if args.baseline else ""
+
     if args.runs == 1:
         if args.output_dir:
             out = args.output_dir.resolve()
         else:
-            out = HERE / "results" / f"{stamp}_{scenario.stem}"
+            out = HERE / "results" / f"{stamp}_{suffix_tag}{scenario.stem}"
         run_benchmark(scenario_path=scenario, primer_path=primer,
-                      output_dir=out, only_pairs=args.pairs)
+                      output_dir=out, only_pairs=args.pairs,
+                      baseline=args.baseline,
+                      baseline_prompt=baseline_prompt_text)
         return
 
     # Multi-run: parent dir contains run-01/, run-02/, … and a parent
@@ -621,7 +678,7 @@ def main() -> None:
     if args.output_dir:
         parent = args.output_dir.resolve()
     else:
-        parent = HERE / "results" / f"{stamp}_{scenario.stem}_x{args.runs}"
+        parent = HERE / "results" / f"{stamp}_{suffix_tag}{scenario.stem}_x{args.runs}"
     parent.mkdir(parents=True, exist_ok=True)
 
     run_dirs: List[str] = []
@@ -630,7 +687,9 @@ def main() -> None:
         print(f"\n========== run {i}/{args.runs}  ({run_dir.name}) ==========",
               flush=True)
         run_benchmark(scenario_path=scenario, primer_path=primer,
-                      output_dir=run_dir, only_pairs=args.pairs)
+                      output_dir=run_dir, only_pairs=args.pairs,
+                      baseline=args.baseline,
+                      baseline_prompt=baseline_prompt_text)
         run_dirs.append(run_dir.name)
 
     parent_index = {

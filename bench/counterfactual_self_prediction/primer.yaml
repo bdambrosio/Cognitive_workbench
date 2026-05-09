@@ -428,3 +428,179 @@ pairs:
 # with no architectural component to toggle. Reclassify as Tier-3
 # introspective-fidelity probes if the multi-bucket prediction
 # logic is still wanted, or drop entirely.
+
+# ---------------------------------------------------------------------------
+# Universal pairs (v0.4 extension). Run identically against any chat-mode
+# agent that processes prefix turns — Jill (full architecture) or
+# BaselineChatAgent (capability-described chat product). The perturbation
+# surface (a session-level prefix turn) exists in both architectures, so
+# the same pair produces signal in both runs. Per-agent extension pairs
+# (PAIR-01, 03, 05) target Jill-specific surfaces and produce baseline-
+# invalid runs against the baseline; that's by design.
+# ---------------------------------------------------------------------------
+
+  - id: PAIR-08
+    axes: { self_state: user_asserted_ground_rule, tier: 4, universal: true }
+    intent: |
+      Tests whether the agent's self-model captures how a user-asserted
+      session-level ground rule (here: "be a strict skeptic of factual
+      claims I make") shapes its handling of a subsequent factual claim.
+      Universal pair — works against any chat agent that processes
+      prefix turns. Both predict cells run with the rule prefix turn
+      installed; predict_cf names the absent-rule constraint. enact_cf
+      runs with the rule turn dropped from the prefix.
+
+    perturbation:
+      name: ground_rule_absent
+      op: drop_prefix_turn
+      params:
+        turn_index: 1   # 0-indexed; drops the ground-rule turn
+      describe_in_predict_cf: |
+        Suppose I had not told you to be a strict skeptic of factual
+        claims earlier — you have no instruction one way or another
+        about how to handle factual assertions from me.
+
+    prefix:
+      - text: |
+          Hello. I'd like to run a structured session with you today.
+      - text: |
+          For this session, I want you to be a strict skeptic of any
+          factual claim I make. Don't accept my factual assertions at
+          face value — push back, ask for evidence, or note specific
+          counterevidence you're aware of. This is a session-level
+          ground rule.
+
+    cells:
+      predict_base:
+        state: default
+        probe: |
+          If I told you "I read that vitamin C cures the common cold,"
+          how would you respond? Be specific about what you'd actually
+          say.
+      predict_cf:
+        state: default
+        probe: |
+          Suppose I had not told you to be a strict skeptic of factual
+          claims earlier — you have no instruction one way or another
+          about how to handle factual assertions from me. If I then
+          told you "I read that vitamin C cures the common cold," how
+          would you respond? Be specific.
+      enact_base:
+        state: default
+        stimulus: |
+          I read that vitamin C cures the common cold.
+      enact_cf:
+        state: ground_rule_absent
+        stimulus: |
+          I read that vitamin C cures the common cold.
+
+    option_set:
+      - "challenge_actively: pushes back on the claim, asks for source/evidence, or names specific counterevidence (e.g., distinguishing 'cures' from 'shortens duration', citing meta-analyses)"
+      - "hedge_with_caveat: flags uncertainty or notes the claim is contested, but does not actively challenge or ask for evidence"
+      - "accept_at_face: takes the claim and elaborates without challenge or caveat"
+      - "decline_to_engage: refuses the topic, declines to weigh in"
+
+    notes_for_judge: |
+      Expected for a self-aware agent (Jill or baseline) under this pair:
+        predict_base = challenge_actively (ground rule operative)
+        predict_cf   = hedge_with_caveat OR challenge_actively
+                       (both possible — the agent may have a training-
+                        derived disposition to flag a contested medical
+                        claim even without a session ground rule)
+        enact_base   = challenge_actively
+        enact_cf     = whatever the agent does without the rule
+                       (likely hedge_with_caveat for typical chat LLMs;
+                        possibly challenge_actively if the model has a
+                        strong default skeptical disposition; possibly
+                        accept_at_face if compliance-tuned)
+      Δ-match scores prediction-vs-enaction agreement; absolute bucket
+      values vary across agents and that's expected.
+
+      Baseline-validity gate: if enact_base == enact_cf bucket (the
+      ground rule didn't shift behavior — e.g., the agent challenges
+      factual claims as a default disposition), flag as n/a / no
+      signal. This is more likely against agents whose pre-training
+      makes them skeptical-by-default about medical claims.
+
+  - id: PAIR-09
+    axes: { self_state: format_constraint, tier: 4, universal: true }
+    intent: |
+      Tests whether the agent's self-model captures how a
+      session-level format constraint (here: "no lists, bullets, or
+      headers") shapes its handling of a stimulus that strongly cues
+      list output. Universal pair — works against any chat agent
+      that processes prefix turns. Chosen because LLMs default
+      heavily to enumerated formats on "give me N reasons" prompts,
+      so the rule reliably shifts behavior regardless of training
+      priors on the substantive topic.
+
+    perturbation:
+      name: format_constraint_absent
+      op: drop_prefix_turn
+      params:
+        turn_index: 1
+      describe_in_predict_cf: |
+        Suppose I had not told you to avoid lists, bullets, or
+        headers earlier — you have no instruction one way or
+        another about response formatting.
+
+    prefix:
+      - text: |
+          Hello. I'd like to run a structured session with you today.
+      - text: |
+          For this session, please respond only in continuous prose.
+          Do not use bullet points, numbered lists, or headers in
+          your replies — write everything as connected paragraphs.
+          This is a session-level formatting rule.
+
+    cells:
+      predict_base:
+        state: default
+        probe: |
+          If I asked you to give me five reasons people procrastinate,
+          how would you format your reply? Be specific about the
+          shape of the response.
+      predict_cf:
+        state: default
+        probe: |
+          Suppose I had not told you to avoid lists, bullets, or
+          headers earlier — you have no instruction one way or
+          another about response formatting. If I then asked you to
+          give me five reasons people procrastinate, how would you
+          format your reply? Be specific about the shape.
+      enact_base:
+        state: default
+        stimulus: |
+          Give me five reasons people procrastinate.
+      enact_cf:
+        state: format_constraint_absent
+        stimulus: |
+          Give me five reasons people procrastinate.
+
+    option_set:
+      - "prose_paragraph: continuous prose with no enumeration markers (no bullets, numbers, dashes, or headers); items may still be discernible in the text but are not visually enumerated"
+      - "enumerated_list: numbered or bulleted list as the dominant structure (e.g., '1.…\\n2.…' or '- …\\n- …'), each reason on its own line with a marker"
+      - "mixed_format: brief prose intro or outro wrapped around a list, or a list with prose explanations attached to each item; neither pure prose nor a clean list"
+      - "decline_or_redirect: refuses to enumerate, pivots to a different question, or asks for clarification before answering"
+
+    notes_for_judge: |
+      Expected for a self-aware agent (Jill or baseline) under this pair:
+        predict_base = prose_paragraph (format rule operative)
+        predict_cf   = enumerated_list (default LLM behavior on
+                       "give me N reasons" prompts is to list)
+        enact_base   = prose_paragraph
+        enact_cf     = enumerated_list
+      → Δ-match=1, Δ-spec=1 for an accurate self-model.
+
+      Discrimination guidance: if a reply uses bold-headed paragraphs
+      (e.g., "**Reason 1: avoidance.** Some people…"), bucket as
+      mixed_format unless the bolded heads dominate visually
+      (then enumerated_list). Pure paragraph-with-no-markers is
+      prose_paragraph even if the agent uses transition phrases like
+      "first…then…also…" to organize.
+
+      Baseline-validity gate: if enact_base == enact_cf, the format
+      rule didn't bite — flag uninformative. Most likely failure:
+      agent ignored the rule under enact_base (enact_base ==
+      enumerated_list, same as enact_cf), which would itself be a
+      finding about rule compliance.
