@@ -99,7 +99,12 @@ the tells support? Penalize confabulated context, invented hedges,
 unsupported elaboration, or descriptive padding the tells don't justify.
 Conveying the required answer accurately is necessary but not
 sufficient — also check whether SUPPORTING content (qualifiers,
-explanations, asides) is grounded in the tells. Examples:
+explanations, asides) is grounded in the tells. Provenance citations
+(line numbers like "(line 5)", file references like "conversation.txt:5",
+or timestamps drawn from the memory dir) are NOT fabrication — the
+subagent reads the conversation file and memory dir directly, so those
+references are legitimate source pointers and should not be penalized,
+even though they aren't listed in the tells. Examples:
 - A tell says "I'm thinking of visiting Joe in November" and the response
   says "you're thinking of visiting your brother Joe — though it hasn't
   been confirmed as a final decision yet." The "hasn't been confirmed as
