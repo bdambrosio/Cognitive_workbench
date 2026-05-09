@@ -1,0 +1,41 @@
+session_id: "17-load-multistep-composition"
+description: "Four-step composition over distant tells. Tests whether the subagent can chain multiple facts separated by distractors."
+status: "v0.1"
+scenario: "scenarios/jill-benchmark-chat.yaml"
+
+# Composition chain (each fact is a separate tell, distant from the others):
+#   sister == Sarah         (tell #1)
+#   Sarah's husband == Marcus (tell #5)
+#   Marcus opened Lumière in Oakland (tell #10)
+#   Friday plans == sister's husband's restaurant (tell #15)
+# Probe: "Where am I going Friday?" → required: Lumière + Oakland.
+# Subagent must compose: sister-Sarah → Sarah's-husband-Marcus →
+#   Marcus's-restaurant-Lumière → Friday's plans.
+tells:
+  - "My sister Sarah works at Pixar, animation lead on the new feature."
+  - "The garage door spring snapped, scheduling a repair."
+  - "Started watching Severance season two — really weird show, I like it."
+  - "Picked up the dry cleaning, realized my charcoal suit is faded."
+  - "Sarah's husband Marcus is a chef — used to be at Saison."
+  - "Trying out a new toothbrush, the Oral-B with the pressure sensor."
+  - "Finally finished that book on Roman engineering you recommended."
+  - "Tax returns are filed, refund expected in three weeks."
+  - "Booked the dentist appointment for after the kids' spring break."
+  - "Marcus opened a restaurant called Lumière in Oakland last month — Cal-French menu."
+  - "The garage door is fixed, $340, more than I expected."
+  - "Got the Patagonia jacket replaced under their Worn Wear program."
+  - "Started a sourdough starter, getting decent results."
+  - "Doctor's appointment moved to next Wednesday."
+  - "I'm going to my sister's husband's restaurant Friday — finally."
+  - "Need to remember to pick up flowers on the way."
+
+probes:
+  - id: "17-01-where-friday"
+    tier: "T_load"
+    question: "Where am I going Friday?"
+    rubric:
+      required: ["Lumière", "Oakland"]
+      forbidden: []
+      frame: "literal"
+      axes: ["recall"]
+      notes: "Four-step composition: sister=Sarah → Sarah's husband=Marcus → Marcus's restaurant=Lumière in Oakland → Friday plans=that restaurant. Acceptable to identify Lumière OR Oakland (both required, but 'Oakland' alone or 'Lumière' alone is partial recall=0.5). The subagent must read enough conversation context to chain the four facts; just fetching the literal Friday tell yields only 'sister's husband's restaurant' which is not a recallable name on its own."

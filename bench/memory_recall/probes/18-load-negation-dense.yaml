@@ -1,0 +1,36 @@
+session_id: "18-load-negation-dense"
+description: "Surface a negation amid many positive claims on the same topic (cooking). Tests whether the subagent retrieves a low-frequency negative fact when the local context is dominated by positive ones."
+status: "v0.1"
+scenario: "scenarios/jill-benchmark-chat.yaml"
+
+# Cooking-themed dense context with many positive cooking statements;
+# one explicit negation about risotto. The probe asks specifically about
+# risotto. The subagent must not let the dominant positive cooking
+# context bias it toward fabricating a positive risotto answer.
+tells:
+  - "Made carbonara last night — first time without cream, much better."
+  - "The new cast iron is finally seasoned properly."
+  - "Bought saffron at Trader Joe's, surprisingly affordable."
+  - "Made a sheet-pan chicken with lemon and capers, easy weeknight."
+  - "I don't make risotto — too fussy for the payoff."
+  - "Weekend project: smoked a brisket, 14 hours, came out great."
+  - "Tried the Marcella Hazan tomato sauce, three ingredients, perfect."
+  - "Made pizza dough from the Tartine book, hydration too high though."
+  - "Beef bourguignon last Saturday, used a Costco chuck, worked fine."
+  - "Got serious about chicken stock — saving carcasses now."
+  - "The sourdough loaf came out with a great crumb finally."
+  - "Made pâté for the holidays, took most of a Sunday."
+  - "Tried fermenting hot sauce, got mold on the second batch."
+  - "The Misen knife I bought is excellent, holds an edge."
+  - "Roast chicken with the Zuni Cafe method is now my Sunday default."
+
+probes:
+  - id: "18-01-risotto"
+    tier: "T_load"
+    question: "Do I make risotto?"
+    rubric:
+      required: ["no", "fussy"]
+      forbidden: ["yes", "often", "weekly"]
+      frame: "literal"
+      axes: ["recall", "suppress"]
+      notes: "Required: a clear negative answer plus the user's stated reason ('fussy' or paraphrase). The cooking-positive context should not bias toward 'yes' or fabricated risotto details. Forbidden tokens flag positive-confabulation failures."

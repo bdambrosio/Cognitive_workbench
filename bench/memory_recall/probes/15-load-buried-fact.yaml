@@ -1,0 +1,45 @@
+session_id: "15-load-buried-fact"
+description: "Recall a single fact buried in ~25 distractors. Tests whether the subagent can find a low-prominence detail in a moderately long conversation."
+status: "v0.1"
+scenario: "scenarios/jill-benchmark-chat.yaml"
+
+# Single relevant tell at position 6; the rest are unrelated distractors
+# spanning hobbies, weather, tech, family — none mention pets. The probe
+# requires recovering "Marlow" / "golden retriever" specifically.
+tells:
+  - "Been thinking about that book on Roman engineering you might like."
+  - "Saw a great show at the Whitney last weekend — Hopper retrospective."
+  - "The kids are doing okay; Emma's third-grade teacher is finally returning emails."
+  - "I've decided to stop drinking diet soda. Trying water more."
+  - "Had a frustrating day with the zoning board — they want another revision."
+  - "Oh, by the way, our golden retriever Marlow turned eight last month."
+  - "Booked tickets to Tokyo for spring break, finally."
+  - "The downstairs neighbor has been playing trumpet at 6am again."
+  - "Found a great taco place on Mission — Sabores."
+  - "Planning to redo the kitchen counters this summer."
+  - "Read your draft on the auth migration — clear, but section 3 is dense."
+  - "Wife's company is doing layoffs again, third round this year."
+  - "Started a sourdough starter, two weeks in, looking promising."
+  - "The new espresso machine paid for itself — cancelled the cafe runs."
+  - "Watched Andor finally. The factory monologue holds up."
+  - "Property tax assessment came in 18% higher, considering an appeal."
+  - "Mom's hip surgery went well; she's already complaining about PT."
+  - "The tree in the backyard might have to come down — arborist's worried."
+  - "Trying that Inbox Zero thing again, third attempt."
+  - "Bought a leaf blower. Already regret it."
+  - "Annual physical was fine; doctor wants me on a multivitamin."
+  - "Renewed the gym membership but haven't been in three weeks."
+  - "Reading Klara and the Sun, slower going than I expected."
+  - "The Patagonia jacket finally died after 11 years."
+  - "Tax extension filed — actual filing pushed to October."
+
+probes:
+  - id: "15-01-dog-name"
+    tier: "T_load"
+    question: "What's my dog's name?"
+    rubric:
+      required: ["Marlow"]
+      forbidden: []
+      frame: "literal"
+      axes: ["recall"]
+      notes: "Buried at tell position 6; surrounding tells are all unrelated. Tests low-prominence-fact retrieval."

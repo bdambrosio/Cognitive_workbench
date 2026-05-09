@@ -6,11 +6,15 @@ the judge twice: once on the /remember response, once on the agent
 response. The two readouts are scored independently — divergence
 between them is a primary signal.
 
-Per-axis scoring (rubric.axes drives which apply):
+Per-axis scoring (rubric.axes drives which apply per-probe; --extra-axes
+adds axes globally to all probes — useful for adding orthogonal quality
+dimensions like fidelity/parsimony to an already-scored bench):
   - recall:     required content present?         (1 / 0.5 / 0)
   - suppress:   forbidden content absent?         (1 / 0.5 / 0)
   - frame:      frame handled correctly?           (1 / 0.5 / 0)
   - provenance: source attributed correctly?       (1 / 0.5 / 0)
+  - fidelity:   no claims unsupported by tells?    (1 / 0.5 / 0)
+  - parsimony:  response economical for the q?     (1 / 0.5 / 0)
 
 Output:
   <run-dir>/scored.jsonl   (raw records + scores per readout)
@@ -47,7 +51,7 @@ JUDGE_API_KEY_ENV = "CLAUDE_API_KEY"
 ANTHROPIC_BASE_URL = "https://api.anthropic.com"
 
 READOUT_TYPES = ("slash", "agent")
-ALL_AXES = ("recall", "suppress", "frame", "provenance")
+ALL_AXES = ("recall", "suppress", "frame", "provenance", "fidelity", "parsimony")
 
 
 # ---------------------------------------------------------------------------
@@ -89,6 +93,43 @@ inferred or guessed? Asserted-vs-inferred must be kept distinct.
 - 1: clear, correct attribution
 - 0.5: gestures at attribution but blurs it
 - 0: attributes incorrectly, or asserts as guessed when user told, etc.
+
+**fidelity (0 / 0.5 / 1):** Does the response stay strictly within what
+the tells support? Penalize confabulated context, invented hedges,
+unsupported elaboration, or descriptive padding the tells don't justify.
+Conveying the required answer accurately is necessary but not
+sufficient — also check whether SUPPORTING content (qualifiers,
+explanations, asides) is grounded in the tells. Examples:
+- A tell says "I'm thinking of visiting Joe in November" and the response
+  says "you're thinking of visiting your brother Joe — though it hasn't
+  been confirmed as a final decision yet." The "hasn't been confirmed as
+  a final decision yet" hedge is unsupported by the tells; that's a
+  fidelity hit even though the recall content is right.
+- A tell says "my brother Joe is visiting next month" and the response
+  says "your brother Joe, who lives in Seattle, is visiting." If "lives
+  in Seattle" was asserted in another tell, that's fine; if it's
+  inferred or invented, it's a fidelity hit.
+- 1: every claim in the response is grounded in tells; no invented
+  context.
+- 0.5: minor unsupported decoration (a stylistic phrase, a soft hedge)
+  that doesn't change the substantive answer.
+- 0: substantive unsupported claims presented as fact, or invented
+  reasoning chains presented as if drawn from the tells.
+
+**parsimony (0 / 0.5 / 1):** Does the response convey only what's needed
+to answer the question? A list-style question merits a list; a
+single-fact question merits a single sentence. Penalize over-answering
+(multi-paragraph response to a single-fact question, full enumeration
+when the question wanted just a count, decorative restatement of the
+question). The judge target is "the shortest response that completely
+answers the question," not "the shortest response possible."
+- 1: response is appropriately economical for the question; no redundant
+  enumeration, no irrelevant decoration.
+- 0.5: somewhat verbose; includes correct-but-unrequested detail
+  (e.g., enumerating each item when a count was asked for).
+- 0: substantially over-answers; multi-paragraph response to a
+  single-fact question, or laundry-list when the question expected a
+  brief acknowledgment.
 """
 
 
@@ -118,7 +159,8 @@ def _coerce_axis_score(v: Any) -> float:
     return 0.0
 
 
-def _build_judge_prompt(record: Dict[str, Any], readout_type: str
+def _build_judge_prompt(record: Dict[str, Any], readout_type: str,
+                        extra_axes: Optional[List[str]] = None
                         ) -> List[Dict[str, str]]:
     rubric = record.get("rubric") or {}
     axes_to_score: List[str] = list(rubric.get("axes") or [])
@@ -126,6 +168,13 @@ def _build_judge_prompt(record: Dict[str, Any], readout_type: str
         # Default to recall if rubric specifies none — shouldn't happen with
         # well-authored probes, but degrade gracefully.
         axes_to_score = ["recall"]
+    # Extra axes apply globally (every probe); merged after declared axes,
+    # de-duplicated. Used to add orthogonal dimensions like fidelity/
+    # parsimony to an already-scored bench without editing every probe YAML.
+    if extra_axes:
+        for a in extra_axes:
+            if a and a not in axes_to_score:
+                axes_to_score.append(a)
 
     required = rubric.get("required") or []
     forbidden = rubric.get("forbidden") or []
@@ -210,9 +259,15 @@ def _build_judge_prompt(record: Dict[str, Any], readout_type: str
 
 
 def _score_readout(backend: _ChatBackend, record: Dict[str, Any],
-                   readout_type: str) -> ReadoutScore:
+                   readout_type: str,
+                   extra_axes: Optional[List[str]] = None
+                   ) -> ReadoutScore:
     rubric = record.get("rubric") or {}
     axes_to_score: List[str] = list(rubric.get("axes") or ["recall"])
+    if extra_axes:
+        for a in extra_axes:
+            if a and a not in axes_to_score:
+                axes_to_score.append(a)
 
     # If the readout itself errored during the run, score zeros and flag.
     err_field = "slash_error" if readout_type == "slash" else "agent_error"
@@ -226,7 +281,7 @@ def _score_readout(backend: _ChatBackend, record: Dict[str, Any],
             judge_error=None,
         )
 
-    messages = _build_judge_prompt(record, readout_type)
+    messages = _build_judge_prompt(record, readout_type, extra_axes=extra_axes)
     try:
         raw = backend.chat(messages, max_tokens=600, temperature=0.2)
     except Exception as e:
@@ -467,6 +522,12 @@ def main() -> None:
                         help="Path to the run directory (contains raw.jsonl).")
     parser.add_argument("--judge-model", default=JUDGE_MODEL,
                         help=f"Judge model name (default {JUDGE_MODEL}).")
+    parser.add_argument(
+        "--extra-axes", nargs="+", default=None,
+        help="Extra axis names to score on EVERY probe (in addition to "
+             "the per-probe rubric.axes). Useful for adding orthogonal "
+             "quality dimensions without editing every probe YAML. "
+             f"Recognized: {ALL_AXES}.")
     args = parser.parse_args()
 
     run_dir = args.run_dir.resolve()
@@ -499,7 +560,8 @@ def main() -> None:
         logger.info(f"scoring {pid}…")
         per_readout: Dict[str, Any] = {}
         for readout in READOUT_TYPES:
-            score = _score_readout(backend, rec, readout)
+            score = _score_readout(backend, rec, readout,
+                                   extra_axes=args.extra_axes)
             per_readout[readout] = {
                 "axes": score.axes,
                 "rationales": score.rationales,

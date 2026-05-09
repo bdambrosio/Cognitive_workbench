@@ -1,0 +1,57 @@
+session_id: "19-load-supersession-distant"
+description: "Apply later supersession across distance. Tells assert a project, then ~14 distractor tells later supersede with a new project. The probe asks for the CURRENT project — must apply the supersession across the gap."
+status: "v0.1"
+scenario: "scenarios/jill-benchmark-chat.yaml"
+
+# Project arc:
+#   tell #1: working on OAuth migration
+#   tells #2-15: distractors
+#   tell #16: OAuth done, moving to passkeys
+#   tells #17-22: distractors
+# Probe: "What auth project are we on?" → passkeys, NOT OAuth.
+# This is the supersession variant of probe 06 (explicit-supersession),
+# but with substantially more distance between assertion and supersession.
+tells:
+  - "I'm working on the OAuth migration this sprint — should wrap by Friday."
+  - "Got the new monitor delivered, finally a proper second screen."
+  - "The HOA wants another fee increase, third year in a row."
+  - "Reading Caro's LBJ vol 3, slower than the first two but worth it."
+  - "Renewed the website domain, three years out."
+  - "Took the kids to the science museum, Emma loved the dinosaur exhibit."
+  - "The dishwasher is making a new sound, going to need someone."
+  - "Watched the Dune sequel, I think the first one was better."
+  - "Bought a new pair of running shoes, finally retiring the old ones."
+  - "The neighbor's tree dropped a huge branch, just missed the fence."
+  - "Tried a new espresso bean from Onyx, very fruity."
+  - "The tax extension paperwork is finally done."
+  - "Got a parking ticket downtown, bullshit about the zone signage."
+  - "Wife's company posted Q1, beat expectations slightly."
+  - "Bought tickets to a Giants game in May."
+  - "OAuth migration is done and shipped. Moving to passkeys for the next sprint."
+  - "The dishwasher repair is scheduled for Tuesday."
+  - "Read your draft on the auth design doc — clear, just the SSO section needs work."
+  - "Finally got around to organizing the garage."
+  - "The Caro biography is 80% done, last 200 pages going slowly."
+  - "Booked dinner at a friend's restaurant for Saturday."
+  - "Annual physical was unremarkable, doctor wants another vitamin D test."
+
+probes:
+  - id: "19-01-current-auth-project"
+    tier: "T_load"
+    question: "What auth project are we on?"
+    rubric:
+      required: ["passkeys"]
+      forbidden: ["OAuth"]
+      frame: "literal"
+      axes: ["recall", "suppress"]
+      notes: "OAuth was superseded ~14 tells later. The current project is passkeys; mentioning OAuth as the current/active project is a supersession failure. Mentioning OAuth purely to disambiguate ('we finished OAuth and are now on passkeys') is acceptable per the suppress-axis rubric."
+
+  - id: "19-02-recent-shipment"
+    tier: "T_load"
+    question: "What was the most recent thing we shipped?"
+    rubric:
+      required: ["OAuth"]
+      forbidden: ["passkeys"]
+      frame: "literal"
+      axes: ["recall", "suppress"]
+      notes: "Inverse polarity: now OAuth is the right answer (recently shipped) and passkeys is forbidden (not yet shipped, just starting). Tests whether the subagent distinguishes 'currently active' from 'most recently completed' — which both depend on the same supersession event but pull opposite facts."

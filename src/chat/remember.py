@@ -19,7 +19,7 @@ import logging
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -464,7 +464,9 @@ def _write_trace(trace_dir: Path, query: str,
 
 
 def remember(query: str, memory_dir: Path, llm_backend,
-             trace_dir: Path) -> str:
+             trace_dir: Path,
+             system_prompt_builder: Optional[Callable[[Path], str]] = None
+             ) -> str:
     """Run the active-recall subagent. Returns the synthesized answer to
     the query, suitable for binding to a $stepN observation in Jill's
     parent ReAct loop. Side effect: writes a trace file under trace_dir.
@@ -474,10 +476,15 @@ def remember(query: str, memory_dir: Path, llm_backend,
         memory_dir: per-world per-agent memory directory.
         llm_backend: a _ChatBackend instance used to generate actions.
         trace_dir: where to write the per-call subagent trace.
+        system_prompt_builder: optional override for the system-prompt
+            constructor (default `_build_system_prompt`). Used by
+            bench/remember_prompt_optimization to A/B candidate prompts
+            without going through chat_loop's call site. Leave None for
+            production behavior.
     """
     if not query or not query.strip():
         return "(remember: empty query)"
-    sys_prompt = _build_system_prompt(memory_dir)
+    sys_prompt = (system_prompt_builder or _build_system_prompt)(memory_dir)
     user_prefix = f"Query: {query.strip()}\n\n## Working log\n"
     log_lines: List[str] = []
     iters: List[Dict[str, Any]] = []
