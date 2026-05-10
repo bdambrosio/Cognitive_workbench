@@ -990,7 +990,17 @@ class InfospaceResourceManager:
                           # reasoning_history (awareness feed) fields
                           'user_text', 'autonomous', 'exit_reason', 'n_iters', 'compressed',
                           'parent_id', 'order', 'span', 'section', 'source', 'entity', 'edge',
-                          'exclude_from_index', 'tool_metadata', 'placeholder'}
+                          'exclude_from_index', 'tool_metadata', 'placeholder',
+                          # agent_threads fields. Threads carry a centroid
+                          # embedding in properties (NOT in the FAISS index;
+                          # the index covers the summary text). Without
+                          # these in the allowlist they're silently dropped
+                          # at create_note time and threads load with
+                          # empty centroid / summary / counts.
+                          'summary', 'centroid_embedding',
+                          'constituent_turn_count', 'creation_provenance',
+                          'last_activated_at', 'last_centroid_update_at',
+                          'attached_concern_ids', 'attached_rule_ids'}
         for key in allowed_fields:
             if key in extra_props:
                 note_data['properties'][key] = extra_props[key]

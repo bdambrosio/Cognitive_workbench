@@ -118,6 +118,7 @@ _REFLECT_FRAME_OK = 'none'
 # is pressure-driven (silence implies untended work).
 _AGENT_CONCERNS_COLLECTION_NAME = "agent_concerns"
 _USER_CONCERNS_COLLECTION_NAME  = "user_concerns"
+_AGENT_THREADS_COLLECTION_NAME  = "agent_threads"
 _CONCERN_STATUSES = ('active', 'satisfied', 'abandoned')
 
 # ----- user_concerns dynamics -----
@@ -697,8 +698,17 @@ class ChatLoop:
         # the prompt to inform responses.
         self._agent_concerns_collection_id: Optional[str] = None
         self._user_concerns_collection_id: Optional[str] = None
+        # agent_threads: durable activity-level anchors. Each thread
+        # carries a centroid embedding (activation-weighted mean of
+        # constituent turn embeddings), a name, a summary, and pointers
+        # to attached concerns. Seeded by an offline bootstrap pass over
+        # conversation history (tools/threads_bootstrap.py +
+        # tools/threads_install.py), then maintained incrementally by
+        # the reflection pipeline (Stage 5 — not yet wired).
+        self._agent_threads_collection_id: Optional[str] = None
         self._init_agent_concerns()
         self._init_user_concerns()
+        self._init_agent_threads()
         self._seed_concerns_from_config(character_config)
 
         # ---- Reasoning history (awareness feed) ----
@@ -1237,6 +1247,32 @@ class ChatLoop:
         except Exception as e:
             logger.warning(f"[{self.character_name}] _init_user_concerns failed: {e}")
 
+    def _init_agent_threads(self) -> None:
+        """Get-or-create the agent_threads Collection, mark it persistent,
+        ensure semantic index exists. Threads are activity-level anchors;
+        each note carries a centroid_embedding (activation-weighted mean
+        of constituent turn embeddings) in its properties for direct
+        cosine-similarity activation against new turns. The note's
+        text field holds the LLM-generated summary, which the semantic
+        index will pick up — useful for thread-similarity queries during
+        consolidation. Idempotent across restarts."""
+        try:
+            cid = self.resource_manager.named_collections.get(_AGENT_THREADS_COLLECTION_NAME)
+            if not cid:
+                success, cid, err, _ = self.resource_manager.create_collection(
+                    self.character_name, [], "list", "chat-loop", "",
+                    _AGENT_THREADS_COLLECTION_NAME,
+                    {"kind": "agent_threads"},
+                )
+                if not success or not cid:
+                    logger.warning(f"[{self.character_name}] create agent_threads collection failed: {err}")
+                    return
+            self.resource_manager.mark_persistent(cid, self.character_name)
+            self.resource_manager.index_collection(self.character_name, cid, index_type='semantic')
+            self._agent_threads_collection_id = cid
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] _init_agent_threads failed: {e}")
+
     def _reasoning_trace_path(self) -> 'Path':
         """Path to <memory>/reasoning_trace.jsonl — one JSON record per
         ReAct turn, append-only. Line N of the file is record N
@@ -1560,6 +1596,130 @@ class ChatLoop:
         return self._create_concern_note(
             text, name, entity, properties,
             self._user_concerns_collection_id)
+
+    # ------------------------------------------------------------------
+    # Thread anchors. Threads are activity-level state surfaces with a
+    # centroid_embedding stored as a property (NOT in the FAISS index;
+    # the index covers the summary text for thread-similarity queries
+    # during consolidation, but activation matching uses the centroid
+    # directly via cosine similarity over the active-thread set).
+    # No firing, no decay, no autonomous behavior. Read-only at this
+    # stage — install populated by tools/threads_install.py; reflection-
+    # side updates land in Stage 5.
+    # ------------------------------------------------------------------
+
+    def _add_thread(self, name: str, summary: str,
+                    centroid_embedding: List[float],
+                    constituent_turn_count: int = 0,
+                    creation_provenance: str = 'discovered',
+                    status: str = 'active',
+                    extra_properties: Optional[Dict[str, Any]] = None
+                    ) -> Optional[str]:
+        """Create a thread note in the agent_threads Collection. The
+        note's text field gets the summary; centroid_embedding is
+        stored as a list[float] in properties. No similarity-based
+        dedup at this layer (callers are expected to enforce
+        idempotency by checking name)."""
+        if not self._agent_threads_collection_id:
+            return None
+        name = (name or "").strip()
+        summary = (summary or "").strip()
+        if not name or not summary:
+            return None
+        if not centroid_embedding:
+            logger.warning(f"[{self.character_name}] _add_thread: centroid_embedding is empty for {name!r}")
+            return None
+        if creation_provenance not in ('bootstrap', 'discovered'):
+            creation_provenance = 'discovered'
+        if status not in ('active', 'dormant', 'archived'):
+            status = 'active'
+        now_iso = datetime.now(timezone.utc).isoformat()
+        # Note: `name` is stored as `note_name` via create_note's positional
+        # arg (which lands in properties.note_name); `created_at` is set
+        # automatically by create_note. Don't duplicate them here.
+        properties: Dict[str, Any] = {
+            "kind": "thread",
+            "status": status,
+            "summary": summary,
+            "centroid_embedding": list(map(float, centroid_embedding)),
+            "constituent_turn_count": int(constituent_turn_count),
+            "creation_provenance": creation_provenance,
+            "last_activated_at": now_iso,
+            "last_centroid_update_at": now_iso,
+            "attached_concern_ids": [],
+            "attached_rule_ids": [],
+        }
+        if extra_properties:
+            properties.update(extra_properties)
+        try:
+            with self._faiss_lock:
+                success, note_id, err, _ = self.resource_manager.create_note(
+                    self.character_name, summary, "text", "chat-loop",
+                    "", name, properties)
+                if not success or not note_id:
+                    logger.warning(f"[{self.character_name}] thread create failed: {err}")
+                    return None
+                self.resource_manager.mark_persistent(note_id, self.character_name)
+                ok, _, add_err = self.resource_manager.add_to_collection(
+                    self._agent_threads_collection_id, note_id, self.character_name)
+                if not ok:
+                    logger.warning(f"[{self.character_name}] thread add_to_collection failed: {add_err}")
+                return note_id
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] _add_thread failed: {e}")
+            return None
+
+    def _get_threads(self, statuses: Optional[Tuple[str, ...]] = ('active',)
+                     ) -> List[Dict[str, Any]]:
+        """Return thread records matching any of the given statuses
+        (default: active only). Each record is the resource dict with
+        properties merged in for convenience."""
+        if not self._agent_threads_collection_id:
+            return []
+        try:
+            coll = self.resource_manager.get_resource(self._agent_threads_collection_id)
+            if not coll:
+                return []
+            note_ids = (coll.get("properties") or {}).get("content", []) or []
+            out: List[Dict[str, Any]] = []
+            status_set = set(statuses) if statuses else None
+            for nid in note_ids:
+                note = self.resource_manager.get_resource(nid)
+                if not note:
+                    continue
+                props = note.get("properties") or {}
+                if props.get("kind") != "thread":
+                    continue
+                if status_set is not None and props.get("status") not in status_set:
+                    continue
+                # Human-readable name lives in properties.note_name (set
+                # via create_note's positional arg); created_at is set by
+                # create_note automatically.
+                out.append({
+                    "id": nid,
+                    "name": props.get("note_name", ""),
+                    "summary": props.get("summary", ""),
+                    "status": props.get("status", "active"),
+                    "centroid_embedding": props.get("centroid_embedding") or [],
+                    "constituent_turn_count": int(props.get("constituent_turn_count", 0)),
+                    "creation_provenance": props.get("creation_provenance"),
+                    "created_at": props.get("created_at"),
+                    "last_activated_at": props.get("last_activated_at"),
+                    "last_centroid_update_at": props.get("last_centroid_update_at"),
+                    "attached_concern_ids": props.get("attached_concern_ids") or [],
+                    "attached_rule_ids": props.get("attached_rule_ids") or [],
+                })
+            return out
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] _get_threads failed: {e}")
+            return []
+
+    def _find_thread_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        """Return the active thread record with the given name, or None."""
+        for t in self._get_threads(statuses=None):
+            if t.get("name") == name:
+                return t
+        return None
 
     # ------------------------------------------------------------------
     # Per-tick / per-turn dynamics. Pure arithmetic — no LLM in these
