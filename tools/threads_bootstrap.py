@@ -383,6 +383,47 @@ def main() -> None:
         names = name_clusters(clusters, turns, embs, args.judge_model)
 
     # 5. Emit JSON.
+    # all_turns is the unfiltered parse; Turn.index == position in all_turns.
+    # Build a lookup so we can pair a representative turn with its
+    # adjacent counterpart for the exemplar_pairs payload.
+    all_turns_by_index: Dict[int, Turn] = {t.index: t for t in all_turns}
+
+    def _truncate(s: str, n: int = 200) -> str:
+        s = s.replace("\n", " ").strip()
+        return s[:n] + "..." if len(s) > n else s
+
+    def _build_exemplar_pairs(rep_idx: List[int], k: int = 2
+                              ) -> List[Dict[str, str]]:
+        """Walk rep turns in centroid-closeness order, pair each with
+        its adjacent counterpart in all_turns, return up to k valid
+        (user, agent) text pairs. Render-only payload — never used
+        for activation, classification, or drift."""
+        out: List[Dict[str, str]] = []
+        seen_keys: set = set()
+        for t_idx in rep_idx:
+            if len(out) >= k:
+                break
+            t = turns[t_idx]
+            if t.direction == "user":
+                user_t = t
+                agent_t = all_turns_by_index.get(t.index + 1)
+                if not agent_t or agent_t.direction != "agent":
+                    continue
+            else:
+                agent_t = t
+                user_t = all_turns_by_index.get(t.index - 1)
+                if not user_t or user_t.direction != "user":
+                    continue
+            key = (user_t.index, agent_t.index)
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            out.append({
+                "user": _truncate(user_t.text),
+                "agent": _truncate(agent_t.text),
+            })
+        return out
+
     out_threads: List[Dict[str, Any]] = []
     for c, name_blob in zip(clusters, names):
         rep_idx = c.representative_indices(embs, k=10)
@@ -395,6 +436,7 @@ def main() -> None:
                 "direction": t.direction,
                 "text": t.text[:300] + ("..." if len(t.text) > 300 else ""),
             })
+        exemplar_pairs = _build_exemplar_pairs(rep_idx, k=2)
         out_threads.append({
             "cluster_id": c.cluster_id,
             "name": name_blob["name"],
@@ -405,6 +447,7 @@ def main() -> None:
             "centroid_l2_norm": float(np.linalg.norm(c.centroid)),
             "centroid": c.centroid.tolist(),
             "representative_turns": rep_turns,
+            "exemplar_pairs": exemplar_pairs,
         })
 
     payload = {

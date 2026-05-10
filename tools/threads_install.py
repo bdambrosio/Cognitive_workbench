@@ -154,12 +154,14 @@ def main() -> None:
             summary = (t.get("summary") or "").strip()
             centroid = t["centroid"]
             n_turns = int(t.get("turn_count", 0))
+            exemplar_pairs = t.get("exemplar_pairs") or []
             if name in existing_names:
                 skipped_existing.append(name)
                 logger.info(f"  [{name}] SKIP — already in collection")
                 continue
             logger.info(f"  [{name}] {'INSTALL' if args.execute else 'WOULD INSTALL'} "
-                        f"(centroid_dim={len(centroid)}, n_turns={n_turns})")
+                        f"(centroid_dim={len(centroid)}, n_turns={n_turns}, "
+                        f"exemplars={len(exemplar_pairs)})")
             if args.execute:
                 note_id = loop._add_thread(
                     name=name,
@@ -168,6 +170,7 @@ def main() -> None:
                     constituent_turn_count=n_turns,
                     creation_provenance='bootstrap',
                     status='active',
+                    exemplar_pairs=exemplar_pairs,
                 )
                 if note_id:
                     installed.append(name)

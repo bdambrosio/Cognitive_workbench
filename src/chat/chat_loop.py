@@ -1625,13 +1625,20 @@ class ChatLoop:
                     constituent_turn_count: int = 0,
                     creation_provenance: str = 'discovered',
                     status: str = 'active',
+                    exemplar_pairs: Optional[List[Dict[str, str]]] = None,
                     extra_properties: Optional[Dict[str, Any]] = None
                     ) -> Optional[str]:
         """Create a thread note in the agent_threads Collection. The
         note's text field gets the summary; centroid_embedding is
         stored as a list[float] in properties. No similarity-based
         dedup at this layer (callers are expected to enforce
-        idempotency by checking name)."""
+        idempotency by checking name).
+
+        exemplar_pairs is a render-only payload — list of
+        {"user": str, "agent": str} dicts captured at bootstrap as
+        representative exchanges. Surfaced inside the active-threads
+        block to give Jill concrete touchstones for what the thread is.
+        Never read by activation, classification, or centroid drift."""
         if not self._agent_threads_collection_id:
             return None
         name = (name or "").strip()
@@ -1649,6 +1656,12 @@ class ChatLoop:
         # Note: `name` is stored as `note_name` via create_note's positional
         # arg (which lands in properties.note_name); `created_at` is set
         # automatically by create_note. Don't duplicate them here.
+        clean_exemplars: List[Dict[str, str]] = []
+        for ex in (exemplar_pairs or []):
+            u = str((ex or {}).get("user") or "").strip()
+            a = str((ex or {}).get("agent") or "").strip()
+            if u and a:
+                clean_exemplars.append({"user": u, "agent": a})
         properties: Dict[str, Any] = {
             "kind": "thread",
             "status": status,
@@ -1660,6 +1673,7 @@ class ChatLoop:
             "last_centroid_update_at": now_iso,
             "attached_concern_ids": [],
             "attached_rule_ids": [],
+            "exemplar_pairs": clean_exemplars,
         }
         if extra_properties:
             properties.update(extra_properties)
@@ -1720,6 +1734,7 @@ class ChatLoop:
                     "last_centroid_update_at": props.get("last_centroid_update_at"),
                     "attached_concern_ids": props.get("attached_concern_ids") or [],
                     "attached_rule_ids": props.get("attached_rule_ids") or [],
+                    "exemplar_pairs": props.get("exemplar_pairs") or [],
                 })
             return out
         except Exception as e:
@@ -1859,15 +1874,40 @@ class ChatLoop:
             if len(secondaries) >= secondary_cap:
                 break
 
+        def _render_exemplars(thread: Dict[str, Any], k: int,
+                              indent: str = "") -> List[str]:
+            """Format up to k exemplar pairs as 'User: … / Jill: …'
+            lines. Returns empty list when the thread has no exemplars
+            (e.g. installed before exemplars existed). Render-only —
+            never feeds back into activation or drift."""
+            pairs = thread.get("exemplar_pairs") or []
+            if not pairs:
+                return []
+            out: List[str] = []
+            for ex in pairs[:k]:
+                u = str((ex or {}).get("user") or "").strip()
+                a = str((ex or {}).get("agent") or "").strip()
+                if not u or not a:
+                    continue
+                out.append(f"{indent}- User: {u}")
+                out.append(f"{indent}  Jill: {a}")
+            return out
+
         lines: List[str] = []
         lines.append("## Current activity context (from session threads)")
         lines.append(
             "Threads are activity-level anchors inferred from the "
             "shape of recent conversation. The primary thread reflects "
             "what we're most engaged with right now; secondary threads "
-            "are activities the current turn also touches.")
+            "are activities the current turn also touches. Exemplar "
+            "exchanges (when present) are representative past pairs "
+            "from each thread, captured at bootstrap.")
         lines.append("")
         lines.append(f"**Primary:** `{primary_name}` — {primary_summary}")
+        primary_ex = _render_exemplars(primary, k=2)
+        if primary_ex:
+            lines.append("Exemplar exchanges:")
+            lines.extend(primary_ex)
         if secondaries:
             lines.append("")
             lines.append("**Also touching on:**")
@@ -1875,6 +1915,7 @@ class ChatLoop:
                 name = t.get("name", "")
                 summary = (t.get("summary") or "").strip()
                 lines.append(f"- `{name}` — {summary}")
+                lines.extend(_render_exemplars(t, k=1, indent="  "))
         return "\n".join(lines)
 
     # ------------------------------------------------------------------
@@ -3778,7 +3819,13 @@ class ChatLoop:
                 )
         disc = self._discourse_state.get(source, '').strip()
         if disc:
-            parts.append("## Outstanding discourse objects (from periodic reflection)\n" + disc)
+            parts.append(
+                "## Shared premises and standing decisions (from periodic reflection)\n"
+                "These are the operating premises and decisions both parties "
+                "have accepted across this conversation. Treat as load-bearing — "
+                "disagreeing with one reopens prior discussion rather than "
+                "introducing a new topic.\n\n"
+                + disc)
         if orientation:
             parts.append(orientation)
         return "\n\n".join(parts)

@@ -76,11 +76,12 @@ OUTPUT FORMAT (use these exact section headers — plain text only, no markdown 
 DISCOURSE STATE (segment {{$start_turn}}-{{$end_turn}}):
 
 CURRENT AGREEMENTS:
-Describe each shared frame, definition, or joint plan in natural language. One concise sentence per agreement; do not narrate or restate the conversation. Use "(this segment)" for items established in the current segment and "(established earlier)" for items carried forward — do not include specific turn numbers.
+List each shared frame, definition, or joint plan as its own bullet — one item per line, prefixed with "- ". One concise sentence per bullet; do not narrate or restate the conversation. End each bullet with "(this segment)" for items established in the current segment or "(established earlier)" for items carried forward — do not include specific turn numbers.
 - If no current agreements, write "[none]"
 
 Example:
-Navigate northwest for 30 minutes to locate the creek, then follow it back to the parking lot (this segment). If the creek is not found within the time limit, stop and reassess.
+- Navigate northwest for 30 minutes to locate the creek, then follow it back to the parking lot (this segment)
+- If the creek is not found within the time limit, stop and reassess (this segment)
 
 KEY DECISIONS MADE:
 List significant decisions that close a previously open question or establish direction. One decision per line: Adopted/Rejected/Added: <decision> (this segment | established earlier), <what it resolves or replaces>. No sub-bullets, no commentary.
@@ -115,7 +116,9 @@ INSTRUCTIONS:
 DISCOURSE STATE (segment 13-20):
 
 CURRENT AGREEMENTS:
-Navigate northwest for 30 minutes to locate the creek, then follow it southwest back to the crossing (this segment). If the creek is not found within 30 minutes, stop and reassess. Both parties share observations transparently.
+- Navigate northwest for 30 minutes to locate the creek, then follow it southwest back to the crossing (this segment)
+- If the creek is not found within 30 minutes, stop and reassess (this segment)
+- Both parties share observations transparently (established earlier)
 
 KEY DECISIONS MADE:
 - Rejected: downhill water-following strategy (this segment), risk of going deeper into valley
