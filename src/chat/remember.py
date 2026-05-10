@@ -28,12 +28,21 @@ _MAX_READ_CHARS = 10_000
 _MAX_GREP_HITS = 50
 
 
-def _build_system_prompt(memory_dir: Path) -> str:
+def _build_system_prompt(memory_dir: Path, thread_context: str = "") -> str:
     """Static system prompt — output discipline first, then a tight
     procedural sequence, then minimal tool/file detail. Stable across
     all calls in a session, so caches well on the anthropic route
-    (cache_control already attached in _ChatBackend)."""
-    return (
+    (cache_control already attached in _ChatBackend).
+
+    `thread_context` (Stage 4b) is the activity-level threads
+    inventory injected by the chat loop. When non-empty, it's prepended
+    as a separate section so the subagent sees the topical structure
+    of the conversation before procedural instructions. When empty
+    (no threads, or older bench harnesses bypassing chat_loop), the
+    prompt collapses to the original form. Per-prompt content varies
+    only when the threads list changes, so the cache stability
+    property is preserved across most calls."""
+    base = (
         "You are a memory-search subagent for "
         f"{memory_dir}.\n"
         "\n"
@@ -72,6 +81,9 @@ def _build_system_prompt(memory_dir: Path) -> str:
         "- `reasoning_trace.jsonl`: line N = turn N. Reads/greps return "
         "structured records with refs auto-dereferenced one level.\n"
     )
+    if thread_context.strip():
+        return thread_context.strip() + "\n\n---\n\n" + base
+    return base
 
 
 def _safe_resolve(memory_dir: Path, name: str) -> Optional[Path]:
@@ -374,7 +386,8 @@ def _write_trace(trace_dir: Path, query: str,
 
 def remember(query: str, memory_dir: Path, llm_backend,
              trace_dir: Path,
-             system_prompt_builder: Optional[Callable[[Path], str]] = None
+             system_prompt_builder: Optional[Callable[[Path], str]] = None,
+             thread_context: str = ""
              ) -> str:
     """Run the active-recall subagent. Returns the synthesized answer to
     the query, suitable for binding to a $stepN observation in Jill's
@@ -389,11 +402,20 @@ def remember(query: str, memory_dir: Path, llm_backend,
             constructor (default `_build_system_prompt`). Used by
             bench/remember_prompt_optimization to A/B candidate prompts
             without going through chat_loop's call site. Leave None for
-            production behavior.
+            production behavior. When a custom builder is supplied,
+            `thread_context` is ignored — the bench harness controls
+            its own prompt entirely.
+        thread_context: Optional activity-level threads block prepended
+            to the default system prompt (Stage 4b). chat_loop builds
+            this from the agent_threads Collection at invocation time
+            and passes the rendered string in. Empty string disables.
     """
     if not query or not query.strip():
         return "(remember: empty query)"
-    sys_prompt = (system_prompt_builder or _build_system_prompt)(memory_dir)
+    if system_prompt_builder is not None:
+        sys_prompt = system_prompt_builder(memory_dir)
+    else:
+        sys_prompt = _build_system_prompt(memory_dir, thread_context=thread_context)
     user_prefix = f"Query: {query.strip()}\n\n## Working log\n"
     log_lines: List[str] = []
     iters: List[Dict[str, Any]] = []

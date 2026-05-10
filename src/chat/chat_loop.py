@@ -706,6 +706,18 @@ class ChatLoop:
         # tools/threads_install.py), then maintained incrementally by
         # the reflection pipeline (Stage 5 — not yet wired).
         self._agent_threads_collection_id: Optional[str] = None
+        # Per-turn cache of the thread activation distribution (computed
+        # once at user-turn entry, read by _build_system_prompt and the
+        # remember subagent context). List of (thread_dict, weight)
+        # tuples sorted by weight desc; empty when no threads or no
+        # turn in flight.
+        self._current_thread_activation: List[Tuple[Dict[str, Any], float]] = []
+        # Per-turn cache of the user turn's L2-normalized embedding,
+        # populated alongside _current_thread_activation. Reused by
+        # _update_thread_centroids in _post_turn_work to avoid a
+        # second embed pass. None if no embedding was computed this
+        # turn.
+        self._current_turn_embedding: Optional[Any] = None  # np.ndarray or None
         self._init_agent_concerns()
         self._init_user_concerns()
         self._init_agent_threads()
@@ -1720,6 +1732,150 @@ class ChatLoop:
             if t.get("name") == name:
                 return t
         return None
+
+    def _compute_thread_activation(self, text: str, temperature: float = 4.0
+                                   ) -> List[Tuple[Dict[str, Any], float]]:
+        """Compute the activation distribution over active threads for
+        the given text. Embeds the text with the same model used
+        elsewhere (bge-small-en-v1.5, L2-normalized), computes cosine
+        similarity to each active thread's centroid (also L2-normalized),
+        and applies softmax with the given temperature.
+
+        Higher temperature → flatter distribution (more threads share
+        weight). temperature=1.0 is "honest softmax" but tends to
+        produce winner-take-all assignments because cosine similarities
+        in this embedding space cluster within a narrow range.
+        temperature=4.0 (default) gives a more usable distribution where
+        secondary threads carry meaningful weight.
+
+        Returns a list of (thread_record, weight) tuples sorted by
+        weight descending. Empty list if no active threads or text is
+        empty. The list represents a probability distribution; weights
+        sum to 1.0 (within float precision).
+
+        Cheap — single embedding call + N cosine sims for N active
+        threads. With <100 active threads this is sub-millisecond on
+        the GPU."""
+        text = (text or "").strip()
+        if not text:
+            return []
+        threads = self._get_threads(statuses=('active',))
+        if not threads:
+            return []
+
+        try:
+            self.resource_manager._init_embedder()
+            embedder = self.resource_manager.embedder
+            if embedder is None:
+                logger.warning(
+                    f"[{self.character_name}] _compute_thread_activation: "
+                    f"embedder unavailable")
+                return []
+            import numpy as np
+            turn_emb = embedder.encode(
+                text, normalize_embeddings=True, convert_to_numpy=True,
+                show_progress_bar=False)
+            # Cache for reuse by _update_thread_centroids in
+            # _post_turn_work — same embedding feeds both activation
+            # readout and post-turn centroid drift.
+            self._current_turn_embedding = turn_emb
+            # Cosine similarity = dot product on L2-normalized vectors.
+            sims: List[float] = []
+            valid_threads: List[Dict[str, Any]] = []
+            for t in threads:
+                c = t.get("centroid_embedding") or []
+                if not c:
+                    continue
+                cv = np.asarray(c, dtype=np.float32)
+                if cv.shape != turn_emb.shape:
+                    logger.warning(
+                        f"[{self.character_name}] thread {t.get('name')!r} "
+                        f"centroid dim {cv.shape} != turn emb dim "
+                        f"{turn_emb.shape} — skipping")
+                    continue
+                sims.append(float(np.dot(turn_emb, cv)))
+                valid_threads.append(t)
+            if not sims:
+                return []
+            # Softmax with temperature. We expect cos sim in roughly
+            # [-0.2, 0.9] range for bge-small; temperature scales these
+            # before exp.
+            arr = np.asarray(sims, dtype=np.float64) * float(temperature)
+            arr -= arr.max()  # numerical stability
+            exp = np.exp(arr)
+            weights = exp / exp.sum()
+            paired = list(zip(valid_threads, [float(w) for w in weights]))
+            paired.sort(key=lambda x: -x[1])
+            return paired
+        except Exception as e:
+            logger.warning(
+                f"[{self.character_name}] _compute_thread_activation failed: {e}")
+            return []
+
+    def _render_active_threads_block(
+            self,
+            activation: List[Tuple[Dict[str, Any], float]],
+            primary_threshold: float = 0.30,
+            secondary_threshold: float = 0.20,
+            secondary_cap: int = 2,
+            ) -> str:
+        """Render the activation-weighted thread block for the system
+        prompt. Returns empty string when no thread has meaningful
+        activation — caller should skip the block in that case.
+
+        Two thresholds, both load-bearing:
+
+        - primary_threshold: minimum weight for the top thread to
+          count as a primary. Below this, the distribution is too
+          uniform to claim any thread is "what we're working on" —
+          render nothing rather than a misleading attribution. With
+          5 active threads, uniform random would give 0.20 each;
+          threshold 0.30 means the primary is at least 1.5× uniform.
+
+        - secondary_threshold: minimum weight for a thread to appear
+          in "also touching on". Below this, the secondary is too
+          weak to be informative.
+
+        secondary_cap bounds the secondaries list (top-N after
+        filtering). Activation numbers themselves are not surfaced
+        as floats — prominence in the prompt encodes the
+        distribution."""
+        if not activation:
+            return ""
+        primary, primary_w = activation[0]
+        if primary_w < primary_threshold:
+            # No thread is clearly active; suppress the block rather
+            # than mislead with a low-confidence "primary" assignment.
+            return ""
+
+        primary_name = primary.get("name", "")
+        primary_summary = (primary.get("summary") or "").strip()
+
+        secondaries: List[Tuple[Dict[str, Any], float]] = []
+        for t, w in activation[1:]:
+            if w < secondary_threshold:
+                break
+            secondaries.append((t, w))
+            if len(secondaries) >= secondary_cap:
+                break
+
+        lines: List[str] = []
+        lines.append("## Current activity context (from session threads)")
+        lines.append(
+            "Threads are activity-level anchors inferred from the "
+            "shape of recent conversation. The primary thread reflects "
+            "what we're most engaged with right now; secondary threads "
+            "are activities the current turn also touches.")
+        lines.append("")
+        lines.append(f"**Primary:** `{primary_name}` — {primary_summary}")
+        if secondaries:
+            lines.append("")
+            lines.append("**Also touching on:**")
+            for t, _w in secondaries:
+                name = t.get("name", "")
+                summary = (t.get("summary") or "").strip()
+                lines.append(f"- `{name}` — {summary}")
+        return "\n".join(lines)
 
     # ------------------------------------------------------------------
     # Per-tick / per-turn dynamics. Pure arithmetic — no LLM in these
@@ -3574,6 +3730,16 @@ class ChatLoop:
                 "attend to without driving action.\n\n"
                 + "\n".join(ac_lines)
             )
+        # Threads: activity-level anchors. Computed once per turn in
+        # _process_user_turn_inner via _compute_thread_activation; the
+        # rendered block names the primary active thread plus any
+        # secondary threads carrying meaningful weight. Activations
+        # themselves are not surfaced as numbers — prominence in the
+        # prompt encodes the distribution.
+        threads_block = self._render_active_threads_block(
+            self._current_thread_activation)
+        if threads_block:
+            parts.append(threads_block)
         if recall:
             # Episodic specifics retrieved from prior conversations. Distinct
             # from the rolling Companion summary: these are durable items
@@ -4077,22 +4243,150 @@ class ChatLoop:
             out.write_bytes(raw)
         return str(out)
 
+    def _update_thread_centroids(
+            self,
+            min_activation: float = 0.20,
+            learning_rate: float = 0.05,
+            ) -> int:
+        """Stage 5 — incremental centroid evolution. Drift each active
+        thread's centroid toward the current turn's embedding,
+        weighted by how much that thread participated in the turn.
+
+        Algorithm: for each active thread t with activation_t above
+        min_activation:
+
+            c_new  = c_old + lr * activation_t * (turn_emb - c_old)
+            c_norm = c_new / ||c_new||
+            n_new  = n_old + activation_t
+
+        With lr=0.05 and activation=0.5 a single turn shifts the
+        centroid by 2.5%; the constituent count grows by 0.5 (real-
+        valued count, since membership is graded).
+
+        min_activation defaults to 0.20, matching the secondary-render
+        threshold in _render_active_threads_block: a thread that's
+        below the 'meaningful enough to surface' threshold shouldn't
+        drift toward the current turn either. The bge-small embedding
+        space has a ~13-17% noise floor on cosine activation across
+        unrelated threads; updating below the secondary threshold
+        would smear all centroids on every off-topic query.
+
+        Mutates the underlying note properties in-place; persistence
+        is handled by the post-turn _persist_to_disk call. Returns
+        the number of thread centroids actually updated."""
+        activation = self._current_thread_activation
+        turn_emb = self._current_turn_embedding
+        if not activation or turn_emb is None:
+            return 0
+        try:
+            import numpy as np
+        except ImportError:
+            logger.warning(
+                f"[{self.character_name}] _update_thread_centroids: numpy unavailable")
+            return 0
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        updated = 0
+        for thread, weight in activation:
+            if weight < min_activation:
+                continue
+            note_id = thread.get("id")
+            if not note_id:
+                continue
+            note = self.resource_manager.get_resource(note_id)
+            if not note:
+                continue
+            props = note.get("properties") or {}
+            old_c = props.get("centroid_embedding") or []
+            if not old_c:
+                continue
+            try:
+                old_arr = np.asarray(old_c, dtype=np.float32)
+                if old_arr.shape != turn_emb.shape:
+                    logger.warning(
+                        f"[{self.character_name}] centroid update: dim "
+                        f"mismatch for thread {props.get('note_name')!r}, skipping")
+                    continue
+                step = float(learning_rate) * float(weight)
+                new_arr = old_arr + step * (turn_emb - old_arr)
+                norm = float(np.linalg.norm(new_arr))
+                if norm > 0:
+                    new_arr = new_arr / norm
+                old_count = float(props.get("constituent_turn_count") or 0)
+                new_count = old_count + float(weight)
+                props["centroid_embedding"] = [float(x) for x in new_arr.tolist()]
+                props["constituent_turn_count"] = new_count
+                props["last_centroid_update_at"] = now_iso
+                # last_activated_at marks the most recent turn this
+                # thread had non-trivial weight on — useful for
+                # consolidation / archival logic later.
+                props["last_activated_at"] = now_iso
+                updated += 1
+            except Exception as e:
+                logger.warning(
+                    f"[{self.character_name}] centroid update for "
+                    f"{props.get('note_name')!r} failed: {e}")
+                continue
+        if updated:
+            logger.info(
+                f"[{self.character_name}] thread centroids updated: "
+                f"{updated}/{len(activation)} threads")
+        return updated
+
+    def _render_threads_for_subagent(
+            self, threads: List[Dict[str, Any]]) -> str:
+        """Render the full active-threads list as a system-prompt
+        section for subagents (currently: remember). Distinct from
+        _render_active_threads_block, which surfaces only the
+        currently-activated threads to Jill's main turn — subagents
+        operating over the whole memory benefit from seeing the full
+        thread inventory regardless of current activation, since
+        retrospective queries may target dormant-but-active threads."""
+        if not threads:
+            return ""
+        lines: List[str] = []
+        lines.append("## Session threads (activity-level structure of the conversation)")
+        lines.append(
+            "Threads are activity-level anchors inferred from the "
+            "shape of the user's conversation. Each thread groups "
+            "turns that participated in a coherent activity. Use these "
+            "to (a) understand the topical structure of the user's "
+            "interactions, (b) scope retrospective queries to the "
+            "relevant thread when the question is about a specific "
+            "activity, and (c) answer direct enumeration questions "
+            "(\"what threads do you have?\") without needing to read "
+            "memory files. Numbers are constituent turn counts.")
+        lines.append("")
+        for t in threads:
+            name = t.get("name", "")
+            n = int(t.get("constituent_turn_count", 0))
+            summary = (t.get("summary") or "").strip()
+            lines.append(f"- `{name}` ({n} turns): {summary}")
+        return "\n".join(lines)
+
     def _run_remember(self, query: str) -> str:
         """Backend for the ReAct `remember` tool. Delegates to the
         active-recall subagent (chat.remember.remember), which runs its
         own thin ReAct loop over the memory dir. Returns an OK:/EMPTY:/
         ERROR: prefixed observation per the ReAct tool-observation
         convention. Subagent's full per-call trace lands under
-        subagent_traces/ for debugging."""
+        subagent_traces/ for debugging.
+
+        Stage 4b: passes the active-threads inventory to the subagent
+        as a system-prompt extension. The subagent gets activity-level
+        structure for free without needing to grep files for it."""
         if not query or not str(query).strip():
             return "EMPTY: remember query was empty"
         try:
             from chat.remember import remember as _remember
+            threads = self._get_threads(statuses=('active',))
+            thread_context = self._render_threads_for_subagent(threads)
             answer = _remember(
                 query=str(query),
                 memory_dir=self._memory_dir(),
                 llm_backend=self.backend,
                 trace_dir=self._subagent_traces_dir(),
+                thread_context=thread_context,
             )
         except Exception as e:
             logger.warning(f"[{self.character_name}] remember subagent raised: {e}")
@@ -4619,6 +4913,16 @@ class ChatLoop:
             # Reflection runs after discourse so it can see the latest
             # companion state and avoid duplicating it.
             self._reflect_and_remember(source)
+            # Stage 5: drift active thread centroids toward the
+            # current turn's embedding, weighted by thread activation.
+            # No-op if no threads, no embedding, or all activations
+            # below threshold. In-place property mutation; the
+            # _persist_to_disk below handles save.
+            try:
+                self._update_thread_centroids()
+            except Exception as e:
+                logger.warning(
+                    f"[{self.character_name}] thread centroid update failed: {e}")
             if close:
                 self.store.close_dialog(source)
             # Autosave. Memories written above land on disk here; without
@@ -4712,6 +5016,19 @@ class ChatLoop:
         if not autonomous:
             self._decay_user_concerns_per_turn()
             self._bump_user_concerns_on_input(text)
+
+        # Compute thread activation distribution for the current turn.
+        # Read by _build_system_prompt for the "current activity context"
+        # block and (Stage 4b) by the remember subagent. Cheap — single
+        # embedding + N cosine sims for N active threads. Skipped on
+        # autonomous fires: those are agent-initiated (a concern's
+        # instruction firing), not user activity, and shouldn't drive
+        # thread surfacing or centroid drift.
+        if not autonomous:
+            self._current_thread_activation = self._compute_thread_activation(text)
+        else:
+            self._current_thread_activation = []
+            self._current_turn_embedding = None
 
         orientation = self._orientation_summary(source, text)
         # Auto-RAG: pull top-k durable memories that match this turn's input.
