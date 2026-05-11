@@ -12,6 +12,7 @@ import os, sys
 from datetime import timedelta, datetime
 import logging
 import json
+import re
 import numpy as np
 import zenoh
 #from sentence_transformers import SentenceTransformer
@@ -299,6 +300,103 @@ End your response with:
 </end>
 """
 
+TRIAGE_TEMPLATE = """You are reviewing a list of established discourse-state agreements to identify which ones may be affected by a new conversation segment.
+
+CURRENT THEORY OF MIND MODEL:
+{{$current_tom_model}}
+
+CONVERSATION SEGMENT:
+{{$conversation_turns}}
+
+EXISTING AGREEMENTS (numbered):
+{{$indexed_agreements}}
+
+TASK: For each numbered agreement above, decide whether the conversation segment plausibly:
+  - modifies it (changes scope, conditions, or wording),
+  - invalidates or supersedes it (retracts, makes obsolete, replaces), or
+  - directly references it in a way that may update its status.
+
+Bias toward flagging. If unsure, flag it. The downstream pass decides whether to actually change anything. Missing an item that should have been flagged costs more than over-flagging.
+
+Do NOT flag items merely because they share a topic with the segment — flag only when the segment plausibly changes something about the agreement.
+
+Do NOT extract new agreements here. That happens in a later pass.
+
+OUTPUT FORMAT:
+- One line per flagged item, format: <n>: <one short phrase explaining why>
+- After all flag lines, emit a single literal line: END_TRIAGE
+- If no items are affected, emit exactly these two lines and nothing else:
+NONE
+END_TRIAGE
+
+Plain text only. No markdown, no preamble, no commentary.
+
+Example output (3 items flagged):
+3: user contradicted the prior bearing
+7: scope narrowed to weekdays only
+12: previous deadline overridden by new directive
+END_TRIAGE
+
+End your response with:
+</end>
+"""
+
+CRUD_TEMPLATE = """You are updating discourse-state agreements and decisions based on a new conversation segment.
+
+CURRENT THEORY OF MIND MODEL:
+{{$current_tom_model}}
+
+CONVERSATION SEGMENT:
+{{$conversation_turns}}
+
+EXISTING AGREEMENTS NEEDING REVIEW:
+{{$flagged_indexed_items}}
+
+EXISTING DECISIONS (context — may be added to, but do not duplicate):
+{{$existing_decisions}}
+
+TASK:
+
+For each numbered agreement above, decide one of:
+  - UPDATE: replace it with a refined or corrected version that reflects what the segment establishes.
+  - REMOVE: drop it because the segment retracts, supersedes, or makes it obsolete.
+  - (leave alone): emit nothing for that item — it stays in the state as-is.
+
+ALSO: Extract any genuinely NEW agreements established by the segment that are not already covered by the items above.
+
+ALSO: Extract any genuinely NEW decisions made by the segment — Adopted/Rejected/Added events that close a previously open question or set direction. Do not duplicate existing decisions.
+
+Each agreement output must end with a provenance tag in parentheses:
+  - (this segment) — for items newly established or substantially rewritten in this segment
+  - (established earlier) — for items being preserved with only minor refinement
+
+Each new decision must follow the existing format: "<Adopted|Rejected|Added>: <decision> (this segment), <what it resolves or replaces>"
+
+OUTPUT FORMAT — one operation per line, exact prefixes:
+  UPDATE <n>: <new agreement text including its (tag)>
+  REMOVE <n>
+  ADD: <new agreement text including its (tag)>
+  ADD_DECISION: <Adopted|Rejected|Added>: <decision text>
+
+After all operations, emit a single literal line: END_CRUD
+
+If no operations are needed (no updates, no removes, no adds, no new decisions), emit exactly:
+NONE
+END_CRUD
+
+Plain text only. No markdown, no preamble, no commentary.
+
+Example output:
+UPDATE 1: Navigate northwest for 30 minutes, then follow the creek southwest back to the crossing (this segment)
+REMOVE 3
+ADD: If the creek is not found within 30 minutes, stop and reassess (this segment)
+ADD_DECISION: Adopted: 30-minute time limit as safety check (this segment), establishes navigation safety mechanism
+END_CRUD
+
+End your response with:
+</end>
+"""
+
 COMPANION_UPDATE_TEMPLATE = """You are updating a Companion Model — an honest, fair-witness account of {{$other_person_name}}: what they're working on, where they actually are, what matters to them, and how to be genuinely useful. The point is accurate seeing, not flattering portraiture. A model that only records favorable things about the person is broken.
 
 PREVIOUS COMPANION MODEL:
@@ -410,13 +508,266 @@ def _prepend_narrator_stance(prompt: str, narrator_persona: str,
     return "\n\n".join(blocks) + "\n\n---\n\n" + prompt
 
 
+_SECTION_HEADER_RE = re.compile(r'^[A-Z][A-Z ]*:\s*$')
+_PROVENANCE_TAG_RE = re.compile(r'\((?:this segment|established earlier)\)\.?')
+
+
+def _parse_current_agreements(prior_state: str) -> List[str]:
+    """Extract the ordered list of agreement-line strings from the CURRENT
+    AGREEMENTS section of a discourse-state text.
+
+    Tolerates both observed historical formats: one-agreement-per-line with
+    optional `- ` bullet prefix, and the older paragraph format where every
+    agreement is concatenated on one or two lines separated by their
+    provenance tag plus a period. Items are split at the provenance-tag
+    boundary, so each returned string ends with `(this segment).` or
+    `(established earlier).` verbatim — preserving the byte-identical
+    carryover guarantee for items that pass through unchanged.
+
+    Returns [] if the section is missing, empty, or just `[none]`. Trailing
+    content after the last provenance tag (e.g. a truncated item from a
+    truncated upstream artifact) is logged at WARNING and dropped — no
+    silent failure.
+    """
+    if not prior_state:
+        return []
+    in_section = False
+    section_lines: List[str] = []
+    for raw_line in prior_state.splitlines():
+        line = raw_line.strip()
+        if not in_section:
+            if line == 'CURRENT AGREEMENTS:':
+                in_section = True
+            continue
+        if _SECTION_HEADER_RE.match(line):
+            break
+        section_lines.append(raw_line)
+    section_text = '\n'.join(section_lines).strip()
+    if not section_text or section_text.lower() == '[none]':
+        return []
+    items: List[str] = []
+    last_end = 0
+    for match in _PROVENANCE_TAG_RE.finditer(section_text):
+        item = section_text[last_end:match.end()].strip()
+        if item.startswith('- '):
+            item = item[2:].strip()
+        if item:
+            items.append(item)
+        last_end = match.end()
+    trailing = section_text[last_end:].strip()
+    if trailing:
+        logger.warning(
+            "discourse: CURRENT AGREEMENTS has trailing content without a "
+            "provenance tag; dropping %d chars (likely truncated source). "
+            "First 80 chars: %r",
+            len(trailing), trailing[:80]
+        )
+    return items
+
+
+def _parse_key_decisions_section(prior_state: str) -> str:
+    """Extract the body of the KEY DECISIONS MADE section (the bullets, not
+    the header). Returns '' if the section is missing or empty. Used to
+    pass decisions through to assembly while CRUD has the option to emit
+    updates to them (handled separately)."""
+    if not prior_state:
+        return ""
+    in_section = False
+    body_lines: List[str] = []
+    for raw_line in prior_state.splitlines():
+        line = raw_line.strip()
+        if not in_section:
+            if line == 'KEY DECISIONS MADE:':
+                in_section = True
+            continue
+        if _SECTION_HEADER_RE.match(line):
+            break
+        body_lines.append(raw_line)
+    return '\n'.join(body_lines).strip('\n')
+
+
+def _assemble_discourse_state(segment_label: str,
+                              agreements: List[str],
+                              decisions_body: str) -> str:
+    """Render a discourse-state string from its parts, in the canonical
+    format emitted by the current production reflect pass.
+
+    `segment_label` is the parenthesized range, e.g. '0-47'.
+    `agreements` is the ordered list of agreement strings, each already
+    ending with its provenance tag verbatim. Bullet `- ` prefix is added
+    here; if the list is empty, emits `[none]` per the template spec.
+    `decisions_body` is the body of the KEY DECISIONS MADE section,
+    bullets and all. Empty → `[none in this segment]`.
+    """
+    lines = [f"DISCOURSE STATE (segment {segment_label}):", ""]
+    lines.append("CURRENT AGREEMENTS:")
+    if agreements:
+        for item in agreements:
+            lines.append(f"- {item}")
+    else:
+        lines.append("[none]")
+    lines.append("")
+    lines.append("KEY DECISIONS MADE:")
+    body = decisions_body.strip()
+    lines.append(body if body else "[none in this segment]")
+    return '\n'.join(lines)
+
+
+_TRIAGE_LINE_RE = re.compile(r'^\s*(\d+)\s*(?::\s*(.*?))?\s*$')
+
+
+def _format_indexed_agreements(agreements: List[str]) -> str:
+    """Render the agreement list as a plain numbered 1..N block for the
+    triage prompt. Numbering is ephemeral per the design — discarded once
+    the triage→CRUD cycle assembles the new state."""
+    if not agreements:
+        return "[none]"
+    return "\n".join(f"{i + 1}. {item}" for i, item in enumerate(agreements))
+
+
+def _parse_triage_output(response_text: str, n_items: int) -> set:
+    """Parse triage LLM output into the set of flagged 1-based indices.
+
+    Expected format is one '<n>: <reason>' line per flag, terminated by
+    a literal 'END_TRIAGE'. A bare '<n>' (no reason) is also accepted.
+    'NONE' as content means no flags.
+
+    Out-of-range indices, malformed lines, and a missing terminator are
+    logged at WARNING and otherwise tolerated — no silent failure, no
+    blocking on minor protocol drift.
+    """
+    if not response_text:
+        logger.warning("triage: empty response from LLM")
+        return set()
+    flagged: set = set()
+    saw_terminator = False
+    for raw_line in response_text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line == 'END_TRIAGE':
+            saw_terminator = True
+            break
+        if line == 'NONE':
+            continue
+        m = _TRIAGE_LINE_RE.match(line)
+        if not m:
+            logger.warning("triage: malformed line dropped: %r", line[:120])
+            continue
+        idx = int(m.group(1))
+        if idx < 1 or idx > n_items:
+            logger.warning(
+                "triage: out-of-range index %d (n=%d) dropped", idx, n_items
+            )
+            continue
+        flagged.add(idx)
+    if not saw_terminator:
+        logger.warning("triage: response missing END_TRIAGE terminator")
+    return flagged
+
+
+_CRUD_UPDATE_RE = re.compile(r'^\s*UPDATE\s+(\d+)\s*:\s*(.+?)\s*$')
+_CRUD_REMOVE_RE = re.compile(r'^\s*REMOVE\s+(\d+)\s*$')
+_CRUD_ADD_DECISION_RE = re.compile(r'^\s*ADD_DECISION\s*:\s*(.+?)\s*$')
+_CRUD_ADD_RE = re.compile(r'^\s*ADD\s*:\s*(.+?)\s*$')
+
+
+def _format_flagged_subset(flagged_items: List[str]) -> str:
+    """Render the flagged agreements as a 1..M numbered list for the CRUD
+    prompt. The caller is responsible for the M→original-N index mapping."""
+    if not flagged_items:
+        return "[none — no existing items flagged; only extract new agreements / decisions if any]"
+    return "\n".join(f"{i + 1}. {text}" for i, text in enumerate(flagged_items))
+
+
+def _parse_crud_output(response_text: str, n_flagged: int):
+    """Parse CRUD LLM output into (updates, removes, adds, decision_adds).
+
+      updates       : dict[int, str]  — 1-based flagged indices → new text
+      removes       : set[int]        — 1-based flagged indices to drop
+      adds          : list[str]       — newly extracted agreement strings
+      decision_adds : list[str]       — newly extracted decision strings
+
+    Operations are read until 'END_CRUD' or end of text. Out-of-range
+    indices, malformed lines, and a missing terminator are logged at
+    WARNING. If the same index appears in both UPDATE and REMOVE,
+    REMOVE wins and the conflict is logged.
+    """
+    if not response_text:
+        logger.warning("crud: empty response from LLM")
+        return {}, set(), [], []
+    updates: dict = {}
+    removes: set = set()
+    adds: list = []
+    decision_adds: list = []
+    saw_terminator = False
+    for raw_line in response_text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line == 'END_CRUD':
+            saw_terminator = True
+            break
+        if line == 'NONE':
+            continue
+        m = _CRUD_UPDATE_RE.match(line)
+        if m:
+            idx = int(m.group(1))
+            text = m.group(2).strip()
+            if idx < 1 or idx > n_flagged:
+                logger.warning(
+                    "crud: UPDATE out-of-range index %d (n=%d) dropped",
+                    idx, n_flagged,
+                )
+                continue
+            updates[idx] = text
+            continue
+        m = _CRUD_REMOVE_RE.match(line)
+        if m:
+            idx = int(m.group(1))
+            if idx < 1 or idx > n_flagged:
+                logger.warning(
+                    "crud: REMOVE out-of-range index %d (n=%d) dropped",
+                    idx, n_flagged,
+                )
+                continue
+            removes.add(idx)
+            continue
+        # ADD_DECISION must be matched before ADD because both share the
+        # 'ADD' literal prefix.
+        m = _CRUD_ADD_DECISION_RE.match(line)
+        if m:
+            decision_adds.append(m.group(1).strip())
+            continue
+        m = _CRUD_ADD_RE.match(line)
+        if m:
+            adds.append(m.group(1).strip())
+            continue
+        logger.warning("crud: malformed line dropped: %r", line[:120])
+    if not saw_terminator:
+        logger.warning("crud: response missing END_CRUD terminator")
+    conflict = set(updates.keys()) & removes
+    if conflict:
+        logger.warning(
+            "crud: %d indices have both UPDATE and REMOVE; REMOVE wins: %s",
+            len(conflict), sorted(conflict),
+        )
+        for idx in conflict:
+            del updates[idx]
+    return updates, removes, adds, decision_adds
+
+
 class DiscourseTracker:
-    def __init__(self, llm_generate: Callable, self_character_name: str, other_character_name: str):
+    def __init__(self, llm_generate: Callable, self_character_name: str, other_character_name: str, use_triage_crud: bool = False):
         self.llm_generate = llm_generate
         self.self_character = self_character_name
         self.other_character = other_character_name
         self.objects = {}
         self.turn = 0
+        # When True, analyze_segment uses the triage+CRUD decomposition
+        # described in docs/design_note_agreements_rag.md. Default False
+        # preserves the legacy combined-call behavior bit-for-bit.
+        self.use_triage_crud = use_triage_crud
 
     def add_object(self, object):
         self.objects[object.id] = object
@@ -449,12 +800,37 @@ class DiscourseTracker:
           formatted_turns.append(f"{turn['source']}: {turn['text']}")
       return '\n'.join(formatted_turns)
 
+    def _llm_call(self, prompt: str, max_tokens: int = 3000, temperature: float = 0.4):
+        """Single LLM call with response-shape dispatch. Returns
+        (success: bool, text: str). Handles both SGLang dict shape and
+        llm_client object shape."""
+        response = self.llm_generate(
+            messages=[prompt],
+            bindings={},
+            max_tokens=max_tokens,
+            temperature=temperature,
+            stops=['</end>'],
+            is_json=False,
+        )
+        if isinstance(response, dict):
+            return bool(response.get('success', False)), response.get('text', '')
+        if hasattr(response, 'text'):
+            success = response.success if hasattr(response, 'success') else True
+            return bool(success), response.text
+        return True, str(response)
+
     def analyze_segment(self, dialog, start=0, end=None, previous_discourse_state="", tom="", narrator_persona="", narrator_self_model=""):
         if end is None:
             end = len(dialog) - 1
         segment = self.format_segment(dialog, start, end)
 
-        # Apply bindings to template
+        if self.use_triage_crud:
+            return self._analyze_segment_triage_crud(
+                segment, start, end, previous_discourse_state, tom,
+                narrator_persona, narrator_self_model,
+            )
+
+        # Combined-call path (legacy)
         prompt = DISCOURSE_ANALYSIS_TEMPLATE
         bindings = {
             'conversation_turns': segment,
@@ -466,32 +842,113 @@ class DiscourseTracker:
         for key, value in bindings.items():
             prompt = prompt.replace(f"{{{{${key}}}}}", str(value))
         prompt = _prepend_narrator_stance(prompt, narrator_persona, narrator_self_model)
-        
-        response = self.llm_generate(
-            messages=[prompt],
-            bindings={},
-            max_tokens=3000,
-            temperature=0.4,
-            stops=['</end>'],
-            is_json=False
-        )
-        
-        # Handle response format (SGLang returns dict, llm_client returns object)
-        if isinstance(response, dict):
-            response_text = response.get('text', '')
-            success = response.get('success', False)
-        elif hasattr(response, 'text'):
-            response_text = response.text
-            success = response.success if hasattr(response, 'success') else True
-        else:
-            response_text = str(response)
-            success = True
-        
+
+        success, response_text = self._llm_call(prompt)
         if not success:
-            logger.warning(f'Discourse analysis failed')
+            logger.warning('Discourse analysis failed')
             return ""
-        
         return response_text
+
+    def _analyze_segment_triage_crud(self, segment, start, end, previous_discourse_state, tom, narrator_persona, narrator_self_model):
+        """Triage + CRUD path. Decomposes the combined call into:
+          1. parse current agreements + decisions from prior state
+          2. triage (skip if no existing agreements)
+          3. CRUD over flagged subset, also extracting new items + decisions
+          4. assemble new state (untouched items pass through byte-identical)
+
+        Returns the new discourse-state string in the same canonical format
+        as the combined path, satisfying the existing analyze_segment
+        contract used by TOM_UPDATE_TEMPLATE consumers."""
+        agreements = _parse_current_agreements(previous_discourse_state)
+        existing_decisions = _parse_key_decisions_section(previous_discourse_state)
+        n = len(agreements)
+        segment_label = f"{start}-{end}"
+
+        # Triage — skipped entirely when there's nothing to review.
+        if n > 0:
+            triage_prompt = TRIAGE_TEMPLATE
+            for key, value in {
+                'conversation_turns': segment,
+                'current_tom_model': tom,
+                'indexed_agreements': _format_indexed_agreements(agreements),
+            }.items():
+                triage_prompt = triage_prompt.replace(f"{{{{${key}}}}}", str(value))
+            triage_prompt = _prepend_narrator_stance(
+                triage_prompt, narrator_persona, narrator_self_model
+            )
+            success, response_text = self._llm_call(triage_prompt)
+            if not success:
+                # Safe fallback: flag everything. Degenerates the CRUD pass
+                # toward the legacy combined-call working set; no silent
+                # failure, no data loss.
+                logger.warning(
+                    "triage: LLM call failed; falling back to flag-all (n=%d)", n
+                )
+                flagged = set(range(1, n + 1))
+            else:
+                flagged = _parse_triage_output(response_text, n_items=n)
+        else:
+            flagged = set()
+
+        # CRUD — always runs, even with empty flagged set, so the new-item
+        # extraction slot still gets a chance (locked decision: no
+        # triviality skip in v0.1).
+        flagged_sorted = sorted(flagged)
+        flagged_texts = [agreements[i - 1] for i in flagged_sorted]
+
+        crud_prompt = CRUD_TEMPLATE
+        for key, value in {
+            'conversation_turns': segment,
+            'current_tom_model': tom,
+            'flagged_indexed_items': _format_flagged_subset(flagged_texts),
+            'existing_decisions': existing_decisions if existing_decisions else "[none]",
+        }.items():
+            crud_prompt = crud_prompt.replace(f"{{{{${key}}}}}", str(value))
+        crud_prompt = _prepend_narrator_stance(
+            crud_prompt, narrator_persona, narrator_self_model
+        )
+        success, response_text = self._llm_call(crud_prompt)
+        if not success:
+            logger.warning(
+                "crud: LLM call failed; returning prior state unchanged"
+            )
+            return previous_discourse_state
+
+        updates, removes, adds, decision_adds = _parse_crud_output(
+            response_text, n_flagged=len(flagged_sorted)
+        )
+
+        # Assembly. Operate on a mutable copy of the original list using
+        # the M (flagged-subset) → N (original-list) index mapping.
+        new_agreements = list(agreements)
+        # UPDATEs first — in-place edits don't shift indices.
+        for m_idx, new_text in updates.items():
+            original_idx = flagged_sorted[m_idx - 1] - 1
+            new_agreements[original_idx] = new_text
+        # REMOVEs next — descending original index so deletes don't shift
+        # earlier positions.
+        remove_original = sorted(
+            [flagged_sorted[m_idx - 1] - 1 for m_idx in removes],
+            reverse=True,
+        )
+        for orig_idx in remove_original:
+            del new_agreements[orig_idx]
+        # ADDs appended to the end.
+        new_agreements.extend(adds)
+
+        # Decisions: append-only — existing pass through unchanged, new
+        # decisions appended as bullets.
+        new_decisions_body = existing_decisions
+        if decision_adds:
+            new_lines = [f"- {d}" for d in decision_adds]
+            if new_decisions_body.strip():
+                new_decisions_body = new_decisions_body.rstrip('\n') + '\n' + '\n'.join(new_lines)
+            else:
+                new_decisions_body = '\n'.join(new_lines)
+
+        return _assemble_discourse_state(
+            segment_label, new_agreements, new_decisions_body
+        )
 
     def update_tom_from_discourse_segment(self, dialog, character_name, start=0, end=None, discourse_state="", previous_tom_state=""):
         if end is None:

@@ -13,6 +13,9 @@ bench/snapshots/
 # Benchmark per-run output (transcripts, raw/scored jsonl, summaries)
 bench/*/results/
 
+# Benchmark scoring artifacts (judge outputs, aggregate.json) — regenerable
+bench/*/scores*/
+
 # Benchmark experiment output (per-goal JSONL + summary sidecars)
 runs/
 
