@@ -287,12 +287,12 @@ def _parse_command(line: str) -> Optional[dict]:
         # /note <id> as shorthand for /note show <id>
         return {'cmd': '_query', 'query': 'note_show', 'resource_id': args[0]}
 
-    # -- Remember (direct subagent query, bypasses Jill's ReAct loop) --
-    if cmd == 'remember':
+    # -- Recall (direct subagent query, bypasses Jill's ReAct loop) --
+    if cmd == 'recall':
         if not args:
-            _print_error("Usage: /remember <natural-language query>")
+            _print_error("Usage: /recall <natural-language query>")
             return None
-        return {'cmd': '_query', 'query': 'remember', 'text': ' '.join(args)}
+        return {'cmd': '_query', 'query': 'recall', 'text': ' '.join(args)}
 
     # -- External-repo binding (sticky across session; sets the geofence
     # for the inspect_external tool). One repo at a time per character.
@@ -436,17 +436,17 @@ def _handle_query(session, character: str, data: dict, state: dict):
             for e in errors:
                 _print_error(f"  {e}")
 
-    elif query == 'remember':
+    elif query == 'recall':
         q_text = data.get('text', '').strip()
         if not q_text:
-            _print_error("Usage: /remember <query>")
+            _print_error("Usage: /recall <query>")
             return
-        _print_info(f"→ remember: {q_text} (subagent runs up to 10 iters; may take a minute)")
+        _print_info(f"→ recall: {q_text} (subagent runs up to 10 iters; may take a minute)")
         payload = json.dumps({'query': q_text}).encode('utf-8')
         result = None
         try:
             for reply in session.get(
-                f"cognitive/{character}/remember",
+                f"cognitive/{character}/recall",
                 payload=payload, timeout=120.0,
             ):
                 if hasattr(reply, 'ok') and reply.ok is not None:
@@ -577,7 +577,7 @@ def _print_help():
   /note <id>                     Show note content (e.g. /note 3940)
 
 {C.BOLD}Memory:{C.RESET}
-  /remember <query>              Active-recall subagent query (reads agent's memory dir)
+  /recall <query>                Active-recall subagent query (reads agent's memory dir)
 
 {C.BOLD}Image input:{C.RESET}
   /img <path|url> [caption]      Send an image (local file or URL) with optional caption

@@ -74,7 +74,7 @@ _CONCERN_INSTRUCTION_NARROWNESS_RULE = (
 
 # Tools the model can emit. Validated structurally in _parse_react_action;
 # the dispatcher in _run_react_loop knows how to run each.
-_REACT_TOOLS = ('process_text', 'search', 'fetch_text', 'remember', 'inspect', 'inspect_external', 'security', 'respond')
+_REACT_TOOLS = ('process_text', 'search', 'fetch_text', 'recall', 'inspect', 'inspect_external', 'security', 'respond')
 
 # Per-character collection holding episodic specifics across conversations.
 # Auto-RAG searches this on every turn; post-turn reflection writes to it.
@@ -1092,7 +1092,7 @@ class ChatLoop:
                 # Trace: append to memories.jsonl for provenance audit and
                 # remember-subagent visibility. Trigger is hardcoded
                 # 'reflection' since that's currently the sole writer; if
-                # other writers appear (manual /remember, autonomous), pass
+                # other writers appear (manual /recall, autonomous), pass
                 # trigger as a parameter instead.
                 self._write_memory_event({
                     'event': 'write',
@@ -2598,10 +2598,10 @@ class ChatLoop:
             self._handle_concern_manage_query,
         )
         # Direct subagent invocation — bypasses Jill's ReAct loop. Used by
-        # `/remember <query>` in the CLI to test/inspect the active-recall
+        # `/recall <query>` in the CLI to test/inspect the active-recall
         # subagent without spending a full Jill turn.
         self._remember_q = self._zenoh_session.declare_queryable(
-            f"cognitive/{self.character_name}/remember",
+            f"cognitive/{self.character_name}/recall",
             self._handle_remember_query,
         )
         # External-repo binding control. CLI emits set / clear / get;
@@ -3242,7 +3242,7 @@ class ChatLoop:
         """Direct invocation of the active-recall subagent. Payload:
         {"query": "<natural-language question>"}. Returns {"success": bool,
         "answer": "<synthesized answer>", "trace_dir": "<path>"}. Bypasses
-        Jill's ReAct loop — used by `/remember` in the CLI for test/inspect."""
+        Jill's ReAct loop — used by `/recall` in the CLI for test/inspect."""
         try:
             payload_bytes = query.payload.to_bytes() if query.payload else b'{}'
             params = json.loads(payload_bytes.decode('utf-8')) if payload_bytes else {}
@@ -3860,12 +3860,16 @@ class ChatLoop:
              "`{\"thought\": \"<one terse sentence>\", \"tool\": \"fetch_text\", \"url\": <string|$stepN>}` — "
              "full text from a single URL (or local file path). Use when a search hit looks promising and the "
              "snippet isn't enough; always pass the result through process_text before responding."),
-            ("remember",
-             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"remember\", \"query\": <string>}` — "
-             "active recall over your own memory: full reasoning trace, conversation history, current companion "
-             "model, current discourse state. Use when the user asks about prior turns, your earlier reasoning, "
-             "or persistent state that may not be in your current prompt. The query is opaque to you — a subagent "
-             "reads the files and returns a synthesized answer in `$stepN`."),
+            ("recall",
+             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"recall\", \"query\": <string>}` — "
+             "READ-ONLY active recall over your own memory: full reasoning trace, conversation history, "
+             "current companion model, current discourse state, log of persisted memories. Use when the "
+             "user asks about prior turns ('what did we discuss?', 'you mentioned X earlier'), your "
+             "earlier reasoning, or persistent state that may not be in your current prompt. The query "
+             "is opaque to you — a subagent reads the files and returns a synthesized answer in `$stepN`. "
+             "Cannot write: if the user says 'remember X' / 'note Y' / 'save Z', acknowledge in `respond` "
+             "without claiming persistence — memory writes happen via background reflection, not from "
+             "inside this loop."),
             ("inspect",
              "`{\"thought\": \"<one terse sentence>\", \"tool\": \"inspect\", \"query\": <string>}` — "
              "query your own codebase. A separate subagent (geofenced read-only to `src/`, list/read/grep "
@@ -4209,7 +4213,7 @@ class ChatLoop:
             elif tool == 'fetch_text':
                 u = self._resolve_react_value(action.get('url', ''), log)
                 obs = self._run_fetch_text(u)
-            elif tool == 'remember':
+            elif tool == 'recall':
                 q = self._resolve_react_value(action.get('query', ''), log)
                 obs = self._run_remember(q)
             elif tool == 'inspect':
@@ -4412,7 +4416,7 @@ class ChatLoop:
         return "\n".join(lines)
 
     def _run_remember(self, query: str) -> str:
-        """Backend for the ReAct `remember` tool. Delegates to the
+        """Backend for the ReAct `recall` tool. Delegates to the
         active-recall subagent (chat.remember.remember), which runs its
         own thin ReAct loop over the memory dir. Returns an OK:/EMPTY:/
         ERROR: prefixed observation per the ReAct tool-observation
