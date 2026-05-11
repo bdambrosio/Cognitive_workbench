@@ -16,6 +16,9 @@ bench/*/results/
 # Benchmark scoring artifacts (judge outputs, aggregate.json) — regenerable
 bench/*/scores*/
 
+# Archive of bench-spawned scenario worlds moved out of scenarios/
+bench/runs/
+
 # Benchmark experiment output (per-goal JSONL + summary sidecars)
 runs/
 
