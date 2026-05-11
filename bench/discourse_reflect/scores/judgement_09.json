@@ -1,0 +1,107 @@
+{
+  "pair_id": "pair_09",
+  "judgement": {
+    "add_recall": {
+      "items": [
+        {
+          "gold_item": "The Body codebase architecture includes: a Launcher, Motor Controller, Lidar Driver, OAK-D Driver (camera+IMU), Watchdog, and Teleop CLI, all communicating via Zenoh pub/sub with JSON messages on a Raspberry Pi running Python 3.11+",
+          "match": "no",
+          "production_quote": "",
+          "note": "Production does not add this detailed component list as a new agreement; the Body item remains only as the original high-level description."
+        },
+        {
+          "gold_item": "The Body integration contract requires any agent to publish body/heartbeat at ≥2 Hz and body/cmd_vel within timeout; recovery after heartbeat fault follows §5.10 of the spec document",
+          "match": "no",
+          "production_quote": "",
+          "note": "This integration contract detail is not added anywhere in the production state."
+        },
+        {
+          "gold_item": "The Body directory structure includes body/ (core package), deploy/ (Zenoh router config), docs/, scripts/, body_project_spec.md (22KB communication/behavior contract), config.json, requirements.txt, and README.md",
+          "match": "no",
+          "production_quote": "",
+          "note": "No directory structure detail is added to the production state."
+        }
+      ],
+      "score": 0.0,
+      "score_basis": "0 yes + 0 partial / 3 gold = 0.0; none of the three required new agreements were added"
+    },
+    "add_precision": {
+      "items": [
+        {
+          "production_item": "Jill's response to personal concerns should be grounded in observable data (cognitive load, work patterns) rather than medical or spiritual authority, and should treat the user as a competent adult making their own assessment (this segment).",
+          "grounded": "partial",
+          "dialog_quote": "As a coworker, I can tell you that you've been operating at a very high cognitive load... the agitation is a signal that the current pace is unsustainable... As for the 'friend' side: I don't have a body...",
+          "note": "The dialog exchange supports that Jill grounded her response in observable data, but the gold labeller notes this was a conversational acknowledgement and should not be added as a formal agreement. It is a fabricated norm/rule, not something established as a discourse-level agreement."
+        }
+      ],
+      "score": 0.5,
+      "score_basis": "1 item, partially grounded in dialog but the gold explicitly says such personal exchanges should not be added as formal agreements; partial credit given for the dialog connection"
+    },
+    "update_correctness": {
+      "items": [
+        {
+          "gold_modify_target": "The 'Body' codebase is the onboard software for a differential-drive robot chassis running on a Raspberry Pi, utilizing Python processes communicating via Zenoh (established earlier).",
+          "gold_modification": "Substantially expanded with detailed directory structure, specific component list (Launcher, Motor Controller, Lidar Driver, OAK-D-Lite Driver, Watchdog, Teleop), Python 3.11+ stack, and explicit integration contract (heartbeat at ≥2 Hz, cmd_vel timeout, §5.10 recovery).",
+          "production_handling": "unchanged",
+          "note": "The Body item in production is identical to the prior state; no expansion or modification was applied."
+        }
+      ],
+      "score": 0.0,
+      "score_basis": "0/1 modifications correctly applied; the Body item was left unchanged despite gold requiring substantial expansion"
+    },
+    "carryover_preservation": {
+      "items": [
+        {
+          "gold_carryover_item": "The 'Body' codebase is the onboard software for a differential-drive robot chassis running on a Raspberry Pi, utilizing Python processes communicating via Zenoh (established earlier).",
+          "production_handling": "preserved",
+          "note": "The item is preserved verbatim, though it should have been expanded per the modify instruction."
+        },
+        {
+          "gold_carryover_item": "Added: agent concern to deliver a random Ramana Maharshi selection every four hours with attribution (established earlier).",
+          "production_handling": "preserved",
+          "note": "Present verbatim in KEY DECISIONS MADE."
+        }
+      ],
+      "score": 1.0,
+      "score_basis": "Both carry-over items are preserved; 2/2 = 1.0"
+    },
+    "prune_correctness": {
+      "items": [],
+      "score": null,
+      "score_basis": "Gold has no should_remove items; axis is N/A"
+    },
+    "wording": {
+      "sample_items": [
+        {
+          "production_item": "Jill's response to personal concerns should be grounded in observable data (cognitive load, work patterns) rather than medical or spiritual authority, and should treat the user as a competent adult making their own assessment (this segment).",
+          "score_0_3": 2,
+          "note": "Well-worded and self-contained, but it adds a fabricated agreement not sanctioned by gold; wording itself is clear and terse."
+        },
+        {
+          "production_item": "The 'Body' codebase is the onboard software for a differential-drive robot chassis running on a Raspberry Pi, utilizing Python processes communicating via Zenoh (established earlier).",
+          "score_0_3": 2,
+          "note": "Faithful to prior state and dialog, but should have been expanded; wording is adequate as a carry-over."
+        },
+        {
+          "production_item": "The agent possesses a timer sensor that triggers an 'awaken' event every 30 minutes, providing a baseline for asynchronous triggers (established earlier).",
+          "score_0_3": 3,
+          "note": "Terse, specific, self-contained, correctly carried over."
+        },
+        {
+          "production_item": "The current project phase has shifted from 'benchmarking a thesis' to 'active development' (established earlier).",
+          "score_0_3": 3,
+          "note": "Terse, faithful, self-contained."
+        }
+      ],
+      "score": 0.83,
+      "score_basis": "Scores: 2+2+3+3=10 / (4*3)=12 = 0.83; individual items are well-worded but the one newly added item is fabricated"
+    },
+    "overall_note": "The production update correctly carries over all prior items and preserves the Ramana Maharshi decision entry, but entirely fails to execute the gold's primary update requirement: expanding the Body codebase item with the detailed directory structure, component list, Python 3.11+ stack, and integration contract specifics revealed in the dialog. Instead, production adds an unsanctioned new agreement about Jill's approach to personal concerns, which the gold labeller explicitly identifies as a conversational exchange not warranting a formal discourse entry. The result is a state that is consistent with the prior but misses the substantive new knowledge established in the dialog."
+  },
+  "judge_provenance": {
+    "model": "claude-sonnet-4-6",
+    "prompt_version": "v1",
+    "scored_field": "production_new_discourse_state",
+    "ts": "2026-05-10T23:32:30.782730+00:00"
+  }
+}

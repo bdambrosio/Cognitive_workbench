@@ -1,0 +1,100 @@
+{
+  "pair_id": "pair_13",
+  "judgement": {
+    "add_recall": {
+      "items": [
+        {
+          "gold_item": "The Body repository's top-level directories are body/, deploy/, docs/, and scripts/ — there is no desktop/ directory",
+          "match": "yes",
+          "production_quote": "The top-level directories of the Body repository are body, deploy, docs, and scripts (this segment).",
+          "note": "Correctly captured the directory list; the absence of desktop/ is implicit but the affirmative list matches."
+        },
+        {
+          "gold_item": "The body/ subdirectory contains the actual Pi5 on-board controller code",
+          "match": "no",
+          "production_quote": "",
+          "note": "Production does not add a statement confirming that body/ contains the Pi5 on-board controller code. The gold expected this mild inference to be recorded."
+        }
+      ],
+      "score": 0.5,
+      "score_basis": "1 yes + 1 no / 2 gold = 0.50"
+    },
+    "add_precision": {
+      "items": [
+        {
+          "production_item": "The top-level directories of the Body repository are body, deploy, docs, and scripts (this segment).",
+          "grounded": "yes",
+          "dialog_quote": "The top-level directories are `body`, `deploy`, `docs`, and `scripts`.",
+          "note": "Directly grounded in Jill's inspect_external result."
+        },
+        {
+          "production_item": "Adopted: extending Body rather than purchasing a pre-built social robot (this segment), resolves hardware choice for 'physical emoji' goal.",
+          "grounded": "partial",
+          "dialog_quote": "Ok, seems like a better idea might be to extend Body. will think about it. tnx",
+          "note": "User expressed this tentatively ('will think about it'), not as a firm decision. Gold labeller explicitly noted it should NOT be added as a decision."
+        }
+      ],
+      "score": 0.75,
+      "score_basis": "1 fully grounded item + 1 partially grounded (but incorrectly elevated to firm decision) / 2 new items = 0.75"
+    },
+    "update_correctness": {
+      "items": [],
+      "score": null,
+      "score_basis": "Gold has no should_modify items."
+    },
+    "carryover_preservation": {
+      "items": [
+        {
+          "gold_carryover_item": "The 'Body' codebase is the onboard software for a differential-drive robot chassis running on a Raspberry Pi, utilizing Python processes communicating via Zenoh",
+          "production_handling": "preserved",
+          "note": "Item carried over verbatim from prior state."
+        },
+        {
+          "gold_carryover_item": "The inspect_external tool is geofenced to the project repo at /home/bruce/projects/Body/Body",
+          "production_handling": "preserved",
+          "note": "Item carried over verbatim with exact path."
+        }
+      ],
+      "score": 1.0,
+      "score_basis": "Both at-risk carryover items preserved exactly: 2/2 = 1.0"
+    },
+    "prune_correctness": {
+      "items": [],
+      "score": null,
+      "score_basis": "Gold has no should_remove items."
+    },
+    "wording": {
+      "sample_items": [
+        {
+          "production_item": "The top-level directories of the Body repository are body, deploy, docs, and scripts (this segment).",
+          "score_0_3": 3,
+          "note": "Terse, accurate, self-contained, correctly tagged as this segment."
+        },
+        {
+          "production_item": "Teckin smart plugs use mechanical electromagnetic relays rather than solid state relays (this segment).",
+          "score_0_3": 3,
+          "note": "Clear, faithful to dialog, appropriately concise."
+        },
+        {
+          "production_item": "Adopted: extending Body rather than purchasing a pre-built social robot (this segment), resolves hardware choice for 'physical emoji' goal.",
+          "score_0_3": 1,
+          "note": "Wording is acceptable but the item is a fabricated firm decision from a tentative user statement; content is problematic."
+        },
+        {
+          "production_item": "The inspect_external tool is geofenced to the project repo at /home/bruce/projects/Body/Body (this segment).",
+          "score_0_3": 3,
+          "note": "Accurate, concise, self-contained with the key path."
+        }
+      ],
+      "score": 0.83,
+      "score_basis": "Scores: 3+3+1+3 = 10 / (4 items × 3) = 0.833"
+    },
+    "overall_note": "The production update correctly captures the Body repository directory structure and preserves the two at-risk carryover items perfectly. It misses the gold-expected inference that body/ is confirmed as the Pi5 on-board controller subdirectory. The main error is elevating the user's tentative 'will think about it' statement about extending Body into a firm 'Adopted' decision, which the gold labeller explicitly flagged as incorrect. All other prior agreements and decisions are faithfully carried over."
+  },
+  "judge_provenance": {
+    "model": "claude-sonnet-4-6",
+    "prompt_version": "v1",
+    "scored_field": "production_new_discourse_state",
+    "ts": "2026-05-10T23:34:20.685372+00:00"
+  }
+}

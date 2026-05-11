@@ -1,0 +1,39 @@
+{
+  "model": "claude-sonnet-4-6",
+  "prompt_version": "v1",
+  "scored_field": "production_new_discourse_state",
+  "ts": "2026-05-10T23:37:36.938672+00:00",
+  "n_pairs_in_pool": 20,
+  "axes": {
+    "add_recall": {
+      "mean": 0.281,
+      "n_scored_pairs": 18,
+      "n_total_pairs": 20
+    },
+    "add_precision": {
+      "mean": 0.783,
+      "n_scored_pairs": 15,
+      "n_total_pairs": 20
+    },
+    "update_correctness": {
+      "mean": 0.1,
+      "n_scored_pairs": 10,
+      "n_total_pairs": 20
+    },
+    "carryover_preservation": {
+      "mean": 0.973,
+      "n_scored_pairs": 20,
+      "n_total_pairs": 20
+    },
+    "prune_correctness": {
+      "mean": 0.0,
+      "n_scored_pairs": 2,
+      "n_total_pairs": 20
+    },
+    "wording": {
+      "mean": 0.822,
+      "n_scored_pairs": 20,
+      "n_total_pairs": 20
+    }
+  }
+}

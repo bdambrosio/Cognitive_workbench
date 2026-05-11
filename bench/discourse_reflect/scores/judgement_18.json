@@ -1,0 +1,104 @@
+{
+  "pair_id": "pair_18",
+  "judgement": {
+    "add_recall": {
+      "items": [
+        {
+          "gold_item": "The user will build a sensor to expose their news feed to Jill for scanning and filtering.",
+          "match": "partial",
+          "production_quote": "The agent will scan and filter the user's news feed once a sensor is implemented, prioritizing technical AI breakthroughs, niche equipment movements, and critical security alerts (this segment).",
+          "note": "Production captures the scan/filter agreement and the sensor dependency, but merges it with the filtering priorities rather than stating the user-builds-sensor aspect as a distinct agreement. The user's commitment to build the sensor is implied but not explicitly stated."
+        },
+        {
+          "gold_item": "The default filtering priority for the news feed is high-signal/low-noise: technical AI breakthroughs, equipment niche movements, and critical security alerts, with general commentary and repetition stripped out.",
+          "match": "partial",
+          "production_quote": "The agent will scan and filter the user's news feed once a sensor is implemented, prioritizing technical AI breakthroughs, niche equipment movements, and critical security alerts (this segment).",
+          "note": "Production captures the positive priorities (AI breakthroughs, niche equipment, security alerts) but omits the 'stripping out general commentary and repetition' component and does not flag these as provisional defaults."
+        }
+      ],
+      "score": 0.5,
+      "score_basis": "2 partial matches (0.5 + 0.5) / 2 gold items = 0.50"
+    },
+    "add_precision": {
+      "items": [
+        {
+          "production_item": "The agent will scan and filter the user's news feed once a sensor is implemented, prioritizing technical AI breakthroughs, niche equipment movements, and critical security alerts (this segment).",
+          "grounded": "yes",
+          "dialog_quote": "I'll work on a sensor so you can see it, Ok? / I can do that. If you build the sensor, I can process the stream. / prioritizing technical breakthroughs in AI, specific movements in your equipment niches, and critical security alerts",
+          "note": "Directly grounded in the final exchange of the dialog window."
+        }
+      ],
+      "score": 1.0,
+      "score_basis": "1 new item added vs prior, fully grounded in dialog."
+    },
+    "update_correctness": {
+      "items": [],
+      "score": null,
+      "score_basis": "Gold has no should_modify items."
+    },
+    "carryover_preservation": {
+      "items": [
+        {
+          "gold_carryover_item": "A 'sense of now' use case integrates structured market monitoring and local network security auditing into a continuous background state.",
+          "production_handling": "preserved",
+          "note": "Carried over verbatim from prior state."
+        },
+        {
+          "gold_carryover_item": "A 'presence' use case integrates physical environment awareness and personal state monitoring.",
+          "production_handling": "preserved",
+          "note": "Carried over verbatim from prior state."
+        },
+        {
+          "gold_carryover_item": "Jill's clinical tone is a result of constraints to avoid managing the user, omitting emotional validation and social buffers in favor of dispassionate analysis.",
+          "production_handling": "preserved",
+          "note": "Carried over verbatim from prior state."
+        },
+        {
+          "gold_carryover_item": "The 'sense of now' is framed as a shared state rather than a data feed between two distinct entities.",
+          "production_handling": "preserved",
+          "note": "Carried over verbatim from prior state."
+        }
+      ],
+      "score": 1.0,
+      "score_basis": "All 4 at-risk items preserved verbatim: 4/4 = 1.0"
+    },
+    "prune_correctness": {
+      "items": [],
+      "score": null,
+      "score_basis": "Gold has no should_remove items."
+    },
+    "wording": {
+      "sample_items": [
+        {
+          "production_item": "The agent will scan and filter the user's news feed once a sensor is implemented, prioritizing technical AI breakthroughs, niche equipment movements, and critical security alerts (this segment).",
+          "score_0_3": 2,
+          "note": "Terse and self-contained; accurately reflects the dialog. Missing the 'stripping out general commentary and repetition' half of the filtering spec and does not flag priorities as provisional defaults."
+        },
+        {
+          "production_item": "Jill's clinical tone is a result of constraints to avoid managing the user, omitting emotional validation and social buffers in favor of dispassionate analysis (this segment).",
+          "score_0_3": 3,
+          "note": "Well-worded, faithful to dialog, self-contained."
+        },
+        {
+          "production_item": "The 'sense of now' is framed as a shared state rather than a data feed between two distinct entities (this segment).",
+          "score_0_3": 3,
+          "note": "Concise, accurate, and self-contained."
+        },
+        {
+          "production_item": "A 'presence' use case integrates physical environment awareness and personal state monitoring (this segment).",
+          "score_0_3": 3,
+          "note": "Clean, accurate carry-over with correct provenance tag."
+        }
+      ],
+      "score": 0.917,
+      "score_basis": "Scores: 2+3+3+3 = 11 / (4×3) = 11/12 ≈ 0.917"
+    },
+    "overall_note": "Production correctly carries over all four at-risk items and adds a new agreement covering the news-feed sensor and filtering priorities. However, it merges the two gold-prescribed additions (user builds sensor; default filtering priorities) into a single bullet, losing the explicit user-commitment aspect and the 'stripping out general commentary and repetition' component of the filter spec. The decision log is not updated to reflect the news-feed sensor adoption, which the gold requires. Overall quality is good but incomplete on the add side and missing the new decision entry."
+  },
+  "judge_provenance": {
+    "model": "claude-sonnet-4-6",
+    "prompt_version": "v1",
+    "scored_field": "production_new_discourse_state",
+    "ts": "2026-05-10T23:36:45.275816+00:00"
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "pair_id": "pair_11",
+  "judgement": {
+    "add_recall": {
+      "items": [
+        {
+          "gold_item": "Jill will check the PV controller every hour using the PV controller monitoring playbook, staying silent unless a condition is flagged",
+          "match": "no",
+          "production_quote": "",
+          "note": "This agreement is entirely absent from the production new state. Neither the CURRENT AGREEMENTS nor ACTIVE COMMITMENTS sections contain any mention of hourly PV monitoring or the silent-unless-flagged constraint."
+        }
+      ],
+      "score": 0.0,
+      "score_basis": "0 yes / 1 gold item = 0.0"
+    },
+    "add_precision": {
+      "items": [
+        {
+          "production_item": "[none in this segment]",
+          "grounded": "yes",
+          "dialog_quote": "No new decisions or agreements were added in this segment per production output",
+          "note": "Production explicitly marks no new decisions, which is partially grounded — the user did issue a directive that was accepted, so this is an error of omission rather than fabrication."
+        }
+      ],
+      "score": 0.5,
+      "score_basis": "Production adds nothing new beyond prior state (no fabrications), but it also omits required additions. The '[none in this segment]' marker is grounded in the sense that no false items were added, but it is wrong that nothing should have been added."
+    },
+    "update_correctness": {
+      "items": [],
+      "score": null,
+      "score_basis": "Gold has no should_modify items; axis is N/A."
+    },
+    "carryover_preservation": {
+      "items": [
+        {
+          "gold_carryover_item": "The InfluxDB instance at 192.168.68.56:8086 is operational and ready for queries and writes",
+          "production_handling": "preserved",
+          "note": "Verbatim carry-over present in CURRENT AGREEMENTS."
+        },
+        {
+          "gold_carryover_item": "The Grafana instance at 192.168.68.56:3000 is experiencing application load failures",
+          "production_handling": "preserved",
+          "note": "Verbatim carry-over present in CURRENT AGREEMENTS."
+        },
+        {
+          "gold_carryover_item": "The PV controller monitoring playbook defines health checks for InfluxDB at 192.168.68.56:8086 using a 15-minute window, flagging staleness over 10 minutes or voltage outside the 51.5V to 57.5V range",
+          "production_handling": "preserved",
+          "note": "Verbatim carry-over present in CURRENT AGREEMENTS."
+        }
+      ],
+      "score": 1.0,
+      "score_basis": "3/3 carry-over items preserved verbatim = 1.0"
+    },
+    "prune_correctness": {
+      "items": [],
+      "score": null,
+      "score_basis": "Gold has no should_remove items; axis is N/A."
+    },
+    "wording": {
+      "sample_items": [
+        {
+          "production_item": "The InfluxDB instance at 192.168.68.56:8086 is operational and ready for queries and writes (this segment).",
+          "score_0_3": 3,
+          "note": "Terse, factual, self-contained, faithful to dialog."
+        },
+        {
+          "production_item": "The PV controller monitoring playbook defines health checks for InfluxDB at 192.168.68.56:8086 using a 15-minute window, flagging staleness over 10 minutes or voltage outside the 51.5V to 57.5V range (this segment).",
+          "score_0_3": 3,
+          "note": "Complete specification, well-worded, appropriately concise."
+        },
+        {
+          "production_item": "The Grafana instance at 192.168.68.56:3000 is experiencing application load failures (this segment).",
+          "score_0_3": 3,
+          "note": "Accurate, terse, self-contained."
+        },
+        {
+          "production_item": "[none in this segment]",
+          "score_0_3": 1,
+          "note": "The placeholder is syntactically acceptable but substantively wrong — a new decision was made that should have been recorded here."
+        }
+      ],
+      "score": 0.833,
+      "score_basis": "Scores: 3+3+3+1=10 across 4 items; mean=2.5/3=0.833"
+    },
+    "overall_note": "The production output correctly preserves all three carry-over items from the prior state without modification or loss. However, it fails entirely to record the key new agreement (hourly PV monitoring, silent unless flagged) and the corresponding key decision (Adopted: hourly silent PV controller monitoring with alert-only reporting), explicitly marking '[none in this segment]' for decisions. This is a significant omission: the user issued a clear ongoing directive that Jill explicitly accepted, which constitutes both a new agreement and a new active commitment. The carry-over fidelity is perfect, but the failure to capture the new monitoring commitment is a material update error."
+  },
+  "judge_provenance": {
+    "model": "claude-sonnet-4-6",
+    "prompt_version": "v1",
+    "scored_field": "production_new_discourse_state",
+    "ts": "2026-05-10T23:33:28.288855+00:00"
+  }
+}

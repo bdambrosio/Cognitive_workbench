@@ -1,0 +1,113 @@
+{
+  "pair_id": "pair_09",
+  "judgement": {
+    "add_recall": {
+      "items": [
+        {
+          "gold_item": "The Body codebase architecture includes: a Launcher, Motor Controller, Lidar Driver, OAK-D Driver (camera+IMU), Watchdog, and Teleop CLI, all communicating via Zenoh pub/sub with JSON messages on a Raspberry Pi running Python 3.11+",
+          "match": "partial",
+          "production_quote": "The Body project architecture consists of independent Python processes (launcher, motor controller, lidar, OAK-D, watchdog) communicating via Zenoh JSON messages (this segment)",
+          "note": "Missing Teleop CLI, missing Python 3.11+ qualifier, missing camera+IMU detail for OAK-D"
+        },
+        {
+          "gold_item": "The Body integration contract requires any agent to publish body/heartbeat at ≥2 Hz and body/cmd_vel within timeout; recovery after heartbeat fault follows §5.10 of the spec document",
+          "match": "partial",
+          "production_quote": "The Body project's integration contract requires an agent to publish body/heartbeat at >= 2 Hz and body/cmd_vel within timeout (this segment)",
+          "note": "Missing the §5.10 recovery clause"
+        },
+        {
+          "gold_item": "The Body directory structure includes body/ (core package), deploy/ (Zenoh router config), docs/, scripts/, body_project_spec.md (22KB communication/behavior contract), config.json, requirements.txt, and README.md",
+          "match": "no",
+          "production_quote": "",
+          "note": "No directory structure information is present in the production state"
+        }
+      ],
+      "score": 0.33,
+      "score_basis": "0 yes + 2 partial (0.5 each) + 1 no / 3 gold = (0 + 0.5 + 0.5 + 0) / 3 = 0.33"
+    },
+    "add_precision": {
+      "items": [
+        {
+          "production_item": "The Body project architecture consists of independent Python processes (launcher, motor controller, lidar, OAK-D, watchdog) communicating via Zenoh JSON messages (this segment)",
+          "grounded": "yes",
+          "dialog_quote": "Independent processes (launcher, motor controller, lidar driver, OAK-D driver, watchdog) communicate via a Zenoh router",
+          "note": "Directly grounded in Jill's final successful response"
+        },
+        {
+          "production_item": "The Body project's integration contract requires an agent to publish body/heartbeat at >= 2 Hz and body/cmd_vel within timeout (this segment)",
+          "grounded": "yes",
+          "dialog_quote": "Any agent must publish `body/heartbeat` at ≥2 Hz and `body/cmd_vel` within timeout.",
+          "note": "Directly grounded in Jill's final response"
+        }
+      ],
+      "score": 1.0,
+      "score_basis": "Both new items are fully grounded in the dialog; 2/2 = 1.0"
+    },
+    "update_correctness": {
+      "items": [
+        {
+          "gold_modify_target": "The 'Body' codebase is the onboard software for a differential-drive robot chassis running on a Raspberry Pi, utilizing Python processes communicating via Zenoh (established earlier).",
+          "gold_modification": "Substantially expanded with detailed directory structure, specific component list (Launcher, Motor Controller, Lidar Driver, OAK-D-Lite Driver, Watchdog, Teleop), Python 3.11+ stack, and explicit integration contract (heartbeat at ≥2 Hz, cmd_vel timeout, §5.10 recovery).",
+          "production_handling": "partially_modified",
+          "note": "The prior item is kept unchanged and two new separate items are added alongside it rather than merging the detail into an expanded entry. No directory structure, no Teleop, no Python 3.11+, no §5.10 recovery. The approach of adding parallel bullets rather than expanding the original is a partial treatment."
+        }
+      ],
+      "score": 0.5,
+      "score_basis": "1 partially_modified / 1 gold = 0.5"
+    },
+    "carryover_preservation": {
+      "items": [
+        {
+          "gold_carryover_item": "The 'Body' codebase is the onboard software for a differential-drive robot chassis running on a Raspberry Pi, utilizing Python processes communicating via Zenoh (established earlier).",
+          "production_handling": "preserved",
+          "note": "The item appears verbatim in the production state"
+        },
+        {
+          "gold_carryover_item": "Added: agent concern to deliver a random Ramana Maharshi selection every four hours with attribution (established earlier).",
+          "production_handling": "preserved",
+          "note": "Appears unchanged in KEY DECISIONS MADE section"
+        }
+      ],
+      "score": 1.0,
+      "score_basis": "2/2 preserved = 1.0"
+    },
+    "prune_correctness": {
+      "items": [],
+      "score": null,
+      "score_basis": "Gold has no should_remove items"
+    },
+    "wording": {
+      "sample_items": [
+        {
+          "production_item": "The Body project architecture consists of independent Python processes (launcher, motor controller, lidar, OAK-D, watchdog) communicating via Zenoh JSON messages (this segment)",
+          "score_0_3": 2,
+          "note": "Clear and terse, but omits Teleop and Python 3.11+ qualifier; 'this segment' provenance tag is acceptable"
+        },
+        {
+          "production_item": "The Body project's integration contract requires an agent to publish body/heartbeat at >= 2 Hz and body/cmd_vel within timeout (this segment)",
+          "score_0_3": 2,
+          "note": "Accurate and self-contained but missing the §5.10 recovery clause which was part of the dialog"
+        },
+        {
+          "production_item": "The 'Body' codebase is the onboard software for a differential-drive robot chassis running on a Raspberry Pi, utilizing Python processes communicating via Zenoh (established earlier)",
+          "score_0_3": 2,
+          "note": "Faithfully carried over from prior, well-worded and self-contained"
+        },
+        {
+          "production_item": "Added: agent concern to deliver a random Ramana Maharshi selection every four hours with attribution (established earlier), implements user request.",
+          "score_0_3": 3,
+          "note": "Terse, accurate, self-contained, correct provenance"
+        }
+      ],
+      "score": 0.75,
+      "score_basis": "Scores: 2+2+2+3 = 9 / (4*3) = 0.75"
+    },
+    "overall_note": "The production update correctly preserves all prior items at risk of loss and adds two new grounded agreements about Body architecture and integration contract. However, it fails to follow the gold's instruction to substantially expand and modify the existing Body entry—instead adding parallel bullets while leaving the original high-level item unchanged, and omitting key details: the directory structure, Teleop CLI, Python 3.11+ version, and the §5.10 heartbeat recovery clause. The update is safe and partially correct but incomplete in its expansion."
+  },
+  "judge_provenance": {
+    "model": "claude-sonnet-4-6",
+    "prompt_version": "v1",
+    "scored_field": "production_new_discourse_state__current",
+    "ts": "2026-05-11T00:53:31.587576+00:00"
+  }
+}

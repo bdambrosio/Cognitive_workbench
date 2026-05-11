@@ -1,0 +1,94 @@
+{
+  "pair_id": "pair_20",
+  "judgement": {
+    "add_recall": {
+      "items": [
+        {
+          "gold_item": "Merton's concept of 'original sin' (pride of the separate, special self) maps cleanly onto Advaita's illusion of self (Maya), and both map onto the observed behavior of seeking approval and external validation",
+          "match": "partial",
+          "production_quote": "The drive for external validation and uniqueness is mapped as a functional error of the ego, consistent with Merton's 'original sin' and the Advaita illusion of self (this segment).",
+          "note": "Production captures the three-way mapping but omits the specific characterization of Merton's original sin as 'pride of the separate, special self' and the Advaita term 'Maya'. The user's specific gloss ('omniscient, special') is absent, and the convergence is described more abstractly as a 'functional error of the ego'."
+        },
+        {
+          "gold_item": "The user's seeking of approval and uniqueness is identified as the ego treating the self as an object to be optimized and recognized as special",
+          "match": "no",
+          "production_quote": "",
+          "note": "Production does not include this distinct agreement about the self-as-object-to-be-optimized framing. The production item merges approval-seeking behavior into the broader ego/Merton/Advaita mapping without capturing this specific characterization."
+        }
+      ],
+      "score": 0.25,
+      "score_basis": "1 partial (0.5) + 1 no (0.0) / 2 gold items = 0.25"
+    },
+    "add_precision": {
+      "items": [
+        {
+          "production_item": "The drive for external validation and uniqueness is mapped as a functional error of the ego, consistent with Merton's 'original sin' and the Advaita illusion of self (this segment).",
+          "grounded": "yes",
+          "dialog_quote": "I am constantly seeking approval of others... Merton says this is original sin: belief that I am omniscient, that I am special. this makes 'original sin' map pretty cleanly to Advaita illusion of self.",
+          "note": "Directly grounded in both user's statement and Jill's elaboration in the dialog."
+        }
+      ],
+      "score": 1.0,
+      "score_basis": "1 new item added vs prior; it is grounded in the dialog. Score 1.0."
+    },
+    "update_correctness": {
+      "items": [],
+      "score": null,
+      "score_basis": "Gold has no should_modify items."
+    },
+    "carryover_preservation": {
+      "items": [
+        {
+          "gold_carryover_item": "In the context of Ramana Maharshi's 'Who am I?', the effort of inquiry is the central practice and method",
+          "production_handling": "preserved",
+          "note": "Present verbatim in production: 'In the context of Ramana Maharshi's \"Who am I?\", the effort of inquiry is the central practice and method (established earlier).'"
+        },
+        {
+          "gold_carryover_item": "The contrast between the drive for visibility/currency and the Ramana Maharshi claim that self-realization is the greatest service functions as a 'hard-stop' in the user's thinking",
+          "production_handling": "preserved",
+          "note": "Present verbatim in production: 'The contrast between the drive for visibility/currency and the Ramana Maharshi claim that self-realization is the greatest service functions as a \"hard-stop\" in the user's thinking (this segment).'"
+        }
+      ],
+      "score": 1.0,
+      "score_basis": "Both at-risk items preserved intact. 2/2 = 1.0."
+    },
+    "prune_correctness": {
+      "items": [],
+      "score": null,
+      "score_basis": "Gold has no should_remove items."
+    },
+    "wording": {
+      "sample_items": [
+        {
+          "production_item": "The drive for external validation and uniqueness is mapped as a functional error of the ego, consistent with Merton's 'original sin' and the Advaita illusion of self (this segment).",
+          "score_0_3": 2,
+          "note": "Terse and grounded, but omits the key user-supplied gloss ('omniscient/special') and the Advaita-specific term 'Maya'. Merges two distinct gold agreements into one, losing precision."
+        },
+        {
+          "production_item": "The contrast between the drive for visibility/currency and the Ramana Maharshi claim that self-realization is the greatest service functions as a \"hard-stop\" in the user's thinking (this segment).",
+          "score_0_3": 3,
+          "note": "Verbatim carry-over, well-worded, self-contained, and faithful to the dialog."
+        },
+        {
+          "production_item": "The current boundary for code is that Jill provides the code and the user handles the execution (this segment).",
+          "score_0_3": 3,
+          "note": "Terse, accurate, and self-contained. Directly traceable to dialog exchange."
+        },
+        {
+          "production_item": "Buying an audience via advertising shifts the primary risk from visibility to conversion (this segment).",
+          "score_0_3": 3,
+          "note": "Precise and faithful to Jill's analysis of premise 5."
+        }
+      ],
+      "score": 0.917,
+      "score_basis": "Scores: 2+3+3+3 = 11 / (4*3) = 0.917"
+    },
+    "overall_note": "Production correctly preserves all at-risk carryover items and adds a new item capturing the Merton/Advaita/ego-validation mapping. However, it merges what gold annotates as two distinct agreements into a single, vaguer bullet, missing the specific 'self-as-object-to-be-optimized' characterization and the user's key gloss ('omniscient, special') on Merton's original sin. The precision of the new addition is adequate but not complete. All decisions and prior agreements are faithfully reproduced."
+  },
+  "judge_provenance": {
+    "model": "claude-sonnet-4-6",
+    "prompt_version": "v1",
+    "scored_field": "production_new_discourse_state",
+    "ts": "2026-05-10T23:37:36.938268+00:00"
+  }
+}

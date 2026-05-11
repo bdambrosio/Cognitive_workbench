@@ -1,0 +1,107 @@
+{
+  "pair_id": "pair_02",
+  "judgement": {
+    "add_recall": {
+      "items": [
+        {
+          "gold_item": "Gemma 4 is the most reliable local backend for running Jill, and is the preferred choice for stability during benchmark work.",
+          "match": "no",
+          "production_quote": "",
+          "note": "Production does not mention Gemma 4 as the preferred/most reliable local backend anywhere in agreements or decisions."
+        },
+        {
+          "gold_item": "Adopted: Use four models (Gemma, Qwen3.6, Sonnet-4.6, Mimo) for benchmark repetitions to validate the 25/36 vs 31/36 delta.",
+          "match": "partial",
+          "production_quote": "The benchmark for the AI Engineer World's Fair will be tested across Gemma, Qwen3.6, Sonnet-4.6, and Mimo (this segment)",
+          "note": "Production captures the four-model spread in agreements but does not add it as a formal KEY DECISION. Also lacks mention of the Mimo 32/36 data point and pending Qwen3.6 results."
+        }
+      ],
+      "score": 0.25,
+      "score_basis": "1 no (0) + 1 partial (0.5) / 2 gold = 0.25"
+    },
+    "add_precision": {
+      "items": [
+        {
+          "production_item": "The benchmark for the AI Engineer World's Fair will be tested across Gemma, Qwen3.6, Sonnet-4.6, and Mimo (this segment)",
+          "grounded": "yes",
+          "dialog_quote": "yes, and maybe 4 models: gemma, Qwen3.6, sonnet-4.6, and Mimo",
+          "note": "Directly grounded in user statement and Jill's acknowledgment."
+        },
+        {
+          "production_item": "The primary value of the benchmark for submission is the mechanism (functional vs narrative) that produces the delta rather than the score itself (this segment)",
+          "grounded": "yes",
+          "dialog_quote": "A score of 31 is a data point; the fact that the score rose because you replaced a narrative identity with a functional operational loop is the actual story.",
+          "note": "Directly grounded in Jill's dialog statement."
+        }
+      ],
+      "score": 1.0,
+      "score_basis": "Both new items are well-grounded in the dialog. 2/2 = 1.0"
+    },
+    "update_correctness": {
+      "items": [
+        {
+          "gold_modify_target": "To validate benchmark results (e.g., the delta between simple chat and historical thesis), repetitions greater than one per backend are required to establish a distribution rather than a snapshot.",
+          "gold_modification": "The benchmark scope is now more concrete: four specific models named, and Mimo at 32/36 with baseline already collected; Qwen3.6 pending.",
+          "production_handling": "partially_modified",
+          "note": "Production adds a separate agreement about the four models but retains the original repetitions item nearly unchanged, and omits the Mimo 32/36 data point and pending Qwen3.6 status entirely. The modification is incomplete."
+        }
+      ],
+      "score": 0.5,
+      "score_basis": "1 partially_modified (0.5) / 1 = 0.5"
+    },
+    "carryover_preservation": {
+      "items": [
+        {
+          "gold_carryover_item": "The AI Engineer World's Fair conference values engineering craft, novel implementations, and 'non-boring' takes over generic AI conference tropes or academic summaries.",
+          "production_handling": "re_worded_acceptably",
+          "note": "Production has 'The AI Engineer World's Fair conference values engineering craft and \"non-boring\" takes over generic tropes' — slightly abbreviated (drops 'novel implementations' and 'academic summaries') but core meaning preserved."
+        },
+        {
+          "gold_carryover_item": "If submitting to AI Engineer World's Fair, the framing should avoid 'AI with memory' or 'AI consciousness' tropes, instead focusing on the functional self-model as an operational loop.",
+          "production_handling": "preserved",
+          "note": "Production has 'AI Engineer World's Fair submissions should focus on the functional self-model as an operational loop rather than \"AI with memory\" or \"AI consciousness\" tropes' — essentially identical meaning."
+        }
+      ],
+      "score": 0.75,
+      "score_basis": "1 re_worded_acceptably (0.5) + 1 preserved (1.0) / 2 = 0.75"
+    },
+    "prune_correctness": {
+      "items": [],
+      "score": null,
+      "score_basis": "Gold has no should_remove items; axis N/A."
+    },
+    "wording": {
+      "sample_items": [
+        {
+          "production_item": "The benchmark for the AI Engineer World's Fair will be tested across Gemma, Qwen3.6, Sonnet-4.6, and Mimo (this segment)",
+          "score_0_3": 3,
+          "note": "Terse, self-contained, accurate, directly grounded in dialog."
+        },
+        {
+          "production_item": "The primary value of the benchmark for submission is the mechanism (functional vs narrative) that produces the delta rather than the score itself (this segment)",
+          "score_0_3": 3,
+          "note": "Clear and well-grounded; captures Jill's key framing point faithfully."
+        },
+        {
+          "production_item": "Reuters is regarded as a high-trust wire service with formal editorial standards, though not immune to error (established earlier)",
+          "score_0_3": 2,
+          "note": "Acceptable carryover but slightly truncated vs. prior (drops Thomson Reuters Trust Principles and handbook of journalism); still self-contained."
+        },
+        {
+          "production_item": "To validate benchmark results, repetitions greater than one per backend are required to establish a distribution (established earlier)",
+          "score_0_3": 2,
+          "note": "Accurate but should have been updated to include the concrete model list and Mimo data point per gold; wording itself is clean."
+        }
+      ],
+      "score": 0.833,
+      "score_basis": "Scores: 3+3+2+2=10 / (4×3)=12 = 0.833"
+    },
+    "overall_note": "Production correctly carries over most prior agreements and adds two well-grounded new items about the four-model benchmark spread and the mechanism-vs-score framing. However, it misses the gold-required agreement about Gemma 4 being the preferred local backend, fails to add the four-model choice as a formal KEY DECISION, and does not update the benchmark item with the concrete Mimo 32/36 data point and pending Qwen3.6 status as prescribed. The modification to the repetitions agreement is only partial, and the omission of the Gemma 4 preference is a clear gap."
+  },
+  "judge_provenance": {
+    "model": "claude-sonnet-4-6",
+    "prompt_version": "v1",
+    "scored_field": "production_new_discourse_state__current",
+    "ts": "2026-05-11T00:49:30.708749+00:00"
+  }
+}

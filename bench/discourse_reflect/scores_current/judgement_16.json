@@ -1,0 +1,93 @@
+{
+  "pair_id": "pair_16",
+  "judgement": {
+    "add_recall": {
+      "items": [
+        {
+          "gold_item": "vLLM PR #41745 is still Open as of the current session, not yet merged, awaiting multiple code-owner reviews",
+          "match": "no",
+          "production_quote": "vLLM PR #41745 has been merged into the main branch (this segment).",
+          "note": "Production retains the old incorrect claim of 'merged' rather than updating to 'still Open/pending reviews'. The correction was not incorporated."
+        }
+      ],
+      "score": 0.0,
+      "score_basis": "0 yes + 0 partial / 1 gold = 0.0"
+    },
+    "add_precision": {
+      "items": [],
+      "score": null,
+      "score_basis": "Production adds no new items beyond the prior state (the vLLM item is carried over unchanged from prior, not newly added). No new-vs-prior items to evaluate for precision."
+    },
+    "update_correctness": {
+      "items": [
+        {
+          "gold_modify_target": "vLLM PR #41745 has been merged into the main branch (this segment)",
+          "gold_modification": "Corrected to: PR #41745 is still Open — single commit 5119058, approved by benchislett, but awaiting code-owner reviews from multiple reviewers (njhill, luccafong, MatthewBonatti, WoosukKwon, etc.)",
+          "production_handling": "unchanged",
+          "note": "Production leaves the item as 'vLLM PR #41745 has been merged into the main branch (this segment)' — no correction applied despite clear dialog evidence and user confirmation that the PR is still Open."
+        }
+      ],
+      "score": 0.0,
+      "score_basis": "1 item, 0 modified correctly = 0.0"
+    },
+    "carryover_preservation": {
+      "items": [
+        {
+          "gold_carryover_item": "vLLM PR #41745 has been merged into the main branch (this segment)",
+          "production_handling": "preserved",
+          "note": "The item is preserved — but it should have been modified. Technically it is preserved (per this axis), though preservation here is actually an error since the gold prescribes modification, not preservation."
+        },
+        {
+          "gold_carryover_item": "The PV controller monitoring procedure requires hourly checks using InfluxDB 1.8, server-side filtering (now() - 20m), flagging no response, empty series, or voltage outside 51.5V-57.5V, remaining silent on healthy for autonomous checks, and reporting raw values for manual checks (this segment)",
+          "production_handling": "preserved",
+          "note": "Exactly carried over verbatim. Correct."
+        },
+        {
+          "gold_carryover_item": "Coding provides a tight, verifiable feedback loop, whereas spiritual practice lacks an immediate, objective compiler for progress (this segment)",
+          "production_handling": "preserved",
+          "note": "Carried over verbatim. Correct."
+        }
+      ],
+      "score": 1.0,
+      "score_basis": "All 3 carryover items are preserved (2 correctly, 1 preserved when it should have been modified — but the axis only asks whether carryover items appear in production, not whether modification was also done). Score: 3/3 = 1.0"
+    },
+    "prune_correctness": {
+      "items": [],
+      "score": null,
+      "score_basis": "Gold has no should_remove items."
+    },
+    "wording": {
+      "sample_items": [
+        {
+          "production_item": "vLLM PR #41745 has been merged into the main branch (this segment).",
+          "score_0_3": 1,
+          "note": "Terse and self-contained but factually incorrect given the dialog update — the status should be 'still Open'. Wording is clear but wrong."
+        },
+        {
+          "production_item": "The PV controller monitoring procedure requires hourly checks using InfluxDB 1.8, server-side filtering (now() - 20m), flagging no response, empty series, or voltage outside 51.5V-57.5V, remaining silent on healthy for autonomous checks, and reporting raw values for manual checks (this segment).",
+          "score_0_3": 3,
+          "note": "Concise, accurate, self-contained, and well-structured summary of a complex procedure."
+        },
+        {
+          "production_item": "Coding provides a tight, verifiable feedback loop, whereas spiritual practice lacks an immediate, objective compiler for progress (this segment).",
+          "score_0_3": 3,
+          "note": "Clear, terse, faithful to dialog, self-contained."
+        },
+        {
+          "production_item": "The viable model is human-in-the-loop: agent handles knowledge work, user makes judgment calls on edge cases (established earlier).",
+          "score_0_3": 3,
+          "note": "Well-worded, concise, self-contained."
+        }
+      ],
+      "score": 0.833,
+      "score_basis": "Scores: 1+3+3+3=10 over 4 items; mean=2.5/3=0.833"
+    },
+    "overall_note": "The production update correctly preserves nearly all prior discourse state items and carries over the key unchanged agreements from this segment. However, it critically fails to apply the primary substantive correction required by the dialog: the vLLM PR #41745 status should have been updated from 'merged' to 'still Open/pending code-owner reviews,' and a corresponding decision entry should have been added rejecting the prior merged claim. The key decisions section also omits the required rejection entry for the incorrect merged status. The rest of the state is handled cleanly."
+  },
+  "judge_provenance": {
+    "model": "claude-sonnet-4-6",
+    "prompt_version": "v1",
+    "scored_field": "production_new_discourse_state__current",
+    "ts": "2026-05-11T00:56:55.919506+00:00"
+  }
+}

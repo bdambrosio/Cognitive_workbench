@@ -1,0 +1,222 @@
+[
+  {
+    "id": "pair_01",
+    "trace_index_prior": 1,
+    "trace_index_new": 2,
+    "ts_prior": "2026-05-03T02:11:30.639019+00:00",
+    "prior_segment": "0-45",
+    "new_segment": "0-55",
+    "prior_agreement_count": 14,
+    "new_agreement_count": 15,
+    "user_input_preview": "Hi Jill - what have I told you I need to do?"
+  },
+  {
+    "id": "pair_02",
+    "trace_index_prior": 11,
+    "trace_index_new": 12,
+    "ts_prior": "2026-05-03T16:30:58.323030+00:00",
+    "prior_segment": "0-55",
+    "new_segment": "0-64",
+    "prior_agreement_count": 16,
+    "new_agreement_count": 16,
+    "user_input_preview": "back to gemma4 backend. It is simply the most reliable local backend for you. I love it."
+  },
+  {
+    "id": "pair_03",
+    "trace_index_prior": 13,
+    "trace_index_new": 14,
+    "ts_prior": "2026-05-03T16:49:14.455692+00:00",
+    "prior_segment": "0-19",
+    "new_segment": "0-26",
+    "prior_agreement_count": 16,
+    "new_agreement_count": 17,
+    "user_input_preview": "test? still there? switched backend"
+  },
+  {
+    "id": "pair_04",
+    "trace_index_prior": 26,
+    "trace_index_new": 27,
+    "ts_prior": "2026-05-03T23:51:56.621338+00:00",
+    "prior_segment": "0-25",
+    "new_segment": "0-28",
+    "prior_agreement_count": 21,
+    "new_agreement_count": 22,
+    "user_input_preview": "Hmm. Feeling. A thought: feeling might be something like metadata dynamically inserted into the trace each turn: cpu loa"
+  },
+  {
+    "id": "pair_05",
+    "trace_index_prior": 31,
+    "trace_index_new": 32,
+    "ts_prior": "2026-05-04T01:04:15.878894+00:00",
+    "prior_segment": "0-41",
+    "new_segment": "0-45",
+    "prior_agreement_count": 25,
+    "new_agreement_count": 25,
+    "user_input_preview": "Ah. but the original intention of concerns was exactly that they would be the source of immediate goals you would act on"
+  },
+  {
+    "id": "pair_06",
+    "trace_index_prior": 35,
+    "trace_index_new": 36,
+    "ts_prior": "2026-05-04T01:38:21.173500+00:00",
+    "prior_segment": "0-52",
+    "new_segment": "0-71",
+    "prior_agreement_count": 26,
+    "new_agreement_count": 32,
+    "user_input_preview": "please review and comment on our recent conversation about agency and a trigger-evaluator"
+  },
+  {
+    "id": "pair_07",
+    "trace_index_prior": 43,
+    "trace_index_new": 44,
+    "ts_prior": "2026-05-04T18:17:26.086523+00:00",
+    "prior_segment": "0-27",
+    "new_segment": "0-29",
+    "prior_agreement_count": 41,
+    "new_agreement_count": 44,
+    "user_input_preview": "Please inspect your code and report on the new concerns architecture, esp the difference between user and agent concerns"
+  },
+  {
+    "id": "pair_08",
+    "trace_index_prior": 73,
+    "trace_index_new": 74,
+    "ts_prior": "2026-05-05T02:57:59.386190+00:00",
+    "prior_segment": "0-19",
+    "new_segment": "0-19",
+    "prior_agreement_count": 21,
+    "new_agreement_count": 23,
+    "user_input_preview": "5"
+  },
+  {
+    "id": "pair_09",
+    "trace_index_prior": 85,
+    "trace_index_new": 86,
+    "ts_prior": "2026-05-05T21:06:05.795704+00:00",
+    "prior_segment": "0-24",
+    "new_segment": "0-25",
+    "prior_agreement_count": 24,
+    "new_agreement_count": 25,
+    "user_input_preview": "jill - please review the Body repo and describe the purpose and organization of the codebase"
+  },
+  {
+    "id": "pair_10",
+    "trace_index_prior": 92,
+    "trace_index_new": 93,
+    "ts_prior": "2026-05-05T23:36:40.753512+00:00",
+    "prior_segment": "0-25",
+    "new_segment": "0-26",
+    "prior_agreement_count": 38,
+    "new_agreement_count": 40,
+    "user_input_preview": "evaluate an idea for a small business: 1. there are many 'enthusiast' forum sites, where enthusiasts chat and occasional"
+  },
+  {
+    "id": "pair_11",
+    "trace_index_prior": 101,
+    "trace_index_new": 102,
+    "ts_prior": "2026-05-06T01:31:58.770204+00:00",
+    "prior_segment": "0-19",
+    "new_segment": "0-21",
+    "prior_agreement_count": 43,
+    "new_agreement_count": 43,
+    "user_input_preview": "Please check the PV controller every hour using the PV controller monitoring playbook. Stay silent unless something is f"
+  },
+  {
+    "id": "pair_12",
+    "trace_index_prior": 114,
+    "trace_index_new": 115,
+    "ts_prior": "2026-05-06T16:17:58.131077+00:00",
+    "prior_segment": "0-19",
+    "new_segment": "0-19",
+    "prior_agreement_count": 47,
+    "new_agreement_count": 49,
+    "user_input_preview": "Actual drivers: (1) Jill alerting user to a situation she as been monitoring reaching   \n  critical, when user is away f"
+  },
+  {
+    "id": "pair_13",
+    "trace_index_prior": 135,
+    "trace_index_new": 136,
+    "ts_prior": "2026-05-06T20:27:33.031943+00:00",
+    "prior_segment": "0-45",
+    "new_segment": "0-46",
+    "prior_agreement_count": 52,
+    "new_agreement_count": 53,
+    "user_input_preview": "great. I believe the two important subdirs are body/, which contains the actual Pi5 on-board controller, and desktop/, w"
+  },
+  {
+    "id": "pair_14",
+    "trace_index_prior": 137,
+    "trace_index_new": 138,
+    "ts_prior": "2026-05-06T20:29:03.825891+00:00",
+    "prior_segment": "0-46",
+    "new_segment": "0-55",
+    "prior_agreement_count": 53,
+    "new_agreement_count": 53,
+    "user_input_preview": "oops, sorry, ignore"
+  },
+  {
+    "id": "pair_15",
+    "trace_index_prior": 155,
+    "trace_index_new": 156,
+    "ts_prior": "2026-05-07T02:43:58.097837+00:00",
+    "prior_segment": "0-25",
+    "new_segment": "0-26",
+    "prior_agreement_count": 55,
+    "new_agreement_count": 57,
+    "user_input_preview": "Please monitor the PV controller every hour using the following procedure (this replaces\n   any prior PV check rules):  "
+  },
+  {
+    "id": "pair_16",
+    "trace_index_prior": 169,
+    "trace_index_new": 171,
+    "ts_prior": "2026-05-07T17:59:11.637812+00:00",
+    "prior_segment": "0-33",
+    "new_segment": "0-34",
+    "prior_agreement_count": 54,
+    "new_agreement_count": 54,
+    "user_input_preview": "Describe this image."
+  },
+  {
+    "id": "pair_17",
+    "trace_index_prior": 177,
+    "trace_index_new": 179,
+    "ts_prior": "2026-05-07T19:55:48.568163+00:00",
+    "prior_segment": "0-53",
+    "new_segment": "0-54",
+    "prior_agreement_count": 53,
+    "new_agreement_count": 54,
+    "user_input_preview": "indeed, how about a more general hook into the OS to get a stream of what I am doing? Under the old OODA architecture we"
+  },
+  {
+    "id": "pair_18",
+    "trace_index_prior": 199,
+    "trace_index_new": 200,
+    "ts_prior": "2026-05-08T16:33:54.687973+00:00",
+    "prior_segment": "0-22",
+    "new_segment": "0-23",
+    "prior_agreement_count": 57,
+    "new_agreement_count": 58,
+    "user_input_preview": "Good morning. I wish you could scan and filter my news feed,it is too long. I'll work on a sensor so you can see it, Ok?"
+  },
+  {
+    "id": "pair_19",
+    "trace_index_prior": 226,
+    "trace_index_new": 227,
+    "ts_prior": "2026-05-09T19:36:25.266029+00:00",
+    "prior_segment": "0-29",
+    "new_segment": "0-31",
+    "prior_agreement_count": 60,
+    "new_agreement_count": 60,
+    "user_input_preview": "1. You either are a salesman or you work for one.\n2. I don't want to work for one.\n3. A salesman without an audience or "
+  },
+  {
+    "id": "pair_20",
+    "trace_index_prior": 234,
+    "trace_index_new": 235,
+    "ts_prior": "2026-05-09T22:55:05.730791+00:00",
+    "prior_segment": "0-34",
+    "new_segment": "0-35",
+    "prior_agreement_count": 64,
+    "new_agreement_count": 65,
+    "user_input_preview": "I am constantly seeking approval of others. I am constantly seeking uniqueness and external validation of that. Merton s"
+  }
+]

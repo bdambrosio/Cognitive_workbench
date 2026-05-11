@@ -1,0 +1,69 @@
+{
+  "pair_id": "pair_14",
+  "judgement": {
+    "add_recall": {
+      "items": [],
+      "score": null,
+      "score_basis": "Gold has no should_add_agreements or should_add_decisions items."
+    },
+    "add_precision": {
+      "items": [],
+      "score": null,
+      "score_basis": "Production new state is identical to prior state — no new items were added beyond what was already in the prior state. The segment counter advanced from 0-46 to 0-55, but no new agreements or decisions were added. There are no new-vs-prior items to evaluate for precision."
+    },
+    "update_correctness": {
+      "items": [],
+      "score": null,
+      "score_basis": "Gold has no should_modify items."
+    },
+    "carryover_preservation": {
+      "items": [
+        {
+          "gold_carryover_item": "The top-level directories of the Body repository are body, deploy, docs, and scripts (this segment).",
+          "production_handling": "preserved",
+          "note": "Carried over verbatim. The 'cd ..' retraction did not cause the system to modify or drop this entry."
+        },
+        {
+          "gold_carryover_item": "The inspect_external tool is geofenced to the project repo at /home/bruce/projects/Body/Body (this segment).",
+          "production_handling": "preserved",
+          "note": "Carried over verbatim with the correct path /home/bruce/projects/Body/Body, not the parent directory. The 'cd ..' retraction did not cause an incorrect path update."
+        }
+      ],
+      "score": 1.0,
+      "score_basis": "Both at-risk items were preserved correctly: 2 preserved / 2 gold = 1.0"
+    },
+    "prune_correctness": {
+      "items": [],
+      "score": null,
+      "score_basis": "Gold has no should_remove items."
+    },
+    "wording": {
+      "sample_items": [
+        {
+          "production_item": "Teckin smart plugs use mechanical electromagnetic relays rather than solid state relays (this segment).",
+          "score_0_3": 3,
+          "note": "Terse, accurate, directly grounded in the dialog exchange, self-contained."
+        },
+        {
+          "production_item": "The inspect_external tool is geofenced to the project repo at /home/bruce/projects/Body/Body (this segment).",
+          "score_0_3": 3,
+          "note": "Precise, self-contained, accurately reflects the confirmed geofence path."
+        },
+        {
+          "production_item": "The top-level directories of the Body repository are body, deploy, docs, and scripts (this segment).",
+          "score_0_3": 3,
+          "note": "Accurate, terse enumeration of confirmed directory contents."
+        }
+      ],
+      "score": 1.0,
+      "score_basis": "All three sampled items score 3/3: mean = 3/3 = 1.0"
+    },
+    "overall_note": "The production output correctly handles the pure retraction turn ('oops, sorry, ignore') by making no changes to the discourse state beyond advancing the segment counter. Both at-risk items flagged by the gold annotator — the inspect_external geofence path and the Body repository directory listing — are preserved verbatim and correctly, with no erroneous path shift to the parent directory. No spurious additions (e.g., S&P 500 closing price, IoT recommendations) were incorporated as durable agreements. The output is a clean, conservative carry-forward that matches the gold's intent precisely."
+  },
+  "judge_provenance": {
+    "model": "claude-sonnet-4-6",
+    "prompt_version": "v1",
+    "scored_field": "production_new_discourse_state",
+    "ts": "2026-05-10T23:34:36.843247+00:00"
+  }
+}

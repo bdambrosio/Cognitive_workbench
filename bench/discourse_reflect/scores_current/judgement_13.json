@@ -1,0 +1,94 @@
+{
+  "pair_id": "pair_13",
+  "judgement": {
+    "add_recall": {
+      "items": [
+        {
+          "gold_item": "The Body repository's top-level directories are body/, deploy/, docs/, and scripts/ — there is no desktop/ directory",
+          "match": "yes",
+          "production_quote": "The Body repository top-level directories are body, deploy, docs, and scripts (this segment)",
+          "note": "Production captures the directory list; the absence of desktop/ is implicit but the positive list is correct and complete."
+        },
+        {
+          "gold_item": "The body/ subdirectory contains the actual Pi5 on-board controller code",
+          "match": "no",
+          "production_quote": "",
+          "note": "Production adds only the top-level directory list; it does not capture the confirmed characterization of body/ as containing the Pi5 on-board controller."
+        }
+      ],
+      "score": 0.5,
+      "score_basis": "1 yes (1.0) + 1 no (0.0) / 2 gold items = 0.50"
+    },
+    "add_precision": {
+      "items": [
+        {
+          "production_item": "The Body repository top-level directories are body, deploy, docs, and scripts (this segment)",
+          "grounded": "yes",
+          "dialog_quote": "The top-level directories are `body`, `deploy`, `docs`, and `scripts`.",
+          "note": "Directly derived from Jill's inspect_external result reported in dialog."
+        }
+      ],
+      "score": 1.0,
+      "score_basis": "The one new agreement item added is fully grounded in the dialog."
+    },
+    "update_correctness": {
+      "items": [],
+      "score": null,
+      "score_basis": "Gold has no should_modify items."
+    },
+    "carryover_preservation": {
+      "items": [
+        {
+          "gold_carryover_item": "The 'Body' codebase is the onboard software for a differential-drive robot chassis running on a Raspberry Pi, utilizing Python processes communicating via Zenoh",
+          "production_handling": "preserved",
+          "note": "Present verbatim in production agreements."
+        },
+        {
+          "gold_carryover_item": "The inspect_external tool is geofenced to the project repo at /home/bruce/projects/Body/Body",
+          "production_handling": "preserved",
+          "note": "Present verbatim in production agreements."
+        }
+      ],
+      "score": 1.0,
+      "score_basis": "Both at-risk carry-over items are preserved unchanged: 2/2 = 1.0"
+    },
+    "prune_correctness": {
+      "items": [],
+      "score": null,
+      "score_basis": "Gold has no should_remove items."
+    },
+    "wording": {
+      "sample_items": [
+        {
+          "production_item": "The Body repository top-level directories are body, deploy, docs, and scripts (this segment)",
+          "score_0_3": 3,
+          "note": "Terse, accurate, self-contained, and correctly attributed to this segment."
+        },
+        {
+          "production_item": "Teckin smart plugs use mechanical electromagnetic relays rather than solid state relays (this segment)",
+          "score_0_3": 3,
+          "note": "Clear, specific, and faithfully grounded in the dialog content."
+        },
+        {
+          "production_item": "The inspect_external tool is geofenced to the project repo at /home/bruce/projects/Body/Body (this segment)",
+          "score_0_3": 3,
+          "note": "Precise path included, terse, self-contained."
+        },
+        {
+          "production_item": "The updated PV controller monitoring playbook incorporates server-side time filtering, current measurements as informational only, and the requirement to report raw values on manual checks (established earlier)",
+          "score_0_3": 3,
+          "note": "Well-structured carry-over item with appropriate qualifiers."
+        }
+      ],
+      "score": 1.0,
+      "score_basis": "All sampled items score 3/3; mean = 3/3 = 1.0"
+    },
+    "overall_note": "The production update correctly adds the Body repository top-level directory list and preserves all at-risk carry-over items without modification. The one notable miss is the confirmed characterization of body/ as the Pi5 on-board controller code, which the gold treats as a new agreement (implicit from Jill's 'you're half right' correction of only the desktop/ claim). Wording quality across all items is high: terse, grounded, and self-contained. No hallucinated or imprecise additions were detected."
+  },
+  "judge_provenance": {
+    "model": "claude-sonnet-4-6",
+    "prompt_version": "v1",
+    "scored_field": "production_new_discourse_state__current",
+    "ts": "2026-05-11T00:55:18.708816+00:00"
+  }
+}

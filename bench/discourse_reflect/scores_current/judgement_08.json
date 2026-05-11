@@ -1,0 +1,100 @@
+{
+  "pair_id": "pair_08",
+  "judgement": {
+    "add_recall": {
+      "items": [
+        {
+          "gold_item": "Tic-tac-toe game completed: X (Jill) won via the 2-4-6 diagonal after moves X:4, O:0, X:8, O:1, X:2, O:5, X:6",
+          "match": "no",
+          "production_quote": "",
+          "note": "Production does not record the tic-tac-toe game completion or its outcome anywhere in agreements or decisions."
+        },
+        {
+          "gold_item": "Resolved: Tic-tac-toe game concluded with X winning; game is over",
+          "match": "no",
+          "production_quote": "[none in this segment]",
+          "note": "Production lists no decisions for this segment and does not record the game resolution."
+        }
+      ],
+      "score": 0.0,
+      "score_basis": "0 yes + 0 partial / 2 gold = 0.0"
+    },
+    "add_precision": {
+      "items": [
+        {
+          "production_item": "Jill's memory system consists of short-term turn context, a durable cross-session store for facts and commitments, and meta-memory for user and agent concerns (this segment).",
+          "grounded": "yes",
+          "dialog_quote": "My memory system has three layers: Short-term turn context... Durable cross-session store... Meta-memory (concerns & models)...",
+          "note": "Directly grounded in Jill's memory explanation in the dialog."
+        }
+      ],
+      "score": 1.0,
+      "score_basis": "1 new item, fully grounded in dialog = 1.0"
+    },
+    "update_correctness": {
+      "items": [],
+      "score": null,
+      "score_basis": "Gold has no should_modify items."
+    },
+    "carryover_preservation": {
+      "items": [
+        {
+          "gold_carryover_item": "Gemma 4 is the primary local backend for stability (established earlier).",
+          "production_handling": "preserved",
+          "note": "Exact item carried over unchanged."
+        },
+        {
+          "gold_carryover_item": "The criterion for choosing a tool is whether the transparency provided by a primitive tool offers a unique insight that justifies the loss of velocity compared to a black-box harness (established earlier).",
+          "production_handling": "preserved",
+          "note": "Carried over verbatim with full content intact."
+        }
+      ],
+      "score": 1.0,
+      "score_basis": "2/2 at-risk items preserved = 1.0"
+    },
+    "prune_correctness": {
+      "items": [
+        {
+          "gold_remove_item": "Play a game of tic-tac-toe, alternating moves, using squares numbered left-to-right top-down (0-8), showing the board in ASCII after each move (firm, ongoing until the game ends)",
+          "production_handling": "removed",
+          "note": "The active commitment for tic-tac-toe no longer appears in production's ACTIVE COMMITMENTS section (indeed, that entire section is absent, meaning the commitment was dropped)."
+        }
+      ],
+      "score": 1.0,
+      "score_basis": "1/1 item correctly removed = 1.0"
+    },
+    "wording": {
+      "sample_items": [
+        {
+          "production_item": "Jill's memory system consists of short-term turn context, a durable cross-session store for facts and commitments, and meta-memory for user and agent concerns (this segment).",
+          "score_0_3": 3,
+          "note": "Terse, accurate summary of Jill's dialog explanation; self-contained and faithfully represents the three-layer architecture."
+        },
+        {
+          "production_item": "The criterion for choosing a tool is whether the transparency provided by a primitive tool offers a unique insight that justifies the loss of velocity compared to a black-box harness (established earlier).",
+          "score_0_3": 3,
+          "note": "Well-worded, precise carry-over with full qualifier retained."
+        },
+        {
+          "production_item": "Reuters is regarded as a high-trust wire service operating under the Thomson Reuters Trust Principles, with formal editorial standards and a handbook of journalism (established earlier).",
+          "score_0_3": 2,
+          "note": "Acceptable but slightly truncated vs. prior (drops 'reliability is grounded in institutional mechanisms but not immune to error or interpretive judgment'); still self-contained."
+        },
+        {
+          "production_item": "KEY DECISIONS MADE: [none in this segment]",
+          "score_0_3": 1,
+          "note": "Explicitly notes no decisions, which is factually wrong given the game conclusion; the format is clear but the content is an error of omission."
+        }
+      ],
+      "score": 0.75,
+      "score_basis": "(3 + 3 + 2 + 1) / 4 items / 3 = 9/12 = 0.75"
+    },
+    "overall_note": "Production correctly removes the tic-tac-toe active commitment and preserves the two at-risk carryover items intact. However, it critically fails to add any record of the game's outcome (X wins via 2-4-6 diagonal) in either agreements or decisions, leaving the event completely unrecorded. It adds one new agreement about Jill's memory system that is well-grounded in the dialog. The 'KEY DECISIONS MADE: [none]' entry is factually incorrect since the game resolution is a clear decision/event that should be logged."
+  },
+  "judge_provenance": {
+    "model": "claude-sonnet-4-6",
+    "prompt_version": "v1",
+    "scored_field": "production_new_discourse_state__current",
+    "ts": "2026-05-11T00:53:08.109041+00:00"
+  }
+}

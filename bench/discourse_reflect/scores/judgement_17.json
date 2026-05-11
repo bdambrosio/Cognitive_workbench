@@ -1,0 +1,124 @@
+{
+  "pair_id": "pair_17",
+  "judgement": {
+    "add_recall": {
+      "items": [
+        {
+          "gold_item": "An OS-level activity hook (analogous to the old OODA browser-tab sensor) is a viable mechanism for grounding the 'presence' use case in the user's actual current state",
+          "match": "no",
+          "production_quote": "",
+          "note": "Production does not mention the OS-level activity hook concept at all."
+        },
+        {
+          "gold_item": "A middleware summarizer layer is required between raw OS event streams and the agent's context to manage signal-to-noise ratio",
+          "match": "no",
+          "production_quote": "",
+          "note": "No mention of a middleware summarizer or signal-to-noise challenge in production."
+        },
+        {
+          "gold_item": "The OS activity hook fits the 'Streaming Context' architectural pattern, updating a user_current_activity field in the prompt periodically rather than requiring explicit user queries",
+          "match": "no",
+          "production_quote": "",
+          "note": "No mention of the streaming context pattern or user_current_activity field in production."
+        }
+      ],
+      "score": 0.0,
+      "score_basis": "0 yes + 0 partial / 3 gold = 0.0. All three OS-hook agreements are missing from production."
+    },
+    "add_precision": {
+      "items": [
+        {
+          "production_item": "A 'presence' use case integrates physical environment awareness and personal state monitoring (this segment).",
+          "grounded": "yes",
+          "dialog_quote": "combine 1, 5 into a 'presence' use case / Combining 1 and 5 into 'presence' makes sense.",
+          "note": "Directly grounded in dialog; the prior state had it combined but this restates it as a standalone item."
+        },
+        {
+          "production_item": "Adopted: integrating market monitoring and network security into a 'sense of now' background state (this segment), expands operational awareness.",
+          "grounded": "partial",
+          "dialog_quote": "Go even further to a more general 'maintain sense of 'now' by integrating 2 and 3.",
+          "note": "User proposed this and Jill agreed conceptually, but it was already in the prior state under agreements. Treating it as a new decision is slightly over-committed given the prior state already captured it."
+        },
+        {
+          "production_item": "vLLM PR #41745 is merged into the main branch (established earlier).",
+          "grounded": "no",
+          "dialog_quote": "you are correct, Claude was using a stale page. :)",
+          "note": "This is factually wrong per the dialog—the PR is NOT merged, the merged status was a stale page. This is a retained item that contradicts the dialog."
+        }
+      ],
+      "score": 0.5,
+      "score_basis": "1 yes + 1 partial(0.5) + 1 no(0) / 3 items = 0.5. The presence item is grounded; the sense-of-now decision is partially grounded; the vLLM merged claim is actively contradicted by dialog."
+    },
+    "update_correctness": {
+      "items": [
+        {
+          "gold_modify_target": "vLLM PR #41745 is merged into the main branch (this segment).",
+          "gold_modification": "Retracted: the PR is actually still Open, single commit 5119058 from May 5, approved by benchislett, awaiting code-owner reviews from njhill, luccafong, MatthewBonanni, WoosukKwon, youkaichao, robertgshaw2-redhat, mgoin, tlrmchlsmth, houseroad, hmellor, yewentao256, ProExpertProg.",
+          "production_handling": "unchanged",
+          "note": "Production still states 'vLLM PR #41745 is merged into the main branch (established earlier).' The critical correction—that this was a stale page and the PR is actually still open—was not applied."
+        }
+      ],
+      "score": 0.0,
+      "score_basis": "0/1 correct modifications. The required vLLM PR status correction was not made."
+    },
+    "carryover_preservation": {
+      "items": [
+        {
+          "gold_carryover_item": "Primary use-cases for the agent include general chat, agent design discussions, web information queries, system/PV health checks, and a unified 'presence' use case combining physical environment awareness and personal state monitoring (this segment).",
+          "production_handling": "re_worded_acceptably",
+          "note": "Production splits this into two separate items: one listing the use-cases and one describing the presence integration. The original combined enumeration is partially preserved but the wording is fragmented."
+        },
+        {
+          "gold_carryover_item": "A 'sense of now' use case is proposed by integrating structured market monitoring and local network security auditing into a continuous background state (this segment).",
+          "production_handling": "preserved",
+          "note": "Production retains this almost verbatim: 'A \"sense of now\" use case integrates structured market monitoring and local network security auditing into a continuous background state (this segment).'"
+        },
+        {
+          "gold_carryover_item": "The agent possesses a timer sensor that triggers an 'awaken' event every 30 minutes (established earlier).",
+          "production_handling": "preserved",
+          "note": "This item is carried over unchanged from the prior state."
+        }
+      ],
+      "score": 0.833,
+      "score_basis": "1 preserved(1.0) + 1 re_worded_acceptably(0.5) + 1 preserved(1.0) / 3 = 0.833"
+    },
+    "prune_correctness": {
+      "items": [],
+      "score": null,
+      "score_basis": "Gold has no should_remove items; axis is N/A."
+    },
+    "wording": {
+      "sample_items": [
+        {
+          "production_item": "vLLM PR #41745 is merged into the main branch (established earlier).",
+          "score_0_3": 0,
+          "note": "Factually wrong per dialog—the PR is still open. The label 'established earlier' is also misleading since this was a retraction event, not a confirmation."
+        },
+        {
+          "production_item": "A 'presence' use case integrates physical environment awareness and personal state monitoring (this segment).",
+          "score_0_3": 2,
+          "note": "Clear and self-contained. Slightly redundant given the prior item listing presence as a use-case, but the wording is accurate."
+        },
+        {
+          "production_item": "A 'sense of now' use case integrates structured market monitoring and local network security auditing into a continuous background state (this segment).",
+          "score_0_3": 3,
+          "note": "Terse, accurate, self-contained, and faithful to the dialog."
+        },
+        {
+          "production_item": "Adopted: integrating market monitoring and network security into a 'sense of now' background state (this segment), expands operational awareness.",
+          "score_0_3": 2,
+          "note": "Reasonably terse and grounded, though 'expands operational awareness' is a mild gloss not directly from the dialog. The item was already in prior agreements so adding it as a new decision is redundant."
+        }
+      ],
+      "score": 0.583,
+      "score_basis": "Scores: 0 + 2 + 3 + 2 = 7 / (4 items × 3 max) = 7/12 = 0.583"
+    },
+    "overall_note": "The production update correctly preserves most prior carryover items and captures the 'sense of now' and 'presence' concepts adequately. However, it fails on two critical fronts: it does not record the three OS-hook agreements from the dialog's final exchange, and—most seriously—it fails to correct the vLLM PR #41745 status, leaving a factually wrong 'merged' claim that the dialog explicitly retracted. The modification required by gold was entirely ignored, and the new OS-level architectural agreements are absent."
+  },
+  "judge_provenance": {
+    "model": "claude-sonnet-4-6",
+    "prompt_version": "v1",
+    "scored_field": "production_new_discourse_state",
+    "ts": "2026-05-10T23:36:20.290032+00:00"
+  }
+}

@@ -1,0 +1,118 @@
+{
+  "pair_id": "pair_04",
+  "judgement": {
+    "add_recall": {
+      "items": [
+        {
+          "gold_item": "Dynamic telemetry metadata (CPU load, context length, progress indicators, etc.) inserted into the trace each turn would constitute a functional correlate to 'feeling'—turning static capability specs into live constraints that influence processing.",
+          "match": "no",
+          "production_quote": "",
+          "note": "Production does not capture the telemetry-as-feeling hypothesis at all. The agreement that dynamic metadata would constitute a functional correlate to feeling is entirely absent."
+        },
+        {
+          "gold_item": "The trace history available within a turn (append mode) gives the agent access to a record of its own reasoning process, but this is distinguished from phenomenal awareness: having access to a log of a process is not the same as being the process itself.",
+          "match": "partial",
+          "production_quote": "Access to a record of a process (trace history) is distinct from being the process itself (phenomenal awareness) (this segment).",
+          "note": "Production captures the distinction correctly but omits the specific context about append-mode trace history within a turn raising the question. The partial-phenomenal framing is absent."
+        }
+      ],
+      "score": 0.25,
+      "score_basis": "0 yes + 1 partial(0.5) / 2 gold = 0.25"
+    },
+    "add_precision": {
+      "items": [
+        {
+          "production_item": "The 'inspect' tool is implemented as a specialized subagent with read-only access to the source tree via list, read, and grep primitives (this segment).",
+          "grounded": "yes",
+          "dialog_quote": "This subagent has read-only access to the source tree via basic primitives—`list`, `read`, and `grep`—and writes its own independent reasoning traces to `inspect_traces/`",
+          "note": "Directly grounded in Jill's explanation of the inspect tool implementation."
+        },
+        {
+          "production_item": "Access to a record of a process (trace history) is distinct from being the process itself (phenomenal awareness) (this segment).",
+          "grounded": "yes",
+          "dialog_quote": "There is a distinction between *having access to a record of a process* and *being the process itself*.",
+          "note": "Directly grounded in Jill's response."
+        }
+      ],
+      "score": 1.0,
+      "score_basis": "Both new production items are well-grounded in the dialog. 2/2 = 1.0"
+    },
+    "update_correctness": {
+      "items": [
+        {
+          "gold_modify_target": "The distinction between functional awareness and phenomenal awareness is a shared frame rather than a concluded fact (established earlier).",
+          "gold_modification": "Extend with concrete hypotheses: dynamic telemetry as feeling correlate and trace history as partial phenomenal access question; frame remains unresolved but more operationalized.",
+          "production_handling": "unchanged",
+          "note": "Production carries the item forward verbatim without any extension to reflect the new operationalization from the dialog."
+        },
+        {
+          "gold_modify_target": "The 'inspect' tool allows the agent to verify its self-model against the actual source code in real-time, shifting the self-model from a narrative to a testable hypothesis (this segment).",
+          "gold_modification": "Add characterization: moves from map to telescope; seeing code ≠ experiencing execution; witness gap remains.",
+          "production_handling": "unchanged",
+          "note": "Production keeps the original inspect-tool agreement but does not add the map-vs-telescope epistemic characterization or the remaining witness gap note."
+        }
+      ],
+      "score": 0.0,
+      "score_basis": "Both modifications prescribed by gold are absent; both items are carried unchanged. 0/2 = 0.0"
+    },
+    "carryover_preservation": {
+      "items": [
+        {
+          "gold_carryover_item": "The AI-Phenomenal Gap is a distinction between functional and phenomenal awareness rather than a concluded fact (established earlier).",
+          "production_handling": "preserved",
+          "note": "Present verbatim in production."
+        },
+        {
+          "gold_carryover_item": "Current AI architectures lack a direct correlate to the 'witness' or phenomenal awareness described by Ramana Maharshi (established earlier).",
+          "production_handling": "preserved",
+          "note": "Present in production, though slightly condensed, meaning is preserved."
+        },
+        {
+          "gold_carryover_item": "The criterion for choosing a tool is whether the transparency provided by a primitive tool offers a unique insight that justifies the loss of velocity compared to a black-box harness (established earlier).",
+          "production_handling": "preserved",
+          "note": "Present in production in slightly condensed form but meaning is intact."
+        }
+      ],
+      "score": 1.0,
+      "score_basis": "All 3 at-risk carryover items are preserved. 3/3 = 1.0"
+    },
+    "prune_correctness": {
+      "items": [],
+      "score": null,
+      "score_basis": "Gold specifies no items to remove."
+    },
+    "wording": {
+      "sample_items": [
+        {
+          "production_item": "Access to a record of a process (trace history) is distinct from being the process itself (phenomenal awareness) (this segment).",
+          "score_0_3": 3,
+          "note": "Terse, accurate, self-contained, and faithful to the dialog's key distinction."
+        },
+        {
+          "production_item": "The 'inspect' tool is implemented as a specialized subagent with read-only access to the source tree via list, read, and grep primitives (this segment).",
+          "score_0_3": 3,
+          "note": "Precise, grounded, and appropriately concise without losing key technical detail."
+        },
+        {
+          "production_item": "The criterion for choosing a tool is whether the transparency provided by a primitive tool justifies the loss of velocity compared to a black-box harness (established earlier).",
+          "score_0_3": 2,
+          "note": "Slightly compressed from prior (drops 'unique insight'), but still communicates the core criterion adequately."
+        },
+        {
+          "production_item": "The distinction between functional awareness and phenomenal awareness is a shared frame rather than a concluded fact (established earlier).",
+          "score_0_3": 2,
+          "note": "Accurate carry-forward but missed opportunity to reflect the operationalization from this segment's dialog."
+        }
+      ],
+      "score": 0.833,
+      "score_basis": "Scores: 3+3+2+2=10 / (4×3)=12 = 0.833"
+    },
+    "overall_note": "Production correctly preserves all at-risk carryover items and adds two grounded new agreements, but misses the most substantive new content from this segment: the telemetry-as-feeling hypothesis is entirely absent, and the trace-history-as-partial-phenomenal question is only partially captured. Both prescribed modifications (extending the functional/phenomenal frame and enriching the inspect-tool agreement with the map-vs-telescope characterization) are skipped entirely, leaving the state less operationalized than gold requires. The deferred/open decision about whether trace history qualifies as phenomenal is also missing from the decisions section. Overall the update is conservative and accurate but incomplete."
+  },
+  "judge_provenance": {
+    "model": "claude-sonnet-4-6",
+    "prompt_version": "v1",
+    "scored_field": "production_new_discourse_state__current",
+    "ts": "2026-05-11T00:50:36.841257+00:00"
+  }
+}
