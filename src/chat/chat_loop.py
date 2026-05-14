@@ -42,6 +42,8 @@ if _SRC_DIR not in sys.path:
     sys.path.insert(0, _SRC_DIR)
 
 from cot_profiles import is_reasoning_model, resolve_profile  # noqa: E402
+from affect.publisher import AffectPublisher  # noqa: E402
+from canvas.publisher import CanvasPublisher, default_key as canvas_default_key  # noqa: E402
 
 
 logger = logging.getLogger('chat_loop')
@@ -74,7 +76,7 @@ _CONCERN_INSTRUCTION_NARROWNESS_RULE = (
 
 # Tools the model can emit. Validated structurally in _parse_react_action;
 # the dispatcher in _run_react_loop knows how to run each.
-_REACT_TOOLS = ('process_text', 'search', 'fetch_text', 'recall', 'inspect', 'inspect_external', 'security', 'respond')
+_REACT_TOOLS = ('process_text', 'search', 'fetch_text', 'recall', 'inspect', 'inspect_external', 'security', 'display', 'respond')
 
 # Per-character collection holding episodic specifics across conversations.
 # Auto-RAG searches this on every turn; post-turn reflection writes to it.
@@ -741,6 +743,16 @@ class ChatLoop:
         self._zenoh_session = None
         self._action_pub = None
         self._sense_sub = None
+
+        # Processing-state publisher for the affect visualization.
+        # Headless until _open_zenoh attaches the session — safe to call
+        # mutators before then; they're no-ops on the wire.
+        self._affect = AffectPublisher()
+
+        # Rich-display surface for the `display` ReAct tool. Per-character
+        # Zenoh key, latest-wins. Headless until session attached.
+        self._canvas = CanvasPublisher(
+            key=canvas_default_key(self.character_name))
 
     # ------------------------------------------------------------------
     # LLM helper (used by character_evaluator and DiscourseTracker)
@@ -2557,6 +2569,8 @@ class ChatLoop:
         from utils.zenoh_utils import make_localhost_config
 
         self._zenoh_session = zenoh.open(make_localhost_config())
+        self._affect.attach_session(self._zenoh_session)
+        self._canvas.attach_session(self._zenoh_session)
         self._action_pub = self._zenoh_session.declare_publisher(
             f"cognitive/{self.character_name}/action"
         )
@@ -3569,6 +3583,7 @@ class ChatLoop:
         """Run discourse + companion updates after a turn. Synchronous for now."""
         if not self.discourse_enabled:
             return
+        self._affect.set_memory_op('companion_update')
         try:
             dialog = self._build_dialog(entity, limit=self.history_limit)
             if not dialog:
@@ -3622,6 +3637,8 @@ class ChatLoop:
                 self._write_state_snapshot('companion_state', entity, str(new_comp))
         except Exception as e:
             logger.warning(f'[{self.character_name}] discourse update failed: {e}')
+        finally:
+            self._affect.set_memory_op('none')
 
     # ------------------------------------------------------------------
     # Orientation pass (character_evaluator)
@@ -3897,6 +3914,22 @@ class ChatLoop:
             "or routing/interface state. v0.1 does NOT do traffic capture or IDS log inspection. Phrase as a "
             "natural-language question (e.g. \"what hosts are on my LAN at 192.168.1.0/24?\", \"what TCP ports "
             "am I listening on?\", \"what's my default gateway?\")."))
+        tools.append(("display",
+            "`{\"thought\": \"<one terse sentence>\", \"tool\": \"display\", "
+            "\"content\": <string|$stepN>, \"format\": \"markdown\"|\"html\"}` — "
+            "**USE THIS** whenever the user asks to *show / display / draw / render / visualize / "
+            "put on screen*, OR whenever the answer is fundamentally structured (multi-row tables, "
+            "diagrams via inline SVG, side-by-side comparisons, multi-section walk-throughs). "
+            "Pushes rich content to the canvas window so the user can SEE it, not just read it. "
+            "Non-terminal — the loop continues; immediately follow with a brief `respond` so the "
+            "chat conversation gets a textual reply too (e.g. \"posted it on screen — let me know if "
+            "you want X\"). "
+            "**Even if your data is incomplete or imperfect, render what you DO have** — the user "
+            "asked to see it; don't decline because the picture isn't full. Acknowledge the gap "
+            "verbally in `respond`. "
+            "Default `format=markdown` (safer, easier to author). Use `format=html` only when "
+            "markdown can't express what you need: inline SVG diagrams, multi-column layout, "
+            "custom styling."))
         tools.append(("respond",
             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"respond\", \"text\": <string|$stepN>}` — "
             "final reply, exits loop. Must be in your voice; pass search/fetch results through process_text "
@@ -3981,6 +4014,12 @@ class ChatLoop:
                "  Iter 1: `{\"thought\": \"Need fresh weather data — search first.\", \"tool\": \"search\", \"query\": \"Berkeley CA weather forecast tomorrow\"}` → $step1\n"
                "  Iter 2: `{\"thought\": \"Search synthesis is decent; render in my voice with source.\", \"tool\": \"process_text\", \"source\": \"$step1\", \"instruction\": \"answer the user in your voice in 1-2 sentences, citing the source domain\"}` → $step2\n"
                "  Iter 3: `{\"thought\": \"Processed answer is ready — send it.\", \"tool\": \"respond\", \"text\": \"$step2\"}` → loop exits.\n"
+               "\n"
+               "Worked example with display. User: 'show me the S&P 500 daily closes for the last week.'\n"
+               "  Iter 1: `{\"thought\": \"Need fresh price data.\", \"tool\": \"search\", \"query\": \"S&P 500 daily close last 7 trading days\"}` → $step1\n"
+               "  Iter 2: `{\"thought\": \"Format extracted prices as a markdown table for the canvas.\", \"tool\": \"process_text\", \"source\": \"$step1\", \"instruction\": \"extract the daily closes as a markdown table with Date and Close columns; nothing else\"}` → $step2\n"
+               "  Iter 3: `{\"thought\": \"Push table to canvas — it's tabular, not prose.\", \"tool\": \"display\", \"content\": \"$step2\", \"format\": \"markdown\"}` → $step3 (non-terminal)\n"
+               "  Iter 4: `{\"thought\": \"Acknowledge in the chat with a brief note pointing at the canvas.\", \"tool\": \"respond\", \"text\": \"Posted the last week's closes on screen — let me know if you want a longer window or a chart.\"}` → loop exits.\n"
                "\n")
             + "Output ONLY one JSON object. No prose, no apology, no explanation."
         )
@@ -4108,7 +4147,9 @@ class ChatLoop:
             log.append((label, content))
             log_appendage_str += f"{label}:\n{content}\n"
 
+        self._affect.enter_loop()
         for i in range(REACT_MAX_ITERS):
+            self._affect.set_react_iter(i + 1)
             pre_log_len = len(log)
             usr_msg = user_prefix_str + log_appendage_str + trailer
             # When the turn carries an image, every iter sends a
@@ -4132,6 +4173,7 @@ class ChatLoop:
                 {'role': 'user', 'content': user_content},
             ]
             self._emit_status('thinking…')
+            self._affect.set_waiting_for_llm(True)
             try:
                 raw = self.backend.chat(prompt, max_tokens=8192, temperature=0.7,
                                         cot_profile='none')
@@ -4141,7 +4183,10 @@ class ChatLoop:
                               'raw': f'(LLM call failed: {e})', 'appended': []})
                 reply = self._react_fallback_synthesis(log, str(e))
                 self._clear_status()
+                self._affect.exit_loop()
                 return reply, log, iters, 'llm_error'
+            finally:
+                self._affect.set_waiting_for_llm(False)
 
             iters.append({'system': system_prompt_str, 'user': usr_msg, 'raw': raw or '',
                           'appended': []})
@@ -4150,6 +4195,7 @@ class ChatLoop:
             if action is None:
                 logger.warning(f"[{self.character_name}] ReAct iter {i+1}: unparseable: {raw[:160]!r}")
                 self._emit_status('parse failed, retrying…')
+                self._affect.incr_llm_retry()
                 _append_log('NOTE', "Previous output was prose, not JSON. The user's task above is "
                             "unanswered. Do NOT apologize — emit ONE JSON action now to address it.")
                 iters[-1]['appended'] = log[pre_log_len:]
@@ -4161,9 +4207,20 @@ class ChatLoop:
                 logger.info(f"[{self.character_name}] ReAct iter {i+1}: respond ({len(text)} chars)")
                 # respond appends nothing to the log (loop exits); appended stays []
                 self._clear_status()
+                self._affect.mark_completion()
+                self._affect.exit_loop()
                 return text, log, iters, 'respond'
 
             self._emit_status(f'using {tool}…')
+            # Tool-call signature for repeat detection. Truncated to avoid
+            # giant payloads in the publisher state. Sort keys so equivalent
+            # actions hash the same regardless of dict ordering.
+            _tool_args_sig = json.dumps(
+                {k: v for k, v in action.items() if k != 'tool'},
+                sort_keys=True, default=str)[:200]
+            self._affect.set_tool(tool, args_sig=_tool_args_sig)
+            if tool == 'recall':
+                self._affect.set_memory_op('recall')
             binding = f'$step{i+1}'
             _append_log(f'ACTION {i+1}', json.dumps(action))
 
@@ -4225,23 +4282,35 @@ class ChatLoop:
             elif tool == 'security':
                 q = self._resolve_react_value(action.get('query', ''), log)
                 obs = self._run_security(q)
+            elif tool == 'display':
+                content = self._resolve_react_value(action.get('content', ''), log)
+                fmt = (action.get('format') or 'markdown').strip().lower()
+                obs = self._run_display(content, fmt)
             else:
                 # Tool list shown to the model on bad emission. Don't
                 # advertise inspect_external when nothing is bound — keeps
                 # the surface honest about what's actually available.
-                avail = ("process_text, search, fetch_text, remember, "
-                         "inspect, security, respond")
+                avail = ("process_text, search, fetch_text, recall, "
+                         "inspect, security, display, respond")
                 if self._get_external_repo() is not None:
                     avail = avail.replace("inspect, ", "inspect, inspect_external, ")
                 obs = f"ERROR: unknown tool {tool!r}; available: {avail}"
 
             _append_log(binding, obs)
             iters[-1]['appended'] = log[pre_log_len:]
+            # Tool observations follow the documented OK:/EMPTY:/ERROR: prefix
+            # protocol (see 4170–4184). ERROR: is the only failure signal and
+            # is a literal prefix, not a keyword classification.
+            if isinstance(obs, str) and obs.startswith('ERROR'):
+                self._affect.incr_tool_error()
+            self._affect.set_memory_op('none')
+            self._affect.set_tool(None)
             logger.info(f"[{self.character_name}] ReAct iter {i+1}: {tool} → {binding} ({len(obs)} chars)")
 
         logger.warning(f"[{self.character_name}] ReAct hit max iters ({REACT_MAX_ITERS})")
         reply = self._react_fallback_synthesis(log)
         self._clear_status()
+        self._affect.exit_loop()
         return reply, log, iters, 'max_iters'
 
     def _memory_dir(self) -> 'Path':
@@ -4446,6 +4515,26 @@ class ChatLoop:
         if not text:
             return 'EMPTY: remember subagent produced no answer'
         return 'OK: ' + text
+
+    def _run_display(self, content: str, fmt: str) -> str:
+        """Backend for the ReAct `display` tool. Publishes the content to
+        the canvas Zenoh key; the display window (launched separately or
+        via launcher --canvas) renders markdown or HTML. Non-terminal:
+        the ReAct loop continues after this — Jill should follow up with
+        a `respond` so the conversation gets a textual reply too."""
+        if content is None:
+            return "ERROR: display content was None"
+        body = str(content)
+        if not body.strip():
+            return "EMPTY: display content was empty"
+        if fmt not in ('markdown', 'html'):
+            fmt = 'markdown'
+        try:
+            n_bytes = self._canvas.set_content(body, fmt=fmt)
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] canvas publish failed: {e}")
+            return f"ERROR: canvas publish failed: {e}"
+        return f"OK: rendered to canvas ({n_bytes} bytes, format={fmt})"
 
     def _inspect_traces_dir(self) -> 'Path':
         """Where the inspect (codebase-query) subagent writes its per-call
@@ -5006,6 +5095,8 @@ class ChatLoop:
             'started_at': datetime.now(timezone.utc).isoformat(),
             'autonomous_concern_id': autonomous_concern_id,
         }
+        self._affect.set_trigger('autonomous' if autonomous else 'user')
+        self._affect.set_mode('thinking')
         try:
             self._process_user_turn_inner(
                 source, text, close,
@@ -5014,6 +5105,7 @@ class ChatLoop:
                 image_url=image_url)
         finally:
             self._current_turn = None
+            self._affect.set_mode('idle')
 
     def _process_user_turn_inner(self, source: str, text: str, close: bool,
                                  autonomous: bool = False,
@@ -5502,6 +5594,14 @@ class ChatLoop:
             self._shutdown_zenoh()
 
     def _shutdown_zenoh(self) -> None:
+        try:
+            self._affect.close()
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] affect close failed: {e}")
+        try:
+            self._canvas.close()
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] canvas close failed: {e}")
         try:
             if self._sense_sub:
                 self._sense_sub.undeclare()

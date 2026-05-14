@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Jill</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #000; overflow: hidden;
+               font-family: -apple-system, system-ui, sans-serif; }
+  canvas { display: block; }
+  #status { position: fixed; left: 8px; bottom: 6px;
+            color: rgba(255,255,255,0.45); font-size: 10px;
+            pointer-events: none; }
+  #debug  { position: fixed; right: 8px; bottom: 6px;
+            color: rgba(255,255,255,0.45); font-size: 10px;
+            pointer-events: none; white-space: pre; text-align: right;
+            display: none; }
+  body.debug #debug { display: block; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/p5.min.js"></script>
+</head>
+<body>
+<div id="status">connecting…</div>
+<div id="debug"></div>
+<script>
+'use strict';
+
+// ── WebSocket: receive ProcState from src/affect/display/__main__.py ──
+const WS_URL = 'ws://127.0.0.1:8787';
+let state = {
+  mode: 'idle',
+  mode_entered_at: Date.now() / 1000,
+  trigger: 'user',
+  react_iter: 0,
+  loop_started_at: null,
+  waiting_for_llm: false,
+  tool_name: null,
+  llm_retries: 0,
+  tool_errors: 0,
+  repeat_tool_call: 0,
+  active_concerns: 0,
+  memory_op: 'none',
+  last_completed_at: null,
+  ts: 0,
+  seq: 0,
+};
+let lastMemOp = 'none';
+let memOpFlashAt = -1e9;
+let lastBlinkAt = 0;
+let nextBlinkGap = 4.0;
+
+function connect() {
+  const el = document.getElementById('status');
+  el.textContent = 'connecting…';
+  const ws = new WebSocket(WS_URL);
+  ws.onopen = () => { el.textContent = ''; };
+  ws.onclose = () => {
+    el.textContent = 'disconnected';
+    setTimeout(connect, 1500);
+  };
+  ws.onerror = () => { el.textContent = 'ws error'; };
+  ws.onmessage = (ev) => {
+    try {
+      const next = JSON.parse(ev.data);
+      if (next.memory_op && next.memory_op !== 'none'
+          && next.memory_op !== lastMemOp) {
+        memOpFlashAt = millis() / 1000;
+      }
+      lastMemOp = next.memory_op || 'none';
+      state = next;
+    } catch (e) { console.warn('parse', e); }
+  };
+}
+connect();
+
+// ── Palettes: mode → [primary, secondary, accent] as 0..1 RGB ──
+const MODE_PALETTE = {
+  idle:      [[0.18, 0.30, 0.85], [0.55, 0.25, 0.85], [0.95, 0.55, 0.20]],
+  thinking:  [[0.40, 0.20, 0.85], [0.85, 0.30, 0.80], [0.30, 0.65, 0.95]],
+  tool_exec: [[0.25, 0.80, 0.55], [0.95, 0.85, 0.20], [0.20, 0.75, 0.95]],
+};
+
+function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
+function lerp3(a, b, t) {
+  return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
+}
+function getPalette(s) { return MODE_PALETTE[s.mode] || MODE_PALETTE.idle; }
+
+function troubleScore(s) {
+  const raw = (s.llm_retries || 0) * 0.5
+            + (s.tool_errors || 0) * 0.8
+            + (s.repeat_tool_call || 0) * 0.6;
+  return clamp(raw / 3.0, 0, 1);
+}
+function transitionEnergy(s, nowSec) {
+  const age = Math.max(0, nowSec - (s.mode_entered_at || nowSec));
+  return Math.exp(-age / 1.2);
+}
+function loopWear(s, nowSec) {
+  if (!s.loop_started_at) return 0;
+  return clamp((nowSec - s.loop_started_at) / 30, 0, 1);
+}
+// Completion gesture envelope: 0→1 in 0.18s, then decays back to 0 over 1.6s.
+// Drives mouth widening, eye squint, head bob, and a warm halo bloom.
+function completionBoost(s, nowSec) {
+  const t = s.last_completed_at;
+  if (!t) return 0;
+  const age = nowSec - t;
+  if (age < 0 || age > 1.8) return 0;
+  if (age < 0.18) return age / 0.18;
+  return Math.max(0, 1 - (age - 0.18) / 1.62);
+}
+
+// ── Shader sources (P5 WEBGL inline) ──
+const vertSrc = `
+attribute vec3 aPosition;
+attribute vec2 aTexCoord;
+varying vec2 vTexCoord;
+void main() {
+  vTexCoord = aTexCoord;
+  vec4 p = vec4(aPosition, 1.0);
+  // P5 supplies positions in 0..1 for fullscreen quads with texCoord —
+  // remap to clip space.
+  p.xy = p.xy * 2.0 - 1.0;
+  p.y = -p.y;
+  gl_Position = p;
+}`;
+
+const fragSrc = `
+precision highp float;
+varying vec2 vTexCoord;
+uniform float u_time;
+uniform vec2 u_resolution;
+uniform vec3 u_colorA;     // primary (head/blob mode hue)
+uniform vec3 u_colorB;     // secondary (warm/cool tint)
+uniform vec3 u_colorC;     // accent (highlight)
+uniform float u_flowSpeed;
+uniform float u_turbulence;
+uniform float u_brightness;
+uniform float u_trouble;
+
+// Simplex 2D noise — Ashima Arts, MIT.
+vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
+float snoise(vec2 v){
+  const vec4 C = vec4(0.211324865405187, 0.366025403784439,
+                     -0.577350269189626, 0.024390243902439);
+  vec2 i  = floor(v + dot(v, C.yy));
+  vec2 x0 = v -   i + dot(i, C.xx);
+  vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+  vec4 x12 = x0.xyxy + C.xxzz;
+  x12.xy -= i1;
+  i = mod(i, 289.0);
+  vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0))
+                 + i.x + vec3(0.0, i1.x, 1.0));
+  vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy),
+                          dot(x12.zw,x12.zw)), 0.0);
+  m = m*m; m = m*m;
+  vec3 x = 2.0 * fract(p * C.www) - 1.0;
+  vec3 h = abs(x) - 0.5;
+  vec3 ox = floor(x + 0.5);
+  vec3 a0 = x - ox;
+  m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
+  vec3 g;
+  g.x  = a0.x  * x0.x  + h.x  * x0.y;
+  g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+  return 130.0 * dot(m, g);
+}
+vec2 curl(vec2 p) {
+  float e = 0.06;
+  float n1 = snoise(p + vec2(e, 0.0));
+  float n2 = snoise(p - vec2(e, 0.0));
+  float n3 = snoise(p + vec2(0.0, e));
+  float n4 = snoise(p - vec2(0.0, e));
+  return vec2(n3 - n4, n2 - n1);
+}
+
+void main() {
+  vec2 uv = vTexCoord;
+  vec2 aspect = vec2(u_resolution.x / u_resolution.y, 1.0);
+  vec2 p = (uv - 0.5) * aspect * 2.0;
+
+  float t = u_time * u_flowSpeed * 0.08;
+
+  // Domain warp via curl noise — gives the swirling-ribbon character.
+  vec2 w = curl(p * 0.7 + vec2(t, -t * 0.6)) * (0.4 + u_turbulence * 0.6);
+  p += w;
+
+  // FBM density field.
+  float f = 0.0;
+  f += 0.5   * snoise(p * 1.0 + t * 0.5);
+  f += 0.25  * snoise(p * 2.1 - t * 0.4);
+  f += 0.125 * snoise(p * 4.3 + t * 0.7);
+  f = f * 0.5 + 0.5;
+
+  // Region masks — let secondary/accent colors bleed in pockets.
+  float mA = smoothstep(0.15, 0.85, f);
+  float mB = smoothstep(0.30, 0.95,
+                        snoise(p * 0.9 + 13.0 - t*0.2) * 0.5 + 0.5);
+  float mC = smoothstep(0.45, 1.05,
+                        snoise(p * 1.4 +  7.0 + t*0.3) * 0.5 + 0.5);
+
+  vec3 deep = vec3(0.03, 0.04, 0.10);
+  vec3 col = deep;
+  col = mix(col, u_colorA, mA * 0.85);
+  col = mix(col, u_colorB, mB * 0.65);
+  col = mix(col, u_colorC, mC * 0.55);
+
+  // Bright wisps — pow accentuates peaks; gives the streamer highlights.
+  float wisp = pow(clamp(f * 1.1, 0.0, 1.0), 5.0) * 1.8;
+  col += wisp * mix(u_colorB, u_colorC, 0.5);
+
+  // Trouble: red haze in the secondary regions.
+  vec3 redHaze = vec3(0.95, 0.15, 0.10);
+  col = mix(col, redHaze, u_trouble * 0.35 * mB);
+
+  // Soft vignette toward center.
+  float vig = 1.0 - smoothstep(0.55, 1.25, length(p));
+  col *= 0.45 + 0.65 * vig;
+
+  // Sparse stars (high-frequency noise raised to a high power).
+  float starN = snoise(p * 55.0 + 99.0);
+  float stars = pow(max(0.0, starN), 30.0) * 4.0;
+  col += vec3(0.95, 0.92, 1.0) * stars * (0.5 + 0.5 * vig);
+
+  col *= u_brightness;
+
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+// ── P5 sketch (global mode) ──
+// Architecture: main canvas is 2D for rock-solid face/mouth rendering.
+// The shader nebula runs in an offscreen WEBGL graphics buffer and is
+// blitted onto the main canvas each frame. This sidesteps WEBGL state
+// contamination that was causing the face to disappear.
+let nebulaBuf;       // offscreen WEBGL graphics
+let nebulaShader;    // shader living on nebulaBuf
+let W, H;
+
+function setup() {
+  W = windowWidth;
+  H = windowHeight;
+  createCanvas(W, H);                       // 2D
+  nebulaBuf = createGraphics(W, H, WEBGL);
+  nebulaShader = nebulaBuf.createShader(vertSrc, fragSrc);
+  noStroke();
+
+  window.addEventListener('keydown', (ev) => {
+    if (ev.key === 'd') document.body.classList.toggle('debug');
+  });
+}
+
+function windowResized() {
+  W = windowWidth; H = windowHeight;
+  resizeCanvas(W, H);
+  nebulaBuf = createGraphics(W, H, WEBGL);
+  nebulaShader = nebulaBuf.createShader(vertSrc, fragSrc);
+}
+
+function draw() {
+  const nowSec = millis() / 1000;
+  const palette = getPalette(state);
+  const trouble = troubleScore(state);
+  const energy = transitionEnergy(state, nowSec);
+  const wear = loopWear(state, nowSec);
+
+  // Trigger tint
+  let colorA = palette[0].slice();
+  let colorB = palette[1].slice();
+  let colorC = palette[2].slice();
+  if (state.trigger === 'autonomous') {
+    colorB = lerp3(colorB, [0.20, 0.50, 0.85], 0.40);
+    colorC = lerp3(colorC, [0.30, 0.75, 0.95], 0.30);
+  }
+  if (trouble > 0.05) {
+    colorB = lerp3(colorB, [0.90, 0.25, 0.15], trouble * 0.55);
+  }
+
+  // Flow speed & turbulence
+  const baseSpeed = state.mode === 'tool_exec' ? 1.7
+                  : state.mode === 'thinking'  ? 1.0
+                                              : 0.55;
+  const flowSpeed = baseSpeed + energy * 0.7;
+  const turbulence = trouble;
+
+  // Brightness: wear dims, waiting_for_llm gentle pulse
+  let brightness = 1.0 - wear * 0.20;
+  if (state.waiting_for_llm) {
+    brightness *= 0.90 + 0.10 * Math.sin(nowSec * 1.8);
+  }
+
+  // ── Nebula shader into offscreen WEBGL buffer ──
+  nebulaBuf.shader(nebulaShader);
+  nebulaShader.setUniform('u_time', nowSec);
+  nebulaShader.setUniform('u_resolution', [W, H]);
+  nebulaShader.setUniform('u_colorA', colorA);
+  nebulaShader.setUniform('u_colorB', colorB);
+  nebulaShader.setUniform('u_colorC', colorC);
+  nebulaShader.setUniform('u_flowSpeed', flowSpeed);
+  nebulaShader.setUniform('u_turbulence', turbulence);
+  nebulaShader.setUniform('u_brightness', brightness);
+  nebulaShader.setUniform('u_trouble', trouble);
+  // vertex(x,y,z,u,v) — vert shader remaps xy from 0..1 to clip space.
+  nebulaBuf.beginShape();
+  nebulaBuf.vertex(0, 0, 0, 0, 0);
+  nebulaBuf.vertex(1, 0, 0, 1, 0);
+  nebulaBuf.vertex(1, 1, 0, 1, 1);
+  nebulaBuf.vertex(0, 1, 0, 0, 1);
+  nebulaBuf.endShape(CLOSE);
+  nebulaBuf.resetShader();
+
+  // Blit nebula onto main 2D canvas.
+  image(nebulaBuf, 0, 0, W, H);
+
+  // ── Foreground in 2D. Origin top-left, +y down. Face is at (W/2, H/2). ──
+  drawFace(nowSec, palette, energy, trouble);
+  drawMemoryTransient(nowSec, palette);
+
+  updateDebug(colorA, colorB, trouble, energy, wear, flowSpeed);
+}
+
+function drawFace(nowSec, palette, energy, trouble) {
+  const boost = completionBoost(state, nowSec);
+  // Head position in 2D screen coords. Origin = top-left.
+  const floatY = Math.sin(nowSec * 0.6) * 5 - energy * 6 - boost * 12;
+  const cx = W / 2;
+  const cy = H / 2 + floatY;
+  const size = Math.min(W, H) * 0.22;
+
+  noStroke();
+
+  // Completion bloom: warm halo flash in accent color.
+  if (boost > 0) {
+    const bR = size * (1.45 + boost * 0.40);
+    fill(palette[2][0] * 255, palette[2][1] * 255, palette[2][2] * 255,
+         110 * boost);
+    circle(cx, cy, bR * 2);
+  }
+
+  // Soft halo (faint disk in primary hue, tight around the head).
+  const haloR = size * 1.30;
+  fill(palette[0][0] * 255 * 0.6,
+       palette[0][1] * 255 * 0.6,
+       palette[0][2] * 255 * 1.1, 55);
+  circle(cx, cy, haloR * 2);
+
+  // Head blob: near-black with subtle mode tint, slightly squashed.
+  const blob = [
+    palette[0][0] * 255 * 0.07,
+    palette[0][1] * 255 * 0.07,
+    palette[0][2] * 255 * 0.18,
+  ];
+  fill(blob[0], blob[1], blob[2], 248);
+  ellipse(cx, cy, size * 1.6 * 1.15, size * 1.6);
+
+  // Eye geometry
+  const eyeDX = size * 0.30;
+  const eyeDY = -size * 0.10;
+  const eyeR = size * 0.18;
+  const pupilR = eyeR * 0.45;
+
+  // Gaze
+  let lookX = 0, lookY = 0;
+  if (state.mode === 'thinking')   lookY = -0.35;
+  if (state.mode === 'tool_exec') {
+    const t = state.tool_name || '';
+    const seed = t ? t.charCodeAt(0) : 0;
+    lookX = (seed % 2 === 0) ? 0.40 : -0.40;
+  }
+  if (trouble > 0.20) {
+    lookX += Math.sin(nowSec * 8.0) * trouble * 0.35;
+    lookY += Math.cos(nowSec * 7.0) * trouble * 0.25;
+  }
+
+  // Blink scheduling
+  if (nowSec - lastBlinkAt > nextBlinkGap) {
+    lastBlinkAt = nowSec;
+    nextBlinkGap = 3.0 + Math.random() * 4.0;
+  }
+  const bp = nowSec - lastBlinkAt;
+  let eyeOpen = 1.0;
+  if (bp < 0.18) {
+    const k = bp / 0.18;
+    eyeOpen = Math.abs(k * 2 - 1);  // 1→0→1
+  }
+  // On completion, eyes squint into a happy "ᴗ".
+  const effEyeOpen = Math.max(0.05, eyeOpen * (1 - boost * 0.55));
+
+  for (const side of [-1, 1]) {
+    const ex = cx + side * eyeDX;
+    const ey = cy + eyeDY;
+
+    // Eye white (squint via ellipse height)
+    fill(245, 245, 250, 240);
+    ellipse(ex, ey, eyeR * 2, eyeR * 2 * effEyeOpen);
+
+    if (effEyeOpen > 0.35) {
+      const px = ex + lookX * eyeR * 0.55;
+      const py = ey + lookY * eyeR * 0.55;
+      // Pupil
+      fill(18, 18, 38, 250);
+      circle(px, py, pupilR * 2);
+      // Catchlight
+      fill(255, 255, 255, 225);
+      circle(px - pupilR * 0.32, py - pupilR * 0.32, pupilR * 0.55);
+    }
+  }
+
+  // Mouth curvature: +smile / 0 flat / − frown
+  let mouthCurve = 0.55;
+  if (state.mode === 'thinking')  mouthCurve = 0.12;
+  if (state.mode === 'tool_exec') mouthCurve = 0.30;
+  if (trouble > 0.35) mouthCurve = -0.25 - trouble * 0.35;
+  if (boost > 0) {
+    mouthCurve = mouthCurve * (1 - boost) + 1.30 * boost;
+  }
+
+  drawMouth(cx, cy + size * 0.26, size * 0.34, mouthCurve);
+}
+
+function drawMouth(cx, cy, halfWidth, curve) {
+  // Filled polygon ribbon: top contour left→right, bottom contour
+  // right→left, closed and filled. In 2D, +y is down; smile = midpoint
+  // pushed down (+y).
+  const steps = 32;
+  const thickness = 5.5;
+  noStroke();
+  fill(248, 248, 252, 240);
+  const topPts = [];
+  const botPts = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const x = cx + (t * 2 - 1) * halfWidth;
+    const yCenter = cy + curve * halfWidth * 0.60 * (1 - Math.pow(t * 2 - 1, 2));
+    const taper = 1 - Math.pow(Math.abs(t * 2 - 1), 5);
+    const h = thickness * (0.35 + 0.65 * taper);
+    topPts.push([x, yCenter - h]);
+    botPts.push([x, yCenter + h]);
+  }
+  beginShape();
+  for (const [x, y] of topPts) vertex(x, y);
+  for (let i = botPts.length - 1; i >= 0; i--) vertex(botPts[i][0], botPts[i][1]);
+  endShape(CLOSE);
+}
+
+function drawMemoryTransient(nowSec, palette) {
+  const age = nowSec - memOpFlashAt;
+  if (age < 0 || age > 1.5) return;
+  const k = 1 - age / 1.5;
+  const baseR = Math.min(W, H) * 0.22;
+  const cx = W / 2, cy = H / 2;
+
+  if (lastMemOp === 'recall') {
+    // Inward contracting sparkle ring.
+    stroke(225, 205, 110, 220 * k);
+    strokeWeight(2);
+    noFill();
+    const r = baseR * (1.85 - k * 0.95);
+    circle(cx, cy, r * 2);
+    noStroke();
+  } else if (lastMemOp === 'companion_update') {
+    // Outward warm bloom.
+    noStroke();
+    fill(palette[2][0] * 255, palette[2][1] * 255, palette[2][2] * 255,
+         55 * k);
+    const r = baseR * (1.15 + (1 - k) * 1.4);
+    circle(cx, cy, r * 2);
+  }
+}
+
+function updateDebug(cA, cB, trouble, energy, wear, flowSpeed) {
+  if (!document.body.classList.contains('debug')) return;
+  const dbg = document.getElementById('debug');
+  const ageMode = state.mode_entered_at
+      ? (Date.now() / 1000 - state.mode_entered_at).toFixed(1) + 's'
+      : '—';
+  const ageLoop = state.loop_started_at
+      ? (Date.now() / 1000 - state.loop_started_at).toFixed(1) + 's'
+      : '—';
+  dbg.textContent =
+      `mode=${state.mode}/${ageMode} trig=${state.trigger}\n` +
+      `iter=${state.react_iter} loop=${ageLoop} ` +
+      `llm=${state.waiting_for_llm ? 'wait' : '-'}\n` +
+      `tool=${state.tool_name || '—'}\n` +
+      `ret=${state.llm_retries} terr=${state.tool_errors} ` +
+      `rep=${state.repeat_tool_call} mem=${state.memory_op}\n` +
+      `seq=${state.seq}\n` +
+      `[viz] trouble=${trouble.toFixed(2)} energy=${energy.toFixed(2)} ` +
+      `wear=${wear.toFixed(2)} flow=${flowSpeed.toFixed(2)}`;
+}
+</script>
+</body>
+</html>

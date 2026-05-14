@@ -294,6 +294,125 @@ def launch_resource_browser(world_label: str, character: str = "") -> Optional[s
         return None
 
 
+_BROWSER_CANDIDATES = (
+    # google-chrome preferred over chromium because snap-confined chromium
+    # silently drops some flags (--window-position, --window-size) due to
+    # AppArmor. google-chrome is non-snap and respects flags reliably.
+    'google-chrome', 'google-chrome-stable',
+    'chromium', 'chromium-browser',
+    'brave-browser', 'microsoft-edge',
+)
+
+
+def _resolve_browser(override: Optional[str]) -> Optional[str]:
+    """Return a browser binary suitable for --app= chromium-style launches,
+    or None if none found. `override` is taken verbatim if truthy."""
+    import shutil
+    if override:
+        return override
+    for c in _BROWSER_CANDIDATES:
+        p = shutil.which(c)
+        if p:
+            return p
+    return None
+
+
+def _parse_size(s: str, default: str) -> str:
+    """Normalize 'WxH' or 'W,H' to chromium's 'W,H' format."""
+    txt = (s or default).strip().lower().replace('x', ',').replace(' ', '')
+    parts = txt.split(',')
+    if len(parts) != 2 or not all(p.isdigit() for p in parts):
+        logger.warning(f"unparseable size {s!r}; using default {default!r}")
+        txt = default.replace('x', ',').replace(' ', '')
+    return txt
+
+
+def _launch_widget_window(
+    label: str,
+    html_path: str,
+    size: str,
+    pos: str,
+    browser: Optional[str],
+) -> Optional[subprocess.Popen]:
+    """Open html_path as a chromium app-mode window. Uses --user-data-dir
+    pointed at a fresh tmp profile to prevent the WM from inheriting a
+    previous 'maximized' state — the cause of the affect window opening
+    full-screen on snap chromium."""
+    b = _resolve_browser(browser)
+    if not b:
+        logger.warning(
+            f"{label}: no chromium-family browser on PATH; widget window "
+            "not opened. Set --browser <path> or install chromium/chrome.")
+        return None
+    profile_dir = f"/tmp/jill-{label}-{os.getpid()}"
+    cmd = [
+        b,
+        f'--app=file://{html_path}',
+        f'--window-size={size}',
+        f'--window-position={pos}',
+        f'--user-data-dir={profile_dir}',
+    ]
+    try:
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL)
+        logger.info(f"{label} widget window launched (browser={b}, size={size}, pos={pos})")
+        return proc
+    except Exception as e:
+        logger.error(f"{label}: failed to launch browser: {e}")
+        return None
+
+
+def launch_affect_display(size: str, pos: str, browser: Optional[str]
+                          ) -> List[subprocess.Popen]:
+    """Spawn the affect-display bridge + chromium widget window.
+    Returns the list of subprocesses to track for cleanup."""
+    procs: List[subprocess.Popen] = []
+    try:
+        bridge = subprocess.Popen(
+            [sys.executable, '-m', 'affect.display'],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        procs.append(bridge)
+        logger.info("affect bridge launched (ws://127.0.0.1:8787)")
+    except Exception as e:
+        logger.error(f"affect: failed to launch bridge: {e}")
+        return procs
+    # Brief pause so the WS server is listening when chromium connects.
+    # The JS shim reconnects on failure, so this is just an optimization.
+    time.sleep(0.4)
+    html = os.path.join(_THIS_DIR := os.path.dirname(os.path.abspath(__file__)),
+                        'affect', 'display', 'static', 'index.html')
+    win = _launch_widget_window('affect', html, size, pos, browser)
+    if win is not None:
+        procs.append(win)
+    return procs
+
+
+def launch_canvas_display(character: str, size: str, pos: str,
+                          browser: Optional[str]) -> List[subprocess.Popen]:
+    """Spawn the canvas-display bridge + chromium widget window for
+    the given character. Returns subprocesses to track."""
+    procs: List[subprocess.Popen] = []
+    env = os.environ.copy()
+    env['CANVAS_CHARACTER'] = character
+    try:
+        bridge = subprocess.Popen(
+            [sys.executable, '-m', 'canvas.display'],
+            env=env,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        procs.append(bridge)
+        logger.info(f"canvas bridge launched (character={character}, ws://127.0.0.1:8788)")
+    except Exception as e:
+        logger.error(f"canvas: failed to launch bridge: {e}")
+        return procs
+    time.sleep(0.4)
+    html = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        'canvas', 'display', 'static', 'index.html')
+    win = _launch_widget_window('canvas', html, size, pos, browser)
+    if win is not None:
+        procs.append(win)
+    return procs
+
+
 def launch_telegram_bridge(character: str) -> Optional[subprocess.Popen]:
     """Spawn telegram_bridge.py as a sibling subprocess.
 
@@ -404,6 +523,22 @@ def main():
                         help='Enable autonomous concern firing in chat mode (off by default; '
                              'when off, the tick handler is a no-op so benchmarks and chat '
                              'scenarios behave identically regardless of active concerns).')
+    parser.add_argument('--affect', action='store_true',
+                        help='Launch the affect (processing-state) widget window.')
+    parser.add_argument('--affect-size', default='320x320',
+                        help='Affect window size WxH or W,H (default: 320x320).')
+    parser.add_argument('--affect-pos', default='60,60',
+                        help='Affect window position X,Y (default: 60,60).')
+    parser.add_argument('--canvas', action='store_true',
+                        help='Launch the canvas (rich-display) window. Uses the '
+                             'first launched character as its target.')
+    parser.add_argument('--canvas-size', default='820x640',
+                        help='Canvas window size WxH or W,H (default: 820x640).')
+    parser.add_argument('--canvas-pos', default='540,60',
+                        help='Canvas window position X,Y (default: 540,60).')
+    parser.add_argument('--browser', default=None,
+                        help='Browser binary for widget windows (default: auto-detect '
+                             'chromium/chrome/brave/edge).')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     args = parser.parse_args()
 
@@ -476,6 +611,23 @@ def main():
         proc = launch_telegram_bridge(character=primary_character)
         if proc:
             service_procs.append(proc)
+
+    # Affect (processing-state) and canvas (rich-display) widget windows.
+    # Each spawns a Python bridge + a chromium app-mode window. Both are
+    # tracked in service_procs so they get terminated on shutdown.
+    if args.affect:
+        affect_size = _parse_size(args.affect_size, '320,320')
+        service_procs.extend(launch_affect_display(
+            size=affect_size, pos=args.affect_pos, browser=args.browser))
+    if args.canvas:
+        primary_character = characters[0][0] if characters else ""
+        if not primary_character:
+            logger.warning("--canvas requested but no characters; window not opened.")
+        else:
+            canvas_size = _parse_size(args.canvas_size, '820,640')
+            service_procs.extend(launch_canvas_display(
+                character=primary_character,
+                size=canvas_size, pos=args.canvas_pos, browser=args.browser))
 
     # ---- URL listener (shared; sensors drain the queue) ----
     # Start if any character declares a browser-visits sensor

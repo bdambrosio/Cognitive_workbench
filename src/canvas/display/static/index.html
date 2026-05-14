@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Restrict embedded HTML to no remote network calls (model-controlled
+     content shouldn't fetch arbitrary URLs). Inline scripts are allowed
+     so model-supplied <script> tags inside an HTML payload still run.
+     Tighten this further if you want a stricter sandbox. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self' 'unsafe-inline' data: blob:;
+               img-src 'self' data: blob:;
+               script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+               style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+               connect-src ws://127.0.0.1:* http://127.0.0.1:*;">
+<title>Jill — canvas</title>
+<style>
+  html, body { margin: 0; padding: 0;
+               background: #111; color: #ddd;
+               font-family: -apple-system, system-ui, sans-serif;
+               line-height: 1.55; }
+  #content { padding: 28px 36px; max-width: 980px; margin: 0 auto; }
+  #content h1, #content h2, #content h3 { color: #fff;
+               border-bottom: 1px solid #333; padding-bottom: 4px; }
+  #content code { background: #1d1d1d; padding: 1px 5px; border-radius: 3px;
+               font-family: 'JetBrains Mono', 'Courier New', monospace; }
+  #content pre  { background: #161616; padding: 12px; border-radius: 5px;
+               overflow-x: auto;
+               font-family: 'JetBrains Mono', 'Courier New', monospace; }
+  #content pre code { background: transparent; padding: 0; }
+  #content blockquote { border-left: 3px solid #444; margin: 0;
+               padding: 0 14px; color: #aaa; }
+  #content table { border-collapse: collapse; }
+  #content th, #content td { border: 1px solid #333; padding: 6px 10px; }
+  #content th { background: #1d1d1d; }
+  #content a { color: #6ea0ff; }
+  #content img, #content svg { max-width: 100%; height: auto; }
+  #status { position: fixed; left: 8px; bottom: 6px; font-size: 10px;
+            color: rgba(255,255,255,0.4); pointer-events: none; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+<div id="content"><p style="color:#777">canvas idle — waiting for Jill to push content…</p></div>
+<div id="status">connecting…</div>
+<script>
+'use strict';
+
+const WS_URL = `ws://${location.hostname || '127.0.0.1'}:${
+  new URLSearchParams(location.search).get('ws_port') || '8788'}`;
+const contentEl = document.getElementById('content');
+const statusEl = document.getElementById('status');
+
+function render(payload) {
+  let body = '';
+  try {
+    const obj = JSON.parse(payload);
+    const content = obj.content || '';
+    const fmt = obj.format || 'markdown';
+    if (fmt === 'html') {
+      body = content;
+    } else {
+      // marked.js renders markdown → HTML with sensible defaults.
+      // GFM tables, fenced code, autolinks all on by default in v11+.
+      body = (window.marked && marked.parse) ? marked.parse(content)
+                                              : escapeHtml(content);
+    }
+  } catch (e) {
+    console.warn('parse failed', e);
+    body = `<pre style="color:#f88">canvas: parse error — ${escapeHtml(String(e))}</pre>`;
+  }
+  contentEl.innerHTML = body;
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[c]));
+}
+
+function connect() {
+  statusEl.textContent = 'connecting…';
+  const ws = new WebSocket(WS_URL);
+  ws.onopen  = () => { statusEl.textContent = ''; };
+  ws.onclose = () => {
+    statusEl.textContent = 'disconnected — retrying';
+    setTimeout(connect, 1500);
+  };
+  ws.onerror = () => { statusEl.textContent = 'ws error'; };
+  ws.onmessage = (ev) => render(ev.data);
+}
+connect();
+</script>
+</body>
+</html>
