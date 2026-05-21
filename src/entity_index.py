@@ -12,6 +12,8 @@ import logging
 from collections import defaultdict
 from typing import Any, Callable, Dict, List, Optional, Set
 
+from utils.json_utils import repair_json_string
+
 logger = logging.getLogger(__name__)
 
 # Lightweight NER prompt — much smaller than the full extract-entities tool.
@@ -76,7 +78,10 @@ class EntityIndex:
                 messages=[prompt], max_tokens=256, temperature=0.1,
                 is_json=True, stops=["</end>"])
             if result.success and result.text:
-                parsed = result.text if isinstance(result.text, dict) else json.loads(result.text)
+                if isinstance(result.text, dict):
+                    parsed = result.text
+                else:
+                    parsed = repair_json_string(result.text) or {}
                 # Normalize: ensure all expected keys exist and values are lists of strings
                 out = {}
                 for key in ("people", "organizations", "locations", "topics"):

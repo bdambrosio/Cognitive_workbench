@@ -55,3 +55,6 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## No keyword matching
 Never use keyword/string matching for classification, routing, affordance detection, or intent understanding. Use semantic approaches instead — LLM calls with natural language descriptions, embedding similarity, or other meaning-based methods. Keyword lists are brittle and always miss edge cases. Only use keyword matching with explicit user permission.
+
+## Reuse over re-implementation
+Before writing logic for a common task — code-fence stripping, JSON repair, retry/backoff, path resolution, env-var reading, prompt formatting, etc. — search the codebase for an existing utility. If one exists, use it. If multiple sites need the same logic and none exists, create a shared helper in the appropriate `utils/` module and have every site call it. One canonical implementation, used everywhere; not three slight variants drifting apart. When you find a duplicate has already crept in, prefer consolidating it over leaving the duplication in place.

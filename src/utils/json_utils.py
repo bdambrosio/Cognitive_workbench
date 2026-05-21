@@ -57,6 +57,52 @@ def repair_json_string(json_str: str) -> Optional[Dict]:
             i += 1
         response = ''.join(out)
 
+    # Pre-process: escape unescaped backslashes inside string literals.
+    # LLMs frequently emit LaTeX (`$v = \sqrt{T/\mu}$`) or other
+    # backslash-heavy content inside `text` fields. Only `\" \\ \/ \b
+    # \f \n \r \t \uXXXX` are valid JSON escapes — anything else (e.g.
+    # `\s`, `\m`, `\l`) makes json.loads reject the whole object. This
+    # pass walks the string character by character, and inside any
+    # JSON string literal, doubles any backslash that isn't followed
+    # by a valid escape character. Outside string literals, leaves
+    # backslashes alone. Valid `\\` sequences are detected and
+    # advanced over intact, so this is idempotent on already-valid
+    # JSON.
+    if '\\' in response:
+        _VALID_ESCAPES = set('"\\/bfnrtu')
+        out = []
+        i = 0
+        in_str = False
+        while i < len(response):
+            c = response[i]
+            if not in_str:
+                out.append(c)
+                if c == '"':
+                    in_str = True
+                i += 1
+                continue
+            # Inside a string literal.
+            if c == '\\':
+                nxt = response[i+1] if i + 1 < len(response) else ''
+                if nxt in _VALID_ESCAPES:
+                    # Valid escape — keep both characters as-is. The
+                    # `\"` case correctly leaves in_str = True because
+                    # we never see the `"` as a standalone char.
+                    out.append(c)
+                    out.append(nxt)
+                    i += 2
+                    continue
+                # Invalid (or trailing) backslash — double it.
+                out.append('\\')
+                out.append('\\')
+                i += 1
+                continue
+            if c == '"':
+                in_str = False
+            out.append(c)
+            i += 1
+        response = ''.join(out)
+
     # Pre-process: Evaluate arithmetic expressions in numeric fields before parsing
     # This handles cases like {"yaw": 1.0236+3.14159} which are invalid JSON
     def eval_arithmetic_in_json(text):

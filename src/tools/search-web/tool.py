@@ -17,6 +17,7 @@ The output contract: a single Note containing structured JSON with:
 import json
 import logging
 import os
+import sys
 import time
 import traceback
 from datetime import date
@@ -25,6 +26,14 @@ from urllib.parse import urlparse
 
 import requests
 import warnings
+
+# Tools load via importlib from chat_loop with SRC_DIR already on
+# sys.path. Belt-and-braces for standalone invocations (smoke tests etc.).
+_SRC_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, _SRC_DIR)
+
+from utils.json_utils import repair_json_string  # noqa: E402
 
 # infospace_executor was the planner-side runtime; the chat ReAct loop
 # bypasses it and calls llm_search() directly. Keep the import optional so
@@ -351,34 +360,9 @@ Guidelines:
 
 
 def _parse_json_response(text: str) -> Optional[Dict[str, Any]]:
-    """Parse Claude's JSON response, handling code fences and minor issues."""
-    cleaned = text.strip()
-
-    # Strip markdown code fences
-    if cleaned.startswith("```"):
-        first_nl = cleaned.find("\n")
-        if first_nl >= 0:
-            cleaned = cleaned[first_nl + 1:]
-    if cleaned.endswith("```"):
-        cleaned = cleaned[:-3]
-    cleaned = cleaned.strip()
-
-    # Direct parse
-    try:
-        return json.loads(cleaned)
-    except json.JSONDecodeError:
-        pass
-
-    # Find outermost braces
-    start = cleaned.find("{")
-    end = cleaned.rfind("}") + 1
-    if start >= 0 and end > start:
-        try:
-            return json.loads(cleaned[start:end])
-        except json.JSONDecodeError:
-            pass
-
-    return None
+    """Thin shim over the shared tolerant LLM-JSON parser."""
+    obj = repair_json_string(text or '')
+    return obj if isinstance(obj, dict) else None
 
 
 # ------------------------------

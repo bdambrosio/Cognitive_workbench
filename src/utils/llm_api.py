@@ -293,8 +293,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
 """)]
 
         response = self.ask({"json": response, "error": error, "prompt": prompt}, repair_prompt, tag='repair_json', temp=0.2, max_tokens=3500)
-        try:
-            return json.loads(response.replace("```json", "").replace("```", "").strip())
-        except Exception as e:
-            print(f'Failed to repair JSON: {e}')
-            return None
+        from utils.json_utils import repair_json_string
+        repaired = repair_json_string(response or '')
+        if repaired is None:
+            print('Failed to repair JSON: parser returned None')
+        return repaired

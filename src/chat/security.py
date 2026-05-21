@@ -31,6 +31,8 @@ import logging
 import re
 import shutil
 import subprocess
+
+from utils.json_utils import repair_json_string
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -143,22 +145,8 @@ def _build_system_prompt() -> str:
 
 
 def _parse_action(raw: str) -> Optional[Dict[str, Any]]:
-    s = (raw or '').strip()
-    if not s:
-        return None
-    if s.startswith('```'):
-        s = re.sub(r'^```[a-zA-Z]*\n', '', s)
-        s = re.sub(r'\n```\s*$', '', s)
-    try:
-        return json.loads(s)
-    except json.JSONDecodeError:
-        m = re.search(r'\{.*\}', s, re.DOTALL)
-        if m:
-            try:
-                return json.loads(m.group(0))
-            except json.JSONDecodeError:
-                return None
-        return None
+    obj = repair_json_string(raw or '')
+    return obj if isinstance(obj, dict) else None
 
 
 def _is_rfc1918(target: str) -> Optional[ipaddress.IPv4Network]:

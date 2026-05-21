@@ -21,6 +21,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+from utils.json_utils import repair_json_string
+
 logger = logging.getLogger(__name__)
 
 _MAX_ITERS = 10
@@ -345,23 +347,11 @@ def _tool_grep(memory_dir: Path, pattern: str,
 
 
 def _parse_action(raw: str) -> Optional[Dict[str, Any]]:
-    """Parse a JSON action emission. Returns None if unparseable."""
-    s = (raw or '').strip()
-    if not s:
-        return None
-    if s.startswith('```'):
-        s = re.sub(r'^```[a-zA-Z]*\n', '', s)
-        s = re.sub(r'\n```\s*$', '', s)
-    try:
-        return json.loads(s)
-    except json.JSONDecodeError:
-        m = re.search(r'\{.*\}', s, re.DOTALL)
-        if m:
-            try:
-                return json.loads(m.group(0))
-            except json.JSONDecodeError:
-                return None
-        return None
+    """Parse a JSON action emission via the shared tolerant parser
+    (fences, missing braces, bareword keys, etc). Returns None if no
+    dict can be recovered."""
+    obj = repair_json_string(raw or '')
+    return obj if isinstance(obj, dict) else None
 
 
 def _write_trace(trace_dir: Path, query: str,

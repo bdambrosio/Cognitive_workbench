@@ -32,6 +32,8 @@ _SRC = Path(__file__).resolve().parent.parent.parent
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
+from utils.json_utils import repair_json_string  # noqa: E402
+
 # Load create-tool module (directory has hyphen, use direct load)
 import importlib.util
 _tool_spec = importlib.util.spec_from_file_location("create_tool_tool", Path(__file__).parent / "tool.py")
@@ -129,31 +131,11 @@ No other text. Valid JSON only."""
     response = llm_generate(messages=[prompt], max_tokens=800, temperature=0.2)
     if not response.success:
         return None
-    text = (response.text or "").strip()
-    start = text.find("{")
-    if start < 0:
-        logger.warning("No JSON object in inference response")
+    obj = repair_json_string(response.text or "")
+    if not isinstance(obj, dict):
+        logger.warning("Could not parse inference JSON from LLM response")
         return None
-    # Extract object (find matching brace)
-    depth = 0
-    end = -1
-    for i, c in enumerate(text[start:], start):
-        if c == "{":
-            depth += 1
-        elif c == "}":
-            depth -= 1
-            if depth == 0:
-                end = i
-                break
-    if end < 0:
-        text = text[start:] + "}"
-    else:
-        text = text[start : end + 1]
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError as e:
-        logger.warning(f"Could not parse inference JSON: {e}")
-        return None
+    return obj
 
 
 def load_entries(log_path: Path) -> List[dict]:

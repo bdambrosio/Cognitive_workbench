@@ -2,7 +2,7 @@
 ChatLoop — lightweight per-character chat agent.
 
 Mirrors ZenohExecutiveNode's user-facing wire protocol so existing clients
-(cli.py, tests/chat_cli.py) work unchanged:
+(cli.py) work unchanged:
 
     in:  cognitive/{character}/sense_data
     out: cognitive/{character}/action       (type="say")
@@ -44,6 +44,7 @@ if _SRC_DIR not in sys.path:
 from cot_profiles import is_reasoning_model, resolve_profile  # noqa: E402
 from affect.publisher import AffectPublisher  # noqa: E402
 from canvas.publisher import CanvasPublisher, default_key as canvas_default_key  # noqa: E402
+from utils.json_utils import repair_json_string  # noqa: E402
 
 
 logger = logging.getLogger('chat_loop')
@@ -800,15 +801,10 @@ class ChatLoop:
             if not text:
                 return SimpleNamespace(success=False, text='', error='empty response')
             if is_json and isinstance(text, str):
-                stripped = text.strip()
-                if stripped.startswith('```'):
-                    lines = [l for l in stripped.split('\n') if not l.strip().startswith('```')]
-                    stripped = '\n'.join(lines).strip()
-                try:
-                    parsed = json.loads(stripped)
+                parsed = repair_json_string(text)
+                if parsed is not None:
                     return SimpleNamespace(success=True, text=parsed, error=None)
-                except Exception:
-                    return SimpleNamespace(success=True, text=stripped, error=None)
+                return SimpleNamespace(success=True, text=text.strip(), error=None)
             return SimpleNamespace(success=True, text=text, error=None)
         except Exception as e:
             logger.warning(f'[{self.character_name}] _llm_generate failed: {e}')
@@ -2398,13 +2394,8 @@ class ChatLoop:
                 _preview = repr(payload)
             logger.info(f"[{self.character_name}] reflection raw: {_preview[:800]}")
             if isinstance(payload, str):
-                stripped = payload.strip()
-                if stripped.startswith(('{', '[')):
-                    try:
-                        payload = json.loads(stripped)
-                    except Exception:
-                        return ([], [], [])
-                else:
+                payload = repair_json_string(payload)
+                if payload is None:
                     return ([], [], [])
 
             frame, raw_memories, raw_user_concerns, raw_agent_concerns = (
@@ -2871,52 +2862,13 @@ class ChatLoop:
 
     @staticmethod
     def _parse_react_action(raw: str) -> Optional[Dict[str, Any]]:
-        """Extract a single JSON action object from LLM output. Tolerates
-        ```json fences and surrounding prose. Returns None if no balanced
-        JSON object can be found."""
+        """Extract a single JSON action object from LLM output via the
+        shared tolerant parser (fences, missing braces, bareword keys,
+        etc). Returns None if no dict can be recovered."""
         if not raw or not isinstance(raw, str):
             return None
-        text = raw.strip()
-        text = re.sub(r'^```(?:json)?\s*', '', text)
-        text = re.sub(r'\s*```\s*$', '', text)
-        text = text.strip()
-        if not text:
-            return None
-        start = text.find('{')
-        if start < 0:
-            return None
-        depth = 0
-        in_str = False
-        esc = False
-        end = -1
-        for i in range(start, len(text)):
-            c = text[i]
-            if in_str:
-                if esc:
-                    esc = False
-                elif c == '\\':
-                    esc = True
-                elif c == '"':
-                    in_str = False
-                continue
-            if c == '"':
-                in_str = True
-            elif c == '{':
-                depth += 1
-            elif c == '}':
-                depth -= 1
-                if depth == 0:
-                    end = i
-                    break
-        if end < 0:
-            return None
-        try:
-            obj = json.loads(text[start:end + 1])
-        except Exception:
-            return None
-        if not isinstance(obj, dict):
-            return None
-        return obj
+        obj = repair_json_string(raw)
+        return obj if isinstance(obj, dict) else None
 
     @staticmethod
     def _resolve_react_value(val: Any, log: List[Tuple[str, str]]) -> str:
@@ -3927,9 +3879,23 @@ class ChatLoop:
             "**Even if your data is incomplete or imperfect, render what you DO have** — the user "
             "asked to see it; don't decline because the picture isn't full. Acknowledge the gap "
             "verbally in `respond`. "
-            "Default `format=markdown` (safer, easier to author). Use `format=html` only when "
-            "markdown can't express what you need: inline SVG diagrams, multi-column layout, "
-            "custom styling."))
+            "Default `format=markdown` (safer, easier to author). Use `format=html` for inline "
+            "SVG (diagrams, drawings, illustrations), multi-column layout, or custom styling. "
+            "**Line breaks matter**: markdown needs real `\\n` newlines in the content string "
+            "for headings, lists, and paragraphs to render — don't collapse your source to a "
+            "single line, or `### Title` and `- bullet` show up as literal text. "
+            "**Drawings / illustrations**: when the user says *draw / sketch / illustrate / "
+            "diagram*, generate inline `<svg>...</svg>` yourself — cheap, immediate, no "
+            "external dependency. Image search is for *photos* or specific existing images "
+            "the user named — not for whimsical drawings you can produce yourself. "
+            "**Photos from the web**: `format=html` with "
+            "`<img src=\"http://127.0.0.1:8789/proxy?url=<url>\">`. The URL must be a "
+            "**direct image-file URL** (e.g. `cdn.example.com/photo.jpg`), NOT a webpage that "
+            "contains the image. Page URLs through the proxy produce broken-image icons — "
+            "the proxy faithfully returns whatever bytes the URL yields, and `text/html` "
+            "cannot render inside `<img>`. If you only have a page URL (a search hit, a "
+            "stock-photo landing page, an article), `fetch_text` it first and use "
+            "`metadata.html_metadata.images.og_image` — that's what that field is for."))
         tools.append(("respond",
             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"respond\", \"text\": <string|$stepN>}` — "
             "final reply, exits loop. Must be in your voice; pass search/fetch results through process_text "
@@ -4147,6 +4113,13 @@ class ChatLoop:
             log.append((label, content))
             log_appendage_str += f"{label}:\n{content}\n"
 
+        # Track whether the agent explicitly pushed something to the canvas
+        # this turn. If she did, leave it alone — `display` content is richer
+        # than the prose reply. If she didn't, auto-mirror the respond text
+        # to canvas as markdown so the surface always reflects the latest
+        # reply rather than going stale.
+        did_display = False
+
         self._affect.enter_loop()
         for i in range(REACT_MAX_ITERS):
             self._affect.set_react_iter(i + 1)
@@ -4207,6 +4180,16 @@ class ChatLoop:
                 logger.info(f"[{self.character_name}] ReAct iter {i+1}: respond ({len(text)} chars)")
                 # respond appends nothing to the log (loop exits); appended stays []
                 self._clear_status()
+                # Auto-mirror: when the agent didn't push richer content
+                # via `display` this turn, render the respond text on the
+                # canvas as markdown. Keeps the surface in sync with the
+                # latest reply for free.
+                if not did_display and text and text.strip():
+                    try:
+                        self._canvas.set_content(text, fmt='markdown')
+                    except Exception as e:
+                        logger.warning(
+                            f"[{self.character_name}] canvas auto-mirror failed: {e}")
                 self._affect.mark_completion()
                 self._affect.exit_loop()
                 return text, log, iters, 'respond'
@@ -4286,6 +4269,10 @@ class ChatLoop:
                 content = self._resolve_react_value(action.get('content', ''), log)
                 fmt = (action.get('format') or 'markdown').strip().lower()
                 obs = self._run_display(content, fmt)
+                # Suppress auto-mirror on the final respond — the agent
+                # has already chosen what belongs on the canvas this turn.
+                if isinstance(obs, str) and obs.startswith('OK'):
+                    did_display = True
             else:
                 # Tool list shown to the model on bad emission. Don't
                 # advertise inspect_external when nothing is bound — keeps
@@ -4516,6 +4503,43 @@ class ChatLoop:
             return 'EMPTY: remember subagent produced no answer'
         return 'OK: ' + text
 
+    # Matches any <img ... src="http://127.0.0.1:8789/proxy?url=..."> regardless
+    # of attribute order or surrounding tag content. Compiled once; used by the
+    # preflight to validate proxy URLs before they reach the browser, where a
+    # bad URL would render as a silent broken-image icon.
+    _PROXY_IMG_RE = re.compile(
+        r'''<img\b[^>]*?\bsrc\s*=\s*["'](http://127\.0\.0\.1:8789/proxy\?[^"']+)["']''',
+        re.IGNORECASE,
+    )
+
+    def _preflight_proxy_imgs(self, content: str) -> Optional[str]:
+        """If `content` references the local image proxy, GET each URL
+        ahead of canvas publish. The proxy's Content-Type guard returns
+        415 for non-image upstreams (most commonly a webpage URL the
+        model mistakenly piped into <img>); preflight relays that to the
+        ReAct loop as an ERROR observation so the next iteration can
+        re-strategize instead of leaving a broken-icon on the canvas.
+
+        Returns None if all proxy URLs validated, or a short reason
+        string if any failed. Caller wraps with `ERROR:` prefix.
+        """
+        for m in self._PROXY_IMG_RE.finditer(content):
+            url = m.group(1)
+            try:
+                r = requests.get(url, timeout=5)
+            except requests.RequestException as e:
+                return f"proxy unreachable for {url}: {e}"
+            if r.status_code != 200:
+                # The proxy emits an actionable hint in the body
+                # (e.g. "upstream returned 'text/html', not an image…").
+                # Relay it verbatim so Jill sees what to do next.
+                hint = (r.text or '').strip().replace('\n', ' ')[:400]
+                return (
+                    f"proxy rejected {url} (HTTP {r.status_code})"
+                    + (f" — {hint}" if hint else '')
+                )
+        return None
+
     def _run_display(self, content: str, fmt: str) -> str:
         """Backend for the ReAct `display` tool. Publishes the content to
         the canvas Zenoh key; the display window (launched separately or
@@ -4529,6 +4553,12 @@ class ChatLoop:
             return "EMPTY: display content was empty"
         if fmt not in ('markdown', 'html'):
             fmt = 'markdown'
+        # Validate any proxy URLs before publish so a page-URL-as-image
+        # bug surfaces here, not as a broken-icon on the user's screen.
+        if fmt == 'html':
+            err = self._preflight_proxy_imgs(body)
+            if err is not None:
+                return f"ERROR: display preflight: {err}"
         try:
             n_bytes = self._canvas.set_content(body, fmt=fmt)
         except Exception as e:
@@ -4971,18 +5001,11 @@ class ChatLoop:
         except Exception as e:
             logger.warning(f"[{self.character_name}] successor synth LLM failed: {e}")
             return None
-        # Parse: tolerate code-fenced JSON.
-        s = (raw or '').strip()
-        if s.startswith('```'):
-            s = s.strip('`').strip()
-            if s.lower().startswith('json'):
-                s = s[4:].strip()
-        try:
-            data = json.loads(s)
-        except json.JSONDecodeError as e:
+        data = repair_json_string(raw or '')
+        if data is None:
             logger.warning(
-                f"[{self.character_name}] successor JSON parse failed: {e}; "
-                f"raw={raw[:200]!r}")
+                f"[{self.character_name}] successor JSON parse failed; "
+                f"raw={(raw or '')[:200]!r}")
             return None
         if not isinstance(data, dict) or data.get('complete'):
             return None
