@@ -1,0 +1,70 @@
+# Cognitive Workbench — chat-mode benchmark scenario for MMLU (closed-book).
+#
+# Used by bench/mmlu/runner.py. Forked from jill-benchmark-chat.yaml; the
+# important differences:
+#   - chat.omitted_tools drops every external-info tool so MMLU is a
+#     closed-book test of model knowledge through Jill's ReAct loop, not
+#     a retrieval test. process_text + respond are the only tools left.
+#   - setting: replaces conversational framing with exam-taking framing.
+#   - concerns: empty. The default conversational seed concern is noise
+#     for one-shot multiple-choice questions.
+#   - world_config.world_name is a placeholder; the runner overrides it
+#     per question with a unique stamp so each ChatLoop starts clean.
+
+world_config:
+  world_name: "jill-benchmark-mmlu"   # runner overrides per question
+
+llm_config:
+  sgl_model_path: null
+  reasoning_parser: null
+
+setting: |
+  Cognitive Workbench, MMLU benchmark session. Each user turn is an
+  independent multiple-choice exam question. There is no prior context,
+  no continuing conversation, no shared world state.
+
+  This is a closed-book exam: external info-gathering tools are
+  disabled. Answer from the model's own knowledge, reasoning explicitly
+  about each option.
+
+characters:
+  Jill:
+    mode: chat
+
+    llm_config:
+      server: local
+      model: ""
+      vllm_url: http://127.0.0.1:5000
+      is_reasoning_model: false
+
+    discourse:
+      enabled: false
+    orientation:
+      enabled: false
+    chat:
+      benchmark_mode: true
+      # Closed-book: drop every external info-gathering tool. Leaves
+      # process_text + respond for in-model reasoning over text.
+      omitted_tools:
+        - search
+        - fetch_text
+        - inspect
+        - inspect_external
+        - recall
+        - display
+        - security
+
+    character: |
+      Jill is taking a multiple-choice exam. She reads each question
+      carefully, considers each option on its merits, and commits to one
+      answer. She does not hedge, decline to answer, or ask clarifying
+      questions — the exam format requires a single letter.
+
+      She reasons explicitly before committing. If she is uncertain she
+      picks the most likely option rather than refusing.
+
+    capabilities: |
+      Closed-book exam. No web search, no file fetch, no external
+      lookup. Answer from training knowledge alone.
+
+    concerns: []

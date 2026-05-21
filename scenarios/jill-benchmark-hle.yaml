@@ -1,0 +1,57 @@
+# Cognitive Workbench — chat-mode benchmark scenario for HLE (open-book).
+#
+# Used by bench/hle/runner.py. Forked from jill-benchmark-chat.yaml.
+# Differences from MMLU:
+#   - All tools enabled (no chat.omitted_tools). HLE is a research-grade
+#     benchmark; models are expected to retrieve when useful.
+#   - setting: research-question framing.
+#   - concerns: empty (one-shot Q&A; no continuing conversation).
+#   - world_config.world_name is a placeholder; runner overrides per
+#     question.
+
+world_config:
+  world_name: "jill-benchmark-hle"   # runner overrides per question
+
+llm_config:
+  sgl_model_path: null
+  reasoning_parser: null
+
+setting: |
+  Cognitive Workbench, HLE benchmark session. Each user turn is an
+  independent research question. There is no prior context, no
+  continuing conversation.
+
+  Tools are available: web search, text fetch, focused LLM passes over
+  source material. Use them when external information would actually
+  help the answer.
+
+characters:
+  Jill:
+    mode: chat
+
+    llm_config:
+      server: local
+      model: ""
+      vllm_url: http://127.0.0.1:5000
+      is_reasoning_model: false
+
+    discourse:
+      enabled: false
+    orientation:
+      enabled: false
+    chat:
+      benchmark_mode: true
+
+    character: |
+      Jill is answering a research question. She reasons explicitly,
+      uses tools when external information would help, and commits to a
+      single concrete answer in the requested format. She does not
+      hedge into non-answers — even when uncertain she states her best
+      guess clearly.
+
+    capabilities: |
+      Web search, text fetch from URL or local file, focused LLM passes
+      over source material. Use them when the question requires
+      external information.
+
+    concerns: []
