@@ -172,7 +172,6 @@ src/
 scenarios/               YAML configs
 bench/                   eval harnesses
 docs/                    design notes (referenced from code, not duplicated)
-dev/body_stub/           desktop Body simulator (the real Body lives in a separate repo)
 ```
 
 The tree also contains older infospace / OODA / planner code (`src/primitives/`, `src/Metrics/`, `src/musing/`, `src/saved_plans/`) which `mode: chat` does not import. See Limitations.
@@ -199,7 +198,7 @@ The tree also contains older infospace / OODA / planner code (`src/primitives/`,
 - Memory and reflection are LLM-dependent. Frontier models extract and update reliably; small local models lose recall on subtler write-side moves — see `bench/discourse_reflect/` and `docs/design_note_agreements_rag.md` for the current investigation.
 - No multi-agent coordination beyond Zenoh pub/sub primitives.
 - The infospace / OODA / executive-node legacy code remains in the tree (`src/primitives/`, `src/Metrics/`, `src/musing/`, `src/saved_plans/`, parts of `bench/`) but is not exercised by `mode: chat` and is not maintained.
-- Body / robot integration is **not** in this repo. `dev/body_stub/` is a desktop development client for Zenoh-based teleop; the actual Body stack (Pi onboard software, SLAM, navigation, motor control) lives in a separate repository.
+- Body / robot integration is **not** in this repo. The Body stack (Pi onboard software, SLAM, navigation, motor control, desktop teleop client) lives in a separate repository.
 
 ## License
 
