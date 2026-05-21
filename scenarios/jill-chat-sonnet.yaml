@@ -6,13 +6,6 @@
 # a separate world ("jill_chat") so chat-only turns do not pollute
 # Jill's cognitive infospace.
 #
-# This variant routes Jill to Anthropic Claude Sonnet 4.6 via the native
-# Messages API (https://api.anthropic.com/v1/messages). Triggered by
-# server: anthropic in _ChatBackend — different endpoint, x-api-key +
-# anthropic-version headers, system as a top-level field. The route
-# omits temperature/top_p uniformly (Opus 4.7 rejects temperature; for
-# Sonnet/Haiku the model defaults are fine).
-#
 # launcher.py dispatches characters with `mode: chat` to chat.chat_loop
 # instead of executive_node. Wire protocol is identical to the agent:
 #   in:  cognitive/{name}/sense_data
@@ -23,9 +16,8 @@ world_config:
   world_name: "jill_chat"
 
 # Top-level llm_config drives the optional shared SGLang runtime in
-# launcher.py. Cloud setups don't need a local runtime — leave
-# sgl_model_path null to skip SGL bring-up entirely. The actual chat
-# backend is selected by per-character llm_config (below).
+# launcher.py. Leave sgl_model_path null to skip SGL bring-up entirely;
+# per-character llm_config (below) selects the actual chat backend.
 llm_config:
   sgl_model_path: null
   reasoning_parser: null
@@ -55,6 +47,12 @@ characters:
       enabled: true
     orientation:
       enabled: true
+
+    # Initial binding for the inspect_external tool (sticky across the
+    # session and persisted to a chat-state Note across restarts). The
+    # in-session /set-external-repo / /clear-external-repo slash commands
+    # override this — Note wins on conflict.
+    external_repo: /home/bruce/projects/Body/Body/
 
     character: |
       Jill is conversational, curious, and direct. She speaks from her
@@ -167,7 +165,13 @@ characters:
       account for why they say what they say. She can report what they
       contain, not why.
 
-    # Seed concerns — see jill-chat.yaml for full notes on the mechanism.
+    # Seed concerns — actionable directives Jill should keep ready to advance.
+    # Distinct from preferences (modifiers like "be brief") which live in
+    # memories. The seed below is meta: it keeps the concern-tracking
+    # mechanism itself alive, so reflection is primed to derive new
+    # concerns from user requests as conversations unfold. Seeded
+    # concerns carry seed=true and are immune to decay-induced
+    # satisfaction (they're architectural baseline, not ephemeral).
     concerns:
       - text: "Track what the user wants from me — both immediate and durable — so I can act on it when relevant."
         category: durable
@@ -175,10 +179,10 @@ characters:
         category: durable
 
     # Sensors. The `tick` sensor is the autonomy trigger: a heartbeat
-    # publishes to sense_data every `schedule`, the chat loop dispatches
-    # on it, runs `_check_and_fire_concerns`, and autonomously executes
-    # the instruction of any concern whose cadence has elapsed (cap 2
-    # per tick; the rest defer to the next tick).
+    # publishes to sense_data every `schedule`. With autonomy on,
+    # _handle_tick runs _grow_agent_concerns_per_tick + check_and_fire.
+    # With autonomy off (no --autonomy flag), the tick handler early-
+    # returns so existing benchmarks see no behavioral change.
     sensors:
       - name: tick
         schedule: "1m"

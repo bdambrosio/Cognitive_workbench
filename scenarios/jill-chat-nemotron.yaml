@@ -11,6 +11,27 @@
 #   in:  cognitive/{name}/sense_data
 #   out: cognitive/{name}/action  (type="say")
 # So cli.py and tests/chat_cli.py work unchanged.
+#
+# Backend: NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4 (LatentMoE, 120B/12B
+# active, NVFP4, up to 1M ctx). Self-hosted via vLLM 0.20+ with the
+# super_v3 reasoning parser plugin and qwen3_coder tool-call parser.
+# Reference launch (per HF model card):
+#
+#   wget https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4/raw/main/super_v3_reasoning_parser.py
+#   vllm serve nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4 \
+#     --served-model-name nvidia/nemotron-3-super \
+#     --async-scheduling --dtype auto --max-model-len 262144 \
+#     --trust-remote-code --kv-cache-dtype fp8 \
+#     --gpu-memory-utilization 0.9 --enable-chunked-prefill \
+#     --mamba-ssm-cache-dtype float16 \
+#     --reasoning-parser-plugin /app/super_v3_reasoning_parser.py \
+#     --reasoning-parser super_v3 \
+#     --enable-auto-tool-choice --tool-call-parser qwen3_coder
+#
+# Model card recommends temperature=1.0, top_p=0.95 across all tasks
+# (reasoning, tool calling, general chat). _ChatBackend currently sends
+# its own sampling defaults — adjust there if the recommended values
+# matter for a given run.
 
 world_config:
   world_name: "jill_chat"
@@ -32,32 +53,27 @@ characters:
   Jill:
     mode: chat
 
-    # Per-character LLM backend — xAI Grok via the OpenAI-compatible
-    # /v1/chat/completions endpoint. server='local' just routes through
-    # _ChatBackend's unified OpenAI-compat path; api_key being set is
-    # what flips it into cloud mode (Authorization header attached, no
-    # grammar/chat_template_kwargs sent).
+    # Per-character LLM backend. Default 'local' POSTs directly to
+    # {vllm_url}/v1/chat/completions — works against any OpenAI-compatible
+    # chat server (vLLM chat API, externally-launched SGLang, llama-server,
+    # etc.). Adjust vllm_url to wherever the Nemotron vLLM instance is
+    # listening (the model card example uses :8000; the local SGL wrapper
+    # convention here is :5000).
     llm_config:
       server: local
-      model: "grok-4.3"
-      # _ChatBackend strips a trailing /v1, so this is equivalent to
-      # https://api.x.ai with /v1/chat/completions appended at call time.
-      vllm_url: https://api.x.ai/v1
-      # api_key is the NAME of the env var holding the bearer token, not
-      # the token itself. Export XAI_API_KEY before launching.
-      api_key: XAI_API_KEY
-      # grok-4.3 is always-reasoning per xAI docs (no opt-out). On the
-      # cloud path _ChatBackend skips grammar/cot_profile attach anyway,
-      # so this flag is metadata only — kept true to reflect the model.
-      is_reasoning_model: true
-      # Reasoning budget baseline. xAI's reasoning guide documents
-      # low/medium/high for grok-4.3 (medium is also the silent default).
-      # We set it explicitly because _ChatBackend gates per-call overrides
-      # on the baseline being non-None: chat_loop's _make_llm_callable
-      # passes reasoning_effort='low' on the discourse + companion update
-      # passes (cheaper reflection), and that override only takes effect
-      # when this baseline is set. Match the gpt-oss-120B value.
-      reasoning_effort: none
+      # Match --served-model-name from the vllm serve command above.
+      model: "nvidia/nemotron-3-super"
+      vllm_url: http://127.0.0.1:8000
+      # Reasoning gate. Nemotron's super_v3 reasoning parser strips
+      # thinking blocks server-side, so the answer channel arrives clean.
+      # The is_reasoning_model flag here only governs chat_loop's
+      # grammar / cot_profile attach (a Qwen-style structured-CoT path
+      # judged unhelpful in earlier tests), not whether the model thinks.
+      # Keep false. To toggle thinking itself, vLLM accepts
+      #   extra_body={"chat_template_kwargs": {"enable_thinking": false}}
+      # but chat_loop has no scenario-level wiring for that yet — would
+      # need a small _ChatBackend addition to plumb a baseline through.
+      is_reasoning_model: false
 
     # On by default per project decision.
     discourse:

@@ -600,6 +600,14 @@ def _extract_html_text(content: bytes, url: str) -> str:
     title_match = re.search(r'<title[^>]*>(.*?)</title>', html_str, re.IGNORECASE | re.DOTALL)
     if title_match:
         html_metadata["title"] = re.sub(r'<[^>]+>', '', title_match.group(1)).strip()
+
+    # Image candidates — surfaced so a downstream consumer (e.g. the
+    # chat-loop `display` tool) can pick a "primary" image semantically
+    # without having to refetch and reparse the page. Resolved against
+    # the final URL so relative srcs are usable as-is.
+    page_images = _extract_page_images(html_str, url)
+    if page_images:
+        html_metadata["images"] = page_images
     
     result = {
         "text": full_text,
@@ -614,6 +622,71 @@ def _extract_html_text(content: bytes, url: str) -> str:
     
     logger.info(f"Extracted {len(full_text)} chars from HTML using {extraction_method}")
     return json.dumps(result, indent=2)
+
+
+def _extract_page_images(html_str: str, page_url: str, max_imgs: int = 5) -> dict:
+    """Pull image candidates out of an HTML page.
+
+    Returns a dict with any of: og_image, twitter_image, imgs (list of
+    {src, alt}). Empty dict if the page has no images. All srcs are
+    absolute (resolved against page_url) so consumers can pass them
+    straight to the canvas proxy without re-resolving.
+
+    Capped at `max_imgs` for the imgs list so we don't drag the whole
+    page into the result — Jill needs candidates to choose from, not an
+    exhaustive index.
+    """
+    out: dict = {}
+
+    def _resolve(u: str) -> str:
+        u = (u or '').strip()
+        if not u:
+            return ''
+        try:
+            return urljoin(page_url, u)
+        except Exception as e:
+            logger.debug(f"urljoin failed for {u!r} against {page_url!r}: {e}")
+            return u
+
+    def _meta(prop_or_name: str, key: str) -> str:
+        # Tolerate either attribute order: meta tags routinely appear as
+        # both `<meta property="og:image" content="...">` and the reverse.
+        esc = re.escape(prop_or_name)
+        m = re.search(
+            rf'<meta[^>]+\b{key}=["\']{esc}["\'][^>]+content=["\']([^"\']+)["\']',
+            html_str, re.IGNORECASE,
+        ) or re.search(
+            rf'<meta[^>]+content=["\']([^"\']+)["\'][^>]+\b{key}=["\']{esc}["\']',
+            html_str, re.IGNORECASE,
+        )
+        return _resolve(m.group(1)) if m else ''
+
+    og = _meta('og:image', 'property')
+    tw = _meta('twitter:image', 'name')
+    if og:
+        out['og_image'] = og
+    if tw and tw != og:
+        out['twitter_image'] = tw
+
+    imgs: list = []
+    seen: set = set()
+    for m in re.finditer(r'<img\b([^>]*?)>', html_str, re.IGNORECASE):
+        if len(imgs) >= max_imgs:
+            break
+        attrs = m.group(1)
+        src_match = re.search(r'\bsrc=["\']([^"\']+)["\']', attrs, re.IGNORECASE)
+        if not src_match:
+            continue
+        src = _resolve(src_match.group(1))
+        if not src or src.startswith('data:') or src in seen:
+            continue
+        alt_match = re.search(r'\balt=["\']([^"\']*)["\']', attrs, re.IGNORECASE)
+        alt = alt_match.group(1).strip() if alt_match else ''
+        imgs.append({'src': src, 'alt': alt})
+        seen.add(src)
+    if imgs:
+        out['imgs'] = imgs
+    return out
 
 
 def _try_playwright_extraction(url: str) -> str:

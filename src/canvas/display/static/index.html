@@ -5,10 +5,15 @@
 <!-- Restrict embedded HTML to no remote network calls (model-controlled
      content shouldn't fetch arbitrary URLs). Inline scripts are allowed
      so model-supplied <script> tags inside an HTML payload still run.
-     Tighten this further if you want a stricter sandbox. -->
+     Tighten this further if you want a stricter sandbox.
+
+     Images are allowed only via data:/blob: or the local proxy
+     (http://127.0.0.1:*) — direct remote URLs stay blocked, so model-
+     authored <img src="https://..."> won't bypass the proxy's SSRF
+     guard or its size/cache bounds. -->
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'self' 'unsafe-inline' data: blob:;
-               img-src 'self' data: blob:;
+               img-src 'self' data: blob: http://127.0.0.1:*;
                script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
                style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
                connect-src ws://127.0.0.1:* http://127.0.0.1:*;">
@@ -38,6 +43,12 @@
             color: rgba(255,255,255,0.4); pointer-events: none; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<!-- <model-viewer> web component: pulls in once, then any payload's
+     <model-viewer src="..."> tag renders with mouse orbit controls.
+     Lives at the page level (not in payloads) so the cost is paid once
+     per chromium spawn rather than per display() call. Zero runtime
+     cost when no <model-viewer> tag is in the DOM. -->
+<script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.0.0/dist/model-viewer.min.js"></script>
 </head>
 <body>
 <div id="content"><p style="color:#777">canvas idle — waiting for Jill to push content…</p></div>

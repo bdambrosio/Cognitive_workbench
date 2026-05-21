@@ -351,6 +351,11 @@ def _launch_widget_window(
         f'--window-size={size}',
         f'--window-position={pos}',
         f'--user-data-dir={profile_dir}',
+        # Fresh profile per widget ⇒ Chrome's first-run welcome + default-
+        # browser prompt would fire every time. Both irrelevant for an
+        # app-mode display surface.
+        '--no-first-run',
+        '--no-default-browser-check',
     ]
     try:
         proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,

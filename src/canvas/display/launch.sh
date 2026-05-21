@@ -17,10 +17,15 @@ SIZE="${CANVAS_SIZE:-820,640}"
 POS="${CANVAS_POS:-540,60}"
 PROFILE="/tmp/jill-canvas-$$"
 
+# Fresh profile per launch ⇒ Chrome would show its first-run welcome and
+# default-browser prompt every time. Suppress both — this is an app-mode
+# display window, not a general browsing session.
+COMMON_FLAGS=(--no-first-run --no-default-browser-check)
+
 if [ -n "$CANVAS_BROWSER" ]; then
     exec "$CANVAS_BROWSER" --app="$URL" \
         --window-size="$SIZE" --window-position="$POS" \
-        --user-data-dir="$PROFILE" "$@"
+        --user-data-dir="$PROFILE" "${COMMON_FLAGS[@]}" "$@"
 fi
 
 for cmd in chromium chromium-browser google-chrome google-chrome-stable \
@@ -28,7 +33,7 @@ for cmd in chromium chromium-browser google-chrome google-chrome-stable \
     if command -v "$cmd" >/dev/null 2>&1; then
         exec "$cmd" --app="$URL" \
             --window-size="$SIZE" --window-position="$POS" \
-            --user-data-dir="$PROFILE" "$@"
+            --user-data-dir="$PROFILE" "${COMMON_FLAGS[@]}" "$@"
     fi
 done
 
