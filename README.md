@@ -14,24 +14,71 @@ Each turn the system prompt is reassembled from persistent state files: persona,
 
 > *Placeholder — real transcript fragment showing one turn with 2-3 ReAct iterations (thought → tool → observation → respond).*
 
-## Quick start
+## Installation
 
-Python 3.10+. Optional system binaries: `ripgrep` (for `inspect`), `nmap` (for `security`).
+Python 3.10+ on Linux or macOS. A virtual environment is recommended.
 
 ```
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Pick a backend by editing `scenarios/jill-chat.yaml`'s `llm_config` block. The simplest path is `server: anthropic` with `ANTHROPIC_API_KEY` exported; local vLLM and llama.cpp variants are shown in sibling scenario files.
+For local development (running tests, eval benchmarks):
+
+```
+pip install -r requirements-dev.txt
+```
+
+**System binaries** (not pip-installable):
+
+| Binary | Used by | Install |
+|---|---|---|
+| `ripgrep` (required for the `inspect` subagent) | `src/chat/code_subagent.py` | `apt install ripgrep` / `brew install ripgrep` |
+| `nmap` (optional, for the `security` subagent) | `src/chat/security.py` | `apt install nmap` / `brew install nmap` |
+| Chromium-family browser (optional, for `--affect` / `--canvas` widget windows) | `src/launcher.py` widget windows | `apt install chromium-browser` / install Chrome |
+| Playwright browsers (optional, JS-heavy page fetch fallback) | `src/tools/fetch-text/tool.py` | `playwright install chromium` |
+
+The chat subagents and widget windows degrade gracefully if their binaries are missing — `inspect` returns an `ERROR:` observation, `--affect`/`--canvas` log a warning and skip the window.
+
+**Backend.** Pick a backend by editing `scenarios/jill-chat.yaml`'s per-character `llm_config` block (see Configuration). The simplest path is to switch `server: local` → `server: anthropic` with `ANTHROPIC_API_KEY` exported; local vLLM, llama.cpp, OpenRouter, and xAI variants are shown in sibling `jill-chat-*.yaml` files.
+
+## Quick start
 
 ```
 cd src
-python launcher.py ../scenarios/jill-chat.yaml --cli
+python launcher.py jill-chat.yaml --cli
 ```
 
-If the backend isn't configured, the launcher prints what's missing.
+(Scenario paths are resolved relative to `scenarios/`, so `jill-chat.yaml` is enough — no `../` needed.) If the backend isn't configured, the launcher prints what's missing.
 
 At the chat prompt, type **`/help`** for the full list of slash commands — `/recall`, `/concerns`, `/note`, `/img`, `/paste`, `/set-external-repo`, `/status`, `/resources`, and others. Slash commands are the primary way to inspect agent state, send images, and manage concerns / external-repo bindings outside the normal turn flow.
+
+## Launcher flags
+
+```
+python launcher.py <scenario.yaml> [flags]
+```
+
+| Flag | Purpose |
+|---|---|
+| `--cli` | Interactive terminal chat frontend. The usual way to talk to a chat-mode character. |
+| `--ui` / `--ui-port N` | FastAPI web UI for live trace inspection (default port 3000). |
+| `--resource-browser` | Resource browser web UI on port 3001 (memories, concerns, notes, traces). |
+| `--telegram` | Spawn `telegram_bridge.py` as a sibling subprocess. Relays inbound DMs to the primary character and forwards `say` events back out. Requires `TELEGRAM_BOT_TOKEN` and `TELEGRAM_ALLOWED_CHAT_IDS` env vars; the launcher fails loudly if either is missing. |
+| `--autonomy` | Enable autonomous concern firing in chat mode. Off by default — when off, the `tick` sensor handler is a no-op so benchmarks and chat scenarios behave identically regardless of active concerns. |
+| `--affect` (`--affect-size WxH`, `--affect-pos X,Y`) | Spawn the affect (processing-state) widget: a Python WebSocket bridge plus a chromium app-mode window driven by the bridge. Defaults: `320x320` at `60,60`. |
+| `--canvas` (`--canvas-size WxH`, `--canvas-pos X,Y`) | Spawn the canvas (rich-display) widget, scoped to the first launched character. Defaults: `820x640` at `540,60`. |
+| `--browser PATH` | Override the chromium-family binary used for `--affect` / `--canvas` windows (auto-detected from `google-chrome`, `chromium`, `brave-browser`, `microsoft-edge` if unset). |
+| `--characters NAME [...]` | Launch only a subset of the scenario's characters. |
+| `--list-only` | Print the scenario's characters and exit. |
+| `--debug` | Set `CWB_DEBUG=1` for verbose logging. |
+
+A typical interactive session:
+
+```
+python launcher.py jill-chat.yaml --cli --affect --canvas --resource-browser
+```
 
 ## Concept overview
 
@@ -166,8 +213,12 @@ src/
     code_subagent.py     inspect / inspect_external subagent
     security.py          security subagent
   tools/                 process_text, search, fetch_text implementations
+  affect/                processing-state widget (publisher + WS bridge + HTML)
+  canvas/                rich-display widget (publisher + WS bridge + HTML)
   cli.py                 interactive terminal frontend
-  telegram_bridge.py     alternate frontend (Telegram)
+  telegram_bridge.py     alternate frontend (Telegram DMs ↔ Zenoh)
+  fastapi_action_display.py   --ui web frontend
+  resource_browser.py    --resource-browser web frontend
   launcher.py            scenario loader + character dispatcher
 scenarios/               YAML configs
 bench/                   eval harnesses
