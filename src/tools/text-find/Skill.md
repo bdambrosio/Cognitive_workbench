@@ -1,49 +1,37 @@
 ---
 name: text-find
-type: prompt_augmentation
-description: "Locate pattern or substring and return position with context. Use to search for specific substring or pattern in a text document"
+description: Find a substring or pattern in a text document. Returns position with surrounding context. Deterministic — use this instead of asking the LLM to find substrings.
+args:
+  source: required string — text to search (a `$stepN` binding or a literal)
+  pattern: required string — substring or regex pattern to find
+  context_lines: optional int (default 1) — lines of surrounding context per match
 ---
 
 # text-find
 
-Locate patterns or substrings in text and return matches with context.
-
-## Input
-
-- `target`: Note ID or variable containing text to search
-- `pattern`: Text string or regex pattern to find (required)
-- `context_lines`: Number of lines before/after to include (optional, default: 1)
-
-## Output
-
-Returns Note containing match results:
-- Match positions (line and character)
-- Matched text
-- Surrounding context
-- Count of matches
-
-Returns null if no matches found.
+Locate patterns or substrings in text and return all matches with context.
 
 ## Behavior
 
-- Case-sensitive by default
-- Supports standard regex syntax
-- Returns all matches, not just first
-- Context helps understand match relevance
+- Case-sensitive by default.
+- Supports standard Python regex syntax in `pattern`.
+- Returns every match (not just the first), with line/character position and the surrounding lines.
+- Returns an empty result if no matches — not an error.
 
-## Planning Notes
+## When to use vs `assess` / `process_text`
 
-- Use simple text search for exact substring matching
-- Use regex patterns for flexible pattern matching (e.g., email addresses, dates)
+- `text-find` — exact substring or regex match. Deterministic. No LLM cost.
+- `assess` — natural-language predicate (semantic match). LLM-backed.
+- `process_text` — open-ended transformation with an instruction.
+
+If you want "does this contain the literal string X?" → `text-find`. If you want "does this contain mention of X?" (paraphrases count) → `assess`.
 
 ## Examples
 
-Simple text search:
 ```json
-{"type":"text-find","target":"$document","pattern":"TODO","out":"$todo_locations"}
+{"thought": "find every TODO in the document", "tool": "text-find", "source": "$step1", "pattern": "TODO"}
 ```
 
-Pattern search with context:
 ```json
-{"type":"text-find","target":"$log","pattern":"ERROR.*timeout","context_lines":3,"out":"$errors"}
+{"thought": "locate error lines mentioning a timeout", "tool": "text-find", "source": "$step1", "pattern": "ERROR.*timeout", "context_lines": 3}
 ```

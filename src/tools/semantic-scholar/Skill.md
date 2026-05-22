@@ -1,44 +1,33 @@
 ---
 name: semantic-scholar
-type: python
-description: "Search academic papers. Returns Collection of text Notes with paper text (full text via GROBID when available, otherwise abstract)."
+description: Search academic papers and journals. Returns paper text — full text when available via GROBID, otherwise abstracts. Use for scholarly literature, not general web content.
+args:
+  query: required string — search terms (e.g. "constitutional AI", "BERT pretraining")
+  limit: optional int (default 10) — maximum results
 ---
 
 # semantic-scholar
 
-Search Semantic Scholar API. Returns Collection of text Notes.
+Search the Semantic Scholar academic corpus. Returns paper text concatenated into a single observation: full paper text via GROBID extraction when the PDF is available, otherwise the abstract only.
 
-## Input
+## When to use vs `search-web`
 
-- `query`: Search string (required)
-- `limit`: Max results (int, default: 10)
+- `semantic-scholar` — scholarly literature, peer-reviewed work, papers, citations.
+- `search-web` — current events, general web content, anything that isn't academic.
 
-## What Lives Where
+For a comprehensive search across both, do both — they cover different corpora.
 
-- **Note content** (`get_text(note_id)`): Paper text — full text via GROBID, or abstract only.
-  This is where the **abstract** lives. NOT in metadata.
-- **Metadata** (`tool("get-metadata", target=note_id)`): title, authors, year, citations,
-  venue, uri, doi, paper_id, pdf_url. Returns a JSON Note — parse with `get_json()`.
+## Examples
 
-Do NOT re-fetch the paper via metadata.uri — the text is already loaded.
-
-## Common Workflows
-
-**Content analysis** (extract/synthesize directly on the Collection):
 ```json
-{"type":"semantic-scholar","query":"BERT model","out":"$papers"}
-{"type":"synthesize","target":"$papers","focus":"key contributions","out":"$summary"}
+{"thought": "find recent constitutional AI papers", "tool": "semantic-scholar", "query": "constitutional AI alignment"}
 ```
 
-**Bibliography extraction** (use extract-references, not extract):
-```python
-items = get_items("$papers")
-r = tool("extract-references", path=items[0], out="$refs")
+```json
+{"thought": "load BERT-architecture papers, just the top three", "tool": "semantic-scholar", "query": "BERT bidirectional transformer pretraining", "limit": 3}
 ```
 
-**Metadata access:**
-```python
-items = get_items("$papers")
-r = tool("get-metadata", target=items[0], out="$meta")
-meta = get_json("$meta")  # {"title": "...", "authors": [...], "citations": 172280, ...}
-```
+## Notes
+
+- Free public API; no key required for basic search.
+- Full-text extraction requires a local GROBID instance. Without GROBID, results fall back to abstracts.

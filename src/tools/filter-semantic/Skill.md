@@ -1,44 +1,29 @@
 ---
 name: filter-semantic
-type: python
-description: "Semantic filter: evaluate each Collection item against a `predicate` string and return matching items (target, predicate, [mode])"
+description: Filter a list of items to those matching a natural-language condition (e.g. "only the items that mention X"). NOT YET WIRED in chat-mode — present in src/tools/ for future enablement.
+args:
+  source: required string — items to filter (concrete shape TBD pending wiring)
+  predicate: required string — natural-language condition, e.g. "mentions safety AND published after 2024"
+  mode: optional string (default "include") — "include" returns matches, "exclude" returns non-matches
 ---
 
 # filter-semantic
 
-Apply flexible, natural-language filtering to Collections. Evaluates each item against the `predicate` string using LLM.
+Apply a natural-language predicate to each item in a list and return the items that match (or, with `mode: "exclude"`, the items that don't).
 
-## Input
+**Status:** the tool exists in `src/tools/` but is not yet exposed via the chat ReAct catalog. The list-shape input convention hasn't been settled (chat ReAct passes strings as `$stepN` bindings; the OODA executor passed Collection IDs). When wired, the args contract above will be revised to match the chosen shape.
 
-- `target`: Collection ID or variable (required)
-- `predicate`: String describing filter criteria (required)
-- `mode`: "include" (return matches) or "exclude" (return non-matches) (optional, default: "include")
+## Predicate guidance
 
-## Output
+- Semantic: `"has a positive tone"`, `"contains code or implementation details"`
+- Boolean: `"mentions safety AND published after 2024"`
+- Numeric / date: `"price under $50"`, `"earlier than 2020"`
 
-Success (`status: "success"`):
-- `value`: Summary string (e.g., "3 items [Note_1, Note_2, Note_3]")
-- `resource_id`: New Collection ID containing matching items
+Phrase predicates to describe what to **match**. Use `mode: "exclude"` instead of writing negative predicates ("does NOT contain X").
 
-Failure (`status: "failed"`):
-- `reason`: Error description
+## Why this is different from `assess`
 
-## Behavior
+- `assess` operates on **one** text, returns one bool.
+- `filter-semantic` operates on **many** texts, returns the subset that match.
 
-- Evaluates each item individually using LLM
-- Supports semantic predicates ("has a positive tone"), boolean logic ("A AND B"), numeric/date predicates
-- Empty result returns new empty Collection
-
-## Planning Notes
-
-- Use for content-based filtering beyond simple field comparisons
-- For field-based selection, use `project` or `pluck` instead
-- Predicate should describe what to match, not what to exclude (unless using `mode: "exclude"`)
-
-## Examples
-
-```json
-{"type":"filter-semantic","target":"$collection","predicate":"contains code or implementation details","out":"$filtered"}
-{"type":"filter-semantic","target":"$collection","predicate":"mentions safety AND published after 2024","out":"$filtered"}
-{"type":"filter-semantic","target":"$collection","predicate":"purely theoretical","mode":"exclude","out":"$practical_only"}
-```
+One tool call vs N tool calls for the same job.

@@ -1,49 +1,35 @@
 ---
 name: calculate
-type: python
-description: "Numerically evaluate mathematical expressions using SymPy"
-schema_hint:
-  value: "string (math expression, required)"
-  variables: "dict (variable substitutions, optional)"
-  precision: "int (decimal places, default: 10)"
-  out: "$variable (optional)"
+description: Compute the value of a math expression. Handles arithmetic, algebra, trig, calculus. Use this instead of LLM arithmetic — calculate is exact and deterministic.
+args:
+  expression: required string — the math expression, e.g. "2 + 3 * sqrt(7)" or "x**2 - 4 = 0"
+  vars: optional string — variable bindings as "name=value, name=value", e.g. "v=20, theta=30, g=9.8"
+  precision: optional int (default 10) — decimal places for the result
 ---
 
 # calculate
 
-Evaluate mathematical expressions numerically using SymPy. Returns floating-point results.
+Numerically evaluate mathematical expressions via SymPy. Returns the result as a string.
 
-## Input
-
-- `value`: Mathematical expression as string (required)
-- `variables`: Dictionary of variable substitutions (optional, numbers only)
-- `precision`: Decimal places for evaluation (optional, default: 10)
-
-## Output
-
-Success (`status: "success"`):
-- `value`: String representation of numeric result
-
-Failure (`status: "failed"`):
-- `reason`: Error description
-
-## Behavior
+## Supported operations
 
 - **Operators**: `+`, `-`, `*`, `/`, `**`, `%`
 - **Constants**: `pi`, `E`
 - **Functions**: `sin`, `cos`, `tan`, `asin`, `acos`, `atan` (radians), `sqrt`, `log`, `ln`, `exp`, `abs`, `factorial`
-- **Equations**: Expressions with `=` are solved (e.g., `x**2 - 4 = 0` → `-2.0, 2.0`)
-- All trig functions expect radians
+- **Equations**: an expression containing `=` is solved (e.g. `x**2 - 4 = 0` → `-2.0, 2.0`)
 
-## Planning Notes
-
-- Use for reliable arithmetic (LLM arithmetic is unreliable)
-- To convert result to integer, use coercion tool afterward
+All trig functions expect radians.
 
 ## Examples
 
 ```json
-{"type":"calculate","value":"2 + 3 * 4","out":"$result"}
-{"type":"calculate","value":"2 * v * sin(theta * pi / 180) / g","variables":{"v":20,"theta":30,"g":9.8},"out":"$time"}
-{"type":"calculate","value":"x**2 - 4 = 0","out":"$roots"}
+{"thought": "compute the discriminant", "tool": "calculate", "expression": "b**2 - 4*a*c", "vars": "a=1, b=-5, c=6"}
+```
+
+```json
+{"thought": "projectile range", "tool": "calculate", "expression": "2 * v * sin(theta * pi / 180) / g", "vars": "v=20, theta=30, g=9.8"}
+```
+
+```json
+{"thought": "roots of a quadratic", "tool": "calculate", "expression": "x**2 - 4 = 0"}
 ```

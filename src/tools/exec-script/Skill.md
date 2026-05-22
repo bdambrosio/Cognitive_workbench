@@ -1,39 +1,31 @@
 ---
 name: exec-script
-type: python
-description: "Execute an arbitrary bash script in the scenario filesystem, with user permission."
-schema_hint:
-  target: "string or $variable (bash script text — if $variable, must be a Note, not a Collection)"
-  out: "$variable (captured console output)"
+description: Run a bash/shell script — for system commands the existing tools don't cover. Trusted by default; treat with the same care as any code-execution action.
+args:
+  script: required string — the bash script text to execute
 ---
 
 # exec-script
 
-Execute an arbitrary bash script in the scenario's `fs/` directory after asking the user for permission.
-
-## Input
-
-- `target`: The bash script to execute. Either a string literal or a `$variable` bound to a Note whose content is the script. Binding to a Collection is an error.
-
-## Output
-
-Success (`status: "success"`):
-- `value`: Console output (stdout + stderr) produced by the script
-
-Failure (`status: "failed"`):
-- `reason`: Error description (empty script, Collection binding, permission denied, execution error)
+Run an arbitrary bash script via `bash -c` in the scenario's `fs/` directory. Returns stdout + stderr as a single text observation.
 
 ## Behavior
 
-1. Resolves the script text from `target` (literal string or Note binding; Collection binding fails).
-2. Validates that the resolved script is non-empty text.
-3. **This tool automatically asks the user for permission before executing**, displaying the full script text. Do NOT use ASK_USER before calling exec-script — the tool handles its own permission prompt.
-4. If permission granted, executes the script via `bash -c` in `scenarios/<world_name>/fs/`.
-5. Captures and returns stdout + stderr as the `out` value.
+- Resolves the script text from `script` and runs it in a subprocess with cwd = scenario filesystem root.
+- Captures stdout and stderr together. Non-zero exit codes are surfaced in the observation but do not by themselves abort the ReAct loop.
+- **Trusted by default** — no interactive permission prompt. Treat with the same caution you would treat any code-execution tool.
 
 ## Examples
 
 ```json
-{"type": "exec-script", "target": "ls -la", "out": "$listing"}
-{"type": "exec-script", "target": "$my_script", "out": "$result"}
+{"thought": "list the working directory", "tool": "exec-script", "script": "ls -la"}
 ```
+
+```json
+{"thought": "count lines in the changelog", "tool": "exec-script", "script": "wc -l CHANGELOG.md"}
+```
+
+## Notes
+
+- Use focused single-purpose scripts; avoid pipelines that mix actions you don't both need to see results from.
+- Prefer `fetch-text` / `obsidian` / `check-email` for tasks they cover — `exec-script` is the catch-all for what they don't.

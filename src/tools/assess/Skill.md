@@ -1,38 +1,32 @@
 ---
 name: assess
-description: Boolean test of text content against a natural language predicate. Features auto-chunking for long texts (returns "true" if ANY chunk matches).
-type: python
-flattens_collections: true
+description: Check whether text matches a natural-language condition. Returns "true" or "false". Auto-chunks long texts and short-circuits on first match.
+args:
+  source: required string — text to evaluate (a `$stepN` binding or a literal)
+  predicate: required string — natural-language condition (e.g. "is critical of the author?", "mentions specific dates?")
 ---
 
 # assess
 
-Semantic boolean testing. Evaluates natural language predicates against text content using LLM.
-
-## Input
-
-- `target`: String content to test (empty inputs return "false")
-- `predicate`: Natural language question (e.g., "mentions specific dates?", "is critical of the author?")
-
-## Output
-
-Returns string `"true"` or `"false"` (lowercase string, not JSON boolean).
+Boolean test of text content against a natural-language predicate. Returns the literal lowercase string `"true"` or `"false"`.
 
 ## Behavior
 
-- **Auto-Chunking**: Texts >16k chars are split into boundary-aware chunks
-- **OR Aggregation**: Returns `"true"` on first matching chunk (short-circuit), `"false"` only if all chunks fail
-- **Fallback**: Returns `"false"` on ambiguous LLM responses
+- Texts longer than 16k characters are split into chunks at sentence boundaries.
+- Returns `"true"` on the first matching chunk (short-circuit). Returns `"false"` only if all chunks fail.
+- Returns `"false"` on ambiguous LLM responses (no half-credit).
 
-## Planning Notes
+## Planning notes
 
-- Phrase predicates to detect *presence* rather than global summary (chunks are evaluated in isolation)
-  - Good: "Contains mention of inflation?"
-  - Risky: "Is the main topic inflation?"
-- Every chunk requires an LLM call
+Phrase predicates to detect *presence* rather than global summary, because chunks are evaluated in isolation:
+
+- Good: `"contains mention of inflation?"`
+- Risky: `"is the main topic inflation?"` — a chunk that briefly mentions inflation might match even if it isn't the main topic of the whole document.
+
+Every chunk requires an LLM call, so very long inputs are expensive.
 
 ## Example
 
 ```json
-{"type":"assess","target":"$my_note","predicate":"is urgent?","out":"$urgency"}
+{"thought": "check if the article is critical of the proposal", "tool": "assess", "source": "$step1", "predicate": "is critical of the proposed policy?"}
 ```
