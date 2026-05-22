@@ -57,6 +57,30 @@ def _success(executor: Any, result: str, extra: dict | None = None):
     return executor._create_uniform_return("success", value=result, extra=extra)
 
 
+_REACT_OBS_CAP = 8000  # cap fetched text in the ReAct working log
+
+
+def react_invoke(args, *, character_name=None, backend=None, logger=None):
+    """ReAct entry-point — see Skill.md for the args contract."""
+    from utils.chat_tool_stub import build_tool_kwargs, CapturingResourceManager, translate_result
+    url = args.get("url", "")
+    if not isinstance(url, str) or not url.strip():
+        return {"status": "error", "text": "fetch-text requires non-empty `url`"}
+
+    mgr = CapturingResourceManager()
+    result = tool(url, **build_tool_kwargs(
+        character_name=character_name, backend=backend, manager=mgr,
+    ))
+
+    # fetch-text stashes the extracted text in extra.text.
+    out = translate_result(result, manager=mgr, text_key="extra.text",
+                           empty_text=f"no text extracted from {url}")
+    if out["status"] == "ok" and len(out["text"]) > _REACT_OBS_CAP:
+        out["text"] = out["text"][:_REACT_OBS_CAP].rstrip() + \
+            f"\n…[truncated at {_REACT_OBS_CAP} chars]"
+    return out
+
+
 def tool(url_or_content: str, runtime=None, **kwargs) -> str:
     """
     Fetch text from URL, base64 PDF, Note ID, or Collection ID. Auto-detects format and extracts all text.

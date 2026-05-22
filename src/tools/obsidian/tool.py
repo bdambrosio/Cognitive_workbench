@@ -358,6 +358,34 @@ _ACTIONS = {
 }
 
 
+def react_invoke(args, *, character_name=None, backend=None, logger=None):
+    """ReAct entry-point — see Skill.md for the args contract.
+
+    Multi-action; `action` chooses one of read|search|write|list. Each
+    action requires different args (see Skill.md). The legacy `tool()`
+    dispatcher reads them all from kwargs and routes internally.
+    """
+    from utils.chat_tool_stub import build_tool_kwargs, CapturingResourceManager, translate_result
+    action = args.get("action", "")
+    if action not in ("read", "search", "write", "list"):
+        return {"status": "error",
+                "text": "obsidian requires `action` ∈ {read, search, write, list}"}
+
+    mgr = CapturingResourceManager()
+    extra = {"action": action}
+    for k in ("path", "query", "content", "frontmatter"):
+        v = args.get(k)
+        if v is not None:
+            extra[k] = v
+
+    result = tool(None, **build_tool_kwargs(
+        character_name=character_name, backend=backend, manager=mgr,
+        **extra,
+    ))
+    return translate_result(result, manager=mgr,
+                            empty_text=f"obsidian {action} produced no output")
+
+
 def tool(input_value=None, **kwargs):
     """
     Obsidian vault tool — dispatches to action handlers.

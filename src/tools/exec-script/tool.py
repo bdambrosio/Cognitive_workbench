@@ -26,6 +26,28 @@ def _success(executor: InfospaceExecutor, value: str, extra: Optional[Dict[str, 
     return executor._create_uniform_return("success", value=value, extra=extra)
 
 
+def react_invoke(args, *, character_name=None, backend=None, logger=None):
+    """ReAct entry-point — see Skill.md for the args contract.
+
+    Trusted by default — no interactive prompt. The legacy `tool()`
+    skips the ASK_USER step when `executor.executive_node.benchmark_mode`
+    is True; chat_tool_stub.StubExecutor sets that flag, so chat calls
+    auto-approve.
+    """
+    from utils.chat_tool_stub import build_tool_kwargs, CapturingResourceManager, translate_result
+    script = args.get("script", "")
+    if not isinstance(script, str) or not script.strip():
+        return {"status": "error", "text": "exec-script requires non-empty `script`"}
+
+    mgr = CapturingResourceManager()
+    result = tool(script, **build_tool_kwargs(
+        character_name=character_name, backend=backend, manager=mgr,
+        target=script,
+    ))
+    return translate_result(result, manager=mgr,
+                            empty_text="script produced no output")
+
+
 def tool(input_value=None, runtime=None, **kwargs):
     """
     Execute an arbitrary bash script in scenarios/<world_name>/fs/.

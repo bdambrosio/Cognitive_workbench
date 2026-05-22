@@ -23,6 +23,26 @@ def _succeed(executor: InfospaceExecutor, result: str, extra: Dict[str, Any] | N
     return executor._create_uniform_return("success", value=result, extra=extra)
 
 
+def react_invoke(args, *, character_name=None, backend=None, logger=None):
+    """ReAct entry-point — see Skill.md for the args contract."""
+    from utils.chat_tool_stub import build_tool_kwargs, CapturingResourceManager, translate_result
+    source = args.get("source", "")
+    predicate = args.get("predicate", "")
+    if not isinstance(source, str) or not source:
+        return {"status": "error", "text": "assess requires non-empty `source`"}
+    if not isinstance(predicate, str) or not predicate:
+        return {"status": "error", "text": "assess requires non-empty `predicate`"}
+    if backend is None:
+        return {"status": "error", "text": "assess requires backend (LLM access not configured)"}
+
+    mgr = CapturingResourceManager()
+    result = tool(source, **build_tool_kwargs(
+        character_name=character_name, backend=backend, manager=mgr,
+        predicate=predicate,
+    ))
+    return translate_result(result, manager=mgr)
+
+
 def tool(input_value, runtime=None, **kwargs):
     """
     Test Note content against natural language predicate with automatic chunking.

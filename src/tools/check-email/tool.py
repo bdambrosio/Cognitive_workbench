@@ -301,6 +301,25 @@ def _parse_email(raw_bytes: bytes) -> Dict[str, Any]:
 # Main tool entry point
 # ---------------------------------------------------------------------------
 
+def react_invoke(args, *, character_name=None, backend=None, logger=None):
+    """ReAct entry-point — see Skill.md for the args contract."""
+    from utils.chat_tool_stub import build_tool_kwargs, CapturingResourceManager, translate_result
+    extra = {}
+    for k in ("folder", "limit", "since", "before", "from_addr",
+              "subject", "query", "unseen_only"):
+        v = args.get(k)
+        if v is not None:
+            extra[k] = v
+
+    mgr = CapturingResourceManager()
+    result = tool(None, **build_tool_kwargs(
+        character_name=character_name, backend=backend, manager=mgr,
+        **extra,
+    ))
+    return translate_result(result, manager=mgr,
+                            empty_text="no matching emails")
+
+
 def tool(input_value, runtime=None, **kwargs):
     """
     Gmail IMAP read-only email tool.

@@ -281,6 +281,26 @@ def _search_papers_direct(query: str, limit: int, api_key: str = None) -> List[D
     logger.error("Unexpected error in Semantic Scholar search")
     return []
         
+def react_invoke(args, *, character_name=None, backend=None, logger=None):
+    """ReAct entry-point — see Skill.md for the args contract."""
+    from utils.chat_tool_stub import build_tool_kwargs, CapturingResourceManager, translate_result
+    query = args.get("query", "")
+    if not isinstance(query, str) or not query.strip():
+        return {"status": "error", "text": "semantic-scholar requires non-empty `query`"}
+    try:
+        limit = int(args.get("limit", 10))
+    except (TypeError, ValueError):
+        limit = 10
+
+    mgr = CapturingResourceManager()
+    result = tool(query, **build_tool_kwargs(
+        character_name=character_name, backend=backend, manager=mgr,
+        query=query, limit=limit,
+    ))
+    return translate_result(result, manager=mgr,
+                            empty_text=f"no papers found for {query!r}")
+
+
 def tool(input_value, runtime=None, **kwargs):
     """
     Semantic Scholar search tool.

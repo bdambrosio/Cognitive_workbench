@@ -82,6 +82,23 @@ def _fetch_quote(symbol: str, api_key: str) -> Optional[Dict[str, Any]]:
     return quote
 
 
+def react_invoke(args, *, character_name=None, backend=None, logger=None):
+    """ReAct entry-point — see Skill.md for the args contract."""
+    from utils.chat_tool_stub import build_tool_kwargs, CapturingResourceManager, translate_result
+    ticker = args.get("ticker", "")
+    if not isinstance(ticker, str) or not ticker.strip():
+        return {"status": "error", "text": "stock-price requires non-empty `ticker`"}
+
+    mgr = CapturingResourceManager()
+    # The legacy tool uses `symbol`; map our `ticker` arg to it.
+    result = tool(ticker.upper(), **build_tool_kwargs(
+        character_name=character_name, backend=backend, manager=mgr,
+        symbol=ticker.upper(),
+    ))
+    return translate_result(result, manager=mgr,
+                            empty_text=f"no quote data for {ticker}")
+
+
 def tool(input_value=None, runtime=None, **kwargs):
     """
     Get current stock quote from Alpha Vantage.

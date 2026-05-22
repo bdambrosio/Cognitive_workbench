@@ -38,6 +38,7 @@ import requests
 # Make sibling src/ modules importable when launched from src/ as cwd.
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _SRC_DIR = os.path.dirname(_THIS_DIR)
+_TOOLS_DIR = os.path.join(_SRC_DIR, 'tools')
 if _SRC_DIR not in sys.path:
     sys.path.insert(0, _SRC_DIR)
 
@@ -77,7 +78,7 @@ _CONCERN_INSTRUCTION_NARROWNESS_RULE = (
 
 # Tools the model can emit. Validated structurally in _parse_react_action;
 # the dispatcher in _run_react_loop knows how to run each.
-_REACT_TOOLS = ('process_text', 'search', 'fetch_text', 'recall', 'inspect', 'inspect_external', 'security', 'display', 'respond')
+_REACT_TOOLS = ('process_text', 'recall', 'inspect', 'inspect_external', 'security', 'display', 'respond')
 
 # Per-character collection holding episodic specifics across conversations.
 # Auto-RAG searches this on every turn; post-turn reflection writes to it.
@@ -209,11 +210,6 @@ def _snap_rhythm_hours(value) -> int:
     if v is None or v <= 0:
         return _AGENT_CONCERN_DEFAULT_RHYTHM_HOURS
     return min(_AGENT_CONCERN_RHYTHM_HOURS_ALLOWED, key=lambda b: abs(b - v))
-# Trim observation text from fetch_text before it lands in the working log.
-# Bigger than search synthesis (which is already digested) since fetch_text
-# is raw page text — but bounded so a single fetch can't blow the prompt.
-_FETCH_TEXT_OBS_CAP = 8000
-
 # Reasoning history (awareness feed): per-turn ReAct trace persisted as a
 # Note in the `reasoning_history` collection. Last N entries surface in the
 # user-message prefix between conversation history and current input. Most
@@ -607,6 +603,16 @@ class ChatLoop:
         self._omitted_tools: List[str] = list(
             (character_config.get('chat') or {}).get('omitted_tools') or []
         )
+        # Auto-discovered tools from src/tools/. Each entry exposes
+        # `react_invoke`; the catalog and dispatch path read from this
+        # registry rather than hardcoded if/elif chains. Adding a tool =
+        # dropping a dir under src/tools/ — no chat_loop edit required.
+        self._discovered_tools: Dict[str, Dict[str, Any]] = self._discover_tools()
+        self._tool_module_cache: Dict[str, Any] = {}
+        if self._discovered_tools:
+            logger.info(
+                f"[{character_name}] discovered tools: "
+                f"{sorted(self._discovered_tools.keys())}")
 
         # ---- Resource manager + conversation store ----
         from infospace_resource_manager import InfospaceResourceManager
@@ -2699,163 +2705,10 @@ class ChatLoop:
             logger.warning(f"[{self.character_name}] publish failed: {e}")
 
     # ------------------------------------------------------------------
-    # Web search — backend for the ReAct `search` tool. Persists each
-    # synthesis as a named Note so it appears in /resources.
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _search_note_name(query: str) -> str:
-        slug = re.sub(r'[^a-z0-9]+', '-', query.lower()).strip('-')
-        if len(slug) > 60:
-            slug = slug[:60].rstrip('-')
-        return f"search:{slug}" if slug else "search:result"
-
-    def _get_llm_search(self):
-        """Lazy-load llm_search from src/tools/search-web/tool.py. Cached on
-        the instance after first load. Hyphenated package directory rules
-        out plain `import`, so we use importlib by file path — same pattern
-        executive_node uses for tool dispatch."""
-        if hasattr(self, '_llm_search_cached'):
-            return self._llm_search_cached
-        try:
-            import importlib.util
-            tool_path = os.path.join(_SRC_DIR, "tools", "search-web", "tool.py")
-            spec = importlib.util.spec_from_file_location(
-                "_chat_search_web_tool", tool_path)
-            if spec is None or spec.loader is None:
-                self._llm_search_cached = None
-                return None
-            mod = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(mod)
-            self._llm_search_cached = getattr(mod, 'llm_search', None)
-        except Exception as e:
-            logger.warning(f"[{self.character_name}] could not load search tool: {e}")
-            self._llm_search_cached = None
-        return self._llm_search_cached
-
-    def _run_web_search(self, query: str) -> Optional[Dict[str, Any]]:
-        """Run a single web search and persist the synthesis as a named
-        Note. Returns {synthesis, sources, query} on success, None on
-        failure (missing API key, no results, network error, etc)."""
-        llm_search = self._get_llm_search()
-        if llm_search is None:
-            return None
-        try:
-            result = llm_search(query=query, wall_time_limit=90.0)
-        except Exception as e:
-            logger.warning(f"[{self.character_name}] web search raised: {e}")
-            return None
-        if not result or not result.get('synthesis'):
-            return None
-
-        synthesis = str(result['synthesis'])
-        sources = result.get('sources', []) or []
-
-        try:
-            success, note_id, err, _ = self.resource_manager.create_note(
-                self.character_name, synthesis, "text",
-                "search-web", query, self._search_note_name(query),
-                {
-                    'kind': 'web_search',
-                    'query': query,
-                    'sources': sources,
-                    'source_count': len(sources),
-                    'model': result.get('_model', ''),
-                },
-            )
-            if success and note_id:
-                self.resource_manager.mark_persistent(note_id, self.character_name)
-            elif err:
-                logger.warning(f"[{self.character_name}] persist search note failed: {err}")
-        except Exception as e:
-            logger.warning(f"[{self.character_name}] persist search note failed: {e}")
-
-        return {'synthesis': synthesis, 'sources': sources, 'query': query}
-
-    # ------------------------------------------------------------------
-    # fetch_text — backend for the ReAct `fetch_text` tool. Loaded the
-    # same way as search-web (importlib by file path, hyphenated dir).
-    # ------------------------------------------------------------------
-
-    def _get_fetch_text_tool(self):
-        """Lazy-load the fetch-text tool's `tool` callable. Cached on the
-        instance after first load. The executive_node tool expects an
-        `executor` kwarg with `_create_uniform_return`; we pass a stub
-        since chat doesn't run an executor."""
-        if hasattr(self, '_fetch_text_cached'):
-            return self._fetch_text_cached
-        try:
-            import importlib.util
-            tool_path = os.path.join(_SRC_DIR, "tools", "fetch-text", "tool.py")
-            spec = importlib.util.spec_from_file_location(
-                "_chat_fetch_text_tool", tool_path)
-            if spec is None or spec.loader is None:
-                self._fetch_text_cached = None
-                return None
-            mod = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(mod)
-            self._fetch_text_cached = getattr(mod, 'tool', None)
-        except Exception as e:
-            logger.warning(f"[{self.character_name}] could not load fetch-text tool: {e}")
-            self._fetch_text_cached = None
-        return self._fetch_text_cached
-
-    class _FetchTextStubExecutor:
-        """Minimal stand-in for InfospaceExecutor — fetch-text only calls
-        `_create_uniform_return`, so this is sufficient."""
-        @staticmethod
-        def _create_uniform_return(status, value=None, reason=None,
-                                   resource_id=None, extra=None, data=None):
-            return {'status': status, 'value': value, 'reason': reason,
-                    'resource_id': resource_id, 'extra': extra, 'data': data}
-
-    def _run_fetch_text(self, url: str) -> str:
-        """Fetch+extract text from a URL (or Note/Collection ID, or local
-        absolute path). Returns an OK:/EMPTY:/ERROR: prefixed observation
-        per the ReAct tool-observation convention (see _run_react_loop
-        comment block). Successful text is capped to _FETCH_TEXT_OBS_CAP
-        chars for the ReAct working log."""
-        if not url:
-            return 'EMPTY: fetch_text url was empty'
-        fetch = self._get_fetch_text_tool()
-        if fetch is None:
-            return 'ERROR: fetch_text tool unavailable (failed to load — see warning log)'
-        try:
-            result = fetch(url, executor=self._FetchTextStubExecutor,
-                           resource_manager=self.resource_manager)
-        except Exception as e:
-            logger.warning(f"[{self.character_name}] fetch_text raised: {e}")
-            return f'ERROR: fetch_text raised: {e}'
-        if not isinstance(result, dict):
-            return 'ERROR: fetch_text returned unexpected shape'
-        if result.get('status') != 'success':
-            return f"ERROR: fetch_text failed: {result.get('reason') or 'unknown'}"
-        # The tool returns a JSON-encoded blob in `value` and a parsed dict
-        # in `extra`. Prefer `extra` for the text field.
-        extra = result.get('extra') or {}
-        text = ''
-        if isinstance(extra, dict):
-            text = str(extra.get('text') or '').strip()
-        if not text:
-            value = result.get('value') or ''
-            try:
-                parsed = json.loads(value) if isinstance(value, str) else value
-                if isinstance(parsed, dict):
-                    text = str(parsed.get('text') or '').strip()
-                elif isinstance(parsed, str):
-                    text = parsed.strip()
-            except Exception:
-                text = str(value).strip()
-        if not text:
-            return f'EMPTY: fetch_text extracted no text from {url}'
-        if len(text) > _FETCH_TEXT_OBS_CAP:
-            text = text[:_FETCH_TEXT_OBS_CAP].rstrip() + f"\n…[truncated at {_FETCH_TEXT_OBS_CAP} chars]"
-        return 'OK: ' + text
-
-    # ------------------------------------------------------------------
     # ReAct loop — single-action-per-iteration tool use for chat.
     #
-    # Tools: process_text (LLM transformation), search (web), respond (exit).
+    # Tools: process_text (LLM transformation), discovered tools from
+    # src/tools/ (search-web, fetch-text, calculate, …), respond (exit).
     # Each emit is a single JSON object; results auto-bind to $step1, $step2…
     # Variable scope is per-turn; nothing leaks into conversation history.
     # ------------------------------------------------------------------
@@ -2985,39 +2838,6 @@ class ChatLoop:
         if not text:
             return 'EMPTY: process_text produced no output'
         return 'OK: ' + text
-
-    @staticmethod
-    def _format_react_search_observation(search_result: Dict[str, Any]) -> str:
-        """Render a search result (synthesis + sources) into the scratchpad
-        observation text. Sources capped to keep prompt size bounded.
-
-        Filters opaque internal references (non-http URLs like OpenAI
-        Responses API's `weather://turn0forecast0` grounding refs) — the
-        URL is dropped and the scheme-as-domain (`weather`) is suppressed
-        so downstream citation doesn't forward garbage."""
-        synthesis = search_result.get('synthesis', '') or ''
-        sources = search_result.get('sources', []) or []
-        src_lines = []
-        for s in sources[:8]:
-            domain = s.get('domain') or ''
-            url = s.get('url') or ''
-            title = s.get('title') or ''
-            is_real_url = url.startswith(('http://', 'https://'))
-            if not is_real_url:
-                url = ''
-                # A "domain" with no dot is usually just the URL scheme
-                # of an opaque ref (e.g. "weather"); not a real publication.
-                if domain and '.' not in domain:
-                    domain = ''
-            if url and domain:
-                src_lines.append(f"- {domain}: {title} ({url})")
-            elif domain:
-                src_lines.append(f"- {domain}: {title}")
-            elif title:
-                src_lines.append(f"- {title} (no public URL)")
-        if not src_lines:
-            return synthesis
-        return f"{synthesis}\n\nSources:\n" + "\n".join(src_lines)
 
     # ------------------------------------------------------------------
     # Resource queryable handlers (chat-mode subset of executive_node)
@@ -3809,6 +3629,183 @@ class ChatLoop:
     # direct prose reply.
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # Tool discovery — scan src/tools/, read SKILL.md frontmatter, register
+    # tools that expose `react_invoke`. To add a tool: drop a dir under
+    # src/tools/<name>/ with Skill.md (frontmatter: name, description,
+    # args) and tool.py (function: react_invoke). No chat_loop edit
+    # required.
+    #
+    # Tools without `react_invoke` (e.g. filter-semantic — kept in
+    # src/tools/ for future enablement but list-shape input not yet
+    # settled) are silently skipped — they won't appear in the catalog
+    # or be dispatchable.
+    # ------------------------------------------------------------------
+
+    def _discover_tools(self) -> Dict[str, Dict[str, Any]]:
+        """Scan src/tools/ and return a registry: {name → metadata}.
+
+        Each metadata dict carries `description`, `args` (dict from
+        Skill.md frontmatter), `module_path`, and `body` (Skill.md body
+        text, for any future use). Tools whose `tool.py` lacks
+        `react_invoke` are excluded.
+        """
+        import yaml
+        registry: Dict[str, Dict[str, Any]] = {}
+        if not os.path.isdir(_TOOLS_DIR):
+            return registry
+        for entry in sorted(os.listdir(_TOOLS_DIR)):
+            tool_dir = os.path.join(_TOOLS_DIR, entry)
+            if not os.path.isdir(tool_dir):
+                continue
+            skill_path = os.path.join(tool_dir, "SKILL.md")
+            if not os.path.isfile(skill_path):
+                skill_path = os.path.join(tool_dir, "Skill.md")
+            tool_path = os.path.join(tool_dir, "tool.py")
+            if not os.path.isfile(skill_path) or not os.path.isfile(tool_path):
+                continue
+            try:
+                with open(skill_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+            except Exception as e:
+                logger.warning(f"[{self.character_name}] could not read {skill_path}: {e}")
+                continue
+            # Quick `react_invoke` check by file text — cheap; avoids
+            # importing the module (which may have heavy side-effects
+            # or missing deps).
+            try:
+                with open(tool_path, "r", encoding="utf-8") as f:
+                    tool_src = f.read()
+            except Exception as e:
+                logger.warning(f"[{self.character_name}] could not read {tool_path}: {e}")
+                continue
+            if "def react_invoke" not in tool_src:
+                logger.debug(
+                    f"[{self.character_name}] discover_tools: {entry} has no "
+                    f"react_invoke; skipping")
+                continue
+            # Parse frontmatter.
+            if not content.startswith("---"):
+                logger.warning(
+                    f"[{self.character_name}] {skill_path}: no frontmatter")
+                continue
+            parts = content.split("---", 2)
+            if len(parts) < 3:
+                logger.warning(
+                    f"[{self.character_name}] {skill_path}: malformed frontmatter")
+                continue
+            try:
+                fm = yaml.safe_load(parts[1]) or {}
+            except Exception as e:
+                logger.warning(
+                    f"[{self.character_name}] {skill_path}: yaml parse failed: {e}")
+                continue
+            name = str(fm.get("name") or entry).strip()
+            description = str(fm.get("description") or "").strip()
+            args_spec = fm.get("args") or {}
+            if not isinstance(args_spec, dict):
+                logger.warning(
+                    f"[{self.character_name}] {skill_path}: `args` must be a mapping")
+                args_spec = {}
+            if not description:
+                logger.warning(
+                    f"[{self.character_name}] {skill_path}: missing `description`")
+                continue
+            if name in registry:
+                logger.warning(
+                    f"[{self.character_name}] duplicate tool name {name!r}; "
+                    f"keeping first")
+                continue
+            registry[name] = {
+                "description": description,
+                "args": args_spec,
+                "module_path": tool_path,
+                "body": parts[2].strip(),
+            }
+        return registry
+
+    def _render_discovered_tool_entry(self, name: str, meta: Dict[str, Any]) -> str:
+        """Render one discovered tool's catalog entry as a prompt block."""
+        # Build the example JSON shape from args.
+        arg_keys = list((meta.get("args") or {}).keys())
+        # Lead with `thought` + `tool`, then args by key.
+        shape_parts = ['"thought": "<one terse sentence>"', f'"tool": "{name}"']
+        for k in arg_keys:
+            shape_parts.append(f'"{k}": <...>')
+        shape = "{" + ", ".join(shape_parts) + "}"
+        lines = [f"`{shape}` — {meta['description']}"]
+        if arg_keys:
+            arg_lines = []
+            for k, v in (meta.get("args") or {}).items():
+                arg_lines.append(f"    {k}: {v}")
+            lines.append("  args:\n" + "\n".join(arg_lines))
+        return "\n  ".join(lines) if len(lines) > 1 else lines[0]
+
+    def _load_discovered_tool_module(self, name: str):
+        """Lazy-load a discovered tool's module. Cached on the instance."""
+        if not hasattr(self, "_tool_module_cache"):
+            self._tool_module_cache: Dict[str, Any] = {}
+        if name in self._tool_module_cache:
+            return self._tool_module_cache[name]
+        meta = self._discovered_tools.get(name)
+        if meta is None:
+            return None
+        try:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location(
+                f"_chat_tool_{name.replace('-', '_')}", meta["module_path"])
+            if spec is None or spec.loader is None:
+                self._tool_module_cache[name] = None
+                return None
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            self._tool_module_cache[name] = mod
+            return mod
+        except Exception as e:
+            logger.warning(
+                f"[{self.character_name}] could not load tool {name}: {e}")
+            self._tool_module_cache[name] = None
+            return None
+
+    def _dispatch_discovered_tool(self, name: str, action: Dict[str, Any],
+                                  log: List[Tuple[str, str]]) -> str:
+        """Resolve $stepN args, load the tool module, call react_invoke,
+        translate the result into an OK:/EMPTY:/ERROR: observation."""
+        mod = self._load_discovered_tool_module(name)
+        if mod is None:
+            return f"ERROR: tool {name} failed to load (see warning log)"
+        invoke = getattr(mod, "react_invoke", None)
+        if invoke is None:
+            return f"ERROR: tool {name} has no react_invoke entry-point"
+        # Strip the framing keys; resolve any $stepN bindings in remaining args.
+        tool_args: Dict[str, Any] = {}
+        for k, v in action.items():
+            if k in ("thought", "tool"):
+                continue
+            if isinstance(v, str):
+                tool_args[k] = self._resolve_react_value(v, log)
+            else:
+                tool_args[k] = v
+        try:
+            result = invoke(
+                tool_args,
+                character_name=self.character_name,
+                backend=self.backend,
+                logger=logger,
+            )
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] tool {name} raised: {e}")
+            return f"ERROR: {name} raised: {e}"
+        if not isinstance(result, dict):
+            return f"ERROR: {name} returned non-dict ({type(result).__name__})"
+        status = result.get("status")
+        text = str(result.get("text", "")).strip()
+        if status == "ok":
+            return "OK: " + text
+        if status == "empty":
+            return "EMPTY: " + (text or f"{name} produced no result")
+        return "ERROR: " + (text or f"{name} failed")
+
     def _build_react_tool_catalog(self) -> str:
         """Build the numbered tool list shown in the ReAct system prompt.
         Conditionally includes inspect_external — and the bound external
@@ -3822,13 +3819,6 @@ class ChatLoop:
             ("process_text",
              "`{\"thought\": \"<one terse sentence>\", \"tool\": \"process_text\", \"source\": <string|$stepN>, \"instruction\": <string>}` — "
              "LLM pass over text in context. Use to formulate queries, render results in your voice, extract info."),
-            ("search",
-             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"search\", \"query\": <string|$stepN>}` — "
-             "web search (digested synthesis + sources)."),
-            ("fetch_text",
-             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"fetch_text\", \"url\": <string|$stepN>}` — "
-             "full text from a single URL (or local file path). Use when a search hit looks promising and the "
-             "snippet isn't enough; always pass the result through process_text before responding."),
             ("recall",
              "`{\"thought\": \"<one terse sentence>\", \"tool\": \"recall\", \"query\": <string>}` — "
              "READ-ONLY active recall over your own memory: full reasoning trace, conversation history, "
@@ -3866,6 +3856,14 @@ class ChatLoop:
             "or routing/interface state. v0.1 does NOT do traffic capture or IDS log inspection. Phrase as a "
             "natural-language question (e.g. \"what hosts are on my LAN at 192.168.1.0/24?\", \"what TCP ports "
             "am I listening on?\", \"what's my default gateway?\")."))
+        # Auto-discovered tools from src/tools/ (each exposes react_invoke).
+        # Rendered between the built-in subagents and the display/respond
+        # actions so the prompt's tool ordering matches its mental model:
+        # think (process_text) → recall/inspect/security → real-world tools
+        # (search-web, fetch-text, calculate, …) → present (display) →
+        # finish (respond).
+        for _name, _meta in self._discovered_tools.items():
+            tools.append((_name, self._render_discovered_tool_entry(_name, _meta)))
         tools.append(("display",
             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"display\", "
             "\"content\": <string|$stepN>, \"format\": \"markdown\"|\"html\"}` — "
@@ -3894,11 +3892,11 @@ class ChatLoop:
             "contains the image. Page URLs through the proxy produce broken-image icons — "
             "the proxy faithfully returns whatever bytes the URL yields, and `text/html` "
             "cannot render inside `<img>`. If you only have a page URL (a search hit, a "
-            "stock-photo landing page, an article), `fetch_text` it first and use "
+            "stock-photo landing page, an article), `fetch-text` it first and use "
             "`metadata.html_metadata.images.og_image` — that's what that field is for."))
         tools.append(("respond",
             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"respond\", \"text\": <string|$stepN>}` — "
-            "final reply, exits loop. Must be in your voice; pass search/fetch results through process_text "
+            "final reply, exits loop. Must be in your voice; pass search-web/fetch-text results through process_text "
             "first or write the reply yourself."))
 
         omitted = set(self._omitted_tools or [])
@@ -3931,7 +3929,7 @@ class ChatLoop:
             fresh_info_guidance = (
                 "You do NOT know: current weather, recent news, current prices, "
                 "or anything requiring fresh information. For time-sensitive or "
-                "fact-specific questions, your first action is `search`.\n"
+                "fact-specific questions, your first action is `search-web`.\n"
             )
         react = (
             f"\n\n## Now (system clock)\n{now_str}\n"
@@ -4237,22 +4235,6 @@ class ChatLoop:
                     obs = f'ERROR: process_text rejected: {diag}'
                 else:
                     obs = self._run_process_text(src, ins)
-            elif tool == 'search':
-                q = self._resolve_react_value(action.get('query', ''), log)
-                if not q:
-                    obs = 'EMPTY: search query was empty'
-                elif self._get_llm_search() is None:
-                    obs = 'ERROR: search-web tool unavailable (failed to load — see warning log)'
-                else:
-                    result = self._run_web_search(q)
-                    if result:
-                        obs = 'OK: ' + self._format_react_search_observation(result)
-                    else:
-                        obs = (f'EMPTY: search returned no results for "{q}" '
-                               '(or transient API failure — see warning log)')
-            elif tool == 'fetch_text':
-                u = self._resolve_react_value(action.get('url', ''), log)
-                obs = self._run_fetch_text(u)
             elif tool == 'recall':
                 q = self._resolve_react_value(action.get('query', ''), log)
                 obs = self._run_remember(q)
@@ -4273,14 +4255,16 @@ class ChatLoop:
                 # has already chosen what belongs on the canvas this turn.
                 if isinstance(obs, str) and obs.startswith('OK'):
                     did_display = True
+            elif tool in self._discovered_tools:
+                obs = self._dispatch_discovered_tool(tool, action, log)
             else:
-                # Tool list shown to the model on bad emission. Don't
-                # advertise inspect_external when nothing is bound — keeps
-                # the surface honest about what's actually available.
-                avail = ("process_text, search, fetch_text, recall, "
-                         "inspect, security, display, respond")
+                # Tool list shown to the model on bad emission. Built-ins
+                # are stable; the discovered set comes from the registry.
+                builtin = ["process_text", "recall", "inspect", "security",
+                           "display", "respond"]
                 if self._get_external_repo() is not None:
-                    avail = avail.replace("inspect, ", "inspect, inspect_external, ")
+                    builtin.insert(builtin.index("inspect") + 1, "inspect_external")
+                avail = ", ".join(builtin + sorted(self._discovered_tools.keys()))
                 obs = f"ERROR: unknown tool {tool!r}; available: {avail}"
 
             _append_log(binding, obs)

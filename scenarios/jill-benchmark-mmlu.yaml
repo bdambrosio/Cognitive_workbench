@@ -43,11 +43,18 @@ characters:
       enabled: false
     chat:
       benchmark_mode: true
-      # Closed-book: drop every external info-gathering tool. Leaves
-      # process_text + respond for in-model reasoning over text.
+      # Closed-book: drop every external info-gathering tool. Calculate,
+      # assess, and text-find are kept — they're deterministic / model-side
+      # operations that fit a closed-book MCQ test. process_text + respond
+      # are built-ins.
       omitted_tools:
-        - search
-        - fetch_text
+        - search-web
+        - fetch-text
+        - check-email
+        - semantic-scholar
+        - stock-price
+        - obsidian
+        - exec-script
         - inspect
         - inspect_external
         - recall

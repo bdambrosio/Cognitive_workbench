@@ -23,6 +23,41 @@ def _success(executor: Any, result: str, extra: Optional[Dict[str, Any]] = None)
     return executor._create_uniform_return("success", value=result, extra=extra)
 
 
+def react_invoke(args, *, character_name=None, backend=None, logger=None):
+    """ReAct entry-point — see Skill.md for the args contract."""
+    from utils.chat_tool_stub import build_tool_kwargs, CapturingResourceManager, translate_result
+    expression = args.get("expression", "")
+    if not isinstance(expression, str) or not expression.strip():
+        return {"status": "error", "text": "calculate requires non-empty `expression`"}
+
+    # Parse "x=2, y=3.5" into a {name: float} dict.
+    variables = {}
+    vars_str = args.get("vars") or ""
+    for pair in vars_str.split(",") if vars_str else []:
+        pair = pair.strip()
+        if not pair:
+            continue
+        if "=" not in pair:
+            return {"status": "error", "text": f"invalid var spec `{pair}` — use name=number"}
+        k, v = pair.split("=", 1)
+        try:
+            variables[k.strip()] = float(v.strip())
+        except ValueError:
+            return {"status": "error", "text": f"could not parse value in `{pair}` — must be numeric"}
+
+    try:
+        precision = int(args.get("precision", 10))
+    except (TypeError, ValueError):
+        precision = 10
+
+    mgr = CapturingResourceManager()
+    result = tool(expression, **build_tool_kwargs(
+        character_name=character_name, backend=backend, manager=mgr,
+        variables=variables, precision=precision,
+    ))
+    return translate_result(result, manager=mgr)
+
+
 def tool(input_value, runtime=None, **kwargs):
     """
     Evaluate a mathematical expression numerically.

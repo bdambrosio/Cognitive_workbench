@@ -408,6 +408,50 @@ def llm_search(query: str, llm_generate=None, max_chars: int = 8000,
 # Tool interface for infospace
 # ------------------------------
 
+def react_invoke(args, *, character_name=None, backend=None, logger=None):
+    """ReAct entry-point — see Skill.md for the args contract.
+
+    Bypasses the legacy `tool()` (which wraps note persistence we don't
+    need in chat) and calls `llm_search` directly. Formats synthesis +
+    sources into one text observation; the `Sources:` block triggers
+    process_text's citation discipline downstream.
+    """
+    query = args.get("query", "")
+    if not isinstance(query, str) or not query.strip():
+        return {"status": "error", "text": "search-web requires non-empty `query`"}
+
+    try:
+        result = llm_search(query=query, wall_time_limit=90.0)
+    except Exception as e:
+        return {"status": "error", "text": f"search-web raised: {e}"}
+    if not result or not result.get("synthesis"):
+        return {"status": "empty",
+                "text": f"no results for {query!r} (or transient API failure)"}
+
+    synthesis = str(result["synthesis"]).strip()
+    sources = result.get("sources", []) or []
+    src_lines = []
+    for s in sources[:8]:
+        domain = (s.get("domain") or "").strip()
+        url = (s.get("url") or "").strip()
+        title = (s.get("title") or "").strip()
+        is_real_url = url.startswith(("http://", "https://"))
+        if not is_real_url:
+            url = ""
+            if domain and "." not in domain:
+                domain = ""
+        if url and domain:
+            src_lines.append(f"- {domain}: {title} ({url})")
+        elif domain:
+            src_lines.append(f"- {domain}: {title}")
+        elif title:
+            src_lines.append(f"- {title} (no public URL)")
+    text = synthesis
+    if src_lines:
+        text = f"{synthesis}\n\nSources:\n" + "\n".join(src_lines)
+    return {"status": "ok", "text": text}
+
+
 def tool(input_value, **kwargs):
     """
     Web search tool using Claude Sonnet + web_search.
