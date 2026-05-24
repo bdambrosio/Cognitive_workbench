@@ -18,10 +18,37 @@ def make_localhost_config():
     Keeps multicast scouting for local peer discovery but restricts
     it to the loopback interface, preventing LAN cross-talk.
     """
+    import platform
     import zenoh
     config = zenoh.Config()
-    config.insert_json5("scouting/multicast/interface", '"lo"')
-    config.insert_json5("listen/endpoints", '["tcp/127.0.0.1:0"]')
+    if platform.system() == "Darwin":
+        # macOS does not route multicast over the loopback interface by
+        # default, so Zenoh's multicast scouting never discovers the other
+        # sessions and the CLI reports the chat loop as unreachable. Use
+        # gossip discovery with a fixed local rendezvous endpoint instead.
+        #
+        # Each session listens on BOTH the shared rendezvous port (7447) and
+        # an ephemeral port. The first session to start binds 7447 and acts
+        # as the rendezvous; the rest fail that bind (non-fatal) but still
+        # listen on their ephemeral port and connect out to 7447. Gossip then
+        # advertises every session's ephemeral endpoint so they form DIRECT
+        # peer links. Listening only on 7447 is not enough: with --affect/
+        # --canvas a bridge subprocess grabs 7447 first, leaving the CLI and
+        # the agent as connect-only peers with no way to reach each other (a
+        # plain peer does not relay between them). Verified: the 3-session
+        # topology fails with 7447 alone and succeeds once the ephemeral
+        # listen endpoint is added.
+        config.insert_json5("scouting/multicast/enabled", "false")
+        config.insert_json5("scouting/gossip/enabled", "true")
+        config.insert_json5("listen/endpoints",
+                            '["tcp/127.0.0.1:7447", "tcp/127.0.0.1:0"]')
+        config.insert_json5("listen/exit_on_failure", "false")
+        config.insert_json5("connect/endpoints", '["tcp/127.0.0.1:7447"]')
+        config.insert_json5("connect/exit_on_failure", "false")
+    else:
+        # Linux: loopback is "lo" and supports multicast scouting.
+        config.insert_json5("scouting/multicast/interface", '"lo"')
+        config.insert_json5("listen/endpoints", '["tcp/127.0.0.1:0"]')
     return config
 
 

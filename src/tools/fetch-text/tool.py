@@ -78,6 +78,27 @@ def react_invoke(args, *, character_name=None, backend=None, logger=None):
     if out["status"] == "ok" and len(out["text"]) > _REACT_OBS_CAP:
         out["text"] = out["text"][:_REACT_OBS_CAP].rstrip() + \
             f"\n…[truncated at {_REACT_OBS_CAP} chars]"
+
+    # Surface HTML image candidates. Page text alone doesn't contain
+    # og:image meta-tag URLs, so without this a downstream `display`
+    # call has to re-fetch and re-parse to pick a primary image.
+    # Appended after truncation so the candidates always survive.
+    if out["status"] == "ok":
+        images = (result.get("extra") or {}).get("metadata", {}) \
+            .get("html_metadata", {}).get("images", {}) or {}
+        lines = []
+        if images.get("og_image"):
+            lines.append(f"- og:image: {images['og_image']}")
+        if images.get("twitter_image"):
+            lines.append(f"- twitter:image: {images['twitter_image']}")
+        for img in (images.get("imgs") or [])[:3]:
+            src = img.get("src", "")
+            alt = img.get("alt", "")
+            if src:
+                lines.append(f"- <img>: {src}" + (f"  (alt: {alt})" if alt else ""))
+        if lines:
+            out["text"] = out["text"] + "\n\nImage candidates:\n" + "\n".join(lines)
+
     return out
 
 

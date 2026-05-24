@@ -116,3 +116,7 @@ src/ERROR
 # Ignore stray images in docs, but keep functional icons/assets
 docs/*.png
 # Keep browser_extension icons and src/static tracked (small, functional)
+
+# Local secrets for run.sh (API keys) — do not commit
+.env
+.venv/
