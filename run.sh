@@ -9,12 +9,11 @@
 #   * runs launcher.py from src/ with the jill-chat-mac.yaml scenario
 #   * points the affect/canvas widgets at a real browser binary
 #
-# Secrets: put your key in a local, untracked file `.env` beside this script:
-#     export ANTHROPIC_API_KEY=sk-ant-...
-#     # optional — only if you want the Telegram bridge:
+# Secrets/overrides: optional, in an untracked `.env` beside this script.
+# The current scenario (jill-chat-mac.yaml) talks to a LAN vLLM server, which
+# needs no API key. .env is only needed for the optional Telegram bridge:
 #     # export TELEGRAM_BOT_TOKEN=...
 #     # export TELEGRAM_ALLOWED_CHAT_IDS=...
-# (Exporting ANTHROPIC_API_KEY in your shell / ~/.zshrc works too.)
 #
 # Usage:
 #     ./run.sh                 # default flags below
@@ -32,12 +31,10 @@ if [[ -f "$REPO_DIR/.env" ]]; then
   source "$REPO_DIR/.env"
 fi
 
-if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
-  echo "ERROR: ANTHROPIC_API_KEY is not set." >&2
-  echo "       Add it to $REPO_DIR/.env  (export ANTHROPIC_API_KEY=sk-ant-...)" >&2
-  echo "       or export it in your shell, then re-run." >&2
-  exit 1
-fi
+# The current scenario points at a LAN vLLM server, which needs no API key.
+# If you switch jill-chat-mac.yaml back to a key-based backend (anthropic/
+# openrouter), export that key in .env or your shell — the launcher fails
+# loudly at startup if a required key is missing.
 
 # macOS native-library workarounds:
 #   KMP_DUPLICATE_LIB_OK — torch and faiss each bundle their own OpenMP

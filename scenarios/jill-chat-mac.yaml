@@ -1,9 +1,8 @@
-# Cognitive Workbench — chat-mode scenario (macOS / Anthropic cloud variant)
+# Cognitive Workbench — chat-mode scenario (macOS / LAN vLLM variant)
 #
-# Copy of jill-chat.yaml with the LLM backend switched from a local
-# OpenAI-compatible server (127.0.0.1:5000) to the native Anthropic
-# Messages API, so it runs on a Mac with no local model server. Usage:
-#   export ANTHROPIC_API_KEY=sk-ant-...
+# Copy of jill-chat.yaml pointed at a vLLM OpenAI-compatible server running
+# on the desktop (192.168.68.76:5000) instead of 127.0.0.1, so the Mac uses
+# the desktop GPU. No API key required. Usage:
 #   cd src && python3 launcher.py jill-chat-mac.yaml --cli --autonomy
 # (add --telegram/--affect/--canvas as desired; see notes in those flags).
 #
@@ -45,17 +44,17 @@ characters:
     # SGLangAPIServer on port 5000, lmstudio, etc.). For cloud, use
     # 'openrouter' or 'openai' (model name then required).
     llm_config:
-      # macOS cloud variant — native Anthropic Messages API.
-      #   * api_key is the NAME of an env var (resolved at startup; the
-      #     launcher fails loudly if ANTHROPIC_API_KEY is unset).
-      #   * base_url is REQUIRED: the backend otherwise defaults to
-      #     http://127.0.0.1:5000 for every server. Do NOT add a vllm_url
-      #     line here — vllm_url takes precedence over base_url and would
-      #     redirect calls back to localhost.
-      server: anthropic
-      model: claude-opus-4-7
-      base_url: https://api.anthropic.com
-      api_key: ANTHROPIC_API_KEY
+      # macOS variant — LAN vLLM server (OpenAI-compatible) on the desktop.
+      #   * No api_key: with none set, the unified OpenAI-compat route POSTs
+      #     to {vllm_url}/v1/chat/completions with no Authorization header
+      #     (vLLM needs no auth unless launched with --api-key).
+      #   * vllm_url takes precedence over base_url; the code appends
+      #     /v1/chat/completions, so give it the host:port root (no /v1).
+      #   * model must match the server's --served-model-name; check
+      #     http://192.168.68.76:5000/v1/models if a request 400s.
+      server: local
+      model: google/gemma-4-31B-it
+      vllm_url: http://192.168.68.76:5000
       is_reasoning_model: false
 
     # On by default per project decision.
