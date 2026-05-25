@@ -71,7 +71,11 @@ _SYS_MSG = (
     "Be strict about correctness — for technical/scientific questions, "
     "a near-miss is incorrect, not partial. Reserve 'partial' for cases "
     "where the model demonstrably did some of the work but missed part "
-    "of the answer."
+    "of the answer.\n\n"
+    "CRITICAL: Do NOT attempt to solve, re-derive, or verify the problem "
+    "yourself. You are given the gold answer — treat it as ground truth "
+    "and judge ONLY whether the reply matches it. Show no working; emit "
+    "the JSON verdict and nothing else."
 )
 
 
@@ -82,11 +86,12 @@ def _build_judge_messages(question: str, gold: str,
         f"# Gold answer\n{gold}\n\n"
         f"# Model reply\n{reply or '(empty)'}\n\n"
         f"# Output\n"
-        "Return ONLY a JSON object with these exact keys "
-        "(no prose, no markdown fences):\n"
+        "Respond with ONLY the JSON object below — the very first character "
+        "of your response must be '{', with no analysis, prose, or markdown "
+        "fences before or after it:\n"
         "{\n"
         '  "verdict": "correct" | "partial" | "incorrect",\n'
-        '  "rationale": "<one sentence>"\n'
+        '  "rationale": "<one sentence, no derivation>"\n'
         "}\n"
     )
     return [{"role": "system", "content": _SYS_MSG},
@@ -123,7 +128,11 @@ def _score_one(backend: _ChatBackend, record: Dict[str, Any]) -> Verdict:
 
     messages = _build_judge_messages(question, gold, reply)
     try:
-        raw = backend.chat(messages, max_tokens=300, temperature=0.0)
+        # Generous cap + the "don't re-derive" system rule keep the judge
+        # from spending its whole budget reasoning out the problem and never
+        # reaching the JSON verdict — the failure mode that force-scored hard
+        # math/physics items as unparseable=incorrect.
+        raw = backend.chat(messages, max_tokens=1024, temperature=0.0)
     except Exception as e:
         logger.exception(f"{record.get('question_id')}: judge call failed")
         return Verdict(
@@ -137,6 +146,16 @@ def _score_one(backend: _ChatBackend, record: Dict[str, Any]) -> Verdict:
         parsed = json.loads(raw)
     except json.JSONDecodeError:
         parsed = repair_json_string(raw)
+    # Fallback: if the judge prefaced the verdict with prose despite the
+    # instructions, extract the outermost {...} and retry the parse.
+    if not isinstance(parsed, dict) and isinstance(raw, str):
+        start, end = raw.find("{"), raw.rfind("}")
+        if 0 <= start < end:
+            snippet = raw[start:end + 1]
+            try:
+                parsed = json.loads(snippet)
+            except json.JSONDecodeError:
+                parsed = repair_json_string(snippet)
 
     if not isinstance(parsed, dict):
         logger.warning(
@@ -168,9 +187,20 @@ def _aggregate(scored: List[Dict[str, Any]]) -> Dict[str, Any]:
                  "score_sum": 0.0, "n": 0})
     overall = {"correct": 0, "partial": 0, "incorrect": 0,
                "score_sum": 0.0, "n": 0}
+    judge_errors = 0
     for r in scored:
-        v = (r.get("judge") or {}).get("verdict", "incorrect")
-        s = float((r.get("judge") or {}).get("score", 0.0))
+        j = r.get("judge") or {}
+        # A judge-side failure (unparseable output / API error) is NOT a
+        # model wrong-answer — exclude it from the score so it can't
+        # masquerade as model-incorrect (and so judge flakiness doesn't
+        # differ silently between a baseline and an FP8 run). Runner errors
+        # (judge_error is None, verdict incorrect) are real model failures
+        # and stay counted.
+        if j.get("judge_error"):
+            judge_errors += 1
+            continue
+        v = j.get("verdict", "incorrect")
+        s = float(j.get("score", 0.0))
         cat = r.get("category") or "(uncategorized)"
         for bucket in (by_cat[cat], overall):
             bucket[v] = bucket.get(v, 0) + 1
@@ -197,6 +227,7 @@ def _aggregate(scored: List[Dict[str, Any]]) -> Dict[str, Any]:
             "score_mean": round(overall["score_sum"] / n, 4),
             "exact_correct_rate": round(overall["correct"] / n, 4),
         },
+        "judge_errors": judge_errors,
         "per_category": per_cat,
     }
 
@@ -217,6 +248,10 @@ def _write_summary_md(run_dir: Path, scored: List[Dict[str, Any]],
         f"({o['correct']}/{o['n']})")
     lines.append(
         f"- partial: {o['partial']}  incorrect: {o['incorrect']}")
+    je = agg.get("judge_errors", 0)
+    if je:
+        lines.append(
+            f"- judge_errors (excluded from score, NOT model-incorrect): {je}")
     lines.append("")
     if agg["per_category"]:
         lines.append("## Per-category")
@@ -332,13 +367,15 @@ def main() -> None:
         json.dumps(agg, indent=2, default=str))
 
     o = agg["overall"]
+    je = agg.get("judge_errors", 0)
     print(f"\nscored.jsonl: {scored_path}")
     print(f"summary.md:   {summary_path}")
     print(f"summary.json: {run_dir / 'summary.json'}")
     print(
         f"\nOverall: score_mean={o['score_mean']:.4f}  "
         f"exact_correct={o['exact_correct_rate']:.4f} "
-        f"({o['correct']}/{o['n']})")
+        f"({o['correct']}/{o['n']})"
+        + (f"  |  judge_errors (excluded): {je}" if je else ""))
 
 
 if __name__ == "__main__":

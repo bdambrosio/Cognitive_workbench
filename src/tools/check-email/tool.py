@@ -22,7 +22,13 @@ import ssl
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from infospace_executor import InfospaceExecutor
+# infospace_executor was the planner-side runtime; the chat ReAct loop
+# bypasses it. Keep the import optional so this module loads in chat-only
+# builds — the InfospaceExecutor annotations degrade to Any there.
+try:
+    from infospace_executor import InfospaceExecutor
+except ImportError:
+    InfospaceExecutor = Any  # type: ignore[assignment,misc]
 
 logger = logging.getLogger(__name__)
 

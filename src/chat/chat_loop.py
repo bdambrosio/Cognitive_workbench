@@ -60,6 +60,33 @@ logger = logging.getLogger('chat_loop')
 # outer loop had fewer iters than each subagent it could invoke.
 REACT_MAX_ITERS = 12
 
+# Per-iteration budget for re-emitting a malformed/truncated action. A
+# parse failure (commonly a `thought` that ran long and got cut off by the
+# token limit before the JSON closed) is retried WITHOUT consuming an
+# action iteration — a format stumble shouldn't bleed the REACT_MAX_ITERS
+# budget. After this many retries the loop bails to fallback synthesis.
+REACT_MAX_FORMAT_RETRIES = 2
+
+# Structured-output schema for a ReAct action emission. Sent as
+# response_format=json_schema on local engines (vLLM 0.21 / SGLang honor
+# it; vLLM ignores the legacy top-level guided_* fields). Forces complete,
+# schema-valid JSON every emission and bounds `thought` so a runaway
+# reasoning dump can't eat the token budget before the `tool` field lands.
+# maxLength is in CHARACTERS (no token-based cap exists in JSON schema):
+# 4000 chars ≈ a generous ~1024-token thought — room to reason on hard
+# questions, but a hard ceiling well under the 8192-token call budget.
+# additionalProperties=True so each tool's own args (query, source,
+# content, prompt, …) pass through unconstrained.
+REACT_ACTION_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "thought": {"type": "string", "maxLength": 4000},
+        "tool": {"type": "string"},
+    },
+    "required": ["thought", "tool"],
+    "additionalProperties": True,
+}
+
 # Concern-instruction authoring rubric. Each fired concern dispatches
 # one ReAct loop capped at REACT_MAX_ITERS — an instruction that can't
 # be completed in that budget hits the max-iters fallback (which spawns
@@ -315,6 +342,11 @@ class _ChatBackend:
             self.is_reasoning = is_reasoning_model(self.model)
         else:
             self.is_reasoning = bool(is_reasoning)
+        # Stop/finish reason of the most recent chat() call. Surfaced so the
+        # ReAct loop can tell a token-limit truncation (finish='length' /
+        # stop_reason='max_tokens') apart from genuinely malformed output
+        # when an emission fails to parse. Set on every chat() return path.
+        self.last_finish_reason: Optional[str] = None
 
     @property
     def supports_image_input(self) -> bool:
@@ -337,7 +369,8 @@ class _ChatBackend:
              is_json: bool = False,
              cot_profile: Optional[str] = None,
              enable_thinking: Optional[bool] = None,
-             reasoning_effort: Optional[str] = None) -> str:
+             reasoning_effort: Optional[str] = None,
+             response_schema: Optional[Dict[str, Any]] = None) -> str:
         # Per-call reasoning_effort override. Only takes effect when the
         # scenario already declared a baseline (self.reasoning_effort is
         # not None) — the field is a reasoning-model concept; we don't
@@ -361,6 +394,7 @@ class _ChatBackend:
             )
             if response is None:
                 raise RuntimeError(f'cloud LLM ({self.server}) returned None')
+            self.last_finish_reason = None  # legacy cloud route doesn't expose it
             return response if isinstance(response, str) else json.dumps(response)
 
         # Anthropic native Messages API. Different endpoint, headers, and
@@ -410,6 +444,7 @@ class _ChatBackend:
             )
             resp.raise_for_status()
             data = resp.json()
+            self.last_finish_reason = data.get('stop_reason')
             blocks = data.get('content') or []
             text = ''.join(
                 b.get('text', '') for b in blocks
@@ -471,6 +506,19 @@ class _ChatBackend:
                 # accepts both `grammar` and `ebnf`. Send `grammar` for both.
                 body['grammar'] = grammar
 
+            # Structured-output constraint passed by the caller (the ReAct
+            # loop sends REACT_ACTION_SCHEMA). vLLM 0.21 / SGLang honor the
+            # OpenAI-style response_format=json_schema; it forces complete,
+            # schema-valid JSON and enforces the thought's maxLength, so a
+            # runaway thought can't burn the token budget before the tool
+            # field is emitted. Local engines only — the bench's vLLM
+            # confirmed it works alongside MTP speculative decoding.
+            if response_schema is not None:
+                body['response_format'] = {
+                    'type': 'json_schema',
+                    'json_schema': {'name': 'react_action', 'schema': response_schema},
+                }
+
             # Per-request thinking suppression for Qwen3.x and similar jinja
             # templates that auto-prefix <think>. Setting enable_thinking=False
             # tells the chat template NOT to open the thinking block, so the
@@ -502,6 +550,7 @@ class _ChatBackend:
         # Lets us see what the engine actually emitted before any
         # client-side <think> stripping or grammar-related contortions.
         choice = choices[0]
+        self.last_finish_reason = choice.get('finish_reason')
         try:
             logger.info(
                 "<llm-raw> profile=%s grammar=%s finish=%s message=%s",
@@ -583,6 +632,13 @@ class ChatLoop:
         self.discourse_enabled = bool((character_config.get('discourse') or {}).get('enabled', True))
         self.orientation_enabled = bool((character_config.get('orientation') or {}).get('enabled', True))
         self.history_limit = int((character_config.get('chat') or {}).get('history_limit', 20))
+        # Max tokens per ReAct action emission. Default is generous so
+        # respond/display content has room. Benchmarks that hit hard questions
+        # where the model dumps a runaway into an unbounded tool arg can lower
+        # this (e.g. 4096) so the runaway truncates before chat()'s HTTP read
+        # timeout fires — letting the parse-retry recover instead of erroring
+        # the whole turn out of the loop.
+        self.react_max_tokens = int((character_config.get('chat') or {}).get('react_max_tokens', 8192))
         # Benchmark mode: run post-turn reflection inline (rather than on the
         # background executor) so probe-time state snapshots see fully-resolved
         # state. Off by default; opt-in via scenario YAML for harnesses like
@@ -4121,56 +4177,90 @@ class ChatLoop:
         self._affect.enter_loop()
         for i in range(REACT_MAX_ITERS):
             self._affect.set_react_iter(i + 1)
-            pre_log_len = len(log)
-            usr_msg = user_prefix_str + log_appendage_str + trailer
-            # When the turn carries an image, every iter sends a
-            # multimodal content array (text first per vLLM's expected
-            # ordering, then image_url). The image must persist across
-            # iters: ReAct's parse-failure retry path drops back into
-            # iter 2+, and if the image were missing there, the model
-            # confabulates against its own prior text. Byte-stable image
-            # tokens across iters still let vLLM prefix-cache the text.
-            # No-image turns keep the plain-string content shape exactly
-            # as before — wire format byte-identical to pre-multimodal.
-            if image_url:
-                user_content: Any = [
-                    {'type': 'text', 'text': usr_msg},
-                    {'type': 'image_url', 'image_url': {'url': image_url}},
+            # Emit one parseable action. A malformed/truncated emission is
+            # retried here WITHOUT consuming this action iteration (bounded by
+            # REACT_MAX_FORMAT_RETRIES) — a format stumble shouldn't cost a
+            # tool turn. Each attempt rebuilds usr_msg so the corrective NOTE
+            # appended by the previous attempt is in view.
+            action = None
+            for fmt_attempt in range(REACT_MAX_FORMAT_RETRIES + 1):
+                pre_log_len = len(log)
+                usr_msg = user_prefix_str + log_appendage_str + trailer
+                # When the turn carries an image, every iter sends a
+                # multimodal content array (text first per vLLM's expected
+                # ordering, then image_url). The image must persist across
+                # iters: ReAct's parse-failure retry path drops back into
+                # iter 2+, and if the image were missing there, the model
+                # confabulates against its own prior text. Byte-stable image
+                # tokens across iters still let vLLM prefix-cache the text.
+                # No-image turns keep the plain-string content shape exactly
+                # as before — wire format byte-identical to pre-multimodal.
+                if image_url:
+                    user_content: Any = [
+                        {'type': 'text', 'text': usr_msg},
+                        {'type': 'image_url', 'image_url': {'url': image_url}},
+                    ]
+                else:
+                    user_content = usr_msg
+                prompt = [
+                    {'role': 'system', 'content': system_prompt_str},
+                    {'role': 'user', 'content': user_content},
                 ]
-            else:
-                user_content = usr_msg
-            prompt = [
-                {'role': 'system', 'content': system_prompt_str},
-                {'role': 'user', 'content': user_content},
-            ]
-            self._emit_status('thinking…')
-            self._affect.set_waiting_for_llm(True)
-            try:
-                raw = self.backend.chat(prompt, max_tokens=8192, temperature=0.7,
-                                        cot_profile='none')
-            except Exception as e:
-                logger.error(f"[{self.character_name}] ReAct iter {i+1} LLM failed: {e}")
-                iters.append({'system': system_prompt_str, 'user': usr_msg,
-                              'raw': f'(LLM call failed: {e})', 'appended': []})
-                reply = self._react_fallback_synthesis(log, str(e))
-                self._clear_status()
-                self._affect.exit_loop()
-                return reply, log, iters, 'llm_error'
-            finally:
-                self._affect.set_waiting_for_llm(False)
+                self._emit_status('thinking…')
+                self._affect.set_waiting_for_llm(True)
+                try:
+                    raw = self.backend.chat(prompt, max_tokens=self.react_max_tokens,
+                                            temperature=0.7, cot_profile='none',
+                                            response_schema=REACT_ACTION_SCHEMA)
+                except Exception as e:
+                    logger.error(f"[{self.character_name}] ReAct iter {i+1} LLM failed: {e}")
+                    iters.append({'system': system_prompt_str, 'user': usr_msg,
+                                  'raw': f'(LLM call failed: {e})', 'appended': []})
+                    reply = self._react_fallback_synthesis(log, str(e))
+                    self._clear_status()
+                    self._affect.exit_loop()
+                    return reply, log, iters, 'llm_error'
+                finally:
+                    self._affect.set_waiting_for_llm(False)
 
-            iters.append({'system': system_prompt_str, 'user': usr_msg, 'raw': raw or '',
-                          'appended': []})
+                iters.append({'system': system_prompt_str, 'user': usr_msg, 'raw': raw or '',
+                              'appended': []})
 
-            action = self._parse_react_action(raw)
-            if action is None:
-                logger.warning(f"[{self.character_name}] ReAct iter {i+1}: unparseable: {raw[:160]!r}")
+                action = self._parse_react_action(raw)
+                if action is not None:
+                    break
+
+                # Parse failed. Distinguish a token-limit truncation (the
+                # common case: a `thought` that ran long and got cut off
+                # before the JSON closed) from genuinely malformed output,
+                # and steer the retry accordingly.
+                truncated = self.backend.last_finish_reason in ('length', 'max_tokens')
+                logger.warning(
+                    f"[{self.character_name}] ReAct iter {i+1} fmt-retry "
+                    f"{fmt_attempt + 1}/{REACT_MAX_FORMAT_RETRIES}: unparseable "
+                    f"(finish={self.backend.last_finish_reason}): {raw[:160]!r}")
                 self._emit_status('parse failed, retrying…')
                 self._affect.incr_llm_retry()
-                _append_log('NOTE', "Previous output was prose, not JSON. The user's task above is "
-                            "unanswered. Do NOT apologize — emit ONE JSON action now to address it.")
+                if truncated:
+                    note = ("Your previous emission was cut off by the token limit before the "
+                            "JSON action closed — it was too long. Emit ONE COMPLETE, COMPACT "
+                            "JSON action now: a SHORT thought (a single clause), the `tool`, and "
+                            "concise args. Keep EVERY field brief — do not dump analysis or "
+                            "step-by-step work into `thought` or into any argument value. Work "
+                            "the problem in small steps across iterations instead.")
+                else:
+                    note = ("Previous output was not valid JSON. Do NOT apologize — emit ONE JSON "
+                            "action now: a single object with a short `thought` and a `tool`.")
+                _append_log('NOTE', note)
                 iters[-1]['appended'] = log[pre_log_len:]
-                continue
+
+            if action is None:
+                # Out of format-retry budget without a parseable action —
+                # don't burn the rest of the turn; synthesize from the log.
+                logger.warning(
+                    f"[{self.character_name}] ReAct iter {i+1}: no parseable action after "
+                    f"{REACT_MAX_FORMAT_RETRIES + 1} attempts; bailing to fallback synthesis")
+                break
 
             tool = action.get('tool')
             if tool == 'respond':
