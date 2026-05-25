@@ -632,6 +632,13 @@ class ChatLoop:
         self.discourse_enabled = bool((character_config.get('discourse') or {}).get('enabled', True))
         self.orientation_enabled = bool((character_config.get('orientation') or {}).get('enabled', True))
         self.history_limit = int((character_config.get('chat') or {}).get('history_limit', 20))
+        # Max tokens per ReAct action emission. Default is generous so
+        # respond/display content has room. Benchmarks that hit hard questions
+        # where the model dumps a runaway into an unbounded tool arg can lower
+        # this (e.g. 4096) so the runaway truncates before chat()'s HTTP read
+        # timeout fires — letting the parse-retry recover instead of erroring
+        # the whole turn out of the loop.
+        self.react_max_tokens = int((character_config.get('chat') or {}).get('react_max_tokens', 8192))
         # Benchmark mode: run post-turn reflection inline (rather than on the
         # background executor) so probe-time state snapshots see fully-resolved
         # state. Off by default; opt-in via scenario YAML for harnesses like
@@ -4202,8 +4209,8 @@ class ChatLoop:
                 self._emit_status('thinking…')
                 self._affect.set_waiting_for_llm(True)
                 try:
-                    raw = self.backend.chat(prompt, max_tokens=8192, temperature=0.7,
-                                            cot_profile='none',
+                    raw = self.backend.chat(prompt, max_tokens=self.react_max_tokens,
+                                            temperature=0.7, cot_profile='none',
                                             response_schema=REACT_ACTION_SCHEMA)
                 except Exception as e:
                     logger.error(f"[{self.character_name}] ReAct iter {i+1} LLM failed: {e}")
@@ -4236,10 +4243,11 @@ class ChatLoop:
                 self._affect.incr_llm_retry()
                 if truncated:
                     note = ("Your previous emission was cut off by the token limit before the "
-                            "JSON action closed — your `thought` ran too long. Emit ONE COMPLETE "
-                            "JSON action now with a SHORT thought (a single clause, no step-by-step "
-                            "derivation), then the `tool` and its args. Do extended reasoning across "
-                            "separate iterations or via process_text, never inside `thought`.")
+                            "JSON action closed — it was too long. Emit ONE COMPLETE, COMPACT "
+                            "JSON action now: a SHORT thought (a single clause), the `tool`, and "
+                            "concise args. Keep EVERY field brief — do not dump analysis or "
+                            "step-by-step work into `thought` or into any argument value. Work "
+                            "the problem in small steps across iterations instead.")
                 else:
                     note = ("Previous output was not valid JSON. Do NOT apologize — emit ONE JSON "
                             "action now: a single object with a short `thought` and a `tool`.")

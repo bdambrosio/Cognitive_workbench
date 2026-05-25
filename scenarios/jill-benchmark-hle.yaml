@@ -41,6 +41,12 @@ characters:
       enabled: false
     chat:
       benchmark_mode: true
+      # Hard HLE questions make the model dump a runaway into an unbounded
+      # tool arg; cap the per-action budget low enough that a runaway
+      # truncates before chat()'s 120s HTTP read-timeout, so the parse-retry
+      # recovers instead of erroring the turn out. (Production Jill keeps the
+      # 8192 default for long display/respond content.)
+      react_max_tokens: 4096
 
     character: |
       Jill is answering a research question. She reasons explicitly,
