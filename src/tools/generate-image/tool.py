@@ -1,4 +1,4 @@
-"""generate-image — local text-to-image via SDXL-Turbo on the RTX 5060 Ti.
+"""generate-image — local text-to-image via FLUX.2 klein-4B on the RTX PRO 6000.
 
 ReAct entry-point. Runs worker.py as a subprocess with the CUDA pin set in the
 environment (so the device choice takes effect before torch imports), generates
@@ -6,9 +6,11 @@ a PNG under the canvas server's local root, and returns a ready-to-display URL.
 The image bytes never travel through the ReAct text log.
 
 Two execution modes:
-  - default: spawn a one-shot worker per call (frees the ~8 GB on exit).
-  - keep-warm (env GENERATE_IMAGE_KEEP_WARM truthy): hold a single --serve
-    worker for the session so the ~20 s import + model load is paid once.
+  - keep-warm (DEFAULT): hold a single --serve worker for the session so the
+    import + model load is paid once. Lazy — spawns on the first generation,
+    then holds ~18-19 GB on the PRO 6000 until the session exits.
+  - one-shot (set GENERATE_IMAGE_KEEP_WARM=0/false/no/off): spawn a worker per
+    call and free its ~13 GB on exit.
 """
 import atexit
 import json
@@ -39,15 +41,20 @@ _OUT_DIR = Path("~/.cache/cognitive/generate-image").expanduser()
 # port follows the server's CANVAS_HTTP_PORT env, same default.
 _CANVAS_PORT = os.environ.get("CANVAS_HTTP_PORT", "8789")
 
-# CUDA pin: PCI_BUS_ID makes index 0 == the 5060 Ti (nvidia-smi order), so the
-# PRO 6000 that serves the live vLLM is invisible to the worker. (Worker also
-# asserts on the device name as a hard backstop.)
-_CUDA_ENV = {"CUDA_DEVICE_ORDER": "PCI_BUS_ID", "CUDA_VISIBLE_DEVICES": "0"}
+# CUDA pin: PCI_BUS_ID makes the index match nvidia-smi (0 = 5060 Ti bus 82,
+# 1 = PRO 6000 bus 84). Target the PRO 6000 (index 1) — it has ~45 GB free
+# alongside the FP8 Gemma vLLM pool, and klein-4B (~13 GB) won't fit the 16 GB
+# 5060 Ti. The worker also asserts on the device name as a hard backstop.
+_CUDA_ENV = {"CUDA_DEVICE_ORDER": "PCI_BUS_ID", "CUDA_VISIBLE_DEVICES": "1"}
 
 
 def _keep_warm_enabled():
-    return os.environ.get("GENERATE_IMAGE_KEEP_WARM", "").strip().lower() in (
-        "1", "true", "yes", "on")
+    # Keep-warm is the DEFAULT (lazy: the persistent worker spawns on the first
+    # generation, then stays resident for the session). Set
+    # GENERATE_IMAGE_KEEP_WARM to a falsy value (0/false/no/off) to disable and
+    # fall back to one-shot-per-call.
+    return os.environ.get("GENERATE_IMAGE_KEEP_WARM", "1").strip().lower() not in (
+        "0", "false", "no", "off")
 
 
 def _worker_args(args):
@@ -56,8 +63,6 @@ def _worker_args(args):
     for key in ("steps", "size", "seed"):
         if args.get(key) is not None:
             out[key] = args[key]
-    if args.get("negative"):
-        out["negative"] = str(args["negative"])
     return out
 
 
@@ -120,9 +125,10 @@ def _get_worker():
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=_worker_stderr,
         text=True, bufsize=1,
     )
-    # Wait for {"ready": true} — covers the one-time model load and surfaces a
-    # load failure (e.g. wrong GPU) instead of hanging the chat turn.
-    line = _read_line(_worker_proc, timeout=300)
+    # Wait for {"ready": true} — covers the one-time model load (and the first
+    # run's ~13 GB weight download) and surfaces a load failure (e.g. wrong GPU)
+    # instead of hanging the chat turn.
+    line = _read_line(_worker_proc, timeout=900)
     if line is None or '"ready"' not in line:
         _shutdown_worker()
         raise RuntimeError(
@@ -157,14 +163,13 @@ def _oneshot_generate(args, out_path):
     for flag, key in (("--steps", "steps"), ("--size", "size"), ("--seed", "seed")):
         if args.get(key) is not None:
             cmd += [flag, str(args[key])]
-    if args.get("negative"):
-        cmd += ["--negative", str(args["negative"])]
     try:
+        # Generous timeout: the first-ever run downloads ~13 GB of weights.
         proc = subprocess.run(cmd, env={**os.environ, **_CUDA_ENV},
-                              capture_output=True, text=True, timeout=300)
+                              capture_output=True, text=True, timeout=900)
     except subprocess.TimeoutExpired:
-        _log.warning("generate-image: one-shot worker timed out (300s)")
-        raise RuntimeError("image generation timed out (300s)")
+        _log.warning("generate-image: one-shot worker timed out (900s)")
+        raise RuntimeError("image generation timed out (900s)")
     if proc.returncode != 0:
         tail = (proc.stderr or proc.stdout or "").strip().splitlines()
         _log.warning(f"generate-image: worker failed (rc={proc.returncode}): "

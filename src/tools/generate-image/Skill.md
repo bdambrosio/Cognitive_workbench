@@ -1,25 +1,24 @@
 ---
 name: generate-image
-description: Generate an original image from a text description, locally (SDXL-Turbo). Use when the user wants a picture, illustration, avatar, or face created from a description that does not already exist on the web. For existing photos of real things, prefer image search instead; for simple diagrams or line drawings, prefer authoring inline SVG.
+description: Generate an original image from a text description, locally (FLUX.2 klein). Use when the user wants a picture, illustration, avatar, or face created from a description that does not already exist on the web. For existing photos of real things, prefer image search instead; for simple diagrams or line drawings, prefer authoring inline SVG.
 args:
-  prompt: required string — what to depict, e.g. "a friendly cartoon robot face, soft smile, flat vector style"
-  negative: optional string — qualities to avoid, e.g. "extra limbs, text, watermark, blurry"
-  steps: optional int (default 4) — denoising steps; SDXL-Turbo is tuned for 1-4, more buys little
-  size: optional int (default 512) — square side length in pixels
+  prompt: required string — what to depict, e.g. "a friendly cartoon robot face, soft smile, flat vector style". State qualities you want directly; the model follows prompts literally.
+  steps: optional int (default 4) — denoising steps; klein-4B is distilled for 4, more buys little
+  size: optional int (default 1024) — square side length in pixels (FLUX.2 is tuned for 1024)
   seed: optional int — fix for reproducible output; omit for variety
 ---
 
 # generate-image
 
-Produces an original image from a prompt using SDXL-Turbo running locally on
-the RTX 5060 Ti (no network, no cloud). Returns the path to a saved PNG.
+Produces an original image from a prompt using FLUX.2 klein-4B running locally
+on the RTX PRO 6000 (no network, no cloud). Returns the path to a saved PNG.
 
 Best for invented/illustrative imagery — characters, faces, scenes, styled
 graphics. It is a *generator*, not a search: it cannot reproduce a specific
-real photograph or a named existing image. SDXL-Turbo favours speed
-(sub-second, 1-4 steps) over fine prompt fidelity, so it can be loose on exact
-object counts and small details — lean on `negative` and a clear `prompt` for
-the qualities that matter.
+real photograph or a named existing image. FLUX.2 follows prompts literally
+and renders legible text well, so describe exactly what you want (including
+what to leave out) in the `prompt` itself — there is no separate negative
+prompt.
 
 ## Examples
 
@@ -28,5 +27,5 @@ the qualities that matter.
 ```
 
 ```json
-{"thought": "generate a calm scene, avoid people and text", "tool": "generate-image", "prompt": "a quiet misty lake at dawn, soft pastel sky, minimalist", "negative": "people, text, watermark", "seed": 7}
+{"thought": "generate a calm scene with no people or text", "tool": "generate-image", "prompt": "a quiet misty lake at dawn, soft pastel sky, minimalist, no people, no text", "seed": 7}
 ```
