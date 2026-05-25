@@ -75,6 +75,17 @@ mapped to a 0/0.5/1 score. We report both `score_mean` and
 HLE leaderboards. The judge prompt is strict — near-misses on
 technical/scientific questions count as incorrect, not partial.
 
+**Judge robustness.** The judge is instructed NOT to re-derive or verify
+the problem (it has the gold answer; its only job is reply-vs-gold), the
+call has a generous token budget, and there's a JSON-extraction fallback —
+so it reaches a verdict instead of burning its budget reasoning out hard
+math/physics items. Judge-side failures (unparseable output / API error)
+are reported separately as `judge_errors` and **excluded** from the score
+rather than counted as model-incorrect, so judge flakiness can't
+masquerade as a model difference (important for baseline-vs-FP8
+comparisons). Note: this departs from the HLE-leaderboard convention of
+counting unparseable as incorrect.
+
 **Scenario flags.** `chat.benchmark_mode: true` makes post-turn
 reflection inline. `discourse` and `orientation` are off — same
 rationale as MMLU. Tools are NOT omitted; HLE expects retrieval where
