@@ -4,7 +4,13 @@ Boolean predicate testing with automatic chunking for long documents.
 """
 import logging
 from typing import Any, Dict
-from infospace_executor import InfospaceExecutor
+# infospace_executor was the planner-side runtime; the chat ReAct loop
+# bypasses it. Keep the import optional so this module loads in chat-only
+# builds — the InfospaceExecutor annotations degrade to Any there.
+try:
+    from infospace_executor import InfospaceExecutor
+except ImportError:
+    InfospaceExecutor = Any  # type: ignore[assignment,misc]
 from utils.text_chunking import segment_text_boundary_aware
 
 logger = logging.getLogger(__name__)
