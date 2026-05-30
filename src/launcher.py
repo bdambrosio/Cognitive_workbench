@@ -448,6 +448,31 @@ def launch_telegram_bridge(character: str) -> Optional[subprocess.Popen]:
         return None
 
 
+def launch_image_server() -> Optional[subprocess.Popen]:
+    """Fire-and-forget prestart of the local Bonsai text-to-image backend so
+    the generate-image tool is warm by first use.
+
+    Reuses the tool's own launch logic (serve.sh path + binary-transformer
+    workaround) as the single source of truth — the tool's dir is hyphenated
+    and isn't importable as a package, so we load it by file path."""
+    import importlib.util
+    tool_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             'tools', 'generate-image', 'tool.py')
+    try:
+        spec = importlib.util.spec_from_file_location('generate_image_tool', tool_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+    except Exception as e:
+        logger.error(f"image-server: could not load generate-image tool ({e}); skipping")
+        return None
+    proc = mod.start_image_server()
+    if proc is not None:
+        logger.info("image server prestart launched (warming in background)")
+    else:
+        logger.info("image server already up (or could not start) — see generate-image log")
+    return proc
+
+
 # ---------------------------------------------------------------------------
 # Agent thread
 # ---------------------------------------------------------------------------
@@ -544,6 +569,10 @@ def main():
     parser.add_argument('--browser', default=None,
                         help='Browser binary for widget windows (default: auto-detect '
                              'chromium/chrome/brave/edge).')
+    parser.add_argument('--image-server', action='store_true',
+                        help='Prestart the local Bonsai text-to-image backend so the '
+                             'generate-image tool is warm (otherwise the tool cold-starts '
+                             'it on first use). Fire-and-forget; warms while jill boots.')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     args = parser.parse_args()
 
@@ -614,6 +643,10 @@ def main():
     if args.telegram:
         primary_character = characters[0][0] if characters else ""
         proc = launch_telegram_bridge(character=primary_character)
+        if proc:
+            service_procs.append(proc)
+    if args.image_server:
+        proc = launch_image_server()
         if proc:
             service_procs.append(proc)
 

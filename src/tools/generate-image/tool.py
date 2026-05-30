@@ -1,184 +1,161 @@
-"""generate-image — local text-to-image via FLUX.2 klein-4B on the RTX PRO 6000.
+"""generate-image — local text-to-image via the Bonsai-Image backend server.
 
-ReAct entry-point. Runs worker.py as a subprocess with the CUDA pin set in the
-environment (so the device choice takes effect before torch imports), generates
-a PNG under the canvas server's local root, and returns a ready-to-display URL.
-The image bytes never travel through the ReAct text log.
+ReAct entry-point. POSTs the prompt directly to the long-lived Bonsai FastAPI
+backend (scripts.local_backend, which strips the bearer gate on Linux), saves
+the returned PNG under the canvas server's allowlisted local root, and returns a
+ready-to-display URL. The image bytes never travel through the ReAct text log.
 
-Two execution modes:
-  - keep-warm (DEFAULT): hold a single --serve worker for the session so the
-    import + model load is paid once. Lazy — spawns on the first generation,
-    then holds ~18-19 GB on the PRO 6000 until the session exits.
-  - one-shot (set GENERATE_IMAGE_KEEP_WARM=0/false/no/off): spawn a worker per
-    call and free its ~13 GB on exit.
+The backend is expected at http://localhost:4001 by default and exposes
+/generate and /healthz (the /api/generate path belongs to the Next.js studio
+frontend, which we bypass). If the backend isn't running, the tool launches it
+via the Bonsai-Image-Demo serve.sh and waits for /healthz to come up. Override
+the base URL with GENERATE_IMAGE_URL and the launcher with GENERATE_IMAGE_SERVE_SH.
 """
-import atexit
-import json
 import logging
 import os
-import select
 import subprocess
-import threading
+import time
 import urllib.parse
 import uuid
 from pathlib import Path
 
+import requests
+
 _log = logging.getLogger(__name__)
 
-_DIR = Path(__file__).resolve().parent
-_REPO_ROOT = _DIR.parents[2]
-# zenoh_venv carries diffusers+accelerate; the host process may be running a
-# different interpreter, so target this one explicitly rather than sys.executable.
-_VENV_PY = _REPO_ROOT / "zenoh_venv" / "bin" / "python"
-_WORKER = _DIR / "worker.py"
-
-# Write under the canvas server's allowlisted local root, following its
-# documented convention (~/.cache/cognitive/<tool-name>/). The server's
-# /local route then serves these files to the browser — bytes reach the
-# canvas out-of-band, never through the ReAct text log.
 _OUT_DIR = Path("~/.cache/cognitive/generate-image").expanduser()
-# Browser reaches the server on 127.0.0.1 (CSP allowlist + default bind);
-# port follows the server's CANVAS_HTTP_PORT env, same default.
 _CANVAS_PORT = os.environ.get("CANVAS_HTTP_PORT", "8789")
 
-# CUDA pin: PCI_BUS_ID makes the index match nvidia-smi (0 = 5060 Ti bus 82,
-# 1 = PRO 6000 bus 84). Target the PRO 6000 (index 1) — it has ~45 GB free
-# alongside the FP8 Gemma vLLM pool, and klein-4B (~13 GB) won't fit the 16 GB
-# 5060 Ti. The worker also asserts on the device name as a hard backstop.
-_CUDA_ENV = {"CUDA_DEVICE_ORDER": "PCI_BUS_ID", "CUDA_VISIBLE_DEVICES": "1"}
+# Bonsai FastAPI backend base. /generate and /healthz live here.
+_BASE = os.environ.get("GENERATE_IMAGE_URL", "http://localhost:4001").rstrip("/")
+_GENERATE_URL = f"{_BASE}/generate"
+_HEALTHZ_URL = f"{_BASE}/healthz"
+_BACKEND_PORT = urllib.parse.urlsplit(_BASE).port or 4001
+
+_BONSAI_BACKEND = os.environ.get("GENERATE_IMAGE_BACKEND",
+                                 "bonsai-ternary-gemlite")
+
+# Launcher. serve.sh starts the backend (and a studio frontend we don't use) and
+# prewarms the model before /healthz answers, so a cold boot can take minutes.
+_SERVE_SH = os.environ.get(
+    "GENERATE_IMAGE_SERVE_SH",
+    "/home/bruce/Downloads/Bonsai-Image-Demo/scripts/serve.sh")
+_FRONTEND_PORT = os.environ.get("GENERATE_IMAGE_FRONTEND_PORT", "3100")
+_BOOT_TIMEOUT_S = int(os.environ.get("GENERATE_IMAGE_BOOT_TIMEOUT", "240"))
+
+# Bonsai is distilled for 4 steps; the studio's fast preset is 512×512.
+_DEFAULT_STEPS = 4
+_DEFAULT_SIZE = 512
+# Wall-clock cap. Bonsai cold-first-shape JIT can take ~30-60s; warm calls are
+# ~1s. 120s matches the python_test reference and leaves slack for cold boot.
+_TIMEOUT_S = 120
 
 
-def _keep_warm_enabled():
-    # Keep-warm is the DEFAULT (lazy: the persistent worker spawns on the first
-    # generation, then stays resident for the session). Set
-    # GENERATE_IMAGE_KEEP_WARM to a falsy value (0/false/no/off) to disable and
-    # fall back to one-shot-per-call.
-    return os.environ.get("GENERATE_IMAGE_KEEP_WARM", "1").strip().lower() not in (
-        "0", "false", "no", "off")
-
-
-def _worker_args(args):
-    """Optional generation args, normalized to worker flag/field names."""
-    out = {}
-    for key in ("steps", "size", "seed"):
-        if args.get(key) is not None:
-            out[key] = args[key]
-    return out
-
-
-# ── keep-warm persistent worker ──────────────────────────────────────
-# A single --serve subprocess, lazily spawned and reused. Guarded by a lock
-# (one request in flight). Dies on parent exit (stdin EOF) or atexit.
-_worker_lock = threading.Lock()
-_worker_proc = None
-_worker_stderr = None
-
-
-def _stderr_tail(n=300):
+def _healthy(timeout=2):
+    """True if the backend answers /healthz with 200."""
     try:
-        if _worker_stderr is not None:
-            _worker_stderr.flush()
-        return (_OUT_DIR / "worker.stderr.log").read_text()[-n:].strip()
-    except OSError as e:
-        _log.warning(f"generate-image: could not read worker stderr log: {e}")
-        return ""
+        return requests.get(_HEALTHZ_URL, timeout=timeout).status_code == 200
+    except requests.RequestException as e:
+        _log.debug(f"generate-image: healthz probe failed: {e}")
+        return False
 
 
-def _shutdown_worker():
-    global _worker_proc, _worker_stderr
-    if _worker_proc is not None:
-        try:
-            _worker_proc.terminate()
-        except (ProcessLookupError, OSError) as e:
-            _log.debug(f"generate-image: worker terminate: {e}")
-        _worker_proc = None
-    if _worker_stderr is not None:
-        try:
-            _worker_stderr.close()
-        except OSError as e:
-            _log.debug(f"generate-image: worker stderr close: {e}")
-        _worker_stderr = None
+def _spawn_serve():
+    """Spawn serve.sh detached with the binary-path workaround. Returns the
+    Popen, or None if serve.sh is missing or the launch failed.
 
-
-atexit.register(_shutdown_worker)
-
-
-def _read_line(proc, timeout):
-    """Read one stdout line with a timeout; None if nothing arrives in time."""
-    ready, _, _ = select.select([proc.stdout], [], [], timeout)
-    if not ready:
+    Single source of truth for *how* the Bonsai server is started — used both
+    by the on-demand path (_ensure_server) and the launcher's prestart hook
+    (start_image_server)."""
+    serve = Path(_SERVE_SH)
+    if not serve.is_file():
+        _log.warning(f"generate-image: serve.sh not found at {serve}")
         return None
-    return proc.stdout.readline()
 
-
-def _get_worker():
-    """Return a live --serve worker, spawning (and loading the model) if needed.
-    Raises RuntimeError if the worker can't start."""
-    global _worker_proc, _worker_stderr
-    if _worker_proc is not None and _worker_proc.poll() is None:
-        return _worker_proc
     _OUT_DIR.mkdir(parents=True, exist_ok=True)
-    _worker_stderr = open(_OUT_DIR / "worker.stderr.log", "w")
-    _worker_proc = subprocess.Popen(
-        [str(_VENV_PY), str(_WORKER), "--serve"],
-        env={**os.environ, **_CUDA_ENV},
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=_worker_stderr,
-        text=True, bufsize=1,
-    )
-    # Wait for {"ready": true} — covers the one-time model load (and the first
-    # run's ~13 GB weight download) and surfaces a load failure (e.g. wrong GPU)
-    # instead of hanging the chat turn.
-    line = _read_line(_worker_proc, timeout=900)
-    if line is None or '"ready"' not in line:
-        _shutdown_worker()
-        raise RuntimeError(
-            f"keep-warm worker failed to start: {(line or 'no output').strip()} "
-            f"{_stderr_tail()}")
-    _log.info("generate-image: keep-warm worker ready")
-    return _worker_proc
-
-
-def _persistent_generate(args, out_path):
-    req = {"prompt": args["prompt"], "out": str(out_path), **_worker_args(args)}
-    with _worker_lock:
-        proc = _get_worker()
-        try:
-            proc.stdin.write(json.dumps(req) + "\n")
-            proc.stdin.flush()
-        except (BrokenPipeError, OSError) as e:
-            _log.warning(f"generate-image: keep-warm worker pipe broke: {e}")
-            _shutdown_worker()
-            raise RuntimeError("keep-warm worker died; retry to respawn it")
-        line = _read_line(proc, timeout=180)
-    if line is None:
-        _log.warning("generate-image: keep-warm worker timed out (180s)")
-        _shutdown_worker()
-        raise RuntimeError("image generation timed out (180s)")
-    return json.loads(line)
-
-
-# ── default one-shot worker ──────────────────────────────────────────
-def _oneshot_generate(args, out_path):
-    cmd = [str(_VENV_PY), str(_WORKER), "--prompt", args["prompt"], "--out", str(out_path)]
-    for flag, key in (("--steps", "steps"), ("--size", "size"), ("--seed", "seed")):
-        if args.get(key) is not None:
-            cmd += [flag, str(args[key])]
+    log_path = _OUT_DIR / "serve.log"
+    env = dict(os.environ,
+               BACKEND_PORT=str(_BACKEND_PORT),
+               FRONTEND_PORT=_FRONTEND_PORT)
+    # GpuPipeline.__init__ eagerly requires a path for BOTH the ternary and
+    # binary arms, but serve.sh only sets the binary path when the binary model
+    # is installed. We only ever request the ternary arm, so the binary arm is
+    # never loaded — point it at any installed gemlite transformer so
+    # construction succeeds. (No-op if already set.)
+    if "MFLUX_STUDIO_GPU_BINARY_TRANSFORMER_PATH" not in env:
+        models = serve.parent.parent / "models"
+        xfmr = next(models.glob("bonsai-image-4B-*-gemlite/transformer-gemlite-*"),
+                    None)
+        if xfmr is not None:
+            env["MFLUX_STUDIO_GPU_BINARY_TRANSFORMER_PATH"] = str(xfmr)
+        else:
+            _log.warning("generate-image: no installed gemlite transformer "
+                         f"found under {models}; backend may fail to start")
+    _log.info(f"generate-image: launching Bonsai server "
+              f"(BACKEND_PORT={_BACKEND_PORT}); logging to {log_path}")
     try:
-        # Generous timeout: the first-ever run downloads ~13 GB of weights.
-        proc = subprocess.run(cmd, env={**os.environ, **_CUDA_ENV},
-                              capture_output=True, text=True, timeout=900)
-    except subprocess.TimeoutExpired:
-        _log.warning("generate-image: one-shot worker timed out (900s)")
-        raise RuntimeError("image generation timed out (900s)")
-    if proc.returncode != 0:
-        tail = (proc.stderr or proc.stdout or "").strip().splitlines()
-        _log.warning(f"generate-image: worker failed (rc={proc.returncode}): "
-                     f"{(proc.stderr or '').strip()[-500:]}")
-        raise RuntimeError(f"image generation failed: {tail[-1] if tail else 'unknown error'}")
-    lines = proc.stdout.strip().splitlines()
-    if not lines:
-        raise RuntimeError("image generation produced no output")
-    return json.loads(lines[-1])
+        with open(log_path, "ab") as logf:
+            return subprocess.Popen(
+                [str(serve)],
+                cwd=str(serve.parent.parent),
+                env=env,
+                stdout=logf, stderr=logf, stdin=subprocess.DEVNULL,
+                start_new_session=True)
+    except OSError as e:
+        _log.warning(f"generate-image: failed to launch serve.sh: {e}")
+        return None
+
+
+def start_image_server():
+    """Fire-and-forget prestart of the Bonsai backend (e.g. from the launcher's
+    --image-server flag) so it's warm by the first generate-image call. Returns
+    the Popen if a launch was started, or None (already healthy / couldn't
+    start). Does NOT wait for readiness."""
+    if _healthy():
+        _log.info("generate-image: backend already healthy; no prestart needed")
+        return None
+    return _spawn_serve()
+
+
+def _ensure_server():
+    """Make the backend healthy, launching serve.sh if needed. Returns bool."""
+    if _healthy():
+        return True
+
+    if not Path(_SERVE_SH).is_file():
+        _log.warning(f"generate-image: serve.sh not found at {_SERVE_SH}")
+        return False
+
+    # Atomic launch lock so two concurrent invocations don't both cold-start
+    # serve.sh (a simultaneous bind race could trip the second launcher's
+    # cleanup trap and kill the first server).
+    _OUT_DIR.mkdir(parents=True, exist_ok=True)
+    lock = _OUT_DIR / ".serve.lock"
+    launched_here = False
+    try:
+        os.close(os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+        launched_here = True
+    except FileExistsError:
+        _log.info("generate-image: a serve.sh launch is already in progress; "
+                  "waiting for /healthz")
+
+    if launched_here and _spawn_serve() is None:
+        lock.unlink(missing_ok=True)
+        return False
+
+    # Poll until the model finishes prewarm (cold boot can take minutes).
+    deadline = time.monotonic() + _BOOT_TIMEOUT_S
+    try:
+        while time.monotonic() < deadline:
+            if _healthy():
+                return True
+            time.sleep(2)
+        _log.warning(f"generate-image: backend not healthy after "
+                     f"{_BOOT_TIMEOUT_S}s (still warming?)")
+        return False
+    finally:
+        if launched_here:
+            lock.unlink(missing_ok=True)
 
 
 def react_invoke(args, *, character_name=None, backend=None, logger=None):
@@ -186,29 +163,60 @@ def react_invoke(args, *, character_name=None, backend=None, logger=None):
     prompt = args.get("prompt", "")
     if not isinstance(prompt, str) or not prompt.strip():
         return {"status": "error", "text": "generate-image requires a non-empty `prompt`"}
-    if not _VENV_PY.exists():
+
+    if not _ensure_server():
         return {"status": "error",
-                "text": f"diffusers venv python not found at {_VENV_PY}"}
+                "text": (f"Bonsai image backend not reachable at {_BASE} and "
+                         f"could not be started. Start it manually from the "
+                         f"Bonsai-Image-Demo repo: "
+                         f"BACKEND_PORT={_BACKEND_PORT} FRONTEND_PORT={_FRONTEND_PORT} "
+                         f"./scripts/serve.sh")}
+
+    size = int(args.get("size") or _DEFAULT_SIZE)
+    payload = {
+        "prompt": prompt,
+        "steps": int(args.get("steps") or _DEFAULT_STEPS),
+        "height": size,
+        "width": size,
+        "backend": _BONSAI_BACKEND,
+    }
+    if args.get("seed") is not None:
+        payload["seed"] = int(args["seed"])
+
+    try:
+        resp = requests.post(_GENERATE_URL, json=payload, timeout=_TIMEOUT_S)
+    except requests.ConnectionError as e:
+        _log.warning(f"generate-image: cannot reach Bonsai at {_GENERATE_URL}: {e}")
+        return {"status": "error",
+                "text": (f"Bonsai image backend not reachable at {_GENERATE_URL}. "
+                         f"Start it from the Bonsai-Image-Demo repo: "
+                         f"BACKEND_PORT={_BACKEND_PORT} FRONTEND_PORT={_FRONTEND_PORT} "
+                         f"./scripts/serve.sh")}
+    except requests.Timeout:
+        _log.warning(f"generate-image: Bonsai timed out after {_TIMEOUT_S}s")
+        return {"status": "error", "text": f"image generation timed out ({_TIMEOUT_S}s)"}
+
+    if resp.status_code != 200:
+        body = resp.text[:300] if resp.text else ""
+        _log.warning(f"generate-image: Bonsai returned {resp.status_code}: {body}")
+        return {"status": "error",
+                "text": f"image generation failed (HTTP {resp.status_code}): {body}"}
+
+    ctype = resp.headers.get("content-type", "")
+    if ctype != "image/png" or resp.content[:8] != b"\x89PNG\r\n\x1a\n":
+        _log.warning(f"generate-image: unexpected response content-type={ctype!r}")
+        return {"status": "error",
+                "text": f"Bonsai returned a non-PNG response (content-type={ctype!r})"}
 
     _OUT_DIR.mkdir(parents=True, exist_ok=True)
     out_path = _OUT_DIR / f"{uuid.uuid4().hex}.png"
+    out_path.write_bytes(resp.content)
 
-    try:
-        if _keep_warm_enabled():
-            result = _persistent_generate(args, out_path)
-        else:
-            result = _oneshot_generate(args, out_path)
-    except RuntimeError as e:
-        return {"status": "error", "text": str(e)}
-    except json.JSONDecodeError as e:
-        _log.warning(f"generate-image: unparseable worker result: {e}")
-        return {"status": "error", "text": "image generation produced no parseable result"}
-
-    if "error" in result:
-        return {"status": "error", "text": f"image generation failed: {result['error']}"}
+    gen_s = resp.headers.get("x-wall-seconds")
+    gen_info = f" ({gen_s}s)" if gen_s else ""
 
     url = (f"http://127.0.0.1:{_CANVAS_PORT}/local?path="
-           + urllib.parse.quote(result["path"]))
+           + urllib.parse.quote(str(out_path)))
     return {"status": "ok",
-            "text": (f"image generated ({result.get('gen_s')}s). Show it with the "
-                     f"display tool, format=html: <img src=\"{url}\" style=\"max-width:100%\">")}
+            "text": (f"image generated{gen_info}. Show it with the display tool, "
+                     f"format=html: <img src=\"{url}\" style=\"max-width:100%\">")}

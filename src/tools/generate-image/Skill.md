@@ -1,24 +1,40 @@
 ---
 name: generate-image
-description: Generate an original image from a text description, locally (FLUX.2 klein). Use when the user wants a picture, illustration, avatar, or face created from a description that does not already exist on the web. For existing photos of real things, prefer image search instead; for simple diagrams or line drawings, prefer authoring inline SVG.
+description: Generate an original image from a text description, locally (Bonsai-Image 4B, ternary-quantized, on a long-lived studio server). Use when the user wants a picture, illustration, avatar, or face created from a description that does not already exist on the web. For existing photos of real things, prefer image search instead; for simple diagrams or line drawings, prefer authoring inline SVG.
 args:
   prompt: required string — what to depict, e.g. "a friendly cartoon robot face, soft smile, flat vector style". State qualities you want directly; the model follows prompts literally.
-  steps: optional int (default 4) — denoising steps; klein-4B is distilled for 4, more buys little
-  size: optional int (default 1024) — square side length in pixels (FLUX.2 is tuned for 1024)
+  steps: optional int (default 4) — denoising steps; Bonsai is distilled for 4, more buys little
+  size: optional int (default 512) — square side length in pixels. 512 is the fast preset; 1024 is the quality preset (slower).
   seed: optional int — fix for reproducible output; omit for variety
 ---
 
 # generate-image
 
-Produces an original image from a prompt using FLUX.2 klein-4B running locally
-on the RTX PRO 6000 (no network, no cloud). Returns the path to a saved PNG.
+Produces an original image from a prompt using Bonsai-Image 4B (ternary
+1.58-bit) running locally on the GPU via the prism-image-studio backend. The
+backend is a long-lived server; the tool is a thin HTTP client that POSTs the
+prompt and saves the returned PNG.
+
+The tool talks to the FastAPI backend directly: `POST {base}/generate`, with a
+`{base}/healthz` readiness probe. Base URL defaults to `http://localhost:4001`
+(override with `GENERATE_IMAGE_URL`). If the backend isn't already running, the
+tool launches it via the Bonsai-Image-Demo `serve.sh` and waits for `/healthz`
+(a cold boot prewarms the model and can take a couple of minutes). To start it
+by hand:
+
+```
+BACKEND_PORT=4001 FRONTEND_PORT=3100 ./scripts/serve.sh
+```
+
+`4001` is the **backend** port here. The tool bypasses the Next.js studio
+frontend (`/api/generate`), so its port is irrelevant and its prompt-moderation
+gate is skipped.
 
 Best for invented/illustrative imagery — characters, faces, scenes, styled
 graphics. It is a *generator*, not a search: it cannot reproduce a specific
-real photograph or a named existing image. FLUX.2 follows prompts literally
-and renders legible text well, so describe exactly what you want (including
-what to leave out) in the `prompt` itself — there is no separate negative
-prompt.
+real photograph or a named existing image. There is no separate negative
+prompt; describe exactly what you want (including what to leave out) in the
+`prompt`.
 
 ## Examples
 
