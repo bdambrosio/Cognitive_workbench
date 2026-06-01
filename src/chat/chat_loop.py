@@ -105,7 +105,7 @@ _CONCERN_INSTRUCTION_NARROWNESS_RULE = (
 
 # Tools the model can emit. Validated structurally in _parse_react_action;
 # the dispatcher in _run_react_loop knows how to run each.
-_REACT_TOOLS = ('process_text', 'recall', 'inspect', 'inspect_external', 'security', 'display', 'respond')
+_REACT_TOOLS = ('process_text', 'recall', 'inspect', 'inspect_external', 'security', 'body', 'display', 'respond')
 
 # Per-character collection holding episodic specifics across conversations.
 # Auto-RAG searches this on every turn; post-turn reflection writes to it.
@@ -3912,6 +3912,15 @@ class ChatLoop:
             "or routing/interface state. v0.1 does NOT do traffic capture or IDS log inspection. Phrase as a "
             "natural-language question (e.g. \"what hosts are on my LAN at 192.168.1.0/24?\", \"what TCP ports "
             "am I listening on?\", \"what's my default gateway?\")."))
+        tools.append(("body",
+            "`{\"thought\": \"<one terse sentence>\", \"tool\": \"body\", \"query\": <string>}` — "
+            "sense the physical robot (the Body) over its Zenoh bus. A separate subagent (read-only typed "
+            "primitives: capture_rgb to grab a camera frame, status for driving/pose/health telemetry) runs the "
+            "probes and returns a synthesized answer. v1 is sensing only — it CANNOT drive, turn, or actuate. "
+            "capture_rgb returns a displayable image URL, not a scene description (it does not interpret the "
+            "image). Use when the user asks for a camera frame or the robot's pose/e-stop/motor state. Phrase as "
+            "a natural-language request (e.g. \"capture what the Body's camera sees\", \"what's the robot's "
+            "current pose and is the e-stop engaged?\")."))
         # Auto-discovered tools from src/tools/ (each exposes react_invoke).
         # Rendered between the built-in subagents and the display/respond
         # actions so the prompt's tool ordering matches its mental model:
@@ -4337,6 +4346,9 @@ class ChatLoop:
             elif tool == 'security':
                 q = self._resolve_react_value(action.get('query', ''), log)
                 obs = self._run_security(q)
+            elif tool == 'body':
+                q = self._resolve_react_value(action.get('query', ''), log)
+                obs = self._run_body(q)
             elif tool == 'display':
                 content = self._resolve_react_value(action.get('content', ''), log)
                 fmt = (action.get('format') or 'markdown').strip().lower()
@@ -4351,7 +4363,7 @@ class ChatLoop:
                 # Tool list shown to the model on bad emission. Built-ins
                 # are stable; the discovered set comes from the registry.
                 builtin = ["process_text", "recall", "inspect", "security",
-                           "display", "respond"]
+                           "body", "display", "respond"]
                 if self._get_external_repo() is not None:
                     builtin.insert(builtin.index("inspect") + 1, "inspect_external")
                 avail = ", ".join(builtin + sorted(self._discovered_tools.keys()))
@@ -4737,6 +4749,38 @@ class ChatLoop:
         text = str(answer or '').strip()
         if not text:
             return 'EMPTY: security subagent produced no answer'
+        return 'OK: ' + text
+
+    def _body_traces_dir(self) -> 'Path':
+        """Where the body-sensing subagent writes its per-call traces.
+        Sibling of security_traces/. Layout:
+        scenarios/<world>/<agent>/body_traces/."""
+        return self._memory_dir().parent / 'body_traces'
+
+    def _run_body(self, query: str) -> str:
+        """Backend for the ReAct `body` tool. Delegates to the body-sensing
+        subagent (chat.body.body), which runs its own thin ReAct loop with
+        read-only typed primitives (capture_rgb, status) over the Body's
+        Zenoh bus. Returns an OK:/EMPTY:/ERROR: prefixed observation per the
+        ReAct tool-observation convention.
+
+        Uses Jill's main backend (self.backend) — see _run_inspect for
+        rationale. Per-call traces under body_traces/."""
+        if not query or not str(query).strip():
+            return "EMPTY: body query was empty"
+        try:
+            from chat.body import body as _body
+            answer = _body(
+                query=str(query),
+                llm_backend=self.backend,
+                trace_dir=self._body_traces_dir(),
+            )
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] body subagent raised: {e}")
+            return f"ERROR: body subagent raised: {e}"
+        text = str(answer or '').strip()
+        if not text:
+            return 'EMPTY: body subagent produced no answer'
         return 'OK: ' + text
 
     def _append_conversation_entry(self, direction: str, entity: str,
