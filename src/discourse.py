@@ -20,10 +20,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils import hash_utils
 from utils.state_utils import calculate_state_activity_alignment, get_known_states
 from utils.format_utils import format_middle_nouns, format_middle_verbs
-# Type checking imports
-from typing import TYPE_CHECKING, List, Callable
-if TYPE_CHECKING:
-    from executive_node import ZenohExecutiveNode
+from typing import List, Callable
 
 # Configure logging with unbuffered output
 _cli_mode = os.getenv('CWB_CLI_MODE', '') == '1'
