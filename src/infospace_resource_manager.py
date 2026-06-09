@@ -8,6 +8,7 @@ Extracts resource management logic from map_node to improve modularity and maint
 import json
 import logging
 import hashlib
+import os
 import threading
 import time
 from datetime import datetime, timedelta
@@ -15,6 +16,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
 
 from infospace_types import InfospaceResources, ResourceTypeRegistry
+from utils.file_utils import atomic_write_bytes, atomic_write_json
 
 logger = logging.getLogger(__name__)
 
@@ -118,17 +120,30 @@ class FAISSStore:
         return results
     
     def save(self, path):
-        """Persist to disk"""
+        """Persist to disk. Both files are written to temps first, then
+        moved into place back-to-back, so a crash can't leave a truncated
+        index/meta and the index↔meta mismatch window is minimal (a
+        mismatch is tolerated on load via reindex_persistent_resources)."""
         import faiss
         import pickle
-        
-        faiss.write_index(self.index, f"{path}.faiss")
-        with open(f"{path}.meta", 'wb') as f:
-            pickle.dump({
-                'documents': self.documents,
-                'metadata': self.metadata,
-                'original_contents': self.original_contents
-            }, f)
+
+        faiss_path = f"{path}.faiss"
+        faiss_tmp = f"{faiss_path}.tmp"
+        faiss.write_index(self.index, faiss_tmp)
+        meta_blob = pickle.dumps({
+            'documents': self.documents,
+            'metadata': self.metadata,
+            'original_contents': self.original_contents
+        })
+        try:
+            os.replace(faiss_tmp, faiss_path)
+        except Exception:
+            try:
+                os.unlink(faiss_tmp)
+            except OSError as cleanup_err:
+                logger.warning(f"FAISSStore.save: temp cleanup failed for {faiss_tmp}: {cleanup_err}")
+            raise
+        atomic_write_bytes(f"{path}.meta", meta_blob)
     
     def load(self, path):
         """Load from disk"""
@@ -2088,9 +2103,8 @@ class InfospaceResourceManager:
                 'relation_counter': resource_data.get('relation_counter', 0)
             }
             
-            with open(target_file, 'w') as f:
-                json.dump(save_data, f, indent=2)
-            
+            atomic_write_json(target_file, save_data)
+
             logger.info(f"💾 Saved resources to {target_file}")
             return True
         except Exception as e:

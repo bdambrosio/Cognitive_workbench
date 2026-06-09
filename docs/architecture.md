@@ -1,3 +1,5 @@
+> **STATUS: SUPERSEDED (2026-06-09)** — describes the OODA-era incremental planner / task pipeline, deleted 2026-05 (commit 65ef489d). The live execution engine is the ChatLoop ReAct path (`src/chat/chat_loop.py`). See [STATUS.md](STATUS.md).
+
 # Core Cognitive Architecture
 
 The Cognitive Workbench is built around an **incremental planner** that interleaves reasoning with tool execution. Unlike plan-then-execute architectures, the planner generates one step at a time, executes it, observes the result, and decides what to do next. This tight feedback loop is the central design principle.

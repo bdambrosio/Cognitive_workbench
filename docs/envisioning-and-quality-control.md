@@ -1,3 +1,5 @@
+> **STATUS: SUPERSEDED (2026-06-09)** — describes the OODA-era incremental planner / task pipeline, deleted 2026-05 (commit 65ef489d). The live execution engine is the ChatLoop ReAct path (`src/chat/chat_loop.py`). See [STATUS.md](STATUS.md).
+
 # Envisioning & Quality Control
 
 The Cognitive Workbench uses two mechanisms to maintain quality: **envisioning** (lightweight conversational framing) and **reflection** (post-execution analysis). Together they enable coherent dialog, quality assessment, and systematic failure recovery.

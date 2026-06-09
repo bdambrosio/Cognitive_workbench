@@ -1,3 +1,5 @@
+> **STATUS: SUPERSEDED (2026-06-09)** — describes the OODA-era incremental planner / task pipeline, deleted 2026-05 (commit 65ef489d). The live execution engine is the ChatLoop ReAct path (`src/chat/chat_loop.py`). See [STATUS.md](STATUS.md).
+
 # Spec: Phase-Aware Execution — Trace-Informed Fixes
 
 **Version 3 — incorporates findings from first live trace**

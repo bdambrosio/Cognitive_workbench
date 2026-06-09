@@ -1,3 +1,5 @@
+> **STATUS: SUPERSEDED (2026-06-09)** — describes infospace_executor / map_node-era machinery, deleted with the OODA executive 2026-05. The live execution engine is the ChatLoop ReAct path (`src/chat/chat_loop.py`). See [STATUS.md](STATUS.md).
+
 # Information Space Implementation Summary
 
 **Date:** 2025-10-18  
