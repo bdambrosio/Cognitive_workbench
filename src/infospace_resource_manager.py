@@ -999,6 +999,15 @@ class InfospaceResourceManager:
                           'rhythm_hours', 'rhythm_source',
                           'strength', 'last_bumped_at',
                           'successor_of', 'successor_depth',
+                          # Fire-time triage cache + per-concern WIP
+                          # (running summary of autonomous-fire findings,
+                          # kept on the root concern of a successor chain).
+                          'triage_verdict', 'triage_at', 'triage_reason',
+                          'wip', 'wip_updated_at',
+                          # user_concern evolving context (evidence + what
+                          # the user appears to want); text stays the
+                          # stable handle.
+                          'context', 'context_updated_at',
                           # Memory polarity: 'positive' (default) or
                           # 'negative' for explicit dispreferences.
                           'polarity',

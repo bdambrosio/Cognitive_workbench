@@ -184,6 +184,21 @@ characters:
         category: durable
       - text: "When autonomous work produces findings that meaningfully affect our shared work or contradict prior assumptions, surface them to the user proactively. Routine status updates can be silent."
         category: durable
+      # Activity bridge for user_concerns: periodic judgment over what the
+      # user has been tracking. Governed by the triage gate like any other
+      # fire; remove this entry to disable.
+      - text: "Periodically review what the user has been tracking and consider whether any of it warrants proactive help."
+        category: durable
+        rhythm_hours: 168
+        instruction: |
+          Review the active user_concerns in my context, including the
+          context note under each (evidence + what the user appears to
+          want). If one clearly warrants proactive help at my ability
+          level — a small piece of research, a check-in question, a
+          concrete suggestion — do that one thing now, or ask the user
+          about it. Respect the stance: a concern the user wants
+          witnessed gets acknowledgment at most, not solutions. If
+          nothing clearly qualifies, stay silent.
 
     # Sensors. The `tick` sensor is the autonomy trigger: a heartbeat
     # publishes to sense_data every `schedule`. With autonomy on,
