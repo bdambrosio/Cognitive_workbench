@@ -1,152 +1,248 @@
 # Cognitive Workbench
 
-An agent built around a ReAct chat loop, file-backed memory, and a small set of geofenced subagents.
+A research workbench for agents that maintain a persistent model of what
+matters — *concerns* — and act from it: in conversation, and in the idle
+cycle between conversations.
 
-*Research code, single-author. The chat subproject is the active surface; older infospace/OODA layers remain in the tree but are not exercised — see Limitations.*
+What's distinctive here:
 
-## What this is
+- **Concerns as persistent salience, not a task queue.** Agent concerns
+  accumulate activation on a per-concern rhythm and from semantic evidence
+  in the conversation; crossing threshold doesn't trigger action directly —
+  an LLM triage step judges whether acting *now* is warranted (fire / defer
+  / reset), and completed work leaves a running summary the next firing
+  reads. User concerns are the mirror image: recall-driven, decaying unless
+  the user touches the topic, never firing — they shape responses instead.
+  The asymmetry is the design.
+- **Reflection is the write path.** The system prompt is reassembled every
+  turn from evolving state — persona, self-model, a fair-witness companion
+  model of the user, discourse agreements, recalled memories, active
+  concerns — and a post-turn reflection pass is the only thing that updates
+  that state. Nothing is appended to a transcript and forgotten.
+- **Local-first.** Runs end-to-end against a local model (vLLM /
+  llama.cpp / SGLang); cloud backends (Anthropic, OpenAI-compatible) are a
+  YAML edit away.
 
-Most agent demos lean heavily on either retrieval-augmented prompting or tool use. This one keeps both as first-class inputs and treats *reflection* — the background pass between turns — as the layer that updates the agent's state.
+*Research code, single-author, breaking changes without notice. The
+ChatLoop chat subproject is the live surface; the status of every design
+document and legacy layer is tracked in [docs/STATUS.md](docs/STATUS.md).*
 
-Each turn the system prompt is reassembled from persistent state files: persona, self-model, a fair-witness companion model of the user, current discourse agreements, recalled memories, and active concerns. The turn itself is a ReAct loop over a small tool catalog (`process_text`, `search`, `fetch_text`, `recall`, `inspect[_external]`, `security`, `respond`). After the response ships, reflection updates those state files for the next turn.
+## The idle-cycle problem
 
-## Example turn
+Most agent frameworks are sophisticated listeners: a request arrives, tools
+fire, a response ships, and the agent is inert until the next event. That's
+fine for assistants. It fails the moment you want an agent that notices
+things on its own, tracks your evolving interests, and acts without being
+asked — because a task list can repeat actions, but it can't preserve a
+live evaluative pressure that later justifies *different* actions.
 
-> *Placeholder — real transcript fragment showing one turn with 2-3 ReAct iterations (thought → tool → observation → respond).*
+The concern system is this project's answer. Concerns are persistent,
+revisable structures that keep domains of mattering in play:
 
-## Installation
+- **Agent concerns** are pressure-driven. Activation grows with wall-clock
+  time scaled by each concern's `rhythm_hours`, and jumps when conversation
+  semantically touches the concern's domain. Past threshold, a triage LLM
+  call decides fire / defer / reset — the verdict is cached and aged so a
+  deferred concern doesn't re-cost a call every tick. Fires run through the
+  same ReAct loop as user turns, and each completed fire rewrites the
+  concern's work-in-progress note so consecutive fires don't start cold.
+- **User concerns** model what the user cares about. They're born from
+  reflection with a short stable handle plus an evolving *context* (the
+  evidence, and what the user appears to want — witnessed, tracked, helped,
+  researched, discussed). They decay per turn, bump on semantic match,
+  age out after two unbumped weeks, and can be closed or updated by
+  reflection when an exchange shows resolution or development. A weekly
+  seed concern reviews them and judges — through the same triage gate —
+  whether any warrants one small proactive act.
 
-Python 3.10+ on Linux or macOS. A virtual environment is recommended.
+The framing is developed in
+[docs/what-agents-care-about.md](docs/what-agents-care-about.md) (concerns
+vs tasks, where autonomy actually lives) and the research stance in
+[BACKGROUND.md](BACKGROUND.md).
+
+## One real turn
+
+Captured verbatim against a local vLLM (Gemma-class model). The user asks
+the agent to explain its own firing logic; the agent reads its own source
+through the geofenced `inspect` subagent.
+
+> **User:** I've been wondering — when one of your concerns fires, what
+> actually decides whether you act or stay quiet? Take a look at your own
+> implementation and give me the short version.
 
 ```
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+ORIENTATION  read: asking for a technical explanation of concern activation.
+             posture: refer to the access boundary; explain what is known
+             from the prompt versus what is inaccessible substrate.
+
+iter 1  thought: ...I need to inspect the codebase to see how this is
+        implemented.
+        tool: inspect("How is the activation and firing logic for
+              agent_concerns implemented?...")
+        obs:  OK: (inspect: hit max iterations without responding;
+              consider narrowing the query)
+
+iter 2  thought: The previous query was too broad; I'll search for
+        'concern' to find the relevant files first.
+        tool: inspect("List files containing 'concern'...")
+        obs:  OK: ...Firing Logic: _check_and_fire_agent_concerns ...
+              Triage: _triage_fire_candidate performs a final judgment
+              (fire, defer, or reset) before dispatching...
+
+iter 3  thought: I have the method names; now I need the actual logic...
+        tool: inspect("Show the implementation of
+              _check_and_fire_agent_concerns and _triage_fire_candidate")
+        obs:  OK: ...implemented in chat/concerns.py ... [source follows]
+
+iter 4  tool: respond
 ```
 
-For local development (running tests, eval benchmarks):
+> **Jill:** It's a two-stage filter.
+>
+> First, there's a pure arithmetic check in
+> `_check_and_fire_agent_concerns`. A concern only becomes a candidate if
+> its activation level crosses a specific threshold and it actually has an
+> instruction attached to it. If it doesn't hit that number, it stays quiet.
+>
+> If it does cross the threshold, it hits a second filter:
+> `_triage_fire_candidate`. This is where a separate LLM pass looks at the
+> concern, the instruction, and any existing work-in-progress to decide if
+> acting *right now* is actually warranted. It can return three verdicts:
+> **fire** (run the ReAct loop), **defer** (not worth it yet; keep the
+> activation high but don't act), **reset** (nothing needed this cycle;
+> drop the activation without acting).
+>
+> If the LLM fails or the JSON is garbled, it defaults to 'fire' so I don't
+> accidentally ignore something critical.
+
+Reflection then wrote, without being asked:
 
 ```
-pip install -r requirements-dev.txt
+user_concern: "agent concern firing logic"
+  context: User is investigating the specific mechanical triggers and
+  filters that determine when Jill acts on a concern versus staying
+  quiet... Wants technical transparency and a system-level audit of the
+  decision-making process.
 ```
 
-**System binaries** (not pip-installable):
+Note the recovery in iter 1→2 — tool failures come back as observations,
+not exceptions, and the agent narrows and retries.
 
-| Binary | Used by | Install |
+## Anatomy of a turn
+
+A turn runs four phases. Within the turn the prompt is read-only; state is
+updated *between* turns.
+
+1. **Orient** — one LLM pass reads active concerns, the companion model,
+   recent context, persona, and self-model; emits a posture line and
+   per-concern relevance.
+2. **ReAct** — the main loop. Each iteration emits one JSON action; the
+   dispatcher runs the tool and binds the result to `$stepN`. Exits on
+   `respond` (capped at 12 iterations; a cap-out synthesizes a fallback
+   reply and, on autonomous fires, spawns a narrowed successor concern).
+3. **Respond** — the reply ships.
+4. **Reflect** — asynchronous post-turn updates: memories, discourse state,
+   companion model, user-concern adds/updates/closes, agent-concern
+   extraction. The reply does not wait.
+
+**Push state vs pull state.** Push state is always rendered into the
+system prompt: top-K recalled memories from a FAISS-indexed collection, the
+companion model, discourse agreements, active concerns (user concerns with
+their context lines). The agent does not have to ask; they are present.
+Pull state is the `recall` tool — a read-only subagent that navigates the
+per-world memory directory (list/read/grep) and synthesizes an answer,
+for when the agent needs what was actually said rather than what's
+currently summarized. Writes happen only via reflection; there is no
+in-loop write tool.
+
+**Tools.** Built-ins (`process_text`, `recall`, `inspect`,
+`inspect_external`, `security`, `body`, `display`, `respond`) plus a
+drop-in registry: every directory under `src/tools/` with a `Skill.md` and
+a `tool.py` exposing `react_invoke` is discovered at startup — currently
+web search, page fetch, calculator, email check, Obsidian, Semantic
+Scholar, stock quotes, image generation, shell scripts, and others. No
+core edits to add one.
+
+**Geofenced subagents.** Persona-less ReAct loops scoped to a typed
+surface; from the parent's vantage each call is one step, and per-call
+traces land in sibling `*_traces/` directories.
+
+| Subagent | Scope | Primitives |
 |---|---|---|
-| `ripgrep` (required for the `inspect` subagent) | `src/chat/code_subagent.py` | `apt install ripgrep` / `brew install ripgrep` |
-| `nmap` (optional, for the `security` subagent) | `src/chat/security.py` | `apt install nmap` / `brew install nmap` |
-| Chromium-family browser (optional, for `--affect` / `--canvas` widget windows) | `src/launcher.py` widget windows | `apt install chromium-browser` / install Chrome |
-| Playwright browsers (optional, JS-heavy page fetch fallback) | `src/tools/fetch-text/tool.py` | `playwright install chromium` |
+| `recall` (`src/chat/remember.py`) | per-world per-agent `memory/` dir | list, read, grep |
+| `inspect` / `inspect_external` (`src/chat/code_subagent.py`) | own `src/` or an externally-bound repo | list, read, grep (ripgrep) |
+| `security` (`src/chat/security.py`) | LAN, RFC1918 ranges only | nmap discovery/-sV, ss/ip |
+| `body` (`src/chat/body.py`) | Body robot sensors, read-only, own Zenoh session | capture_rgb, status |
 
-The chat subagents and widget windows degrade gracefully if their binaries are missing — `inspect` returns an `ERROR:` observation, `--affect`/`--canvas` log a warning and skip the window.
-
-**Backend.** Pick a backend by editing `scenarios/jill-chat.yaml`'s per-character `llm_config` block (see Configuration). The simplest path is to switch `server: local` → `server: anthropic` with `ANTHROPIC_API_KEY` exported; local vLLM, llama.cpp, OpenRouter, and xAI variants are shown in sibling `jill-chat-*.yaml` files.
+```
+                       user input                    tick sensor
+                           │                             │
+                           ▼                             ▼
+                      orient pass            grow activations → threshold?
+                           │                             │
+                           │                      triage (LLM, cached)
+                           │                       fire / defer / reset
+                           ▼                             │ fire
+               ┌─────── ReAct loop ◄─────────────────────┘
+               │  thought → tool → observation ($stepN)
+               │    built-ins · discovered tools
+               │    recall / inspect / security / body   (subagents)
+               │    respond ──► reply
+               └──────────────│──────────────────────────
+                              ▼
+                  reflection (async, post-turn)
+                              │
+        memories · companion · discourse · user_concerns(+context)
+        agent_concerns · threads · concern WIP
+```
 
 ## Quick start
+
+Python 3.10+ on Linux or macOS.
+
+```
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt          # + requirements-dev.txt for tests/benches
+```
+
+System binaries (all degrade gracefully if missing):
+
+| Binary | For | Install |
+|---|---|---|
+| `ripgrep` | `inspect` subagent | `apt install ripgrep` |
+| `nmap` (optional) | `security` subagent | `apt install nmap` |
+| Chromium-family (optional) | `--affect` / `--canvas` windows | `apt install chromium-browser` |
+| Playwright browsers (optional) | JS-heavy page fetch fallback | `playwright install chromium` |
+
+**Backend:** edit the `llm_config` block in `scenarios/jill-chat.yaml`.
+Simplest cloud path: `server: anthropic` with `ANTHROPIC_API_KEY` exported.
+Local vLLM / llama.cpp / OpenRouter / xAI variants are shown in the sibling
+`jill-chat-*.yaml` files.
 
 ```
 cd src
 python launcher.py jill-chat.yaml --cli
 ```
 
-(Scenario paths are resolved relative to `scenarios/`, so `jill-chat.yaml` is enough — no `../` needed.) If the backend isn't configured, the launcher prints what's missing.
+Type **`/help`** at the prompt for the slash commands (`/recall`,
+`/concerns`, `/status`, `/note`, `/img`, `/set-external-repo`, …) — the
+primary way to inspect agent state outside the turn flow.
 
-At the chat prompt, type **`/help`** for the full list of slash commands — `/recall`, `/concerns`, `/note`, `/img`, `/paste`, `/set-external-repo`, `/status`, `/resources`, and others. Slash commands are the primary way to inspect agent state, send images, and manage concerns / external-repo bindings outside the normal turn flow.
-
-## Launcher flags
-
-```
-python launcher.py <scenario.yaml> [flags]
-```
+Key launcher flags (see `python launcher.py --help` for the full set):
 
 | Flag | Purpose |
 |---|---|
-| `--cli` | Interactive terminal chat frontend. The usual way to talk to a chat-mode character. |
-| `--ui` / `--ui-port N` | FastAPI web UI for live trace inspection (default port 3000). |
-| `--resource-browser` | Resource browser web UI on port 3001 (memories, concerns, notes, traces). |
-| `--telegram` | Spawn `telegram_bridge.py` as a sibling subprocess. Relays inbound DMs to the primary character and forwards `say` events back out. Requires `TELEGRAM_BOT_TOKEN` and `TELEGRAM_ALLOWED_CHAT_IDS` env vars; the launcher fails loudly if either is missing. |
-| `--autonomy` | Enable autonomous concern firing in chat mode. Off by default — when off, the `tick` sensor handler is a no-op so benchmarks and chat scenarios behave identically regardless of active concerns. |
-| `--affect` (`--affect-size WxH`, `--affect-pos X,Y`) | Spawn the affect (processing-state) widget: a Python WebSocket bridge plus a chromium app-mode window driven by the bridge. Defaults: `320x320` at `60,60`. |
-| `--canvas` (`--canvas-size WxH`, `--canvas-pos X,Y`) | Spawn the canvas (rich-display) widget, scoped to the first launched character. Defaults: `820x640` at `540,60`. |
-| `--browser PATH` | Override the chromium-family binary used for `--affect` / `--canvas` windows (auto-detected from `google-chrome`, `chromium`, `brave-browser`, `microsoft-edge` if unset). |
-| `--characters NAME [...]` | Launch only a subset of the scenario's characters. |
-| `--list-only` | Print the scenario's characters and exit. |
-| `--debug` | Set `CWB_DEBUG=1` for verbose logging. |
+| `--cli` | interactive terminal chat |
+| `--autonomy` | enable autonomous concern firing (off by default) |
+| `--resource-browser` | web UI on :3001 — memories, concerns, notes, traces |
+| `--affect` / `--canvas` | processing-state and rich-display widget windows |
+| `--ui` | FastAPI trace-inspection UI on :3000 |
+| `--telegram` | Telegram DM bridge (needs `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALLOWED_CHAT_IDS`) |
 
-A typical interactive session:
+A typical session:
 
 ```
-python launcher.py jill-chat.yaml --cli --affect --canvas --resource-browser
-```
-
-## Concept overview
-
-### Turn structure
-
-A turn runs four phases. Within the turn the prompt is read-only; state files are updated *between* turns.
-
-1. **Orient** — one LLM pass reads active concerns, the companion model, recent context, persona, and self-model; emits a posture line and per-concern relevance.
-2. **ReAct** — the main loop. Each iteration emits one JSON action; the dispatcher runs the tool and binds the result to `$stepN`. The loop exits on `respond`.
-3. **Respond** — the reply ships to the user.
-4. **Reflect** — asynchronous post-turn updates to memories, discourse state, companion model, and concerns. The reply does not wait.
-
-### Read-side and write-side state
-
-Two flavors of state coexist.
-
-**Push state** is always rendered into the system prompt: top-K recalled memories from a FAISS-indexed collection, the companion model text, current discourse agreements, active concerns. The agent does not have to ask for these; they are present.
-
-**Pull state** is the `recall` tool — a read-only subagent that navigates the per-world memory directory (list/read/grep) and synthesizes an answer. Useful when the agent needs to check what was actually said earlier rather than what's currently summarized.
-
-Writes happen only via reflection. There is no in-loop write tool. When the user says "remember X", the agent acknowledges and reflection extracts the memory afterward.
-
-### Geofenced subagents
-
-Three subagents, each a thin persona-less ReAct loop scoped to a typed surface. From the parent's vantage each call is one ReAct step; the synthesized answer binds to `$stepN`. Per-call traces land in a sibling `subagent_traces/` directory.
-
-| Subagent | Scope | Primitives |
-|---|---|---|
-| `recall` (`src/chat/remember.py`) | per-world per-agent `memory/` directory | list, read (with line ranges), grep |
-| `inspect` / `inspect_external` (`src/chat/code_subagent.py`) | own `src/` or an externally-bound repo; gitignore-respecting | list, read, grep (ripgrep) |
-| `security` (`src/chat/security.py`) | LAN probes, RFC1918 ranges only | nmap host discovery, nmap -sV, ss/ip |
-
-### Concerns and autonomy
-
-Concerns are persisted, cadence-fired actionable directives — categories `one_shot`, `durable`, `derived` with per-concern firing parameters (`cadence_hours` from `{1, 2, 4, 8, 12, 24, 168}`, `lifetime_days`, `instruction`). When `--autonomy` is set on the launcher, the `tick` sensor (default 30 min) checks for due concerns and fires them through the same ReAct loop, capped per tick.
-
-Off by default.
-
-## Architecture at a glance
-
-```
-                  user input
-                      │
-                      ▼
-                 orient pass  ◄── persona · self-model · companion state
-                      │            discourse state · recalled memories
-                      │            active concerns · recent traces
-                      ▼
-          ┌────────── ReAct loop ──────────┐
-          │  thought → tool → observation  │
-          │             │                  │
-          │             ▼                  │
-          │   process_text · search        │
-          │   fetch_text                   │
-          │   recall   ──▶ memory/ dir     │  (subagent)
-          │   inspect  ──▶ src/   tree     │  (subagent)
-          │   security ──▶ LAN            │  (subagent)
-          │   respond ─────────┐           │
-          └─────────────────────┼──────────┘
-                                ▼
-                              reply
-                                │
-                                ▼
-                    reflection queue (async)
-                                │
-                                ▼
-              memories · discourse_state · companion_state
-              agent_concerns · agent_threads
+python launcher.py jill-chat.yaml --cli --autonomy --resource-browser --affect --canvas
 ```
 
 ## Configuration
@@ -155,101 +251,145 @@ A scenario is a YAML file under `scenarios/`. Minimum shape:
 
 ```yaml
 world_config:
-  world_name: jill_chat
+  world_name: my_world          # per-world, per-agent state directories
 
 characters:
   Jill:
     mode: chat
     llm_config:
-      server: anthropic
+      server: anthropic         # or local / openrouter / openai / xai
       model: claude-opus-4-7
-      api_key: ANTHROPIC_API_KEY        # env var name
-    discourse:
-      enabled: true
-    orientation:
-      enabled: true
+      api_key: ANTHROPIC_API_KEY   # env var NAME, not the key
     character: |
       [voice and stance]
     self_model: |
       [architectural account: what the agent is and isn't]
-    concerns:
-      - text: "..."
-        category: durable
+    concerns:                   # seed agent_concerns
+      - text: "Periodically review what the user has been tracking and
+               consider whether any of it warrants proactive help."
+        rhythm_hours: 168       # one of {1,2,4,8,12,24,168}
+        instruction: |
+          [what to do when this fires; omit to make it a non-firing
+           source concern]
     sensors:
-      - name: tick
-        schedule: "30m"
+      - name: tick              # autonomy heartbeat
+        schedule: "1m"
 ```
 
-**Backends.** The `server` field selects the route. `anthropic` uses the native Messages API. Cloud OpenAI-compatible endpoints (`openrouter`, `openai`, `xai`, or any URL) use a unified Bearer-auth POST and read the API key from the env var named by `api_key`. Local servers (`vllm`, `llama.cpp`, `sglang_api_server`, `lmstudio`) POST to `vllm_url` without auth and accept grammar / chat-template kwargs.
-
-**Per-scenario tool gating.** `chat.omitted_tools: [...]` removes tools from the catalog (used by benches to ablate behaviors). Catalog numbers shift automatically.
-
-**External-repo binding.** Set `external_repo:` on a character to pre-bind the `inspect_external` subagent. Can also be set at runtime via `/set-external-repo` (sticky for the session).
+`server` selects the route: `anthropic` → native Messages API; cloud
+OpenAI-compatible endpoints → unified Bearer-auth POST with the key read
+from the env var named by `api_key`; local servers POST to `vllm_url`
+without auth and accept grammar / chat-template kwargs.
+`chat.omitted_tools: [...]` ablates tools per scenario (used by benches);
+`external_repo:` pre-binds `inspect_external`.
 
 ## Memory substrate
 
-Each character in each world has a `memory/` directory.
+Each character in each world gets a `memory/` directory.
 
-**Overwritten snapshots — authoritative:**
-- `companion_state_<entity>.txt` — fair-witness model of the user
-- `discourse_state_<entity>.txt` — outstanding commitments, current agreements, key decisions
+- **Overwritten snapshots (authoritative):** `companion_state_<entity>.txt`,
+  `discourse_state_<entity>.txt`.
+- **Append-only history:** `conversation.txt`, `reasoning_trace.jsonl`
+  (per-iteration ReAct records), `memories.jsonl` (write provenance),
+  `autonomy.jsonl` (concern fires + triage verdicts).
+- **FAISS-indexed collections:** `memories`, `reasoning_history`,
+  `agent_concerns`, `user_concerns`, `agent_threads`. Concerns and threads
+  are first-class notes — user concerns carry their evolving context,
+  agent concerns their triage cache and work-in-progress — all inspectable
+  in the resource browser.
 
-**Append-only history — point-in-time records:**
-- `conversation.txt` — verbatim dialogue
-- `chat_trace.txt` — per-turn LLM I/O
-- `reasoning_trace.jsonl` — per-iteration ReAct records
-- `memories.jsonl` — provenance log of memory writes
-- `autonomy.jsonl` — log of concern firings
-
-**In-process FAISS collections:** `memories`, `reasoning_history`, `agent_concerns`, `user_concerns`, `agent_threads`. The push-side prompt retrieves via the FAISS index; the `recall` subagent grep/reads the plain-text files.
+The push-side prompt retrieves via FAISS; the `recall` subagent greps the
+plain-text files. All full-file writes go through atomic
+write-temp-then-rename (`src/utils/file_utils.py`).
 
 ## Project layout
 
 ```
 src/
-  chat/                  live subproject — ReAct loop, subagents, backend
-    chat_loop.py         main per-character chat engine
-    remember.py          recall subagent
-    code_subagent.py     inspect / inspect_external subagent
-    security.py          security subagent
-  tools/                 process_text, search, fetch_text implementations
-  affect/                processing-state widget (publisher + WS bridge + HTML)
-  canvas/                rich-display widget (publisher + WS bridge + HTML)
-  cli.py                 interactive terminal frontend
-  telegram_bridge.py     alternate frontend (Telegram DMs ↔ Zenoh)
-  fastapi_action_display.py   --ui web frontend
-  resource_browser.py    --resource-browser web frontend
-  launcher.py            scenario loader + character dispatcher
+  chat/                  the live subproject
+    chat_loop.py         orchestration spine: init, turn loop, tick, run()
+    concerns.py          concern dynamics, triage, WIP, serialization
+    reflection.py        post-turn extraction (memories / concerns / closes)
+    memories.py          FAISS-backed remember/recall
+    threads.py           activity-thread anchors (centroid embeddings)
+    react.py             ReAct loop + built-in tool runners
+    tools.py             discovered-tool registry (src/tools/*)
+    prompts.py           system-prompt assembly, orientation, history render
+    zenoh_io.py          Zenoh session + browser/CLI queryables
+    backend.py           LLM client (anthropic / OpenAI-compat / local)
+    remember.py · code_subagent.py · security.py · body.py   subagents
+  tools/                 drop-in ReAct tools (Skill.md + tool.py each)
+  sensors/               drop-in sensors (tick, rss-watcher, …)
+  affect/  canvas/       widget publishers + WS bridges + HTML
+  cli.py · resource_browser.py · telegram_bridge.py · launcher.py
 scenarios/               YAML configs
-bench/                   eval harnesses
-docs/                    design notes (referenced from code, not duplicated)
+bench/                   eval harnesses (each with its own README)
+docs/                    design notes — see docs/STATUS.md for what's
+                         LIVE vs ASPIRATIONAL vs SUPERSEDED
 ```
 
-The tree also contains older infospace / OODA / planner code (`src/primitives/`, `src/Metrics/`, `src/musing/`, `src/saved_plans/`) which `mode: chat` does not import. See Limitations.
+Legacy layers from earlier architectures remain in the tree but are not
+imported by `mode: chat`; [docs/STATUS.md](docs/STATUS.md) is the
+authoritative map.
 
-## Development
+## Extending
 
-**Adding a tool.** Append a `(name, description)` entry in `_build_react_tool_catalog` in `chat_loop.py` and a dispatch branch in `_run_react_loop`. Return observations with `OK: ` / `EMPTY: ` / `ERROR: ` prefixes so the agent can route on outcome.
+**Tool:** create `src/tools/<name>/` with a `Skill.md` (frontmatter:
+`name`, `description`, `args`) and a `tool.py` exposing
+`react_invoke(args, *, character_name, backend, logger) → {status, text}`.
+Discovered at startup; no core edits. Prefix observations `OK:` /
+`EMPTY:` / `ERROR:` so the agent can route on outcome.
 
-**Adding a subagent.** Use `src/chat/remember.py` as the template: a static `_build_system_prompt()`, a small set of read-only primitives, a `respond` exit, and a per-call trace file written to a sibling `*_traces/` directory. Keep the prompt stable across calls so the backend's KV cache hits.
+**Sensor:** create `src/sensors/<name>/` with a `SKILL.md` (`name`,
+`type`, `schedule`, `disposition`) and a `sensor.py` exposing
+`run(context)`; reference it from the scenario's `sensors:` list.
 
-**Adding a scenario.** Copy `scenarios/jill-chat.yaml`, change `world_name` and `characters.<name>`, point the backend, write the persona and self_model. The launcher creates per-world per-agent directories on first run.
+**Subagent:** use `src/chat/remember.py` as the template — a static system
+prompt (stable across calls, so the backend's KV cache hits), a small set
+of read-only primitives, a `respond` exit, per-call trace files.
 
-**Local-LLM gotchas:**
-- llama.cpp GBNF rule names cannot contain underscores — use hyphens.
-- `{N,M}` quantifiers in GBNF are approximate, not exact.
-- Qwen3 jinja chat templates auto-open `<think>` on the assistant turn; pass `--reasoning-format none` or strip in post-processing.
-- Reasoning-model detection is substring-based on model name; override via `is_reasoning_model: true|false` in the scenario YAML if it misfires.
+**Scenario:** copy `scenarios/jill-chat.yaml`, change `world_name` and the
+character block; per-world per-agent directories are created on first run.
 
-**Benchmarks.** `bench/` holds eval harnesses (discourse reflection, memory recall, recall-subagent prompt A/B, cspred, …). Each has its own README. Runs land in `bench/runs/` (gitignored).
+**Local-LLM gotchas:** llama.cpp GBNF rule names can't contain
+underscores; GBNF `{N,M}` quantifiers are approximate; Qwen-family jinja
+templates auto-open `<think>` (pass `--reasoning-format none`);
+reasoning-model detection is name-substring-based — override with
+`is_reasoning_model:` in the scenario.
+
+## Benchmarks
+
+`bench/` holds the eval harnesses, each with its own README: introspective
+fidelity (four-tier operational self-awareness), discourse reflection,
+memory recall, recall-subagent prompt A/B, counterfactual self-prediction
+(cspred), HLE. Runs land in `bench/runs/` (gitignored).
 
 ## Limitations and non-goals
 
-- Single-author research code. Breaking changes without notice.
-- Memory and reflection are LLM-dependent. Frontier models extract and update reliably; small local models lose recall on subtler write-side moves — see `bench/discourse_reflect/` and `docs/design_note_agreements_rag.md` for the current investigation.
+- Single-author research code; breaking changes without notice.
+- Memory and reflection quality is LLM-dependent: frontier models extract
+  and update reliably; small local models lose recall on subtler
+  write-side moves (`bench/discourse_reflect/`,
+  `docs/design_note_agreements_rag.md`).
+- **No autonomy bench yet** — whether autonomous fires are useful and
+  well-timed is currently judged anecdotally from `autonomy.jsonl`, not
+  measured. It's the next evaluation gap.
 - No multi-agent coordination beyond Zenoh pub/sub primitives.
-- The infospace / OODA / executive-node legacy code remains in the tree (`src/primitives/`, `src/Metrics/`, `src/musing/`, `src/saved_plans/`, parts of `bench/`) but is not exercised by `mode: chat` and is not maintained.
-- Body / robot integration is **not** in this repo. The Body stack (Pi onboard software, SLAM, navigation, motor control, desktop teleop client) lives in a separate repository.
+- Body / robot integration is **not** in this repo — the Body stack (Pi
+  software, SLAM, navigation, teleop) lives in a separate repository; this
+  side only carries the read-only `body` subagent.
+
+## Reading
+
+- [BACKGROUND.md](BACKGROUND.md) — research stance: what LLMs already
+  know, the Socratic approach, why an information space.
+- [docs/what-agents-care-about.md](docs/what-agents-care-about.md) — the
+  concern-system essay: concerns vs tasks, the idle-cycle problem.
+- [docs/STATUS.md](docs/STATUS.md) — every design doc classified against
+  the live code.
+- [docs/concerns-architecture.md](docs/concerns-architecture.md),
+  [docs/substack_sensors_vs_tools.md](docs/substack_sensors_vs_tools.md),
+  [docs/self-awareness-benchmarks.md](docs/self-awareness-benchmarks.md).
 
 ## License
 
