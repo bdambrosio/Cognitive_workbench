@@ -393,4 +393,4 @@ memory recall, recall-subagent prompt A/B, counterfactual self-prediction
 
 ## License
 
-[TBD]
+MIT — see [LICENSE](LICENSE).
