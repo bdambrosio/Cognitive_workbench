@@ -718,7 +718,13 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
         from discourse import DiscourseTracker
         tracker = self._discourse_trackers.get(other_name)
         if tracker is None:
-            tracker = DiscourseTracker(self._llm_generate, self.character_name, other_name)
+            # triage+CRUD path (docs/design_note_agreements_rag.md):
+            # bounded per-segment working set, byte-identical carryover
+            # for untouched items, and date-stamp aging at assembly. The
+            # legacy combined call had no enforceable pruning and grew
+            # the state monotonically.
+            tracker = DiscourseTracker(self._llm_generate, self.character_name,
+                                       other_name, use_triage_crud=True)
             self._discourse_trackers[other_name] = tracker
         return tracker
 

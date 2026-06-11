@@ -363,11 +363,11 @@ ALSO: Extract any genuinely NEW agreements established by the segment that are n
 
 ALSO: Extract any genuinely NEW decisions made by the segment — Adopted/Rejected/Added events that close a previously open question or set direction. Do not duplicate existing decisions.
 
-Each agreement output must end with a provenance tag in parentheses:
-  - (this segment) — for items newly established or substantially rewritten in this segment
-  - (established earlier) — for items being preserved with only minor refinement
+Each agreement output (UPDATE and ADD) must end with the literal stamp ({{$today}}) — the date the item was last affirmed. Items not emitted keep their existing stamp.
 
-Each new decision must follow the existing format: "<Adopted|Rejected|Added>: <decision> (this segment), <what it resolves or replaces>"
+RE-AFFIRMATION: If a flagged item is clearly re-affirmed or relied on by the segment but needs no content change, emit UPDATE with the same text and the fresh ({{$today}}) stamp — this is how an item's last-affirmed date stays current. Leave an item alone only when the segment doesn't actually engage it.
+
+Each new decision must follow the existing format: "<Adopted|Rejected|Added>: <decision> ({{$today}}), <what it resolves or replaces>"
 
 OUTPUT FORMAT — one operation per line, exact prefixes:
   UPDATE <n>: <new agreement text including its (tag)>
@@ -384,10 +384,10 @@ END_CRUD
 Plain text only. No markdown, no preamble, no commentary.
 
 Example output:
-UPDATE 1: Navigate northwest for 30 minutes, then follow the creek southwest back to the crossing (this segment)
+UPDATE 1: Navigate northwest for 30 minutes, then follow the creek southwest back to the crossing ({{$today}})
 REMOVE 3
-ADD: If the creek is not found within 30 minutes, stop and reassess (this segment)
-ADD_DECISION: Adopted: 30-minute time limit as safety check (this segment), establishes navigation safety mechanism
+ADD: If the creek is not found within 30 minutes, stop and reassess ({{$today}})
+ADD_DECISION: Adopted: 30-minute time limit as safety check ({{$today}}), establishes navigation safety mechanism
 END_CRUD
 
 End your response with:
@@ -506,7 +506,21 @@ def _prepend_narrator_stance(prompt: str, narrator_persona: str,
 
 
 _SECTION_HEADER_RE = re.compile(r'^[A-Z][A-Z ]*:\s*$')
-_PROVENANCE_TAG_RE = re.compile(r'\((?:this segment|established earlier)\)\.?')
+
+# Aging (triage+CRUD path only). Items carry a last-affirmed date stamp
+# "(YYYY-MM-DD)" in place of the legacy binary provenance tags; CRUD
+# re-stamps items it updates or re-affirms, untouched items keep their
+# stamp byte-identical, and assembly sweeps items whose stamp is older
+# than the stale window. Wall-clock aging, same rationale as the
+# user_concern stale sweep: turn-based rules can't age state between
+# sessions, and the binary tags gave the LLM no age signal at all —
+# which is how discourse state grew monotonically.
+_DISCOURSE_STALE_DAYS = 30     # unaffirmed this long → swept at assembly
+
+_DATE_STAMP_RE = re.compile(r'\((\d{4}-\d{2}-\d{2})\)')
+_LEGACY_PROVENANCE_RE = re.compile(r'\((?:this segment|established earlier)\)')
+_PROVENANCE_TAG_RE = re.compile(
+    r'\((?:this segment|established earlier|\d{4}-\d{2}-\d{2})\)\.?')
 
 
 def _parse_current_agreements(prior_state: str) -> List[str]:
@@ -581,6 +595,49 @@ def _parse_key_decisions_section(prior_state: str) -> str:
             break
         body_lines.append(raw_line)
     return '\n'.join(body_lines).strip('\n')
+
+
+def _item_stamp_date(item: str):
+    """Most recent (YYYY-MM-DD) date stamp on an item line, or None when
+    the line carries no parseable stamp (such lines are never swept)."""
+    parsed = []
+    for d in _DATE_STAMP_RE.findall(item):
+        try:
+            parsed.append(datetime.strptime(d, '%Y-%m-%d').date())
+        except ValueError:
+            logger.warning("discourse aging: unparseable date stamp %r dropped", d)
+    return max(parsed) if parsed else None
+
+
+def _age_and_sweep_items(items: List[str], today, label: str) -> List[str]:
+    """Apply aging to a list of agreement/decision lines:
+      1. Grandfather: legacy binary provenance tags are rewritten to a
+         fresh date stamp (one-time conversion; the item then ages
+         normally from today).
+      2. Sweep: drop items whose last-affirmed stamp is older than
+         _DISCOURSE_STALE_DAYS. Items with no stamp at all are kept —
+         conservative, and CRUD restamping converges them over time.
+    Conversions and sweeps are logged; nothing is dropped silently."""
+    kept: List[str] = []
+    converted = swept = 0
+    for item in items:
+        if _LEGACY_PROVENANCE_RE.search(item):
+            item = _LEGACY_PROVENANCE_RE.sub(f'({today.isoformat()})', item)
+            converted += 1
+        stamp = _item_stamp_date(item)
+        if stamp is not None and (today - stamp).days > _DISCOURSE_STALE_DAYS:
+            swept += 1
+            continue
+        kept.append(item)
+    if converted:
+        logger.info(
+            "discourse aging (%s): stamped %d legacy-tagged item(s) with %s",
+            label, converted, today.isoformat())
+    if swept:
+        logger.info(
+            "discourse aging (%s): swept %d stale item(s) (unaffirmed > %dd)",
+            label, swept, _DISCOURSE_STALE_DAYS)
+    return kept
 
 
 def _assemble_discourse_state(segment_label: str,
@@ -893,12 +950,14 @@ class DiscourseTracker:
         flagged_sorted = sorted(flagged)
         flagged_texts = [agreements[i - 1] for i in flagged_sorted]
 
+        today = datetime.now().date()
         crud_prompt = CRUD_TEMPLATE
         for key, value in {
             'conversation_turns': segment,
             'current_tom_model': tom,
             'flagged_indexed_items': _format_flagged_subset(flagged_texts),
             'existing_decisions': existing_decisions if existing_decisions else "[none]",
+            'today': today.isoformat(),
         }.items():
             crud_prompt = crud_prompt.replace(f"{{{{${key}}}}}", str(value))
         crud_prompt = _prepend_narrator_stance(
@@ -933,15 +992,19 @@ class DiscourseTracker:
         # ADDs appended to the end.
         new_agreements.extend(adds)
 
-        # Decisions: append-only — existing pass through unchanged, new
-        # decisions appended as bullets.
-        new_decisions_body = existing_decisions
-        if decision_adds:
-            new_lines = [f"- {d}" for d in decision_adds]
-            if new_decisions_body.strip():
-                new_decisions_body = new_decisions_body.rstrip('\n') + '\n' + '\n'.join(new_lines)
-            else:
-                new_decisions_body = '\n'.join(new_lines)
+        # Aging: grandfather legacy tags to a date stamp, sweep stale.
+        new_agreements = _age_and_sweep_items(new_agreements, today, 'agreements')
+
+        # Decisions: existing pass through, new decisions appended as
+        # bullets, then the same aging sweep — without it the section is
+        # append-only and grows without bound.
+        decision_lines = [
+            ln for ln in existing_decisions.splitlines()
+            if ln.strip() and ln.strip().lower() not in ('[none]', '[none in this segment]')
+        ]
+        decision_lines.extend(f"- {d}" for d in decision_adds)
+        decision_lines = _age_and_sweep_items(decision_lines, today, 'decisions')
+        new_decisions_body = '\n'.join(decision_lines)
 
         return _assemble_discourse_state(
             segment_label, new_agreements, new_decisions_body

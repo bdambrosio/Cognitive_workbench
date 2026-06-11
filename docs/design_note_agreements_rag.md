@@ -130,6 +130,29 @@ Resolved deliberately in favor of KISS — default to the existing artifact and 
 - **Agreement provenance tags pass through verbatim.** The parsed line is the full bullet content including the `(this segment)` / `(established earlier)` tag. Carryover items remain byte-identical. CRUD's UPDATE/ADD lines must include a tag; the prompt directs it on which one.
 - **No triviality threshold on segments.** CRUD always runs (with an empty flagged set if triage flagged nothing), so the new-item slot still gets a chance. No "skip on short segment" heuristic; no threshold to calibrate.
 
+## Aging amendment (2026-06-11)
+
+Production evidence (Note_2968, ~40KB / 200+ items): neither path ages
+state — the binary provenance tags carry no age signal, the segment label
+resets to 0 every call, so the template's "~30-turn pruning rule" is
+undecidable and the state grows monotonically. Decisions were additionally
+append-only by code in the CRUD path. Amendments, shipped alongside
+flipping `use_triage_crud=True` in production:
+
+- Provenance tags become last-affirmed date stamps `(YYYY-MM-DD)`. CRUD
+  stamps UPDATE/ADD lines with today's date and is instructed to UPDATE
+  (same text, fresh stamp) items the segment re-affirms without change.
+  Untouched items still pass through byte-identical — the stamp just
+  carries information now. Legacy binary tags are grandfathered to a
+  fresh stamp once at assembly.
+- Assembly sweeps agreements AND decisions unaffirmed for
+  `_DISCOURSE_STALE_DAYS` (30). Wall-clock aging, same rationale as the
+  user_concern stale sweep. Sweeps are logged, never silent.
+
+This bounds state size on the write side, which also defers the read-side
+RAG-push: a swept state is small enough to inject whole. Revisit RAG-push
+if the steady-state footprint still feels heavy.
+
 ## What's not yet decided
 
 - **K and threshold values for render.** Threads use primary≥0.30, secondary≥0.20, secondary_cap=2. Agreements may need different values — they're more numerous than threads and may benefit from a larger K with a tighter threshold. Tune empirically once the basic plumbing exists.
