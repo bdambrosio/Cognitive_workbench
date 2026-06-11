@@ -186,10 +186,14 @@ characters:
         category: durable
       # Activity bridge for user_concerns: periodic judgment over what the
       # user has been tracking. Governed by the triage gate like any other
-      # fire; remove this entry to disable.
+      # fire; remove this entry to disable. user_model_reviewer designates
+      # this concern as the heat-coupling target: a user_concern bumped
+      # past high strength evidence-bumps this concern's activation, so
+      # the review fires ahead of rhythm while the heat is current.
       - text: "Periodically review what the user has been tracking and consider whether any of it warrants proactive help."
         category: durable
         rhythm_hours: 168
+        user_model_reviewer: true
         instruction: |
           Review the active user_concerns in my context, including the
           context note under each (evidence + what the user appears to

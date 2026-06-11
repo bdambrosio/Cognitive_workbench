@@ -26,6 +26,7 @@ from chat.chat_loop import (
     _USER_CONCERN_BUMP_AMOUNT,
     _USER_CONCERN_BUMP_MAX_PER_TURN,
     _USER_CONCERN_DECAY_PER_TURN,
+    _USER_CONCERN_HIGH_STRENGTH,
     _USER_CONCERN_STALE_DAYS,
     _triage_defer_cooldown_hours,
 )
@@ -330,6 +331,82 @@ def test_resolve_and_close_user_concern(loop):
     # no match → None (closure skipped, never guessed)
     loop.resource_manager.search_collection = lambda *a, **k: (True, [], None)
     assert loop._resolve_user_concern_by_text("totally unrelated", []) is None
+
+
+# ── heat coupling: high-strength crossing bumps the reviewer ───────────
+
+def make_agent_collection(loop, note_ids):
+    """Register a real agent_concerns collection (the fixture default is
+    a dangling id) containing the given notes."""
+    mgr = loop.resource_manager
+    mgr.resource_registry["Collection_ac"] = {
+        "name": "Collection_ac",
+        "type": mgr.resource_types.Collection,
+        "location": (0, 0),
+        "description": "test agent_concerns",
+        "remove_on_take": False,
+        "properties": {"content": list(note_ids), "format": "list",
+                       "collection_name": "agent_concerns",
+                       "kind": "agent_concerns"},
+    }
+    loop._agent_concerns_collection_id = "Collection_ac"
+
+
+def test_high_strength_crossing_bumps_reviewer(loop):
+    reviewer = make_concern(loop, activation=0.3, extra={
+        "user_model_reviewer": True,
+        "triage_verdict": "defer",
+        "triage_at": datetime.now(timezone.utc).isoformat(),
+        "triage_reason": "nothing new",
+    })
+    bystander = make_concern(loop, activation=0.3)
+    make_agent_collection(loop, [reviewer, bystander])
+    crossing = make_user_concern(
+        loop, "hot topic", strength=_USER_CONCERN_HIGH_STRENGTH - 0.05)
+    loop.resource_manager.search_collection = (
+        lambda *a, **k: (True, [{"metadata": {"source_note_id": crossing}}], None))
+
+    loop._bump_user_concerns_on_input("input about the hot topic")
+
+    rp = loop.resource_manager.get_resource(reviewer)["properties"]
+    assert rp["activation"] == pytest.approx(0.3 + _AGENT_CONCERN_BUMP_AMOUNT)
+    for f in ("triage_verdict", "triage_at", "triage_reason"):
+        assert f not in rp
+    assert loop.resource_manager.get_resource(
+        bystander)["properties"]["activation"] == 0.3
+
+
+def test_no_reviewer_bump_without_crossing(loop):
+    reviewer = make_concern(loop, activation=0.3,
+                            extra={"user_model_reviewer": True})
+    make_agent_collection(loop, [reviewer])
+    # One concern already above the threshold, one staying below: a bump
+    # to either is not a crossing.
+    above = make_user_concern(loop, "already hot",
+                              strength=_USER_CONCERN_HIGH_STRENGTH + 0.05)
+    below = make_user_concern(loop, "still cool", strength=0.2)
+    hits = [{"metadata": {"source_note_id": n}} for n in (above, below)]
+    loop.resource_manager.search_collection = lambda *a, **k: (True, hits, None)
+
+    loop._bump_user_concerns_on_input("anything")
+
+    assert loop.resource_manager.get_resource(
+        reviewer)["properties"]["activation"] == 0.3
+
+
+def test_seed_sync_flags_existing_reviewer_note(loop):
+    existing = make_concern(loop, activation=0.5)
+    name = ChatLoop._seed_concern_name(0)
+    loop.resource_manager.named_notes[name] = existing
+
+    loop._seed_concerns_from_config({"concerns": [
+        {"text": "review what the user has been tracking",
+         "user_model_reviewer": True},
+    ]})
+
+    props = loop.resource_manager.get_resource(existing)["properties"]
+    assert props["user_model_reviewer"] is True
+    assert props["activation"] == 0.5  # untouched beyond the flag
 
 
 # ── user-concern context: birth, recurrence refresh, explicit update ───

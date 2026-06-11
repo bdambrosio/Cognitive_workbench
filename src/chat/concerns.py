@@ -75,6 +75,17 @@ _USER_CONCERN_PROMPT_BUDGET   = 5      # top-K by strength surfaced
 
 _USER_CONCERN_STALE_DAYS      = 14     # unbumped this long → satisfied
 
+# Heat coupling user model → agenda: a user_concern bumped ACROSS this
+# strength (crossing, not dwelling — one bump per turn at most) applies
+# an evidence bump to any active agent_concern carrying the
+# user_model_reviewer property (the "review what the user has been
+# tracking" seed). Hot-but-transient concerns can spike to 1.0 and
+# decay to prune well inside the reviewer's rhythm; the crossing pulls
+# the reviewer's fire forward so it looks while the heat is real.
+# Whether anything warrants action stays with the reviewer's
+# instruction at fire time.
+_USER_CONCERN_HIGH_STRENGTH   = 0.70   # crossing this bumps the reviewer
+
 # ----- agent_concerns dynamics -----
 # activation ∈ [0, 1]. Grows each tick proportional to elapsed wall-
 # clock time. Decremented on service per exit_reason. Fires when
@@ -293,8 +304,19 @@ class ConcernsMixin:
                 continue
             entity = str(seed.get('entity', 'User') or 'User')
             name = self._seed_concern_name(idx)
+            reviewer = bool(seed.get('user_model_reviewer'))
             if name in self.resource_manager.named_notes:
-                continue   # Already seeded; preserve any edits
+                # Already seeded; preserve any edits — but sync the
+                # reviewer designation so config can flag an existing
+                # seed note (heat coupling targets this property).
+                if reviewer:
+                    note = self.resource_manager.get_resource(
+                        self.resource_manager.named_notes[name])
+                    if note and not (note.get('properties') or {}).get(
+                            'user_model_reviewer'):
+                        note.setdefault('properties', {})[
+                            'user_model_reviewer'] = True
+                continue
             rhythm_h = seed.get('rhythm_hours')
             if rhythm_h is None:
                 rhythm_h = seed.get('cadence_hours')   # legacy field
@@ -306,7 +328,9 @@ class ConcernsMixin:
             self._add_agent_concern(
                 text, entity=entity, provenance='asserted', seed=True,
                 name=name, rhythm_hours=rhythm_h, rhythm_source='external',
-                instruction=seed.get('instruction'))
+                instruction=seed.get('instruction'),
+                extra_properties=(
+                    {'user_model_reviewer': True} if reviewer else None))
 
     # ------------------------------------------------------------------
     # Concern creation: shared note-create path + per-collection helpers.
@@ -712,6 +736,7 @@ class ConcernsMixin:
                 return
             now_iso = datetime.now(timezone.utc).isoformat()
             bumped = 0
+            crossed_high = False
             for r in results:
                 if bumped >= _USER_CONCERN_BUMP_MAX_PER_TURN:
                     break
@@ -728,12 +753,55 @@ class ConcernsMixin:
                 if props.get('status') != 'active':
                     continue
                 s = float(props.get('strength', 0.0) or 0.0)
-                props['strength'] = min(1.0, s + _USER_CONCERN_BUMP_AMOUNT)
+                new_s = min(1.0, s + _USER_CONCERN_BUMP_AMOUNT)
+                props['strength'] = new_s
                 props['last_bumped_at'] = now_iso
+                if s < _USER_CONCERN_HIGH_STRENGTH <= new_s:
+                    crossed_high = True
                 bumped += 1
+            if crossed_high:
+                self._bump_user_model_reviewer(now_iso)
         except Exception as e:
             logger.warning(
                 f"[{self.character_name}] _bump_user_concerns_on_input failed: {e}")
+
+    def _bump_user_model_reviewer(self, now_iso: str) -> None:
+        """A user_concern just crossed _USER_CONCERN_HIGH_STRENGTH:
+        evidence-bump the agent_concern(s) carrying the
+        user_model_reviewer property (designated on the YAML seed) so
+        the periodic review of the user model fires ahead of its rhythm
+        while the heat is current. The reviewer's instruction still
+        judges at fire time whether anything warrants action."""
+        if not self._agent_concerns_collection_id:
+            return
+        coll = self.resource_manager.get_resource(self._agent_concerns_collection_id)
+        if not coll:
+            return
+        for nid in (coll.get('properties') or {}).get('content', []) or []:
+            note = self.resource_manager.get_resource(nid)
+            if not note:
+                continue
+            props = note.setdefault('properties', {})
+            if props.get('status') != 'active' or not props.get('user_model_reviewer'):
+                continue
+            self._apply_agent_concern_evidence_bump(props, now_iso)
+            logger.info(
+                f"[{self.character_name}] user_concern crossed "
+                f"{_USER_CONCERN_HIGH_STRENGTH} strength; bumped reviewer "
+                f"{nid} to activation={props['activation']:.2f}")
+
+    @staticmethod
+    def _apply_agent_concern_evidence_bump(props: Dict[str, Any],
+                                           now_iso: str) -> None:
+        """Apply one evidence bump to an active agent_concern's props:
+        raise activation, stamp last_bumped_at, and clear any cached
+        triage 'defer' verdict — new evidence reopens the fire/defer
+        question."""
+        a = float(props.get('activation', 0.0) or 0.0)
+        props['activation'] = min(1.0, a + _AGENT_CONCERN_BUMP_AMOUNT)
+        props['last_bumped_at'] = now_iso
+        for stale in ('triage_verdict', 'triage_at', 'triage_reason'):
+            props.pop(stale, None)
 
     def _bump_agent_concerns_on_input(self, text: str) -> None:
         """Semantic-search agent_concerns for input similarity; bump
@@ -768,11 +836,7 @@ class ConcernsMixin:
                 props = note.setdefault('properties', {})
                 if props.get('status') != 'active':
                     continue
-                a = float(props.get('activation', 0.0) or 0.0)
-                props['activation'] = min(1.0, a + _AGENT_CONCERN_BUMP_AMOUNT)
-                props['last_bumped_at'] = now_iso
-                for stale in ('triage_verdict', 'triage_at', 'triage_reason'):
-                    props.pop(stale, None)
+                self._apply_agent_concern_evidence_bump(props, now_iso)
         except Exception as e:
             logger.warning(
                 f"[{self.character_name}] _bump_agent_concerns_on_input failed: {e}")
