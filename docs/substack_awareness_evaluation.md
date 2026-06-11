@@ -209,7 +209,6 @@ That's a less dramatic but more defensible claim than "architecture buys you sel
   ·
   [`bench/counterfactual_self_prediction/`](../bench/counterfactual_self_prediction/)
 - Architecture being probed:
-  [`docs/spec-agent-self-awareness.md`](spec-agent-self-awareness.md),
   [`docs/trace_grounded_introspectionv3.md`](trace_grounded_introspectionv3.md)
 
 ---

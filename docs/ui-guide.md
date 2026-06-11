@@ -302,5 +302,3 @@ Both UIs connect via WebSocket (`ws://localhost:3000/ws`) for live updates:
 ## Next
 
 - [Getting Started](getting-started.md) — launching the UI for the first time
-- [Goals & Scheduling](goals-and-scheduling.md) — using the Schedule tab
-- [Architecture](architecture.md) — what the action log is showing you

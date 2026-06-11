@@ -193,5 +193,4 @@ not counterfactual reasoning.
 - Tier-4 primer:
   [`bench/counterfactual_self_prediction/primer.yaml`](../bench/counterfactual_self_prediction/primer.yaml)
 - Background on the architecture being probed:
-  [`docs/spec-agent-self-awareness.md`](spec-agent-self-awareness.md),
   [`docs/trace_grounded_introspectionv3.md`](trace_grounded_introspectionv3.md)

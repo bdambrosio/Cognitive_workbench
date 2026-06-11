@@ -1,6 +1,7 @@
 # docs/ Status Index
 
-Classification of every doc against the live codebase as of **2026-06-09**.
+Classification of every doc against the live codebase as of **2026-06-09**
+(superseded set deleted **2026-06-11**).
 
 Context: the OODA executive, incremental planner (Stage 0–3, envisioning,
 vision eval), GoalScheduler, and task-execution machinery were deleted
@@ -13,7 +14,7 @@ canvas displays.
 Categories:
 - **LIVE** — accurately describes current code/behavior
 - **ASPIRATIONAL** — design for something not (or only partially) built; not invalidated by the deletions
-- **SUPERSEDED** — describes deleted or replaced machinery (these docs carry a status banner)
+- **SUPERSEDED** — described deleted or replaced machinery; these docs were removed 2026-06-11 (recover via git history)
 - **REFERENCE** — essay / analysis / background, not a spec of system behavior
 
 ## LIVE
@@ -25,7 +26,7 @@ Categories:
 | [character_evaluator.md](character_evaluator.md) | Orientation pass (`src/character_evaluator.py`), integrated per turn |
 | [cognitive_graph_explorer.md](cognitive_graph_explorer.md) | CognitiveGraph visualization via resource browser |
 | [cognitive_graph_spec.md](cognitive_graph_spec.md) | CognitiveGraph data structure (`src/cognitive_graph.py`) |
-| [commands.md](commands.md) | CLI / browser commands for concerns, goals, system control |
+| [commands.md](commands.md) | Chat-CLI slash commands (rewritten 2026-06-11 against `src/cli.py`; task/goal-era commands removed) |
 | [concerns-architecture.md](concerns-architecture.md) | Concern layers + dynamics; triage step implemented 2026-06 |
 | [configuration.md](configuration.md) | Scenario YAML / LLM / tool configuration |
 | [getting-started.md](getting-started.md) | Install, venv, credentials |
@@ -53,44 +54,27 @@ Categories:
 | [semantic_operators_spec.md](semantic_operators_spec.md) | extract/synthesize operator split — not implemented |
 | [tools-and-primitives.md](tools-and-primitives.md) | Primitive/tool catalog spec; implementation status varies |
 
-## SUPERSEDED (banner in each file)
+## SUPERSEDED — deleted 2026-06-11
+
+27 banner-stamped docs describing deleted machinery were removed from the
+tree (recover any via `git log --diff-filter=D -- docs/<name>`).
 
 OODA-executive / incremental-planner / task-pipeline era:
-
-| Doc | Covered (then) |
-|---|---|
-| [architecture.md](architecture.md) | System architecture centered on the executive node + planner stages |
-| [incremental_planner_article.md](incremental_planner_article.md) | The incremental planner deep-dive (Stages 0–3, SGLang slots) |
-| [TASK_EXECUTION_LOOP.md](TASK_EXECUTION_LOOP.md) | Outer task loop + inner planner pipeline |
-| [TASK_EXECUTION_SPEC.md](TASK_EXECUTION_SPEC.md) | Task lifecycle (proposed→establishing→active→cooldown) |
-| [task_mechanism_spec.md](task_mechanism_spec.md) | Persistent task entities + milestone loop |
-| [goals-and-scheduling.md](goals-and-scheduling.md) | Goal submission + GoalScheduler modes |
-| [phase_aware_execution_spec_v2.md](phase_aware_execution_spec_v2.md) | Phase-aware planning (pipeline vs deliberative) |
-| [phase_aware_execution_spec_v3.md](phase_aware_execution_spec_v3.md) | Phase-aware execution, trace-informed revision |
-| [envisioning-spec.md](envisioning-spec.md) | Vision criteria generation + evaluation |
-| [envisioning-and-quality-control.md](envisioning-and-quality-control.md) | Shallow/deep vision checks in the planner loop |
-| [mixed-initiative-plan-review.md](mixed-initiative-plan-review.md) | Offline plan review + learning injection |
-| [spec-agent-self-awareness.md](spec-agent-self-awareness.md) | Self-model injection into the planner snapshot |
-| [STAGE0_RESOURCE_RETRIEVAL_DESIGN.md](STAGE0_RESOURCE_RETRIEVAL_DESIGN.md) | Stage 0 retrieval for the planner |
-| [TOOL_DEVELOPMENT_GUIDE.md](TOOL_DEVELOPMENT_GUIDE.md) | Planner-facing `tool()` convention (live convention: SKILL.md + `react_invoke`) |
-| [TOOL_ARGUMENT_CONVENTION_ANALYSIS.md](TOOL_ARGUMENT_CONVENTION_ANALYSIS.md) | value/target argument conventions for the executor |
-| [MINECRAFT_UPDATES_2026-01.md](MINECRAFT_UPDATES_2026-01.md) | Executive-era Minecraft world-tools work |
+architecture.md, incremental_planner_article.md, TASK_EXECUTION_LOOP.md,
+TASK_EXECUTION_SPEC.md, task_mechanism_spec.md, goals-and-scheduling.md,
+phase_aware_execution_spec_v2.md, phase_aware_execution_spec_v3.md,
+envisioning-spec.md, envisioning-and-quality-control.md,
+mixed-initiative-plan-review.md, spec-agent-self-awareness.md,
+STAGE0_RESOURCE_RETRIEVAL_DESIGN.md, TOOL_DEVELOPMENT_GUIDE.md,
+TOOL_ARGUMENT_CONVENTION_ANALYSIS.md, MINECRAFT_UPDATES_2026-01.md
 
 infospace_executor / map_node era:
-
-| Doc | Covered (then) |
-|---|---|
-| [AGENT_LOCATION_ANALYSIS.md](AGENT_LOCATION_ANALYSIS.md) | map.py → map_agent.py refactor analysis |
-| [CONVERSATION_LOCKS_README.md](CONVERSATION_LOCKS_README.md) | Conversation locks in map_node/executive_node |
-| [FS_FILESYSTEM_MAPPING_REVIEW.md](FS_FILESYSTEM_MAPPING_REVIEW.md) | fs-* tools + executor integration |
-| [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) | SpaceMap implementation tracker |
-| [INFORMATION_TO_NOTE_MIGRATION.md](INFORMATION_TO_NOTE_MIGRATION.md) | Information→Note rename in deleted modules |
-| [INFOSPACE_IMPLEMENTATION_SUMMARY.md](INFOSPACE_IMPLEMENTATION_SUMMARY.md) | InfospaceMap + map_node integration |
-| [INFOSPACE_INFO_REFACTOR.md](INFOSPACE_INFO_REFACTOR.md) | infospace_executor plan_bindings refactor |
-| [INFOSPACE_PRIMITIVES_UPDATE.md](INFOSPACE_PRIMITIVES_UPDATE.md) | Executor primitive handlers |
-| [INFOSPACE_REVIEW_FIXES.md](INFOSPACE_REVIEW_FIXES.md) | Executor bug-fix log |
-| [NOTE_COLLECTION_EXTENSION_REVIEW.md](NOTE_COLLECTION_EXTENSION_REVIEW.md) | Note/Collection extension review against the executor |
-| [SPACEMAP_ARCHITECTURE.md](SPACEMAP_ARCHITECTURE.md) | SpaceMap/InfospaceMap class hierarchy |
+AGENT_LOCATION_ANALYSIS.md, CONVERSATION_LOCKS_README.md,
+FS_FILESYSTEM_MAPPING_REVIEW.md, IMPLEMENTATION_STATUS.md,
+INFORMATION_TO_NOTE_MIGRATION.md, INFOSPACE_IMPLEMENTATION_SUMMARY.md,
+INFOSPACE_INFO_REFACTOR.md, INFOSPACE_PRIMITIVES_UPDATE.md,
+INFOSPACE_REVIEW_FIXES.md, NOTE_COLLECTION_EXTENSION_REVIEW.md,
+SPACEMAP_ARCHITECTURE.md
 
 ## REFERENCE
 
@@ -98,7 +82,7 @@ infospace_executor / map_node era:
 |---|---|
 | [# When AI Agents Talk, Nobody's Listenin.md](<# When AI Agents Talk, Nobody's Listenin.md>) | Essay on agent-to-agent conversation |
 | [METHOD_TOOLS_TWEETS.md](METHOD_TOOLS_TWEETS.md) | Thread outline for the method-tools idea |
-| [design_note_agreements_rag.md](design_note_agreements_rag.md) | Discourse/agreements RAG design discussion |
+| [design_note_agreements_rag.md](design_note_agreements_rag.md) | Discourse/agreements design; write-side (triage+CRUD + date-stamp aging) implemented 2026-06-11, read-side RAG-push deferred |
 | [design_note_threads.md](design_note_threads.md) | Threads design discussion (threads shipped 2026-05; see `src/chat/`) |
 | [introspective_fidelity_benchmark_v01.md](introspective_fidelity_benchmark_v01.md) | Introspective-fidelity bench methodology |
 | [journey_note_trace_qualia_self_model.md](journey_note_trace_qualia_self_model.md) | Audit-record essay: trace/qualia self-model |

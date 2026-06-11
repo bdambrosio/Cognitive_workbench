@@ -256,8 +256,6 @@ Plan tools define reusable action sequences in a `plan.json` file alongside thei
 
 Parameters are passed as bound variables: the main input becomes `$input`, and additional arguments become `$key` variables.
 
-See [Tool Development Guide](TOOL_DEVELOPMENT_GUIDE.md) for full details on creating tools.
-
 ## World-Specific Tools
 
 When a scenario sets `world_config.world_name`, tools from `src/world-tools/<world_name>/` are loaded alongside core tools. The planner sees them grouped by source (e.g., `#MINECRAFT`, `#FS`).
@@ -293,6 +291,4 @@ Situational tools (marked `situational: true`) are auto-called at the start of p
 
 ## Next
 
-- [Architecture](architecture.md) — how the planner uses tools
 - [Configuration](configuration.md) — scenario YAML and world config
-- [Tool Development Guide](TOOL_DEVELOPMENT_GUIDE.md) — creating new tools

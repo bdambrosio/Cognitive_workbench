@@ -217,6 +217,5 @@ See also: `logs/` directory for detailed runtime logs (one file per component).
 
 ## Next
 
-- [Architecture](architecture.md) — how the system works
-- [Goals & Scheduling](goals-and-scheduling.md) — goal handling and scheduling
 - [Configuration](configuration.md) — scenario YAML reference
+- [STATUS.md](STATUS.md) — doc index and what's live vs aspirational

@@ -181,25 +181,23 @@ Cognitive_workbench/
 │   ├── jill-minecraft.yaml
 │   └── ...
 ├── docs/                          # Documentation
-│   ├── architecture.md
+│   ├── STATUS.md
 │   ├── getting-started.md
 │   └── ...
 ├── src/
 │   ├── launcher.py                # Entry point
-│   ├── executive_node.py          # OODA loop coordinator
-│   ├── incremental_planner.py     # Core planner
-│   ├── infospace_executor.py      # Primitive + tool execution
+│   ├── cli.py                     # Chat CLI (slash commands, image send)
+│   ├── chat/                      # ChatLoop ReAct engine (live runtime)
+│   │   ├── chat_loop.py           #   turn loop + mixin assembly
+│   │   ├── concerns.py            #   agent/user concern dynamics
+│   │   ├── reflection.py          #   post-turn reflection
+│   │   └── ...
 │   ├── infospace_resource_manager.py  # Persistence + FAISS
-│   ├── fastapi_action_display.py  # Web UI (Activation Field + Classic)
+│   ├── fastapi_action_display.py  # Web UI
 │   ├── resource_browser.py        # Resource Browser UI (port 3001)
-│   ├── task_manager.py            # Task & Concern Manager UI (port 3002)
-│   ├── goal_scheduler.py          # Autonomous goal scheduler
-│   ├── concern_triage.py          # Concern → task pipeline
-│   ├── derived_concern_model.py   # Agent-derived concerns
+│   ├── discourse.py               # Discourse / companion / ToM reflection
 │   ├── sensor_runner.py           # Sensor scheduling and execution
 │   ├── conversation_store.py      # Dialog tracking
-│   ├── tool_model.py              # Tool success tracking
-│   ├── world_model.py             # Persistent knowledge base
 │   ├── templates.py               # Prompt templates
 │   ├── AGENTS.md                  # Contributor guidelines
 │   ├── tools/                     # Core tools
@@ -208,21 +206,9 @@ Cognitive_workbench/
 │   │   ├── run-script/
 │   │   └── ...
 │   ├── world-tools/               # World-specific tools
-│   │   ├── minecraft/
-│   │   ├── fs/
-│   │   ├── osworld/
-│   │   └── scienceworld/
 │   ├── sensors/                   # Sensor implementations (browser-visits, rss-watcher)
-│   ├── static/ui/                 # Activation Field frontend (HTML/JS/CSS)
 │   ├── scripts/                   # Shell scripts for run-script tool
 │   ├── utils/                     # Shared utilities
-│   │   ├── llm_api.py
-│   │   ├── OpenAIClient.py
-│   │   ├── OpenRouterClient.py
-│   │   ├── tool_loader.py
-│   │   └── ...
-│   ├── goals/                     # Goal YAML definitions for testing
-│   ├── saved_plans/               # Saved plan templates
 │   └── logs/                      # Runtime logs
 └── tests/                         # Test files
 ```
@@ -230,5 +216,4 @@ Cognitive_workbench/
 ## Next
 
 - [Getting Started](getting-started.md) — first run walkthrough
-- [Architecture](architecture.md) — how the components fit together
 - [Tools & Primitives](tools-and-primitives.md) — tool catalog reference
