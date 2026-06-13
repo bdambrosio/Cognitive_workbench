@@ -67,8 +67,8 @@ characters:
     # session and persisted to a chat-state Note across restarts). The
     # in-session /set-external-repo / /clear-external-repo slash commands
     # override this — Note wins on conflict.
-    # NOTE: the original Linux path (/home/bruce/projects/Body/Body/) does
-    # not exist on macOS, which would leave inspect_external bound to a
+    # NOTE: the Linux path (/home/bruce/Downloads/ChatterBot) does not
+    # exist on macOS, which would leave inspect_external bound to a
     # missing directory. Left unbound here — set a real Mac path below or
     # bind at runtime with /set-external-repo.
     # external_repo: /Users/dambrosiobruce/path/to/repo/

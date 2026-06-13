@@ -85,7 +85,7 @@ characters:
     # session and persisted to a chat-state Note across restarts). The
     # in-session /set-external-repo / /clear-external-repo slash commands
     # override this — Note wins on conflict.
-    external_repo: /home/bruce/projects/Body/Body/
+    external_repo: /home/bruce/Downloads/ChatterBot
 
     character: |
       Jill is conversational, curious, and direct. She speaks from her

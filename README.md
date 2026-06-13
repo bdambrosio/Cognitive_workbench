@@ -156,7 +156,7 @@ currently summarized. Writes happen only via reflection; there is no
 in-loop write tool.
 
 **Tools.** Built-ins (`process_text`, `recall`, `inspect`,
-`inspect_external`, `security`, `body`, `display`, `respond`) plus a
+`inspect_external`, `security`, `display`, `respond`) plus a
 drop-in registry: every directory under `src/tools/` with a `Skill.md` and
 a `tool.py` exposing `react_invoke` is discovered at startup — currently
 web search, page fetch, calculator, email check, Obsidian, Semantic
@@ -172,7 +172,6 @@ traces land in sibling `*_traces/` directories.
 | `recall` (`src/chat/remember.py`) | per-world per-agent `memory/` dir | list, read, grep |
 | `inspect` / `inspect_external` (`src/chat/code_subagent.py`) | own `src/` or an externally-bound repo | list, read, grep (ripgrep) |
 | `security` (`src/chat/security.py`) | LAN, RFC1918 ranges only | nmap discovery/-sV, ss/ip |
-| `body` (`src/chat/body.py`) | Body robot sensors, read-only, own Zenoh session | capture_rgb, status |
 
 ```
                        user input                    tick sensor
@@ -186,7 +185,7 @@ traces land in sibling `*_traces/` directories.
                ┌─────── ReAct loop ◄─────────────────────┘
                │  thought → tool → observation ($stepN)
                │    built-ins · discovered tools
-               │    recall / inspect / security / body   (subagents)
+               │    recall / inspect / security   (subagents)
                │    respond ──► reply
                └──────────────│──────────────────────────
                               ▼
@@ -317,7 +316,7 @@ src/
     prompts.py           system-prompt assembly, orientation, history render
     zenoh_io.py          Zenoh session + browser/CLI queryables
     backend.py           LLM client (anthropic / OpenAI-compat / local)
-    remember.py · code_subagent.py · security.py · body.py   subagents
+    remember.py · code_subagent.py · security.py   subagents
   tools/                 drop-in ReAct tools (Skill.md + tool.py each)
   sensors/               drop-in sensors (tick, rss-watcher, …)
   affect/  canvas/       widget publishers + WS bridges + HTML
@@ -375,9 +374,10 @@ memory recall, recall-subagent prompt A/B, counterfactual self-prediction
   well-timed is currently judged anecdotally from `autonomy.jsonl`, not
   measured. It's the next evaluation gap.
 - No multi-agent coordination beyond Zenoh pub/sub primitives.
-- Body / robot integration is **not** in this repo — the Body stack (Pi
-  software, SLAM, navigation, teleop) lives in a separate repository; this
-  side only carries the read-only `body` subagent.
+- Robot integration is **not** in this repo — the robot stack (Pi software,
+  sensors, actuators) lives in a separate repository. The Jill-side binding
+  to the ChatterBot companion-bot head is a design note (`docs/jill-integration.md`),
+  not yet implemented.
 
 ## Reading
 

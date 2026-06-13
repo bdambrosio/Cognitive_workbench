@@ -255,15 +255,6 @@ class ToolsMixin:
             "or routing/interface state. v0.1 does NOT do traffic capture or IDS log inspection. Phrase as a "
             "natural-language question (e.g. \"what hosts are on my LAN at 192.168.1.0/24?\", \"what TCP ports "
             "am I listening on?\", \"what's my default gateway?\")."))
-        tools.append(("body",
-            "`{\"thought\": \"<one terse sentence>\", \"tool\": \"body\", \"query\": <string>}` — "
-            "sense the physical robot (the Body) over its Zenoh bus. A separate subagent (read-only typed "
-            "primitives: capture_rgb to grab a camera frame, status for driving/pose/health telemetry) runs the "
-            "probes and returns a synthesized answer. v1 is sensing only — it CANNOT drive, turn, or actuate. "
-            "capture_rgb returns a displayable image URL, not a scene description (it does not interpret the "
-            "image). Use when the user asks for a camera frame or the robot's pose/e-stop/motor state. Phrase as "
-            "a natural-language request (e.g. \"capture what the Body's camera sees\", \"what's the robot's "
-            "current pose and is the e-stop engaged?\")."))
         # Auto-discovered tools from src/tools/ (each exposes react_invoke).
         # Rendered between the built-in subagents and the display/respond
         # actions so the prompt's tool ordering matches its mental model:
