@@ -291,6 +291,12 @@ class ReactMixin:
         # reply rather than going stale.
         did_display = False
 
+        # Most-recent image produced by a tool this turn (e.g. camera-capture),
+        # injected into the multimodal content array below so the model can SEE
+        # it. Single slot (most-recent-wins) and reset each turn: a fresh frame
+        # replaces the old one, and stale frames don't leak across turns.
+        self._pending_tool_image = None
+
         self._affect.enter_loop()
         for i in range(REACT_MAX_ITERS):
             self._affect.set_react_iter(i + 1)
@@ -303,20 +309,28 @@ class ReactMixin:
             for fmt_attempt in range(REACT_MAX_FORMAT_RETRIES + 1):
                 pre_log_len = len(log)
                 usr_msg = user_prefix_str + log_appendage_str + trailer
-                # When the turn carries an image, every iter sends a
-                # multimodal content array (text first per vLLM's expected
-                # ordering, then image_url). The image must persist across
-                # iters: ReAct's parse-failure retry path drops back into
-                # iter 2+, and if the image were missing there, the model
-                # confabulates against its own prior text. Byte-stable image
-                # tokens across iters still let vLLM prefix-cache the text.
-                # No-image turns keep the plain-string content shape exactly
-                # as before — wire format byte-identical to pre-multimodal.
+                # When the turn carries any image, every iter sends a multimodal
+                # content array (text first per vLLM's expected ordering, then
+                # image_url blocks). Two image sources: the user-supplied image
+                # for this turn (image_url) and the most-recent tool-produced
+                # image (self._pending_tool_image, e.g. a camera-capture frame).
+                # Images must persist across iters: ReAct's parse-failure retry
+                # path drops back into iter 2+, and if an image were missing
+                # there, the model confabulates against its own prior text.
+                # Byte-stable image tokens across iters still let vLLM
+                # prefix-cache the text. No-image turns keep the plain-string
+                # content shape exactly as before — byte-identical wire format.
+                image_blocks: List[Any] = []
                 if image_url:
-                    user_content: Any = [
-                        {'type': 'text', 'text': usr_msg},
-                        {'type': 'image_url', 'image_url': {'url': image_url}},
-                    ]
+                    image_blocks.append(
+                        {'type': 'image_url', 'image_url': {'url': image_url}})
+                if self._pending_tool_image is not None:
+                    image_blocks.append(
+                        {'type': 'image_url',
+                         'image_url': {'url': self._pending_tool_image['data_uri']}})
+                if image_blocks:
+                    user_content: Any = [{'type': 'text', 'text': usr_msg},
+                                         *image_blocks]
                 else:
                     user_content = usr_msg
                 prompt = [

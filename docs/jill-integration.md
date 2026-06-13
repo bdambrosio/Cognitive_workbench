@@ -127,14 +127,58 @@ this later).
 - Head arbitration policy (§5).
 
 **Cognitive_workbench (Jill side):**
-- `sensor_runner`: dedicated isolated zenoh session to the Pi router (§3).
-- VAD-segment → STT → text injection into the chat-loop with source tags.
-- Generic sensor-event → concern-activation ingress (§4).
-- Tool wrappers for `head/cmd` and `camera/capture`/`camera/image` (decode
-  base64 JPEG; filter `camera/image` by `request_id` since it is broadcast).
-- TTS → `audio/out`, with self-voice gating (§6).
+- **DONE** — `head-move` + `camera-capture` drop-in tools (`src/tools/`), over a
+  shared isolated zenoh session to the Pi (`src/utils/chatter_link.py`,
+  `ChatterLink`; endpoint `CHATTER_ROUTER`, default `tcp/192.168.68.78:7447`).
+  `head-move` does pan/tilt/gesture and waits for an `arrived` status;
+  `camera-capture` requests a frame, filters `camera/image` by `request_id`,
+  decodes the base64 JPEG, and feeds it to the model as vision input (see §8).
+  Discrete tools, not a `body`-style subagent — actuation/capture are direct,
+  no extra reasoning hop. Live-verified against the Pi.
+- **DONE** — captured-image-as-vision wiring (§8).
+- TODO — `mic_driver` consumer: dedicated isolated zenoh session already exists
+  in `ChatterLink`; the STT path reuses it.
+- TODO — VAD-segment → STT → text injection into the chat-loop with source tags.
+- TODO — generic sensor-event → concern-activation ingress (§4).
+- TODO — TTS → `audio/out`, with self-voice gating (§6).
+- TODO — Tier 2/3 vision (§8).
 
-## 8. Topic contract (current vs to-build)
+## 8. Vision: captured images as model input
+
+A captured frame reaches the model as real vision input, not just a display
+URL. The mechanism is generic: a drop-in tool may return
+`{"status","text","image":{"data_uri","label"}}`; `_dispatch_discovered_tool`
+(`src/chat/tools.py`) stashes it in a single most-recent slot
+(`self._pending_tool_image`), and `_run_react_loop` (`src/chat/react.py`)
+injects it into the multimodal `content` array alongside any `/paste` image —
+the same path user-supplied images already use. `camera-capture` is the first
+user: it inlines the JPEG as a base64 data-URI (a local model server can't fetch
+the `127.0.0.1` `/local` URL, so vision goes via the data-URI; the `/local` URL
+stays in the text observation for canvas display).
+
+Constraints / decisions:
+- **Backend-gated**: only the OpenAI-compat route carries image content
+  (`backend.supports_image_input`). The `jill-chat` world's `local` server with a
+  multimodal model (gemma4-34B) qualifies; Anthropic-native and legacy-cloud
+  routes do not.
+- **Per-turn, single slot**: the captured frame is in view for the rest of the
+  turn it was taken in, then cleared. No stale cross-turn frame — re-capture is
+  cheap. Only the most recent capture is kept.
+- **Cost**: ~110 KB of base64 per capture, resent each remaining iter of the
+  turn. Fine for single captures; relevant before Tier 2's gaze loop.
+
+Capability tiers:
+- **Tier 0 (done)** — capture + `display` to screen.
+- **Tier 1 (done)** — VQA on the current frame: "what do you see?", "am I in
+  frame?", "is there a cat?".
+- **Tier 2 (deferred)** — closed-loop gaze ("point at me", "center on the cat"):
+  Tier 1 + iterative `head-move`, the multimodal model estimating the correction
+  (no separate detector), with an iteration cap and a one-time pan-sign
+  calibration (camera `hflip`/`vflip`). Slow/deliberate per `DESIGN.md §8`.
+- **Tier 3 (deferred)** — identity/recognition ("can you see John") against a
+  small reference-image library: multi-image LLM compare, or a face-rec pipeline.
+
+## 9. Topic contract (current vs to-build)
 
 JSON unless marked **binary**; all carry `ts` (unix epoch float). Authoritative
 list: `chatterbot/lib/topics.py` + `DESIGN.md §5`.
@@ -151,7 +195,7 @@ list: `chatterbot/lib/topics.py` + `DESIGN.md §5`.
 | `chatter/audio/out` | Jill→Pi | **binary** PCM + `{seq, ts}` (TTS) | declared, not built |
 | `chatter/status` | Pi→Jill | `{ts, processes, ...}` | declared, not built |
 
-## 9. Open questions
+## 10. Open questions
 
 - DOA-degrees → pan-angle mapping + smoothing (avoid jittery reflex) — Pi side.
 - Reflex/deliberative arbitration policy: explicit-cmd-override vs mode toggle

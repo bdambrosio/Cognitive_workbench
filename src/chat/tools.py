@@ -200,6 +200,17 @@ class ToolsMixin:
         status = result.get("status")
         text = str(result.get("text", "")).strip()
         if status == "ok":
+            # A tool may optionally return an image for the model to SEE
+            # (e.g. camera-capture). The image bytes never enter the text log:
+            # we stash a data-URI in the single most-recent slot and the ReAct
+            # loop injects it into the next iteration's multimodal content
+            # array. A text breadcrumb keeps the log self-explaining.
+            img = result.get("image")
+            if isinstance(img, dict) and img.get("data_uri"):
+                label = str(img.get("label") or "image").strip()
+                self._pending_tool_image = {"data_uri": img["data_uri"],
+                                            "label": label}
+                text = (text + f" [{label} attached as an image below]").strip()
             return "OK: " + text
         if status == "empty":
             return "EMPTY: " + (text or f"{name} produced no result")
