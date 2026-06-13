@@ -336,6 +336,12 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
         self._canvas = CanvasPublisher(
             key=canvas_default_key(self.character_name))
 
+        # Embodied idle micro-gaze for the ChatterBot head (launcher
+        # --head-aliveness). Off by default; no-op if the bot is absent.
+        from affect.head_aliveness import HeadAliveness
+        self._head_aliveness = HeadAliveness(
+            enabled=bool(character_config.get('head_aliveness_enabled', False)))
+
     # ------------------------------------------------------------------
     # LLM helper (used by character_evaluator and DiscourseTracker)
     # ------------------------------------------------------------------

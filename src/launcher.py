@@ -553,6 +553,9 @@ def main():
                         help='Enable autonomous concern firing in chat mode (off by default; '
                              'when off, the tick handler is a no-op so benchmarks and chat '
                              'scenarios behave identically regardless of active concerns).')
+    parser.add_argument('--head-aliveness', action='store_true',
+                        help='Drive gentle idle micro-gaze on the ChatterBot head '
+                             '(off by default; no-op if the bot is unreachable).')
     parser.add_argument('--affect', action='store_true',
                         help='Launch the affect (processing-state) widget window.')
     parser.add_argument('--affect-size', default='320x320',
@@ -614,6 +617,7 @@ def main():
         cfg['is_infospace'] = True
         cfg['map_name'] = world_name
         cfg['autonomy_enabled'] = bool(args.autonomy)
+        cfg['head_aliveness_enabled'] = bool(args.head_aliveness)
 
     if args.list_only:
         print("Characters:")

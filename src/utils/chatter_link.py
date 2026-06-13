@@ -42,6 +42,20 @@ _CHATTER_ROUTER = (
     or "tcp/192.168.68.78:7447"
 )
 
+# Safe head envelope + neutral/attentive pose. Source of truth: ChatterBot
+# docs/gaze-support.md §1 (measured for this mount). Mirrored by every agent-side
+# consumer (look-at-target, head_aliveness) so the geometry lives in one place.
+PAN_MIN, PAN_MAX = 10, 170          # 0=cam right, 170=cam left
+TILT_MIN, TILT_MAX = 30, 150        # 30=up, 115=horizontal, 150=~45° down
+NEUTRAL_PAN, NEUTRAL_TILT = 90, 113  # forward, horizontal ("attentive")
+
+
+def clamp_pose(pan, tilt):
+    """Clamp a (pan, tilt) pair into the safe envelope."""
+    return (max(PAN_MIN, min(PAN_MAX, pan)),
+            max(TILT_MIN, min(TILT_MAX, tilt)))
+
+
 # Topics.
 _T_HEAD_CMD = "chatter/head/cmd"
 _T_HEAD_STATUS = "chatter/head/status"

@@ -39,6 +39,7 @@ class ZenohMixin:
         self._zenoh_session = zenoh.open(make_localhost_config())
         self._affect.attach_session(self._zenoh_session)
         self._canvas.attach_session(self._zenoh_session)
+        self._head_aliveness.attach_session(self._zenoh_session)
         self._action_pub = self._zenoh_session.declare_publisher(
             f"cognitive/{self.character_name}/action"
         )
@@ -570,6 +571,10 @@ class ZenohMixin:
             self._canvas.close()
         except Exception as e:
             logger.warning(f"[{self.character_name}] canvas close failed: {e}")
+        try:
+            self._head_aliveness.close()
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] head_aliveness close failed: {e}")
         try:
             if self._sense_sub:
                 self._sense_sub.undeclare()

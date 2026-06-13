@@ -31,7 +31,9 @@ _SRC = os.path.dirname(os.path.dirname(_THIS))
 if _SRC not in sys.path:
     sys.path.insert(0, _SRC)
 
-from utils.chatter_link import get_link, jpeg_to_data_uri, router  # noqa: E402
+from utils.chatter_link import (  # noqa: E402
+    NEUTRAL_PAN, NEUTRAL_TILT, PAN_MAX, PAN_MIN, TILT_MAX, TILT_MIN,
+    get_link, jpeg_to_data_uri, router)
 from utils.json_utils import repair_json_string  # noqa: E402
 
 _log = logging.getLogger(__name__)
@@ -40,9 +42,9 @@ _OUT_DIR = Path("~/.cache/cognitive/chatterbot").expanduser()
 _CANVAS_PORT = os.environ.get("CANVAS_HTTP_PORT", "8789")
 
 # Safe head envelope + neutral pose (ChatterBot docs/gaze-support.md §1).
-_PAN_MIN, _PAN_MAX = 10, 170
-_TILT_MIN, _TILT_MAX = 30, 150
-_HOME_PAN, _HOME_TILT = 90, 113          # forward, horizontal
+_PAN_MIN, _PAN_MAX = PAN_MIN, PAN_MAX
+_TILT_MIN, _TILT_MAX = TILT_MIN, TILT_MAX
+_HOME_PAN, _HOME_TILT = NEUTRAL_PAN, NEUTRAL_TILT
 
 # Bounded per-cycle deltas (degrees) by bucket. left -> pan+, up -> tilt-.
 _H_STEP = {"left_a_lot": +18, "left_a_little": +7, "centered": 0,
