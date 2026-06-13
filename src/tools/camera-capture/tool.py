@@ -6,7 +6,6 @@ root, and returns a ready-to-display URL — mirroring generate-image's output s
 the `display` tool can render it. The image bytes never travel through the ReAct
 text log.
 """
-import base64
 import logging
 import os
 import sys
@@ -20,7 +19,7 @@ _SRC = os.path.dirname(os.path.dirname(_THIS))
 if _SRC not in sys.path:
     sys.path.insert(0, _SRC)
 
-from utils.chatter_link import get_link, router  # noqa: E402
+from utils.chatter_link import get_link, jpeg_to_data_uri, router  # noqa: E402
 
 _log = logging.getLogger(__name__)
 
@@ -57,8 +56,7 @@ def react_invoke(args, *, character_name=None, backend=None, logger=None):
     # Data-URI for the model's vision input — inline base64, like /paste. The
     # /local URL below is for the canvas display only; a local model server
     # generally can't fetch a 127.0.0.1 URL, so vision goes via the data-URI.
-    data_uri = "data:image/jpeg;base64," + base64.b64encode(
-        frame["jpeg"]).decode("ascii")
+    data_uri = jpeg_to_data_uri(frame["jpeg"])
 
     url = (f"http://127.0.0.1:{_CANVAS_PORT}/local?path="
            + urllib.parse.quote(str(out_path)))

@@ -135,13 +135,14 @@ this later).
   decodes the base64 JPEG, and feeds it to the model as vision input (see §8).
   Discrete tools, not a `body`-style subagent — actuation/capture are direct,
   no extra reasoning hop. Live-verified against the Pi.
-- **DONE** — captured-image-as-vision wiring (§8).
+- **DONE** — captured-image-as-vision wiring + Tier-2 closed-loop gaze
+  (`look-at-target`) (§8).
 - TODO — `mic_driver` consumer: dedicated isolated zenoh session already exists
   in `ChatterLink`; the STT path reuses it.
 - TODO — VAD-segment → STT → text injection into the chat-loop with source tags.
 - TODO — generic sensor-event → concern-activation ingress (§4).
 - TODO — TTS → `audio/out`, with self-voice gating (§6).
-- TODO — Tier 2/3 vision (§8).
+- TODO — Tier-3 vision (reference-image library) (§8).
 
 ## 8. Vision: captured images as model input
 
@@ -171,12 +172,44 @@ Capability tiers:
 - **Tier 0 (done)** — capture + `display` to screen.
 - **Tier 1 (done)** — VQA on the current frame: "what do you see?", "am I in
   frame?", "is there a cat?".
-- **Tier 2 (deferred)** — closed-loop gaze ("point at me", "center on the cat"):
-  Tier 1 + iterative `head-move`, the multimodal model estimating the correction
-  (no separate detector), with an iteration cap and a one-time pan-sign
-  calibration (camera `hflip`/`vflip`). Slow/deliberate per `DESIGN.md §8`.
+- **Tier 2 (done)** — closed-loop gaze ("point at me", "center on the cat"):
+  the `look-at-target` tool (`src/tools/look-at-target/`). It runs the whole
+  acquire→center loop internally and reuses `ChatterLink` (pose read → absolute
+  `head/cmd` → capture) plus its own multimodal `backend.chat` judgements — so
+  it is one opaque step in the parent ReAct trace, and cheap per cycle (a small
+  downscaled frame + a tight question, not the whole conversation). Details below.
 - **Tier 3 (deferred)** — identity/recognition ("can you see John") against a
   small reference-image library: multi-image LLM compare, or a face-rec pipeline.
+
+### Tier-2 gaze: control law (`look-at-target`)
+
+The geometry/limits live in ChatterBot `docs/gaze-support.md` §1 (authoritative);
+the agent mirrors them as constants: pan ∈ [10,170] (0=right, 170=left),
+tilt ∈ [30,150] (30=up, 115=horizontal, 150=~45°down), neutral ≈ pan 90 tilt 113.
+
+- **Perception → control.** Each cycle asks the vision model for the target's
+  position relative to frame center as **coarse buckets** — `h_pos` ∈
+  {left_a_lot, left_a_little, centered, right_a_little, right_a_lot}, `v_pos`
+  likewise up/down (structured output via `response_schema`). Coarse buckets are
+  what a general VLM does reliably; precise pixel/degree regression is not.
+- **Buckets → bounded delta.** a_lot ≈ 18°, a_little ≈ 7°, centered = 0. Signs
+  (camera `hflip/vflip` false): target left → pan **+**, target up → tilt **−**.
+  Applied relative to the current pose and **clamped to the envelope** every step.
+- **Acquire then center.** If the target isn't visible, sweep a fixed set of
+  in-envelope waypoints (3 pan × 2 tilt, near horizontal), capturing at each,
+  until it appears or the set is exhausted (`empty: couldn't find …`). Then the
+  centering loop runs to a cap (≤5 iters) with a halve-on-flip anti-oscillation
+  guard, stopping when both axes read `centered`.
+- **Once, not continuous.** It centers a roughly-static target and returns the
+  final pose + frame (attached as the model's view via the §8 image contract,
+  plus a `/local` display URL). A moving subject gets best-effort, not tracking.
+- **Speed/settle/limits are also Pi-side** (`gaze-support.md` §2): envelope
+  clamp, a `max_deg_per_s` rate limit, and `arrived`-means-settled (kills capture
+  blur). The agent clamps and bounds too (defense-in-depth) but relies on the Pi
+  for settle and rate.
+- **Cost.** Assessment frames are downscaled to ~640×360 (`jpeg_to_data_uri`
+  `max_wh`); the final returned frame is full res. Each cycle ≈ move+settle +
+  capture + one VLM call.
 
 ## 9. Topic contract (current vs to-build)
 

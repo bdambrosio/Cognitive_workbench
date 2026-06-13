@@ -72,6 +72,25 @@ def _payload_bytes(sample: Any) -> bytes:
     return bytes(payload)
 
 
+def jpeg_to_data_uri(jpeg: bytes, max_wh: Optional[tuple] = None) -> str:
+    """Build a `data:image/jpeg;base64,...` URI from JPEG bytes for use as LLM
+    vision input. If max_wh=(w,h) is given, downscale first (preserving aspect)
+    to cut size/latency — used for the gaze loop's assessment frames. Downscale
+    failure falls back to the full frame (logged, never silent)."""
+    if max_wh is not None:
+        try:
+            import io
+            from PIL import Image
+            im = Image.open(io.BytesIO(jpeg))
+            im.thumbnail(max_wh)
+            buf = io.BytesIO()
+            im.convert("RGB").save(buf, format="JPEG", quality=85)
+            jpeg = buf.getvalue()
+        except Exception as e:
+            logger.warning(f"chatter: downscale failed, using full frame: {e}")
+    return "data:image/jpeg;base64," + base64.b64encode(jpeg).decode("ascii")
+
+
 class ChatterLink:
     """Owns the Zenoh session to the ChatterBot Pi: head/camera publishers,
     a latest-value cache for head/status, and the camera/image request/reply
