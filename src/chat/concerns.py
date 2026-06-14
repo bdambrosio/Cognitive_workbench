@@ -305,17 +305,19 @@ class ConcernsMixin:
             entity = str(seed.get('entity', 'User') or 'User')
             name = self._seed_concern_name(idx)
             reviewer = bool(seed.get('user_model_reviewer'))
+            self_ext = bool(seed.get('self_extension'))
             if name in self.resource_manager.named_notes:
                 # Already seeded; preserve any edits — but sync the
-                # reviewer designation so config can flag an existing
-                # seed note (heat coupling targets this property).
-                if reviewer:
-                    note = self.resource_manager.get_resource(
-                        self.resource_manager.named_notes[name])
-                    if note and not (note.get('properties') or {}).get(
-                            'user_model_reviewer'):
-                        note.setdefault('properties', {})[
-                            'user_model_reviewer'] = True
+                # designation flags so config can flag an existing seed
+                # note (heat coupling / reflection target these properties).
+                note = self.resource_manager.get_resource(
+                    self.resource_manager.named_notes[name])
+                if note:
+                    props = note.setdefault('properties', {})
+                    if reviewer and not props.get('user_model_reviewer'):
+                        props['user_model_reviewer'] = True
+                    if self_ext and not props.get('self_extension'):
+                        props['self_extension'] = True
                 continue
             rhythm_h = seed.get('rhythm_hours')
             if rhythm_h is None:
@@ -325,12 +327,16 @@ class ConcernsMixin:
                     rhythm_h = float(seed.get('cadence_days')) * 24.0
                 except (TypeError, ValueError):
                     rhythm_h = None
+            extra: Dict[str, Any] = {}
+            if reviewer:
+                extra['user_model_reviewer'] = True
+            if self_ext:
+                extra['self_extension'] = True
             self._add_agent_concern(
                 text, entity=entity, provenance='asserted', seed=True,
                 name=name, rhythm_hours=rhythm_h, rhythm_source='external',
                 instruction=seed.get('instruction'),
-                extra_properties=(
-                    {'user_model_reviewer': True} if reviewer else None))
+                extra_properties=extra or None)
 
     # ------------------------------------------------------------------
     # Concern creation: shared note-create path + per-collection helpers.
@@ -789,6 +795,58 @@ class ConcernsMixin:
                 f"[{self.character_name}] user_concern crossed "
                 f"{_USER_CONCERN_HIGH_STRENGTH} strength; bumped reviewer "
                 f"{nid} to activation={props['activation']:.2f}")
+
+    def _self_extension_concern_id(self) -> Optional[str]:
+        """Note id of the active agent_concern flagged self_extension
+        (the propose-new-tools seed), or None. Reflection records gaps
+        onto it; _handle_tick tags its fires as capability_proposal."""
+        for nid, note, _a in self._iter_active_agent_concerns():
+            if (note.get('properties') or {}).get('self_extension'):
+                return nid
+        return None
+
+    def _record_capability_gap(self, gap: str) -> None:
+        """Reflection noticed {character} lacked a tool this turn. Append
+        the gap to the self-extension concern's WIP (so it rides into the
+        fire frame) and evidence-bump its activation (so recurring gaps
+        fire ahead of the weekly rhythm). No-op if the seed is absent.
+        Repetition in WIP is informative — it's the recurrence signal the
+        fire instruction looks for — so gaps are not deduped at capture."""
+        gap = (gap or '').strip()
+        if not gap:
+            return
+        nid = self._self_extension_concern_id()
+        if not nid:
+            logger.debug(
+                f"[{self.character_name}] capability gap noted but no "
+                f"self_extension concern present; dropping: {gap[:80]!r}")
+            return
+        note = self.resource_manager.get_resource(nid)
+        if not note:
+            return
+        props = note.setdefault('properties', {})
+        now_iso = datetime.now(timezone.utc).isoformat()
+        day = now_iso[:10]
+        entry = f"GAP NOTED ({day}): {gap}"
+        prev_wip = str(props.get('wip', '') or '').strip()
+        new_wip = (prev_wip + "\n" + entry).strip() if prev_wip else entry
+        # Cap to the same budget as post-fire WIP; keep the most-recent
+        # tail when over budget (recent gaps matter most).
+        if len(new_wip) > _CONCERN_WIP_MAX_CHARS:
+            new_wip = new_wip[-_CONCERN_WIP_MAX_CHARS:]
+        props['wip'] = new_wip
+        props['wip_updated_at'] = now_iso
+        self._apply_agent_concern_evidence_bump(props, now_iso)
+        self._write_autonomy_event({
+            'event': 'capability_gap',
+            'concern_id': nid,
+            'gap': gap,
+            'activation': round(float(props.get('activation', 0.0) or 0.0), 3),
+        })
+        logger.info(
+            f"[{self.character_name}] capability gap recorded → "
+            f"self_extension concern {nid} activation="
+            f"{props['activation']:.2f}: {gap[:80]!r}")
 
     @staticmethod
     def _apply_agent_concern_evidence_bump(props: Dict[str, Any],

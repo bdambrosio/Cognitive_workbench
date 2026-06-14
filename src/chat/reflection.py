@@ -189,6 +189,14 @@ class ReflectionMixin:
         "    `urgency` if user signaled importance ('track this closely')\n"
         "    `default` if you guessed (default to 168 / weekly when guessing)\n"
         "{narrowness_rule}\n\n"
+        "STAGE 5 — Capability gap. If, during THIS exchange, {character} "
+        "needed a tool or capability she does not have in order to fully "
+        "help {entity} — she had to decline, do the thing manually or "
+        "awkwardly, or simply could not act — describe that gap in ONE "
+        "plain sentence: what she needed to do and couldn't. This is about "
+        "{character}'s OWN tooling, NOT {entity}'s preoccupations. Most "
+        "turns have no gap — return null. Do not invent a gap to seem "
+        "useful; only report one the exchange actually evidenced.\n\n"
         "Output ONLY this JSON shape — nothing else, no prose:\n"
         "  {{\"frame\": \"<hypothetical|roleplay|counterfactual|instructional|none>\",\n"
         "   \"memories\": [{{\"text\": \"...\", \"category\": \"fact|preference|commitment\", \"polarity\": \"positive|negative\"}}, ...],\n"
@@ -200,7 +208,8 @@ class ReflectionMixin:
         "     \"instruction\": \"<imperative>|null\",\n"
         "     \"rhythm_hours\": <int|null>,\n"
         "     \"rhythm_source\": \"external|urgency|default\"\n"
-        "   }}, ...]}}\n\n"
+        "   }}, ...],\n"
+        "   \"capability_gap\": \"<one sentence>\"|null}}\n\n"
         "WORKED EXAMPLE 1. {entity}: \"Please keep an eye on S&P 500 "
         "closes — I want to hear about them every day.\"\n"
         "Output:\n"
@@ -245,8 +254,19 @@ class ReflectionMixin:
         "    \"context\": \"{entity} has settled the core distinction (concerns = persistent evaluative pressure; tasks = what emerges past threshold) and moved on to designing the triage step between them. Wants a thinking partner on triage design specifically.\"}}],\n"
         "  \"user_concerns_closed\": [],\n"
         "  \"agent_concerns\": []}}\n\n"
+        "WORKED EXAMPLE 5 (capability gap). {entity}: \"Can you convert 3pm "
+        "Tokyo time to my timezone?\" {character} has no timezone tool and "
+        "works it out by hand. A real exchange with no durable items, but a "
+        "tooling gap surfaced:\n"
+        "{{\"frame\": \"none\", \"memories\": [],\n"
+        "  \"user_concerns\": [],\n"
+        "  \"user_concerns_updated\": [],\n"
+        "  \"user_concerns_closed\": [],\n"
+        "  \"agent_concerns\": [],\n"
+        "  \"capability_gap\": \"I had to convert between timezones by hand "
+        "because I have no tool for timezone conversion.\"}}\n\n"
         "If frame≠none or nothing qualifies: return the envelope with all "
-        "lists empty."
+        "lists empty and capability_gap null."
     )
 
     def _reflect_and_remember(self, source: str) -> Tuple[List[str], List[str], List[str]]:
@@ -339,6 +359,15 @@ class ReflectionMixin:
                     f"[{self.character_name}] reflection suppressed "
                     f"(frame={frame!r}) — nothing written")
                 return ([], [], [])
+
+            # Capability gap (STAGE 5): {character} lacked a tool this turn.
+            # Routed to the self-extension concern (WIP + evidence bump),
+            # not the memory/concern lists. Read straight off the payload —
+            # _parse_reflection_payload doesn't carry it.
+            if isinstance(payload, dict):
+                gap = str(payload.get('capability_gap') or '').strip()
+                if gap and gap.lower() not in ('null', 'none'):
+                    self._record_capability_gap(gap)
 
             mems_written: List[str] = []
             for text, category, polarity in raw_memories:

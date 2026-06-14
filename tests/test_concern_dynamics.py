@@ -472,3 +472,84 @@ def test_render_user_concerns_block_includes_context():
     assert "- [0.90] topic A" in block
     assert "    evidence + stance here" in block
     assert "- [0.50] topic B" in block
+
+
+# ── capability gaps → self-extension concern (Phase 2a) ────────────────
+
+def _inject_agent_collection(loop):
+    """Real agent_concerns collection so _iter_active_agent_concerns walks
+    it (mirrors the fixture's user_concerns injection — no embedder)."""
+    mgr = loop.resource_manager
+    mgr.resource_registry["Collection_ac"] = {
+        "name": "Collection_ac",
+        "type": mgr.resource_types.Collection,
+        "location": (0, 0),
+        "description": "test agent_concerns",
+        "remove_on_take": False,
+        "properties": {"content": [], "format": "list",
+                       "collection_name": "agent_concerns",
+                       "kind": "agent_concerns"},
+    }
+    loop._agent_concerns_collection_id = "Collection_ac"
+
+
+def _add_to_agent_collection(loop, nid):
+    loop.resource_manager.resource_registry["Collection_ac"][
+        "properties"]["content"].append(nid)
+
+
+def test_capability_gap_records_to_self_extension_concern(loop, tmp_path):
+    _inject_agent_collection(loop)
+    nid = make_concern(loop, activation=0.2, extra={"self_extension": True})
+    _add_to_agent_collection(loop, nid)
+
+    assert loop._self_extension_concern_id() == nid
+
+    loop._record_capability_gap(
+        "I had to convert timezones by hand because I have no tool for it.")
+
+    props = loop.resource_manager.get_resource(nid)["properties"]
+    # Gap lands in WIP (rides into the fire frame) ...
+    assert "no tool for it" in props["wip"]
+    assert "GAP NOTED" in props["wip"]
+    assert "wip_updated_at" in props
+    # ... and evidence-bumps activation (recurring gaps fire ahead of rhythm).
+    assert props["activation"] == pytest.approx(0.2 + _AGENT_CONCERN_BUMP_AMOUNT)
+
+    # A second gap appends, not overwrites.
+    loop._record_capability_gap("I could not fetch the weather.")
+    wip = loop.resource_manager.get_resource(nid)["properties"]["wip"]
+    assert "no tool for it" in wip and "fetch the weather" in wip
+
+    # Distinct autonomy.jsonl events for the eval surface.
+    recs = [json.loads(l) for l in
+            (tmp_path / "autonomy.jsonl").read_text().strip().splitlines()]
+    gap_events = [r for r in recs if r.get("event") == "capability_gap"]
+    assert len(gap_events) == 2
+    assert gap_events[0]["concern_id"] == nid
+    assert "no tool" in gap_events[0]["gap"]
+
+
+def test_capability_gap_noop_without_seed(loop, tmp_path):
+    _inject_agent_collection(loop)
+    nid = make_concern(loop, activation=0.5)  # plain, not self_extension
+    _add_to_agent_collection(loop, nid)
+
+    assert loop._self_extension_concern_id() is None
+    loop._record_capability_gap("some gap")  # no-op, no crash
+
+    props = loop.resource_manager.get_resource(nid)["properties"]
+    assert "wip" not in props
+    assert props["activation"] == 0.5
+    p = tmp_path / "autonomy.jsonl"
+    assert not p.exists() or not p.read_text().strip()
+
+
+def test_capability_gap_empty_is_ignored(loop, tmp_path):
+    _inject_agent_collection(loop)
+    nid = make_concern(loop, activation=0.3, extra={"self_extension": True})
+    _add_to_agent_collection(loop, nid)
+    loop._record_capability_gap("   ")
+    props = loop.resource_manager.get_resource(nid)["properties"]
+    assert "wip" not in props
+    assert props["activation"] == 0.3

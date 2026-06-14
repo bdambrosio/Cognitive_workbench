@@ -1002,6 +1002,9 @@ class InfospaceResourceManager:
                           # Designates the agent_concern that reviews the
                           # user model (heat-coupling bump target).
                           'user_model_reviewer',
+                          # Designates the agent_concern that proposes new
+                          # tools to close capability gaps (self-extension).
+                          'self_extension',
                           # Fire-time triage cache + per-concern WIP
                           # (running summary of autonomous-fire findings,
                           # kept on the root concern of a successor chain).

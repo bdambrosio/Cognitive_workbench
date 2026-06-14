@@ -1445,6 +1445,11 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
                 'instruction': instruction,
                 'started_at': started_at.isoformat(),
             }
+            # Tag self-extension fires so autonomy_review can score the
+            # capability-proposal stream distinctly (Phase 2a).
+            fired_note = self.resource_manager.get_resource(nid)
+            if fired_note and (fired_note.get('properties') or {}).get('self_extension'):
+                outcome['kind'] = 'capability_proposal'
             # Imperative wrapper. Without it, instruction bodies written
             # as reference docs ("InfluxDB lives at...") get acknowledged
             # rather than executed. The framing forces "act now" and
