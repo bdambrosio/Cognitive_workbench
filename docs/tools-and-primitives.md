@@ -194,6 +194,7 @@ These live in `src/tools/` and are always available:
 | Tool | Description |
 |------|-------------|
 | `stock-price` | Get current stock quote (price, change, volume). Requires `ALPHA_VANTAGE_API_KEY` |
+| `get_financial_statements` | Fetch standardized income / balance / cash-flow / earnings / overview statements for a ticker (recent annual+quarterly JSON). Same `ALPHA_VANTAGE_API_KEY`; handles the free-tier throttle and self-throttles. |
 
 ### System & Management
 

@@ -4,8 +4,18 @@ Design for forcing Jill's self-extension proposals to **start from "what can I
 extend?"** instead of "what would I write from scratch?" — by requiring an
 `inspect` pass over the codebase before any "build tool X" proposal.
 
-Status: **Option A specified + chosen for implementation 2026-06-19.** Option B
-held in reserve.
+Status: **Option A implemented 2026-06-19, but observed live to be
+insufficient the same day** (see "Known gaps", below). Option B held in reserve.
+
+> **Author skepticism (Bruce, 2026-06-19):** I have NOT fully reviewed these
+> proposals. My working suspicion is that this whole gating apparatus may be
+> over-designed and bureaucratic for what is, so far, a couple of observed
+> misfires. Treat everything below as a candidate design under review, not a
+> settled plan. The simpler responses — do nothing, delete bad concerns by
+> hand when they appear, or just tighten what an autonomous fire is *allowed
+> to do* — are live alternatives and may well be the right call. Do not build
+> out Option B (or further machinery) without an explicit decision that the
+> problem is real and recurring enough to justify the cost.
 
 ## Why
 
@@ -140,8 +150,59 @@ data justifies it.
   (via import sites in `src/`). Manifest-aware checks would need a wider
   geofence or a dedicated query — a separate, larger change, not this prototype.
 
-## Recommendation
+## Known gaps (observed live 2026-06-19)
 
-Ship Option A (instruction amendment), instrument with the audit above, hold
-Option B in reserve. One-file prompt change, reuses the entire inspect stack,
-directly targets the failure mode — the smallest thing that could work.
+Within hours of shipping Option A, the live `jill_chat` session demonstrated the
+gate does not cover the path that actually misbehaves. From `autonomy.jsonl`, a
+chain of **derived** concerns built FMP from scratch — duplicating the existing
+Alpha Vantage tool, contradicting the locked AV decision (which Jill herself
+flagged), and emitting low-quality code (wrong FMP base URL, missing `/v3/`):
+
+- `Note_3360` "Research and propose implementation for financial API tool" →
+  instruction "Evaluate FMP and Finnhub APIs to define the exact tool schema…"
+- `Note_3366` "Implement FMP API tool wrapper" → instruction "Write the full
+  implementation … for the user or Fable 5 to deploy."
+
+(Both were deleted by hand in the live session via the resource browser. Note:
+deleting the derived concerns may not stop recurrence if the upstream gap signal
+on the seed concern's WIP persists — watch later ticks.)
+
+Three distinct gaps, each with where a fix would live — **all unverified and
+possibly not worth fixing** (see author skepticism up top):
+
+1. **Persisted seeds ignore instruction edits.** `concerns.py:309-321` — a
+   seed concern already in `named_notes` is preserved on re-seed; only boolean
+   flags sync, never `instruction`/`text`. So the Option-A amendment never
+   reaches an existing world's seed, even on restart. A fix would mean a
+   one-time migration of the persisted instruction, or letting seeding refresh
+   instruction text (risky — clobbers any in-world edits).
+
+2. **The derivation/escalation path is unguarded.** The misfires were *derived*
+   concerns with their own imperative instructions, not the seed — so the
+   seed-instruction gate is structurally irrelevant to them. Whatever turns a
+   capability gap into a "research X" then "implement X" concern is where a
+   reuse-check would actually bite. This is Option B territory and larger; not
+   scoped here.
+
+3. **"Write deployable code" is an autonomously-fireable outcome.** `Note_3366`
+   autonomously produced ship-ready code against a decision Jill knew about.
+   Arguably the cheapest and most robust fix is not more gating but a *ceiling
+   on autonomous outcomes* — an autonomous fire may research/propose in words,
+   but may not emit deployable implementations without a human in the loop. This
+   would live at the fire-dispatch step (`chat_loop.py` `_handle_tick`, the
+   self-extension/derived branch ~1463-1487) and would neutralize the observed
+   failure without any inspect machinery at all.
+
+Gap 3 in particular suggests the simpler lever (constrain what a fire may *do*)
+may dominate the whole inspect-gating approach. Decide which problem is real
+before building either.
+
+## Recommendation (under review — see skepticism)
+
+As originally drafted: ship Option A, instrument with the audit, hold Option B
+in reserve. **But the 2026-06-19 live evidence weakens this** — Option A as
+built doesn't reach the misbehaving path, and the cheapest effective fix may be
+Gap 3's outcome-ceiling rather than any reuse-gate. Pending Bruce's review, the
+honest status is: problem not yet shown to be recurring enough to justify the
+machinery; do-nothing + hand-delete + (maybe) an outcome ceiling are the leading
+options. No further build without an explicit go.

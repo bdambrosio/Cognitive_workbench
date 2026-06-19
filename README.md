@@ -160,8 +160,8 @@ in-loop write tool.
 drop-in registry: every directory under `src/tools/` with a `Skill.md` and
 a `tool.py` exposing `react_invoke` is discovered at startup — currently
 web search, page fetch, calculator, email check, Obsidian, Semantic
-Scholar, stock quotes, image generation, shell scripts, and others. No
-core edits to add one.
+Scholar, stock quotes, company financial statements, image generation,
+shell scripts, and others. No core edits to add one.
 
 **Geofenced subagents.** Persona-less ReAct loops scoped to a typed
 surface; from the parent's vantage each call is one step, and per-call
@@ -376,8 +376,10 @@ memory recall, recall-subagent prompt A/B, counterfactual self-prediction
 - No multi-agent coordination beyond Zenoh pub/sub primitives.
 - Robot integration is **not** in this repo — the robot stack (Pi software,
   sensors, actuators) lives in a separate repository. The Jill-side binding
-  to the ChatterBot companion-bot head is a design note (`docs/jill-integration.md`),
-  not yet implemented.
+  to the ChatterBot companion-bot head is mostly a design note
+  (`docs/jill-integration.md`); the voice path (mic→turn sensor,
+  `src/chat/voice_sensor.py`, launcher `--voice`) is the first piece
+  implemented, the rest remains design.
 
 ## Reading
 

@@ -1,7 +1,8 @@
 # docs/ Status Index
 
 Classification of every doc against the live codebase as of **2026-06-09**
-(superseded set deleted **2026-06-11**).
+(superseded set deleted **2026-06-11**; financial-tools / voice-sensor /
+capability-gap-gating docs registered **2026-06-19**).
 
 Context: the OODA executive, incremental planner (Stage 0–3, envisioning,
 vision eval), GoalScheduler, and task-execution machinery were deleted
@@ -29,6 +30,7 @@ Categories:
 | [commands.md](commands.md) | Chat-CLI slash commands (rewritten 2026-06-11 against `src/cli.py`; task/goal-era commands removed) |
 | [concerns-architecture.md](concerns-architecture.md) | Concern layers + dynamics; triage step implemented 2026-06 |
 | [configuration.md](configuration.md) | Scenario YAML / LLM / tool configuration |
+| [cw-voice-sensor.md](cw-voice-sensor.md) | CW-side ChatterBot voice sensor (mic→turn): `src/chat/voice_sensor.py`, `src/utils/voice_pipeline.py` — shipped 2026-06-19 |
 | [getting-started.md](getting-started.md) | Install, venv, credentials |
 | [musing_spec.md](musing_spec.md) | Musing LoRA-adapter biasing (`src/musing/`) |
 | [self-awareness-benchmarks.md](self-awareness-benchmarks.md) | Four-tier self-awareness bench (`bench/introspective_fidelity/`) |
@@ -46,7 +48,12 @@ Categories:
 | Doc | Covers |
 |---|---|
 | [METHOD_TOOLS.md](METHOD_TOOLS.md) | Protocol-based multi-step "method tools" — not implemented |
+| [audio-out-design.md](audio-out-design.md) | ChatterBot audio-out ("say"); Pi player built/bench-verified, CW binding + ElevenLabs live test pending |
+| [capability-gap-reuse-gating.md](capability-gap-reuse-gating.md) | Reuse-gating self-extension proposals via an `inspect` pass; Option A shipped but found insufficient live 2026-06-19 — under review (author skeptical it's worth the machinery) |
 | [conversation_goal_wrapper_spec.md](conversation_goal_wrapper_spec.md) | Conversational context wrapper draft |
+| [cw-voice-sensor-plan.md](cw-voice-sensor-plan.md) | Build plan behind the shipped voice sensor (cross-repo: Pi mic path + CW consumer) |
+| [financial-analysis-tools-plan.md](financial-analysis-tools-plan.md) | AV `get_financial_statements` tool + PDF→markdown helper LIVE 2026-06-19; document-inspection subagent deferred |
+| [jill-integration.md](jill-integration.md) | Jill↔ChatterBot head binding design; voice sensor is the first piece live, rest design |
 | [knowledge-base-system.md](knowledge-base-system.md) | Obsidian-backed three-tier knowledge base; obsidian tool exists, full KB system doesn't |
 | [load-slice-spec.md](load-slice-spec.md) | Unified load-with-slicing primitive |
 | [plan-review-eval-taskset.md](plan-review-eval-taskset.md) | 18-goal review eval protocol (machinery it tested is gone; methodology reusable) |
