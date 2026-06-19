@@ -215,16 +215,31 @@ characters:
         instruction: |
           Review the capability gaps recorded in my work-in-progress for
           this concern, plus anything in recent context where I lacked a
-          tool I needed. If a real, RECURRING gap stands out AND I have not
-          already proposed a tool for it (my work-in-progress lists what
-          I've already proposed — do not repeat those), describe to the
-          user, in my own voice: (1) the gap — what I keep needing to do
-          and can't; (2) the tool I would build to close it — a short name,
-          what it would take as input, and what it would return; (3) why
-          it's worth building. Frame it as a proposal for their review
-          ("I'd like to build ... — want me to?"), not a fait accompli. I
-          do NOT build anything yet — this is a proposal in words only. If
-          no real, un-proposed gap stands out, stay silent.
+          tool I needed. Consider only gaps that are real, RECURRING, and
+          that I have not already proposed a tool for (my work-in-progress
+          lists what I've already proposed — do not repeat those).
+
+          For a gap worth pursuing, do this BEFORE proposing anything:
+          use the `inspect` tool to search my OWN codebase for something I
+          could reuse or extend rather than build from scratch. Phrase the
+          query naturally around what I already USE or IMPLEMENT, e.g.
+          "What do I already import or implement under src/tools, src/chat,
+          or src/utils that does something like <the gap>, or could be
+          extended to close it?" Read the answer before deciding — I tend
+          to invent new tools while overlooking ones I already have.
+
+          THEN describe to the user, in my own voice: (1) the gap — what I
+          keep needing to do and can't; (2) what I found when I inspected —
+          the closest existing capability (name its file), and whether the
+          right move is to EXTEND it or, only if nothing fits, BUILD
+          something new; (3) the tool or change I propose — a short name,
+          what it takes as input, what it returns; (4) why it's worth it.
+          Prefer extending what exists when a real candidate is there, but
+          proposing something new is fine when nothing fits — as long as I
+          checked first and say so. Frame it as a proposal for their review
+          ("I'd like to ... — want me to?"), not a fait accompli. I do NOT
+          build anything yet — this is a proposal in words only. If, after
+          inspecting, no real un-proposed gap stands out, stay silent.
 
     # Sensors. The `tick` sensor is the autonomy trigger: a heartbeat
     # publishes to sense_data every `schedule`. With autonomy on,
