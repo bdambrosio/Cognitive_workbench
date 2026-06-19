@@ -40,6 +40,7 @@ class ZenohMixin:
         self._affect.attach_session(self._zenoh_session)
         self._canvas.attach_session(self._zenoh_session)
         self._head_aliveness.attach_session(self._zenoh_session)
+        self._voice_sensor.attach_session(self._zenoh_session)
         self._action_pub = self._zenoh_session.declare_publisher(
             f"cognitive/{self.character_name}/action"
         )
@@ -124,12 +125,14 @@ class ZenohMixin:
         text = ""
         close = False
         image_url: Optional[str] = None
+        modality: Optional[str] = None
         if isinstance(content, str):
             try:
                 inner = json.loads(content)
                 source = inner.get('source', source)
                 text = inner.get('text', '')
                 close = bool(inner.get('close', False))
+                modality = inner.get('modality')
                 img = inner.get('image')
                 if isinstance(img, dict):
                     url = img.get('url')
@@ -141,6 +144,7 @@ class ZenohMixin:
             source = content.get('source', source)
             text = content.get('text', '')
             close = bool(content.get('close', False))
+            modality = content.get('modality')
             img = content.get('image')
             if isinstance(img, dict):
                 url = img.get('url')
@@ -160,9 +164,11 @@ class ZenohMixin:
         msg: Dict[str, Any] = {'kind': 'user', 'source': source, 'text': text, 'close': close}
         if image_url:
             msg['image_url'] = image_url
+        if modality:
+            msg['modality'] = modality
         self._inbox.put(msg)
 
-    def _publish_say(self, text: str) -> None:
+    def _publish_say(self, text: str, *, speak: bool = False) -> None:
         if not self._action_pub:
             return
         payload = {
@@ -175,6 +181,38 @@ class ZenohMixin:
             self._action_pub.put(json.dumps(payload).encode('utf-8'))
         except Exception as e:
             logger.warning(f"[{self.character_name}] publish failed: {e}")
+        # Voice-sourced turns also get spoken: synthesize and ship to the bot's
+        # chatter/audio/out (docs/audio-out-design.md). Off-thread so the chat
+        # loop never blocks on the ElevenLabs round-trip; self-voice gating is
+        # Pi-side (mic muted during playback), so nothing to coordinate here.
+        if speak:
+            self._speak_async(text)
+
+    def _speak_async(self, text: str) -> None:
+        import threading
+
+        def _run() -> None:
+            try:
+                from utils.voice_pipeline import synthesize
+                from utils.chatter_link import get_link
+                pcm = synthesize(text)
+                if not pcm:
+                    return  # synthesize() logged the reason (no key/voice/etc.)
+                link = get_link()
+                err = link.ensure()
+                if err:
+                    logger.warning(
+                        f"[{self.character_name}] chatter link unavailable "
+                        f"for TTS: {err}")
+                    return
+                seq = link.send_audio_out(pcm)
+                logger.info(
+                    f"[{self.character_name}] spoke utterance seq={seq} "
+                    f"({len(pcm)} pcm bytes)")
+            except Exception as e:
+                logger.warning(f"[{self.character_name}] TTS say failed: {e}")
+
+        threading.Thread(target=_run, name="tts-say", daemon=True).start()
 
     # ------------------------------------------------------------------
     # Resource queryable handlers (chat-mode subset of executive_node)
@@ -575,6 +613,10 @@ class ZenohMixin:
             self._head_aliveness.close()
         except Exception as e:
             logger.warning(f"[{self.character_name}] head_aliveness close failed: {e}")
+        try:
+            self._voice_sensor.close()
+        except Exception as e:
+            logger.warning(f"[{self.character_name}] voice_sensor close failed: {e}")
         try:
             if self._sense_sub:
                 self._sense_sub.undeclare()

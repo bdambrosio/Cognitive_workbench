@@ -113,6 +113,10 @@ src/ERROR
 *.mp4
 *.pptx
 *.pdf
+# TTS samples / audio scratch (e.g. tts_samples/)
+*.wav
+# stray text-to-image scratch output
+/flux-klein.png
 # Ignore stray images in docs, but keep functional icons/assets
 docs/*.png
 # Keep browser_extension icons and src/static tracked (small, functional)

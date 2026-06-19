@@ -556,6 +556,15 @@ def main():
     parser.add_argument('--head-aliveness', action='store_true',
                         help='Drive gentle idle micro-gaze on the ChatterBot head '
                              '(off by default; no-op if the bot is unreachable).')
+    parser.add_argument('--voice', action='store_true',
+                        help='Enable the ChatterBot voice sensor: Pi mic → STT → '
+                             'user-like turns, with wake-word head-orient (off by '
+                             'default; no-op if the bot is unreachable).')
+    parser.add_argument('--wake', default=None, metavar='PHRASE',
+                        help='Wake phrase for --voice (default: Jill, or '
+                             'CW_WAKE_WORD). Every turn is gated on it: a literal '
+                             'match is the free fast path; a semantic '
+                             'address-check is the fallback on a miss.')
     parser.add_argument('--affect', action='store_true',
                         help='Launch the affect (processing-state) widget window.')
     parser.add_argument('--affect-size', default='320x320',
@@ -618,6 +627,8 @@ def main():
         cfg['map_name'] = world_name
         cfg['autonomy_enabled'] = bool(args.autonomy)
         cfg['head_aliveness_enabled'] = bool(args.head_aliveness)
+        cfg['voice_enabled'] = bool(args.voice)
+        cfg['voice_wake_word'] = args.wake
 
     if args.list_only:
         print("Characters:")

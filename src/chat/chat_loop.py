@@ -44,6 +44,7 @@ from affect.publisher import AffectPublisher  # noqa: E402
 from canvas.publisher import CanvasPublisher, default_key as canvas_default_key  # noqa: E402
 from utils.json_utils import repair_json_string  # noqa: E402
 from utils.file_utils import atomic_write_text  # noqa: E402
+from utils.voice_pipeline import VOICE_MODALITY  # noqa: E402
 from chat.backend import _ChatBackend  # noqa: E402
 from chat.memories import (  # noqa: E402,F401 — mixin + back-compat re-exports
     MemoriesMixin, _MEMORIES_COLLECTION_NAME, _MEMORY_CATEGORIES)
@@ -341,6 +342,14 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
         from affect.head_aliveness import HeadAliveness
         self._head_aliveness = HeadAliveness(
             enabled=bool(character_config.get('head_aliveness_enabled', False)))
+
+        # Voice sensor: Pi mic → STT → user-like turn + wake-word orient
+        # (launcher --voice). Off by default; no-op if the bot is absent.
+        from chat.voice_sensor import VoiceSensor
+        self._voice_sensor = VoiceSensor(
+            self.character_name,
+            enabled=bool(character_config.get('voice_enabled', False)),
+            wake_word=character_config.get('voice_wake_word'))
 
     # ------------------------------------------------------------------
     # LLM helper (used by character_evaluator and DiscourseTracker)
@@ -1110,7 +1119,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
     def _process_user_turn(self, source: str, text: str, close: bool,
                            autonomous: bool = False,
                            autonomous_concern_id: Optional[str] = None,
-                           image_url: Optional[str] = None) -> None:
+                           image_url: Optional[str] = None,
+                           modality: Optional[str] = None) -> None:
         """Drive one turn through the ReAct loop. The autonomous path
         (autonomous=True) reuses the same prompt construction so Jill's
         voice stays consistent and traces share format. Divergences are
@@ -1138,7 +1148,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
                 source, text, close,
                 autonomous=autonomous,
                 autonomous_concern_id=autonomous_concern_id,
-                image_url=image_url)
+                image_url=image_url, modality=modality)
         finally:
             self._current_turn = None
             self._affect.set_mode('idle')
@@ -1146,7 +1156,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
     def _process_user_turn_inner(self, source: str, text: str, close: bool,
                                  autonomous: bool = False,
                                  autonomous_concern_id: Optional[str] = None,
-                                 image_url: Optional[str] = None) -> None:
+                                 image_url: Optional[str] = None,
+                                 modality: Optional[str] = None) -> None:
         # Reject image input early when the active backend route can't
         # carry it (Anthropic native, legacy cloud_llm). Bail before any
         # state mutation; let the user retry without the image.
@@ -1254,7 +1265,11 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
         self._append_conversation_entry(
             'out', source, reply, meta=f'act={act_type} close={close}')
         if not intentionally_silent:
-            self._publish_say(reply)
+            # Speak the reply only when the turn arrived by voice — keyed on the
+            # turn's modality, not the speaker's identity, so an attributed voice
+            # turn (a resolved name) still gets spoken (cw-voice-sensor-plan.md §10).
+            speak = (not autonomous) and modality == VOICE_MODALITY
+            self._publish_say(reply, speak=speak)
         self._last_reply_at = datetime.now(timezone.utc).isoformat()
         logger.info(f"[{self.character_name}] -> {source} ({act_type}): {reply!r}")
 
@@ -1648,11 +1663,13 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
                 text = msg.get('text', '')
                 close = bool(msg.get('close', False))
                 image_url = msg.get('image_url')
+                modality = msg.get('modality')
                 img_tag = ' [+image]' if image_url else ''
                 logger.info(f"[{self.character_name}] <- {source}: {text!r} (close={close}){img_tag}")
 
                 try:
-                    self._process_user_turn(source, text, close, image_url=image_url)
+                    self._process_user_turn(source, text, close,
+                                            image_url=image_url, modality=modality)
                 except Exception as e:
                     logger.error(f"[{self.character_name}] turn handling crashed: {e}")
                     import traceback

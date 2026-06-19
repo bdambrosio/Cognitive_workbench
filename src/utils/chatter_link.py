@@ -61,6 +61,9 @@ _T_HEAD_CMD = "chatter/head/cmd"
 _T_HEAD_STATUS = "chatter/head/status"
 _T_CAMERA_CAPTURE = "chatter/camera/capture"
 _T_CAMERA_IMAGE = "chatter/camera/image"
+_T_AUDIO_OUT = "chatter/audio/out"
+_T_VOICE_EVENT = "chatter/voice/event"
+_T_AUDIO_IN = "chatter/audio/in"
 
 # How long to wait for the camera/image reply before giving up.
 _CAPTURE_TIMEOUT_S = float(os.environ.get("CHATTER_CAPTURE_TIMEOUT_S", "8.0"))
@@ -115,8 +118,15 @@ class ChatterLink:
         self._session: Optional[Any] = None
         self._head_pub: Optional[Any] = None
         self._capture_pub: Optional[Any] = None
+        self._audio_out_pub: Optional[Any] = None
+        self._audio_out_seq: int = 0  # utterance counter (audio_frame seq)
         self._image_sub: Optional[Any] = None
         self._status_sub: Optional[Any] = None
+        # Optional mic-stream subscribers, declared on demand by attach_voice
+        # for the voice sensor (chat/voice_sensor.py). Most processes never use
+        # them, so they are not declared in ensure().
+        self._voice_sub: Optional[Any] = None
+        self._audio_in_sub: Optional[Any] = None
 
         # camera/image: request_id -> {"event": Event, "result": dict|None}
         self._pending_lock = threading.Lock()
@@ -149,6 +159,8 @@ class ChatterLink:
                 self._head_pub = self._session.declare_publisher(_T_HEAD_CMD)
                 self._capture_pub = self._session.declare_publisher(
                     _T_CAMERA_CAPTURE)
+                self._audio_out_pub = self._session.declare_publisher(
+                    _T_AUDIO_OUT)
                 self._image_sub = self._session.declare_subscriber(
                     _T_CAMERA_IMAGE, self._on_image)
                 self._status_sub = self._session.declare_subscriber(
@@ -165,6 +177,9 @@ class ChatterLink:
         rather than silently swallowing."""
         for obj, name in ((self._status_sub, "status_sub"),
                           (self._image_sub, "image_sub"),
+                          (self._voice_sub, "voice_sub"),
+                          (self._audio_in_sub, "audio_in_sub"),
+                          (self._audio_out_pub, "audio_out_pub"),
                           (self._capture_pub, "capture_pub"),
                           (self._head_pub, "head_pub")):
             if obj is not None:
@@ -174,6 +189,9 @@ class ChatterLink:
                     logger.warning(f"chatter: {name} undeclare failed: {e}")
         self._status_sub = None
         self._image_sub = None
+        self._voice_sub = None
+        self._audio_in_sub = None
+        self._audio_out_pub = None
         self._capture_pub = None
         self._head_pub = None
         if self._session is not None:
@@ -249,6 +267,62 @@ class ChatterLink:
             "tilt": status.get("tilt"),
             "state": status.get("state"),
         }
+
+    def send_audio_out(self, pcm_mono: bytes, *,
+                       sample_rate: int = 16000) -> int:
+        """Publish one whole-utterance audio frame to chatter/audio/out for the
+        Pi to speak (docs/audio-out-design.md: v1 = one frame = one utterance,
+        mono S16_LE 16 kHz; the Pi upmixes to 2 ch and AEC-gates its own mic
+        during playback). Returns the seq used, or -1 if the link isn't open or
+        the PCM is empty. Fire-and-forget — playback completion is not signalled
+        back in v1."""
+        if self._audio_out_pub is None or not pcm_mono:
+            return -1
+        from utils.voice_pipeline import pack_audio_frame
+        seq = self._audio_out_seq & 0xFFFFFFFF
+        self._audio_out_seq += 1
+        frame = pack_audio_frame(pcm_mono, sample_rate=sample_rate,
+                                 channels=1, seq=seq, ts=time.time())
+        self._audio_out_pub.put(frame)
+        return seq
+
+    def attach_voice(self, on_event: Any, on_audio: Any) -> Optional[str]:
+        """Declare subscribers for the Pi mic streams — `chatter/voice/event`
+        (JSON VAD/DoA) and `chatter/audio/in` (binary CBA1 PCM) — so a voice
+        consumer can segment + STT on the shared Pi session (docs/
+        cw-voice-sensor-plan.md §7). Callbacks receive raw Zenoh samples; the
+        consumer decodes. ensure()s the session first. Returns None on success
+        or an error string. Idempotent-ish: re-declares if called twice."""
+        err = self.ensure()
+        if err:
+            return err
+        with self._init_lock:
+            try:
+                self._voice_sub = self._session.declare_subscriber(
+                    _T_VOICE_EVENT, on_event)
+                self._audio_in_sub = self._session.declare_subscriber(
+                    _T_AUDIO_IN, on_audio)
+            except Exception as e:
+                logger.warning(f"chatter: attach_voice failed: {e}")
+                return f"{type(e).__name__}: {e}"
+        logger.info("chatter: voice subscribers attached "
+                    "(voice/event + audio/in)")
+        return None
+
+    def detach_voice(self) -> None:
+        """Undeclare the mic-stream subscribers (best-effort). The rest of the
+        link (head/camera/audio-out) stays up for the process lifetime."""
+        with self._init_lock:
+            for obj, name in ((self._voice_sub, "voice_sub"),
+                              (self._audio_in_sub, "audio_in_sub")):
+                if obj is not None:
+                    try:
+                        obj.undeclare()
+                    except Exception as e:
+                        logger.warning(
+                            f"chatter: {name} undeclare failed: {e}")
+            self._voice_sub = None
+            self._audio_in_sub = None
 
     def capture_image(self, timeout: float = _CAPTURE_TIMEOUT_S) -> Dict[str, Any]:
         """Request a frame and return the decoded reply. Raises RuntimeError

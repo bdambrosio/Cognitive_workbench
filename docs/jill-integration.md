@@ -1,8 +1,14 @@
 # Jill ↔ ChatterBot Integration
 
-Status: **design note.** Records how the Cognitive_workbench agent ("Jill")
-drives and senses through the ChatterBot head. Written to be shared with the
-Cognitive_workbench project as well as kept here.
+Status: **design + integration note.** Records how the Cognitive_workbench agent
+("Jill") drives and senses through the ChatterBot head. The ChatterBot/Pi side
+(head, camera, `xvf_audio`, DoA reflex) is implemented and live-verified on
+hardware; the Cognitive_workbench side is partially built (head/camera tools,
+vision) — see §7. Written to be shared with the Cognitive_workbench project as
+well as kept here. Companion docs (in the ChatterBot repo): `docs/DESIGN.md`
+(architecture), `docs/cw-voice-sensor.md` (the CW voice-sensor consumer guide —
+formats, code, wake-word orient), `docs/xvf3800-setup.md` (mic bring-up + DoA
+calibration).
 
 Read alongside `DESIGN.md` (the ChatterBot architecture) — this note does not
 restate it, it *binds* it. The key move:
@@ -52,6 +58,10 @@ the Pi router:
   localhost gossip mesh (`make_localhost_config`) — that would federate
   Cognitive_workbench's entire topic space with the Pi router in both
   directions. Keep the Pi link a separate session.
+- **Endpoint:** the Pi runs the `zenohd` router on `tcp/0.0.0.0:7447`. Default
+  `CHATTER_ROUTER = tcp/192.168.68.78:7447`. The Pi IP is **DHCP and can change** —
+  make it overridable (env var, as `ChatterLink` already does) and consider a
+  static lease or `raspberrypi.local` mDNS so it doesn't break on a new address.
 - Zenoh versions are wire-compatible: CW `eclipse-zenoh 1.6.2`, Pi `zenohd
   1.9.0`, all 1.x.
 
@@ -94,18 +104,33 @@ separates this from a reactive wake-word assistant, and it is the part most
 worth getting right (false-positive interruptions are how companion devices get
 unplugged).
 
-## 5. Head arbitration (reflex vs deliberative)
+## 5. Head arbitration & the use-mode decision
 
-Even with the desktop app gone, two writers want the servos. `head_controller`
-remains the **sole** servo owner and arbitrates via `chatter/head/mode`:
+`head_controller` (Pi `head_service`) is the **sole** servo owner. Two writers
+want it: the Pi-local DoA reflex and Jill's deliberate `head/cmd`. Both are now
+implemented; arbitration is automatic — **any `head/cmd` suspends the reflex for
+a cooldown** (`head.doa.cmd_cooldown_s`), so deliberate gaze and the reflex never
+fight. Jill can also hard-toggle the reflex via `chatter/head/mode {doa_follow}`.
 
-- `doa_follow: true` → the Pi reflex idles the head toward whoever speaks.
-- When Jill issues a deliberate `head/cmd` (centering a face, a scan, a gesture),
-  it should **suspend the reflex** so they don't fight — Jill sets
-  `doa_follow:false` for the duration, or the controller treats an explicit
-  `head/cmd` as a temporary manual override that re-enables the reflex after an
-  idle timeout. (Exact policy is an open item; `head_service.on_mode` already
-  caches `doa_follow` but nothing reads it yet — see §7.)
+**Use-mode decision (current default): wake-word orient, reflex off.** In testing,
+the XVF3800 VAD is energy-based and fires on non-speech noise (a rolling chair, a
+clack), so an always-on "turn toward any sound" reflex twitches. Two clean
+stances:
+
+- **Intentional (default):** the autonomous reflex is **off** (`doa_follow:false`,
+  the boot default). The head turns only when Jill is addressed — on recognizing
+  the wake word ("Jill…"), Jill sends `head/cmd {doa_deg}` using the bearing from
+  the concurrent `voice/event`, and the Pi maps it to pan with its calibrated
+  `head.doa` mapping. Rock-solid, never twitches, inert until addressed. Recipe:
+  `cw-voice-sensor.md §5`.
+- **Companion presence (opt-in):** set `doa_follow:true` for ambient "glance at
+  the speaker" liveliness. The Pi reflex is a **saccade** (one glance then settle,
+  going deaf while moving so servo noise — the XVF3800 sits directly under the
+  servos — can't feed back) with a **persistence gate** (needs a consistent
+  bearing for ~1 s). Still occasionally glances at sustained non-speech sound.
+
+Either way the DoA→pan mapping needs a one-time per-mount calibration
+(`config.json head.doa`: `front_deg`, `sign`; see `xvf3800-setup.md §6`).
 
 ## 6. Self-trigger / echo gating
 
@@ -117,14 +142,28 @@ this later).
 
 ## 7. What each project must build
 
-**ChatterBot (Pi side) — not yet implemented:**
-- `mic_driver`: XVF3800 capture + control-channel VAD/DOA → publish
-  `voice/event` and VAD-gated `audio/in`. (Topics declared in
-  `chatterbot/lib/topics.py`; no implementation yet.)
-- DOA reflex: make `doa_follow` actually drive the head. Today
-  `head_service.on_mode` caches the flag but no code consumes it.
-- `audio_out`: play `audio/out` PCM through the XVF3800.
-- Head arbitration policy (§5).
+**ChatterBot (Pi side):**
+- **DONE** — `xvf_audio`: the single duplex owner of the XVF3800. Captures +
+  control-channel VAD/DOA → publishes `voice/event` (start/active/stop +
+  `doa_deg`) and VAD-gated binary `audio/in`; and plays `audio/out` TTS through
+  the device (silence ↔ TTS on one persistent stream — AEC reference + capture
+  keepalive), muting `audio/in` while speaking (self-voice gating)
+  (`chatterbot/services/xvf_audio.py`, `chatterbot/xvf3800.py`,
+  `chatterbot/lib/audio_frame.py`). Consumer guide: `docs/cw-voice-sensor.md`;
+  bring-up: `docs/xvf3800-setup.md`; playback design: `docs/audio-out-design.md`.
+  Live-verified DoA/VAD/capture on the Pi (playback pending live test).
+- **DONE** — DoA reflex: `head_service` consumes `chatter/voice/event` and can
+  turn the head toward the talker when `doa_follow` is set — saccade (glance +
+  settle, goes deaf while moving so servo noise doesn't feed back) with a
+  persistence gate and an explicit-command cooldown for arbitration (§5).
+  **Off by default**: the XVF VAD is energy-based and fires on non-speech noise,
+  so the recommended pattern is CW-driven **wake-word orient**, not an always-on
+  reflex — CW sends `head/cmd {doa_deg}` on hearing "Jill" and the Pi maps the
+  bearing to pan via its calibrated `config.json` `head.doa`
+  (`docs/cw-voice-sensor.md` §5, calibration in `docs/xvf3800-setup.md` §6).
+- TODO — `audio/out` live test against CW's ElevenLabs `--say` (the player is
+  built; needs an end-to-end check on hardware).
+- TODO — Head arbitration policy refinements (§5).
 
 **Cognitive_workbench (Jill side):**
 - **DONE** — `head-move` + `camera-capture` drop-in tools (`src/tools/`), over a
@@ -137,11 +176,16 @@ this later).
   no extra reasoning hop. Live-verified against the Pi.
 - **DONE** — captured-image-as-vision wiring + Tier-2 closed-loop gaze
   (`look-at-target`) (§8).
-- TODO — `mic_driver` consumer: dedicated isolated zenoh session already exists
-  in `ChatterLink`; the STT path reuses it.
+- **DONE** — TTS → `audio/out` (output "say" path): `voice_pipeline.synthesize`
+  (ElevenLabs `pcm_16000`) + `pack_audio_frame` (the CBA1 codec, inverse of the
+  Pi's `unpack`) + `ChatterLink.send_audio_out`; voice-sourced replies synthesize
+  off-thread (`_speak_async`) and speak iff `source == ACOUSTIC_SOURCE`. Standalone
+  `voice_harness.py --say "…"`. Frame round-trip verified; **self-voice gating is
+  Pi-side** (xvf_audio mutes `audio/in` while speaking) so CW keeps no mute flag.
+- TODO — `xvf_audio` consumer (voice-sensor input): isolated zenoh session already
+  exists in `ChatterLink`; the STT path reuses it.
 - TODO — VAD-segment → STT → text injection into the chat-loop with source tags.
 - TODO — generic sensor-event → concern-activation ingress (§4).
-- TODO — TTS → `audio/out`, with self-voice gating (§6).
 - TODO — Tier-3 vision (reference-image library) (§8).
 
 ## 8. Vision: captured images as model input
@@ -218,24 +262,54 @@ list: `chatterbot/lib/topics.py` + `DESIGN.md §5`.
 
 | Topic | Dir | Payload | Status |
 |---|---|---|---|
-| `chatter/head/cmd` | Jill→Pi | `{ts, pan?, tilt?, gesture?: nod\|shake\|scan\|center, smooth?}` | **implemented** |
+| `chatter/head/cmd` | Jill→Pi | `{ts, pan?, tilt?, doa_deg?, gesture?: nod\|shake\|scan\|center, smooth?}` | **implemented** |
 | `chatter/head/status` | Pi→Jill | `{ts, pan, tilt, state, mode}` (~5 Hz, `config.status_hz`) | **implemented** |
-| `chatter/head/mode` | Jill→Pi | `{ts, doa_follow}` | subscribed; reflex not wired |
+| `chatter/head/mode` | Jill→Pi | `{ts, doa_follow}` | **implemented** (drives the DoA reflex) |
 | `chatter/camera/capture` | Jill→Pi | `{ts, request_id}` (width/height currently ignored) | **implemented** |
 | `chatter/camera/image` | Pi→Jill | `{ts, request_id, format:"jpeg_base64", data_base64, width, height, head_pose, settled}` | **implemented** |
-| `chatter/voice/event` | Pi→Jill | `{ts, vad: start\|stop, doa_deg, confidence}` | declared, not built |
-| `chatter/audio/in` | Pi→Jill | **binary** PCM + `{seq, ts}`, VAD-gated | declared, not built |
-| `chatter/audio/out` | Jill→Pi | **binary** PCM + `{seq, ts}` (TTS) | declared, not built |
+| `chatter/voice/event` | Pi→Jill | `{ts, vad: start\|active\|stop, doa_deg, confidence}` | **implemented (Pi)** |
+| `chatter/audio/in` | Pi→Jill | **binary** `audio_frame` header + S16_LE PCM, VAD-gated | **implemented (Pi)** |
+| `chatter/audio/out` | Jill→Pi | **binary** `audio_frame` header + S16_LE PCM (TTS) | declared, not built |
 | `chatter/status` | Pi→Jill | `{ts, processes, ...}` | declared, not built |
 
-## 10. Open questions
+### Audio & voice wire formats
 
-- DOA-degrees → pan-angle mapping + smoothing (avoid jittery reflex) — Pi side.
-- Reflex/deliberative arbitration policy: explicit-cmd-override vs mode toggle
-  vs idle-timeout re-enable (§5).
-- Audio transport: VAD-gated segments (default) vs continuous; sample
-  rate/format (lean 16 kHz mono 16-bit) — `DESIGN.md §10`.
-- XVF3800 control transport (USB `xvf_host` vs I2C) — determines how DOA/VAD are
-  read. Primary directional mic expected ~the Monday after 2026-06-13.
-- Whether STT runs continuously over `audio/in` or only on `voice/event`
+- **`voice/event`** (JSON): `{ts, vad, doa_deg, confidence}`. `vad` ∈
+  `start | active | stop` (start = rising edge of speech; active = ~15 Hz updates
+  while speaking, each carrying a refreshed bearing; stop = after a ~0.6 s silence
+  hangover). `doa_deg` is 0–359 in the **array frame**, not the room — calibrate.
+  `confidence` is coarse (1.0 speaking / 0.5 hangover / 0.0 stop).
+- **`audio/in`** (binary, VAD-gated): a **24-byte little-endian header then
+  interleaved PCM**. Header `struct "<4sBBBBIId"` = magic `b"CBA1"`, version (1),
+  format (0 = S16_LE), channels (2), reserved (0), sample_rate (16000),
+  seq (uint32, monotonic — detects drops), ts (float64). So **2 ch / 16 kHz /
+  S16_LE**; downmix to mono for STT. Unpack code + per-utterance reassembly:
+  `cw-voice-sensor.md §3`. Source of truth: `chatterbot/lib/audio_frame.py`.
+- **`audio/out`** (binary, TTS — to build): **same `audio_frame` framing**,
+  **16 kHz S16_LE mono** (`channels=1`); the Pi upmixes to the device's 2 ch.
+  Source is ElevenLabs `pcm_16000` (no transcode). Must play through the XVF3800
+  output (the AEC reference, `DESIGN.md §7`). v1 = one payload per utterance.
+  Full design + locked decisions: `docs/audio-out-design.md`.
+- **`camera/image`** (JSON): `format:"jpeg_base64"`, `data_base64` (decode →
+  JPEG bytes), plus `head_pose{pan,tilt}` and `settled`.
+
+## 10. Open questions / status
+
+**Resolved since first draft:**
+- XVF3800 arrived; bring-up complete. Control is **USB vendor transfers** (not
+  I2C) via `pyusb` — `xvf3800-setup.md`. Audio is 2 ch / 16 kHz / S16_LE.
+- DoA reflex implemented as a **saccade**; the "jittery reflex" worry is handled
+  by going deaf during motion + a persistence gate (§5).
+- Reflex/deliberative arbitration: explicit `head/cmd` suspends the reflex for a
+  cooldown (§5).
+- Use-mode default chosen: **wake-word orient, autonomous reflex off** (§5).
+
+**Still open:**
+- DoA→pan calibration (`head.doa` `front_deg`/`sign`) — one-time per mount; do it
+  when wiring the CW wake-word path (`xvf3800-setup.md §6`).
+- `audio/out` channel count / exact framing — finalize with the `audio_out`
+  service (must route through the XVF3800 for AEC).
+- Whether STT runs continuously over `audio/in` or only between `voice/event`
   start/stop boundaries.
+- Optional acoustic insulation between the servos and the XVF3800 (further
+  reduces servo-noise DoA corruption; the saccade already handles it in software).
