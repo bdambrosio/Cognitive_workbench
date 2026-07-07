@@ -25,6 +25,7 @@ import queue
 import re
 import sys
 import threading
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
@@ -50,7 +51,8 @@ from chat.memories import (  # noqa: E402,F401 — mixin + back-compat re-export
     MemoriesMixin, _MEMORIES_COLLECTION_NAME, _MEMORY_CATEGORIES)
 from chat.threads import ThreadsMixin, _AGENT_THREADS_COLLECTION_NAME  # noqa: E402,F401
 from chat.reflection import (  # noqa: E402,F401
-    ReflectionMixin, _REFLECT_FRAME_OK, _CONCERN_INSTRUCTION_NARROWNESS_RULE)
+    ReflectionMixin, _REFLECT_FRAME_OK, _CONCERN_INSTRUCTION_NARROWNESS_RULE,
+    _REFLECT_STAGE6_RULE)
 from chat.react import (  # noqa: E402,F401
     ReactMixin, REACT_MAX_ITERS, REACT_MAX_FORMAT_RETRIES,
     REACT_ACTION_SCHEMA, _REACT_TOOLS, _REACT_BINDING_RE)
@@ -67,6 +69,9 @@ from chat.concerns import (  # noqa: E402,F401
     _AGENT_CONCERN_BUMP_AMOUNT, _AGENT_CONCERN_RHYTHM_HOURS_ALLOWED,
     _AGENT_CONCERN_DEFAULT_RHYTHM_HOURS, _CONCERN_SUCCESSOR_MAX_DEPTH,
     _CONCERN_WIP_MAX_CHARS, _CONCERN_RECURRENCE_THRESHOLD,
+    _FIRE_OUTCOME_EXPIRY_TURNS, _FIRE_OUTCOME_EXPIRY_DAYS,
+    _FIRE_OUTCOME_MAX_PER_REFLECTION, _FIRE_OUTCOME_DIGEST_CHARS,
+    _FIRE_OUTCOME_EVIDENCE_CHARS, _FIRE_OUTCOME_JUDGED,
     _agent_concern_growth_for_elapsed, _triage_defer_cooldown_hours,
     _snap_rhythm_hours)
 from chat.tools import ToolsMixin, _TOOLS_DIR as _TOOLS_DIR  # noqa: E402,F401
@@ -981,7 +986,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
                                   agent_concerns: Optional[List[Any]] = None,
                                   user_concerns: Optional[List[Any]] = None,
                                   autonomous: bool = False,
-                                  image_ref: Optional[str] = None) -> None:
+                                  image_ref: Optional[str] = None,
+                                  fire_id: Optional[str] = None) -> None:
         """Append one structured ReAct turn record to
         <memory>/reasoning_trace.jsonl. Per-turn-unique content (orientation,
         active concerns at this turn, recall hits at this turn, user input,
@@ -1053,6 +1059,11 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
             }
             if image_ref:
                 record['image_ref'] = image_ref
+            # Fire-outcome join key: lets a trajectory builder assemble
+            # (trace beats, outcome) for one autonomous episode
+            # (docs/fire-outcome-capture.md §3.1). Absent on user turns.
+            if fire_id:
+                record['fire_id'] = fire_id
 
             path = self._reasoning_trace_path()
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -1120,7 +1131,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
                            autonomous: bool = False,
                            autonomous_concern_id: Optional[str] = None,
                            image_url: Optional[str] = None,
-                           modality: Optional[str] = None) -> None:
+                           modality: Optional[str] = None,
+                           fire_id: Optional[str] = None) -> None:
         """Drive one turn through the ReAct loop. The autonomous path
         (autonomous=True) reuses the same prompt construction so Jill's
         voice stays consistent and traces share format. Divergences are
@@ -1148,7 +1160,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
                 source, text, close,
                 autonomous=autonomous,
                 autonomous_concern_id=autonomous_concern_id,
-                image_url=image_url, modality=modality)
+                image_url=image_url, modality=modality,
+                fire_id=fire_id)
         finally:
             self._current_turn = None
             self._affect.set_mode('idle')
@@ -1157,7 +1170,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
                                  autonomous: bool = False,
                                  autonomous_concern_id: Optional[str] = None,
                                  image_url: Optional[str] = None,
-                                 modality: Optional[str] = None) -> None:
+                                 modality: Optional[str] = None,
+                                 fire_id: Optional[str] = None) -> None:
         # Reject image input early when the active backend route can't
         # carry it (Anthropic native, legacy cloud_llm). Bail before any
         # state mutation; let the user retry without the image.
@@ -1209,6 +1223,10 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
             # Evidence bump for agent_concerns: same input, same gating.
             # Decay is service-based for agent concerns, so bump only.
             self._bump_agent_concerns_on_input(text)
+            # Fire-outcome aging: each user turn widens the reaction
+            # window on pending autonomous fires; records past the cap
+            # resolve to 'unobserved' (docs/fire-outcome-capture.md §4).
+            self._age_pending_fire_outcomes()
 
         # Compute thread activation distribution for the current turn.
         # Read by _build_system_prompt for the "current activity context"
@@ -1279,6 +1297,18 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
         if autonomous and autonomous_concern_id:
             self._service_agent_concern(autonomous_concern_id, exit_reason)
 
+        # Fire-outcome capture (phase 1): register this fire for outcome
+        # judgment by a later user-turn's reflection stage 6
+        # (docs/fire-outcome-capture.md §4). Silent fires resolve
+        # immediately as 'unobservable' and never enter the registry.
+        # Only real executions register — a crashed loop has no act to
+        # judge. _register_fire_outcome is itself failure-tolerant.
+        if (autonomous and autonomous_concern_id and fire_id
+                and exit_reason in ('respond', 'max_iters')):
+            self._register_fire_outcome(
+                fire_id, autonomous_concern_id, exit_reason, reply,
+                intentionally_silent)
+
         # Successor-concern spawn. When an autonomous ReAct loop hits its
         # iter cap, the work likely isn't done — synthesize what's left
         # into a narrow successor concern so the next tick can pick up
@@ -1315,7 +1345,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
                 source, text, iters, reply, exit_reason,
                 orientation=orientation, recall=recall,
                 agent_concerns=agent_concerns, user_concerns=user_concerns,
-                autonomous=autonomous, image_ref=image_ref)
+                autonomous=autonomous, image_ref=image_ref, fire_id=fire_id)
 
         # Post-turn work (discourse + reflection + close + persist) is
         # ~5-15s of LLM calls and conceptually a side effect of the turn.
@@ -1453,8 +1483,14 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
                 logger.warning(f"[{self.character_name}] preamble-print failed: {e}")
 
             started_at = datetime.now(timezone.utc)
+            # fire_id: minted at dispatch, stamped into this fire event,
+            # the react-trace record, and the pending-outcome record — the
+            # join key that lets a trajectory builder assemble (trace
+            # beats, outcome) for one episode (docs/fire-outcome-capture.md).
+            fire_id = str(uuid.uuid4())
             outcome: Dict[str, Any] = {
                 'event': 'fire',
+                'fire_id': fire_id,
                 'concern_id': nid,
                 'concern_text': text,
                 'instruction': instruction,
@@ -1493,7 +1529,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
                 # still the User dialogue (see _build_react_user_prefix).
                 self._process_user_turn(
                     source=self.character_name, text=wrapped_instruction, close=False,
-                    autonomous=True, autonomous_concern_id=nid)
+                    autonomous=True, autonomous_concern_id=nid, fire_id=fire_id)
                 outcome['terminated'] = 'ok'
             except Exception as e:
                 logger.error(f"[{self.character_name}] autonomous fire failed for {nid}: {e}")

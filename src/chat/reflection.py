@@ -45,6 +45,30 @@ _CONCERN_INSTRUCTION_NARROWNESS_RULE = (
 # missing one we'll re-encounter.
 _REFLECT_FRAME_OK = 'none'
 
+# STAGE 6 — fire outcomes (docs/fire-outcome-capture.md). Kept OUT of
+# _REFLECT_SYS and appended to the formatted system message only when
+# the pending-fire registry is non-empty: on the (common) empty-registry
+# turn the reflection prompt must stay byte-identical to pre-capture
+# behavior (KV-cache stability; existing benchmarks unaffected). Suffix
+# position keeps the shared prefix cacheable when it does appear. No
+# format placeholders — appended after .format(), so literal braces in
+# the JSON example are safe.
+_REFLECT_STAGE6_RULE = (
+    "STAGE 6 — fire outcomes. For each act listed under \"## Recent "
+    "autonomous acts awaiting outcome\", judge ONLY from evidence "
+    "visible in this exchange whether the user's words or behavior show "
+    "the act helped, was neutral, hindered, or is being ignored. Absence "
+    "of mention is NOT evidence — omit the entry and it stays pending. "
+    "Do not infer approval from politeness. valence is for the concern's "
+    "domain; user_impact is for how the act landed with the user; they "
+    "may disagree.\n"
+    "Emit judged acts in `fire_outcomes` (usually this list is empty):\n"
+    "  [{\"fire_id\": \"<id exactly as listed>\", "
+    "\"outcome\": \"helped|neutral|hindered|ignored\", "
+    "\"valence\": <-1.0..1.0>, \"user_impact\": <-1.0..1.0>, "
+    "\"evidence\": \"<quote or paraphrase of the user evidence, <=200 chars>\"}, ...]"
+)
+
 
 class ReflectionMixin:
     """Mixin for ChatLoop — moved verbatim from chat_loop.py."""
@@ -293,9 +317,16 @@ class ReflectionMixin:
             # write that *might* be redundant; false-negatives produce a
             # duplicate. Suppression is the cheaper failure mode.
             existing_memories = self._recall(convo, k=8, threshold=0.4)
+            # Pending fire outcomes (STAGE 6): read-only registry peek.
+            # Empty on most turns — everything stage-6 below is gated on
+            # this list so the empty-registry prompt stays byte-identical
+            # to pre-capture behavior. Load failure → [] (stays pending).
+            pending_fires = self._load_pending_fire_outcomes()
             sys_msg = self._REFLECT_SYS.format(
                 character=self.character_name, entity=source,
                 narrowness_rule=_CONCERN_INSTRUCTION_NARROWNESS_RULE)
+            if pending_fires:
+                sys_msg += "\n\n" + _REFLECT_STAGE6_RULE
             user_parts = []
             if companion:
                 user_parts.append(
@@ -326,12 +357,30 @@ class ReflectionMixin:
                 user_parts.append(
                     "## Existing agent_concerns (do NOT re-emit; emit only "
                     "NEW agent_concerns this exchange surfaced)\n" + "\n".join(lines))
+            if pending_fires:
+                # Identity + reach-back beyond the 4-turn dialog window;
+                # the reaction evidence itself is usually already in the
+                # dialog above (auto_say lines to the same entity).
+                lines = [
+                    f"- [{r.get('fire_id', '')}] concern: "
+                    f"{r.get('concern_text', '')} — {self.character_name} "
+                    f"did/said: {r.get('reply_digest', '')} "
+                    f"({int(r.get('user_turns_since', 0) or 0)} user turns ago)"
+                    for r in pending_fires]
+                user_parts.append(
+                    "## Recent autonomous acts awaiting outcome\n"
+                    + "\n".join(lines))
             user_parts.append("## Latest exchange\n" + convo)
+            # Key list grows `fire_outcomes` only when the section above
+            # was shown — byte-identical otherwise (KV-cache stability).
+            return_keys = ("frame, memories, user_concerns, "
+                           "user_concerns_updated, user_concerns_closed, "
+                           "agent_concerns")
+            if pending_fires:
+                return_keys += ", fire_outcomes"
             user_parts.append(
-                "Return the JSON object now (keys: frame, memories, "
-                "user_concerns, user_concerns_updated, user_concerns_closed, "
-                "agent_concerns). All lists empty if frame≠none or nothing "
-                "qualifies.")
+                f"Return the JSON object now (keys: {return_keys}). All "
+                "lists empty if frame≠none or nothing qualifies.")
             result = self._llm_generate(
                 [{'role': 'system', 'content': sys_msg},
                  {'role': 'user', 'content': "\n\n".join(user_parts)}],
@@ -368,6 +417,15 @@ class ReflectionMixin:
                 gap = str(payload.get('capability_gap') or '').strip()
                 if gap and gap.lower() not in ('null', 'none'):
                     self._record_capability_gap(gap)
+
+            # Fire outcomes (STAGE 6): judged acts leave the pending
+            # registry and land in autonomy.jsonl. Read straight off the
+            # payload like capability_gap — _parse_reflection_payload
+            # doesn't carry it. Gated on pending_fires: we only accept
+            # judgments for records the LLM was actually shown.
+            if isinstance(payload, dict) and pending_fires:
+                self._apply_fire_outcome_judgments(
+                    payload.get('fire_outcomes'), pending_fires)
 
             mems_written: List[str] = []
             for text, category, polarity in raw_memories:

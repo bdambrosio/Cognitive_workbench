@@ -10,7 +10,7 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -21,6 +21,7 @@ if _SRC_DIR not in sys.path:
     sys.path.insert(0, _SRC_DIR)
 
 from utils.json_utils import repair_json_string  # noqa: E402
+from utils.file_utils import atomic_write_json  # noqa: E402
 
 logger = logging.getLogger('chat_loop')
 
@@ -148,6 +149,28 @@ _CONCERN_WIP_MAX_CHARS = 1500
 # recall because a false merge silently loses specificity while a missed
 # merge just creates a sibling that can be merged manually.
 _CONCERN_RECURRENCE_THRESHOLD = 0.8
+
+# ----- fire-outcome capture (phase 1: capture only) -----
+# Each autonomous fire registers a pending record awaiting outcome
+# judgment (docs/fire-outcome-capture.md). Judgment rides the existing
+# post-turn reflection call as stage 6 — zero added LLM calls. Pending
+# records age per user turn; the reaction window closes at the turn cap
+# or the wall-clock cap, whichever hits first, resolving to 'unobserved'
+# (distinct from 'unobservable' — a silent fire that never had anything
+# user-visible to react to).
+_FIRE_OUTCOME_EXPIRY_TURNS = 3         # user turns before pending → unobserved
+
+_FIRE_OUTCOME_EXPIRY_DAYS = 7          # wall-clock cap on the reaction window
+
+_FIRE_OUTCOME_MAX_PER_REFLECTION = 3   # outcomes judged per reflection call
+
+_FIRE_OUTCOME_DIGEST_CHARS = 280       # reply digest cap in the pending record
+
+_FIRE_OUTCOME_EVIDENCE_CHARS = 200     # evidence cap in the outcome record
+
+# Outcomes the reflection LLM may assign. 'unobserved'/'unobservable'
+# are runtime-resolved, never LLM-judged.
+_FIRE_OUTCOME_JUDGED = ('helped', 'neutral', 'hindered', 'ignored')
 
 # --- Legacy aliases (in-flight rename; will be removed once dynamics rewrite lands)
 _CONCERN_CATEGORIES = ('one_shot', 'durable', 'derived')
@@ -921,6 +944,204 @@ class ConcernsMixin:
             a = float(props.get('activation', 0.0) or 0.0)
             props['activation'] = max(0.0, a - decrement)
         props['last_fired_at'] = datetime.now(timezone.utc).isoformat()
+
+    # ------------------------------------------------------------------
+    # Fire-outcome capture (phase 1: capture only) — pending registry +
+    # outcome records (docs/fire-outcome-capture.md). Signed per-ledger
+    # outcomes for autonomous fires, judged from the cheapest reliable
+    # evidence: the user's subsequent turns, via reflection stage 6.
+    # Everything here is instrumentation — failure-tolerant, never
+    # allowed to disrupt the turn loop.
+    # ------------------------------------------------------------------
+
+    def _pending_fire_outcomes_path(self) -> 'Path':
+        """Path to <memory>/pending_fire_outcomes.json — the registry of
+        autonomous fires awaiting outcome judgment. Full-rewrite file, so
+        writes go through atomic_write_json (crash mid-write can't leave
+        a truncated registry)."""
+        return self._memory_dir() / 'pending_fire_outcomes.json'
+
+    def _load_pending_fire_outcomes(self) -> List[Dict[str, Any]]:
+        """Read the pending registry. Missing or corrupt file → [] —
+        losing pending records costs one outcome datum, not a turn."""
+        path = self._pending_fire_outcomes_path()
+        try:
+            if not path.exists():
+                return []
+            data = json.loads(path.read_text(encoding='utf-8'))
+            if isinstance(data, list):
+                return [r for r in data if isinstance(r, dict)]
+        except Exception as e:
+            logger.warning(
+                f"[{self.character_name}] pending_fire_outcomes read failed: {e}")
+        return []
+
+    def _save_pending_fire_outcomes(self, records: List[Dict[str, Any]]) -> None:
+        """Atomically rewrite the pending registry."""
+        try:
+            path = self._pending_fire_outcomes_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write_json(path, records)
+        except Exception as e:
+            logger.warning(
+                f"[{self.character_name}] pending_fire_outcomes write failed: {e}")
+
+    def _register_fire_outcome(self, fire_id: str, concern_id: str,
+                               exit_reason: str, reply: str,
+                               intentionally_silent: bool) -> None:
+        """Register a completed autonomous fire for outcome judgment.
+        Called after reply publication. A silent fire never enters the
+        registry: its downstream outcome is structurally unobservable
+        (nothing user-visible to react to — a different fact than
+        'observed and neutral'), so it resolves immediately with the
+        process fields only."""
+        try:
+            note = self.resource_manager.get_resource(concern_id) or {}
+            props = note.get('properties') or {}
+            concern_text = str(
+                props.get('content', '') or note.get('text', '') or '').strip()
+            now_iso = datetime.now(timezone.utc).isoformat()
+            if intentionally_silent:
+                self._write_autonomy_event({
+                    'event': 'fire_outcome',
+                    'fire_id': fire_id,
+                    'concern_id': concern_id,
+                    'concern_text': concern_text,
+                    'exit_reason': exit_reason,
+                    'outcome': 'unobservable',
+                    'valence': None,
+                    'user_impact': None,
+                    'evidence': None,
+                    'latency_turns': 0,
+                    'observed_at': now_iso,
+                })
+                return
+            records = self._load_pending_fire_outcomes()
+            records.append({
+                'fire_id': fire_id,
+                'concern_id': concern_id,
+                'concern_text': concern_text,
+                'fired_at': now_iso,
+                'exit_reason': exit_reason,
+                'reply_digest': (reply or '')[:_FIRE_OUTCOME_DIGEST_CHARS],
+                'intentionally_silent': False,
+                'user_turns_since': 0,
+            })
+            self._save_pending_fire_outcomes(records)
+        except Exception as e:
+            logger.warning(
+                f"[{self.character_name}] fire-outcome registration failed "
+                f"for {fire_id}: {e}")
+
+    def _age_pending_fire_outcomes(self) -> None:
+        """Per-user-turn aging of the pending registry: each user turn
+        widens the reaction window. Records past the turn cap or the
+        wall-clock cap resolve to 'unobserved' (valence null — consumers
+        weight these down, not zero-code them as neutral) and leave the
+        registry. Called once per non-autonomous turn, next to the
+        user_concern decay."""
+        try:
+            records = self._load_pending_fire_outcomes()
+            if not records:
+                return
+            now = datetime.now(timezone.utc)
+            keep: List[Dict[str, Any]] = []
+            for rec in records:
+                rec['user_turns_since'] = int(rec.get('user_turns_since', 0) or 0) + 1
+                expired = rec['user_turns_since'] >= _FIRE_OUTCOME_EXPIRY_TURNS
+                if not expired:
+                    try:
+                        fired_at = datetime.fromisoformat(str(rec.get('fired_at')))
+                        if fired_at.tzinfo is None:
+                            fired_at = fired_at.replace(tzinfo=timezone.utc)
+                        expired = (now - fired_at) > timedelta(
+                            days=_FIRE_OUTCOME_EXPIRY_DAYS)
+                    except (TypeError, ValueError):
+                        # Unparseable fired_at can never wall-clock expire;
+                        # expire now rather than let it pend forever.
+                        expired = True
+                if expired:
+                    self._write_autonomy_event({
+                        'event': 'fire_outcome',
+                        'fire_id': rec.get('fire_id'),
+                        'concern_id': rec.get('concern_id'),
+                        'concern_text': rec.get('concern_text'),
+                        'exit_reason': rec.get('exit_reason'),
+                        'outcome': 'unobserved',
+                        'valence': None,
+                        'user_impact': None,
+                        'evidence': None,
+                        'latency_turns': rec['user_turns_since'],
+                        'observed_at': now.isoformat(),
+                    })
+                else:
+                    keep.append(rec)
+            self._save_pending_fire_outcomes(keep)
+        except Exception as e:
+            logger.warning(
+                f"[{self.character_name}] fire-outcome aging failed: {e}")
+
+    def _apply_fire_outcome_judgments(self, raw: Any,
+                                      pending: List[Dict[str, Any]]
+                                      ) -> List[str]:
+        """Validate reflection stage-6 judgments against the pending
+        records the LLM was shown; write one fire_outcome event per
+        accepted judgment and drop those records from the registry.
+        Conservative, mirroring the one-patch ethos: unknown fire_ids,
+        bad outcome values, and entries beyond the per-reflection cap
+        are skipped — they stay pending and age out naturally. Returns
+        the resolved fire_ids."""
+        if not isinstance(raw, list) or not pending:
+            return []
+
+        def _clamp(v: Any) -> Optional[float]:
+            try:
+                return max(-1.0, min(1.0, float(v)))
+            except (TypeError, ValueError):
+                return None
+
+        by_id = {str(r.get('fire_id')): r for r in pending if r.get('fire_id')}
+        resolved: List[str] = []
+        now_iso = datetime.now(timezone.utc).isoformat()
+        for item in raw:
+            if len(resolved) >= _FIRE_OUTCOME_MAX_PER_REFLECTION:
+                break
+            if not isinstance(item, dict):
+                continue
+            fid = str(item.get('fire_id', '') or '').strip()
+            rec = by_id.get(fid)
+            if rec is None or fid in resolved:
+                continue
+            outcome = str(item.get('outcome', '') or '').strip().lower()
+            if outcome not in _FIRE_OUTCOME_JUDGED:
+                continue
+            evidence = str(item.get('evidence', '') or '').strip()
+            self._write_autonomy_event({
+                'event': 'fire_outcome',
+                'fire_id': fid,
+                'concern_id': rec.get('concern_id'),
+                'concern_text': rec.get('concern_text'),
+                'exit_reason': rec.get('exit_reason'),
+                'outcome': outcome,
+                'valence': _clamp(item.get('valence')),
+                'user_impact': _clamp(item.get('user_impact')),
+                'evidence': evidence[:_FIRE_OUTCOME_EVIDENCE_CHARS] or None,
+                'latency_turns': int(rec.get('user_turns_since', 0) or 0),
+                'observed_at': now_iso,
+            })
+            resolved.append(fid)
+        if resolved:
+            # Reload before rewriting: aging on the inbox thread may have
+            # expired records while reflection ran on the post-turn
+            # executor — filtering the fresh registry can't resurrect them.
+            current = self._load_pending_fire_outcomes()
+            gone = set(resolved)
+            self._save_pending_fire_outcomes(
+                [r for r in current if str(r.get('fire_id')) not in gone])
+            logger.info(
+                f"[{self.character_name}] fire outcomes judged: "
+                f"{len(resolved)} record(s) resolved")
+        return resolved
 
     # ------------------------------------------------------------------
     # Surfacing helpers — top-K iteration over each collection for
