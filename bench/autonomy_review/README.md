@@ -23,6 +23,10 @@ python bench/autonomy_review/review.py --log <path/to/autonomy.jsonl>
 # eval loop
 python bench/autonomy_review/review.py --score          # rate each fire warranted / unwarranted / maybe
 python bench/autonomy_review/review.py --scores         # summarize ratings; lists the concerns to tune away
+
+# fire-outcome readout (roadmap M1; aggregates Phase-1 fire_outcome records)
+python bench/autonomy_review/outcomes.py                # baseline table
+python bench/autonomy_review/outcomes.py --json         # machine-readable
 ```
 
 ## What it shows
@@ -35,6 +39,12 @@ python bench/autonomy_review/review.py --scores         # summarize ratings; lis
   and records a verdict + note to the sidecar; `--scores` rolls them up and
   surfaces the concerns producing *unwarranted* fires — the ones whose rhythm or
   triage prompt needs tuning.
+- **outcomes.py**: the roadmap-M1 readout over `fire_outcome` records
+  (fire-outcome capture Phase 1, `docs/fire-outcome-capture.md`): outcome
+  distribution, helped / hindered+ignored rates, triage precision, judgment
+  coverage, valence / user_impact means, the capability-proposal stream, and a
+  per-concern table. Read-only; also reads `pending_fire_outcomes.json` for the
+  awaiting-judgment count.
 
 ## Next (not built)
 
