@@ -118,7 +118,12 @@ def _git_dirty() -> bool:
     out = subprocess.run(
         ["git", "status", "--porcelain", "-uno"], cwd=str(REPO),
         capture_output=True, text=True, check=True).stdout.strip()
-    return bool(out)
+    # The ledger is tracked (it is the record) but it is run OUTPUT —
+    # each run appends a row, which must not dirty the next run in a
+    # chained baseline. Nothing about a modified ledger changes what runs.
+    lines = [ln for ln in out.splitlines()
+             if not ln.strip().endswith("bench/composite/ledger.jsonl")]
+    return bool(lines)
 
 
 def _git_commit() -> str:
