@@ -58,6 +58,9 @@ DEFAULT_MODEL = "claude-sonnet-4-6"
 ANTHROPIC_BASE_URL = "https://api.anthropic.com"
 API_KEY_ENV = "CLAUDE_API_KEY"
 PROMPT_VERSION = "v1"
+# Extra samples when the judge returns syntactically broken or
+# axis-incomplete JSON (availability retry; rubric unchanged).
+_JUDGE_PARSE_RETRIES = 2
 
 AXES = (
     "add_recall",
@@ -247,19 +250,31 @@ def _judge_one(backend: _ChatBackend, pair: Dict[str, Any],
         {"role": "system", "content": JUDGE_SYSTEM},
         {"role": "user", "content": user_msg},
     ]
-    try:
-        raw = backend.chat(messages, max_tokens=8000, temperature=0.2)
-    except Exception as e:
-        logger.warning(f"backend.chat raised: {e}")
-        return None
-    j = _parse_judgement_json(raw)
-    if j is None:
-        return None
-    missing = _validate_axes_present(j)
-    if missing:
-        logger.warning(f"judgement missing axes: {missing}")
-        return None
-    return j
+    # Long judgements quoting dialog occasionally come back with broken
+    # JSON (unescaped inner quote) at temperature 0.2 — ~3% per pair
+    # observed, enough to fail about half of full 20-pair runs. Resample
+    # on parse/axes failure: availability-only, the rubric is unchanged.
+    for attempt in range(1 + _JUDGE_PARSE_RETRIES):
+        try:
+            raw = backend.chat(messages, max_tokens=8000, temperature=0.2)
+        except Exception as e:
+            logger.warning(f"backend.chat raised: {e}")
+            return None
+        j = _parse_judgement_json(raw)
+        if j is None:
+            logger.warning(f"attempt {attempt + 1}: unparseable judgement"
+                           + ("; resampling" if attempt < _JUDGE_PARSE_RETRIES
+                              else "; giving up"))
+            continue
+        missing = _validate_axes_present(j)
+        if missing:
+            logger.warning(f"attempt {attempt + 1}: judgement missing axes: "
+                           f"{missing}"
+                           + ("; resampling" if attempt < _JUDGE_PARSE_RETRIES
+                              else "; giving up"))
+            continue
+        return j
+    return None
 
 
 def _aggregate(judgements: List[Dict[str, Any]]) -> Dict[str, Any]:
