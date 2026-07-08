@@ -50,10 +50,11 @@ Categories:
 | [METHOD_TOOLS.md](METHOD_TOOLS.md) | Protocol-based multi-step "method tools" — not implemented |
 | [audio-out-design.md](audio-out-design.md) | ChatterBot audio-out ("say"); Pi player built/bench-verified, CW binding + ElevenLabs live test pending |
 | [capability-gap-reuse-gating.md](capability-gap-reuse-gating.md) | Reuse-gating self-extension proposals via an `inspect` pass; Option A shipped but found insufficient live 2026-06-19 — under review (author skeptical it's worth the machinery) |
-| [fire-outcome-capture.md](fire-outcome-capture.md) | Signed per-ledger outcome capture for autonomous fires (reflection stage 6 + pending registry) — drafted 2026-07-06, not implemented; serves the autonomy-bench gap and the modular-memory bridge |
+| [fire-outcome-capture.md](fire-outcome-capture.md) | Signed per-ledger outcome capture for autonomous fires (reflection stage 6 + pending registry) — Phase 1 (capture) implemented 2026-07 (commit 8a2bacf7); Phase 2 (outcome-modulated dynamics) gated on data |
 | [conversation_goal_wrapper_spec.md](conversation_goal_wrapper_spec.md) | Conversational context wrapper draft |
 | [cw-voice-sensor-plan.md](cw-voice-sensor-plan.md) | Build plan behind the shipped voice sensor (cross-repo: Pi mic path + CW consumer) |
 | [financial-analysis-tools-plan.md](financial-analysis-tools-plan.md) | AV `get_financial_statements` tool + PDF→markdown helper LIVE 2026-06-19; document-inspection subagent deferred |
+| [harness-roadmap.md](harness-roadmap.md) | Measurement-gated improvement loop (M0 frozen composite bench → fire-outcome data → weakness-mining cycles → re-grounded self-extension) — proposed 2026-07-08, inspired by Weng's harness post |
 | [jill-integration.md](jill-integration.md) | Jill↔ChatterBot head binding design; voice sensor is the first piece live, rest design |
 | [knowledge-base-system.md](knowledge-base-system.md) | Obsidian-backed three-tier knowledge base; obsidian tool exists, full KB system doesn't |
 | [load-slice-spec.md](load-slice-spec.md) | Unified load-with-slicing primitive |
