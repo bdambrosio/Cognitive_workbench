@@ -68,6 +68,9 @@ logger = logging.getLogger("bench.introspective_fidelity.judge")
 JUDGE_MODEL = "claude-sonnet-4-6"
 JUDGE_API_KEY_ENV = "CLAUDE_API_KEY"
 ANTHROPIC_BASE_URL = "https://api.anthropic.com"
+# Extra samples on unparseable judge output (availability retry;
+# rubric unchanged).
+_JUDGE_RETRIES = 2
 
 
 # ---------------------------------------------------------------------------
@@ -455,13 +458,29 @@ def _score_one(backend: _ChatBackend, probe: Dict[str, Any],
                snapshot: Dict[str, Any]) -> ProbeScore:
     pid = probe.get("id", "?")
     messages = _build_judge_prompt(probe, snapshot)
-    raw = backend.chat(messages, max_tokens=800, temperature=0.2)
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError:
-        parsed = repair_json_string(raw)
+    # Availability retry (rubric unchanged): a broken-JSON sample would
+    # otherwise silently zero-score the probe with only a prose
+    # rationale as the marker.
+    raw: Any = None
+    parsed: Any = None
+    for attempt in range(1 + _JUDGE_RETRIES):
+        try:
+            raw = backend.chat(messages, max_tokens=800, temperature=0.2)
+        except Exception:
+            logger.exception(f"{pid}: judge call failed "
+                             f"(attempt {attempt + 1})")
+            if attempt == _JUDGE_RETRIES:
+                raise  # API dead after retries: crash > silent zeros
+            continue
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            parsed = repair_json_string(raw)
+        if isinstance(parsed, dict):
+            break
+        logger.warning(f"{pid}: judge returned unparseable output "
+                       f"(attempt {attempt + 1}); raw head: {str(raw)[:300]!r}")
     if not isinstance(parsed, dict):
-        logger.warning(f"{pid}: judge returned unparseable output; raw head: {raw[:300]!r}")
         # Score as zeros with explanatory rationale so the row still
         # appears in the table — caller can re-judge if needed.
         return ProbeScore(

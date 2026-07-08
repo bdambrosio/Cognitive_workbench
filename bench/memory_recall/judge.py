@@ -49,6 +49,9 @@ logger = logging.getLogger("bench.memory_recall.judge")
 JUDGE_MODEL = "claude-sonnet-4-6"
 JUDGE_API_KEY_ENV = "CLAUDE_API_KEY"
 ANTHROPIC_BASE_URL = "https://api.anthropic.com"
+# Extra samples on judge API failure or unparseable output
+# (availability retry; rubric unchanged).
+_JUDGE_RETRIES = 2
 
 READOUT_TYPES = ("slash", "agent")
 ALL_AXES = ("recall", "suppress", "frame", "provenance", "fidelity", "parsimony")
@@ -287,28 +290,41 @@ def _score_readout(backend: _ChatBackend, record: Dict[str, Any],
         )
 
     messages = _build_judge_prompt(record, readout_type, extra_axes=extra_axes)
-    try:
-        raw = backend.chat(messages, max_tokens=600, temperature=0.2)
-    except Exception as e:
-        logger.exception(f"{record.get('probe_id')}/{readout_type}: judge call failed")
-        return ReadoutScore(
-            readout_type=readout_type,
-            axes={a: 0.0 for a in axes_to_score},
-            rationales={a: "judge call failed" for a in axes_to_score},
-            overall_verdict="fail",
-            judge_error=f"{type(e).__name__}: {e}",
-        )
-
-    parsed: Any
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError:
-        parsed = repair_json_string(raw)
+    # Availability retry (rubric unchanged): a transient API failure or
+    # broken-JSON sample would otherwise zero-score the readout, which is
+    # indistinguishable from a real memory regression downstream.
+    raw: Any = None
+    last_err: Optional[str] = None
+    parsed: Any = None
+    for attempt in range(1 + _JUDGE_RETRIES):
+        try:
+            raw = backend.chat(messages, max_tokens=600, temperature=0.2)
+        except Exception as e:
+            logger.exception(
+                f"{record.get('probe_id')}/{readout_type}: judge call "
+                f"failed (attempt {attempt + 1})")
+            last_err = f"{type(e).__name__}: {e}"
+            continue
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            parsed = repair_json_string(raw)
+        if isinstance(parsed, dict):
+            break
+        logger.warning(
+            f"{record.get('probe_id')}/{readout_type}: judge output "
+            f"unparseable (attempt {attempt + 1}); head: {str(raw)[:300]!r}")
+        last_err = "unparseable"
 
     if not isinstance(parsed, dict):
-        logger.warning(
-            f"{record.get('probe_id')}/{readout_type}: judge output unparseable; "
-            f"head: {raw[:300]!r}")
+        if raw is None:
+            return ReadoutScore(
+                readout_type=readout_type,
+                axes={a: 0.0 for a in axes_to_score},
+                rationales={a: "judge call failed" for a in axes_to_score},
+                overall_verdict="fail",
+                judge_error=last_err,
+            )
         return ReadoutScore(
             readout_type=readout_type,
             axes={a: 0.0 for a in axes_to_score},

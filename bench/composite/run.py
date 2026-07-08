@@ -302,6 +302,15 @@ def run_introspective_fidelity(run_dir: Path, chat_scenario: Path, smoke: bool):
     d2 = _sh([sys.executable, BENCH / "introspective_fidelity" / "judge.py",
               "--run-dir", out, "--judge-model", JUDGE_MODEL], log, cwd=REPO)
     scores = _read_json(out / "scores.json")
+    # The introspective judge zero-scores a probe whose judge output
+    # stayed unparseable after retries, with only this rationale string
+    # as the marker — catch it so silent zeros can't reach the ledger.
+    poisoned = [p.get("probe_id") for p in scores.get("per_probe") or []
+                if p.get("rationale_accuracy") == "judge output unparseable"]
+    if poisoned:
+        raise SuiteError(
+            f"introspective judge zero-scored {poisoned} (unparseable "
+            f"after retries) — re-run the judge against this run dir")
     total, max_total = scores.get("total"), scores.get("max_total")
     if not isinstance(total, (int, float)) or not max_total:
         raise SuiteError(f"no total/max_total in {out}/scores.json")

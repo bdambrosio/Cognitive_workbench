@@ -41,6 +41,9 @@ logger = logging.getLogger("bench.hle.judge")
 JUDGE_MODEL = "claude-sonnet-4-6"
 JUDGE_API_KEY_ENV = "CLAUDE_API_KEY"
 ANTHROPIC_BASE_URL = "https://api.anthropic.com"
+# Extra samples on judge API failure or unparseable output
+# (availability retry; rubric unchanged).
+_JUDGE_RETRIES = 2
 
 VERDICTS = ("correct", "partial", "incorrect")
 
@@ -127,40 +130,55 @@ def _score_one(backend: _ChatBackend, record: Dict[str, Any]) -> Verdict:
     reply = record.get("reply") or ""
 
     messages = _build_judge_messages(question, gold, reply)
-    try:
-        # Generous cap + the "don't re-derive" system rule keep the judge
-        # from spending its whole budget reasoning out the problem and never
-        # reaching the JSON verdict — the failure mode that force-scored hard
-        # math/physics items as unparseable=incorrect.
-        raw = backend.chat(messages, max_tokens=1024, temperature=0.0)
-    except Exception as e:
-        logger.exception(f"{record.get('question_id')}: judge call failed")
-        return Verdict(
-            verdict="incorrect", score=0.0,
-            rationale="judge call failed",
-            judge_error=f"{type(e).__name__}: {e}",
-        )
-
-    parsed: Any
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError:
-        parsed = repair_json_string(raw)
-    # Fallback: if the judge prefaced the verdict with prose despite the
-    # instructions, extract the outermost {...} and retry the parse.
-    if not isinstance(parsed, dict) and isinstance(raw, str):
-        start, end = raw.find("{"), raw.rfind("}")
-        if 0 <= start < end:
-            snippet = raw[start:end + 1]
-            try:
-                parsed = json.loads(snippet)
-            except json.JSONDecodeError:
-                parsed = repair_json_string(snippet)
+    # Availability retry (rubric unchanged): transient API failures
+    # (ReadTimeout at 120s observed live) and unparseable output get a
+    # bounded resample before force-scoring — a single flake otherwise
+    # shrinks the denominator and breaks run-to-run comparability.
+    raw: Any = None
+    last_err: Optional[str] = None
+    parsed: Any = None
+    for attempt in range(1 + _JUDGE_RETRIES):
+        try:
+            # Generous cap + the "don't re-derive" system rule keep the
+            # judge from spending its whole budget reasoning out the
+            # problem and never reaching the JSON verdict — the failure
+            # mode that force-scored hard math/physics items as
+            # unparseable=incorrect.
+            raw = backend.chat(messages, max_tokens=1024, temperature=0.0)
+        except Exception as e:
+            logger.exception(
+                f"{record.get('question_id')}: judge call failed "
+                f"(attempt {attempt + 1})")
+            last_err = f"{type(e).__name__}: {e}"
+            continue
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            parsed = repair_json_string(raw)
+        # Fallback: if the judge prefaced the verdict with prose despite
+        # the instructions, extract the outermost {...} and retry the parse.
+        if not isinstance(parsed, dict) and isinstance(raw, str):
+            start, end = raw.find("{"), raw.rfind("}")
+            if 0 <= start < end:
+                snippet = raw[start:end + 1]
+                try:
+                    parsed = json.loads(snippet)
+                except json.JSONDecodeError:
+                    parsed = repair_json_string(snippet)
+        if isinstance(parsed, dict):
+            break
+        logger.warning(
+            f"{record.get('question_id')}: judge output unparseable "
+            f"(attempt {attempt + 1}); head: {str(raw)[:300]!r}")
+        last_err = "unparseable"
 
     if not isinstance(parsed, dict):
-        logger.warning(
-            f"{record.get('question_id')}: judge output unparseable; "
-            f"head: {raw[:300]!r}")
+        if raw is None:
+            return Verdict(
+                verdict="incorrect", score=0.0,
+                rationale="judge call failed",
+                judge_error=last_err,
+            )
         return Verdict(
             verdict="incorrect", score=0.0,
             rationale="judge output unparseable",
