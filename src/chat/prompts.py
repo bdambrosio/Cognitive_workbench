@@ -164,7 +164,8 @@ class PromptsMixin:
             "— notes on how to do a job well; those are not reviewable "
             "items. The reviewable items are half-done arcs: a pending "
             "idea, an unfollowed finding, work stalled or blocked on "
-            "something.\n\n"
+            "something. An entry ending with a 'NEXT: ' line is naming "
+            "its own most promising next step — weigh those first.\n\n"
             + "\n".join(lines)
         )
 

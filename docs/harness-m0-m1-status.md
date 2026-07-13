@@ -76,6 +76,13 @@ instrument's blindness; treat post-digest data as the real M1 set.
   revival; seeds never close; `concern_abandoned` event logged to
   autonomy.jsonl). Before this, nothing in the runtime could ever
   write `abandoned`.
+- **NEXT: line in WIP rewrites** (2026-07-13 follow-up): the post-fire
+  WIP rewrite prompt (`_update_concern_wip`) now ends the WIP with a
+  'NEXT: <step>' line when a genuine unfinished arc exists (omitted
+  otherwise — no invented steps), and the reviewer's inventory framing
+  tells it to weigh NEXT-bearing entries first. Write side of the
+  "greedy planner" reading of WIP; feeds the reviewer non-procedural
+  material.
 - **Seed instruction sync**: `_seed_concerns_from_config` now syncs a
   seed's `instruction` from scenario YAML on restart (runtime dynamics
   untouched; sync never deletes). Fixes silently-stale seed procedures

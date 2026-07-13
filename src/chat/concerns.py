@@ -1770,8 +1770,13 @@ class ConcernsMixin:
                 "summary of accumulated findings and open threads that the "
                 "NEXT fire should know: what's been established, what's "
                 "pending, what to not redo. Drop items that are stale or "
-                "resolved. Max 200 words. Output the WIP text only — no "
-                "preamble, no headers."
+                "resolved. If this fire left a genuine unfinished arc — a "
+                "lead worth pursuing, a question raised but not answered, "
+                "work blocked on something — end the WIP with one line "
+                "starting exactly 'NEXT: ' stating the single most promising "
+                "next step. If nothing is genuinely pending, omit the NEXT "
+                "line entirely — do not invent one. Max 200 words. Output "
+                "the WIP text only — no preamble, no headers."
             )
             user_msg = (
                 f"Concern: {str(props.get('content', '') or '').strip()}\n\n"
