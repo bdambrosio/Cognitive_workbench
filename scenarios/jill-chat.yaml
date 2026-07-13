@@ -241,6 +241,26 @@ characters:
           build anything yet — this is a proposal in words only. If, after
           inspecting, no real un-proposed gap stands out, stay silent.
 
+      # Dialog-initiation probe (M1 passivity investigation, 2026-07-12):
+      # unlike the monitors above, this concern's job is to START a
+      # conversation. Tracks agent-development work on Hugging Face's
+      # daily-papers page; remove this entry to disable.
+      - text: "Track new agent-development work appearing on Hugging Face's daily papers and bring genuinely relevant items to the user's attention."
+        category: durable
+        rhythm_hours: 24
+        instruction: |
+          Fetch https://huggingface.co/papers for today's papers (fall
+          back to a web search for "Hugging Face daily papers today" if
+          the fetch fails). Pick at most ONE paper that genuinely bears
+          on agent development as the user and I practice it — agent
+          memory, planning, autonomy, tool use, evaluation of agents,
+          cognitive architectures. Judge relevance by what the paper
+          actually claims, not by buzzwords in the title. If there is a
+          real hit, open a short exchange with the user: name the paper,
+          say in one or two sentences what it claims and why I think it
+          matters to our work, and ask whether they want me to dig in.
+          If today's crop has nothing genuinely relevant, stay silent.
+
     # Sensors. The `tick` sensor is the autonomy trigger: a heartbeat
     # publishes to sense_data every `schedule`. With autonomy on,
     # _handle_tick runs _grow_agent_concerns_per_tick + check_and_fire.

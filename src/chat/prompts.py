@@ -122,6 +122,31 @@ class PromptsMixin:
             + "\n".join(uc_lines)
         )
 
+    @staticmethod
+    def _render_pending_fires_block(
+            pending: List[Dict[str, Any]]) -> str:
+        """Render the fire digest: autonomous acts awaiting the user's
+        reaction, surfaced once each (chat_loop marks them) so the user
+        gets a reaction opportunity inside the outcome-judgment window
+        (docs/fire-outcome-capture.md §4)."""
+        pf_lines: List[str] = []
+        for rec in pending:
+            turns = int(rec.get('user_turns_since', 0) or 0)
+            ago = f"{turns} user turn{'s' if turns != 1 else ''} ago"
+            concern = str(rec.get('concern_text', '') or '').strip()
+            digest = str(rec.get('reply_digest', '') or '').strip()
+            pf_lines.append(f"- [{ago}] {concern[:120]}\n    I said/did: {digest}")
+        return (
+            "## My recent autonomous acts the user may not have seen\n"
+            "Work I did on my own concerns since the user last engaged "
+            "with it. Where it fits naturally, mention one briefly (a "
+            "clause is enough) so the user can react; the user's current "
+            "input always takes priority, and if they are already "
+            "reacting to one of these, just respond to that naturally — "
+            "no need to re-announce it.\n\n"
+            + "\n".join(pf_lines)
+        )
+
     def _build_system_prompt(self, source: str, orientation: str,
                              recall: Optional[List[Tuple[str, str, str]]] = None,
                              agent_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None,
@@ -197,6 +222,12 @@ class PromptsMixin:
                 "attend to without driving action.\n\n"
                 + "\n".join(ac_lines)
             )
+        # Fire digest: pending autonomous fires being surfaced this turn
+        # (set at user-turn entry in _process_user_turn; empty on
+        # autonomous turns). Absent when empty — prompt stability.
+        pending_fires = getattr(self, '_pending_fire_digest', None)
+        if pending_fires:
+            parts.append(self._render_pending_fires_block(pending_fires))
         # Threads: activity-level anchors. Computed once per turn in
         # _process_user_turn_inner via _compute_thread_activation; the
         # rendered block names the primary active thread plus any

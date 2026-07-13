@@ -168,6 +168,11 @@ _FIRE_OUTCOME_DIGEST_CHARS = 280       # reply digest cap in the pending record
 
 _FIRE_OUTCOME_EVIDENCE_CHARS = 200     # evidence cap in the outcome record
 
+# Fire digest: pending fires surfaced (once each) in the next user turn's
+# prompt so the user gets a reaction opportunity inside the judgment
+# window. Cap mirrors _FIRE_OUTCOME_MAX_PER_REFLECTION's conservatism.
+_FIRE_DIGEST_MAX_ITEMS = 3
+
 # Outcomes the reflection LLM may assign. 'unobserved'/'unobservable'
 # are runtime-resolved, never LLM-judged.
 _FIRE_OUTCOME_JUDGED = ('helped', 'neutral', 'hindered', 'ignored')
@@ -1080,6 +1085,32 @@ class ConcernsMixin:
         except Exception as e:
             logger.warning(
                 f"[{self.character_name}] fire-outcome aging failed: {e}")
+
+    def _take_unsurfaced_pending_fires(self) -> List[Dict[str, Any]]:
+        """Select pending fires not yet surfaced in a user-turn prompt,
+        mark them surfaced, and return them (registry order = oldest
+        first, capped at _FIRE_DIGEST_MAX_ITEMS). One digest appearance
+        per fire — enough to invite a reaction without nagging every
+        turn. Called once per non-autonomous turn, after aging, so
+        user_turns_since is current."""
+        try:
+            records = self._load_pending_fire_outcomes()
+            if not records:
+                return []
+            picked: List[Dict[str, Any]] = []
+            for rec in records:
+                if len(picked) >= _FIRE_DIGEST_MAX_ITEMS:
+                    break
+                if not rec.get('surfaced'):
+                    rec['surfaced'] = True
+                    picked.append(rec)
+            if picked:
+                self._save_pending_fire_outcomes(records)
+            return picked
+        except Exception as e:
+            logger.warning(
+                f"[{self.character_name}] pending-fire surfacing failed: {e}")
+            return []
 
     def _apply_fire_outcome_judgments(self, raw: Any,
                                       pending: List[Dict[str, Any]]

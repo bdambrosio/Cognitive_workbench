@@ -31,6 +31,7 @@ from chat.chat_loop import (
     _FIRE_OUTCOME_EXPIRY_TURNS,
     _FIRE_OUTCOME_MAX_PER_REFLECTION,
 )
+from chat.concerns import _FIRE_DIGEST_MAX_ITEMS
 from infospace_resource_manager import InfospaceResourceManager
 
 
@@ -443,3 +444,43 @@ def test_trace_record_has_no_fire_id_on_user_turns(loop, tmp_path):
     rec = json.loads(
         (tmp_path / "reasoning_trace.jsonl").read_text().splitlines()[-1])
     assert "fire_id" not in rec
+
+
+# ── fire digest: one-shot surfacing into the user-turn prompt ───────────
+
+def test_take_unsurfaced_marks_caps_and_orders(loop):
+    nid = make_concern(loop)
+    for i in range(_FIRE_DIGEST_MAX_ITEMS + 2):
+        loop._register_fire_outcome(f"fid-{i}", nid, "respond",
+                                    f"reply {i}", False)
+
+    first = loop._take_unsurfaced_pending_fires()
+    assert [r["fire_id"] for r in first] == ["fid-0", "fid-1", "fid-2"]
+    # Marks persist in the registry; the remainder stays unsurfaced.
+    recs = read_pending(loop)
+    assert [bool(r.get("surfaced")) for r in recs] == [
+        True, True, True, False, False]
+
+    second = loop._take_unsurfaced_pending_fires()
+    assert [r["fire_id"] for r in second] == ["fid-3", "fid-4"]
+    assert loop._take_unsurfaced_pending_fires() == []
+    # Surfacing never removes records — judgment/expiry do that.
+    assert len(read_pending(loop)) == 5
+
+
+def test_take_unsurfaced_empty_registry(loop):
+    assert loop._take_unsurfaced_pending_fires() == []
+
+
+def test_render_pending_fires_block(loop):
+    nid = make_concern(loop)
+    loop._register_fire_outcome("fid-1", nid, "respond",
+                                "Morning reading is on the screen.", False)
+    loop._age_pending_fire_outcomes()
+    pending = loop._take_unsurfaced_pending_fires()
+
+    block = loop._render_pending_fires_block(pending)
+    assert block.startswith(
+        "## My recent autonomous acts the user may not have seen")
+    assert "- [1 user turn ago] concern text" in block
+    assert "I said/did: Morning reading is on the screen." in block

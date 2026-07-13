@@ -45,6 +45,24 @@
   591/844 fires are the PV-monitor concern; triage split fire=334 /
   defer=495 / reset=1.
 
+## M1 coverage fix — fire digest (2026-07-12)
+
+First readout (2026-07-12): 41 records but only 3 judged; coverage
+0.125 (21 unobserved, 17 unobservable) — the instrument was starving.
+Two changes, both instrument-side, not M2 tuning:
+
+- **Fire digest** (`_take_unsurfaced_pending_fires` +
+  `_render_pending_fires_block`): each pending fire is surfaced ONCE
+  in the next user turn's system prompt so Jill can mention it and the
+  user can react inside the judgment window. Harness change — needs a
+  composite ledger row before "known good".
+- **Dialog-initiation seed** (`jill-chat.yaml`): HF daily-papers
+  concern, 24h rhythm — a probe of whether passivity is
+  portfolio-shaped (fire volume was ~97% three clock-driven monitors).
+
+Outcome records from before these changes mostly measure the
+instrument's blindness; treat post-digest data as the real M1 set.
+
 ## Next steps
 
 1. **(Bruce, ongoing)** Daily-ish conversation per the collection
@@ -52,7 +70,11 @@
 2. **(M2, gated on data)** First outcome-modulated tuning cycle — one
    knob — once outcomes ≥50 and coverage is known. Candidates already
    visible: PV-concern rhythm/verbosity, triage prompt, judgment
-   window (if coverage is poor).
+   window (if coverage is poor). **Leading candidate: generic
+   sensor-event → concern-activation ingress (jill-integration.md §4)**
+   — time is currently the only high-bandwidth activation source, so
+   behavior collapses to scheduled monitors while opportunistic /
+   dialog-initiating concerns starve at threshold.
 3. **(Ship-gate discipline, immediate)** Any harness change now gets a
    composite row before merging to "known good."
 4. **(Optional, first weakness-cycle candidate)** Parallelize composite

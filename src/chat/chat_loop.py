@@ -308,6 +308,10 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
         # second embed pass. None if no embedding was computed this
         # turn.
         self._current_turn_embedding: Optional[Any] = None  # np.ndarray or None
+        # Per-turn cache of pending autonomous fires being surfaced this
+        # turn (fire digest). Set at user-turn entry, read by
+        # _build_system_prompt; empty on autonomous turns.
+        self._pending_fire_digest: List[Dict[str, Any]] = []
         self._init_agent_concerns()
         self._init_user_concerns()
         self._init_agent_threads()
@@ -1217,6 +1221,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
         # autonomous turns (the agent talking to itself doesn't shift
         # the user model). Order: decay first so a fresh mention's
         # full bump prevails over the same-turn decay step.
+        self._pending_fire_digest = []
         if not autonomous:
             self._decay_user_concerns_per_turn()
             self._bump_user_concerns_on_input(text)
@@ -1227,6 +1232,12 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
             # window on pending autonomous fires; records past the cap
             # resolve to 'unobserved' (docs/fire-outcome-capture.md §4).
             self._age_pending_fire_outcomes()
+            # Fire digest: surface each surviving pending fire once in
+            # this turn's prompt so the user gets a reaction opportunity
+            # inside the judgment window. Rendered by
+            # _build_system_prompt; empty on autonomous turns (a fire
+            # shouldn't be prompted to talk about other fires).
+            self._pending_fire_digest = self._take_unsurfaced_pending_fires()
 
         # Compute thread activation distribution for the current turn.
         # Read by _build_system_prompt for the "current activity context"
