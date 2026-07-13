@@ -44,7 +44,7 @@ if _SRC_DIR not in sys.path:
 from affect.publisher import AffectPublisher  # noqa: E402
 from canvas.publisher import CanvasPublisher, default_key as canvas_default_key  # noqa: E402
 from utils.json_utils import repair_json_string  # noqa: E402
-from utils.file_utils import atomic_write_text  # noqa: E402
+from utils.file_utils import atomic_write_text, atomic_write_json  # noqa: E402
 from utils.voice_pipeline import VOICE_MODALITY  # noqa: E402
 from chat.backend import _ChatBackend  # noqa: E402
 from chat.memories import (  # noqa: E402,F401 — mixin + back-compat re-exports
@@ -316,6 +316,12 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
         # (seed flag). Read by _build_system_prompt; empty on every
         # other turn.
         self._wip_review_inventory: List[Tuple[str, str, float, str]] = []
+        # Substrate line: session-static harness provenance — HEAD,
+        # dirty-tree count, commits since the last session's HEAD, and
+        # the backend model. Push-shaped by design: she boots knowing
+        # the harness changed rather than needing to think to ask
+        # (docs/substack_sensors_vs_tools.md). '' → no prompt section.
+        self._substrate_line = self._compute_substrate_line()
         self._init_agent_concerns()
         self._init_user_concerns()
         self._init_agent_threads()
@@ -367,6 +373,76 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
     # ------------------------------------------------------------------
     # LLM helper (used by character_evaluator and DiscourseTracker)
     # ------------------------------------------------------------------
+
+    _SUBSTRATE_MARKER = 'substrate_marker.json'
+
+    def _compute_substrate_line(self, repo_root: Optional[Path] = None) -> str:
+        """One-line harness provenance for the system prompt: current
+        commit, uncommitted-file count, commit subjects since the last
+        session's HEAD (tracked via <memory>/substrate_marker.json), and
+        the backend model. Covers the working tree — what is actually
+        running — not just pushed history. Returns '' when git is
+        unavailable; the prompt section is simply absent."""
+        import subprocess
+        repo = repo_root or Path(__file__).resolve().parents[2]
+
+        def _git(*args: str) -> Optional[str]:
+            try:
+                r = subprocess.run(
+                    ['git', '-C', str(repo), *args],
+                    capture_output=True, text=True, timeout=5)
+                if r.returncode != 0:
+                    return None
+                return r.stdout.strip()
+            except Exception as e:
+                logger.warning(
+                    f"[{self.character_name}] substrate git call failed: {e}")
+                return None
+
+        head = _git('rev-parse', '--short', 'HEAD')
+        if not head:
+            return ''
+        line = f"running commit {head}"
+        porcelain = _git('status', '--porcelain') or ''
+        dirty = len([l for l in porcelain.splitlines() if l.strip()])
+        if dirty:
+            line += f" (+{dirty} file(s) uncommitted)"
+        parts = [line]
+        marker_path = self._memory_dir() / self._SUBSTRATE_MARKER
+        prev_head = None
+        try:
+            if marker_path.exists():
+                prev_head = (json.loads(
+                    marker_path.read_text(encoding='utf-8')) or {}).get('head')
+        except Exception as e:
+            logger.warning(
+                f"[{self.character_name}] substrate marker read failed: {e}")
+        if prev_head and prev_head != head:
+            # prev..HEAD fails when prev was rebased away — _git returns
+            # None and the delta clause is simply omitted.
+            log = _git('log', '--oneline', f'{prev_head}..HEAD') or ''
+            subjects = [l.split(' ', 1)[1] if ' ' in l else l
+                        for l in log.splitlines()]
+            if subjects:
+                shown = "; ".join(subjects[:3])
+                more = (f" (+{len(subjects) - 3} more)"
+                        if len(subjects) > 3 else '')
+                parts.append(f"{len(subjects)} commit(s) since my last "
+                             f"session: {shown}{more}")
+        elif prev_head == head:
+            parts.append("no commits since my last session")
+        model = str(getattr(self.backend, 'model', '') or '').strip()
+        if model:
+            parts.append(f"backend model {model}")
+        try:
+            marker_path.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write_json(marker_path, {
+                'head': head,
+                'recorded_at': datetime.now(timezone.utc).isoformat()})
+        except Exception as e:
+            logger.warning(
+                f"[{self.character_name}] substrate marker write failed: {e}")
+        return "; ".join(parts)
 
     def _llm_generate(self, messages, bindings=None, max_tokens=400,
                       temperature=0.7, stops=None, is_json=False,

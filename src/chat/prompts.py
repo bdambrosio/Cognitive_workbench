@@ -184,6 +184,20 @@ class PromptsMixin:
             parts.append("## Self-model (from character config; what I am, not who)\n" + self.self_model)
         if self.capabilities:
             parts.append("## Capabilities (from character config; chat-only mode)\n" + self.capabilities)
+        # Substrate provenance: computed once at session start
+        # (chat_loop._compute_substrate_line). Absent when git is
+        # unavailable.
+        substrate = getattr(self, '_substrate_line', '') or ''
+        if substrate:
+            parts.append(
+                "## Substrate (harness provenance, session start)\n"
+                "What I am actually running — the working tree, not just "
+                "pushed history. This covers harness code only; my model "
+                "weights are separate (backend named below when known). "
+                "If commits landed since my last session, my beliefs "
+                "about my own architecture may be stale — verify with "
+                "inspect or exec-script before asserting them.\n\n"
+                + substrate)
         # When an external repo is bound for the session, append a single
         # capabilities line so the persona-level account reflects what the
         # ReAct surface actually exposes. Self-model is intentionally left

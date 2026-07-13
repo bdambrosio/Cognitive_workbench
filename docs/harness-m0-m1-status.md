@@ -83,6 +83,14 @@ instrument's blindness; treat post-digest data as the real M1 set.
   original instruction, missing the inspect-first clause added
   2026-06-19.
 
+- **Substrate line** (`_compute_substrate_line`): session-start system
+  prompt section with HEAD + uncommitted-file count + commit subjects
+  since the last session's HEAD (marker file in `<memory>/`) + backend
+  model. Push-shaped fix for the self-observed blind spot ("I can't
+  tell when my substrate changed", fire of 2026-07-12 19:21); her
+  `inspect_version` tool proposal was declined — `exec-script` + git
+  already covers ad-hoc depth.
+
 Both the reflection-prompt change and the reviewer are harness changes
 — composite ledger row owed before "known good".
 
