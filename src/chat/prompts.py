@@ -147,6 +147,27 @@ class PromptsMixin:
             + "\n".join(pf_lines)
         )
 
+    @staticmethod
+    def _render_wip_review_block(
+            inventory: List[Tuple[str, str, float, str]]) -> str:
+        """Render the WIP inventory a wip_reviewer fire reviews: one
+        entry per active concern carrying work-in-progress, activation
+        descending (chat_loop collects it via _collect_concern_wip)."""
+        lines: List[str] = []
+        for _nid, text, activation, wip in inventory:
+            lines.append(f"- [{activation:.2f}] {text[:120]}")
+            for wl in wip.splitlines():
+                lines.append(f"    {wl}")
+        return (
+            "## Work-in-progress across my active concerns (for this review)\n"
+            "One entry per concern carrying WIP. Much of it is procedural "
+            "— notes on how to do a job well; those are not reviewable "
+            "items. The reviewable items are half-done arcs: a pending "
+            "idea, an unfollowed finding, work stalled or blocked on "
+            "something.\n\n"
+            + "\n".join(lines)
+        )
+
     def _build_system_prompt(self, source: str, orientation: str,
                              recall: Optional[List[Tuple[str, str, str]]] = None,
                              agent_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None,
@@ -228,6 +249,11 @@ class PromptsMixin:
         pending_fires = getattr(self, '_pending_fire_digest', None)
         if pending_fires:
             parts.append(self._render_pending_fires_block(pending_fires))
+        # WIP inventory: present only on a wip_reviewer concern's own
+        # fire (set in _process_user_turn). Absent otherwise.
+        wip_inventory = getattr(self, '_wip_review_inventory', None)
+        if wip_inventory:
+            parts.append(self._render_wip_review_block(wip_inventory))
         # Threads: activity-level anchors. Computed once per turn in
         # _process_user_turn_inner via _compute_thread_activation; the
         # rendered block names the primary active thread plus any

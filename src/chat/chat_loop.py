@@ -312,6 +312,10 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
         # turn (fire digest). Set at user-turn entry, read by
         # _build_system_prompt; empty on autonomous turns.
         self._pending_fire_digest: List[Dict[str, Any]] = []
+        # Per-turn cache of the WIP inventory for a wip_reviewer fire
+        # (seed flag). Read by _build_system_prompt; empty on every
+        # other turn.
+        self._wip_review_inventory: List[Tuple[str, str, float, str]] = []
         self._init_agent_concerns()
         self._init_user_concerns()
         self._init_agent_threads()
@@ -1238,6 +1242,21 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
             # _build_system_prompt; empty on autonomous turns (a fire
             # shouldn't be prompted to talk about other fires).
             self._pending_fire_digest = self._take_unsurfaced_pending_fires()
+
+        # WIP-review inventory: only a wip_reviewer concern's own fire
+        # sees the WIP accumulated across the other concerns. Failure
+        # here degrades to an inventory-less review, not a lost turn.
+        self._wip_review_inventory = []
+        if autonomous and autonomous_concern_id:
+            try:
+                rev_note = self.resource_manager.get_resource(
+                    autonomous_concern_id) or {}
+                if (rev_note.get('properties') or {}).get('wip_reviewer'):
+                    self._wip_review_inventory = self._collect_concern_wip(
+                        exclude_id=autonomous_concern_id)
+            except Exception as e:
+                logger.warning(
+                    f"[{self.character_name}] WIP-review inventory failed: {e}")
 
         # Compute thread activation distribution for the current turn.
         # Read by _build_system_prompt for the "current activity context"

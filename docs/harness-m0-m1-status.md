@@ -63,6 +63,29 @@ Two changes, both instrument-side, not M2 tuning:
 Outcome records from before these changes mostly measure the
 instrument's blindness; treat post-digest data as the real M1 set.
 
+## WIP reviewer + retire path (2026-07-13)
+
+- **WIP reviewer seed** (`jill-chat.yaml`, `wip_reviewer: true`): 24h
+  escalate-or-retire pass over the WIP accumulated across
+  agent_concerns; its fires see every active concern's WIP in context
+  (`_collect_concern_wip` → `_render_wip_review_block`). At most one
+  item per fire, proposal-in-words only.
+- **Retire execution** (`agent_concerns_closed`): reflection stage 4
+  gains a closure list mirroring `user_concerns_closed` — user assent
+  in conversation marks the concern `abandoned` (blocks recurrence
+  revival; seeds never close; `concern_abandoned` event logged to
+  autonomy.jsonl). Before this, nothing in the runtime could ever
+  write `abandoned`.
+- **Seed instruction sync**: `_seed_concerns_from_config` now syncs a
+  seed's `instruction` from scenario YAML on restart (runtime dynamics
+  untouched; sync never deletes). Fixes silently-stale seed procedures
+  — observed live 2026-07-12: the self-extension concern fired its
+  original instruction, missing the inspect-first clause added
+  2026-06-19.
+
+Both the reflection-prompt change and the reviewer are harness changes
+— composite ledger row owed before "known good".
+
 ## Next steps
 
 1. **(Bruce, ongoing)** Daily-ish conversation per the collection

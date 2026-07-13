@@ -261,6 +261,30 @@ characters:
           matters to our work, and ask whether they want me to dig in.
           If today's crop has nothing genuinely relevant, stay silent.
 
+      # WIP reviewer (agent-side twin of the user_model_reviewer above,
+      # 2026-07-13): periodic escalate-or-retire pass over the
+      # work-in-progress accumulated across agent_concerns. The
+      # wip_reviewer flag makes this concern's fires see every active
+      # concern's WIP in context. Retirement executes via reflection's
+      # agent_concerns_closed when the user assents. Remove this entry
+      # to disable.
+      - text: "Periodically review the work-in-progress across my concerns and judge whether any half-done arc deserves further effort or should be retired."
+        category: durable
+        rhythm_hours: 24
+        wip_reviewer: true
+        instruction: |
+          Read the work-in-progress inventory in my context — one entry
+          per active concern. Most WIP is procedural notes on how to do
+          a job; skip those. Look for half-done arcs: a pending idea, an
+          unanswered question, a finding never followed up, work stalled
+          or blocked on something. Pick AT MOST ONE item and, in my own
+          voice, either (1) escalate — tell the user what the pending
+          item is, why it still seems worth effort, and what I would do
+          next (a proposal in words, not action); or (2) retire — tell
+          the user which concern's pending work looks stale or no longer
+          worth carrying, and ask whether to drop it. If everything is
+          procedural or already moving, stay silent.
+
     # Sensors. The `tick` sensor is the autonomy trigger: a heartbeat
     # publishes to sense_data every `schedule`. With autonomy on,
     # _handle_tick runs _grow_agent_concerns_per_tick + check_and_fire.

@@ -97,8 +97,8 @@ class ReflectionMixin:
         "agreements between you carry their literal weight\n"
         "If the frame is anything other than `none`, return all lists "
         "empty (memories, user_concerns, user_concerns_closed, "
-        "agent_concerns). When in doubt, prefer the more conservative "
-        "classification.\n\n"
+        "agent_concerns, agent_concerns_closed). When in doubt, prefer "
+        "the more conservative classification.\n\n"
         "STAGE 2 — Memories. If frame is `none`, extract stable specifics "
         "that should survive into FUTURE conversations.\n"
         "CAPTURE as memories:\n"
@@ -212,7 +212,15 @@ class ReflectionMixin:
         "    `external` if user specified rhythm or topic has natural cadence\n"
         "    `urgency` if user signaled importance ('track this closely')\n"
         "    `default` if you guessed (default to 168 / weekly when guessing)\n"
-        "{narrowness_rule}\n\n"
+        "{narrowness_rule}\n"
+        "CLOSE agent_concerns: when the exchange shows an EXISTING "
+        "agent_concern (from the list in your input) should be dropped — "
+        "{entity} agreed to stop tracking it, asked {character} to drop "
+        "it, or declared it obsolete — put its EXACT text in "
+        "`agent_concerns_closed`. Entries marked [seed] are architectural "
+        "baseline and can never be closed. Absence of mention is NOT "
+        "closure evidence; close only on explicit assent or instruction "
+        "this exchange.\n\n"
         "STAGE 5 — Capability gap. If, during THIS exchange, {character} "
         "needed a tool or capability she does not have in order to fully "
         "help {entity} — she had to decline, do the thing manually or "
@@ -233,6 +241,7 @@ class ReflectionMixin:
         "     \"rhythm_hours\": <int|null>,\n"
         "     \"rhythm_source\": \"external|urgency|default\"\n"
         "   }}, ...],\n"
+        "   \"agent_concerns_closed\": [\"<exact text of an existing agent_concern>\", ...],\n"
         "   \"capability_gap\": \"<one sentence>\"|null}}\n\n"
         "WORKED EXAMPLE 1. {entity}: \"Please keep an eye on S&P 500 "
         "closes — I want to hear about them every day.\"\n"
@@ -289,6 +298,16 @@ class ReflectionMixin:
         "  \"agent_concerns\": [],\n"
         "  \"capability_gap\": \"I had to convert between timezones by hand "
         "because I have no tool for timezone conversion.\"}}\n\n"
+        "WORKED EXAMPLE 6 (agent-concern closure). Existing agent_concerns "
+        "include \"- Track S&P 500 closing price daily.\". {entity}: \"You "
+        "can drop the S&P tracking — I don't need it anymore.\"\n"
+        "Output:\n"
+        "{{\"frame\": \"none\", \"memories\": [],\n"
+        "  \"user_concerns\": [],\n"
+        "  \"user_concerns_updated\": [],\n"
+        "  \"user_concerns_closed\": [],\n"
+        "  \"agent_concerns\": [],\n"
+        "  \"agent_concerns_closed\": [\"Track S&P 500 closing price daily.\"]}}\n\n"
         "If frame≠none or nothing qualifies: return the envelope with all "
         "lists empty and capability_gap null."
     )
@@ -353,10 +372,16 @@ class ReflectionMixin:
                     "## Existing user_concerns (do NOT re-emit; emit only "
                     "NEW user_concerns this exchange surfaced)\n" + "\n".join(lines))
             if existing_agent:
-                lines = [f"- {text}" for _nid, text, _a, _p in existing_agent]
+                # [seed] tag: tells the closure stage which entries are
+                # architectural baseline (never closable) so it doesn't
+                # waste a closure the apply step would refuse anyway.
+                lines = [
+                    f"- {text}" + (" [seed]" if (p or {}).get('seed') else "")
+                    for _nid, text, _a, p in existing_agent]
                 user_parts.append(
                     "## Existing agent_concerns (do NOT re-emit; emit only "
-                    "NEW agent_concerns this exchange surfaced)\n" + "\n".join(lines))
+                    "NEW agent_concerns this exchange surfaced; candidates "
+                    "for agent_concerns_closed)\n" + "\n".join(lines))
             if pending_fires:
                 # Identity + reach-back beyond the 4-turn dialog window;
                 # the reaction evidence itself is usually already in the
@@ -375,7 +400,7 @@ class ReflectionMixin:
             # was shown — byte-identical otherwise (KV-cache stability).
             return_keys = ("frame, memories, user_concerns, "
                            "user_concerns_updated, user_concerns_closed, "
-                           "agent_concerns")
+                           "agent_concerns, agent_concerns_closed")
             if pending_fires:
                 return_keys += ", fire_outcomes"
             user_parts.append(
@@ -478,6 +503,17 @@ class ReflectionMixin:
                         f"[{self.character_name}] reflection close failed "
                         f"for {nid}: {err}")
 
+            # Agent-concern closures (retire path): the exchange showed an
+            # existing agent_concern should be dropped — e.g. the user
+            # assented to a retire proposal. Read straight off the payload
+            # like capability_gap — _parse_reflection_payload doesn't
+            # carry it. Resolved against the same top-K list the LLM was
+            # shown; seeds never close.
+            agent_cons_closed: List[str] = []
+            if isinstance(payload, dict):
+                agent_cons_closed = self._apply_agent_concern_closures(
+                    payload.get('agent_concerns_closed'), existing_agent)
+
             agent_cons_written: List[str] = []
             for c in raw_agent_concerns:
                 text = c.get('text', '')
@@ -493,14 +529,16 @@ class ReflectionMixin:
                     agent_cons_written.append(text)
 
             if (mems_written or user_cons_written or user_cons_updated
-                    or user_cons_closed or agent_cons_written):
+                    or user_cons_closed or agent_cons_written
+                    or agent_cons_closed):
                 logger.info(
                     f"[{self.character_name}] reflection wrote "
                     f"{len(mems_written)} memory(s), "
                     f"{len(user_cons_written)} user_concern(s) "
                     f"(+{len(user_cons_updated)} updated, "
                     f"+{len(user_cons_closed)} closed), "
-                    f"{len(agent_cons_written)} agent_concern(s) from {source}")
+                    f"{len(agent_cons_written)} agent_concern(s) "
+                    f"(+{len(agent_cons_closed)} closed) from {source}")
             return (mems_written, user_cons_written, agent_cons_written)
         except Exception as e:
             logger.warning(f"[{self.character_name}] _reflect_and_remember failed: {e}")

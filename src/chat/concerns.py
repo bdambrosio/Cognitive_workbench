@@ -334,6 +334,7 @@ class ConcernsMixin:
             name = self._seed_concern_name(idx)
             reviewer = bool(seed.get('user_model_reviewer'))
             self_ext = bool(seed.get('self_extension'))
+            wip_rev = bool(seed.get('wip_reviewer'))
             if name in self.resource_manager.named_notes:
                 # Already seeded; preserve any edits — but sync the
                 # designation flags so config can flag an existing seed
@@ -346,6 +347,24 @@ class ConcernsMixin:
                         props['user_model_reviewer'] = True
                     if self_ext and not props.get('self_extension'):
                         props['self_extension'] = True
+                    if wip_rev and not props.get('wip_reviewer'):
+                        props['wip_reviewer'] = True
+                    # Sync instruction from YAML: config is the source of
+                    # truth for a seed's PROCEDURE; runtime state
+                    # (activation, WIP, status) stays untouched. Without
+                    # this, YAML instruction edits never reach an
+                    # already-seeded concern (observed live 2026-07-12:
+                    # the self-extension concern fired its original
+                    # instruction, missing the inspect-first clause added
+                    # to the YAML 2026-06-19). YAML-less instructions are
+                    # left alone — sync never deletes.
+                    yaml_instr = str(seed.get('instruction') or '').strip()
+                    cur_instr = str(props.get('instruction') or '').strip()
+                    if yaml_instr and yaml_instr != cur_instr:
+                        props['instruction'] = yaml_instr
+                        logger.info(
+                            f"[{self.character_name}] seed {name}: "
+                            f"instruction synced from scenario YAML")
                 continue
             rhythm_h = seed.get('rhythm_hours')
             if rhythm_h is None:
@@ -360,6 +379,8 @@ class ConcernsMixin:
                 extra['user_model_reviewer'] = True
             if self_ext:
                 extra['self_extension'] = True
+            if wip_rev:
+                extra['wip_reviewer'] = True
             self._add_agent_concern(
                 text, entity=entity, provenance='asserted', seed=True,
                 name=name, rhythm_hours=rhythm_h, rhythm_source='external',
@@ -418,23 +439,84 @@ class ConcernsMixin:
             props['status'] = 'active'
         return note_id
 
+    def _resolve_concern_by_text(
+            self, text: str,
+            shown: List[Tuple[str, str, float, Dict[str, Any]]],
+            collection_id: Optional[str]
+    ) -> Optional[str]:
+        """Resolve a reflection-emitted concern text to a note id in
+        `collection_id`. Exact (case-insensitive) match against the list
+        the LLM was shown first; falls back to the recurrence-threshold
+        semantic search for paraphrases. Returns None when nothing
+        matches — caller skips rather than guessing."""
+        needle = (text or '').strip().lower()
+        if not needle:
+            return None
+        for nid, shown_text, _rank, _props in shown:
+            if shown_text.strip().lower() == needle:
+                return nid
+        return self._find_similar_concern(text, collection_id)
+
     def _resolve_user_concern_by_text(
             self, text: str,
             shown: List[Tuple[str, str, float, Dict[str, Any]]]
     ) -> Optional[str]:
         """Resolve a reflection-emitted closure text to a user_concern
-        note id. Exact (case-insensitive) match against the list the LLM
-        was shown first; falls back to the recurrence-threshold semantic
-        search for paraphrases. Returns None when nothing matches —
-        caller skips the closure rather than guessing."""
-        needle = (text or '').strip().lower()
-        if not needle:
-            return None
-        for nid, shown_text, _strength, _props in shown:
-            if shown_text.strip().lower() == needle:
-                return nid
-        return self._find_similar_concern(
-            text, self._user_concerns_collection_id)
+        note id (see _resolve_concern_by_text)."""
+        return self._resolve_concern_by_text(
+            text, shown, self._user_concerns_collection_id)
+
+    def _apply_agent_concern_closures(
+            self, raw: Any,
+            shown: List[Tuple[str, str, float, Dict[str, Any]]]
+    ) -> List[str]:
+        """Retire agent_concerns reflection says the user agreed to drop
+        (the WIP reviewer's escalate-or-retire loop closes here). Each
+        emitted text resolves against the list the LLM was shown; seeds
+        are architectural baseline and never close; misses are skipped.
+        Status → 'abandoned', not 'satisfied': a drop decision blocks
+        recurrence revival (_find_similar_concern excludes abandoned).
+        Returns the closed texts."""
+        if not isinstance(raw, list):
+            return []
+        closed: List[str] = []
+        for item in raw:
+            if isinstance(item, str):
+                text = item.strip()
+            elif isinstance(item, dict):
+                text = str(item.get('text', '') or '').strip()
+            else:
+                continue
+            if not text:
+                continue
+            nid = self._resolve_concern_by_text(
+                text, shown, self._agent_concerns_collection_id)
+            if not nid:
+                logger.info(
+                    f"[{self.character_name}] agent-concern close skipped — "
+                    f"no match for {text[:80]!r}")
+                continue
+            note = self.resource_manager.get_resource(nid) or {}
+            props = note.get('properties') or {}
+            if props.get('seed'):
+                logger.info(
+                    f"[{self.character_name}] agent-concern close refused — "
+                    f"{nid} is a seed (architectural baseline)")
+                continue
+            ok, err = self._set_concern_status(nid, 'abandoned')
+            if ok:
+                closed.append(text)
+                self._write_autonomy_event({
+                    'event': 'concern_abandoned',
+                    'concern_id': nid,
+                    'concern_text': text,
+                    'via': 'reflection',
+                })
+            else:
+                logger.warning(
+                    f"[{self.character_name}] agent-concern close failed "
+                    f"for {nid}: {err}")
+        return closed
 
     def _bump_existing_user_concern(self, note_id: str,
                                     context: Optional[str] = None) -> str:
@@ -1230,6 +1312,26 @@ class ConcernsMixin:
             if not text:
                 continue
             out.append((nid, text, a, props))
+        return out
+
+    def _collect_concern_wip(self, exclude_id: Optional[str] = None
+                             ) -> List[Tuple[str, str, float, str]]:
+        """WIP inventory for a wip_reviewer fire: every active
+        agent_concern carrying non-empty WIP, as (note_id, text,
+        activation, wip), activation-descending. `exclude_id` drops the
+        reviewer concern itself — its own WIP is review bookkeeping,
+        not reviewable work."""
+        out: List[Tuple[str, str, float, str]] = []
+        for nid, note, a in self._iter_active_agent_concerns():
+            if exclude_id and nid == exclude_id:
+                continue
+            props = note.get('properties') or {}
+            wip = str(props.get('wip', '') or '').strip()
+            if not wip:
+                continue
+            text = str(props.get('content', '') or note.get('text', '') or '').strip()
+            out.append((nid, text, a, wip))
+        out.sort(key=lambda t: t[2], reverse=True)
         return out
 
     def _top_active_user_concerns(self, n: int = _USER_CONCERN_PROMPT_BUDGET

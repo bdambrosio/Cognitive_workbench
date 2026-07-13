@@ -553,3 +553,104 @@ def test_capability_gap_empty_is_ignored(loop, tmp_path):
     props = loop.resource_manager.get_resource(nid)["properties"]
     assert "wip" not in props
     assert props["activation"] == 0.3
+
+
+# ── WIP reviewer: inventory collection + prompt block ──────────────────
+
+def test_collect_concern_wip_filters_orders_excludes(loop):
+    _inject_agent_collection(loop)
+    n_hi = make_concern(loop, activation=0.9,
+                        extra={"wip": "pending: follow up on X"})
+    n_lo = make_concern(loop, activation=0.3,
+                        extra={"wip": "established: how to do Y"})
+    n_bare = make_concern(loop, activation=0.7)  # no WIP — dropped
+    n_rev = make_concern(loop, activation=0.5,
+                         extra={"wip": "reviewed everything",
+                                "wip_reviewer": True})
+    for nid in (n_hi, n_lo, n_bare, n_rev):
+        _add_to_agent_collection(loop, nid)
+
+    inv = loop._collect_concern_wip(exclude_id=n_rev)
+    assert [t[0] for t in inv] == [n_hi, n_lo]  # activation-descending
+    assert inv[0][3] == "pending: follow up on X"
+    assert inv[0][1] == "concern text"
+
+
+def test_render_wip_review_block(loop):
+    block = loop._render_wip_review_block([
+        ("Note_1", "topic A", 0.9, "line one\nline two"),
+        ("Note_2", "topic B", 0.4, "single"),
+    ])
+    assert block.startswith(
+        "## Work-in-progress across my active concerns (for this review)")
+    assert "- [0.90] topic A" in block
+    assert "    line one" in block and "    line two" in block
+    assert "- [0.40] topic B" in block
+
+
+# ── agent-concern closures (reflection retire path) ────────────────────
+
+def test_agent_concern_closure_abandons_and_logs(loop, tmp_path):
+    _inject_agent_collection(loop)
+    nid = make_concern(loop, activation=0.6)
+    _add_to_agent_collection(loop, nid)
+    shown = [(nid, "concern text", 0.6, {})]
+
+    closed = loop._apply_agent_concern_closures(["Concern Text"], shown)
+
+    assert closed == ["Concern Text"]  # case-insensitive exact match
+    props = loop.resource_manager.get_resource(nid)["properties"]
+    assert props["status"] == "abandoned"
+    recs = [json.loads(l) for l in
+            (tmp_path / "autonomy.jsonl").read_text().strip().splitlines()]
+    assert recs[-1]["event"] == "concern_abandoned"
+    assert recs[-1]["concern_id"] == nid
+    assert recs[-1]["via"] == "reflection"
+
+
+def test_agent_concern_closure_refuses_seed(loop, tmp_path):
+    _inject_agent_collection(loop)
+    nid = make_concern(loop, activation=0.6, extra={"seed": True})
+    _add_to_agent_collection(loop, nid)
+    shown = [(nid, "concern text", 0.6, {})]
+
+    closed = loop._apply_agent_concern_closures(["concern text"], shown)
+
+    assert closed == []
+    props = loop.resource_manager.get_resource(nid)["properties"]
+    assert props["status"] == "active"
+    p = tmp_path / "autonomy.jsonl"
+    assert not p.exists() or not p.read_text().strip()
+
+
+def test_agent_concern_closure_skips_unmatched_and_bad_input(loop):
+    _inject_agent_collection(loop)
+    nid = make_concern(loop, activation=0.6)
+    _add_to_agent_collection(loop, nid)
+    shown = [(nid, "concern text", 0.6, {})]
+
+    assert loop._apply_agent_concern_closures(
+        ["something never shown"], shown) == []
+    assert loop._apply_agent_concern_closures(None, shown) == []
+    assert loop._apply_agent_concern_closures("not a list", shown) == []
+    props = loop.resource_manager.get_resource(nid)["properties"]
+    assert props["status"] == "active"
+
+
+# ── seed instruction sync from YAML ────────────────────────────────────
+
+def test_seed_instruction_syncs_from_yaml(loop):
+    nid = make_concern(loop, instruction="OLD procedure",
+                       extra={"seed": True})
+    loop.resource_manager.named_notes["chat:agent_concern:seed:0"] = nid
+
+    loop._seed_concerns_from_config({"concerns": [
+        {"text": "concern text", "instruction": "NEW procedure"}]})
+
+    props = loop.resource_manager.get_resource(nid)["properties"]
+    assert props["instruction"] == "NEW procedure"
+
+    # YAML-less instruction never deletes an existing one.
+    loop._seed_concerns_from_config({"concerns": [{"text": "concern text"}]})
+    props = loop.resource_manager.get_resource(nid)["properties"]
+    assert props["instruction"] == "NEW procedure"
