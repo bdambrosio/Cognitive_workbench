@@ -21,6 +21,9 @@ Composes the bridge's /status, /observe and /telemetry into one call.
   deviation classification compares against — observe first, act second.
 - Appends production telemetry (per-item flows over the last minute) and
   any recent alerts.
+- Resource patches in range are included as summary lines — e.g.
+  "iron-ore patch (~608 tiles, ~436829 units) @ (-39, -22)" (position is
+  the patch centroid). Use fac-nearest when no patch is in range.
 - Water and cliffs are terrain, not entities: an empty listing does not
   guarantee buildable ground.
 

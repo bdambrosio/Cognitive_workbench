@@ -235,6 +235,27 @@ app = FastAPI(title="factorio-bridge", lifespan=_lifespan)
 
 # ---------------------------------------------------------------------- read
 
+# Connected players WITH positions (live read; the telemetry cache keeps
+# names only — the sensor's join/leave diff depends on that shape).
+_PLAYERS_LUA = (
+    "local out = {} "
+    "for _, p in pairs(game.connected_players) do "
+    "local e = {name = p.name} "
+    "if p.character then e.x = p.character.position.x e.y = p.character.position.y end "
+    "table.insert(out, e) end "
+    "rcon.print(helpers.table_to_json(out))"
+)
+
+
+def _players_with_positions():
+    resp = link.sc(_PLAYERS_LUA)
+    if not resp or resp.startswith("Cannot execute"):
+        log.warning("player position read failed: %s", (resp or "")[:200])
+        return []
+    data = json.loads(resp)
+    return data if isinstance(data, list) else []
+
+
 @app.get("/status")
 def status():
     pos = _position()
@@ -247,10 +268,48 @@ def status():
         "position": {"x": pos["x"], "y": pos["y"]},
         "walking": pos["walking"],
         "tick": telem.get("tick"),
-        "players": telem.get("players", []),
+        "players": _players_with_positions(),
         "last_activity": last,
         "last_hard_stop_s_ago": round(time.time() - stop_ts, 1) if stop_ts else None,
     }
+
+
+# Ore patches are neutral-force entities; the mod's get_entities filters by
+# player force and cannot see them (observed live: Jill was ore-blind). A
+# data-only /sc read, aggregated per resource type; surfaced through
+# /observe as summary pseudo-entities so the existing tools show them
+# without agent-side changes.
+_RESOURCES_LUA = (
+    "local out = {} "
+    "for _, e in pairs(game.surfaces[1].find_entities_filtered{"
+    "area = {{%.1f, %.1f}, {%.1f, %.1f}}, type = 'resource'}) do "
+    "local r = out[e.name] "
+    "if not r then r = {count = 0, amount = 0, sx = 0, sy = 0} out[e.name] = r end "
+    "r.count = r.count + 1 r.amount = r.amount + e.amount "
+    "r.sx = r.sx + e.position.x r.sy = r.sy + e.position.y "
+    "end rcon.print(helpers.table_to_json(out))"
+)
+
+
+def _resource_pseudo_entities(x, y, radius):
+    resp = link.sc(_RESOURCES_LUA % (x - radius, y - radius, x + radius, y + radius))
+    if not resp or resp.startswith("Cannot execute"):
+        log.warning("resource scan failed: %s", (resp or "")[:200])
+        return []
+    data = json.loads(resp)
+    if not isinstance(data, dict):
+        return []
+    out = []
+    for name, r in sorted(data.items()):
+        out.append({
+            "name": "%s patch (~%d tiles, ~%d units)" % (name, r["count"], r["amount"]),
+            "position": {"x": round(r["sx"] / r["count"], 1),
+                         "y": round(r["sy"] / r["count"], 1)},
+            "resource": name,
+            "tiles": r["count"],
+            "amount": r["amount"],
+        })
+    return out
 
 
 @app.get("/observe")
@@ -260,7 +319,18 @@ def observe(x: float | None = None, y: float | None = None, radius: float = 15):
         x, y = pos["x"], pos["y"]
     radius = min(radius, 50)
     entities, _ = _observe(x, y, radius)
+    # Resources are appended AFTER the deviation-cache record: pseudo-
+    # entities must not perturb world-change comparisons.
+    entities = entities + _resource_pseudo_entities(x, y, radius)
     return {"ok": True, "center": {"x": x, "y": y}, "radius": radius, "entities": entities}
+
+
+@app.get("/nearest")
+def nearest(resource: str):
+    """Nearest resource patch by name ('iron-ore', 'coal', also 'water',
+    'wood'); the mod scans 500 tiles around the agent."""
+    return _act("/nearest", {"resource": resource},
+                lambda: link.call("nearest", AGENT, resource))
 
 
 @app.get("/inventory")

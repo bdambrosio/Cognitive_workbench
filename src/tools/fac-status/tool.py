@@ -23,7 +23,18 @@ def _impl():
         + f", server tick {st.get('tick')}."
     ]
     players = st.get("players") or []
-    lines.append("Players online: " + (", ".join(players) if players else "none"))
+    if players:
+        parts = []
+        for p in players:
+            if isinstance(p, dict):
+                name = p.get("name", "?")
+                parts.append(f"{name} at {fmt_pos(p.get('x'), p.get('y'))}"
+                             if p.get("x") is not None else name)
+            else:
+                parts.append(str(p))
+        lines.append("Players online: " + ", ".join(parts))
+    else:
+        lines.append("Players online: none")
     last = st.get("last_activity")
     if last:
         outcome = "ok" if last.get("ok") else f"FAILED ({last.get('error', '?')})"

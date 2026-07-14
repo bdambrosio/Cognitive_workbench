@@ -125,14 +125,33 @@ Gotchas learned in step 3:
 
 ## CW-side tools (step 4)
 
-`src/tools/fac-*/` — 13 chat tools (react_invoke pattern), all HTTP via
+`src/tools/fac-*/` — 14 chat tools (react_invoke pattern), all HTTP via
 the one canonical client `src/utils/factorio_link.py` (`FACTORIO_URL`,
 default `http://localhost:3004`): fac-status, fac-observe (status +
-observe + telemetry composition), fac-inventory, fac-walk, fac-place,
-fac-connect, fac-insert, fac-extract, fac-craft, fac-harvest,
-fac-rotate, fac-say, fac-stop. Deviation reports pass through verbatim
-in the returned text. Tests: `tests/test_fac_tools.py` (discovery scan
-+ mocked-bridge smokes, no server needed).
+observe + telemetry composition), fac-inventory, fac-nearest, fac-walk,
+fac-place, fac-connect, fac-insert, fac-extract, fac-craft,
+fac-harvest, fac-rotate, fac-say, fac-stop. Deviation reports pass
+through verbatim in the returned text. Tests: `tests/test_fac_tools.py`
+(discovery scan + mocked-bridge smokes, no server needed).
+
+Shakedown-session fixes (2026-07-14, first live session with a human):
+
+- Ore-blindness: the mod's `get_entities` filters by player force, and
+  resources are neutral-force — Jill could not see ore at all, even
+  standing on it. `/observe` now appends per-type resource-patch
+  summaries (tiles, units, centroid) from a separate data-only scan,
+  and `/nearest` + fac-nearest expose the mod's already-ported 500-tile
+  nearest-resource scan.
+- `/status` now reports connected players WITH positions ("come to
+  where I am" needed a coordinate dance before). The telemetry cache
+  keeps names-only — the sensor's join/leave diff depends on that shape.
+- jill-factorio.yaml names the identity binding explicitly (in-game
+  "Bruce" = CLI author): with a fresh world and generic source labels,
+  Jill treated them as two people.
+- CAUTION: two chat-loop processes with the same character name (e.g.
+  jill-chat and jill-factorio both as "Jill") share
+  cognitive/Jill/sense_data and BOTH act on every event — stop one
+  before starting the other.
 
 ## Sensor + scenario (step 5)
 

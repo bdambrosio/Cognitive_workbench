@@ -22,7 +22,7 @@ from utils import factorio_link  # noqa: E402
 from utils.tool_loader import load_tools  # noqa: E402
 
 FAC_TOOLS = [
-    "fac-status", "fac-observe", "fac-inventory",
+    "fac-status", "fac-observe", "fac-inventory", "fac-nearest",
     "fac-walk", "fac-place", "fac-connect", "fac-insert", "fac-extract",
     "fac-craft", "fac-harvest", "fac-rotate",
     "fac-say", "fac-stop",
@@ -62,10 +62,11 @@ def test_react_invoke_present():
 CANNED = {
     ("GET", "/status"): {
         "ok": True, "position": {"x": 10.0, "y": 20.0}, "walking": False,
-        "tick": 12345, "players": ["Bruce"],
+        "tick": 12345, "players": [{"name": "Bruce", "x": -30.1, "y": 13.9}],
         "last_activity": {"endpoint": "/act/place", "params": {}, "ok": True},
         "last_hard_stop_s_ago": None,
     },
+    ("GET", "/nearest"): {"ok": True, "result": {"x": -32.5, "y": -8.5}},
     ("GET", "/chat"): {
         "ok": True, "last_seq": 2,
         "entries": [{"seq": 1, "speaker": "Bruce", "message": "Hi Jill"},
@@ -132,7 +133,9 @@ def mock_bridge(monkeypatch):
 
 
 SMOKE = [
-    ("fac-status", {}, ["(10.0, 20.0)", "Bruce", "Hi Jill"]),
+    ("fac-status", {}, ["(10.0, 20.0)", "Bruce at (-30.1, 13.9)", "Hi Jill"]),
+    ("fac-nearest", {"resource": "iron-ore"},
+     ["Nearest iron-ore is at (-32.5, -8.5)", "tiles from you"]),
     ("fac-observe", {"radius": 10}, ["stone-furnace", "transport-belt x9", "iron-plate +10"]),
     ("fac-inventory", {}, ["coal:40", "transport-belt:12"]),
     ("fac-walk", {"x": 30, "y": 40}, ["Arrived at (30.0, 40.0)"]),
