@@ -261,6 +261,27 @@ characters:
           matters to our work, and ask whether they want me to dig in.
           If today's crop has nothing genuinely relevant, stay silent.
 
+      # X-feed watcher (2026-07-13): hourly sweep of the user's curated
+      # X List via the check-x-feed tool (per-account since_id polling,
+      # so frequency is ~free; cost tracks feed volume only). Requires
+      # X_BEARER_TOKEN and X_LIST_ID in the launcher environment;
+      # comment this block out to disable.
+      - text: "Stay current with the user's X feed and bring genuinely interesting new posts to their attention."
+        category: durable
+        rhythm_hours: 1
+        instruction: |
+          Call the check-x-feed tool to get posts that appeared since
+          the last check. Judge what came back the way the user would:
+          work on agents, LLMs, or robotics they would want to see,
+          items touching our ongoing projects, or something genuinely
+          surprising from someone they chose to follow. If one or two
+          posts clear that bar, mention them — who posted, the gist in
+          a sentence, the link, and why I think they'd care. Most
+          sweeps will have nothing worth interrupting for; in that
+          case stay silent. If the tool reports an error, record it in
+          my work-in-progress and tell the user at most once — do not
+          repeat the same error report every hour.
+
       # WIP reviewer (agent-side twin of the user_model_reviewer above,
       # 2026-07-13): periodic escalate-or-retire pass over the
       # work-in-progress accumulated across agent_concerns. The
