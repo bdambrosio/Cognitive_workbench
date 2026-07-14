@@ -50,10 +50,13 @@ def _save_recent(recent: list[str]) -> None:
 
 
 def _format(saying: dict) -> str:
+    context = (saying.get("context") or "").strip()
     question = (saying.get("question") or "").strip()
     answer = (saying.get("answer") or "").strip()
     talk = saying.get("talk") or "Talks with Sri Ramana Maharshi"
     lines = []
+    if context:
+        lines.append(f"*{context}*")
     if question:
         lines.append(f"**Q.** {question}")
     lines.append(f"> {answer}")

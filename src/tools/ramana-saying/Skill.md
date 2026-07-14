@@ -8,7 +8,9 @@ args: {}
 
 Samples a single question → answer exchange from a bundled, verbatim corpus of
 *Talks with Sri Ramana Maharshi* and returns it as markdown with source
-attribution (e.g. *(Talk 26)*). Takes no arguments.
+attribution (e.g. *(Talk 26)*). Takes no arguments. Where the book provides a
+narrative scene-setting passage for the talk's opening exchange, it is included
+as an italicized lead-in above the Q&A.
 
 The tool does **not** add commentary — it hands back the genuine quote so you
 can frame it in your own voice. A small recent-history file keeps successive
