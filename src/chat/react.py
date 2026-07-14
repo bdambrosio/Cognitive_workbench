@@ -63,7 +63,7 @@ REACT_ACTION_SCHEMA: Dict[str, Any] = {
 
 # Tools the model can emit. Validated structurally in _parse_react_action;
 # the dispatcher in _run_react_loop knows how to run each.
-_REACT_TOOLS = ('process_text', 'recall', 'inspect', 'inspect_external', 'security', 'display', 'respond')
+_REACT_TOOLS = ('process_text', 'recall', 'inspect', 'inspect_external', 'security', 'display', 'respond', 'yield')
 
 # Per-iteration auto-binding: $step1, $step2, ... names the result of each
 # action so subsequent actions can reference it. Scoped to the current turn
@@ -297,6 +297,12 @@ class ReactMixin:
         # replaces the old one, and stale frames don't leak across turns.
         self._pending_tool_image = None
 
+        # Intentional-yield handoff: when an autonomous run exits via the
+        # `yield` action, the follow-up instruction lands here for the
+        # caller (_process_user_turn) to spawn the successor concern from.
+        # Reset each loop so a stale handoff can't leak across turns.
+        self._react_yield_next = None
+
         self._affect.enter_loop()
         for i in range(REACT_MAX_ITERS):
             self._affect.set_react_iter(i + 1)
@@ -413,6 +419,26 @@ class ReactMixin:
                 self._affect.exit_loop()
                 return text, log, iters, 'respond'
 
+            # Intentional multi-loop continuation: an autonomous run ends
+            # at a clean boundary, handing the remainder to a successor
+            # concern verbatim (no synthesizer pass — unlike the reactive
+            # max_iters route). Validation failures fall through to the
+            # dispatch chain below, which emits the ERROR observation and
+            # lets the loop continue.
+            if (tool == 'yield' and source == self.character_name):
+                next_slice = self._resolve_react_value(
+                    action.get('next', ''), log).strip()
+                if next_slice:
+                    text = self._resolve_react_value(action.get('text', ''), log)
+                    self._react_yield_next = next_slice
+                    logger.info(
+                        f"[{self.character_name}] ReAct iter {i+1}: yield "
+                        f"(next={next_slice[:120]!r}, text={len(text)} chars)")
+                    self._clear_status()
+                    self._affect.mark_completion()
+                    self._affect.exit_loop()
+                    return text, log, iters, 'yield'
+
             self._emit_status(f'using {tool}…')
             # Tool-call signature for repeat detection. Truncated to avoid
             # giant payloads in the publisher state. Sort keys so equivalent
@@ -476,6 +502,17 @@ class ReactMixin:
                 # has already chosen what belongs on the canvas this turn.
                 if isinstance(obs, str) and obs.startswith('OK'):
                     did_display = True
+            elif tool == 'yield':
+                # Reached only when the happy-path branch above declined:
+                # wrong context or missing args. Emit the ERROR observation
+                # and keep the loop alive.
+                if source != self.character_name:
+                    obs = ("ERROR: `yield` is only available in autonomous "
+                           "runs; finish with `respond` instead.")
+                else:
+                    obs = ("ERROR: `yield` requires a non-empty `next` field "
+                           "— the imperative instruction for the follow-up "
+                           "run.")
             elif tool in self._discovered_tools:
                 obs = self._dispatch_discovered_tool(tool, action, log)
             else:

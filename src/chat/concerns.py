@@ -1013,6 +1013,9 @@ class ConcernsMixin:
         """Decrement activation on service. Called after autonomous fire
         completes. exit_reason determines decrement size:
           'respond'   → full service (ReAct ran to completion)
+          'yield'     → full service (intentional boundary; the successor
+                        concern carries the remainder — the parent should
+                        not re-fire the same work on top of it)
           'max_iters' → partial (work continued via successor concern)
           others      → no decrement (fire didn't really happen)
         Activation floors at 0; last_fired_at recorded so we have a
@@ -1021,7 +1024,7 @@ class ConcernsMixin:
         if not note:
             return
         props = note.setdefault('properties', {})
-        if exit_reason == 'respond':
+        if exit_reason in ('respond', 'yield'):
             decrement = _AGENT_CONCERN_SERVICE_FULL
         elif exit_reason == 'max_iters':
             decrement = _AGENT_CONCERN_SERVICE_PARTIAL
@@ -1707,7 +1710,36 @@ class ConcernsMixin:
         if not isinstance(data, dict) or data.get('complete'):
             return None
         next_slice = str(data.get('next_slice') or '').strip()
+        return self._create_successor_concern(parent_id, next_slice)
+
+    def _spawn_successor_from_yield(self, parent_id: str,
+                                    next_slice: str) -> Optional[str]:
+        """Intentional-yield continuation: the autonomous ReAct loop ended
+        with a `yield` action carrying the follow-up instruction verbatim,
+        so no synthesizer LLM pass is needed — the agent stated the
+        remainder herself at a boundary she chose. Same creation path and
+        depth cap as the reactive max_iters route."""
+        return self._create_successor_concern(parent_id, next_slice)
+
+    def _create_successor_concern(self, parent_id: str,
+                                  next_slice: str) -> Optional[str]:
+        """Create the successor agent_concern carrying next_slice as its
+        instruction. Shared tail of the reactive (max_iters + synthesizer)
+        and intentional (yield) continuation paths. Enforces the depth cap
+        — successor chains can't run away regardless of route. Returns the
+        new concern id, or None (missing parent, cap, empty slice)."""
+        next_slice = (next_slice or '').strip()
         if not next_slice:
+            return None
+        parent = self.resource_manager.get_resource(parent_id)
+        if not parent:
+            return None
+        parent_props = parent.get('properties') or {}
+        parent_depth = int(parent_props.get('successor_depth', 0) or 0)
+        if parent_depth >= _CONCERN_SUCCESSOR_MAX_DEPTH:
+            logger.info(
+                f"[{self.character_name}] successor cap reached for {parent_id} "
+                f"(depth={parent_depth}); no successor created.")
             return None
         # Successor inherits the parent's surface text + a depth tag so it
         # reads coherently in the active-concerns surface.

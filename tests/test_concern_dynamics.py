@@ -654,3 +654,70 @@ def test_seed_instruction_syncs_from_yaml(loop):
     loop._seed_concerns_from_config({"concerns": [{"text": "concern text"}]})
     props = loop.resource_manager.get_resource(nid)["properties"]
     assert props["instruction"] == "NEW procedure"
+
+
+# ── intentional yield (deliberate multi-loop continuation) ─────────────
+# The `yield` ReAct action ends an autonomous run at a chosen boundary and
+# spawns a successor concern carrying the agent's own `next` instruction
+# verbatim — same creation path and depth cap as the reactive max_iters
+# route, but no synthesizer LLM pass.
+
+from chat.concerns import (  # noqa: E402
+    _AGENT_CONCERN_FIRE_THRESHOLD,
+    _CONCERN_SUCCESSOR_MAX_DEPTH,
+)
+
+
+def _mute_indexer(loop):
+    """Successor creation goes through create_note, which would index the
+    new Note (embedder load). Not what these tests exercise."""
+    loop.resource_manager.resource_indexer.index_note = lambda *a, **k: None
+
+
+def test_yield_spawns_successor_verbatim_no_llm(loop):
+    _mute_indexer(loop)
+    parent = make_concern(loop)
+    loop.backend = StubBackend(["must not be consulted"])
+    nxt = "Finish steps 4-6: place the boiler row at (12,4); ids are in WIP."
+    succ = loop._spawn_successor_from_yield(parent, nxt)
+    assert succ
+    # Verbatim handoff: the synthesizer LLM is never called.
+    assert loop.backend.calls == 0
+    props = loop.resource_manager.get_resource(succ)["properties"]
+    assert props["instruction"] == nxt
+    assert props["successor_of"] == parent
+    assert props["successor_depth"] == 1
+    assert props["activation"] == pytest.approx(
+        _AGENT_CONCERN_FIRE_THRESHOLD - 0.1)
+    assert loop._root_concern_id(succ) == parent
+
+
+def test_yield_successor_depth_capped(loop):
+    _mute_indexer(loop)
+    parent = make_concern(
+        loop, extra={"successor_depth": _CONCERN_SUCCESSOR_MAX_DEPTH})
+    assert loop._spawn_successor_from_yield(parent, "keep going") is None
+
+
+def test_yield_empty_next_spawns_nothing(loop):
+    _mute_indexer(loop)
+    parent = make_concern(loop)
+    assert loop._spawn_successor_from_yield(parent, "   ") is None
+    assert loop._spawn_successor_from_yield(parent, None) is None
+
+
+def test_service_yield_full_decrement(loop):
+    nid = make_concern(loop, activation=0.8)
+    loop._service_agent_concern(nid, "yield")
+    props = loop.resource_manager.get_resource(nid)["properties"]
+    assert props["activation"] == pytest.approx(
+        max(0.0, 0.8 - _AGENT_CONCERN_SERVICE_FULL))
+    assert props["last_fired_at"]
+
+
+def test_tool_catalog_gates_yield_on_autonomous(loop):
+    loop._discovered_tools = {}
+    loop._omitted_tools = []
+    loop._get_external_repo = lambda: None
+    assert '"yield"' not in loop._build_react_tool_catalog()
+    assert '"yield"' in loop._build_react_tool_catalog(include_yield=True)

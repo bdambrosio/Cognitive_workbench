@@ -3,7 +3,9 @@
 **Status:** Proposed roadmap (ASPIRATIONAL — M0 onward not implemented)
 **Date:** 2026-07-08
 **Inspiration:** Lilian Weng, *Harness Engineering for Self-Improvement*
-(https://lilianweng.github.io/posts/2026-07-04-harness/)
+(https://lilianweng.github.io/posts/2026-07-04-harness/); mining-procedure
+rigor from Kang et al., *TRACE: Capability-Targeted Agentic Training*
+(https://arxiv.org/abs/2604.05336) — adopted 2026-07-10, see M3.
 **Companion docs:** `fire-outcome-capture.md` (Phase 1 implemented, commit
 8a2bacf7 — M1/M2 build directly on it), `capability-gap-reuse-gating.md`
 (superseded in intent by M4 of this roadmap).
@@ -68,6 +70,22 @@ asks the backend to judge or propose must be checked against this floor —
 one more reason the frozen regression suite (M0) comes first, and a reason
 to consider pinning *judge* calls to a cloud model even when the agent
 under test is local.
+
+### Known caveat: the harness-only ceiling (TRACE finding)
+
+TRACE (Kang et al. 2026) ran the direct comparison this roadmap implicitly
+bets against: given the *same* mined capability deficits, prompt-level
+injection (GEPA) improved over base but plateaued after ~4 capabilities
+and underperformed weight training by ~8.6–10pp on τ²-Bench/SWE-bench.
+Implication: when a mined weakness cluster is a genuine *model* capability
+deficit (their recurring examples: structured data reasoning, precondition
+verification, tool-calling precision), harness edits have a real but
+bounded ceiling. The M3 loop must therefore be able to say "not
+harness-fixable" and stop, rather than burn cycles on prompt wording —
+see the cluster-triage step in M3. Weight-level fixes (e.g. TRACE-style
+LoRA on the local backend) remain out of scope; a model-capability
+cluster is recorded as backend evidence, feeding the unresolved
+local-vs-cloud question.
 
 ## 2. Milestones
 
@@ -203,16 +221,38 @@ procedure, not resident machinery; running it as a Claude Code session
 over the artifacts is fine and is itself the post's "coding agent as
 meta-level" pattern. Per cycle:
 
-1. **Mine:** cluster failures from the corpus into named patterns with
-   counts and example trajectory IDs. (Precedent: the repeated ReAct
-   parse-hardening fixes — truncated actions, runaway tool-args — were
-   exactly such a cluster, found reactively; this pass finds them
-   systematically.)
-2. **Propose:** ONE bounded harness change targeting the largest
-   actionable cluster. Written up with: the cluster, the change, the
-   held-in check (which existing probes / which new probe exercises the
-   failure), prior attempts if any.
-3. **Validate:** held-in probes improve AND M0 composite holds. Keep or
+1. **Mine (contrastive, two-phase — per TRACE):**
+   a. *Discovery:* survey the corpus and fix a named dictionary of
+      candidate failure patterns, each with a one-line description.
+      Freeze the dictionary before labeling — no adding patterns
+      mid-pass, so counts stay comparable.
+   b. *Labeling:* label every trajectory in the corpus against the fixed
+      dictionary — **successes as well as failures**. For each pattern
+      record prevalence on failed vs successful trajectories. The
+      contrastive gap (failure-prevalence − success-prevalence) is the
+      ranking signal: a pattern equally present in successes reflects
+      task ambiguity or judge noise, not a fixable deficit. Also record
+      coverage (fraction of failures exhibiting the pattern). Target
+      only clusters with both a large gap and material coverage
+      (TRACE used gap ≥ 0.20, coverage ≥ 0.10; start there, tune later).
+   c. *Stability:* rerun discovery (a) independently 2–3× and keep only
+      clusters recovered in every run — the variance-protocol idea
+      applied to the mining stage, which is itself an LLM pass and
+      therefore noisy.
+   Output per cluster: name, counts, gap, coverage, example trajectory
+   IDs. (Precedent: the repeated ReAct parse-hardening fixes — truncated
+   actions, runaway tool-args — were exactly such a cluster, found
+   reactively; this pass finds them systematically.)
+2. **Triage:** classify each surviving cluster **harness-fixable vs
+   model-capability**. Model-capability clusters (the backend lacks the
+   skill regardless of prompting — see the TRACE harness-only-ceiling
+   caveat) get no harness patch: record them as backend evidence and
+   move on. Only harness-fixable clusters proceed.
+3. **Propose:** ONE bounded harness change targeting the largest
+   actionable (harness-fixable, high-gap) cluster. Written up with: the
+   cluster, the change, the held-in check (which existing probes / which
+   new probe exercises the failure), prior attempts if any.
+4. **Validate:** held-in probes improve AND M0 composite holds. Keep or
    revert. Ledger entry either way — negative results are recorded (the
    post's "negative results" challenge; a reverted change with a reason
    is corpus for the next cycle).
@@ -222,7 +262,9 @@ regression-free-cycle rate. **Exit:** two completed cycles, at least one
 accepted change.
 
 **Artifacts:** `docs/weakness-cycles/NNN-<slug>.md` per cycle (mine →
-propose → validate → verdict). Deliberately files-not-database.
+triage → propose → validate → verdict), including the labeled
+gap/coverage table and any clusters parked as model-capability.
+Deliberately files-not-database.
 
 ### M4 — Self-extension re-grounded
 
@@ -258,6 +300,40 @@ proposal precision ≥0.5 — i.e., only once the validation harness has a
 track record of catching bad changes. If the local backend sits below
 the STOP capability floor for this task, the finding is "not yet" and
 the milestone parks.
+
+### Deliberate multi-loop continuation (intentional yield) — SHIPPED 2026-07-13
+
+Not a milestone; recorded so the requirement survives with its shape
+agreed. **The gap:** tasks needing long tool-call chains (7+) previously
+ended at the iteration cap, where `_maybe_spawn_successor_concern`
+(`src/chat/concerns.py`) reactively packaged the remainder into a
+successor concern — a guillotine, not a decision. **Shipped shape:** a
+`yield` ReAct action, offered only on autonomous fires (catalog gated on
+`source == character`): `next` (imperative for the follow-up run,
+spawned verbatim into a successor concern — no synthesizer pass) +
+optional `text` (status line; omit to stay silent). Same
+depth-capped creation path as the reactive route
+(`_create_successor_concern`); `yield` services the parent fully
+(successor carries the work); WIP update + fire-outcome registration
+treat it as a first-class exit. Tests in
+`tests/test_concern_dynamics.py`. The reactive max_iters valve remains
+as fallback. Auditability comes from yield points, not from a plan
+artifact.
+
+**Explicitly not:** plan-first execution (upfront objective → predefined
+blocks → per-block success criteria). That is the shape of the deleted
+OODA/incremental planner and contradicts the WIP+NEXT greedy model;
+pre-committed plans go stale between blocks, especially with a human
+changing the world mid-chain.
+
+**Deferred until** the Factorio bridge lands: the game's macro workload
+is the designated forcing function for this item, and the design should
+be made against a real 20-step task, not a speculative one.
+
+Provenance: WIP-reviewer escalation 2026-07-12 ("Multi-Loop Execution
+Gap", METHOD_TOOLS.md); independently re-derived by Jill's
+self-extension concern 2026-07-13 (proposed as `plan_long_chain`;
+counter-scoped to intentional yield per the objections above).
 
 ## 3. Cross-cutting discipline
 

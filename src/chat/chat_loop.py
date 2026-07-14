@@ -1410,24 +1410,33 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
         # Only real executions register — a crashed loop has no act to
         # judge. _register_fire_outcome is itself failure-tolerant.
         if (autonomous and autonomous_concern_id and fire_id
-                and exit_reason in ('respond', 'max_iters')):
+                and exit_reason in ('respond', 'max_iters', 'yield')):
             self._register_fire_outcome(
                 fire_id, autonomous_concern_id, exit_reason, reply,
                 intentionally_silent)
 
-        # Successor-concern spawn. When an autonomous ReAct loop hits its
-        # iter cap, the work likely isn't done — synthesize what's left
-        # into a narrow successor concern so the next tick can pick up
-        # where this one left off (capped by _CONCERN_SUCCESSOR_MAX_DEPTH).
-        if autonomous and autonomous_concern_id and exit_reason == 'max_iters':
+        # Successor-concern spawn, two routes into the same creation path
+        # (both capped by _CONCERN_SUCCESSOR_MAX_DEPTH):
+        #   max_iters — reactive: the loop was cut off; an LLM pass
+        #               synthesizes what's left from the working log.
+        #   yield     — intentional: the loop ended at a boundary it chose
+        #               and stated the remainder itself; spawned verbatim,
+        #               no synthesizer.
+        if autonomous and autonomous_concern_id and exit_reason in ('max_iters', 'yield'):
             try:
-                succ_id = self._maybe_spawn_successor_concern(
-                    autonomous_concern_id, text, log)
+                if exit_reason == 'yield':
+                    succ_id = self._spawn_successor_from_yield(
+                        autonomous_concern_id,
+                        getattr(self, '_react_yield_next', None) or '')
+                else:
+                    succ_id = self._maybe_spawn_successor_concern(
+                        autonomous_concern_id, text, log)
                 if succ_id:
                     self._write_autonomy_event({
                         'event': 'successor_spawned',
                         'parent_concern_id': autonomous_concern_id,
                         'successor_concern_id': succ_id,
+                        'via': exit_reason,
                     })
             except Exception as e:
                 logger.warning(
@@ -1464,7 +1473,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
             # from this fire's outcome. One LLM call, on the post-turn
             # executor so the inbox loop isn't blocked. Only for fires
             # that actually ran ReAct to a meaningful exit.
-            if autonomous_concern_id and exit_reason in ('respond', 'max_iters'):
+            if autonomous_concern_id and exit_reason in ('respond', 'max_iters', 'yield'):
                 try:
                     self._post_turn_executor.submit(
                         self._update_concern_wip, autonomous_concern_id,

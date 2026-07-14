@@ -216,10 +216,13 @@ class ToolsMixin:
             return "EMPTY: " + (text or f"{name} produced no result")
         return "ERROR: " + (text or f"{name} failed")
 
-    def _build_react_tool_catalog(self) -> str:
+    def _build_react_tool_catalog(self, include_yield: bool = False) -> str:
         """Build the numbered tool list shown in the ReAct system prompt.
         Conditionally includes inspect_external — and the bound external
-        repo path — only when an external_repo is currently bound. Tools
+        repo path — only when an external_repo is currently bound.
+        include_yield adds the `yield` action (intentional multi-loop
+        continuation) — offered only on autonomous concern fires, where a
+        successor concern can carry the remainder. Tools
         whose name appears in self._omitted_tools (set per scenario via
         chat.omitted_tools, used by the cspred bench cf-cells) are
         filtered out so the affordance representation matches what is
@@ -308,6 +311,19 @@ class ToolsMixin:
             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"respond\", \"text\": <string|$stepN>}` — "
             "final reply, exits loop. Must be in your voice; pass search-web/fetch-text results through process_text "
             "first or write the reply yourself."))
+        if include_yield:
+            from chat.react import REACT_MAX_ITERS
+            tools.append(("yield",
+                "`{\"thought\": \"<one terse sentence>\", \"tool\": \"yield\", "
+                "\"next\": <string>, \"text\": <string, optional>}` — "
+                f"this autonomous run has a hard cap of {REACT_MAX_ITERS} actions. When the task "
+                "genuinely needs more than the remaining budget, end at a CLEAN boundary with "
+                "`yield` instead of getting cut off mid-step: a follow-up run will execute `next` "
+                "as its instruction. Write `next` imperatively and self-contained — state what is "
+                "already done, what remains, and every specific the follow-up must not rediscover "
+                "(names, ids, paths, values found so far). Optional `text` posts a brief status "
+                "line to the conversation; omit it to stay silent. Exits the loop. Use `respond` "
+                "when the work is DONE — `yield` only when real work remains."))
 
         omitted = set(self._omitted_tools or [])
         if omitted:
