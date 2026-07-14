@@ -64,6 +64,17 @@ the bridge), set_inventory, plus the human-safe
 create_agent_characters. Walking/harvest tick handlers are statically
 registered and pcall-guarded.
 
+0.3.0 adds game-chat capture: `on_console_chat` → data-only ring
+buffer in `storage.chat` (cap 200, monotonic seq); poll with
+`get_chat(since_seq)`; `say(message)` prints as blue "Jill: …" and
+appends itself to the buffer (game.print does not fire
+on_console_chat, so no loop). Verified live 2026-07-14 (human chat
+captured, say visible in client, saves clean).
+
+When remote.call args go through `/silent-command`, encode them with
+`json.dumps(..., ensure_ascii=False)` — JSON's `\uXXXX` escapes are
+invalid Lua string escapes (bare `\u` errors).
+
 - After editing `build_mod.py`: bump `MOD_VERSION` (on_configuration_changed
   only fires on version change), regenerate, `docker compose restart`.
 - **Human clients need the mod too** (Factorio requires matching mods and

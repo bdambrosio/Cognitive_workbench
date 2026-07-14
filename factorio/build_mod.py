@@ -28,7 +28,7 @@ OUT = Path(__file__).parent / "fle-bridge"
 MOD_NAME = "fle-bridge"
 # Bump on any change that must re-run init_data on an existing save —
 # on_configuration_changed only fires when the version changes.
-MOD_VERSION = "0.2.1"
+MOD_VERSION = "0.3.0"
 
 # Shared libs, in FLE's own init_scripts order (instance.initialise).
 # alerts.lua provides utils.get_issues (used by place_entity's warnings)
@@ -158,6 +158,56 @@ actions.create_agent_characters = function(num_agents)
 end
 """
 
+# Game-chat capture (ours). on_console_chat -> data-only ring buffer in
+# storage; the bridge polls get_chat(since_seq) (same since-id pattern as
+# check-x-feed). say() is the agent's voice: game.print does NOT fire
+# on_console_chat, so it is appended to the buffer explicitly (no loop).
+CHAT_CAPTURE = """
+local CHAT_CAP = 200
+
+local function chat_state()
+    storage.chat = storage.chat or {seq = 0, entries = {}}
+    return storage.chat
+end
+
+local function chat_append(speaker, message)
+    local chat = chat_state()
+    chat.seq = chat.seq + 1
+    table.insert(chat.entries, {seq = chat.seq, tick = game.tick, speaker = speaker, message = message})
+    while #chat.entries > CHAT_CAP do table.remove(chat.entries, 1) end
+end
+
+script.on_event(defines.events.on_console_chat, function(event)
+    -- An error in a mod event handler is a non-recoverable server crash.
+    local ok, err = pcall(function()
+        if not event.message or event.message == "" then return end
+        local speaker = "<server>"
+        if event.player_index then
+            local p = game.get_player(event.player_index)
+            if p then speaker = p.name end
+        end
+        chat_append(speaker, event.message)
+    end)
+    if not ok then log("fle-bridge chat handler error: " .. tostring(err)) end
+end)
+
+actions.say = function(message)
+    message = tostring(message)
+    game.print("[color=#55aaff]Jill: " .. message .. "[/color]")
+    chat_append("Jill", message)
+    return true
+end
+
+actions.get_chat = function(since_seq)
+    since_seq = since_seq or 0
+    local out = {}
+    for _, e in ipairs(chat_state().entries) do
+        if e.seq > since_seq then table.insert(out, e) end
+    end
+    return out
+end
+"""
+
 REMOTE_INTERFACE = """
 remote.add_interface("fle_bridge", {
     ping = function() return "pong" end,
@@ -237,6 +287,8 @@ def main():
 
     parts.append("\n-- ==== action: create_agent_characters (human-safe, ours) ====\n")
     parts.append(SAFE_CREATE_CHARACTERS)
+    parts.append("\n-- ==== game-chat capture: say / get_chat (ours) ====\n")
+    parts.append(block("chat capture", CHAT_CAPTURE))
     parts.append("\n-- ==== remote interface ====\n")
     parts.append(REMOTE_INTERFACE)
 
