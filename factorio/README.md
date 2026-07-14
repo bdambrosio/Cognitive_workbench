@@ -90,6 +90,39 @@ invalid Lua string escapes (bare `\u` errors).
   forces `storage.fast = true`); tick work belongs in statically
   registered handlers that never error.
 
+## The bridge process (step 3)
+
+`bridge/` — the peripheral-pattern process from the architecture note:
+FastAPI on `localhost:3004`, RCON to the mod's remote interface,
+policy allowlist (`bridge/policy.py`), observation cache + deviation
+classifier (world_changed / stale_model / infeasible), ~10 s telemetry
+cache, chat relay with the below-the-LLM "Jill, stop" watcher.
+
+```bash
+.venv/bin/python -m bridge            # serve (from factorio/)
+.venv/bin/python verify_bridge.py     # step-3 acceptance: smelting
+                                      # column over HTTP + one forced
+                                      # deviation of each class
+```
+
+Gotchas learned in step 3:
+
+- Factorio 2.0 directions are 16-step: 0=N, 4=E, 8=S, 12=W (not the
+  1.1-era 0/2/4/6).
+- Pathfinding needs a clearance ladder (entity_size 1.5→0.25, cribbed
+  from FLE's connect client): a start position adjacent to entities
+  fails at full character size. Applied in both /act/walk and
+  /act/connect.
+- `place_entity` enforces character reach; `place_entity_next_to` does
+  NOT (FLE inconsistency, observed live). Don't rely on next_to for
+  reach realism.
+- Water/cliffs are tiles, not entities — an entity-empty area is not
+  necessarily buildable or walkable (`get_tile(...).collides_with`).
+- mod 0.4.x: move_to always takes the walking queue (real walking at
+  1x, visible presence); `storage.fast` stays true for the synchronous
+  semantics of every other action. `agent_position` / `stop` /
+  `get_alerts` back /status, /act/stop and the telemetry poll.
+
 ## Step-2 finding: NEVER run FLE injection against this server
 
 FLE's runtime injection puts Lua functions into `storage`. Factorio

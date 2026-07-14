@@ -28,7 +28,7 @@ OUT = Path(__file__).parent / "fle-bridge"
 MOD_NAME = "fle-bridge"
 # Bump on any change that must re-run init_data on an existing save —
 # on_configuration_changed only fires when the version changes.
-MOD_VERSION = "0.3.0"
+MOD_VERSION = "0.4.1"
 
 # Shared libs, in FLE's own init_scripts order (instance.initialise).
 # alerts.lua provides utils.get_issues (used by place_entity's warnings)
@@ -65,6 +65,10 @@ FILE_FIXES = {
     # load, and conditional registration breaks save/load determinism.
     # Register statically; gate + pcall inside the handler (an error in
     # a mod event handler is a non-recoverable server crash).
+    # 0.4.0: move_to ALWAYS takes the walking-queue branch — real walking
+    # at 1x is a v1 requirement (visible presence, architecture note);
+    # storage.fast stays true for every other action's semantics
+    # (synchronous place/craft/harvest).
     "move_to/server.lua": [
         (
             """if not storage.fast then
@@ -75,10 +79,37 @@ FILE_FIXES = {
     end)
 end""",
             """script.on_nth_tick(5, function(event)
-    if storage.fast or not storage.walking_queues or not next(storage.walking_queues) then return end
+    if not storage.walking_queues or not next(storage.walking_queues) then return end
     local ok, err = pcall(storage.actions.update_walking_queues)
     if not ok then log("fle-bridge walking-queue error: " .. tostring(err)) end
 end)""",
+        ),
+        (
+            """    -- If fast mode is disabled, set up walking queue
+    if not storage.fast then""",
+            """    -- CW: always real walking, regardless of storage.fast
+    if true then""",
+        ),
+    ],
+    # inspect_inventory: the non-fast branch registers a dynamic
+    # on_nth_tick (the non-recoverable crash class) to auto-close a UI
+    # pane no headless agent has. Dead behind storage.fast=true, but
+    # stripped outright — one flag flip away from killing the server.
+    "inspect_inventory/server.lua": [
+        (
+            """       if not is_fast then
+           player.opened = closest_entity
+           script.on_nth_tick(60, function()
+               if automatic_close == True then
+                   if closest_entity and closest_entity.valid then
+                       player.opened = nil
+                   end
+                   automatic_close = False
+               end
+           end)
+       end
+""",
+            "       -- (non-fast UI auto-close stripped: dynamic on_nth_tick is the crash class)\n",
         ),
     ],
     # request_path: top-level storage guard moved to lazy init inside the
@@ -120,6 +151,7 @@ ACTIONS = [
     "pickup_entity",
     "rotate_entity",
     "connect_entities",
+    "inspect_inventory",
 ]
 
 # Admin actions (fle/env/tools/admin/). set_inventory stocks the agent
@@ -155,6 +187,34 @@ actions.create_agent_characters = function(num_agents)
         storage.agent_characters[i] = char
     end
     return num_agents
+end
+"""
+
+# Bridge-support actions (ours). agent_position backs /status and walk
+# arrival polling (get_entities' name filter does not match the agent
+# character); stop backs /act/stop and the hard "Jill, stop" (clearing
+# the queue alone leaves walking_state stuck on); get_alerts exposes the
+# alerts lib's drain-and-return global through the remote interface.
+BRIDGE_SUPPORT = """
+actions.agent_position = function(player_index)
+    local player = utils.ensure_valid_character(player_index)
+    local q = storage.walking_queues and storage.walking_queues[player_index]
+    return {
+        x = player.position.x,
+        y = player.position.y,
+        walking = (q and q.current_target) ~= nil,
+    }
+end
+
+actions.stop = function(player_index)
+    actions.clear_walking_queue(player_index)
+    local player = utils.ensure_valid_character(player_index)
+    player.walking_state = {walking = false}
+    return {x = player.position.x, y = player.position.y}
+end
+
+actions.get_alerts = function(seconds)
+    return get_alerts(seconds or 0)
 end
 """
 
@@ -289,6 +349,8 @@ def main():
     parts.append(SAFE_CREATE_CHARACTERS)
     parts.append("\n-- ==== game-chat capture: say / get_chat (ours) ====\n")
     parts.append(block("chat capture", CHAT_CAPTURE))
+    parts.append("\n-- ==== bridge support: agent_position / stop / get_alerts (ours) ====\n")
+    parts.append(block("bridge support", BRIDGE_SUPPORT))
     parts.append("\n-- ==== remote interface ====\n")
     parts.append(REMOTE_INTERFACE)
 
