@@ -123,6 +123,17 @@ Gotchas learned in step 3:
   semantics of every other action. `agent_position` / `stop` /
   `get_alerts` back /status, /act/stop and the telemetry poll.
 
+## CW-side tools (step 4)
+
+`src/tools/fac-*/` — 13 chat tools (react_invoke pattern), all HTTP via
+the one canonical client `src/utils/factorio_link.py` (`FACTORIO_URL`,
+default `http://localhost:3004`): fac-status, fac-observe (status +
+observe + telemetry composition), fac-inventory, fac-walk, fac-place,
+fac-connect, fac-insert, fac-extract, fac-craft, fac-harvest,
+fac-rotate, fac-say, fac-stop. Deviation reports pass through verbatim
+in the returned text. Tests: `tests/test_fac_tools.py` (discovery scan
++ mocked-bridge smokes, no server needed).
+
 ## Step-2 finding: NEVER run FLE injection against this server
 
 FLE's runtime injection puts Lua functions into `storage`. Factorio
