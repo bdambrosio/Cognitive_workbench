@@ -1,0 +1,261 @@
+"""Generate the fle-bridge Factorio mod from the installed fle package.
+
+Why a mod (vs FLE's runtime RCON injection): Lua functions in `storage`
+make the world unsaveable and crash the headless server (step-2 finding,
+docs/factorio-bridge-architecture.md "Step-2 reversal"). This script
+cribs FLE's per-tool server.lua bodies and shared libs into a single
+control.lua where functions live in the mod's Lua state (globals
+`actions` / `utils`, recreated on every load) and `storage` stays
+data-only. Actions are exposed via remote.add_interface("fle_bridge").
+
+Usage:  .venv/bin/python build_mod.py     (writes fle-bridge/)
+Then restart the server; docker-compose.yml mounts fle-bridge/ into
+/factorio/mods/.
+
+Transforms applied to cribbed sources:
+  storage.actions.  ->  actions.   (function registry -> mod global)
+  storage.utils.    ->  utils.     (helper registry  -> mod global)
+All other storage.* references are data and stay in storage.
+checksum.lua is skipped entirely (functions on storage; mods don't
+need re-injection checksums).
+"""
+
+from pathlib import Path
+
+FLE = Path(__file__).parent / ".venv/lib/python3.13/site-packages/fle/env"
+OUT = Path(__file__).parent / "fle-bridge"
+
+MOD_NAME = "fle-bridge"
+# Bump on any change that must re-run init_data on an existing save —
+# on_configuration_changed only fires when the version changes.
+MOD_VERSION = "0.2.1"
+
+# Shared libs, in FLE's own init_scripts order (instance.initialise).
+# alerts.lua provides utils.get_issues (used by place_entity's warnings)
+# and registers a static on_tick alert scanner — static registration is
+# the correct mod pattern, unlike the dynamic on_nth_tick issue above.
+LIBS = [
+    "lualib_util.lua",
+    "utils.lua",
+    "alerts.lua",
+    "connection_points.lua",
+    "recipe_fluid_connection_mappings.lua",
+    "serialize.lua",
+    "serialize_direction_fix.lua",
+]
+
+# Per-file fixes beyond the two global replacements. alerts.lua opens
+# with a bare top-level `storage.alerts = {}` (illegal outside events in
+# a mod; initialise.lua's guarded version covers it) and defines
+# storage.get_alerts as a function directly on storage (save poison).
+FILE_FIXES = {
+    # lualib_util ends with a chunk-level `return util` (vestigial — util
+    # is a global). Inside our do-wrapper that returns from the WHOLE
+    # control.lua chunk, silently skipping everything after it (observed:
+    # mod active but remote interface never registered).
+    "lualib_util.lua": [
+        ("\nreturn util", "\n-- (chunk-level `return util` stripped: would end control.lua early)"),
+    ],
+    "alerts.lua": [
+        ("storage.alerts = {}\n", "-- storage.alerts init lives in init_data (initialise.lua)\n"),
+        ("storage.get_alerts", "get_alerts"),
+    ],
+    # move_to: the walking-queue handler was registered top-level behind
+    # `if not storage.fast` — top-level storage access crashes a mod at
+    # load, and conditional registration breaks save/load determinism.
+    # Register statically; gate + pcall inside the handler (an error in
+    # a mod event handler is a non-recoverable server crash).
+    "move_to/server.lua": [
+        (
+            """if not storage.fast then
+    script.on_nth_tick(5, function(event)
+        if storage.walking_queues then
+            storage.actions.update_walking_queues()
+        end
+    end)
+end""",
+            """script.on_nth_tick(5, function(event)
+    if storage.fast or not storage.walking_queues or not next(storage.walking_queues) then return end
+    local ok, err = pcall(storage.actions.update_walking_queues)
+    if not ok then log("fle-bridge walking-queue error: " .. tostring(err)) end
+end)""",
+        ),
+    ],
+    # request_path: top-level storage guard moved to lazy init inside the
+    # action; player-visible game.print noise demoted to the log.
+    "request_path/server.lua": [
+        (
+            """-- Store created entities globally
+if not storage.clearance_entities then
+    storage.clearance_entities = {}
+end""",
+            "-- clearance_entities init is lazy (mods cannot touch storage at top level)",
+        ),
+        (
+            "storage.actions.request_path = function(player_index, start_x, start_y, goal_x, goal_y, radius, allow_paths_through_own_entities, entity_size)\n",
+            "storage.actions.request_path = function(player_index, start_x, start_y, goal_x, goal_y, radius, allow_paths_through_own_entities, entity_size)\n"
+            "    storage.clearance_entities = storage.clearance_entities or {}\n",
+        ),
+        (
+            'game.print("No request data found for ID: " .. event.id)',
+            'log("fle-bridge: no path request data for ID: " .. event.id)',
+        ),
+    ],
+}
+
+# Agent actions. place_entity cross-calls get_entity; move_to needs the
+# request_path/get_path admin pipeline. connect_entities' Python-side
+# resolvers live in the bridge process; only its Lua ships here.
+ACTIONS = [
+    "get_entity",
+    "get_entities",
+    "nearest",
+    "place_entity",
+    "place_entity_next_to",
+    "move_to",
+    "harvest_resource",
+    "insert_item",
+    "extract_item",
+    "craft_item",
+    "pickup_entity",
+    "rotate_entity",
+    "connect_entities",
+]
+
+# Admin actions (fle/env/tools/admin/). set_inventory stocks the agent
+# character — needed because the mod's storage is isolated from the
+# level state, so /sc cannot reach storage.agent_characters directly.
+ADMIN_ACTIONS = ["set_inventory", "request_path", "get_path"]
+
+# The marker in initialise.lua separating storage-data guards (must run
+# inside an event: on_init/on_configuration_changed) from function
+# definitions (must run at every load, i.e. top level).
+INIT_SPLIT_MARKER = "-- Factorio 2.0 compatibility"
+
+# Our human-safe character spawn — replaces FLE's admin
+# create_agent_characters, which destroys every character on the
+# surface including a connected human's (see coexist_fle.py).
+SAFE_CREATE_CHARACTERS = """
+actions.create_agent_characters = function(num_agents)
+    for _, entity in pairs(game.surfaces[1].find_entities_filtered{type = "character"}) do
+        if entity.player == nil then entity.destroy() end
+    end
+    if storage.agent_characters then
+        for _, char in pairs(storage.agent_characters) do
+            if char and char.valid then char.destroy() end
+        end
+    end
+    storage.agent_characters = {}
+    for i = 1, num_agents do
+        local target = {x = 0, y = 4 + (i - 1) * 2}
+        local pos = game.surfaces[1].find_non_colliding_position("character", target, 30, 0.5) or target
+        local char = game.surfaces[1].create_entity{
+            name = "character", position = pos, force = game.forces.player}
+        char.color = {r = 0.2, g = 0.6, b = 1.0, a = 1.0}
+        storage.agent_characters[i] = char
+    end
+    return num_agents
+end
+"""
+
+REMOTE_INTERFACE = """
+remote.add_interface("fle_bridge", {
+    ping = function() return "pong" end,
+    version = function() return "%s" end,
+    actions_list = function()
+        local out = {}
+        for k in pairs(actions) do table.insert(out, k) end
+        table.sort(out)
+        return out
+    end,
+    call = function(name, ...)
+        local fn = actions[name]
+        if not fn then error("fle_bridge: unknown action '" .. tostring(name) .. "'") end
+        return fn(...)
+    end,
+})
+""" % MOD_VERSION
+
+
+def transform(lua: str) -> str:
+    return lua.replace("storage.actions.", "actions.").replace("storage.utils.", "utils.")
+
+
+def block(title: str, body: str) -> str:
+    return f"\n-- ==== {title} ====\ndo\n{body}\nend\n"
+
+
+def main():
+    parts = [
+        f"-- {MOD_NAME} {MOD_VERSION} — GENERATED by build_mod.py; do not edit by hand.\n"
+        "-- Cribbed from fle (MIT, github.com/JackHopkins/factorio-learning-environment)\n"
+        "-- with storage.actions/storage.utils moved out of storage (save safety).\n\n"
+        "actions = actions or {}\n"
+        "utils = utils or {}\n"
+    ]
+
+    for lib in LIBS:
+        src = (FLE / "mods" / lib).read_text()
+        for old, new in FILE_FIXES.get(lib, []):
+            if old not in src:
+                raise SystemExit(f"{lib}: expected fix target not found: {old!r}")
+            src = src.replace(old, new)
+        parts.append(block(f"lib: {lib}", transform(src)))
+
+    init_src = transform((FLE / "mods" / "initialise.lua").read_text())
+    if INIT_SPLIT_MARKER not in init_src:
+        raise SystemExit(f"initialise.lua split marker not found: {INIT_SPLIT_MARKER!r}")
+    data_part, fn_part = init_src.split(INIT_SPLIT_MARKER, 1)
+    parts.append(block("initialise: function defs (every load)", INIT_SPLIT_MARKER + fn_part))
+    parts.append(
+        "\n-- ==== initialise: storage data (on_init / on_configuration_changed) ====\n"
+        "local function init_data()\n" + data_part +
+        "\n    -- CW override: always fast/synchronous actions. The non-fast\n"
+        "    -- path registers on_nth_tick closures dynamically; an error in\n"
+        "    -- one is a non-recoverable mod error that kills the server\n"
+        "    -- (observed live). Walking gets a static queue processor when\n"
+        "    -- move_to is ported.\n"
+        "    storage.fast = true\n"
+        "end\n"
+        "script.on_init(init_data)\n"
+        "script.on_configuration_changed(init_data)\n"
+    )
+
+    def load_action(kind: str, action: str) -> str:
+        src = (FLE / "tools" / kind / action / "server.lua").read_text()
+        for old, new in FILE_FIXES.get(f"{action}/server.lua", []):
+            if old not in src:
+                raise SystemExit(f"{action}/server.lua: expected fix target not found: {old!r}")
+            src = src.replace(old, new)
+        return src
+
+    for action in ACTIONS:
+        parts.append(block(f"action: {action}", transform(load_action("agent", action))))
+
+    for action in ADMIN_ACTIONS:
+        parts.append(block(f"admin action: {action}", transform(load_action("admin", action))))
+
+    parts.append("\n-- ==== action: create_agent_characters (human-safe, ours) ====\n")
+    parts.append(SAFE_CREATE_CHARACTERS)
+    parts.append("\n-- ==== remote interface ====\n")
+    parts.append(REMOTE_INTERFACE)
+
+    OUT.mkdir(exist_ok=True)
+    (OUT / "info.json").write_text(
+        '{\n'
+        f'  "name": "{MOD_NAME}",\n'
+        f'  "version": "{MOD_VERSION}",\n'
+        '  "title": "FLE Bridge",\n'
+        '  "author": "Cognitive Workbench",\n'
+        '  "factorio_version": "2.0",\n'
+        '  "dependencies": ["base >= 2.0"],\n'
+        '  "description": "FLE action vocabulary as remote interfaces for the CW game-embodiment bridge."\n'
+        '}\n'
+    )
+    control = "".join(parts)
+    (OUT / "control.lua").write_text(control)
+    print(f"wrote {OUT}/info.json and control.lua ({len(control.splitlines())} lines)")
+
+
+if __name__ == "__main__":
+    main()

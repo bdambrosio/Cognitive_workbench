@@ -1,0 +1,19 @@
+{
+  "_comment": "Jill v1 experiment map: enemies disabled entirely, bounded map (docs/factorio-bridge-architecture.md, server setup section)",
+  "terrain_segmentation": 1,
+  "water": 1,
+  "width": 1024,
+  "height": 1024,
+  "starting_area": 1.5,
+  "peaceful_mode": true,
+  "autoplace_controls": {
+    "enemy-base": { "frequency": 0, "size": 0, "richness": 0 }
+  },
+  "cliff_settings": {
+    "name": "cliff",
+    "cliff_elevation_0": 10,
+    "cliff_elevation_interval": 40,
+    "richness": 0
+  },
+  "seed": null
+}

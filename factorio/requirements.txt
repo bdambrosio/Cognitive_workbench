@@ -1,0 +1,4 @@
+# Pinned per docs/factorio-bridge-architecture.md (fork-FLE decision).
+factorio-learning-environment==0.4.3
+# FLE 0.4.3's send_message imports a2a.types.TextPart, removed in a2a 1.x.
+a2a-sdk==0.3.26

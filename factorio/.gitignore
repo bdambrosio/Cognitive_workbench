@@ -1,0 +1,4 @@
+# Server state (saves, mods, logs) is runtime data; config templates are kept.
+data/*
+!data/config/
+data/config/rconpw

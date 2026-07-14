@@ -32,6 +32,8 @@ Categories:
 | [configuration.md](configuration.md) | Scenario YAML / LLM / tool configuration |
 | [cw-voice-sensor.md](cw-voice-sensor.md) | CW-side ChatterBot voice sensor (mic→turn): `src/chat/voice_sensor.py`, `src/utils/voice_pipeline.py` — shipped 2026-06-19 |
 | [getting-started.md](getting-started.md) | Install, venv, credentials |
+| [factorio-bridge-architecture.md](factorio-bridge-architecture.md) | Factorio game-embodiment bridge (separate subproject, `factorio/`); steps 1–2b built 2026-07-13 (server + fle-bridge mod 0.2.1, saves/late-join verified), bridge process + CW tools pending |
+| [game-embodiment-assessment.md](game-embodiment-assessment.md) | Factorio-vs-Satisfactory assessment + v1 plan (role, controls, success criteria); feeds the bridge-architecture doc |
 | [harness-m0-m1-status.md](harness-m0-m1-status.md) | M0 complete (baseline 0.720 ± 0.007 frozen 2026-07-09, ship gate live), M1 collection running; next steps + session commit trail |
 | [m1-collection-inputs.md](m1-collection-inputs.md) | Exemplar user inputs for M1 fire-outcome collection: reaction forms per outcome, latency spread, anti-patterns, cadence |
 | [musing_spec.md](musing_spec.md) | Musing LoRA-adapter biasing (`src/musing/`) |
