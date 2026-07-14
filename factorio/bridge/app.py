@@ -41,9 +41,10 @@ state = {
     "activity": deque(maxlen=500),  # Jill's action log (the audit control)
     "activity_seq": 0,
     "telemetry": {},
-    "alerts": deque(maxlen=200),
+    "alerts": {},                   # (entity, issue, x, y) -> alert dict, expired by ALERT_TTL_S
     "stop_ts": 0.0,                 # last hard stop (chat phrase or /act/stop)
 }
+ALERT_TTL_S = 600.0
 
 
 def _log_activity(endpoint, params, ok, error=None, deviation=None, result=None):
@@ -184,9 +185,25 @@ def _poll_telemetry():
     else:
         log.warning("telemetry poll failed: %s", (resp or "")[:200])
     alerts = link.call("get_alerts", 30)
-    if isinstance(alerts, list) and alerts:
-        with _lock:
-            state["alerts"].extend(alerts)
+    now = time.time()
+    with _lock:
+        if isinstance(alerts, list):
+            # The mod emits one entry per (entity, tick); dedupe to one live
+            # alert per (entity, issue, position), refreshed while it recurs.
+            for a in alerts:
+                if not isinstance(a, dict):
+                    continue
+                pos = a.get("position") or {}
+                for issue in a.get("issues") or []:
+                    issue = str(issue).strip("'")
+                    key = (a.get("entity_name"), issue, pos.get("x"), pos.get("y"))
+                    state["alerts"][key] = {
+                        "entity": a.get("entity_name"), "issue": issue,
+                        "x": pos.get("x"), "y": pos.get("y"),
+                        "tick": a.get("tick"), "seen": round(now, 1),
+                    }
+        state["alerts"] = {k: v for k, v in state["alerts"].items()
+                           if now - v["seen"] < ALERT_TTL_S}
 
 
 def _poller():
@@ -261,7 +278,7 @@ def entity(x: float, y: float, prototype: str):
 @app.get("/telemetry")
 def telemetry():
     with _lock:
-        return {"ok": True, **state["telemetry"], "alerts": list(state["alerts"])}
+        return {"ok": True, **state["telemetry"], "alerts": list(state["alerts"].values())}
 
 
 @app.get("/chat")

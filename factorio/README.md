@@ -134,6 +134,26 @@ fac-rotate, fac-say, fac-stop. Deviation reports pass through verbatim
 in the returned text. Tests: `tests/test_fac_tools.py` (discovery scan
 + mocked-bridge smokes, no server needed).
 
+## Sensor + scenario (step 5)
+
+- `src/sensors/factorio-telemetry/` — event ingress: game chat from
+  others (no addressing filter; Jill judges), joins/leaves, watched
+  flow stops (`watch_items`), new alert kinds. Plain-text results so
+  events arrive as chat-loop turns; first run baselines silently;
+  state in `~/.cache/cognitive/factorio-telemetry/state.json`.
+- `scenarios/jill-factorio.yaml` — junior-factory-engineer role +
+  norms, the one durable assignment concern (iron-plate health,
+  rhythm 1h), tick + factorio-telemetry sensors. Run:
+  `python src/launcher.py scenarios/jill-factorio.yaml --autonomy`
+  (server and bridge must be up first).
+- "Jill, stop" wiring verified end-to-end: the phrase in game chat
+  aborts an in-flight /act/walk with deviation kind=stopped, below
+  the LLM.
+- Bridge /telemetry alerts are deduped to one live alert per
+  (entity, issue, position), expired after 10 min quiet.
+- Tests: `tests/test_factorio_sensor.py` (mocked bridge; event
+  classes, self-chat skip, bridge-down).
+
 ## Step-2 finding: NEVER run FLE injection against this server
 
 FLE's runtime injection puts Lua functions into `storage`. Factorio
