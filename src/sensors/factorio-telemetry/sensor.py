@@ -62,10 +62,15 @@ def run(context):
     production = telemetry.get("production") or {}
     if not isinstance(production, dict):
         production = {}
-    alert_kinds_now = sorted({
-        f"{a.get('entity')}: {a.get('issue')}"
-        for a in telemetry.get("alerts") or [] if isinstance(a, dict)
-    })
+    alert_positions = {}
+    for a in telemetry.get("alerts") or []:
+        if not isinstance(a, dict):
+            continue
+        kind = f"{a.get('entity')}: {a.get('issue')}"
+        positions = alert_positions.setdefault(kind, set())
+        if a.get("x") is not None and a.get("y") is not None:
+            positions.add((a["x"], a["y"]))
+    alert_kinds_now = sorted(alert_positions)
     flows_live = {
         item: bool(
             (production.get(item) or {}).get("produced_1m")
@@ -119,7 +124,11 @@ def run(context):
     # new alert kinds
     new_kinds = sorted(set(alert_kinds_now) - set(state.get("alert_kinds") or []))
     for kind in new_kinds:
-        events.append(f"new alert: {kind}")
+        positions = sorted(alert_positions.get(kind) or [])
+        where = ""
+        if positions:
+            where = " — at " + ", ".join(f"({x}, {y})" for x, y in positions)
+        events.append(f"new alert: {kind}{where}")
 
     state.update({
         "chat_seq": max(state.get("chat_seq", 0), chat.get("last_seq", 0)),

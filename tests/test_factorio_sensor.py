@@ -68,7 +68,7 @@ def test_baseline_then_events_then_quiet(sensor, monkeypatch):
     assert "Bruce: Jill, take the NE patch" in text
     assert "Bruce left the game" in text
     assert "iron-plate production has stopped" in text
-    assert "new alert: stone-furnace: out of fuel" in text
+    assert "new alert: stone-furnace: out of fuel — at (1, 2)" in text
 
     # run 3: same world state again -> quiet (no re-reporting)
     out = sensor.run(CTX)
