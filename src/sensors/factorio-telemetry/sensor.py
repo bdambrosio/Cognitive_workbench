@@ -75,6 +75,12 @@ def run(context):
     }
 
     state = _load_state()
+    if state is not None and chat.get("last_seq", 0) < state.get("chat_seq", 0):
+        # Chat seq went backwards: the world was reset or the mod's chat
+        # buffer restarted. Rebaseline silently rather than missing all
+        # chat until seq catches up.
+        logger.info("factorio-telemetry: chat seq regressed (world reset?) — rebaselining")
+        state = None
     if state is None:
         # First run: baseline silently — no history replay.
         _save_state({

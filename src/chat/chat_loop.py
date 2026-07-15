@@ -1616,6 +1616,13 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
             fired_note = self.resource_manager.get_resource(nid)
             if fired_note and (fired_note.get('properties') or {}).get('self_extension'):
                 outcome['kind'] = 'capability_proposal'
+            # Domain tag (e.g. factorio) for M-series stratification:
+            # domain-tagged fires can be sliced out so the chat-only
+            # composite stays comparable to frozen baselines.
+            fired_domain = ((fired_note.get('properties') or {}).get('domain')
+                            if fired_note else None)
+            if fired_domain:
+                outcome['domain'] = fired_domain
             # Imperative wrapper. Without it, instruction bodies written
             # as reference docs ("InfluxDB lives at...") get acknowledged
             # rather than executed. The framing forces "act now" and
@@ -1771,7 +1778,56 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
     # Main loop
     # ------------------------------------------------------------------
 
+    # Character lock: two chat loops with the same character name share
+    # cognitive/{name}/sense_data and BOTH act on every event (observed
+    # live 2026-07-14: jill-chat + jill-factorio double-executed fac-stop
+    # and answered every CLI turn twice). Refuse to start a duplicate.
+
+    def _character_lock_path(self):
+        from pathlib import Path
+        d = Path('~/.cache/cognitive/locks').expanduser()
+        d.mkdir(parents=True, exist_ok=True)
+        return d / f"chat_loop_{self.character_name}.pid"
+
+    def _acquire_character_lock(self) -> Optional[str]:
+        """Returns None on success, or an error string naming the holder."""
+        path = self._character_lock_path()
+        if path.exists():
+            try:
+                other = int(path.read_text().strip())
+            except (ValueError, OSError):
+                other = None
+            if other is not None and other != os.getpid():
+                try:
+                    os.kill(other, 0)   # liveness probe only
+                except OSError:
+                    logger.info(f"[{self.character_name}] stale character lock "
+                                f"(pid {other} gone); taking over")
+                else:
+                    return (f"another chat loop for character "
+                            f"'{self.character_name}' is already running "
+                            f"(pid {other}) — refusing to start a second one; "
+                            f"stop it first (both would act on every event)")
+        try:
+            path.write_text(str(os.getpid()))
+        except OSError as e:
+            logger.warning(f"[{self.character_name}] could not write character lock: {e}")
+        return None
+
+    def _release_character_lock(self) -> None:
+        path = self._character_lock_path()
+        try:
+            if path.exists() and path.read_text().strip() == str(os.getpid()):
+                path.unlink()
+        except OSError as e:
+            logger.warning(f"[{self.character_name}] could not release character lock: {e}")
+
     def run(self) -> None:
+        lock_err = self._acquire_character_lock()
+        if lock_err:
+            logger.error(f"[{self.character_name}] {lock_err}")
+            print(f"FATAL: {lock_err}", file=sys.stderr)
+            return
         self._open_zenoh()
         # Sensors start AFTER zenoh — they publish to sense_data on the
         # same session.
@@ -1838,4 +1894,5 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
             # in its last job (or that we did synchronously) is on disk.
             self._persist_to_disk()
             self._shutdown_zenoh()
+            self._release_character_lock()
 

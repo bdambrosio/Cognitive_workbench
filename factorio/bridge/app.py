@@ -207,14 +207,22 @@ def _poll_telemetry():
 
 
 def _poller():
+    # Log on health transitions only: with Jill long-lived and the game
+    # server routinely down, a warning every 2s is pure spam.
     n = 0
+    healthy = True
     while True:
         try:
             _poll_chat()
             if n % 5 == 0:
                 _poll_telemetry()
+            if not healthy:
+                log.info("poller: game server reachable again")
+                healthy = True
         except Exception as e:
-            log.warning("poller error: %s", e)
+            if healthy:
+                log.warning("poller: game server unreachable (will log again on recovery): %s", e)
+                healthy = False
         n += 1
         time.sleep(2)
 

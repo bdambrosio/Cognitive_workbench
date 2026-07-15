@@ -38,8 +38,8 @@ def _request(method: str, path: str, **kwargs) -> Dict[str, Any]:
         resp = requests.request(method, url, timeout=_HTTP_TIMEOUT_S, **kwargs)
     except requests.ConnectionError as e:
         raise BridgeError(
-            f"factorio bridge unreachable at {base_url()} — is it running? "
-            f"(cd factorio && .venv/bin/python -m bridge) [{e}]"
+            f"factorio bridge unreachable at {base_url()} — the factory is "
+            f"offline (start it with factorio/up.sh) [{e}]"
         )
     except requests.RequestException as e:
         raise BridgeError(f"factorio bridge request failed: {e}")

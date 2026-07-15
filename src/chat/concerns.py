@@ -335,6 +335,7 @@ class ConcernsMixin:
             reviewer = bool(seed.get('user_model_reviewer'))
             self_ext = bool(seed.get('self_extension'))
             wip_rev = bool(seed.get('wip_reviewer'))
+            domain = str(seed.get('domain') or '').strip()
             if name in self.resource_manager.named_notes:
                 # Already seeded; preserve any edits — but sync the
                 # designation flags so config can flag an existing seed
@@ -349,6 +350,8 @@ class ConcernsMixin:
                         props['self_extension'] = True
                     if wip_rev and not props.get('wip_reviewer'):
                         props['wip_reviewer'] = True
+                    if domain and props.get('domain') != domain:
+                        props['domain'] = domain
                     # Sync instruction from YAML: config is the source of
                     # truth for a seed's PROCEDURE; runtime state
                     # (activation, WIP, status) stays untouched. Without
@@ -381,6 +384,8 @@ class ConcernsMixin:
                 extra['self_extension'] = True
             if wip_rev:
                 extra['wip_reviewer'] = True
+            if domain:
+                extra['domain'] = domain
             self._add_agent_concern(
                 text, entity=entity, provenance='asserted', seed=True,
                 name=name, rhythm_hours=rhythm_h, rhythm_source='external',
