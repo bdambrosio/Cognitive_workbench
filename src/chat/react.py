@@ -419,17 +419,22 @@ class ReactMixin:
                 self._affect.exit_loop()
                 return text, log, iters, 'respond'
 
-            # Intentional multi-loop continuation: an autonomous run ends
-            # at a clean boundary, handing the remainder to a successor
-            # concern verbatim (no synthesizer pass — unlike the reactive
-            # max_iters route). Validation failures fall through to the
+            # Intentional multi-loop continuation: the run ends at a clean
+            # boundary, handing the remainder verbatim to a successor
+            # concern (autonomous fires) or a fresh agent_concern (user
+            # turns) — no synthesizer pass, unlike the reactive max_iters
+            # route. Validation failures fall through to the
             # dispatch chain below, which emits the ERROR observation and
             # lets the loop continue.
-            if (tool == 'yield' and source == self.character_name):
+            if tool == 'yield':
                 next_slice = self._resolve_react_value(
                     action.get('next', ''), log).strip()
                 if next_slice:
                     text = self._resolve_react_value(action.get('text', ''), log)
+                    if not text.strip() and source != self.character_name:
+                        # A user is waiting on this turn — never hand them
+                        # "(no reply)". State the handoff plainly.
+                        text = f"(continuing in the background: {next_slice})"
                     self._react_yield_next = next_slice
                     logger.info(
                         f"[{self.character_name}] ReAct iter {i+1}: yield "

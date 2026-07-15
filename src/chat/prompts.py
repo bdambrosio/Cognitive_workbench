@@ -367,8 +367,7 @@ class PromptsMixin:
             "\n"
             + fresh_info_guidance
             + "\n"
-            + self._build_react_tool_catalog(
-                include_yield=(source == self.character_name))
+            + self._build_react_tool_catalog()
             + "\n"
             "## Observation format\n"
             "Each tool observation in the working log starts with one of three tags:\n"

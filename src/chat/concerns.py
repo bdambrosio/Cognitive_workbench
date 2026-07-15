@@ -1726,6 +1726,43 @@ class ConcernsMixin:
         depth cap as the reactive max_iters route."""
         return self._create_successor_concern(parent_id, next_slice)
 
+    def _spawn_concern_from_user_yield(self, turn_text: str,
+                                       next_slice: str) -> Optional[str]:
+        """User-turn intentional yield: a ReAct loop serving a USER (or
+        sensor) turn ended with `yield`, carrying the remainder verbatim.
+        There is no parent concern, so create a fresh agent_concern —
+        the concern machinery then continues the user's task without
+        another prod. Starts at successor_depth 0: if the spawned
+        concern's own fire yields again, the ordinary successor path and
+        its depth cap take over."""
+        next_slice = (next_slice or '').strip()
+        if not next_slice:
+            return None
+        turn_text = ' '.join((turn_text or '').split())
+        succ_text = (f"continue work I yielded mid-turn: {turn_text[:140]}"
+                     if turn_text else "continue work I yielded mid-turn")
+        new_id = self._add_agent_concern(
+            text=succ_text, entity='User', provenance='inferred',
+            seed=False, name='',
+            rhythm_hours=1, rhythm_source='urgency',
+            instruction=next_slice,
+            skip_recurrence=True,
+            extra_properties={
+                # Prime activation just below threshold so the next tick's
+                # growth pushes it over — same priming as successors. The
+                # provenance trail lives in autonomy.jsonl (via: user_yield);
+                # no dedicated note property (create_note whitelists fields).
+                'activation': max(0.0,
+                                  _AGENT_CONCERN_FIRE_THRESHOLD - 0.1),
+            },
+        )
+        if not new_id:
+            return None
+        logger.info(
+            f"[{self.character_name}] spawned agent concern {new_id} from "
+            f"user-turn yield: {next_slice[:120]!r}")
+        return new_id
+
     def _create_successor_concern(self, parent_id: str,
                                   next_slice: str) -> Optional[str]:
         """Create the successor agent_concern carrying next_slice as its

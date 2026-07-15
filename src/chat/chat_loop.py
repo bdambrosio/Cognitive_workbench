@@ -1442,6 +1442,24 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
                 logger.warning(
                     f"[{self.character_name}] successor spawn failed for "
                     f"{autonomous_concern_id}: {e}")
+        elif not autonomous and exit_reason == 'yield':
+            # User-turn yield: no parent concern exists — spawn a fresh
+            # agent_concern carrying the remainder verbatim, so the
+            # user's task continues without another prod.
+            try:
+                succ_id = self._spawn_concern_from_user_yield(
+                    text, getattr(self, '_react_yield_next', None) or '')
+                if succ_id:
+                    self._write_autonomy_event({
+                        'event': 'successor_spawned',
+                        'parent_concern_id': None,
+                        'successor_concern_id': succ_id,
+                        'via': 'user_yield',
+                    })
+            except Exception as e:
+                logger.warning(
+                    f"[{self.character_name}] user-yield concern spawn "
+                    f"failed: {e}")
 
         # Trace write goes immediately after publish, before any slow
         # post-turn LLM work, so format_prompt can read the reasoning

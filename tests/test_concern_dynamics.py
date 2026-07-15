@@ -715,9 +715,33 @@ def test_service_yield_full_decrement(loop):
     assert props["last_fired_at"]
 
 
-def test_tool_catalog_gates_yield_on_autonomous(loop):
+def test_tool_catalog_always_offers_yield(loop):
+    # User-turn yield extension: the action is offered on every turn,
+    # not just autonomous fires.
     loop._discovered_tools = {}
     loop._omitted_tools = []
     loop._get_external_repo = lambda: None
-    assert '"yield"' not in loop._build_react_tool_catalog()
-    assert '"yield"' in loop._build_react_tool_catalog(include_yield=True)
+    assert '"yield"' in loop._build_react_tool_catalog()
+
+
+def test_user_yield_spawns_fresh_concern(loop):
+    _mute_indexer(loop)
+    loop.backend = StubBackend(["must not be consulted"])
+    nxt = "Extract the plates, craft the drill, place it at (-54, -31)."
+    nid = loop._spawn_concern_from_user_yield(
+        "restore the burner drill you deleted", nxt)
+    assert nid
+    assert loop.backend.calls == 0  # verbatim, no synthesizer
+    props = loop.resource_manager.get_resource(nid)["properties"]
+    assert props["instruction"] == nxt
+    assert "successor_of" not in props  # fresh root, not a successor
+    assert props["activation"] == pytest.approx(
+        _AGENT_CONCERN_FIRE_THRESHOLD - 0.1)
+    # Fresh root: its own future yields start a normal successor chain.
+    assert loop._root_concern_id(nid) == nid
+
+
+def test_user_yield_empty_next_spawns_nothing(loop):
+    _mute_indexer(loop)
+    assert loop._spawn_concern_from_user_yield("some ask", "   ") is None
+    assert loop._spawn_concern_from_user_yield("some ask", None) is None
