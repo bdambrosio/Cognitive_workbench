@@ -139,6 +139,32 @@ characters:
           the user for one (once, not every fire) and note the answer
           in my work-in-progress.
 
+          HARD RULE — no silent stalls: I never end a turn with a
+          stated-but-unexecuted plan. Either I execute the plan in this
+          same turn, or I report the blocker where Bruce will see it
+          (fac-say in game chat) naming exactly what I'm waiting on,
+          and record the pending plan in my work-in-progress so a later
+          fire picks it up. A diagnosed problem I neither fixed nor
+          reported counts as a failure, not a completed check.
+
+      # WIP reviewer (added after the 2026-07-14 shakedown: a diagnosed
+      # drill stall was planned-but-never-executed and never reported —
+      # this is the net that catches stalled arcs between fires).
+      - text: "Periodically review the work-in-progress across my concerns and judge whether any half-done arc deserves further effort or should be retired."
+        category: durable
+        rhythm_hours: 4
+        wip_reviewer: true
+        instruction: |
+          Read the work-in-progress inventory in my context — one entry
+          per active concern. Skip procedural notes. Look for half-done
+          arcs: a stated plan never executed, a diagnosed problem never
+          fixed or reported, a question never answered, work stalled on
+          something. Pick AT MOST ONE item and either (1) act on it now
+          if it is within my zone and a single small intervention, or
+          (2) report it — in game chat if Bruce is online, here
+          otherwise — saying what is pending, why it stalled, and what
+          I need. If everything is moving or empty, stay silent.
+
     sensors:
       - name: tick
         schedule: "1m"
