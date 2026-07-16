@@ -306,6 +306,20 @@ class ReactMixin:
         self._affect.enter_loop()
         for i in range(REACT_MAX_ITERS):
             self._affect.set_react_iter(i + 1)
+            # Budget nudge: yield-adherence is decided at the moment the
+            # budget runs short, not when the catalog was read ~2k tokens
+            # ago. Surface it in the working log while there is still
+            # room to hand off cleanly (observed: cut-off max_iters turns
+            # with zero yields ever emitted, 2026-07-15).
+            if i == REACT_MAX_ITERS - 3:
+                _append_log(
+                    'NOTE',
+                    f"iteration {i + 1} of {REACT_MAX_ITERS} — the action "
+                    "budget is nearly exhausted. If the remaining work will "
+                    "not fit, do NOT start anything new: emit `yield` NOW "
+                    "with a self-contained `next` (what is done, what "
+                    "remains, every specific already found) so a follow-up "
+                    "run continues the work. If the work is done, `respond`.")
             # Emit one parseable action. A malformed/truncated emission is
             # retried here WITHOUT consuming this action iteration (bounded by
             # REACT_MAX_FORMAT_RETRIES) — a format stumble shouldn't cost a

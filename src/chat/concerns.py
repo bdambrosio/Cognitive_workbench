@@ -1669,6 +1669,23 @@ class ConcernsMixin:
                 f"[{self.character_name}] successor cap reached for {parent_id} "
                 f"(depth={parent_depth}); standing on fallback response.")
             return None
+        # WIP from earlier fires: lets the synthesizer judge what's left
+        # against accumulated findings, not just this loop's log tail.
+        root = self.resource_manager.get_resource(self._root_concern_id(parent_id))
+        wip = str(((root or {}).get('properties') or {}).get('wip', '') or '').strip()
+        next_slice = self._synthesize_remainder(parent_instruction, log, wip=wip)
+        if not next_slice:
+            return None
+        return self._create_successor_concern(parent_id, next_slice)
+
+    def _synthesize_remainder(self, instruction: str,
+                              log: List[Tuple[str, str]],
+                              wip: str = '') -> Optional[str]:
+        """LLM judgment shared by the max_iters continuation routes
+        (autonomous successor + user-turn spawn): did the cut-off loop
+        substantively complete its instruction, and if not, what narrow
+        next slice should run next? Returns the imperative slice, or
+        None (complete, LLM failure, or parse failure)."""
         # Show the synthesizer enough log to judge what's left, but not
         # so much it drowns in detail. Last 10 entries, content trimmed.
         tail = log[-10:] if len(log) > 10 else log
@@ -1682,16 +1699,12 @@ class ConcernsMixin:
             "(one ReAct loop's worth, ~12 tool calls) that should run "
             "next?\n\nRespond ONLY with JSON, no prose, no markdown."
         )
-        # WIP from earlier fires: lets the synthesizer judge what's left
-        # against accumulated findings, not just this loop's log tail.
-        root = self.resource_manager.get_resource(self._root_concern_id(parent_id))
-        wip = str(((root or {}).get('properties') or {}).get('wip', '') or '').strip()
         wip_section = (
             f"Accumulated work-in-progress from earlier fires:\n{wip}\n\n"
             if wip else ""
         )
         user_msg = (
-            f"Original instruction: {parent_instruction}\n\n"
+            f"Original instruction: {instruction}\n\n"
             f"{wip_section}"
             f"ReAct working log (last entries):\n{summary}\n\n"
             "JSON shapes:\n"
@@ -1714,8 +1727,7 @@ class ConcernsMixin:
             return None
         if not isinstance(data, dict) or data.get('complete'):
             return None
-        next_slice = str(data.get('next_slice') or '').strip()
-        return self._create_successor_concern(parent_id, next_slice)
+        return str(data.get('next_slice') or '').strip() or None
 
     def _spawn_successor_from_yield(self, parent_id: str,
                                     next_slice: str) -> Optional[str]:

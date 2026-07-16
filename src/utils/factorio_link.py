@@ -169,6 +169,11 @@ def fmt_entity(e: dict) -> str:
     parts = [f"{e.get('name', '?')} @ {fmt_pos(e.get('position', {}))}"]
     if e.get("direction") not in (None, 0):
         parts.append(f"facing {fmt_direction(e['direction'])}")
+    # Drills/inserters eject output at drop_position — the one tile a
+    # receiving belt/chest must occupy. Surface it so the agent never
+    # guesses (guessing put belts inside the drill's own footprint).
+    if isinstance(e.get("drop_position"), dict):
+        parts.append(f"outputs to {fmt_pos(e['drop_position'])}")
     if e.get("status") and e["status"] not in ("normal",):
         parts.append(f"status={e['status']}")
     warnings = e.get("warnings")

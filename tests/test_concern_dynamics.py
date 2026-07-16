@@ -745,3 +745,24 @@ def test_user_yield_empty_next_spawns_nothing(loop):
     _mute_indexer(loop)
     assert loop._spawn_concern_from_user_yield("some ask", "   ") is None
     assert loop._spawn_concern_from_user_yield("some ask", None) is None
+
+
+def test_synthesize_remainder_complete_returns_none(loop):
+    loop.backend = StubBackend(['{"complete": true}'])
+    assert loop._synthesize_remainder("build the line", [("ACTION 1", "x")]) is None
+    assert loop.backend.calls == 1
+
+
+def test_user_max_iters_synthesizes_then_spawns(loop):
+    # The user-turn max_iters route: synthesizer names the remainder,
+    # which spawns a fresh concern exactly like a verbatim yield.
+    _mute_indexer(loop)
+    loop.backend = StubBackend(
+        ['{"complete": false, "next_slice": "Place the belt at the drop tile."}'])
+    nxt = loop._synthesize_remainder(
+        "proceed with the smelting line", [("ACTION 12", "cut off")])
+    assert nxt == "Place the belt at the drop tile."
+    nid = loop._spawn_concern_from_user_yield("proceed with the smelting line", nxt)
+    assert nid
+    props = loop.resource_manager.get_resource(nid)["properties"]
+    assert props["instruction"] == nxt

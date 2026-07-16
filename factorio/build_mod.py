@@ -28,7 +28,7 @@ OUT = Path(__file__).parent / "fle-bridge"
 MOD_NAME = "fle-bridge"
 # Bump on any change that must re-run init_data on an existing save —
 # on_configuration_changed only fires when the version changes.
-MOD_VERSION = "0.4.1"
+MOD_VERSION = "0.4.3"
 
 # Shared libs, in FLE's own init_scripts order (instance.initialise).
 # alerts.lua provides utils.get_issues (used by place_entity's warnings)
@@ -59,6 +59,27 @@ FILE_FIXES = {
     "alerts.lua": [
         ("storage.alerts = {}\n", "-- storage.alerts init lives in init_data (initialise.lua)\n"),
         ("storage.get_alerts", "get_alerts"),
+    ],
+    # serialize.lua exposes drop_position for inserters only. Mining
+    # drills need it too: it is the ONE tile where the drill ejects ore —
+    # exactly where a receiving belt/chest must go. Without it the agent
+    # can't see the 2x2 footprint or the output tile and places belts
+    # inside the drill (observed live 2026-07-15).
+    "serialize.lua": [
+        (
+            "    -- Add input and output locations if the entity is an inserter\n",
+            """    -- CW: expose where a mining drill ejects its output — the one
+    -- tile a receiving belt/chest must occupy.
+    if entity.type == "mining-drill" and entity.drop_position then
+        serialized.drop_position = {
+            x = math.round(entity.drop_position.x * 2) / 2,
+            y = math.round(entity.drop_position.y * 2) / 2,
+        }
+    end
+
+    -- Add input and output locations if the entity is an inserter
+""",
+        ),
     ],
     # move_to: the walking-queue handler was registered top-level behind
     # `if not storage.fast` — top-level storage access crashes a mod at
@@ -95,6 +116,51 @@ end)""",
     # on_nth_tick (the non-recoverable crash class) to auto-close a UI
     # pane no headless agent has. Dead behind storage.fast=true, but
     # stripped outright — one flag flip away from killing the server.
+    # place_entity: enforce the entity's placement grid up front with a
+    # teaching error. Odd-tile entities (belt, inserter) center on tile
+    # centers (coordinates ending in .5); even-tile ones (drill, furnace)
+    # on tile corners (integers). A misaligned request collides with
+    # neighbours and yields a misleading "blocked by" list — observed
+    # 2026-07-15: agent read the drop tile (-54.5, -32.5) correctly, then
+    # placed at (-54, -32) and spiralled on phantom ground-item blockage.
+    "place_entity/server.lua": [
+        (
+            "    local position = {x = x, y = y}\n",
+            """    local position = {x = x, y = y}
+
+    -- CW: placement-grid guard (see build_mod.py FILE_FIXES)
+    local cw_proto = prototypes.entity[entity]
+    if cw_proto and cw_proto.tile_width then
+        local function cw_axis_err(axis, v, tiles)
+            if tiles % 2 == 1 then
+                if (v - math.floor(v)) ~= 0.5 then
+                    return axis .. " must end in .5 (this entity is " .. tiles ..
+                        " tile(s) wide and sits on tile centers; nearest: " ..
+                        (math.floor(v) - 0.5) .. " or " .. (math.floor(v) + 0.5) .. ")"
+                end
+            else
+                if v ~= math.floor(v) then
+                    return axis .. " must be a whole number (this entity is " .. tiles ..
+                        " tiles wide and sits on tile corners; nearest: " ..
+                        math.floor(v) .. " or " .. math.ceil(v) .. ")"
+                end
+            end
+            return nil
+        end
+        local cw_errs = {}
+        local ex = cw_axis_err("x", position.x, cw_proto.tile_width)
+        local ey = cw_axis_err("y", position.y, cw_proto.tile_height)
+        if ex then table.insert(cw_errs, ex) end
+        if ey then table.insert(cw_errs, ey) end
+        if #cw_errs > 0 then
+            error("\\"Cannot place " .. entity .. " at (" .. position.x .. ", " .. position.y ..
+                ") - position is off the placement grid: " .. table.concat(cw_errs, "; ") ..
+                ". Use the exact coordinates from observation (e.g. an 'outputs to' tile) - do not round.\\"")
+        end
+    end
+""",
+        ),
+    ],
     "inspect_inventory/server.lua": [
         (
             """       if not is_fast then
