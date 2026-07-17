@@ -388,6 +388,60 @@ def _resource_pseudo_entities(x, y, radius):
     return out
 
 
+# Loose items on the ground are neutral-force item-entities — invisible to
+# the mod's player-force get_entities, but they block building placement
+# (observed live 2026-07-17: Jill fought "item-on-ground" placement
+# failures she could not see). Same data-only /sc pattern as resources,
+# aggregated per item type; the span shows whether debris overlaps an
+# intended footprint.
+_GROUND_ITEMS_LUA = (
+    "local out = {} "
+    "for _, e in pairs(game.surfaces[1].find_entities_filtered{"
+    "area = {{%.1f, %.1f}, {%.1f, %.1f}}, type = 'item-entity'}) do "
+    "local n = e.stack.name "
+    "local r = out[n] "
+    "if not r then r = {piles = 0, count = 0, sx = 0, sy = 0, "
+    "minx = 1e9, miny = 1e9, maxx = -1e9, maxy = -1e9} out[n] = r end "
+    "r.piles = r.piles + 1 r.count = r.count + e.stack.count "
+    "local p = e.position "
+    "r.sx = r.sx + p.x r.sy = r.sy + p.y "
+    "if p.x < r.minx then r.minx = p.x end if p.y < r.miny then r.miny = p.y end "
+    "if p.x > r.maxx then r.maxx = p.x end if p.y > r.maxy then r.maxy = p.y end "
+    "end rcon.print(helpers.table_to_json(out))"
+)
+
+
+def _ground_item_pseudo_entities(x, y, radius):
+    resp = link.sc(_GROUND_ITEMS_LUA % (x - radius, y - radius, x + radius, y + radius))
+    if not resp or resp.startswith("Cannot execute"):
+        log.warning("ground-item scan failed: %s", (resp or "")[:200])
+        return []
+    try:
+        data = json.loads(resp)
+    except (ValueError, TypeError) as e:
+        log.warning("ground-item scan parse failed: %s", e)
+        return []
+    if not isinstance(data, dict):
+        return []
+    out = []
+    for name, r in sorted(data.items()):
+        if r["piles"] > 1:
+            label = ("loose %s on ground x%d (%d piles spanning "
+                     "(%.1f, %.1f)..(%.1f, %.1f) — blocks placement)" % (
+                         name, r["count"], r["piles"],
+                         r["minx"], r["miny"], r["maxx"], r["maxy"]))
+        else:
+            label = "loose %s on ground x%d (blocks placement)" % (name, r["count"])
+        out.append({
+            "name": label,
+            "position": {"x": round(r["sx"] / r["piles"], 1),
+                         "y": round(r["sy"] / r["piles"], 1)},
+            "item": name,
+            "count": r["count"],
+        })
+    return out
+
+
 # Water/cliffs are tiles, not entities, so an entity-empty target can still
 # be impassable — and the entity-based deviation classifier cannot see why.
 # A data-only tile read (same `collides_with('player')` predicate the verify
@@ -450,9 +504,10 @@ def observe(x: float | None = None, y: float | None = None, radius: float = 15):
         x, y = pos["x"], pos["y"]
     radius = min(radius, 50)
     entities, _ = _observe(x, y, radius)
-    # Resources are appended AFTER the deviation-cache record: pseudo-
-    # entities must not perturb world-change comparisons.
-    entities = entities + _resource_pseudo_entities(x, y, radius)
+    # Resources and ground items are appended AFTER the deviation-cache
+    # record: pseudo-entities must not perturb world-change comparisons.
+    entities = (entities + _resource_pseudo_entities(x, y, radius)
+                + _ground_item_pseudo_entities(x, y, radius))
     return {"ok": True, "center": {"x": x, "y": y}, "radius": radius, "entities": entities}
 
 

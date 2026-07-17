@@ -118,6 +118,11 @@ Gotchas learned in step 3:
   reach realism.
 - Water/cliffs are tiles, not entities — an entity-empty area is not
   necessarily buildable or walkable (`get_tile(...).collides_with`).
+- Loose items on the ground are neutral-force item-entities: invisible
+  to the mod's player-force `get_entities`, yet they block building
+  placement. `/observe` surfaces them as `loose <item> on ground`
+  pseudo-entities (per-type, with pile span) via a data-only `/sc` scan
+  — same pattern as ore patches.
 - `infeasible` deviations (walk-short, no-path, place-onto-target) carry
   a `blocked_by {tile, position}` when a data-only tile probe finds an
   impassable tile in the way — turns "7.6 tiles short of goal" into
