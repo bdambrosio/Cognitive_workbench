@@ -118,6 +118,11 @@ Gotchas learned in step 3:
   reach realism.
 - Water/cliffs are tiles, not entities — an entity-empty area is not
   necessarily buildable or walkable (`get_tile(...).collides_with`).
+- `infeasible` deviations (walk-short, no-path, place-onto-target) carry
+  a `blocked_by {tile, position}` when a data-only tile probe finds an
+  impassable tile in the way — turns "7.6 tiles short of goal" into
+  "blocked by water at (44.8, 39.9)" so the un-seeable wall is legible
+  without adding telemetry. Read-only `/sc`, cannot crash the server.
 - mod 0.4.x: move_to always takes the walking queue (real walking at
   1x, visible presence); `storage.fast` stays true for the synchronous
   semantics of every other action. `agent_position` / `stop` /

@@ -97,6 +97,8 @@ def _act(endpoint, params, fn, target=None):
                 deviation = classify(cache, target[0], target[1], str(e), _observe)
             except Exception as ce:
                 log.warning("deviation classification failed for %s: %s", endpoint, ce)
+            if deviation is not None and deviation.get("kind") == "infeasible":
+                _add_tile_blocker(deviation, [(target[0], target[1])])
         _log_activity(endpoint, params, ok=False, error=str(e), deviation=deviation)
         out = {"ok": False, "error": str(e)}
         if deviation is not None:
@@ -172,6 +174,69 @@ rcon.print(helpers.table_to_json(out))
 """.strip().replace("\n", " ")
 
 
+# Current status of every player-force entity, for re-validating latched
+# alerts (the mod's `on_tick` writes an issue once and never clears it, so
+# a working, producing line still reports stale "out of fuel / no sink /
+# result full" alerts). Read-only /sc; keyed by position on the Python side.
+_STATUS_SCAN_LUA = """
+local surf = game.surfaces[1]
+local W = defines.entity_status.working
+local WD = defines.entity_status.waiting_for_space_in_destination
+local out = {}
+for _, e in pairs(surf.find_entities_filtered{force = 'player'}) do
+    local st = e.status
+    if st ~= nil then
+        local rec = {x = e.position.x, y = e.position.y, working = (st == W)}
+        if e.type == 'mining-drill' and e.drop_position then
+            rec.waiting_dest = (st == WD)
+            local sink = surf.find_entities_filtered{position = e.drop_position, force = 'player'}[1]
+            if sink and sink.status ~= nil then rec.sink_working = (sink.status == W) end
+        end
+        out[#out + 1] = rec
+    end
+end
+rcon.print(helpers.table_to_json(out))
+""".strip().replace("\n", " ")
+
+
+def _revalidate_alerts():
+    """Drop held alerts contradicted by current entity status: (1) the
+    entity is working, or (2) a mining-drill is over-feeding a working sink
+    (drill in `waiting_for_space_in_destination` while its drop-target is
+    working — the healthy steady state of a direct-insert line, not a
+    fault). Read-only scan; skipped silently if the server is unreachable."""
+    resp = link.sc(_STATUS_SCAN_LUA)
+    if not resp or resp.startswith("Cannot execute"):
+        log.warning("alert revalidation scan failed: %s", (resp or "")[:200])
+        return
+    try:
+        recs = json.loads(resp)
+    except (ValueError, TypeError) as e:
+        log.warning("alert revalidation parse failed: %s", e)
+        return
+    if not isinstance(recs, list):
+        return
+
+    def _k(x, y):
+        return (round(x * 2) / 2, round(y * 2) / 2)
+
+    working, overfeed = set(), set()
+    for r in recs:
+        if not isinstance(r, dict) or r.get("x") is None or r.get("y") is None:
+            continue
+        k = _k(r["x"], r["y"])
+        if r.get("working"):
+            working.add(k)
+        if r.get("waiting_dest") and r.get("sink_working"):
+            overfeed.add(k)
+    with _lock:
+        for key, a in list(state["alerts"].items()):
+            if a.get("x") is None or a.get("y") is None:
+                continue
+            if _k(a["x"], a["y"]) in working or _k(a["x"], a["y"]) in overfeed:
+                del state["alerts"][key]
+
+
 def _poll_telemetry():
     resp = link.sc(_TELEMETRY_LUA)
     if resp and not resp.startswith("Cannot execute"):
@@ -204,6 +269,9 @@ def _poll_telemetry():
                     }
         state["alerts"] = {k: v for k, v in state["alerts"].items()
                            if now - v["seen"] < ALERT_TTL_S}
+    # Re-validate against live status (outside the state lock: does its own
+    # RCON scan, then re-acquires the lock only to drop stale entries).
+    _revalidate_alerts()
 
 
 def _poller():
@@ -320,6 +388,61 @@ def _resource_pseudo_entities(x, y, radius):
     return out
 
 
+# Water/cliffs are tiles, not entities, so an entity-empty target can still
+# be impassable — and the entity-based deviation classifier cannot see why.
+# A data-only tile read (same `collides_with('player')` predicate the verify
+# script and mod use) turns "infeasible/short of goal" into "blocked by
+# deepwater at (x, y)". Read-only /sc, so it cannot crash the server.
+_TILE_PROBE_LUA = (
+    "local pts = %s local out = {} "
+    "for _, p in ipairs(pts) do "
+    "local t = game.surfaces[1].get_tile(p[1], p[2]) "
+    "if t.collides_with('player') then "
+    "out[#out + 1] = {name = t.name, x = p[1], y = p[2]} break end "
+    "end rcon.print(helpers.table_to_json(out))"
+)
+
+
+def _ray_samples(x0, y0, x1, y1, cap=8):
+    """Points one tile apart from (x0,y0) toward (x1,y1), nearest first."""
+    d = ((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5
+    if d < 1e-6:
+        return [(round(x0, 1), round(y0, 1))]
+    ux, uy = (x1 - x0) / d, (y1 - y0) / d
+    n = min(cap, max(1, int(d)))
+    return [(round(x0 + ux * s, 1), round(y0 + uy * s, 1)) for s in range(1, n + 1)]
+
+
+def _blocking_tile(points):
+    """First impassable tile among `points` (data-only read), or None."""
+    if not points:
+        return None
+    lua_pts = "{" + ",".join("{%.1f,%.1f}" % (x, y) for x, y in points) + "}"
+    resp = link.sc(_TILE_PROBE_LUA % lua_pts)
+    if not resp or resp.startswith("Cannot execute"):
+        log.warning("tile probe failed: %s", (resp or "")[:200])
+        return None
+    try:
+        hits = json.loads(resp)
+    except (ValueError, TypeError) as e:
+        log.warning("tile probe parse failed: %s", e)
+        return None
+    if not isinstance(hits, list) or not hits:  # empty Lua table -> {} (dict)
+        return None
+    h = hits[0]
+    return {"tile": h["name"], "position": {"x": h["x"], "y": h["y"]}}
+
+
+def _add_tile_blocker(deviation, points):
+    """Annotate an infeasible deviation with the tile that blocks `points`."""
+    blk = _blocking_tile(points)
+    if blk is not None:
+        deviation["blocked_by"] = blk
+        deviation["detail"] += " — blocked by %s at (%.1f, %.1f)" % (
+            blk["tile"], blk["position"]["x"], blk["position"]["y"])
+    return deviation
+
+
 @app.get("/observe")
 def observe(x: float | None = None, y: float | None = None, radius: float = 15):
     if x is None or y is None:
@@ -398,6 +521,7 @@ def act_walk(req: Walk):
     if handle is None:
         deviation = {"kind": "infeasible", "detail": "pathfinder: %s" % path_status,
                      "target": {"x": req.x, "y": req.y}}
+        _add_tile_blocker(deviation, _ray_samples(pos["x"], pos["y"], req.x, req.y))
         _log_activity("/act/walk", params, ok=False, error=path_status, deviation=deviation)
         return {"ok": False, "error": "no path: %s" % path_status, "deviation": deviation}
     link.call("move_to", AGENT, handle, None, False)
@@ -422,6 +546,7 @@ def act_walk(req: Walk):
     else:
         deviation = {"kind": "infeasible", "detail": "walk ended %.1f tiles short of goal" % dist,
                      "position": position}
+        _add_tile_blocker(deviation, _ray_samples(pos["x"], pos["y"], req.x, req.y))
     _log_activity("/act/walk", params, ok=False, error=deviation["detail"], deviation=deviation)
     return {"ok": False, "error": deviation["detail"], "deviation": deviation}
 
