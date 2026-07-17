@@ -471,6 +471,46 @@ class ConcernsMixin:
         return self._resolve_concern_by_text(
             text, shown, self._user_concerns_collection_id)
 
+    @staticmethod
+    def _is_one_shot_concern(props: Dict[str, Any]) -> bool:
+        """Is this agent_concern a finite task (continuation spawn) rather
+        than a standing concern? Seeds are never one-shot. New spawns carry
+        an explicit category='one_shot'; notes created before the category
+        stamp are recognized by the markers both continuation routes have
+        always written: successor_of, or rhythm_source='urgency' (the two
+        spawn paths are the only pre-category writers of 'urgency')."""
+        if props.get('seed'):
+            return False
+        category = props.get('category')
+        if category:
+            return category == 'one_shot'
+        return (props.get('successor_of') is not None
+                or props.get('rhythm_source') == 'urgency')
+
+    def _satisfy_agent_concern(self, nid: str, via: str) -> bool:
+        """Transition an agent_concern to 'satisfied' (never a seed, never
+        a delete) and record the autonomy event. 'satisfied' — unlike
+        'abandoned' — stays recallable and can revive through recurrence
+        if the theme genuinely returns."""
+        note = self.resource_manager.get_resource(nid)
+        if not note:
+            return False
+        props = note.get('properties') or {}
+        if props.get('seed') or props.get('status') != 'active':
+            return False
+        ok, err = self._set_concern_status(nid, 'satisfied')
+        if not ok:
+            logger.warning(
+                f"[{self.character_name}] satisfy failed for {nid}: {err}")
+            return False
+        self._write_autonomy_event({
+            'event': 'concern_satisfied',
+            'concern_id': nid,
+            'concern_text': str(props.get('content', '') or '')[:140],
+            'via': via,
+        })
+        return True
+
     def _apply_agent_concern_closures(
             self, raw: Any,
             shown: List[Tuple[str, str, float, Dict[str, Any]]]
@@ -642,6 +682,7 @@ class ConcernsMixin:
                            rhythm_source: str = 'default',
                            instruction: Optional[str] = None,
                            skip_recurrence: bool = False,
+                           category: str = 'durable',
                            extra_properties: Optional[Dict[str, Any]] = None
                            ) -> Optional[str]:
         """Create an agent_concern. Activation starts at 0; per-tick
@@ -662,6 +703,8 @@ class ConcernsMixin:
         instruction = (str(instruction).strip() if instruction else '') or None
         if rhythm_source not in ('external', 'urgency', 'default'):
             rhythm_source = 'default'
+        if category not in _CONCERN_CATEGORIES:
+            category = 'durable'
         if provenance not in ('asserted', 'inferred'):
             provenance = 'asserted'
         if not seed and not skip_recurrence:
@@ -677,6 +720,7 @@ class ConcernsMixin:
             "provenance": provenance,
             "seed": bool(seed),
             "instruction": instruction,
+            "category": category,
             "rhythm_hours": rhythm_hours,
             "rhythm_source": rhythm_source,
             "activation": 0.0,
@@ -775,6 +819,60 @@ class ConcernsMixin:
             a = float(props.get('activation', 0.0) or 0.0)
             props['activation'] = min(1.0, a + growth)
             props['last_activation_update_at'] = now.isoformat()
+
+    def _sweep_stale_agent_concerns(self) -> None:
+        """Wall-clock staleness sweep for agent_concerns — the agent-side
+        analog of the user-concern sweep below. Active non-seed concerns
+        whose last activity (fire, bump, creation) is older than their
+        category's _CONCERN_DEFAULT_LIFETIME_DAYS go active → 'satisfied'
+        (recallable; revivable via recurrence if the theme returns).
+        Seeds are never touched and nothing is ever deleted. Pure
+        arithmetic — safe to run every tick."""
+        if not self._agent_concerns_collection_id:
+            return
+        coll = self.resource_manager.get_resource(self._agent_concerns_collection_id)
+        if not coll:
+            return
+        note_ids = list((coll.get('properties') or {}).get('content', []) or [])
+        now = datetime.now(timezone.utc)
+        swept = 0
+        for nid in note_ids:
+            note = self.resource_manager.get_resource(nid)
+            if not note:
+                continue
+            props = note.get('properties') or {}
+            if props.get('status') != 'active' or props.get('seed'):
+                continue
+            category = props.get('category') or (
+                'one_shot' if self._is_one_shot_concern(props) else 'durable')
+            lifetime_days = _CONCERN_DEFAULT_LIFETIME_DAYS.get(
+                category, _CONCERN_DEFAULT_LIFETIME_DAYS['durable'])
+            latest = None
+            for anchor_str in (props.get('last_fired_at'),
+                               props.get('last_bumped_at'),
+                               props.get('created_at')):
+                if not anchor_str:
+                    continue
+                try:
+                    anchor = datetime.fromisoformat(str(anchor_str))
+                    if anchor.tzinfo is None:
+                        anchor = anchor.replace(tzinfo=timezone.utc)
+                except (TypeError, ValueError) as e:
+                    logger.warning(
+                        f"[{self.character_name}] unparseable activity "
+                        f"timestamp on {nid} ({anchor_str!r}): {e}")
+                    continue
+                if latest is None or anchor > latest:
+                    latest = anchor
+            if latest is None:
+                continue
+            if (now - latest) >= timedelta(days=lifetime_days):
+                if self._satisfy_agent_concern(nid, via='stale_sweep'):
+                    swept += 1
+        if swept:
+            logger.info(
+                f"[{self.character_name}] stale sweep satisfied {swept} "
+                f"agent concern(s)")
 
     def _decay_user_concerns_per_turn(self) -> None:
         """Apply per-turn strength decay to active user_concerns. Hard-
@@ -1039,6 +1137,14 @@ class ConcernsMixin:
             a = float(props.get('activation', 0.0) or 0.0)
             props['activation'] = max(0.0, a - decrement)
         props['last_fired_at'] = datetime.now(timezone.utc).isoformat()
+        # One-shot concerns (continuation spawns) are finite tasks: a loop
+        # that ran to completion IS the completion — without this they
+        # regrow activation and re-fire the same finished instruction
+        # forever (observed live 2026-07-17: two-day-old yield spawns
+        # still firing). yield/max_iters exits stay active here; the
+        # successor path decides their fate.
+        if exit_reason == 'respond' and self._is_one_shot_concern(props):
+            self._satisfy_agent_concern(note_id, via='completed')
 
     # ------------------------------------------------------------------
     # Fire-outcome capture (phase 1: capture only) — pending registry +
@@ -1673,19 +1779,32 @@ class ConcernsMixin:
         # against accumulated findings, not just this loop's log tail.
         root = self.resource_manager.get_resource(self._root_concern_id(parent_id))
         wip = str(((root or {}).get('properties') or {}).get('wip', '') or '').strip()
-        next_slice = self._synthesize_remainder(parent_instruction, log, wip=wip)
-        if not next_slice:
+        verdict, next_slice = self._synthesize_remainder(
+            parent_instruction, log, wip=wip)
+        if verdict == 'complete':
+            # The cut-off loop substantively finished: a one-shot parent
+            # is done, not merely paused. 'error' leaves it active to
+            # retry on a later fire.
+            if self._is_one_shot_concern(parent_props):
+                self._satisfy_agent_concern(parent_id, via='synth_complete')
+            return None
+        if verdict != 'remainder' or not next_slice:
             return None
         return self._create_successor_concern(parent_id, next_slice)
 
     def _synthesize_remainder(self, instruction: str,
                               log: List[Tuple[str, str]],
-                              wip: str = '') -> Optional[str]:
+                              wip: str = '') -> Tuple[str, Optional[str]]:
         """LLM judgment shared by the max_iters continuation routes
         (autonomous successor + user-turn spawn): did the cut-off loop
         substantively complete its instruction, and if not, what narrow
-        next slice should run next? Returns the imperative slice, or
-        None (complete, LLM failure, or parse failure)."""
+        next slice should run next? Returns (verdict, slice):
+          ('complete', None)   — work substantively done
+          ('remainder', text)  — real work remains; text is the slice
+          ('error', None)      — LLM/parse failure; nothing decided.
+        The three-way verdict matters: 'complete' lets the caller retire
+        a one-shot concern, which a collapsed None could not distinguish
+        from a failed judgment."""
         # Show the synthesizer enough log to judge what's left, but not
         # so much it drowns in detail. Last 10 entries, content trimmed.
         tail = log[-10:] if len(log) > 10 else log
@@ -1718,16 +1837,19 @@ class ConcernsMixin:
                 max_tokens=4096, temperature=0.2, cot_profile='none')
         except Exception as e:
             logger.warning(f"[{self.character_name}] successor synth LLM failed: {e}")
-            return None
+            return ('error', None)
         data = repair_json_string(raw or '')
-        if data is None:
+        if data is None or not isinstance(data, dict):
             logger.warning(
                 f"[{self.character_name}] successor JSON parse failed; "
                 f"raw={(raw or '')[:200]!r}")
-            return None
-        if not isinstance(data, dict) or data.get('complete'):
-            return None
-        return str(data.get('next_slice') or '').strip() or None
+            return ('error', None)
+        if data.get('complete'):
+            return ('complete', None)
+        # complete=false with no slice is a malformed judgment, not a
+        # completion — spawn nothing, retire nothing.
+        next_slice = str(data.get('next_slice') or '').strip()
+        return ('remainder', next_slice) if next_slice else ('error', None)
 
     def _spawn_successor_from_yield(self, parent_id: str,
                                     next_slice: str) -> Optional[str]:
@@ -1759,6 +1881,7 @@ class ConcernsMixin:
             rhythm_hours=1, rhythm_source='urgency',
             instruction=next_slice,
             skip_recurrence=True,
+            category='one_shot',
             extra_properties={
                 # Prime activation just below threshold so the next tick's
                 # growth pushes it over — same priming as successors. The
@@ -1794,6 +1917,10 @@ class ConcernsMixin:
             logger.info(
                 f"[{self.character_name}] successor cap reached for {parent_id} "
                 f"(depth={parent_depth}); no successor created.")
+            # The chain is being cut deliberately — a one-shot parent left
+            # active would just re-fire the same capped work.
+            if self._is_one_shot_concern(parent_props):
+                self._satisfy_agent_concern(parent_id, via='depth_cap')
             return None
         # Successor inherits the parent's surface text + a depth tag so it
         # reads coherently in the active-concerns surface.
@@ -1811,6 +1938,7 @@ class ConcernsMixin:
             rhythm_hours=1, rhythm_source='urgency',
             instruction=next_slice,
             skip_recurrence=True,
+            category='one_shot',
             extra_properties={
                 'successor_of': parent_id,
                 'successor_depth': new_depth,
@@ -1826,6 +1954,12 @@ class ConcernsMixin:
         logger.info(
             f"[{self.character_name}] spawned successor concern {new_id} for "
             f"{parent_id} (depth {new_depth}): {next_slice[:120]!r}")
+        # The successor carries the remainder: a one-shot parent left
+        # active alongside it re-fires the same instruction and spawns
+        # sibling successors (observed live 2026-07-17: one parent, five
+        # same-depth children). Durable parents keep their rhythm.
+        if self._is_one_shot_concern(parent_props):
+            self._satisfy_agent_concern(parent_id, via='superseded')
         return new_id
 
     def _update_concern_wip(self, concern_id: str, fire_text: str,

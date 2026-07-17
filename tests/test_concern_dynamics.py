@@ -747,9 +747,10 @@ def test_user_yield_empty_next_spawns_nothing(loop):
     assert loop._spawn_concern_from_user_yield("some ask", None) is None
 
 
-def test_synthesize_remainder_complete_returns_none(loop):
+def test_synthesize_remainder_complete_verdict(loop):
     loop.backend = StubBackend(['{"complete": true}'])
-    assert loop._synthesize_remainder("build the line", [("ACTION 1", "x")]) is None
+    assert loop._synthesize_remainder(
+        "build the line", [("ACTION 1", "x")]) == ('complete', None)
     assert loop.backend.calls == 1
 
 
@@ -759,10 +760,139 @@ def test_user_max_iters_synthesizes_then_spawns(loop):
     _mute_indexer(loop)
     loop.backend = StubBackend(
         ['{"complete": false, "next_slice": "Place the belt at the drop tile."}'])
-    nxt = loop._synthesize_remainder(
+    verdict, nxt = loop._synthesize_remainder(
         "proceed with the smelting line", [("ACTION 12", "cut off")])
+    assert verdict == 'remainder'
     assert nxt == "Place the belt at the drop tile."
     nid = loop._spawn_concern_from_user_yield("proceed with the smelting line", nxt)
     assert nid
     props = loop.resource_manager.get_resource(nid)["properties"]
     assert props["instruction"] == nxt
+
+
+# ── one-shot lifecycle: completion is terminal ─────────────────────────
+
+def test_one_shot_satisfied_on_respond(loop):
+    nid = make_concern(loop, extra={"category": "one_shot"})
+    loop._service_agent_concern(nid, "respond")
+    assert loop.resource_manager.get_resource(nid)["properties"]["status"] == "satisfied"
+
+
+def test_durable_stays_active_on_respond(loop):
+    nid = make_concern(loop)
+    loop._service_agent_concern(nid, "respond")
+    assert loop.resource_manager.get_resource(nid)["properties"]["status"] == "active"
+
+
+def test_legacy_urgency_spawn_counts_as_one_shot(loop):
+    # Pre-category continuation spawns carried rhythm_source='urgency';
+    # they must satisfy on completion like stamped one-shots.
+    nid = make_concern(loop, extra={"rhythm_source": "urgency"})
+    loop._service_agent_concern(nid, "respond")
+    assert loop.resource_manager.get_resource(nid)["properties"]["status"] == "satisfied"
+
+
+def test_seed_never_satisfied_even_as_one_shot(loop):
+    nid = make_concern(loop, extra={"seed": True, "category": "one_shot"})
+    loop._service_agent_concern(nid, "respond")
+    assert loop.resource_manager.get_resource(nid)["properties"]["status"] == "active"
+
+
+def test_successor_spawn_supersedes_one_shot_parent(loop):
+    _mute_indexer(loop)
+    parent = make_concern(loop, extra={"category": "one_shot"})
+    succ = loop._spawn_successor_from_yield(parent, "finish the belt run")
+    assert succ
+    assert loop.resource_manager.get_resource(parent)["properties"]["status"] == "satisfied"
+    sprops = loop.resource_manager.get_resource(succ)["properties"]
+    assert sprops["status"] == "active"
+    assert sprops["category"] == "one_shot"
+
+
+def test_successor_spawn_keeps_durable_parent(loop):
+    _mute_indexer(loop)
+    parent = make_concern(loop)
+    succ = loop._spawn_successor_from_yield(parent, "finish the belt run")
+    assert succ
+    assert loop.resource_manager.get_resource(parent)["properties"]["status"] == "active"
+
+
+def test_depth_cap_satisfies_one_shot_parent(loop):
+    _mute_indexer(loop)
+    parent = make_concern(loop, extra={
+        "category": "one_shot",
+        "successor_depth": _CONCERN_SUCCESSOR_MAX_DEPTH})
+    assert loop._spawn_successor_from_yield(parent, "keep going") is None
+    assert loop.resource_manager.get_resource(parent)["properties"]["status"] == "satisfied"
+
+
+def test_synth_complete_satisfies_one_shot_parent(loop):
+    _mute_indexer(loop)
+    parent = make_concern(loop, extra={"category": "one_shot"})
+    loop.backend = StubBackend(['{"complete": true}'])
+    assert loop._maybe_spawn_successor_concern(parent, "instr", [("A", "x")]) is None
+    assert loop.resource_manager.get_resource(parent)["properties"]["status"] == "satisfied"
+
+
+def test_synth_error_leaves_one_shot_active(loop):
+    _mute_indexer(loop)
+    parent = make_concern(loop, extra={"category": "one_shot"})
+    loop.backend = StubBackend(['no json here'])
+    assert loop._maybe_spawn_successor_concern(parent, "instr", [("A", "x")]) is None
+    assert loop.resource_manager.get_resource(parent)["properties"]["status"] == "active"
+
+
+# ── stale sweep ────────────────────────────────────────────────────────
+
+def _age_note(loop, nid, days):
+    old = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    props = loop.resource_manager.get_resource(nid)["properties"]
+    props["created_at"] = old
+    props["last_fired_at"] = old
+    props.pop("last_bumped_at", None)
+
+
+def test_sweep_satisfies_stale_one_shot(loop):
+    nid = make_concern(loop, extra={"category": "one_shot"})
+    _age_note(loop, nid, days=1)  # one_shot lifetime is 0.5d
+    _inject_agent_collection(loop)
+    _add_to_agent_collection(loop, nid)
+    loop._sweep_stale_agent_concerns()
+    assert loop.resource_manager.get_resource(nid)["properties"]["status"] == "satisfied"
+
+
+def test_sweep_keeps_fresh_one_shot(loop):
+    nid = make_concern(loop, extra={"category": "one_shot"})
+    _inject_agent_collection(loop)
+    _add_to_agent_collection(loop, nid)
+    loop._sweep_stale_agent_concerns()
+    assert loop.resource_manager.get_resource(nid)["properties"]["status"] == "active"
+
+
+def test_sweep_keeps_durable_within_lifetime(loop):
+    nid = make_concern(loop)
+    _age_note(loop, nid, days=30)  # durable lifetime is 120d
+    _inject_agent_collection(loop)
+    _add_to_agent_collection(loop, nid)
+    loop._sweep_stale_agent_concerns()
+    assert loop.resource_manager.get_resource(nid)["properties"]["status"] == "active"
+
+
+def test_sweep_never_touches_seeds(loop):
+    nid = make_concern(loop, extra={"seed": True})
+    _age_note(loop, nid, days=3650)
+    _inject_agent_collection(loop)
+    _add_to_agent_collection(loop, nid)
+    loop._sweep_stale_agent_concerns()
+    assert loop.resource_manager.get_resource(nid)["properties"]["status"] == "active"
+
+
+def test_sweep_infers_one_shot_for_legacy_urgency(loop):
+    # Legacy continuation (no category stamp): swept on the one_shot
+    # lifetime, not the durable one.
+    nid = make_concern(loop, extra={"rhythm_source": "urgency"})
+    _age_note(loop, nid, days=1)
+    _inject_agent_collection(loop)
+    _add_to_agent_collection(loop, nid)
+    loop._sweep_stale_agent_concerns()
+    assert loop.resource_manager.get_resource(nid)["properties"]["status"] == "satisfied"

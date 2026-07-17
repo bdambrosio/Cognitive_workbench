@@ -1453,7 +1453,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
                 if exit_reason == 'yield':
                     next_slice = getattr(self, '_react_yield_next', None) or ''
                 else:
-                    next_slice = self._synthesize_remainder(text, log) or ''
+                    verdict, next_slice = self._synthesize_remainder(text, log)
+                    next_slice = next_slice if verdict == 'remainder' else ''
                 succ_id = self._spawn_concern_from_user_yield(text, next_slice)
                 if succ_id:
                     self._write_autonomy_event({
@@ -1565,8 +1566,10 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
         if not self._autonomy_enabled:
             return
         # Grow first, then check — ensures activations reflect elapsed
-        # time before the fire decision.
+        # time before the fire decision. The stale sweep sits between:
+        # a concern past its lifetime must not fire on the same tick.
         self._grow_agent_concerns_per_tick()
+        self._sweep_stale_agent_concerns()
         fired = self._check_and_fire_agent_concerns()
         if not fired:
             return
