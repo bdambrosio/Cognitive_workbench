@@ -28,7 +28,7 @@ OUT = Path(__file__).parent / "fle-bridge"
 MOD_NAME = "fle-bridge"
 # Bump on any change that must re-run init_data on an existing save —
 # on_configuration_changed only fires when the version changes.
-MOD_VERSION = "0.4.3"
+MOD_VERSION = "0.4.4"
 
 # Shared libs, in FLE's own init_scripts order (instance.initialise).
 # alerts.lua provides utils.get_issues (used by place_entity's warnings)
@@ -196,6 +196,35 @@ end""",
         (
             'game.print("No request data found for ID: " .. event.id)',
             'log("fle-bridge: no path request data for ID: " .. event.id)',
+        ),
+        # Characters do not collide with transport belts (they walk over
+        # them); masking the belt layer walls off any exit covered by a
+        # belt run — observed 2026-07-17: agent one tile from an open belt
+        # got not_found in every direction.
+        (
+            """                object = true,
+                transport_belt = true
+            }""",
+            """                object = true
+                -- CW: transport_belt layer removed — characters walk
+                -- over belts; masking them walls off belt-covered exits
+            }""",
+        ),
+        # A script-walked agent can stop embedded in an entity's collision
+        # box (observed 2026-07-17: agent inside a stone-furnace's box).
+        # The start then collides at every bounding-box size and all path
+        # requests return not_found. Snap the start to the nearest
+        # character-sized free spot; move_to's walking queue steps the
+        # character out through it.
+        (
+            "    local start_position = {y = start_y, x = start_x}\n",
+            """    local start_position = {y = start_y, x = start_x}
+    -- CW: unstick an embedded start (see build_mod.py FILE_FIXES)
+    if surface.entity_prototype_collides("character", start_position, false) then
+        local cw_free = surface.find_non_colliding_position("character", start_position, 3, 0.25)
+        if cw_free then start_position = cw_free end
+    end
+""",
         ),
     ],
 }
