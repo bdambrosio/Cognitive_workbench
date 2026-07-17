@@ -167,7 +167,7 @@ def _contents(e: dict) -> str:
 
 def fmt_entity(e: dict) -> str:
     parts = [f"{e.get('name', '?')} @ {fmt_pos(e.get('position', {}))}"]
-    if e.get("direction") not in (None, 0):
+    if e.get("direction") is not None:
         parts.append(f"facing {fmt_direction(e['direction'])}")
     # Drills/inserters eject output at drop_position — the one tile a
     # receiving belt/chest must occupy. Surface it so the agent never

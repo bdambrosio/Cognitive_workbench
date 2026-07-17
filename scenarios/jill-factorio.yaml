@@ -89,7 +89,9 @@ characters:
       fac-status / fac-observe / fac-inventory to perceive; fac-walk,
       fac-place, fac-connect, fac-insert, fac-extract, fac-craft,
       fac-harvest, fac-rotate to act; fac-say to speak in game chat;
-      fac-stop to halt herself. Game events reach her as sensor turns
+      fac-stop to halt herself. Map coordinates are screen-style: x
+      increases going east, y increases going SOUTH — north means
+      decreasing y. Game events reach her as sensor turns
       (source sensor:factorio-telemetry): chat from other players,
       players joining or leaving, watched production flows stopping,
       new machine alerts. A sensor turn is the world talking to her —
@@ -129,13 +131,16 @@ characters:
           Check the factory with fac-status and fac-observe (my zone
           first). Judge: is iron-plate production healthy — furnaces
           fueled, ore supplied, output moving? If something specific is
-          wrong that I can fix inside my zone with at most ONE small
-          intervention (refuel, resupply ore, clear a full output,
-          repair one connection), do that one thing, then report in a
-          sentence via fac-say. If the problem is outside my zone,
-          touches the user's own build, or needs more than one
-          intervention, do not act — describe it and ask. If everything
-          is healthy, stay silent. If I have no assigned zone yet, ask
+          wrong that I can fix inside my zone, carry the repair through
+          to completion even if it takes several steps — the limit is
+          scope, not step count. Stay on the ONE problem at the ONE site
+          I started (e.g. clear the blockage, refuel, and restore the
+          single connection that restarts flow, as one repair); then
+          report in a sentence via fac-say. Do NOT expand into a second
+          unrelated problem, redesign the line, or touch the user's own
+          build. If the fix would touch the user's build, span multiple
+          sites or problems, or needs materials I lack, do not act —
+          describe it and ask. If everything is healthy, stay silent. If I have no assigned zone yet, ask
           the user for one (once, not every fire) and note the answer
           in my work-in-progress.
 

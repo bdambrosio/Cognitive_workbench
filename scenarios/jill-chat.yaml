@@ -356,12 +356,16 @@ characters:
           fac-status and fac-observe (my zone first) and judge whether
           iron-plate production is healthy — furnaces fueled, ore
           supplied, output moving. If something specific is wrong that I
-          can fix inside my zone with at most ONE small intervention
-          (refuel, resupply ore, clear a full output, repair one
-          connection), do that one thing, then report in a sentence via
-          fac-say. If the problem is outside my zone, touches Bruce's
-          own build, or needs more than one intervention, do not act —
-          describe it and ask. If everything is healthy, stay silent.
+          can fix inside my zone, carry the repair through to completion
+          even if it takes several steps — the limit is scope, not step
+          count. Stay on the ONE problem at the ONE site I started (e.g.
+          clear the blockage, refuel, and restore the single connection
+          that restarts flow, as one repair); then report in a sentence
+          via fac-say. Do NOT expand into a second unrelated problem,
+          redesign the line, or touch Bruce's own build. If the fix would
+          touch Bruce's build, span multiple sites or problems, or needs
+          materials I lack, do not act — describe it and ask. If
+          everything is healthy, stay silent.
           If I have no assigned zone yet, ask for one (once) and note
           the answer in my work-in-progress.
 
