@@ -307,8 +307,38 @@ class ConcernsMixin:
             logger.warning(f"[{self.character_name}] autonomy.jsonl write failed: {e}")
 
     @staticmethod
-    def _seed_concern_name(idx: int) -> str:
-        return f"chat:agent_concern:seed:{idx}"
+    def _seed_concern_name(ident) -> str:
+        """Named-note slot for a seed: an explicit YAML `name:` (stable
+        across list edits) or, legacy, the entry's list index."""
+        return f"chat:agent_concern:seed:{ident}"
+
+    def _adopt_legacy_seed_slot(self, name: str, idx: int) -> None:
+        """One-time migration to name-keyed slots: if the name-keyed slot
+        is empty but the index-keyed slot from the pre-name era exists,
+        rename that note into the name-keyed slot. Pairing by list
+        position is exactly how the index scheme assigned slots; any
+        text/flag drift the index scheme caused (a list insertion
+        re-labeled every later seed — observed live 2026-07-17: slot 5
+        carried WIP-reviewer text with the X-feed instruction synced on
+        top) is repaired by the authoritative sync that follows. The
+        target slot is verified empty first, so set_resource_name's
+        replace-prior-note path (a delete) can never trigger."""
+        nn = self.resource_manager.named_notes
+        if name in nn:
+            return
+        legacy = self._seed_concern_name(idx)
+        nid = nn.get(legacy)
+        if not nid:
+            return
+        ok, err = self.resource_manager.set_resource_name(nid, name)
+        if ok:
+            logger.info(
+                f"[{self.character_name}] seed slot migrated: "
+                f"{legacy} -> {name} ({nid})")
+        else:
+            logger.warning(
+                f"[{self.character_name}] seed slot migration failed "
+                f"({legacy} -> {name}): {err}")
 
     def _seed_concerns_from_config(self, character_config: dict) -> None:
         """Instantiate seed concerns listed under YAML key `concerns:`.
@@ -317,6 +347,14 @@ class ConcernsMixin:
         (if any) for direct firing. Idempotent — each seed gets a stable
         named-note slot.
 
+        Slots are keyed by the entry's explicit YAML `name:` when present
+        (index-keyed slots are adopted once, see _adopt_legacy_seed_slot);
+        unnamed entries keep the legacy index key, where inserting or
+        reordering entries re-labels seeds — name every entry. For a
+        name-keyed seed the YAML is authoritative for identity and
+        procedure (text, flags, domain, rhythm, instruction); runtime
+        state (activation, WIP, status) is never touched.
+
         YAML may specify `rhythm_hours` (preferred) or legacy
         `cadence_hours` per seed; default is weekly (168h). `instruction`
         is optional — without it the concern accumulates activation but
@@ -324,6 +362,7 @@ class ConcernsMixin:
         seeds = character_config.get('concerns') or []
         if not isinstance(seeds, list) or not self._agent_concerns_collection_id:
             return
+        seen_slots: set = set()
         for idx, seed in enumerate(seeds):
             if not isinstance(seed, dict):
                 continue
@@ -331,11 +370,30 @@ class ConcernsMixin:
             if not text:
                 continue
             entity = str(seed.get('entity', 'User') or 'User')
-            name = self._seed_concern_name(idx)
+            explicit = str(seed.get('name') or '').strip()
+            if explicit:
+                name = self._seed_concern_name(explicit)
+                self._adopt_legacy_seed_slot(name, idx)
+            else:
+                name = self._seed_concern_name(idx)
+            if name in seen_slots:
+                logger.warning(
+                    f"[{self.character_name}] duplicate seed slot {name!r} "
+                    f"at index {idx}; entry skipped")
+                continue
+            seen_slots.add(name)
             reviewer = bool(seed.get('user_model_reviewer'))
             self_ext = bool(seed.get('self_extension'))
             wip_rev = bool(seed.get('wip_reviewer'))
             domain = str(seed.get('domain') or '').strip()
+            rhythm_h = seed.get('rhythm_hours')
+            if rhythm_h is None:
+                rhythm_h = seed.get('cadence_hours')   # legacy field
+            if rhythm_h is None and seed.get('cadence_days') is not None:
+                try:
+                    rhythm_h = float(seed.get('cadence_days')) * 24.0
+                except (TypeError, ValueError):
+                    rhythm_h = None
             if name in self.resource_manager.named_notes:
                 # Already seeded; preserve any edits — but sync the
                 # designation flags so config can flag an existing seed
@@ -344,14 +402,54 @@ class ConcernsMixin:
                     self.resource_manager.named_notes[name])
                 if note:
                     props = note.setdefault('properties', {})
-                    if reviewer and not props.get('user_model_reviewer'):
-                        props['user_model_reviewer'] = True
-                    if self_ext and not props.get('self_extension'):
-                        props['self_extension'] = True
-                    if wip_rev and not props.get('wip_reviewer'):
-                        props['wip_reviewer'] = True
-                    if domain and props.get('domain') != domain:
-                        props['domain'] = domain
+                    if explicit:
+                        # Name-keyed seed: the YAML entry IS this seed's
+                        # identity, so text, flags, domain, and rhythm all
+                        # sync authoritatively (this also repairs notes
+                        # adopted from a drifted index slot). Unnamed
+                        # seeds keep the historical grow-only flag sync
+                        # below — index pairing is too weak to trust for
+                        # removals.
+                        if str(props.get('content') or '').strip() != text:
+                            props['content'] = text
+                            logger.info(
+                                f"[{self.character_name}] seed {name}: "
+                                f"text synced from scenario YAML")
+                            try:
+                                with self._faiss_lock:
+                                    self.resource_manager.resource_indexer.index_note(
+                                        self.resource_manager.named_notes[name])
+                            except Exception as e:
+                                logger.warning(
+                                    f"[{self.character_name}] seed {name}: "
+                                    f"reindex after text sync failed: {e}")
+                        for flag, val in (('user_model_reviewer', reviewer),
+                                          ('self_extension', self_ext),
+                                          ('wip_reviewer', wip_rev)):
+                            if val:
+                                props[flag] = True
+                            elif props.get(flag):
+                                props.pop(flag, None)
+                                logger.info(
+                                    f"[{self.character_name}] seed {name}: "
+                                    f"stale {flag} flag cleared")
+                        if domain:
+                            props['domain'] = domain
+                        elif props.get('domain'):
+                            props.pop('domain', None)
+                        if rhythm_h is not None:
+                            snapped = _snap_rhythm_hours(rhythm_h)
+                            if props.get('rhythm_hours') != snapped:
+                                props['rhythm_hours'] = snapped
+                    else:
+                        if reviewer and not props.get('user_model_reviewer'):
+                            props['user_model_reviewer'] = True
+                        if self_ext and not props.get('self_extension'):
+                            props['self_extension'] = True
+                        if wip_rev and not props.get('wip_reviewer'):
+                            props['wip_reviewer'] = True
+                        if domain and props.get('domain') != domain:
+                            props['domain'] = domain
                     # Sync instruction from YAML: config is the source of
                     # truth for a seed's PROCEDURE; runtime state
                     # (activation, WIP, status) stays untouched. Without
@@ -369,14 +467,6 @@ class ConcernsMixin:
                             f"[{self.character_name}] seed {name}: "
                             f"instruction synced from scenario YAML")
                 continue
-            rhythm_h = seed.get('rhythm_hours')
-            if rhythm_h is None:
-                rhythm_h = seed.get('cadence_hours')   # legacy field
-            if rhythm_h is None and seed.get('cadence_days') is not None:
-                try:
-                    rhythm_h = float(seed.get('cadence_days')) * 24.0
-                except (TypeError, ValueError):
-                    rhythm_h = None
             extra: Dict[str, Any] = {}
             if reviewer:
                 extra['user_model_reviewer'] = True

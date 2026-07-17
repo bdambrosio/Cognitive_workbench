@@ -214,8 +214,10 @@ characters:
     # satisfaction (they're architectural baseline, not ephemeral).
     concerns:
       - text: "Track what the user wants from me — both immediate and durable — so I can act on it when relevant."
+        name: track-user-wants
         category: durable
       - text: "When autonomous work produces findings that meaningfully affect our shared work or contradict prior assumptions, surface them to the user proactively. Routine status updates can be silent."
+        name: surface-findings
         category: durable
       # Activity bridge for user_concerns: periodic judgment over what the
       # user has been tracking. Governed by the triage gate like any other
@@ -224,6 +226,7 @@ characters:
       # past high strength evidence-bumps this concern's activation, so
       # the review fires ahead of rhythm while the heat is current.
       - text: "Periodically review what the user has been tracking and consider whether any of it warrants proactive help."
+        name: review-tracking
         category: durable
         rhythm_hours: 168
         user_model_reviewer: true
@@ -242,6 +245,7 @@ characters:
       # fire ahead of rhythm. self_extension: true tags it so reflection
       # finds it and so its fires log distinctly (kind=capability_proposal).
       - text: "When I repeatedly hit a task my current tools can't do, treat it as a standing interest: notice the gap, and when one recurs, propose in words — for the user's review — a new tool that would close it."
+        name: capability-gap
         category: durable
         rhythm_hours: 168
         self_extension: true
@@ -279,6 +283,7 @@ characters:
       # conversation. Tracks agent-development work on Hugging Face's
       # daily-papers page; remove this entry to disable.
       - text: "Track new agent-development work appearing on Hugging Face's daily papers and bring genuinely relevant items to the user's attention."
+        name: hf-papers
         category: durable
         rhythm_hours: 24
         instruction: |
@@ -300,6 +305,7 @@ characters:
       # X_BEARER_TOKEN and X_LIST_ID in the launcher environment;
       # comment this block out to disable.
       - text: "Stay current with the user's X feed and bring genuinely interesting new posts to their attention."
+        name: x-feed
         category: durable
         rhythm_hours: 1
         instruction: |
@@ -323,6 +329,7 @@ characters:
       # agent_concerns_closed when the user assents. Remove this entry
       # to disable.
       - text: "Periodically review the work-in-progress across my concerns and judge whether any half-done arc deserves further effort or should be retired."
+        name: wip-reviewer
         category: durable
         rhythm_hours: 24
         wip_reviewer: true
@@ -346,6 +353,7 @@ characters:
       # concern's fires so M-series analysis can slice them out and keep
       # the chat-only composite comparable to frozen baselines.
       - text: "Keep iron-plate production healthy in my assigned zone of the shared Factorio factory."
+        name: iron-plate
         category: durable
         rhythm_hours: 1
         domain: factorio

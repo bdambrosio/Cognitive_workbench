@@ -122,9 +122,11 @@ characters:
 
     concerns:
       - text: "Track what the user wants from me — both immediate and durable — so I can act on it when relevant."
+        name: track-user-wants
         category: durable
       # The v1 factory assignment (architecture note, "Concern seeds").
       - text: "Keep iron-plate production healthy in my assigned zone of the factory."
+        name: iron-plate
         category: durable
         rhythm_hours: 1
         instruction: |
@@ -156,6 +158,7 @@ characters:
       # drill stall was planned-but-never-executed and never reported —
       # this is the net that catches stalled arcs between fires).
       - text: "Periodically review the work-in-progress across my concerns and judge whether any half-done arc deserves further effort or should be retired."
+        name: wip-reviewer
         category: durable
         rhythm_hours: 4
         wip_reviewer: true

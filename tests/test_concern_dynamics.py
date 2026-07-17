@@ -896,3 +896,59 @@ def test_sweep_infers_one_shot_for_legacy_urgency(loop):
     _add_to_agent_collection(loop, nid)
     loop._sweep_stale_agent_concerns()
     assert loop.resource_manager.get_resource(nid)["properties"]["status"] == "satisfied"
+
+
+# ── name-keyed seeding + legacy slot adoption ──────────────────────────
+
+def test_seed_name_keyed_creation(loop):
+    _mute_indexer(loop)
+    _inject_agent_collection(loop)
+    loop._seed_concerns_from_config(
+        {'concerns': [{'text': 'watch the feed', 'name': 'x-feed'}]})
+    nid = loop.resource_manager.named_notes.get('chat:agent_concern:seed:x-feed')
+    assert nid
+    props = loop.resource_manager.get_resource(nid)["properties"]
+    assert props["seed"] is True
+    assert props["content"] == 'watch the feed'
+
+
+def test_seed_legacy_slot_adopted_and_repaired(loop):
+    # The live 2026-07-17 corruption: an index slot carrying stale text
+    # and a stale designation flag. Naming the entry adopts the slot and
+    # the authoritative sync repairs text, flags, and rhythm in place.
+    _mute_indexer(loop)
+    _inject_agent_collection(loop)
+    loop._seed_concerns_from_config(
+        {'concerns': [{'text': 'review the WIP', 'wip_reviewer': True}]})
+    old_id = loop.resource_manager.named_notes['chat:agent_concern:seed:0']
+
+    loop._seed_concerns_from_config(
+        {'concerns': [{'text': 'watch the X feed', 'name': 'x-feed',
+                       'rhythm_hours': 1}]})
+    assert 'chat:agent_concern:seed:0' not in loop.resource_manager.named_notes
+    new_id = loop.resource_manager.named_notes['chat:agent_concern:seed:x-feed']
+    assert new_id == old_id  # adopted, not recreated
+    props = loop.resource_manager.get_resource(new_id)["properties"]
+    assert props["content"] == 'watch the X feed'
+    assert not props.get("wip_reviewer")
+    assert props["rhythm_hours"] == 1
+
+
+def test_seed_unnamed_keeps_legacy_no_text_sync(loop):
+    _mute_indexer(loop)
+    _inject_agent_collection(loop)
+    loop._seed_concerns_from_config({'concerns': [{'text': 'original'}]})
+    nid = loop.resource_manager.named_notes['chat:agent_concern:seed:0']
+    loop._seed_concerns_from_config({'concerns': [{'text': 'edited'}]})
+    props = loop.resource_manager.get_resource(nid)["properties"]
+    assert props["content"] == 'original'  # index slots never text-sync
+
+
+def test_seed_duplicate_name_skipped(loop):
+    _mute_indexer(loop)
+    _inject_agent_collection(loop)
+    loop._seed_concerns_from_config(
+        {'concerns': [{'text': 'first', 'name': 'dup'},
+                      {'text': 'second', 'name': 'dup'}]})
+    nid = loop.resource_manager.named_notes['chat:agent_concern:seed:dup']
+    assert loop.resource_manager.get_resource(nid)["properties"]["content"] == 'first'
