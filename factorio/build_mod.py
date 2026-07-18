@@ -28,7 +28,7 @@ OUT = Path(__file__).parent / "fle-bridge"
 MOD_NAME = "fle-bridge"
 # Bump on any change that must re-run init_data on an existing save —
 # on_configuration_changed only fires when the version changes.
-MOD_VERSION = "0.4.5"
+MOD_VERSION = "0.4.6"
 
 # Shared libs, in FLE's own init_scripts order (instance.initialise).
 # alerts.lua provides utils.get_issues (used by place_entity's warnings)
@@ -181,6 +181,50 @@ end)""",
         end
     end
 """,
+        ),
+    ],
+    # pickup_entity: (1) an item name ("iron-plate") is a valid
+    # ground-item pickup but an unknown ENTITY name, and
+    # find_entities_filtered ERRORS on unknown entity names before the
+    # ground-item scan can run — observed live 2026-07-17: agent could
+    # not clear plate debris, bridge said "Unknown entity name".
+    # (2) the ground-item loop has a stray `return true` after the
+    # first element regardless of match — a wrong-named first item in
+    # range silently no-ops as success.
+    "pickup_entity/server.lua": [
+        (
+            """    -- Find both types of entities first
+    local player_entities = surface.find_entities_filtered{
+        name=entity,
+        position=position,
+        radius=0.707,
+        force="player"
+    }""",
+            """    -- CW: reject names that are neither entity nor item; scan placed
+    -- entities only for real entity prototypes (see build_mod.py)
+    if not prototypes.entity[entity] and not prototypes.item[entity] then
+        error("\\"Unknown entity or item name: " .. entity .. "\\"")
+    end
+    local player_entities = {}
+    if prototypes.entity[entity] then
+        player_entities = surface.find_entities_filtered{
+            name=entity,
+            position=position,
+            radius=0.707,
+            force="player"
+        }
+    end""",
+        ),
+        (
+            """            end
+            return true
+        end
+        return false
+    end""",
+            """            end
+        end
+        return false
+    end""",
         ),
     ],
     "inspect_inventory/server.lua": [
