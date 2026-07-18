@@ -95,18 +95,37 @@ could not see, learning about each only from the error text. Fix:
 ground items surfaced as pseudo-entities with a bounding span, so
 debris-vs-footprint overlap is legible at a glance.
 
-**4. The pathfinder island.** The best one. She reported being
-completely stuck: *"In every direction I've tried to walk, the tool
-returns `no path: not_found`. … the pathfinder is unable to find any
-exit route from my current tile, effectively treating my position as an
-isolated island."* Note what she is claiming: not "I am boxed in" but
-"the pathfinder's model of me is wrong." **She was right, twice over.**
-A live probe showed her character was physically embedded inside a
+**4. The pathfinder island.** The best one, in two acts. She reported
+being completely stuck: *"In every direction I've tried to walk, the
+tool returns `no path: not_found`. … the pathfinder is unable to find
+any exit route from my current tile, effectively treating my position
+as an isolated island."* Note what she is claiming: not "I am boxed in"
+but "the pathfinder's model of me is wrong." **She was right — and
+then, when it happened again that afternoon, she was right a second
+time while our first fix turned out to be wrong.**
+
+Act one: a live probe showed her character physically embedded inside a
 furnace's collision box (script walking can stop where real players
-can't stand), which invalidates the path start at *any* clearance
-size; and the pathfinder's collision mask included transport belts,
-which characters in fact walk straight over. Two fixes later she walked
-out on her own next attempt, and was clearing debris within minutes.
+can't stand — the culprit was a goal-clearance helper that teleports
+the character diagonally, collision-ignoring, and forgets to put her
+back), which invalidates the path start at *any* clearance size. We
+patched that, plus what we believed was the belt problem, and she
+walked out.
+
+Act two, hours later: stuck again, "boxed in by the belts and the
+furnace" — correct again. The deeper dig taught us the actual rule:
+Factorio collision is *symmetric mask intersection*, and the
+pathfinder's mask shared **two** layers with transport belts —
+`object`, and `water_tile`, the can't-build-on-water flag that nearly
+every placeable entity carries. So belts her body steps straight over
+were absolute walls to her route planner, and her factory sits on an
+ore patch ringed by her own belt runs: every in-factory path failed
+while open desert worked, which is also why our first fix had appeared
+to work. The fix that held: make the pathfinder's mask mirror the
+character's own collision layers exactly — nothing extra. Every extra
+layer in a path mask is a false wall somewhere. She was unstuck within
+minutes of each deploy; the mask diagnosis went upstream the same
+evening as a correction to our own morning-filed issue.
 
 **5. The concern flood.** Purely on the cognitive side: her yield
 mechanism (ending a long task mid-way and spawning a continuation

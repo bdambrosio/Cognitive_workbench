@@ -118,6 +118,16 @@ Gotchas learned in step 3:
   reach realism.
 - Water/cliffs are tiles, not entities — an entity-empty area is not
   necessarily buildable or walkable (`get_tile(...).collides_with`).
+- Factorio collision is symmetric mask intersection — a pathfinder
+  request's collision_mask must mirror the character prototype's own
+  layers EXACTLY ({is_object, player, train}). Every extra layer is a
+  false wall somewhere: `object` and `water_tile` (carried by belts and
+  most placeables as the can't-build-on-water flag) made every belt an
+  absolute pather wall (mod 0.4.5). Water tiles carry `player`, so
+  water needs no extra layer. When debugging collisions, dump
+  `prototype.collision_mask.layers` — do not trust intuition. The
+  cw_debug_path action (RCON-only) issues raw path requests with mask
+  variants for exactly this.
 - Loose items on the ground are neutral-force item-entities: invisible
   to the mod's player-force `get_entities`, yet they block building
   placement. `/observe` surfaces them as `loose <item> on ground`
