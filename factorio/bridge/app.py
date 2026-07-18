@@ -395,20 +395,22 @@ def _resource_pseudo_entities(x, y, radius):
 # aggregated per item type; the span shows whether debris overlaps an
 # intended footprint.
 _GROUND_ITEMS_LUA = (
-    "local out = {} "
+    "local out = {} local n = 0 "
     "for _, e in pairs(game.surfaces[1].find_entities_filtered{"
     "area = {{%.1f, %.1f}, {%.1f, %.1f}}, type = 'item-entity'}) do "
-    "local n = e.stack.name "
-    "local r = out[n] "
-    "if not r then r = {piles = 0, count = 0, sx = 0, sy = 0, "
-    "minx = 1e9, miny = 1e9, maxx = -1e9, maxy = -1e9} out[n] = r end "
-    "r.piles = r.piles + 1 r.count = r.count + e.stack.count "
-    "local p = e.position "
-    "r.sx = r.sx + p.x r.sy = r.sy + p.y "
-    "if p.x < r.minx then r.minx = p.x end if p.y < r.miny then r.miny = p.y end "
-    "if p.x > r.maxx then r.maxx = p.x end if p.y > r.maxy then r.maxy = p.y end "
-    "end rcon.print(helpers.table_to_json(out))"
+    "n = n + 1 "
+    "if n <= 60 then out[#out + 1] = {n = e.stack.name, c = e.stack.count, "
+    "x = e.position.x, y = e.position.y} end "
+    "end rcon.print(helpers.table_to_json({piles = out, total = n}))"
 )
+
+# Scattered piles must be listed INDIVIDUALLY: an aggregate centroid is a
+# coordinate where nothing exists — observed live 2026-07-17: three
+# 1-plate piles 2-4 tiles apart reported as one "x3 @ centroid"; pickup
+# (0.707 search radius) failed at the centroid while observe kept
+# "seeing" plates there. Aggregate only same-type piles too numerous to
+# list, and keep the span so footprint overlap stays legible.
+_GROUND_ITEM_LIST_MAX = 4
 
 
 def _ground_item_pseudo_entities(x, y, radius):
@@ -421,24 +423,40 @@ def _ground_item_pseudo_entities(x, y, radius):
     except (ValueError, TypeError) as e:
         log.warning("ground-item scan parse failed: %s", e)
         return []
-    if not isinstance(data, dict):
+    piles = data.get("piles") if isinstance(data, dict) else None
+    if not isinstance(piles, list):
         return []
+    total = data.get("total", len(piles))
+    if total > len(piles):
+        log.info("ground-item scan truncated: %s piles, listing %s", total, len(piles))
+    by_name = {}
+    for p in piles:
+        by_name.setdefault(p["n"], []).append(p)
     out = []
-    for name, r in sorted(data.items()):
-        if r["piles"] > 1:
-            label = ("loose %s on ground x%d (%d piles spanning "
-                     "(%.1f, %.1f)..(%.1f, %.1f) — blocks placement)" % (
-                         name, r["count"], r["piles"],
-                         r["minx"], r["miny"], r["maxx"], r["maxy"]))
+    for name, group in sorted(by_name.items()):
+        if len(group) <= _GROUND_ITEM_LIST_MAX:
+            for p in group:
+                out.append({
+                    "name": "loose %s on ground x%d (blocks placement)" % (name, p["c"]),
+                    "position": {"x": round(p["x"], 1), "y": round(p["y"], 1)},
+                    "item": name,
+                    "count": p["c"],
+                })
         else:
-            label = "loose %s on ground x%d (blocks placement)" % (name, r["count"])
-        out.append({
-            "name": label,
-            "position": {"x": round(r["sx"] / r["piles"], 1),
-                         "y": round(r["sy"] / r["piles"], 1)},
-            "item": name,
-            "count": r["count"],
-        })
+            count = sum(p["c"] for p in group)
+            xs = [p["x"] for p in group]
+            ys = [p["y"] for p in group]
+            out.append({
+                "name": ("loose %s on ground x%d (%d piles spanning "
+                         "(%.1f, %.1f)..(%.1f, %.1f) — blocks placement; "
+                         "pick up each pile at its own tile)" % (
+                             name, count, len(group),
+                             min(xs), min(ys), max(xs), max(ys))),
+                "position": {"x": round(sum(xs) / len(xs), 1),
+                             "y": round(sum(ys) / len(ys), 1)},
+                "item": name,
+                "count": count,
+            })
     return out
 
 
