@@ -165,6 +165,28 @@ the fixes that touched FLE's own code are now filed upstream with
 line numbers and offered patches
 ([#375–#381](https://github.com/JackHopkins/factorio-learning-environment/issues)).
 
+Why is she a good bug reporter? I've come to think it's architectural,
+not incidental — a property of the bridge design as much as of the
+agent. The bridge speaks to her in concrete, falsifiable sentences:
+exact coordinates, named entity statuses, failures classified as
+*world-changed / stale-model / infeasible* with the blocking thing
+named. Her side of the architecture matches: her norms require reading
+the deviation report before retrying and reporting blockers plainly,
+and her turn loop puts a fresh observation next to her expectation
+before she speaks. The last bug of the week made the point perfectly.
+After the pathfinder fix she still couldn't clear debris, and reported:
+*"The observation tool sees the plates at that coordinate, but the
+pickup tool claims they aren't there."* Both tools were telling the
+truth — the contradiction was real. Our observation layer (a fix from
+earlier that same day) was aggregating scattered piles to a centroid
+where nothing existed, and the pickup tool honestly found nothing
+there. She could *detect* that inconsistency only because both tools
+commit to the same precise coordinate vocabulary: perception that makes
+concrete claims can be caught lying; perception that hedges cannot. If
+you want your agent to debug your harness — and in a persistent world
+you very much do — give it a world model precise enough to contradict
+itself.
+
 ## Does this need a frontier model?
 
 The standing assumption in the benchmark results is that Factorio is
@@ -221,7 +243,12 @@ domain.
    build the lifecycle before the spawner. Continuations without a
    completion path are a fork bomb with extra steps.
 5. Listen to the agent's failure narrations. Ours was right about her
-   own harness more often than either of the engineers reviewing her.
+   own harness more often than either of the engineers reviewing her —
+   and that's a design outcome, not a personality trait: agent bug
+   reports are only as good as the perception layer is precise. Vague
+   observations produce vague complaints; exact coordinates and named
+   statuses produce contradictions a language model can notice and
+   state.
 
 Setup, code, and the full commit trail are in the
 [Cognitive Workbench repo](https://github.com/bdambrosio/Cognitive_workbench)
