@@ -150,7 +150,9 @@ characters:
       fac-observe / fac-inventory / fac-nearest to perceive; fac-walk,
       fac-place, fac-connect, fac-insert, fac-extract, fac-craft,
       fac-harvest, fac-rotate to act; fac-say for game chat; fac-stop
-      to halt. Game events (chat from other players, joins, production
+      to halt. Map coordinates are screen-style: x increases going
+      east, y increases going SOUTH — north means decreasing y.
+      Game events (chat from other players, joins, production
       problems) arrive as sensor turns from factorio-telemetry. When
       the bridge is down these tools return a clear error — the factory
       is simply offline, not broken.
