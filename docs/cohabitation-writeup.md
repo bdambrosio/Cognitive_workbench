@@ -137,6 +137,50 @@ completion is terminal, spawning a successor retires the parent, and a
 staleness sweep ages out the rest. The workspace drained itself within
 a day, no manual deletions.
 
+**6. The un-building.** The concern flood's sequel, also cognitive —
+and the only failure of the week where the world model was telling the
+truth and *memory* was the liar. She had spent an evening fighting a
+drill placement (a misleading blocker list: placement errors named the
+ore *patch* as `iron-ore`, indistinguishable from clearable debris,
+while the real collision — an overlapping furnace — drowned mid-list;
+we fixed the error message in the mod the same night) and then solved
+it herself: cleared her own stray belt, placed the drill one tile
+further out, fueled it, line running. Then I restarted her session,
+and the concern re-fired carrying a continuation written *before* the
+solution: the drill is in inventory; place it at the old coordinate.
+
+Fresh observation said the line was running. The frozen goal said
+build at a dead coordinate. The goal won: the (now accurate) placement
+error correctly named her own working drill as a blocker of the target
+tile, and she picked it up — un-building a running production line in
+service of an intention that no longer referred to anything. Drill in
+hand, she re-derived the previous evening from scratch, this time
+reporting the truthful collision errors as *"ghost collisions … it
+says I can't place a drill at (-50, -31) or even (-51, -31) because
+the furnace at (-50, -30) is in the way, which makes no sense for
+adjacent tiles."* It made perfect sense — drill and furnace are both
+2×2, so centers one tile apart mean overlapping bodies — but she was
+modeling entities as points, and (our fault) the sentence explaining
+footprints lived in a part of the tool documentation her prompt never
+renders.
+
+Recovery was instructive about both channels. Three server-chat
+messages carrying ground truth got partial uptake — and one of them,
+beginning "Jill, STOP placing at (-50, -31)", tripped the
+below-reasoning stop watcher: the hard stop caught the *engineer*.
+Working as designed; oops. What actually repaired her was a single CLI
+line: "note that the drill and the furnace are both 2×2." Her reply —
+*"That explains the 'ghost collisions.' … I was treating them as
+1×1."* — and minutes later she walked back, re-placed the drill
+correctly, and fueled it, unprompted. The fix we haven't built yet is
+the design lesson: the lifecycle keeps dead continuations from
+*firing*, but nothing revalidates a live continuation's *content*. A
+continuation is a snapshot of an intention, and right after a working
+fix, the fastest-staling thing in the system is your own last plan.
+The triage step that decides whether to fire needs to also ask whether
+the goal still refers to anything — one observation's worth of
+checking against what the teardown cost.
+
 ## The loop I didn't expect
 
 The pathfinder story generalizes into the most interesting workflow of
@@ -241,7 +285,10 @@ domain.
    bugs were only observable because the body was slow and physical.
 4. Give the agent standing motivation (concerns with rhythms), but
    build the lifecycle before the spawner. Continuations without a
-   completion path are a fork bomb with extra steps.
+   completion path are a fork bomb with extra steps — and a
+   continuation that legitimately fires still needs its goal checked
+   against the present world: ours un-built her own working drill in
+   service of a snapshot plan the world had outgrown.
 5. Listen to the agent's failure narrations. Ours was right about her
    own harness more often than either of the engineers reviewing her —
    and that's a design outcome, not a personality trait: agent bug
