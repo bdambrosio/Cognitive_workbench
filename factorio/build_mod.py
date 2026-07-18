@@ -28,7 +28,7 @@ OUT = Path(__file__).parent / "fle-bridge"
 MOD_NAME = "fle-bridge"
 # Bump on any change that must re-run init_data on an existing save —
 # on_configuration_changed only fires when the version changes.
-MOD_VERSION = "0.4.6"
+MOD_VERSION = "0.4.7"
 
 # Shared libs, in FLE's own init_scripts order (instance.initialise).
 # alerts.lua provides utils.get_issues (used by place_entity's warnings)
@@ -180,6 +180,49 @@ end)""",
                 ". Use the exact coordinates from observation (e.g. an 'outputs to' tile) - do not round.\\"")
         end
     end
+""",
+        ),
+        # The "blocked by" list is an UNFILTERED area scan: on an ore
+        # patch it lists the resource tiles as "iron-ore" — reading
+        # exactly like loose ground ore, while the real blocker (an
+        # overlapping furnace) drowns in the middle. Observed live
+        # 2026-07-17: agent chased phantom "loose iron-ore" with pickup
+        # (which rightly found nothing — resources are neutral-force)
+        # and never saw the furnace overlap. Filter to entities whose
+        # collision mask actually intersects the placed prototype's,
+        # and label item-on-ground with its stack for legibility.
+        (
+            """                local blocking_entities = player.surface.find_entities_filtered{area = blocking_area}
+                local blocking_info = {}
+                for _, blocking_entity in ipairs(blocking_entities) do
+                    if blocking_entity.name ~= "character" then
+                        table.insert(blocking_info, blocking_entity.name .. " at x=" .. blocking_entity.position.x .. " y=" .. blocking_entity.position.y)
+                    end
+                end
+""",
+            """                local blocking_entities = player.surface.find_entities_filtered{area = blocking_area}
+                -- CW: list only entities whose collision mask intersects the
+                -- placed prototype's (see build_mod.py FILE_FIXES)
+                local cw_mask = entity_prototype.collision_mask.layers
+                local blocking_info = {}
+                for _, blocking_entity in ipairs(blocking_entities) do
+                    if blocking_entity.name ~= "character" then
+                        local cw_collides = false
+                        for cw_layer in pairs(cw_mask) do
+                            if blocking_entity.prototype.collision_mask.layers[cw_layer] then
+                                cw_collides = true
+                                break
+                            end
+                        end
+                        if cw_collides then
+                            local cw_label = blocking_entity.name
+                            if blocking_entity.type == "item-entity" then
+                                cw_label = "loose " .. blocking_entity.stack.name .. " on the ground"
+                            end
+                            table.insert(blocking_info, cw_label .. " at x=" .. blocking_entity.position.x .. " y=" .. blocking_entity.position.y)
+                        end
+                    end
+                end
 """,
         ),
     ],

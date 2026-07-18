@@ -133,6 +133,14 @@ Gotchas learned in step 3:
   placement. `/observe` surfaces them as `loose <item> on ground`
   pseudo-entities (per-type, with pile span) via a data-only `/sc` scan
   — same pattern as ore patches.
+- `place_entity`'s "blocked by" list was an unfiltered area scan: on an
+  ore patch it listed the resource tiles as `iron-ore` — reading exactly
+  like loose ground ore — while the real blocker (a furnace the footprint
+  overlapped) drowned in the middle. The agent chased phantom piles with
+  pickup, which rightly found nothing (resources are neutral-force). Mod
+  0.4.7 filters the list by collision-mask intersection with the placed
+  prototype and labels item-on-ground blockers `loose <item> on the
+  ground`.
 - `infeasible` deviations (walk-short, no-path, place-onto-target) carry
   a `blocked_by {tile, position}` when a data-only tile probe finds an
   impassable tile in the way — turns "7.6 tiles short of goal" into
