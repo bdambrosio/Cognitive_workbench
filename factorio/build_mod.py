@@ -28,7 +28,7 @@ OUT = Path(__file__).parent / "fle-bridge"
 MOD_NAME = "fle-bridge"
 # Bump on any change that must re-run init_data on an existing save —
 # on_configuration_changed only fires when the version changes.
-MOD_VERSION = "0.4.4"
+MOD_VERSION = "0.4.5"
 
 # Shared libs, in FLE's own init_scripts order (instance.initialise).
 # alerts.lua provides utils.get_issues (used by place_entity's warnings)
@@ -59,6 +59,28 @@ FILE_FIXES = {
     "alerts.lua": [
         ("storage.alerts = {}\n", "-- storage.alerts init lives in init_data (initialise.lua)\n"),
         ("storage.get_alerts", "get_alerts"),
+    ],
+    # avoid_entity teleports the agent character diagonally (+i,+i up to
+    # +10,+10, script teleport ignores collision) to test whether SHE is
+    # what blocks a path goal — and on success returns WITHOUT restoring
+    # her position, leaving her wherever the loop parked her, including
+    # inside another entity's collision box. This is the mechanism that
+    # embedded the agent in a stone-furnace (observed live 2026-07-17,
+    # the "pathfinder island"). Always teleport back: the function's
+    # value is its can_place answer; the displacement is a side effect
+    # nothing depends on (request_path ignores the return entirely).
+    "utils.lua": [
+        (
+            """        if can_place then
+            return true
+        end
+        player.teleport({player_position.x + i, player_position.y + i})""",
+            """        if can_place then
+            player.teleport(player_position)
+            return true
+        end
+        player.teleport({player_position.x + i, player_position.y + i})""",
+        ),
     ],
     # serialize.lua exposes drop_position for inserters only. Mining
     # drills need it too: it is the ONE tile where the drill ejects ore —
@@ -197,18 +219,38 @@ end""",
             'game.print("No request data found for ID: " .. event.id)',
             'log("fle-bridge: no path request data for ID: " .. event.id)',
         ),
-        # Characters do not collide with transport belts (they walk over
-        # them); masking the belt layer walls off any exit covered by a
-        # belt run — observed 2026-07-17: agent one tile from an open belt
-        # got not_found in every direction.
+        # The pathfinder mask must mirror the CHARACTER's own collision
+        # layers EXACTLY ({is_object, player, train}) — collision is
+        # symmetric mask intersection, so every extra layer creates
+        # false walls. FLE's {player, train, water_tile, object} blocks
+        # belts twice over: belts carry `object` (but not `is_object` —
+        # which is why real characters walk over them) AND `water_tile`
+        # (the can't-build-on-water flag every placeable carries).
+        # Dropping water_tile loses nothing: water TILES carry `player`,
+        # so the character mask already avoids water. Observed live
+        # 2026-07-17, twice: agent sealed in a pocket "walled" by her
+        # own belts that her body could step straight over.
         (
-            """                object = true,
+            """        collision_mask = {
+            layers = {
+                player = true,
+                train = true,
+                water_tile = true,
+                object = true,
                 transport_belt = true
-            }""",
-            """                object = true
-                -- CW: transport_belt layer removed — characters walk
-                -- over belts; masking them walls off belt-covered exits
-            }""",
+            }
+        },""",
+            """        collision_mask = {
+            -- CW: mirror the character's own collision layers exactly
+            -- (see build_mod.py FILE_FIXES) — the extra layers (object,
+            -- water_tile) made belts into pathfinder walls; water tiles
+            -- carry `player`, so water is still avoided.
+            layers = {
+                is_object = true,
+                player = true,
+                train = true
+            }
+        },""",
         ),
         # A script-walked agent can stop embedded in an entity's collision
         # box (observed 2026-07-17: agent inside a stone-furnace's box).
@@ -219,8 +261,21 @@ end""",
         (
             "    local start_position = {y = start_y, x = start_x}\n",
             """    local start_position = {y = start_y, x = start_x}
-    -- CW: unstick an embedded start (see build_mod.py FILE_FIXES)
-    if surface.entity_prototype_collides("character", start_position, false) then
+    -- CW: unstick an embedded start (see build_mod.py FILE_FIXES).
+    -- Self-collision-aware: entity_prototype_collides at the agent's own
+    -- position is ALWAYS true (her body carries the player layer), so
+    -- test for a solid (is_object) entity other than herself instead.
+    local cw_embedded = false
+    for _, cw_e in pairs(surface.find_entities_filtered{
+            area = {{start_position.x - 0.3, start_position.y - 0.3},
+                    {start_position.x + 0.3, start_position.y + 0.3}}}) do
+        if cw_e ~= player and cw_e.valid
+                and cw_e.prototype.collision_mask.layers.is_object then
+            cw_embedded = true
+            break
+        end
+    end
+    if cw_embedded then
         local cw_free = surface.find_non_colliding_position("character", start_position, 3, 0.25)
         if cw_free then start_position = cw_free end
     end
@@ -310,6 +365,39 @@ end
 
 actions.get_alerts = function(seconds)
     return get_alerts(seconds or 0)
+end
+
+-- CW debug: raw path request with selectable mask variant and NO goal
+-- shifting / avoid_entity, to isolate which pipeline stage or mask layer
+-- kills a path. Results readable via the normal get_path action.
+actions.cw_debug_path = function(sx, sy, gx, gy, size, variant, straight, ignore_self)
+    local surface = game.surfaces[1]
+    local masks = {
+        mirror = {is_object = true, player = true, train = true, water_tile = true},
+        noplayer = {is_object = true, train = true, water_tile = true},
+        objectful = {object = true, player = true, train = true, water_tile = true},
+        watertile = {water_tile = true},
+    }
+    local half = size / 2 - 0.01
+    local flags = {cache = false, no_break = true}
+    if straight then flags.prefer_straight_paths = true end
+    local ignore = nil
+    if ignore_self then ignore = storage.agent_characters[1] end
+    local request_id = surface.request_path{
+        bounding_box = {{-half, -half}, {half, half}},
+        collision_mask = {layers = masks[variant] or masks.mirror},
+        start = {x = sx, y = sy},
+        goal = {x = gx, y = gy},
+        force = game.forces.player,
+        radius = 1.0,
+        can_open_gates = true,
+        pathfind_flags = flags,
+        entity_to_ignore = ignore,
+    }
+    storage.path_requests = storage.path_requests or {}
+    storage.paths = storage.paths or {}
+    storage.path_requests[request_id] = 1
+    return request_id
 end
 """
 
