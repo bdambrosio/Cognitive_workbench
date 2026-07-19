@@ -69,7 +69,9 @@ conversation_goal_wrapper_spec.md, retrieval_envisionment_spec.md,
 semantic_operators_spec.md, plan-review-eval-taskset.md,
 tools-and-primitives.md, spec-seed-agent-concerns.md (live seeding is
 `_seed_concerns_from_config`, a different model — see
-concerns-architecture.md), text_input_state_machine.html.
+concerns-architecture.md), text_input_state_machine.html,
+musing_spec.md (deleted along with the orphaned `src/musing/`
+experimental subsystem — unimported, planner integration target gone).
 
 **2026-06-11 set** (27 docs):
 
@@ -107,7 +109,3 @@ SPACEMAP_ARCHITECTURE.md
 | [substack-gut-feeling-draft.md](substack-gut-feeling-draft.md) | DRAFT essay: gut feelings as index-free memory (valence compression) |
 | [user_concern_model.md](user_concern_model.md) | Historical user-concern design; the shipped model differs (per-turn decay/bump + reflection, not patch ops — see banner + concerns-architecture.md) |
 | [what-agents-care-about.md](what-agents-care-about.md) | Concerns-not-tasks essay; the system's motivational thesis |
-
-Pending: `musing_spec.md` + `src/musing/` flagged for deletion
-2026-07-19 (standalone experimental subsystem, unimported, planner
-integration target deleted) — awaiting owner action.
