@@ -1,3 +1,10 @@
+> **STATUS (2026-07-19): built as a standalone experimental subsystem;
+> planner integration target gone.** `src/musing/` implements the specified
+> components (adapter scaffold, bias policy G, segments, observation
+> vector), but the spec's runtime anchor — incremental-planner episodes —
+> was deleted 2026-05-02, and nothing outside `src/musing/` imports it. It
+> is not wired into the live ChatLoop.
+
 Great — then the right move is to **freeze the design as a concrete, readable spec**, not just an outline. What follows is a **ready-to-paste `docs/musing_spec.md`**, written to be consumed by *Codex desktop* and future-you as an engineering artifact, not as narrative prose.
 
 You can paste this verbatim into your repo.

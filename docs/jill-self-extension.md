@@ -1,7 +1,12 @@
 # Jill self-extension (recursive tool construction)
 
-**Status: ASPIRATIONAL (design).** Not built as of 2026-06-14. This doc is the
-plan; nothing here is live until a phase says "shipped."
+**Status: Phase 2a (judgment/propose-only) SHIPPED 2026-06.** Capability-gap
+capture runs through reflection STAGE 5 (`src/chat/reflection.py`) →
+`_record_capability_gap` (`src/chat/concerns.py`) → the `capability-gap`
+self-extension concern in `scenarios/jill-chat.yaml`; fires are tagged for
+scoring. Phase 1 / Phase 2b (the generative author-test-restart-gate
+tool-writing path) remain unbuilt — for those phases this doc is still the
+plan.
 
 ## Thesis
 

@@ -72,7 +72,8 @@ Factorio; Satisfactory later only if the itch persists.
 ## Roadmap convergence (why this isn't a detour)
 
 - The **macro layer** is the Multi-Loop Execution Gap the WIP reviewer
-  escalated 2026-07-12, and METHOD_TOOLS.md made necessary. The game is
+  escalated 2026-07-12, and METHOD_TOOLS.md (since deleted as
+  superseded; in git history) made necessary. The game is
   its forcing function.
 - **Event→concern ingress** ("power dipped" spiking the power concern)
   is the same machinery as the penciled M2 candidate.

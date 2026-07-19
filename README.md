@@ -386,14 +386,46 @@ memory recall, recall-subagent prompt A/B, counterfactual self-prediction
 
 ## Reading
 
+Key entrypoints, by need:
+
+**Running the system**
+
+- [docs/getting-started.md](docs/getting-started.md) — install, venv,
+  credentials, first run.
+- [docs/configuration.md](docs/configuration.md) — scenario YAML
+  reference (backends, seed concerns, sensors, launcher flags).
+- [docs/commands.md](docs/commands.md) — CLI slash commands.
+- [docs/ui-guide.md](docs/ui-guide.md) — the UI surfaces (CLI, resource
+  browser, affect, canvas, telegram).
+
+**The concern system**
+
+- [docs/what-agents-care-about.md](docs/what-agents-care-about.md) — the
+  motivating essay: concerns vs tasks, the idle-cycle problem.
+- [docs/concerns-architecture.md](docs/concerns-architecture.md) — the
+  live mechanics: two-layer strength/activation model, triage, WIP,
+  yield, fire-outcome capture.
+- [docs/harness-roadmap.md](docs/harness-roadmap.md) — the
+  measurement-gated improvement loop (M0 done, M1 running).
+
+**The Factorio experiment**
+
+- [factorio/README.md](factorio/README.md) — server, bridge, tools,
+  operation (v1 complete, both success criteria passed).
+- [docs/game-embodiment-assessment.md](docs/game-embodiment-assessment.md)
+  — goals + success criteria;
+  [docs/factorio-bridge-architecture.md](docs/factorio-bridge-architecture.md)
+  — design rationale.
+- [docs/cohabitation-writeup.md](docs/cohabitation-writeup.md) — the
+  results narrative (draft).
+
+**Background**
+
 - [BACKGROUND.md](BACKGROUND.md) — research stance: what LLMs already
   know, the Socratic approach, why an information space.
-- [docs/what-agents-care-about.md](docs/what-agents-care-about.md) — the
-  concern-system essay: concerns vs tasks, the idle-cycle problem.
 - [docs/STATUS.md](docs/STATUS.md) — every design doc classified against
-  the live code.
-- [docs/concerns-architecture.md](docs/concerns-architecture.md),
-  [docs/substack_sensors_vs_tools.md](docs/substack_sensors_vs_tools.md),
+  the live code (LIVE / ASPIRATIONAL / SUPERSEDED / REFERENCE).
+- [docs/substack_sensors_vs_tools.md](docs/substack_sensors_vs_tools.md),
   [docs/self-awareness-benchmarks.md](docs/self-awareness-benchmarks.md).
 
 ## License

@@ -1,5 +1,13 @@
 # Sensor Spec — Change Order 1: Disposition & Boundary Clarifications
 
+> **STATUS (2026-07-19): data contract LIVE, vocabulary semantics dead.**
+> The `disposition` field is parsed, merged, and stamped into sensor
+> payloads as specified. But the `trigger:<goal>` / `alert` semantics were
+> defined against the deleted OODA/goal runtime: no goal schedule exists,
+> startup validation (§3) was never built, and downstream routing treats
+> every non-tick sensor the same (generic inbox turn; orientation hardcodes
+> `inform`). Only `inform` is meaningful today.
+
 ## 1. Add `disposition` to sensor configuration
 
 ### SKILL.md frontmatter

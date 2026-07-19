@@ -1,6 +1,11 @@
 # Financial-analysis tooling for Jill — design notes & resume point
 
-Status: **design only, no code written.** Captured 2026-06-17, resume next session.
+Status: **implemented 2026-06-19** — `src/tools/get-financial-statements/`
+ships Decision 1 (Alpha Vantage fundamentals on the existing key, stock-price
+tool shape, free-tier throttle handling). The PDF-inspection half was
+redirected to the existing `src/chat/code_subagent.py` rather than built as a
+separate tool, per Decision 2. Retained as the design rationale.
+(Originally: design only, captured 2026-06-17.)
 
 ## Origin
 

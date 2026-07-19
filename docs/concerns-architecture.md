@@ -1,172 +1,143 @@
 # Concerns: How an Autonomous Agent Decides What Matters
 
+*(Rewritten 2026-07-19 against `src/chat/concerns.py`. The previous
+version described the OODA-era model — three fixed character concerns,
+activation-monitor thresholds, concern→task triage — deleted 2026-05-02.
+For the motivating essay see
+[what-agents-care-about.md](what-agents-care-about.md).)*
+
 ## The Problem
 
-An autonomous agent sitting idle has no reason to act. Events arrive — user messages, sensor alerts, scheduled triggers — and the agent responds. But between events, it's inert. Worse, even when events do arrive, the agent has no persistent model of what's important. Each interaction starts from scratch, with no memory of what the user cares about or what operational priorities the agent should maintain.
+An agent sitting idle has no reason to act, and an agent that only
+reacts has no persistent model of what's important. Concerns give the
+agent both: a durable model of what the user cares about, and standing
+evaluative pressure toward its own work that accumulates until it fires
+as autonomous action.
 
-This is the problem concerns solve. They give the agent a continuous, multi-layered model of what matters — from the user's ongoing interests to the agent's own operational health — and connect that model to autonomous action through a cognitive control loop that runs even when nothing is happening.
+## Two Layers, One Asymmetry
 
-## Three Layers of Concern
+Everything lives in two note collections per character
+(`src/chat/concerns.py`):
 
-The concern system operates at three levels, each tracking a different kind of "what matters" and updating at a different cadence.
+- **`user_concerns`** — a model of the user, maintained by observation.
+  Each carries `strength` ∈ [0,1]. **Strength decays**; conversation
+  about the topic bumps it back up. Silence implies disinterest.
+- **`agent_concerns`** — what the agent itself wants to act on. Each
+  carries `activation` ∈ [0,1]. **Activation grows** with wall-clock
+  time; servicing it (an autonomous fire) knocks it back down. Silence
+  implies untended work.
 
-### Character Concerns: The Evaluation Lens
+The asymmetry — strength decays, activation grows — is the design's
+center: user models are recall-driven, agent action is pressure-driven.
 
-At the base are three fixed character concerns that act as evaluation dimensions during orientation:
+Both collections share the status vocabulary `active` / `satisfied` /
+`abandoned`. `satisfied` stays recallable and can revive through
+recurrence (a new candidate whose similarity to an existing note exceeds
+0.8 refreshes it rather than duplicating); `abandoned` blocks revival —
+it records a deliberate drop decision.
 
-- **homeostasis** — the agent's operational health, stability, and resource usage
-- **attend_to_user** — responsiveness to the user's communicative intent
-- **attend_to_user_concerns** — sensitivity to the user's persistent, ongoing interests
+## User-concern dynamics
 
-These aren't things the agent "works on." They're the lens through which it evaluates every incoming event. When a user message arrives, the orientation step assesses it against all three dimensions: does this affect system health? does the user expect a response? does this touch something the user has been persistently interested in?
+Applied at user-turn entry (`_decay_user_concerns_per_turn`,
+`_bump_user_concerns_on_input`):
 
-Each assessment produces a strength signal — none, weak, moderate, or strong — that feeds into a running activation level for each concern.
+- decay 0.05 strength per user turn; prune below 0.10
+- input with embedding similarity ≥ 0.5 bumps +0.15, capped at 3
+  concerns per turn (uncapped bumping once sustained a 34-concern
+  population that decay could never win against)
+- unbumped for 14 days → swept `active` → `satisfied`
+- top 5 by strength are surfaced in the prompt
 
-### User Concerns: What the User Cares About
+Creation, development, and closure ride the post-turn reflection call
+(`src/chat/reflection.py`): reflection can capture new user concerns,
+update existing ones, and close ones the conversation resolved.
 
-The second layer tracks the user's actual interests. These are not concerns the agent chooses — they're concerns the agent *observes* in the user's behavior and maintains as a persistent model.
+**Heat coupling** bridges the two layers: a user concern bumped *across*
+strength 0.70 applies an evidence bump to any active agent concern
+carrying `user_model_reviewer` (the "review what the user has been
+tracking" seed) — so the review fires ahead of its rhythm while the heat
+is real, and the judgment of whether anything warrants action stays in
+the reviewer's instruction at fire time.
 
-Each user concern records:
+## Agent-concern dynamics
 
-- What it's about and a brief description
-- The user's stance (exploratory, committed, frustrated, etc.)
-- Current status (open or closed)
-- A weight reflecting perceived importance
-- How many interactions have touched it
-- Evidence references linking back to specific conversations
+An agent concern fires autonomously when **all** hold:
 
-User concerns are updated incrementally after conversations and goal completions. A single LLM call examines the interaction against the existing concern list and emits one patch: add a new concern, update an existing one, close one, or make no change. This conservative, one-patch-at-a-time design prevents the model from drifting wildly on any single interaction.
+1. `activation` ≥ 0.70,
+2. it has a non-null `instruction` (what a fire should actually do),
+3. status is `active`,
+4. the launcher ran with `--autonomy` (off by default), and
+5. fire-time triage doesn't defer (below).
 
-The result is a compact model of the user's ongoing interests that persists across sessions. When the agent is deciding whether an event matters, it can consult this model — not just react to the literal content of the current message.
+**Growth.** Activation grows per tick proportional to *elapsed
+wall-clock time*, scaled so a concern with `rhythm_hours: 24` climbs
+from the post-service floor back to threshold in 24 hours. Rhythms snap
+to buckets (1, 2, 4, 8, 12, 24, 168h; default 168). Changing tick
+frequency does not change firing rhythm.
 
-### Derived Concerns: The Agent's Working Priorities
+**Service.** A completed fire decrements activation: −0.60 when the fire
+ran to a natural finish (`respond`), −0.25 when it hit the iteration cap
+(`max_iters`) — partial service leaves pressure in place.
 
-The third layer is where the agent develops its own operational priorities. Derived concerns are things the agent chooses to care about, based on what it observes in user concerns and its own orientation state.
+**Evidence bumps.** Non-autonomous input semantically matching an active
+agent concern (similarity ≥ 0.5) raises its activation — accumulating
+evidence pulls a fire forward ahead of rhythm. A bump also clears any
+cached triage defer: new evidence reopens the question.
 
-They have a richer lifecycle than user concerns:
+**Fire-time triage.** At threshold, a cheap triage step asks whether
+acting *now* is warranted. A `defer` verdict is cached and suppresses
+re-triage for `rhythm/8` hours (clamped 1–24h) so a weekly concern
+deferred once isn't re-asked hourly.
 
-```
-surfaced → active → satisfied → [revisit period] → active → ...
-                  → abandoned
-```
+**Categories and lifetimes.** `one_shot` (default lifetime 0.5 d),
+`derived` (2 d), `durable` (120 d). A staleness sweep retires expired
+concerns `active` → `satisfied`. Concerns are created three ways:
+seeded from the scenario, derived by reflection from conversation, or
+spawned as successors by yield (below).
 
-A derived concern starts as **surfaced** — identified but not yet committed to. When the agent decides to act on it, it becomes **active**. When adequately addressed, it moves to **satisfied** — but this is not terminal. After a configurable revisit period (typically 4 hours for operational concerns, 24 hours for others), a satisfied concern automatically returns to active status.
+**Seeds.** The scenario YAML's `concerns:` block seeds durable agent
+concerns (`seed=True`) — see
+[configuration.md](configuration.md) for the fields (`text`, `name`,
+`category`, `rhythm_hours`, `instruction`, `domain`,
+`user_model_reviewer`, `wip_reviewer`, `self_extension`). Seeds are
+architectural baseline: they are **never closed** — not by reflection,
+not by the sweep. `domain` tags (e.g. `factorio`) are stamped onto fire
+records so analyses can stratify (chat-only vs all-life composites).
 
-This revisit mechanism is key. It means the agent's system health monitoring concern doesn't get permanently closed by one successful health check. It comes back, ensuring ongoing vigilance without requiring the user to re-request it.
+**Closure.** Reflection can retire non-seed agent concerns the user
+agreed to drop — status `abandoned`, blocking recurrence revival. The
+`wip_reviewer` seed runs the escalate-or-retire loop over stalled work.
 
-Derived concerns can be seeded from the agent's character configuration — standing operational priorities like system health monitoring, workspace maintenance, knowledge improvement, and user responsiveness. These provide the agent with reasons to act from the moment it starts, before any user interaction has occurred.
+## WIP: continuity across fires
 
-```
-User Concerns          Derived Concerns
-(what user cares       (what agent decides
- about)                 to work on)
-     │                       │
-     └──── derives from ─────┘
-                             │
-                    ┌────────┴────────┐
-                    │   active        │
-                    │   surfaced      │
-                    │   satisfied ──→ revisit → active
-                    │   abandoned     │
-                    └─────────────────┘
-```
+Each agent concern carries a work-in-progress summary (cap 1500 chars,
+rewritten — not appended — after each completed fire) with a NEXT: line,
+so consecutive fires don't start cold. This is the greedy planning
+model: no upfront plan, always "most valuable next improvement."
 
-## The OODA Loop and Idle Cycle
+## Yield: multi-turn work without a planner
 
-The concern system is embedded in a continuous OODA (Observe-Orient-Decide-Act) cognitive control loop that runs on a 0.2-second tick.
+A fire (or a user turn) that can't finish in one ReAct loop can
+**yield**: the remainder is captured into a successor agent concern that
+carries the work forward on its own pressure. Auditability comes from
+yield points, not plan artifacts (see
+[harness-roadmap.md](harness-roadmap.md) §2).
 
-### The Active Cycle
+## Fire-outcome capture
 
-When events are present:
+Each autonomous fire registers a pending record awaiting outcome
+judgment ([fire-outcome-capture.md](fire-outcome-capture.md), Phase 1
+live). Pending fires are surfaced once in the next user turn's prompt
+(fire digest, ≤3 items) so the user gets a reaction opportunity;
+judgment rides reflection stage 6 (`helped` / `neutral` / `hindered` /
+`ignored`, ≤3 per reflection), with runtime-resolved `unobserved` /
+`unobservable` when the window (3 user turns or 7 days) closes first.
 
-**Observe** dequeues one event from priority-ordered queues — alerts first, then sensor triggers, then user text input.
+## Observability
 
-**Orient** runs a single LLM evaluation of the event against all three character concerns (plus any active derived concerns and user concerns). The output includes strength ratings per concern and an action recommendation. Post-evaluation, concern activations update via exponential decay plus bump:
-
-```
-activation = old_activation * 0.9 + bump
-
-where bump = 0.30 (strong), 0.15 (moderate), 0.05 (weak), 0.0 (none)
-```
-
-This means activations build over sustained relevant events but fade when not reinforced — a natural attention mechanism.
-
-**Decide** is pure routing with no LLM call. It maps the event classification and orient assessment to an action type: respond to user, dispatch a goal, proceed an existing goal, or take no action.
-
-**Act** executes the decision, typically by launching a goal on a background thread that runs through the planner.
-
-### The Idle Cycle
-
-When no events are observed, the OODA loop enters an idle tick. This is where concerns drive autonomous behavior.
-
-During idle ticks:
-
-1. **Derived concern maintenance** — the derived concern model re-evaluates its concerns against the current orientation state. Concerns may be surfaced, activated, satisfied, or abandoned based on what the agent observes in user concerns and its own operational state.
-
-2. **Revisit expiration** — satisfied concerns whose revisit period has elapsed are reactivated, ensuring periodic attention to ongoing priorities.
-
-3. **Concern triage** — the bridge between concerns and action.
-
-```
-┌─────────────────────────────────────────────┐
-│              OODA Loop (0.2s tick)           │
-│                                             │
-│  Event present?                             │
-│   YES → Observe → Orient → Decide → Act    │
-│                     │                       │
-│                     └─→ activation updates  │
-│                     └─→ orient nominations  │
-│                                             │
-│   NO  → Idle Tick                           │
-│           ├─ derived concern maintenance    │
-│           ├─ revisit expiration check       │
-│           ├─ activation-monitor nominations │
-│           └─ triage (if candidates + cooldown elapsed)
-│                 └─→ task proposals          │
-└─────────────────────────────────────────────┘
-```
-
-## From Concerns to Autonomous Action
-
-Concern triage is the mechanism that converts persistent attention into concrete work. It operates through two nomination paths, each capturing a different kind of signal.
-
-### Activation Monitor
-
-During idle ticks, the system checks concern activations in the living state. If a concern's activation exceeds 0.55 and its trend is rising, it's nominated for triage. This captures sustained, building attention — something the agent has been noticing repeatedly across multiple events.
-
-### Orient Bypass
-
-During orientation, if an event produces a strong bump on a concern whose activation is still low (below 0.35), the concern is nominated immediately. This captures novel, high-impact events — something contextually important that hasn't had time to build activation through repeated exposure.
-
-### Triage
-
-When candidates accumulate and a 120-second cooldown has elapsed, an LLM triage call evaluates up to 6 candidates against existing tasks and agent context. For each candidate, triage decides:
-
-- **create_task** — this concern needs new work; generates a task intention
-- **attach_to_task** — an existing task already addresses this concern
-- **defer** — not actionable now; suppress for a period and re-evaluate later
-- **dismiss** — false alarm; suppress for a longer period
-
-Task creation proposals flow into the task system, where they begin an establishment process: specification, capability evaluation, and incremental execution through the same planner that handles user-initiated goals.
-
-### The Single-Thread Challenge
-
-The current implementation runs the OODA loop, concern triage, and goal execution on a single-threaded main loop (with goals executing on background threads that the loop polls). This creates a practical tension: when the agent autonomously launches a task from concern triage, it occupies the same execution pathway that handles user requests. If a user message arrives during autonomous execution, the agent must interrupt its self-directed work to respond.
-
-This is an active area of development — finding the right balance between autonomous initiative and user responsiveness within the constraints of a single cognitive control loop. The concern system itself is designed to handle this gracefully: the attend_to_user concern naturally gains activation when user messages arrive, and the triage system can defer autonomous work when user engagement is high.
-
-## Why This Architecture
-
-Several design choices are worth noting:
-
-**Non-terminal satisfaction.** Most goal-tracking systems treat completion as final. The revisit mechanism treats satisfaction as temporary, which matches how real operational concerns work — system health doesn't stop mattering because you checked it once.
-
-**Three-layer separation.** Character concerns (evaluation lens), user concerns (observed interests), and derived concerns (agent priorities) serve different functions at different update cadences. Character concerns are fixed and fast. User concerns update after interactions. Derived concerns evolve during idle time. This separation prevents the system from conflating "what the user said" with "what matters operationally."
-
-**Conservative patching.** Both user and derived concern models update via single-patch LLM calls — one change per invocation. This prevents cascading updates where a single event rewrites the entire concern landscape.
-
-**Activation dynamics.** The exponential decay plus bump model means the agent's attention naturally follows sustained signals. A single strong event produces a spike that fades. Repeated moderate events build activation that persists. This mirrors how human attention works — a single alarm is noticed then forgotten, but a recurring pattern demands action.
-
-**Triage as bridge.** The separation between concern activation and task creation via an explicit triage step prevents the agent from compulsively acting on every activated concern. The triage LLM can consider context, existing work, and timing before committing to action.
-
-The concern system gives the agent something most autonomous architectures lack: persistent, self-maintaining reasons to act that are grounded in what the user actually cares about, filtered through the agent's own operational judgment, and connected to concrete action through a principled cognitive control loop.
+- `/concerns` in the CLI: current populations with strengths/activations
+  (see [commands.md](commands.md) for the management subcommands)
+- `autonomy.jsonl`: append-only event log (fires, satisfactions,
+  abandonments, triage decisions)
+- the Resource Browser (:3001) shows both collections with inline
+  management

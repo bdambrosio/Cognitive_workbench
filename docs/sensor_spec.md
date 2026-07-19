@@ -1,5 +1,15 @@
 # Sensor Subsystem Specification
 
+> **STATUS (2026-07-19): core machinery LIVE, framing partly stale.** The
+> sensor runner, loader, code/plan sensor types, gating, heartbeats, and
+> `sense_data` publish all exist as specified. Stale parts: every "OODA
+> loop / observe phase" reference (that runtime was deleted 2026-05-02 —
+> sensors now feed the ChatLoop inbox as user-like turns); runners are
+> constructed by the ChatLoop (`src/chat/chat_loop.py`), not `launcher.py`;
+> `SensorRunner.__init__` dropped `character_config`/`runtime`/`tokenizer`
+> and gained `executor_factory`; the push payload gained a structured
+> `summary`/`data` variant and a `disposition` stamp.
+
 ## Overview
 
 Sensors are autonomous, asynchronous information-gathering processes associated with an agent. They run independently of the agent's OODA loop on their own schedule, execute a predefined plan, and push results to the agent via the existing `cognitive/{character_name}/sense_data` Zenoh channel. The agent encounters sensor output during its normal observe phase — it does not manage, invoke, or reason about sensors directly.

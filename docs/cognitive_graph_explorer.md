@@ -1,5 +1,12 @@
 # Cognitive Graph Explorer
 
+> **STATUS (2026-07-19): non-functional under the live runtime.** The
+> Resource Browser Graph tab still exists, but it queries the executive
+> node deleted 2026-05-02, and nothing in the live ChatLoop populates the
+> graph — so the tab renders nothing. The node/edge vocabulary described
+> below (triage nominations, spawned tasks/goals, OODA assessments) was
+> produced only by the deleted pipeline.
+
 The cognitive graph explorer is an interactive visualization of the agent's cognitive event graph, accessible via the Resource Browser (default: http://localhost:3001, Graph tab).
 
 ## What the Graph Contains

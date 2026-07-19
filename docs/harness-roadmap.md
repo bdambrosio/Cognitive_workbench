@@ -1,6 +1,8 @@
 # Harness Roadmap — Measurement-Gated Improvement Loop
 
-**Status:** Proposed roadmap (ASPIRATIONAL — M0 onward not implemented)
+**Status:** Adopted roadmap — M0 COMPLETE (baseline 0.720 ± 0.007 frozen
+2026-07-09; see `harness-m0-m1-status.md`), M1 collection RUNNING; M2–M5
+proposed/unbuilt
 **Date:** 2026-07-08
 **Inspiration:** Lilian Weng, *Harness Engineering for Self-Improvement*
 (https://lilianweng.github.io/posts/2026-07-04-harness/); mining-procedure
@@ -329,9 +331,14 @@ changing the world mid-chain.
 **Deferred until** the Factorio bridge lands: the game's macro workload
 is the designated forcing function for this item, and the design should
 be made against a real 20-step task, not a speculative one.
+*(Update 2026-07-19: the bridge landed 2026-07-14 and the intentional-yield
+mechanism shipped 2026-07-13/15 — autonomous + user-turn yield, successor
+concerns carrying the remainder. The Factorio workload is now its live
+forcing function.)*
 
 Provenance: WIP-reviewer escalation 2026-07-12 ("Multi-Loop Execution
-Gap", METHOD_TOOLS.md); independently re-derived by Jill's
+Gap", METHOD_TOOLS.md — since deleted as superseded, in git history);
+independently re-derived by Jill's
 self-extension concern 2026-07-13 (proposed as `plan_long_chain`;
 counter-scoped to intentional yield per the objections above).
 

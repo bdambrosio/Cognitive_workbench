@@ -1,304 +1,107 @@
-# Web UI Guide
+# UI Guide
 
-The Cognitive Workbench provides four web-facing components:
+*(Rewritten 2026-07-19 against the live ChatLoop runtime; the previous
+version documented the deleted OODA-era Activation Field / Classic UI
+and a Task & Concern Manager that no longer exists.)*
 
-| Component | Port | Purpose |
-|-----------|------|---------|
-| **Activation Field** (modern UI) | 3000 | D3 force-directed graph, chat, goal entry, inspector |
-| **Classic UI** | 3000/classic | Text-based action log, sidebar tabs, scheduling |
-| **Resource Browser** | 3001 | Browse, edit, and delete Notes and Collections |
-| **Task & Concern Manager** | 3002 | Concern activation, task lifecycle, triage status |
+The live interaction surfaces:
 
-Plus an optional **Browser Extension** that feeds visited URLs to the agent as sensor input.
-
-## Launching
-
-```bash
-cd src
-python3 launcher.py ../scenarios/jill-infospace.yaml --ui --resource-browser --task-manager
-```
-
-- `--ui` — main dashboard on port 3000 (override with `--ui-port PORT`)
-- `--resource-browser` — Resource Browser on port 3001
-- `--task-manager` — Task & Concern Manager on port 3002
-
-All three flags are included in the VS Code launch configurations.
+| Surface | Flag | Where |
+|---|---|---|
+| CLI chat | `--cli` | terminal |
+| Resource Browser | `--resource-browser` | http://localhost:3001 |
+| Affect display | `--affect` | widget window (WS :8787) |
+| Canvas display | `--canvas` | widget window (WS :8788, image proxy :8789) |
+| Telegram bridge | `--telegram` | Telegram DM |
 
 ---
 
-## Activation Field — Modern UI (Port 3000)
+## CLI (`--cli`)
 
-The default view is a real-time D3 force-directed graph centered on the active agent.
-
-### Graph Canvas
-
-The main area renders an interactive node graph:
-
-- **Agent node** (large, center) — the character (e.g., Jill)
-- **Goal nodes** — active goals, sized by activation level
-- **Concern nodes** — user and derived concerns
-- **Note nodes** — infospace resources created during execution
-- **Binding nodes** — current variable bindings (e.g., `$results`)
-- **Edges** — connections between agent, goals, and resources
-
-Interactions:
-- **Click** a node to open the Inspector panel
-- **Scroll** to zoom (0.2x–4x)
-- **Drag** to pan the canvas
-- Nodes glow brighter with higher activation
-- A completion pulse animation plays when a goal finishes
-
-### OODA Pulse Overlay
-
-Expanding colored rings pulse from the agent node on each OODA tick:
-- Blue = Observe, Yellow = Orient, Orange = Decide, Green = Act
-
-### Inspector Panel (Right Side)
-
-Slides in when you click a node. Shows contextual detail depending on node type:
-
-- **Agent** — current OODA phase, recent actions
-- **Goal** — status, goal text, result summary, output resources
-- **Concern** — status, weight, stance, description
-- **Note** — resource content
-- **Binding** — current variable value
-
-Goal nodes also show action buttons: interrupt, remove, rename, change mode.
-
-### Bottom Dock Bar
-
-A fixed bar along the bottom with:
-
-| Control | Function |
-|---------|----------|
-| **Chat** | Toggle the chat slide panel |
-| **+ Goal** | Toggle the goal entry panel |
-| **Status** | Connection/sync indicator |
-| **Stop** | Pause execution |
-| **Continuous** | Toggle auto-advance between goals |
-| **LLM** | Switch between primary and alt LLM |
-| **Resources** | Open Resource Browser (port 3001) |
-| **Tasks** | Open Task Manager (port 3002) |
-| **Classic** | Switch to Classic UI |
-| **Save** | Persist all state to disk |
-| **Shutdown** | Save and stop the system |
-
-### Chat Panel
-
-Slides up from the bottom when **Chat** is clicked:
-
-- Message history (user / agent / system messages)
-- Text input with **Send** button
-- **End Conversation** button to close the active dialog
-- Unread badge appears on the dock button when the agent sends a message
-
-### Goal Entry Panel
-
-Slides up from the bottom when **+ Goal** is clicked:
-
-- Text area for the goal description
-- **Schedule** checkbox — auto-proceed after completion
-- **Mode** dropdown — Auto / Manual / Daily
-- **Submit** button
+The primary surface: interactive terminal chat driving the ReAct turn
+loop. Slash commands (`/help` for the list) are the main way to inspect
+and manage agent state — `/concerns`, `/recall`, `/status`, `/note`,
+`/img`, `/set-external-repo`, … See [commands.md](commands.md) for the
+full reference.
 
 ---
 
-## Classic UI (Port 3000/classic)
+## Resource Browser (`--resource-browser`, port 3001)
 
-A text-oriented alternative view, accessible via the dock bar or by navigating to `/classic`.
+Web browser over the agent's persistent state: memories, notes,
+collections, concerns, traces. Read-write: inline content editing,
+resource deletion, and concern management from the UI. Can also run
+standalone: `python src/resource_browser.py`. See
+[RESOURCE_BROWSER.md](RESOURCE_BROWSER.md).
 
-### Layout
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  [Text Input]                    [Step] [Auto] [Stop]   │
-├───────────────────┬─────────────────────────────────────┤
-│  Character Tabs   │  Action Log                         │
-│  ┌─────────────┐  │  [14:22:30] [JILL] search-web ...  │
-│  │ ● Jill      │  │  [14:22:45] [JILL] create-note ... │
-│  └─────────────┘  │  [14:23:01] [JILL] say User: ...   │
-│                   │                                     │
-│  Sidebar Tabs:    ├─────────────────────────────────────┤
-│  Plan             │  Controls: LLM toggle, Stop, Save,  │
-│  Bindings         │  Resource Browser, Task Manager,     │
-│  Goals            │  Obsidian Export, Shutdown            │
-│  Plans            │                                     │
-│  State            │                                     │
-│  Schedule         │                                     │
-│  Tasks            │                                     │
-└───────────────────┴─────────────────────────────────────┘
-```
-
-### Text Input
-
-- **Goals**: Prefix with `goal:` to submit a goal (e.g., `goal: Summarize this PDF`)
-- **Chat**: Type without prefix for conversational messages
-- **Commands**: `proceed <id>`, `reuse <id>`, `terminate <id>`, `clear-cache <id>` for scheduled goal management
-
-### Sidebar Tabs
-
-| Tab | Content |
-|-----|---------|
-| **Plan** | Current execution plan steps |
-| **Bindings** | Variable values (e.g., `$results → Note_15`) |
-| **Goals** | Available test goal YAML files |
-| **Plans** | Saved reusable plan templates |
-| **State** | World model snapshot |
-| **Schedule** | Goal scheduler with auto-proceed toggle, mode, interval |
-| **Tasks** | Task WIPs (work in progress) with approve/edit/abandon |
-
-### Action Log
-
-Scrollable history of all actions:
-
-```
-[14:22:30] [JILL] search-web "transformer architectures" | status: SUCCESS
-[14:22:45] [JILL] create-note search_results | Note_15
-[14:23:01] [JILL] say User: "I found 8 relevant papers..."
-```
-
-- Resource IDs (e.g., `Note_15`) are clickable links to the Resource Browser
-- Action types are color-coded: dialog, reasoning, tool execution, errors (red)
+(The Graph tab queries the deleted executive node and is currently
+non-functional — see [cognitive_graph_explorer.md](cognitive_graph_explorer.md).)
 
 ---
 
-## Resource Browser (Port 3001)
+## Affect display (`--affect`)
 
-A standalone app for inspecting infospace memory.
-
-### Features
-
-- **Two-panel layout**: resource list (left) + content viewer (right)
-- **Browse**: all active Notes and Collections with IDs and names
-- **View**: click a resource to see full content
-- **Edit**: modify note content in-place
-- **Delete**: remove resources
-- **Search**: filter by name or content
-
-### Resource ID Format
-
-- Notes: `Note_15`, `Note_42`
-- Collections: `Collection_4`, `Collection_12`
+A small always-on-top widget window rendering the agent's
+processing-state as a face/mood surface (`src/affect/`). Transport:
+ChatLoop publishes to Zenoh `cognitive/affect/state`; `python -m
+affect.display` bridges to a WebSocket fanout (default `127.0.0.1:8787`,
+`AFFECT_WS_HOST`/`AFFECT_WS_PORT`) consumed by
+`src/affect/display/static/index.html`. The launcher flag wires all of
+this up and opens the window (`--affect-size`, `--affect-pos`,
+`--browser` control the window). Design note: the face is a relational
+read of processing state only — no content or companion signals on this
+surface.
 
 ---
 
-## Task & Concern Manager (Port 3002)
+## Canvas display (`--canvas`)
 
-A standalone app for monitoring the concern-to-task pipeline.
+A rich-display widget window (`src/canvas/`) the agent can push HTML and
+images to mid-turn (the `display` tool). Same bridge pattern as affect:
+WebSocket on `:8788` (`CANVAS_WS_PORT`) plus a localhost image proxy on
+`:8789` (`CANVAS_HTTP_PORT`). `--canvas-size`, `--canvas-pos` control
+the window.
 
-### Layout
+For viewing all of these from another machine, see
+[REMOTE_VIEWER_DESIGN.md](REMOTE_VIEWER_DESIGN.md) (`mirror.sh` tunnels
+:8787/:8788/:8789).
 
-```
-┌──────────────────────┬──────────────────────────────────┐
-│  Character Selector  │                                  │
-├──────────────────────┤  Tasks Panel                     │
-│  Concerns Panel      │  ┌────────────────────────────┐  │
-│                      │  │ Task WIPs                   │  │
-│  User Concerns       │  │  name, state, approve/edit  │  │
-│  ┌────────────────┐  │  ├────────────────────────────┤  │
-│  │ concern name   │  │  │ Scheduled Goals             │  │
-│  │ status, weight │  │  │  status, controls           │  │
-│  │ manage buttons │  │  ├────────────────────────────┤  │
-│  └────────────────┘  │  │ Situation Note              │  │
-│                      │  │ Triage Status               │  │
-│  Derived Concerns    │  └────────────────────────────┘  │
-│  (same format)       │                                  │
-└──────────────────────┴──────────────────────────────────┘
-```
+---
 
-### Concerns Panel (Left)
+## Telegram bridge (`--telegram`)
 
-- **User Concerns** — concerns surfaced from user goals and interactions
-- **Derived Concerns** — agent-generated concerns from orientation and reflection
-- Each concern shows: name, status badge, weight, activation trend
-- Expand to see full description
-- **Manage buttons**: close, resolve, abandon, delete
+DM bridge to the same chat loop (`src/telegram_bridge.py`). Requires
+`TELEGRAM_BOT_TOKEN` and `TELEGRAM_ALLOWED_CHAT_IDS`.
 
-### Tasks Panel (Right)
+---
 
-- **Task WIPs** — in-progress tasks with approve, edit, abandon, run-now controls
-- **Scheduled Goals** — active goals with status and scheduling info
-- **Situation Note** — current `_situation` resource content
-- **Triage Status** — concern triage pipeline statistics
+## Legacy: `--ui` (port 3000)
+
+`--ui` still launches the OODA-era FastAPI display
+(`fastapi_action_display.py`). Nothing in it reflects chat-mode state
+(no goals, bindings, or OODA pulse exist in the live runtime); it is
+retained for archaeology and is of limited use in `mode: chat`.
 
 ---
 
 ## Browser Extension
 
-An optional Chrome extension that monitors page visits and feeds them to the agent.
+An optional Chrome extension (`browser_extension/`) that captures page
+visits (URL, title, timestamp) and posts them to a local HTTP listener
+on port 5004; the `browser-visits` sensor polls the listener and
+delivers visits to the agent as sensor turns.
 
-### What It Does
-
-- Captures URLs, page titles, and timestamps as you browse
-- Sends them to a local HTTP listener on port 5004
-- Buffers up to 500 visits if the listener is temporarily down
-- The `browser-visits` sensor polls this data and delivers it to the agent
-
-### Installation
-
-1. Open Chrome → Extensions → Enable Developer Mode
-2. Click "Load unpacked" → select the `browser_extension/` directory
-3. The extension runs automatically in the background
-
-The URL listener starts automatically when any character declares a `browser-visits` sensor in its scenario config.
+1. Chrome → Extensions → Enable Developer Mode
+2. "Load unpacked" → select `browser_extension/`
+3. The listener starts automatically when a character declares a
+   `browser-visits` sensor.
 
 ---
 
 ## Sensors
 
-Sensors are autonomous data collectors that run on configurable schedules and feed information to the agent.
-
-### Available Sensors
-
-| Sensor | Schedule | What It Does |
-|--------|----------|-------------|
-| **browser-visits** | 30s | Polls the URL listener for recent page visits |
-| **rss-watcher** | 15m | Polls RSS feeds, filters by keywords, deduplicates |
-
-### Configuration
-
-Sensors are declared per-character in the scenario YAML:
-
-```yaml
-characters:
-  Jill:
-    sensors:
-      - name: browser-visits
-      - name: rss-watcher
-        parameters:
-          feeds:
-            - "https://example.com/feed.xml"
-          keywords:
-            - "AI"
-            - "transformers"
-```
-
----
-
-## Real-Time Updates (WebSocket)
-
-Both UIs connect via WebSocket (`ws://localhost:3000/ws`) for live updates:
-
-| Message Type | Content |
-|--------------|---------|
-| `action` | Tool execution, dialog, reasoning steps |
-| `goal` | Goal state changes |
-| `concern` | Concern activation updates |
-| `binding` | Variable binding changes |
-| `decided_action` | Planner's next intended action |
-| `current_plan` | Full plan state |
-| `world_state_update` | World state changes |
-| `turn_state_update` | Turn number, execution mode |
-
----
-
-## Tips
-
-- The Classic UI sidebar is **resizable** — drag the divider (width saved to localStorage)
-- **Ctrl+Enter** submits text input
-- Open Resource Browser and Task Manager in **separate tabs** for side-by-side viewing
-- Use browser DevTools (F12) → Network → WS tab to inspect raw WebSocket messages
-
-## Next
-
-- [Getting Started](getting-started.md) — launching the UI for the first time
+Declared per-character in the scenario YAML (see
+[configuration.md](configuration.md)). Available under `src/sensors/`:
+`tick`, `browser-visits`, `rss-watcher`, `obsidian-clipper`,
+`factorio-telemetry`. Each carries a `SKILL.md` describing its
+parameters; results arrive as user-like turns in the chat loop.

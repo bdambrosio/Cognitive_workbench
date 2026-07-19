@@ -1,5 +1,12 @@
 # Cognitive Memory Graph — Implementation Specification
 
+> **STATUS (2026-07-19): store built, integration removed — currently
+> dormant.** `src/cognitive_graph.py` implements the store API (§5/§6) as
+> specified, but every integration point in §7 targeted the OODA executive
+> deleted 2026-05-02. Nothing in the live ChatLoop instantiates or writes
+> the graph (`entity_index.py` is likewise unconstructed), so the graph is
+> unpopulated at runtime.
+
 ## 1. Purpose
 
 Replace Jill's `_ooda_living_state` snapshot and rolling `_ooda_event_feed` buffer with a persistent semantic graph that records cognitive objects and their provenance relationships as the OODA loop and planner execute. The graph serves as the substrate for context assembly: when Jill needs to build an LLM prompt, she queries the graph for relevant subgraphs rather than maintaining ad-hoc state variables.

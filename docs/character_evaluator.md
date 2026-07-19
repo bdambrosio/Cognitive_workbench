@@ -1,5 +1,15 @@
 # Character orientation evaluator
 
+> **STATUS (2026-07-19): module LIVE, integration section stale.** The
+> evaluator itself (`src/character_evaluator.py`: V2 LLM eval, compact-key
+> expansion, `build_orientation_summary`, epistemic flags) matches this doc.
+> Stale: the §Implementation hooks point at the deleted `executive_node.py`
+> — live integration is `src/chat/prompts.py` (`_orientation_summary`) plus
+> `src/chat/concerns.py` (`_user_concerns_for_evaluator`); the config key is
+> `orientation.enabled` (not `character_evaluator:`/`jill_evaluator`); the
+> "idle orientation policy" no longer exists; chat mode drives only the
+> `user_text` trigger.
+
 ## Purpose
 
 Evaluate an incoming event **before** the character (agent) handles it, to estimate significance relative to the agent's persistent orientation.

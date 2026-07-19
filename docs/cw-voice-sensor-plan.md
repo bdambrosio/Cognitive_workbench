@@ -1,6 +1,9 @@
 # CW Voice Sensor — implementation plan
 
-Status: **design note / build plan.** Plans the Cognitive_workbench (CW / "Jill")
+Status: **historical build plan — implemented 2026-06-19** as
+`src/chat/voice_sensor.py` (see `docs/cw-voice-sensor.md` for the shipped
+consumer guide). Retained for the planning rationale (standalone-debug
+approach, §10 output binding). Plans the Cognitive_workbench (CW / "Jill")
 side consumer for the ChatterBot voice path. The Pi `mic_driver` is implemented
 and publishing (`chatter/voice/event` + binary `chatter/audio/in`); this note
 plans how CW turns that into recognized text, a wake-word head-orient, and a

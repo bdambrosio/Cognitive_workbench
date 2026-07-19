@@ -1,6 +1,9 @@
 # Fire-Outcome Capture Specification
 
-**Status:** Draft / proposed (ASPIRATIONAL — not implemented)
+**Status:** Phase 1 (capture) IMPLEMENTED 2026-07 (commit 8a2bacf7) —
+reflection STAGE 6 in `src/chat/reflection.py` (pending-fire load,
+`helped|neutral|hindered|ignored` judgments, outcome application).
+Phase 2 (outcome-modulated dynamics) remains gated on collected data.
 **Audience:** Internal (chat-loop + reflection developers)
 **Companion analysis:** `modular-memory/docs/jill-bridge.md` (the
 cross-project design note this spec serves), though the spec stands on

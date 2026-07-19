@@ -1,5 +1,12 @@
 # Resource Browser
 
+> **STATUS (2026-07-19): LIVE, but no longer read-only.** Since this doc was
+> written the browser gained resource deletion (context menu + `DELETE
+> /api/resource/{id}`), inline content editing, concern management
+> (`POST /api/concern/{character}/manage`), and a Graph tab. Note the Graph
+> tab queries the deleted executive node and is non-functional under the
+> live ChatLoop runtime.
+
 Standalone web-based browser for viewing Notes and Collections in a running map_node.
 
 ## Features

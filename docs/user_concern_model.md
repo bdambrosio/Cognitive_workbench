@@ -1,5 +1,15 @@
 # user_concern_model.md
 
+> **STATUS (2026-07-19): historical design — the shipped model differs.**
+> The live user-concern implementation (`src/chat/concerns.py` +
+> `src/chat/reflection.py`) kept this doc's intent but not its mechanics:
+> notes carry `strength`/`status` (`active/satisfied/abandoned`)/`context`,
+> not `stance`/`end_disposition`/`touch_count`/`weight`; updates are
+> per-turn decay/bump arithmetic plus post-turn reflection
+> capture/develop/close, not conversation-end patch ops; aging is strength
+> decay + stale-sweep, not a `dormant` state. Retained for the design
+> rationale. See `docs/concerns-architecture.md` for the live model.
+
 ## Purpose
 
 Maintain a compact, incrementally updated model of the user's active and recent concerns, based on completed conversations and completed goals.
