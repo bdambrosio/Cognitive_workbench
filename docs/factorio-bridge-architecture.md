@@ -6,6 +6,13 @@ plumbing onto a concrete Factorio interface. Based on source-level
 review of FLE at HEAD (f748ec4, 2026-06-11) and a full map of the
 Minecraft world-tools layer. No code yet.
 
+**Update 2026-07-19: implemented.** All build-order steps shipped
+2026-07-13/14 and both v1 success criteria passed (2026-07-15/17).
+`factorio/README.md` is the operational document — including the
+as-built deviations (mod instead of injection, position-native
+connect, embodiment merged into jill-chat). This note is retained as
+the design rationale.
+
 ## Corrections to the assessment (facts that changed)
 
 1. **FLE is on Factorio 2.0.73, not 1.1.x.** v0.4.0 (2026) was a full

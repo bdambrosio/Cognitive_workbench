@@ -32,8 +32,8 @@ Categories:
 | [configuration.md](configuration.md) | Scenario YAML / LLM / tool configuration |
 | [cw-voice-sensor.md](cw-voice-sensor.md) | CW-side ChatterBot voice sensor (mic→turn): `src/chat/voice_sensor.py`, `src/utils/voice_pipeline.py` — shipped 2026-06-19 |
 | [getting-started.md](getting-started.md) | Install, venv, credentials |
-| [factorio-bridge-architecture.md](factorio-bridge-architecture.md) | Factorio game-embodiment bridge (separate subproject, `factorio/`); steps 1–2b built 2026-07-13 (server + fle-bridge mod 0.2.1, saves/late-join verified), bridge process + CW tools pending |
-| [game-embodiment-assessment.md](game-embodiment-assessment.md) | Factorio-vs-Satisfactory assessment + v1 plan (role, controls, success criteria); feeds the bridge-architecture doc |
+| [factorio-bridge-architecture.md](factorio-bridge-architecture.md) | Factorio game-embodiment bridge (separate subproject, `factorio/`); all build steps 1–5 shipped 2026-07-13/14 (server + fle-bridge mod, bridge process, fac-* tools, telemetry sensor); embodiment merged into jill-chat 2026-07-14; operational state in `factorio/README.md` |
+| [game-embodiment-assessment.md](game-embodiment-assessment.md) | Factorio-vs-Satisfactory assessment + v1 plan (role, controls, success criteria); **v1 complete — both success criteria passed** (cooperative session 2026-07-15, CLI grounding 2026-07-17); results narrative in cohabitation-writeup.md |
 | [harness-m0-m1-status.md](harness-m0-m1-status.md) | M0 complete (baseline 0.720 ± 0.007 frozen 2026-07-09, ship gate live), M1 collection running; next steps + session commit trail |
 | [m1-collection-inputs.md](m1-collection-inputs.md) | Exemplar user inputs for M1 fire-outcome collection: reaction forms per outcome, latency spread, anti-patterns, cadence |
 | [musing_spec.md](musing_spec.md) | Musing LoRA-adapter biasing (`src/musing/`) |
@@ -95,6 +95,7 @@ SPACEMAP_ARCHITECTURE.md
 |---|---|
 | [# When AI Agents Talk, Nobody's Listenin.md](<# When AI Agents Talk, Nobody's Listenin.md>) | Essay on agent-to-agent conversation |
 | [METHOD_TOOLS_TWEETS.md](METHOD_TOOLS_TWEETS.md) | Thread outline for the method-tools idea |
+| [cohabitation-writeup.md](cohabitation-writeup.md) | DRAFT essay: five days living with the Factorio agent — records both v1 criteria passed, the perception-layer lessons, FLE upstream issues |
 | [design_note_agreements_rag.md](design_note_agreements_rag.md) | Discourse/agreements design; write-side (triage+CRUD + date-stamp aging) implemented 2026-06-11, read-side RAG-push deferred |
 | [design_note_threads.md](design_note_threads.md) | Threads design discussion (threads shipped 2026-05; see `src/chat/`) |
 | [introspective_fidelity_benchmark_v01.md](introspective_fidelity_benchmark_v01.md) | Introspective-fidelity bench methodology |

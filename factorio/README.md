@@ -4,6 +4,11 @@ Server + bridge for the Jill v1 experiment. Design:
 `docs/factorio-bridge-architecture.md`. Separate subproject — not part
 of M1/M2 measurement.
 
+**Status: v1 complete.** Both success criteria from
+`docs/game-embodiment-assessment.md` passed — the 45-minute cooperative
+session (2026-07-15) and grounded CLI conversation about game state
+(2026-07-17). Narrative write-up: `docs/cohabitation-writeup.md`.
+
 ## Server
 
 Factorio 2.0.73 headless (Docker), base game only (no Space Age DLC —
@@ -153,12 +158,12 @@ Gotchas learned in step 3:
 
 ## CW-side tools (step 4)
 
-`src/tools/fac-*/` — 14 chat tools (react_invoke pattern), all HTTP via
+`src/tools/fac-*/` — 15 chat tools (react_invoke pattern), all HTTP via
 the one canonical client `src/utils/factorio_link.py` (`FACTORIO_URL`,
 default `http://localhost:3004`): fac-status, fac-observe (status +
 observe + telemetry composition), fac-inventory, fac-nearest, fac-walk,
 fac-place, fac-connect, fac-insert, fac-extract, fac-craft,
-fac-harvest, fac-rotate, fac-say, fac-stop. Deviation reports pass
+fac-harvest, fac-pickup, fac-rotate, fac-say, fac-stop. Deviation reports pass
 through verbatim in the returned text. Tests: `tests/test_fac_tools.py`
 (discovery scan + mocked-bridge smokes, no server needed).
 
@@ -188,11 +193,17 @@ Shakedown-session fixes (2026-07-14, first live session with a human):
   flow stops (`watch_items`), new alert kinds. Plain-text results so
   events arrive as chat-loop turns; first run baselines silently;
   state in `~/.cache/cognitive/factorio-telemetry/state.json`.
-- `scenarios/jill-factorio.yaml` — junior-factory-engineer role +
-  norms, the one durable assignment concern (iron-plate health,
-  rhythm 1h), tick + factorio-telemetry sensors. Run:
-  `python src/launcher.py scenarios/jill-factorio.yaml --autonomy`
-  (server and bridge must be up first).
+- Scenario: embodiment was **merged into `scenarios/jill-chat.yaml`**
+  (2026-07-14) — the factory concern (`domain: factorio` tag),
+  factorio-telemetry sensor, and engineer norms all live there now, so
+  the normal Jill session is the way to run:
+  `python src/launcher.py scenarios/jill-chat.yaml --autonomy`
+  (server and bridge must be up first). `scenarios/jill-factorio.yaml`
+  (isolated world, junior-factory-engineer role) was retained as a
+  standalone instrument but rejected in practice 2026-07-15 — no CLI,
+  and criterion 2 requires the normal CLI anyway. NEVER run both at
+  once: same character name = same sense_data topic = both act on
+  every event.
 - "Jill, stop" wiring verified end-to-end: the phrase in game chat
   aborts an in-flight /act/walk with deviation kind=stopped, below
   the LLM.

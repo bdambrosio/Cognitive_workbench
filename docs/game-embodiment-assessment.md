@@ -7,6 +7,12 @@ substantially the same conclusions — convergent points below are treated
 as settled. Prompted by: "how close are we to an agent that could join a
 multiplayer non-time-critical game like Satisfactory 1.2?"
 
+**Update 2026-07-19: v1 complete.** Both success criteria below passed —
+criterion 1 (45-min cooperative session) 2026-07-15, criterion 2
+(grounded CLI conversation) 2026-07-17. Implementation:
+`docs/factorio-bridge-architecture.md` (design) and `factorio/README.md`
+(as built). Results narrative: `docs/cohabitation-writeup.md`.
+
 ## Verdict
 
 The cognitive layer is largely ready; the game interface is essentially

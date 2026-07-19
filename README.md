@@ -323,6 +323,9 @@ src/
   cli.py · resource_browser.py · telegram_bridge.py · launcher.py
 scenarios/               YAML configs
 bench/                   eval harnesses (each with its own README)
+factorio/                Factorio game-embodiment subproject: headless
+                         server + fle-bridge mod + HTTP bridge behind
+                         the fac-* tools (see factorio/README.md)
 docs/                    design notes — see docs/STATUS.md for what's
                          LIVE vs ASPIRATIONAL vs SUPERSEDED
 ```
