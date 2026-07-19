@@ -25,6 +25,10 @@ from utils.grobid import parse_pdf_grobid
 logger = logging.getLogger(__name__)
 
 
+class SearchUnavailable(Exception):
+    """Search backend unreachable/throttled — distinct from a search that ran and found nothing."""
+
+
 def _fail(executor: InfospaceExecutor, reason: str, value: Optional[str] = None, extra: Optional[Dict[str, Any]] = None):
     return executor._create_uniform_return(
         "failed",
@@ -163,12 +167,14 @@ def search_papers(query: str, limit: int = 6) -> List[Dict[str, Any]]:
 def _search_papers_direct(query: str, limit: int, api_key: str = None) -> List[Dict[str, Any]]:
     """
     Direct API call to Semantic Scholar with rate limit handling.
-    
+
     Implements exponential backoff for 429 (rate limit) responses:
     - Retry 1: 2 seconds
     - Retry 2: 4 seconds
     - Retry 3: 8 seconds
-    - After 3 retries: fail gracefully
+    - After 3 retries, or on any other HTTP/network error: raises
+      SearchUnavailable so callers can distinguish "search broken/throttled"
+      from "search ran and found nothing" ([]).
     """
     import subprocess
     import urllib.parse
@@ -190,8 +196,12 @@ def _search_papers_direct(query: str, limit: int, api_key: str = None) -> List[D
     
     for attempt in range(max_retries + 1):
         # Send the API request
-        response = requests.get(url, params=query_params, headers=headers)
-        
+        try:
+            response = requests.get(url, params=query_params, headers=headers)
+        except requests.RequestException as e:
+            logger.error(f"Semantic Scholar request failed: {e}")
+            raise SearchUnavailable(f"Semantic Scholar unreachable: {e}") from e
+
         # Check response status
         if response.status_code == 200:
             data = response.json()   
@@ -265,27 +275,17 @@ def _search_papers_direct(query: str, limit: int, api_key: str = None) -> List[D
                 continue
             else:
                 logger.error(f"Rate limit exceeded after {max_retries} retries. Giving up.")
-                return []
-        
+                raise SearchUnavailable(
+                    f"Semantic Scholar is rate-limited (429 after {max_retries} retries) — "
+                    "transient availability problem, not an empty result; retry later")
+
         else:
-            # Other error - log and fail
-            logger.error(f"Semantic Scholar API error {response.status_code} on attempt {attempt + 1}")
-            if attempt < max_retries:
-                # Brief retry for transient errors
-                delay = 1.0
-                logger.info(f"Retrying after {delay}s...")
-                time.sleep(delay)
-                continue
-            else:
-                print("Status:", response.status_code)
-                print("Headers:")
-                for k, v in response.headers.items():
-                    print(f"{k}: {v}")
-                return []
-    
-    # Should not reach here, but handle gracefully
-    logger.error("Unexpected error in Semantic Scholar search")
-    return []
+            # Deterministic error — retrying won't help, fail fast
+            logger.error(f"Semantic Scholar API error {response.status_code}: {response.text[:200]}")
+            hint = " (likely invalid/expired API key)" if response.status_code == 403 else ""
+            raise SearchUnavailable(
+                f"Semantic Scholar returned HTTP {response.status_code}{hint} — "
+                "search unavailable, not an empty result")
         
 def react_invoke(args, *, character_name=None, backend=None, logger=None):
     """ReAct entry-point — see Skill.md for the args contract."""
@@ -342,9 +342,13 @@ def tool(input_value, runtime=None, **kwargs):
         return _fail(executor, 'resource_manager required in kwargs')
     
     limit = kwargs.get('limit', 10)
-    
+
     # Search papers
-    results = search_papers(query, limit=limit)
+    try:
+        results = search_papers(query, limit=limit)
+    except SearchUnavailable as e:
+        logger.error(f"semantic-scholar search unavailable: {e}")
+        return _fail(executor, str(e))
     
     # Enhance results with GROBID if grobid_url is provided and pdf_parser is not "pymupdf"
     use_pymupdf_only = (pdf_parser or "").lower() == "pymupdf"
