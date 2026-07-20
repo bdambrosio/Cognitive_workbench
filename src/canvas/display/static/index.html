@@ -41,6 +41,14 @@
   #content img, #content svg { max-width: 100%; height: auto; }
   #status { position: fixed; left: 8px; bottom: 6px; font-size: 10px;
             color: rgba(255,255,255,0.4); pointer-events: none; }
+  #pager { position: fixed; right: 10px; bottom: 6px; font-size: 12px;
+           color: rgba(255,255,255,0.55); user-select: none;
+           background: rgba(17,17,17,0.8); padding: 2px 8px;
+           border-radius: 10px; }
+  #pager .pager-btn { cursor: pointer; padding: 0 4px; }
+  #pager .pager-btn.disabled { opacity: 0.25; cursor: default; }
+  #pager #pager-live { color: #6ea0ff; cursor: pointer; margin-left: 6px;
+                       font-weight: 600; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <!-- <model-viewer> web component: pulls in once, then any payload's
@@ -53,6 +61,12 @@
 <body>
 <div id="content"><p style="color:#777">canvas idle — waiting for Jill to push content…</p></div>
 <div id="status">connecting…</div>
+<div id="pager" hidden>
+  <span id="pager-prev" class="pager-btn">‹</span>
+  <span id="pager-info"></span>
+  <span id="pager-next" class="pager-btn">›</span>
+  <span id="pager-live" hidden>LIVE</span>
+</div>
 <script>
 'use strict';
 
@@ -60,27 +74,97 @@ const WS_URL = `ws://${location.hostname || '127.0.0.1'}:${
   new URLSearchParams(location.search).get('ws_port') || '8788'}`;
 const contentEl = document.getElementById('content');
 const statusEl = document.getElementById('status');
+const pagerEl = document.getElementById('pager');
+const pagerPrevEl = document.getElementById('pager-prev');
+const pagerInfoEl = document.getElementById('pager-info');
+const pagerNextEl = document.getElementById('pager-next');
+const pagerLiveEl = document.getElementById('pager-live');
 
-function render(payload) {
+// Scrollback: one entry per ReAct turn (the bridge replays recent ones on
+// connect). Same-turn publishes are drafts — they replace the tail entry,
+// so scrollback holds each turn's final render. Paging back pins the view;
+// new entries then only bump the counter until LIVE (or ›) returns to the
+// latest.
+const HISTORY_MAX = 50;   // keep in step with _HISTORY_MAX in the bridge
+const entries = [];       // {content, format, ts, seq, turn, key}
+let viewIdx = -1;
+
+function onPayload(payload) {
+  let obj;
+  try {
+    obj = JSON.parse(payload);
+  } catch (e) {
+    console.warn('parse failed', e);
+    contentEl.innerHTML =
+      `<pre style="color:#f88">canvas: parse error — ${escapeHtml(String(e))}</pre>`;
+    return;
+  }
+  if (!obj.seq) return;  // idle '{}' placeholder — nothing published yet
+  const key = `${obj.seq}:${obj.ts}`;
+  if (entries.some(en => en.key === key)) return;  // reconnect replay dup
+  const wasLive = viewIdx === entries.length - 1;  // true when empty too
+  const entry = { content: obj.content || '', format: obj.format || 'markdown',
+                  ts: obj.ts || 0, seq: obj.seq, turn: obj.turn || 0, key };
+  if (entry.turn && entries.length
+      && entries[entries.length - 1].turn === entry.turn) {
+    entries[entries.length - 1] = entry;  // same-turn draft → replace keyframe
+    if (wasLive) show(entries.length - 1); else updatePager();
+    return;
+  }
+  entries.push(entry);
+  if (entries.length > HISTORY_MAX) {
+    entries.shift();
+    if (viewIdx > 0) viewIdx -= 1;
+  }
+  if (wasLive) show(entries.length - 1);
+  else updatePager();
+}
+
+function show(idx) {
+  viewIdx = idx;
+  const en = entries[idx];
   let body = '';
   try {
-    const obj = JSON.parse(payload);
-    const content = obj.content || '';
-    const fmt = obj.format || 'markdown';
-    if (fmt === 'html') {
-      body = content;
+    if (en.format === 'html') {
+      body = en.content;
     } else {
       // marked.js renders markdown → HTML with sensible defaults.
       // GFM tables, fenced code, autolinks all on by default in v11+.
-      body = (window.marked && marked.parse) ? marked.parse(content)
-                                              : escapeHtml(content);
+      body = (window.marked && marked.parse) ? marked.parse(en.content)
+                                             : escapeHtml(en.content);
     }
   } catch (e) {
-    console.warn('parse failed', e);
-    body = `<pre style="color:#f88">canvas: parse error — ${escapeHtml(String(e))}</pre>`;
+    console.warn('render failed', e);
+    body = `<pre style="color:#f88">canvas: render error — ${escapeHtml(String(e))}</pre>`;
   }
   contentEl.innerHTML = body;
+  updatePager();
 }
+
+function updatePager() {
+  if (!entries.length) { pagerEl.hidden = true; return; }
+  pagerEl.hidden = false;
+  const t = new Date(entries[viewIdx].ts * 1000);
+  const hhmm = `${String(t.getHours()).padStart(2, '0')}:${
+    String(t.getMinutes()).padStart(2, '0')}`;
+  pagerInfoEl.textContent = `${viewIdx + 1}/${entries.length} · ${hhmm}`;
+  pagerPrevEl.classList.toggle('disabled', viewIdx === 0);
+  pagerNextEl.classList.toggle('disabled', viewIdx === entries.length - 1);
+  pagerLiveEl.hidden = viewIdx === entries.length - 1;
+}
+
+function nav(delta) {
+  const i = viewIdx + delta;
+  if (i >= 0 && i < entries.length) show(i);
+}
+
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'ArrowLeft') nav(-1);
+  else if (ev.key === 'ArrowRight') nav(1);
+});
+pagerPrevEl.onclick = () => nav(-1);
+pagerNextEl.onclick = () => nav(1);
+pagerLiveEl.onclick = () => show(entries.length - 1);
 
 function escapeHtml(s) {
   return s.replace(/[&<>"']/g, c => ({
@@ -97,7 +181,7 @@ function connect() {
     setTimeout(connect, 1500);
   };
   ws.onerror = () => { statusEl.textContent = 'ws error'; };
-  ws.onmessage = (ev) => render(ev.data);
+  ws.onmessage = (ev) => onPayload(ev.data);
 }
 connect();
 </script>

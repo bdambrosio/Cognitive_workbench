@@ -26,6 +26,7 @@ from __future__ import annotations
 import asyncio
 import collections
 import ipaddress
+import json
 import logging
 import os
 import signal
@@ -77,6 +78,15 @@ _LOCAL_ROOT = Path(
     os.environ.get('CANVAS_LOCAL_ROOT', '~/.cache/cognitive')
 ).expanduser().resolve()
 _LOCAL_MAX_RESPONSE_BYTES = 50 * 1024 * 1024  # 50 MiB — meshes can be bigger than images
+
+# Scrollback: the bridge keeps the last N canvas keyframes and replays them
+# to each connecting client, so the page can offer paging back through
+# recent entries (and a reloaded page repopulates). Publishes carrying the
+# same `turn` (ReAct episode counter) coalesce into one keyframe — the
+# turn's final render wins; drafts still stream to live clients untouched.
+# In-memory only — dies with the bridge process; cross-session persistence
+# deliberately deferred.
+_HISTORY_MAX = 50
 
 # Minimal MIME map. Anything else is served as octet-stream, which model-
 # viewer / browsers handle fine for known-extension files.
@@ -400,7 +410,10 @@ class Bridge:
     def __init__(self, zenoh_key: str) -> None:
         self._zenoh_key = zenoh_key
         self._clients: Set[Any] = set()
-        self._last_payload: str = '{}'
+        # Entries are (turn, payload); turn is None when the payload has no
+        # usable turn stamp (pre-turn publisher, non-JSON) — never coalesced.
+        self._history: "collections.deque[tuple[Optional[int], str]]" = (
+            collections.deque(maxlen=_HISTORY_MAX))
         self._loop: Optional[asyncio.AbstractEventLoop] = None
 
     async def serve(self) -> None:
@@ -435,7 +448,17 @@ class Bridge:
         except Exception as e:
             logger.warning(f"decode failed: {e}")
             return
-        self._last_payload = payload
+        turn: Optional[int] = None
+        try:
+            t = json.loads(payload).get('turn')
+            if isinstance(t, int) and t > 0:
+                turn = t
+        except Exception as e:
+            logger.info(f"payload turn parse failed (kept as own entry): {e}")
+        if turn is not None and self._history and self._history[-1][0] == turn:
+            self._history[-1] = (turn, payload)   # same-turn draft → keyframe
+        else:
+            self._history.append((turn, payload))
         if self._loop is None:
             return
         try:
@@ -461,9 +484,12 @@ class Bridge:
         logger.info(f"client connected (n={len(self._clients)})")
         try:
             try:
-                await ws.send(self._last_payload)
+                # Replay recent history oldest-first; the page dedups by
+                # (seq, ts) so a reconnect doesn't duplicate entries.
+                for _, payload in list(self._history):
+                    await ws.send(payload)
             except Exception as e:
-                logger.info(f"initial send failed: {e}")
+                logger.info(f"history replay failed: {e}")
             async for _ in ws:
                 pass
         except Exception as e:

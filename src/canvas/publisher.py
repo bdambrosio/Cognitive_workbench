@@ -29,6 +29,7 @@ class CanvasPublisher:
         self._pub: Optional[Any] = None
         self._state = CanvasState()
         self._seq = 0
+        self._turn = 0
         self._lock = threading.Lock()
         if session is not None:
             self.attach_session(session)
@@ -51,6 +52,13 @@ class CanvasPublisher:
             logger.warning(f"canvas: undeclare failed: {e}")
         self._pub = None
 
+    def new_turn(self) -> None:
+        """Mark a ReAct-episode boundary. Publishes stamp the current turn
+        so the display layer can coalesce a turn's drafts into one
+        scrollback keyframe (last render of the turn wins)."""
+        with self._lock:
+            self._turn += 1
+
     def set_content(self, content: str, fmt: str = Format.MARKDOWN.value) -> int:
         """Publish a new content payload. Returns content byte length so the
         ReAct tool dispatcher can report a useful observation."""
@@ -61,6 +69,7 @@ class CanvasPublisher:
         with self._lock:
             self._state.content = body
             self._state.format = fmt
+            self._state.turn = self._turn
             self._seq += 1
             self._state.seq = self._seq
             self._state.ts = time.time()

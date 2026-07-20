@@ -2,7 +2,10 @@
 
 Wire format is the JSON-serialized dataclass — `content` carries the
 markdown/HTML body, `format` selects how the shim renders it. seq is
-monotonic per publisher; ts is wall-clock seconds.
+monotonic per publisher; ts is wall-clock seconds. turn is the ReAct
+episode counter (see CanvasPublisher.new_turn) — the display layer
+coalesces same-turn publishes into one scrollback keyframe; 0 means
+"no turn info", never coalesced.
 """
 from __future__ import annotations
 
@@ -22,6 +25,7 @@ class CanvasState:
     format: str = Format.MARKDOWN.value
     ts: float = 0.0
     seq: int = 0
+    turn: int = 0
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), separators=(',', ':'))

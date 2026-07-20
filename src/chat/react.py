@@ -244,6 +244,9 @@ class ReactMixin:
         """Run the ReAct loop. Returns (reply, log, iters, exit_reason).
         The trace is NOT written here — caller writes it after post-turn
         reflection so the trace can include memories written."""
+        # Episode boundary for canvas scrollback: publishes during this
+        # episode (user turn or auto-fire) coalesce to one keyframe.
+        self._canvas.new_turn()
         log: List[Tuple[str, str]] = []
         # Per-iteration record:
         #   system   — full system prompt sent (constant across iters,
