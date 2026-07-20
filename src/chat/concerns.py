@@ -192,6 +192,15 @@ _CONCERN_DEFAULT_LIFETIME_DAYS = {'one_shot': 0.5, 'durable': 120.0}
 
 _CONCERN_SATISFIED_THRESHOLD = 0.1
 
+# Dead-concern cleanup: abandoned concerns and satisfied one-shots are
+# permanently non-functional (abandoned = invisible to similarity search,
+# can never fire or revive; a completed one-shot must never revive — its
+# instruction is a snapshot of a finished intention). Past this grace
+# they are tombstoned verbatim to <memory>/concerns_graveyard.jsonl and
+# hard-deleted by the sweep. Satisfied DURABLE concerns are kept: they
+# are the recurrence-revival pool. Seeds are never touched.
+_DEAD_CONCERN_GRACE_DAYS = 7
+
 _CONCERN_LIFETIME_MIN_DAYS, _CONCERN_LIFETIME_MAX_DAYS = 0.1, 3650.0
 
 _CONCERN_ALWAYS_ON_BUDGET = _AGENT_CONCERN_PROMPT_BUDGET
@@ -920,8 +929,10 @@ class ConcernsMixin:
         whose last activity (fire, bump, creation) is older than their
         category's _CONCERN_DEFAULT_LIFETIME_DAYS go active → 'satisfied'
         (recallable; revivable via recurrence if the theme returns).
-        Seeds are never touched and nothing is ever deleted. Pure
-        arithmetic — safe to run every tick."""
+        Seeds are never touched. Ends with the dead-concern cleanup pass
+        (_delete_dead_agent_concerns): abandoned + satisfied one-shots
+        past grace are tombstoned to the graveyard and deleted; satisfied
+        durables are kept as the revival pool."""
         if not self._agent_concerns_collection_id:
             return
         coll = self.resource_manager.get_resource(self._agent_concerns_collection_id)
@@ -947,23 +958,8 @@ class ConcernsMixin:
             # this floor it would be swept before its first fire.
             rhythm_h = float(props.get('rhythm_hours') or 0.0)
             lifetime_days = max(lifetime_days, 2.0 * rhythm_h / 24.0)
-            latest = None
-            for anchor_str in (props.get('last_fired_at'),
-                               props.get('last_bumped_at'),
-                               props.get('created_at')):
-                if not anchor_str:
-                    continue
-                try:
-                    anchor = datetime.fromisoformat(str(anchor_str))
-                    if anchor.tzinfo is None:
-                        anchor = anchor.replace(tzinfo=timezone.utc)
-                except (TypeError, ValueError) as e:
-                    logger.warning(
-                        f"[{self.character_name}] unparseable activity "
-                        f"timestamp on {nid} ({anchor_str!r}): {e}")
-                    continue
-                if latest is None or anchor > latest:
-                    latest = anchor
+            latest = self._latest_props_timestamp(
+                nid, props, 'last_fired_at', 'last_bumped_at', 'created_at')
             if latest is None:
                 continue
             if (now - latest) >= timedelta(days=lifetime_days):
@@ -973,6 +969,119 @@ class ConcernsMixin:
             logger.info(
                 f"[{self.character_name}] stale sweep satisfied {swept} "
                 f"agent concern(s)")
+        self._delete_dead_agent_concerns()
+
+    def _latest_props_timestamp(self, nid: str, props: Dict[str, Any],
+                                *keys: str) -> Optional[datetime]:
+        """Latest parseable UTC timestamp among props[key] for the given
+        keys; None if none parse."""
+        latest: Optional[datetime] = None
+        for key in keys:
+            raw = props.get(key)
+            if not raw:
+                continue
+            try:
+                ts = datetime.fromisoformat(str(raw))
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+            except (TypeError, ValueError) as e:
+                logger.warning(
+                    f"[{self.character_name}] unparseable {key} "
+                    f"on {nid} ({raw!r}): {e}")
+                continue
+            if latest is None or ts > latest:
+                latest = ts
+        return latest
+
+    def _dead_concern_disposition(self, props: Dict[str, Any]
+                                  ) -> Optional[str]:
+        """Deletion reason for a permanently non-functional agent_concern,
+        or None to keep. Abandoned concerns are invisible to similarity
+        search and can never fire or revive. Satisfied one-shots must not
+        revive — their instruction is a snapshot of a finished intention
+        (the un-building hazard). Satisfied durables are KEPT: they are
+        the recurrence-revival pool. Seeds are never touched."""
+        if props.get('seed'):
+            return None
+        status = props.get('status')
+        if status == 'abandoned':
+            return 'abandoned'
+        if status == 'satisfied' and self._is_one_shot_concern(props):
+            return 'completed_one_shot'
+        return None
+
+    def _delete_dead_agent_concerns(self, dry_run: bool = False
+                                    ) -> List[Tuple[str, str, str]]:
+        """Tombstone-then-delete dead agent_concerns past the grace
+        period. Each note is appended verbatim to
+        <memory>/concerns_graveyard.jsonl BEFORE deletion — an unwritable
+        graveyard blocks the delete. Grace anchor: status_changed_at when
+        present (stamped by _set_concern_status), else last activity;
+        notes with no parseable timestamp are kept and logged. Returns
+        (note_id, reason, text) per deletion; dry_run collects the list
+        without touching anything (the supervised batch runner's
+        preview). autonomy.jsonl gets a concern_deleted event per real
+        deletion, so history survives the note."""
+        if not self._agent_concerns_collection_id:
+            return []
+        coll = self.resource_manager.get_resource(
+            self._agent_concerns_collection_id)
+        if not coll:
+            return []
+        note_ids = list((coll.get('properties') or {}).get('content', []) or [])
+        now = datetime.now(timezone.utc)
+        out: List[Tuple[str, str, str]] = []
+        for nid in note_ids:
+            note = self.resource_manager.get_resource(nid)
+            if not note:
+                continue
+            props = note.get('properties') or {}
+            reason = self._dead_concern_disposition(props)
+            if not reason:
+                continue
+            anchor = self._latest_props_timestamp(
+                nid, props, 'status_changed_at', 'last_fired_at',
+                'last_bumped_at', 'created_at')
+            if anchor is None:
+                logger.warning(
+                    f"[{self.character_name}] dead concern {nid} has no "
+                    f"parseable timestamp — kept (cannot age)")
+                continue
+            if (now - anchor) < timedelta(days=_DEAD_CONCERN_GRACE_DAYS):
+                continue
+            text = str(props.get('content', '') or '')
+            if not dry_run:
+                gy = self._memory_dir() / 'concerns_graveyard.jsonl'
+                try:
+                    gy.parent.mkdir(parents=True, exist_ok=True)
+                    with open(gy, 'a', encoding='utf-8') as f:
+                        f.write(json.dumps(
+                            {'deleted_at': now.isoformat(), 'note_id': nid,
+                             'reason': reason, 'note': note},
+                            ensure_ascii=False, default=str) + '\n')
+                except OSError as e:
+                    logger.warning(
+                        f"[{self.character_name}] graveyard append failed "
+                        f"for {nid} — delete skipped: {e}")
+                    continue
+                ok, err = self.resource_manager.delete_resource(nid)
+                if not ok:
+                    logger.warning(
+                        f"[{self.character_name}] dead-concern delete "
+                        f"failed for {nid}: {err}")
+                    continue
+                self._write_autonomy_event({
+                    'event': 'concern_deleted',
+                    'concern_id': nid,
+                    'concern_text': text[:140],
+                    'via': reason,
+                })
+            out.append((nid, reason, text))
+        if out and not dry_run:
+            logger.info(
+                f"[{self.character_name}] graveyarded + deleted {len(out)} "
+                f"dead agent concern(s)")
+        return out
 
     def _decay_user_concerns_per_turn(self) -> None:
         """Apply per-turn strength decay to active user_concerns. Hard-
@@ -1577,6 +1686,8 @@ class ConcernsMixin:
         if props.get('kind') not in ('concern', 'agent_concern', 'user_concern'):
             return False, f"{concern_id} is not a concern"
         props['status'] = new_status
+        # Time-of-death anchor for the dead-concern grace period.
+        props['status_changed_at'] = datetime.now(timezone.utc).isoformat()
         return True, None
 
     # ------------------------------------------------------------------

@@ -1014,3 +1014,100 @@ def test_stale_sweep_lifetime_floored_by_rhythm(loop):
         waiting)["properties"]["status"] == "active"
     assert loop.resource_manager.get_resource(
         expired)["properties"]["status"] == "satisfied"
+
+
+# ── dead-concern cleanup (graveyard + delete) ──────────────────────────
+
+def _make_dead(loop, status, days_dead, extra=None):
+    old = (datetime.now(timezone.utc) - timedelta(days=days_dead)).isoformat()
+    props = {"status": status, "status_changed_at": old}
+    props.update(extra or {})
+    nid = make_concern(loop, extra=props)
+    # create_note stamps created_at=now; backdate so the latest-of grace
+    # anchor sees the intended age (in production created_at always
+    # precedes status_changed_at).
+    loop.resource_manager.get_resource(nid)["properties"]["created_at"] = old
+    loop.resource_manager.resource_registry[
+        "Collection_ac"]["properties"]["content"].append(nid)
+    return nid
+
+
+def test_set_concern_status_stamps_time(loop):
+    nid = make_concern(loop)
+    ok, err = loop._set_concern_status(nid, "abandoned")
+    assert ok, err
+    props = loop.resource_manager.get_resource(nid)["properties"]
+    assert props["status"] == "abandoned"
+    assert props["status_changed_at"]
+
+
+def test_dead_concern_disposition(loop):
+    assert loop._dead_concern_disposition(
+        {"status": "abandoned"}) == "abandoned"
+    assert loop._dead_concern_disposition(
+        {"status": "satisfied", "category": "one_shot"}) == "completed_one_shot"
+    assert loop._dead_concern_disposition(
+        {"status": "satisfied", "category": "durable"}) is None
+    assert loop._dead_concern_disposition(
+        {"status": "abandoned", "seed": True}) is None
+    assert loop._dead_concern_disposition({"status": "active"}) is None
+
+
+def test_delete_dead_concerns_tiers(loop, tmp_path):
+    _inject_agent_collection(loop)
+    loop._memory_dir = lambda: tmp_path / "memory"
+    old_one_shot = _make_dead(loop, "satisfied", 10,
+                              extra={"category": "one_shot"})
+    fresh_one_shot = _make_dead(loop, "satisfied", 1,
+                                extra={"category": "one_shot"})
+    old_durable = _make_dead(loop, "satisfied", 10)
+    old_abandoned = _make_dead(loop, "abandoned", 10)
+    active = _make_dead(loop, "active", 10)
+
+    deleted = loop._delete_dead_agent_concerns()
+
+    assert {nid for nid, _, _ in deleted} == {old_one_shot, old_abandoned}
+    mgr = loop.resource_manager
+    assert mgr.get_resource(old_one_shot) is None
+    assert mgr.get_resource(old_abandoned) is None
+    assert mgr.get_resource(fresh_one_shot) is not None   # within grace
+    assert mgr.get_resource(old_durable) is not None      # revival pool
+    assert mgr.get_resource(active) is not None
+    # collection membership cleaned by delete_resource
+    content = mgr.resource_registry["Collection_ac"]["properties"]["content"]
+    assert old_one_shot not in content and old_abandoned not in content
+    # tombstones written, one line each, note carried verbatim
+    gy = tmp_path / "memory" / "concerns_graveyard.jsonl"
+    lines = [json.loads(l) for l in gy.read_text().splitlines()]
+    assert {l["note_id"] for l in lines} == {old_one_shot, old_abandoned}
+    assert all(l["note"]["properties"]["status"] in ("satisfied", "abandoned")
+               for l in lines)
+    # autonomy events logged
+    events = [json.loads(l) for l in
+              (tmp_path / "autonomy.jsonl").read_text().splitlines()]
+    assert sum(1 for e in events if e["event"] == "concern_deleted") == 2
+
+
+def test_delete_dead_concerns_dry_run(loop, tmp_path):
+    _inject_agent_collection(loop)
+    loop._memory_dir = lambda: tmp_path / "memory"
+    nid = _make_dead(loop, "abandoned", 10)
+
+    doomed = loop._delete_dead_agent_concerns(dry_run=True)
+
+    assert [d[0] for d in doomed] == [nid]
+    assert loop.resource_manager.get_resource(nid) is not None
+    assert not (tmp_path / "memory" / "concerns_graveyard.jsonl").exists()
+
+
+def test_delete_dead_concerns_no_timestamp_kept(loop, tmp_path):
+    _inject_agent_collection(loop)
+    loop._memory_dir = lambda: tmp_path / "memory"
+    nid = _make_dead(loop, "abandoned", 10)
+    props = loop.resource_manager.get_resource(nid)["properties"]
+    for k in ("status_changed_at", "last_fired_at", "last_bumped_at",
+              "created_at"):
+        props.pop(k, None)
+
+    assert loop._delete_dead_agent_concerns() == []
+    assert loop.resource_manager.get_resource(nid) is not None
