@@ -275,6 +275,51 @@ domain.
   the probe session she interleaved an autonomous refuel with answering
   questions, without dropping either thread.
 
+## What the factory fed back into the harness
+
+The experiment was chartered as a forcing function — for coordination,
+collaboration, and autonomy — and with v1 closed it's worth tallying
+what it actually forced, because almost none of the yield is
+game-specific:
+
+- **The intentional-yield mechanism.** Long tool-call chains used to end
+  at an iteration cap that reactively packaged the remainder into a
+  successor concern — a guillotine, not a decision. The deliberate
+  version (a `yield` action: hand the follow-up to a successor concern,
+  optionally say one line about it) had been explicitly deferred *until
+  the game provided a real 20-step task to design against*. It shipped
+  mid-experiment, forced by factory work, and is now available on every
+  turn, game or not.
+- **The concern lifecycle.** The concern flood (#5) forced completion,
+  supersession, and staleness semantics that now govern every concern
+  in the system — the fork bomb was a factory incident; the fix was
+  architectural.
+- **An open item with a name: continuation revalidation.** The
+  un-building (#6) identified a failure class the lifecycle doesn't
+  cover — a *live* continuation whose content the world has outgrown.
+  "Stale continuation" is now a named concept in the workbench's
+  vocabulary and a candidate for the next tuning cycle: fire-time
+  triage should ask not just *should this fire* but *does its goal
+  still refer to anything*.
+- **A dry run of the improvement loop.** The workbench's harness
+  roadmap formalizes a measurement-gated cycle: mine weaknesses from
+  real trajectories, propose one bounded change, validate, keep or
+  revert. The week's debugging loop was that cycle at n=1 and
+  same-day latency: the embedded agent narrates the failure from the
+  inside (mining, in open language, before anyone has a category for
+  it), the coding assistant verifies against ground truth and triages
+  — harness-fixable or not — and the patch ships bounded, one failure
+  class at a time. What the formal loop adds is the part the week ran
+  on trust: a frozen regression suite, so a fix that helps the factory
+  can be shown not to have hurt everything else.
+- **A data point on the capability floor.** The roadmap carries an
+  unresolved question about whether a local ~30B backend sits above or
+  below the floor needed for self-improvement-style loops. Five days
+  of cohabitation is evidence on the cheerful side — *provided the
+  harness spends its effort on legibility* — but it's an existence
+  proof, not a measurement. The FLE lab-play run is the measured
+  version of the claim.
+
 ## Takeaways for builders
 
 1. If you want a *persistent* agent world on FLE's stack: package the
