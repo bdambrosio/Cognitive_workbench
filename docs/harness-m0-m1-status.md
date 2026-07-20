@@ -101,6 +101,42 @@ instrument's blindness; treat post-digest data as the real M1 set.
 Both the reflection-prompt change and the reviewer are harness changes
 — composite ledger row owed before "known good".
 
+## 2026-07-20 — gate failure on the owed rows; waived; HLE-pin lesson
+
+The owed composite row for the 2026-07-12/13 instrument batch (plus
+canvas scrollback, reflection one-shot category, dead-concern cleanup —
+commits 9e4a0bde, c9272052, e01d69b9) was run twice and **failed the
+gate both times**:
+
+| | memory | hle | discourse | introspective | composite |
+|---|---|---|---|---|---|
+| baseline | 0.990 | 0.417 | 0.640 | 0.833 | 0.720 (gate 0.710) |
+| run 1 (contaminated) | 0.994 | 0.375 | 0.623 | 0.806 | 0.6995 |
+| run 2 (clean) | 0.994 | **0.167** | 0.716 | 0.778 | 0.664 |
+
+Run 1 was invalidated procedurally: commits landed mid-run, so early
+suites ran different code than late suites (lesson: **never commit
+during a bench run**). Run 2 was clean and breached the HLE floor.
+
+Diagnosis: instrument noise, not regression. All 12 HLE replies were
+normal ReAct outputs (no errors, sane iteration counts); the three
+correct→incorrect flips are divergent reasoning paths on hard math
+questions, sampled at temperature 0.4–0.7. HLE across four runs now
+reads 0.50 / ~0.42 / 0.375 / 0.167 — the 12-question pin cannot carry
+the gate alone, which is exactly BASELINE.md's pre-registered caveat.
+Meanwhile the suite most exercising the changed code (discourse_reflect,
+reflection path) hit the top of its band, and memory_recall sat at
+ceiling.
+
+**Decision (Bruce, 2026-07-20): gate waived for this batch; commits
+pushed.** Further runs would only relabel the changes (a re-baseline
+absorbs them without validating against the old baseline; a tie-breaker
+rerun adds no mechanism-level information). **Growing the HLE pin to
+~30 questions + re-baselining is now a precondition of the first M2
+cycle**, not optional hardening — M2's "composite flat" guard is
+meaningless while one noisy suite can swing the composite past the
+gate.
+
 ## Next steps
 
 1. **(Bruce, ongoing)** Daily-ish conversation per the collection
