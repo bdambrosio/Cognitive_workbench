@@ -178,13 +178,17 @@ _FIRE_DIGEST_MAX_ITEMS = 3
 _FIRE_OUTCOME_JUDGED = ('helped', 'neutral', 'hindered', 'ignored')
 
 # --- Legacy aliases (in-flight rename; will be removed once dynamics rewrite lands)
-_CONCERN_CATEGORIES = ('one_shot', 'durable', 'derived')
+# one_shot = finite task: fires once at the right moment, completes on a
+# clean exit, never revives (spawned by yield/max_iters continuations and
+# by reflection when the exchange asks for a one-time action).
+# durable = standing concern: recurs on its rhythm until closed or stale.
+_CONCERN_CATEGORIES = ('one_shot', 'durable')
 
 _CONCERN_CADENCE_HOURS_ALLOWED = _AGENT_CONCERN_RHYTHM_HOURS_ALLOWED
 
-_CONCERN_DEFAULT_CADENCE_HOURS = {'one_shot': 1, 'derived': 24, 'durable': 24}
+_CONCERN_DEFAULT_CADENCE_HOURS = {'one_shot': 1, 'durable': 24}
 
-_CONCERN_DEFAULT_LIFETIME_DAYS = {'one_shot': 0.5, 'derived': 2.0, 'durable': 120.0}
+_CONCERN_DEFAULT_LIFETIME_DAYS = {'one_shot': 0.5, 'durable': 120.0}
 
 _CONCERN_SATISFIED_THRESHOLD = 0.1
 
@@ -937,6 +941,12 @@ class ConcernsMixin:
                 'one_shot' if self._is_one_shot_concern(props) else 'durable')
             lifetime_days = _CONCERN_DEFAULT_LIFETIME_DAYS.get(
                 category, _CONCERN_DEFAULT_LIFETIME_DAYS['durable'])
+            # A never-fired concern must outlive its rhythm: a reflection-
+            # derived one-shot can carry rhythm_hours=24 ("do it
+            # tomorrow") against the 0.5-day one_shot lifetime — without
+            # this floor it would be swept before its first fire.
+            rhythm_h = float(props.get('rhythm_hours') or 0.0)
+            lifetime_days = max(lifetime_days, 2.0 * rhythm_h / 24.0)
             latest = None
             for anchor_str in (props.get('last_fired_at'),
                                props.get('last_bumped_at'),
@@ -1739,12 +1749,14 @@ class ConcernsMixin:
     # Concern queryables (browser-facing).
     # The Resource Browser frontend expects the executive's shape
     # ({user_concerns: [...], derived_concerns: [...], activations: {}});
-    # we adapt chat's single concerns collection to that split:
-    #   - user_concerns  = category in (one_shot, durable). Status remap:
+    # we adapt chat's two concern collections to that split:
+    #   - user_concerns  = the user_concerns collection. Status remap:
     #                      active→open, satisfied→closed, abandoned→abandoned
     #                      so the UI's user-concern color/label code (which
     #                      checks "open"/"closed") works unchanged.
-    #   - derived_concerns = category == derived. Status passthrough.
+    #   - derived_concerns = the agent_concerns collection (legacy API key
+    #                        name only — not the retired 'derived'
+    #                        category). Status passthrough.
     # ------------------------------------------------------------------
 
     _USER_CONCERN_STATUS_MAP = {'active': 'open', 'satisfied': 'closed',

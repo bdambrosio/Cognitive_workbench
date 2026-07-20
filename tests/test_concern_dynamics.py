@@ -853,7 +853,10 @@ def _age_note(loop, nid, days):
 
 
 def test_sweep_satisfies_stale_one_shot(loop):
-    nid = make_concern(loop, extra={"category": "one_shot"})
+    # rhythm 1h (the continuation-spawn value) keeps the 2×rhythm
+    # lifetime floor below the 0.5d one_shot default.
+    nid = make_concern(loop, extra={"category": "one_shot",
+                                    "rhythm_hours": 1})
     _age_note(loop, nid, days=1)  # one_shot lifetime is 0.5d
     _inject_agent_collection(loop)
     _add_to_agent_collection(loop, nid)
@@ -889,8 +892,9 @@ def test_sweep_never_touches_seeds(loop):
 
 def test_sweep_infers_one_shot_for_legacy_urgency(loop):
     # Legacy continuation (no category stamp): swept on the one_shot
-    # lifetime, not the durable one.
-    nid = make_concern(loop, extra={"rhythm_source": "urgency"})
+    # lifetime, not the durable one. rhythm 1h as the spawn paths write.
+    nid = make_concern(loop, extra={"rhythm_source": "urgency",
+                                    "rhythm_hours": 1})
     _age_note(loop, nid, days=1)
     _inject_agent_collection(loop)
     _add_to_agent_collection(loop, nid)
@@ -952,3 +956,61 @@ def test_seed_duplicate_name_skipped(loop):
                       {'text': 'second', 'name': 'dup'}]})
     nid = loop.resource_manager.named_notes['chat:agent_concern:seed:dup']
     assert loop.resource_manager.get_resource(nid)["properties"]["content"] == 'first'
+
+
+# ── reflection category + one-shot lifetime floor ──────────────────────
+
+def test_parse_reflection_payload_agent_category():
+    frame, _, _, _, _, acs = ChatLoop._parse_reflection_payload({
+        "frame": "none", "memories": [], "user_concerns": [],
+        "agent_concerns": [
+            {"text": "remind about dentist", "instruction": "remind",
+             "rhythm_hours": 12, "category": "one_shot"},
+            {"text": "track topic", "instruction": "check"},
+            {"text": "bad category", "instruction": "x",
+             "category": "derived"},
+        ]})
+    assert frame == "none"
+    assert acs[0]["category"] == "one_shot"
+    assert acs[1]["category"] == "durable"   # missing → durable
+    assert acs[2]["category"] == "durable"   # invalid → durable
+
+
+def test_add_agent_concern_stores_category(loop):
+    _mute_indexer(loop)
+    _inject_agent_collection(loop)
+    nid = loop._add_agent_concern(
+        "one-time thing", instruction="do it", rhythm_hours=12,
+        skip_recurrence=True, category="one_shot")
+    props = loop.resource_manager.get_resource(nid)["properties"]
+    assert props["category"] == "one_shot"
+
+
+def test_stale_sweep_lifetime_floored_by_rhythm(loop):
+    _inject_agent_collection(loop)
+    now = datetime.now(timezone.utc)
+
+    def make(created_days_ago, rhythm_hours):
+        nid = make_concern(loop, extra={
+            "category": "one_shot",
+            "rhythm_hours": rhythm_hours,
+        })
+        # create_note stamps its own created_at — backdate post-creation.
+        loop.resource_manager.get_resource(nid)["properties"]["created_at"] = (
+            now - timedelta(days=created_days_ago)).isoformat()
+        loop.resource_manager.resource_registry[
+            "Collection_ac"]["properties"]["content"].append(nid)
+        return nid
+
+    # 0.6d old with a 24h rhythm: past the 0.5d one_shot default but
+    # inside the 2×rhythm floor — must NOT be swept before first fire.
+    waiting = make(0.6, 24)
+    # 3d old with a 24h rhythm: past the floor — swept.
+    expired = make(3.0, 24)
+
+    loop._sweep_stale_agent_concerns()
+
+    assert loop.resource_manager.get_resource(
+        waiting)["properties"]["status"] == "active"
+    assert loop.resource_manager.get_resource(
+        expired)["properties"]["status"] == "satisfied"

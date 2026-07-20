@@ -212,6 +212,12 @@ class ReflectionMixin:
         "    `external` if user specified rhythm or topic has natural cadence\n"
         "    `urgency` if user signaled importance ('track this closely')\n"
         "    `default` if you guessed (default to 168 / weekly when guessing)\n"
+        "- `category` (\"one_shot\"|\"durable\"): `one_shot` = a finite task — "
+        "do it once at the right moment, then it is complete and gone "
+        "('send me that link tomorrow'). rhythm_hours = when it should "
+        "fire. `durable` = a standing concern that recurs on its rhythm "
+        "(monitoring, tracking, recurring check-ins). Default `durable` "
+        "when unsure.\n"
         "{narrowness_rule}\n"
         "CLOSE agent_concerns: when the exchange shows an EXISTING "
         "agent_concern (from the list in your input) should be dropped — "
@@ -239,7 +245,8 @@ class ReflectionMixin:
         "     \"text\": \"...\",\n"
         "     \"instruction\": \"<imperative>|null\",\n"
         "     \"rhythm_hours\": <int|null>,\n"
-        "     \"rhythm_source\": \"external|urgency|default\"\n"
+        "     \"rhythm_source\": \"external|urgency|default\",\n"
+        "     \"category\": \"one_shot|durable\"\n"
         "   }}, ...],\n"
         "   \"agent_concerns_closed\": [\"<exact text of an existing agent_concern>\", ...],\n"
         "   \"capability_gap\": \"<one sentence>\"|null}}\n\n"
@@ -255,7 +262,21 @@ class ReflectionMixin:
         "    \"text\": \"Track S&P 500 closing price daily.\",\n"
         "    \"instruction\": \"Search for today's S&P 500 close and summarize the day's move.\",\n"
         "    \"rhythm_hours\": 24,\n"
-        "    \"rhythm_source\": \"external\"\n"
+        "    \"rhythm_source\": \"external\",\n"
+        "    \"category\": \"durable\"\n"
+        "  }}]}}\n\n"
+        "WORKED EXAMPLE 1b (one-time task). {entity}: \"Tomorrow morning, "
+        "remind me to call the dentist.\"\n"
+        "Output (finite task, not a standing concern → category one_shot; "
+        "fires once at its rhythm, then completes):\n"
+        "{{\"frame\": \"none\", \"memories\": [],\n"
+        "  \"user_concerns\": [], \"user_concerns_updated\": [], \"user_concerns_closed\": [],\n"
+        "  \"agent_concerns\": [{{\n"
+        "    \"text\": \"Remind {entity} to call the dentist tomorrow morning.\",\n"
+        "    \"instruction\": \"Remind {entity} to call the dentist.\",\n"
+        "    \"rhythm_hours\": 12,\n"
+        "    \"rhythm_source\": \"external\",\n"
+        "    \"category\": \"one_shot\"\n"
         "  }}]}}\n\n"
         "WORKED EXAMPLE 2. {entity}: \"I'm thinking about how concerns and "
         "tasks differ.\" (Just thinking aloud — no action requested.)\n"
@@ -525,7 +546,8 @@ class ReflectionMixin:
                         seed=False,
                         rhythm_hours=c.get('rhythm_hours'),
                         rhythm_source=c.get('rhythm_source') or 'default',
-                        instruction=c.get('instruction')):
+                        instruction=c.get('instruction'),
+                        category=c.get('category') or 'durable'):
                     agent_cons_written.append(text)
 
             if (mems_written or user_cons_written or user_cons_updated
@@ -560,7 +582,9 @@ class ReflectionMixin:
         user_concerns_closed: list of text strings naming existing
                               user_concerns the exchange showed resolved.
         agent_concerns: list of dicts with keys text, instruction,
-                        rhythm_hours, rhythm_source (any may be missing/None).
+                        rhythm_hours, rhythm_source, category (any may be
+                        missing/None; category normalizes to
+                        one_shot|durable, default durable).
 
         Accepts:
           - New envelope: {"frame", "memories", "user_concerns",
@@ -632,7 +656,8 @@ class ReflectionMixin:
             for item in raw:
                 if isinstance(item, str) and item.strip():
                     out.append({'text': item.strip(), 'instruction': None,
-                                'rhythm_hours': None, 'rhythm_source': 'default'})
+                                'rhythm_hours': None, 'rhythm_source': 'default',
+                                'category': 'durable'})
                 elif isinstance(item, dict):
                     t = str(item.get('text', '') or '').strip()
                     if not t:
@@ -649,11 +674,15 @@ class ReflectionMixin:
                     src = str(item.get('rhythm_source', 'default') or 'default').strip().lower()
                     if src not in ('external', 'urgency', 'default'):
                         src = 'default'
+                    cat = str(item.get('category', '') or '').strip().lower()
+                    if cat not in ('one_shot', 'durable'):
+                        cat = 'durable'
                     out.append({
                         'text': t,
                         'instruction': str(instr).strip() if instr else None,
                         'rhythm_hours': rhythm_h,
                         'rhythm_source': src,
+                        'category': cat,
                     })
             return out
 
