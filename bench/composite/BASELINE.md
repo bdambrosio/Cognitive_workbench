@@ -33,7 +33,8 @@ be wider — driven entirely by introspective_fidelity's run-3 dip
 (0.7222 vs 0.86–0.88). n=3 bands are rough estimates; a 0.660 gate
 would wave through real regressions. The gate is therefore set at
 **0.700 = min observed run, rounded down** — every clean baseline run
-cleared it, and it keeps roughly the old gate's strictness. Marginal
+cleared it, and it keeps roughly the old gate's strictness. Ratified
+by Bruce 2026-07-24. Marginal
 results (within ~0.005 of a floor): re-run once before concluding.
 
 ## Reading the numbers
