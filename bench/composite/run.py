@@ -57,7 +57,7 @@ JUDGE_FILES = (
 )
 
 HLE_START = 0
-HLE_MAX_QUESTIONS = 12
+HLE_MAX_QUESTIONS = 30
 HLE_SMOKE_QUESTIONS = 2
 DISCOURSE_OUTPUT_FIELD = "production_new_discourse_state__current"
 SMOKE_MEMORY_SUBSETS = ("01-direct-recall", "03-negative-fact")
