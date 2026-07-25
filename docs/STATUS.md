@@ -56,6 +56,7 @@ Categories:
 | [jill-integration.md](jill-integration.md) | Jill↔ChatterBot head binding design; voice sensor + say path + head/camera tools live, rest design |
 | [jill-self-extension.md](jill-self-extension.md) | Recursive tool construction; Phase 2a (judgment/propose-only) SHIPPED 2026-06 — capability-gap capture → self-extension concern; Phase 1/2b (generative author-test-restart path) unbuilt |
 | [knowledge-base-system.md](knowledge-base-system.md) | Obsidian-backed three-tier knowledge base; obsidian tool (read/search/write→Notes) exists, decomposition/curation system doesn't |
+| [learned-disposition-design.md](learned-disposition-design.md) | Tiny-LM state→value learning over fire decisions (RL on imagined trajectories, real judged outcomes as anchor); G1 offline anchor passed 2026-07-24 (`bench/disposition/`), build-order step 1 — state capture + render — SHIPPED 2026-07-25 (`src/chat/disposition.py`, shadow-log only); scorer, imagination gate, and triage coupling unbuilt. Descends from substack-gut-feeling-draft.md |
 
 ## SUPERSEDED — deleted 2026-06-11 and 2026-07-19
 
@@ -106,6 +107,6 @@ SPACEMAP_ARCHITECTURE.md
 | [journey_note_trace_qualia_self_model.md](journey_note_trace_qualia_self_model.md) | Audit-record essay: trace/qualia self-model |
 | [journey_note_trace_qualia_self_model_v2.md](journey_note_trace_qualia_self_model_v2.md) | v2 of the above |
 | [metadata-is-a-relation.md](metadata-is-a-relation.md) | Data-model essay (note: metadata is implemented as nested properties, not relations) |
-| [substack-gut-feeling-draft.md](substack-gut-feeling-draft.md) | DRAFT essay: gut feelings as index-free memory (valence compression) |
+| [substack-gut-feeling-draft.md](substack-gut-feeling-draft.md) | DRAFT essay: gut feelings as index-free memory (valence compression) — the origin idea behind learned-disposition-design.md |
 | [user_concern_model.md](user_concern_model.md) | Historical user-concern design; the shipped model differs (per-turn decay/bump + reflection, not patch ops — see banner + concerns-architecture.md) |
 | [what-agents-care-about.md](what-agents-care-about.md) | Concerns-not-tasks essay; the system's motivational thesis |
