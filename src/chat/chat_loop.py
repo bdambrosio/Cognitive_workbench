@@ -79,6 +79,7 @@ from chat.prompts import (  # noqa: E402,F401
     PromptsMixin, _REASONING_HISTORY_COLLECTION_NAME,
     _REASONING_HISTORY_RING_SIZE, _REASONING_HISTORY_RECENT,
     _REASONING_HISTORY_FULL, _REASONING_HISTORY_OBS_CAP)
+from chat.disposition import DispositionMixin  # noqa: E402
 from chat.zenoh_io import ZenohMixin  # noqa: E402
 
 
@@ -114,7 +115,8 @@ logger = logging.getLogger('chat_loop')
 # ─── ChatLoop ───────────────────────────────────────────────────────────────
 
 class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
-               ConcernsMixin, ToolsMixin, PromptsMixin, ZenohMixin):
+               ConcernsMixin, DispositionMixin, ToolsMixin, PromptsMixin,
+               ZenohMixin):
     def __init__(
         self,
         character_name: str,

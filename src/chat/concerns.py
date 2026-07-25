@@ -1790,6 +1790,12 @@ class ConcernsMixin:
 
         root = self.resource_manager.get_resource(self._root_concern_id(nid))
         wip = str(((root or {}).get('properties') or {}).get('wip', '') or '').strip()
+        # Shadow state capture for the learned-disposition scorer
+        # (docs/learned-disposition-design.md). Snapshot here, before the
+        # verdict mutates props; written with the verdict at exit. Read-only
+        # and never raises — no effect on the verdict.
+        disposition_state = self._capture_disposition_state(
+            nid, text, instruction, props, wip)
         sys_msg = (
             f"You are the autonomy triage step for the agent {self.character_name}. "
             "A standing concern's activation has crossed its fire threshold; "
@@ -1854,6 +1860,7 @@ class ConcernsMixin:
             'verdict': verdict,
             'reason': reason,
         })
+        self._log_disposition_state(disposition_state, verdict, reason)
         return verdict
 
     # ------------------------------------------------------------------
