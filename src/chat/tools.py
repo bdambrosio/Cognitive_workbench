@@ -249,8 +249,12 @@ class ToolsMixin:
              "`docs/`, `tests/`, `bench/`; list/read/grep primitives) navigates the tree and returns a "
              "synthesized answer with file:line citations. Use when the user asks how you work, where something "
              "is implemented, what a module does, to read a design doc, or to verify a claim about your own "
-             "code. The query is opaque to you — phrase it as a natural-language question (e.g. \"where is the "
-             "ReAct dispatch defined?\", \"what does the learned-disposition design doc say?\")."),
+             "code. **Named paths are fair game**: a request to read a specific file under the repo root "
+             "(`docs/foo.md`, `bench/x/README.md`, `src/chat/bar.py`) belongs here — put the path in the query "
+             "(e.g. \"read docs/learned-disposition-design.md and summarize it\"). This is the ONLY tool for "
+             "paths under your own repo; `inspect_external` reaches a different tree entirely and cannot see "
+             "them. Otherwise phrase as a natural-language question (e.g. \"where is the ReAct dispatch "
+             "defined?\")."),
         ]
         external_repo = self._get_external_repo()
         if external_repo is not None:
@@ -258,8 +262,10 @@ class ToolsMixin:
                 "`{\"thought\": \"<one terse sentence>\", \"tool\": \"inspect_external\", \"query\": <string>}` — "
                 f"query the external project repo currently bound to this session: `{external_repo}`. "
                 "Same primitives as `inspect` (list/read/grep), different geofence — this is reading an external "
-                "codebase as documentation, not introspection of your own substrate. Use when the user asks "
-                "questions about THAT project (its code, README, structure, behavior). Phrase as a "
+                "codebase as documentation, not introspection of your own substrate. Use ONLY when the user asks "
+                "questions about THAT project (its code, README, structure, behavior). It cannot see your own "
+                f"repo: a path like `docs/x.md` resolves under `{external_repo}` and will simply be missing — "
+                "if the user names a file that is part of YOUR substrate, use `inspect` instead. Phrase as a "
                 "natural-language question (e.g. \"how does this project structure its modules?\", "
                 "\"what does the README say about installation?\", \"where is the main entry point?\")."))
         tools.append(("security",
