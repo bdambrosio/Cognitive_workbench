@@ -1,125 +1,167 @@
-# Learned Disposition Scorer — design note
+# Learned Disposition — tiny-LM value learning over Jill's fire decisions
 
-**Status: design note, nothing built.** Drafted 2026-07-24. Provenance:
-the memory-tier musing in [substack-gut-feeling-draft.md](substack-gut-feeling-draft.md)
-("value learning as the last tier of the memory stack"), plus Bruce's
-framing: *continual learning as a very-small LLM repeatedly trained over
-variants of recent history*. This note turns the musing into a testable
-v1 with explicit gates. Do-nothing remains a first-class outcome at
-every gate.
+**Status: design settled in discussion 2026-07-24 evening; Stage A
+(offline anchor) built and passed; nothing else implemented.** This
+version supersedes the morning draft, which mis-framed Bruce's idea as
+supervised data augmentation. The actual idea: **a standalone tiny LM
+learns a state→value mapping via RL, where most training experience is
+imagined — trajectory variants rolled forward from states in recent
+history — anchored by the sparse real judged outcomes.** Provenance:
+[substack-gut-feeling-draft.md](substack-gut-feeling-draft.md)
+(disposition as the fourth memory tier; "inventive replay").
 
-## Concept
+## Architecture in one paragraph
 
-A sidecar model — much smaller than the backend — that maps a
-*situation* to a *valence*: "how did acting in situations like this
-tend to land?" It is trained on the agent's own outcome history, not
-prompted; episodes are discarded, disposition survives. It is the
-fourth memory tier from the essay (working → episodic → semantic →
-disposition), and the first CW mechanism where experience would change
-weights rather than text.
+At fire-time triage, a deterministic template renders the decision
+*state* as text. A tiny LM (≤1B, standalone process, never the vLLM
+substrate) maps that state to a value v ∈ [0,1]. It is retrained
+offline (nightly-from-scratch, rolling window) on a mixture of real
+transitions (few, anchoring) and imagined trajectory variants generated
+by a large LLM from real logged states (many, admitted only after the
+simulator passes a calibration gate against real outcomes). The value
+first shadows triage (log-only), later becomes one evidence line in
+the triage prompt — an ordinary composite-gated M-cycle knob.
 
-Two properties distinguish it from scaffold-level self-improvement
-(cf. the AREX plateau discussion, 2026-07-24):
+## 1. State model
 
-- **Open loop.** Labels come from observed user reaction
-  (fire-outcome capture Phase 1), not from the model judging itself.
-  The environment injects information each cycle.
-- **Repeated retraining over a rolling window.** The model is cheap
-  enough to retrain nightly from scratch over recent history — no
-  incremental-learning machinery, no catastrophic-forgetting problem;
-  drift tracking comes free from the rolling window.
+Two-part rendered text block, **fixed schema, deterministic template**
+— a ledger, not a narrative. No learned summarizer inside the state
+pipeline in v1 (that is a second model to validate; revisit later —
+the AREX `update_context` move).
 
-## Why now (and not when the essay was written)
+```
+== concern ==
+text / instruction / activation / rhythm / last_fired / last_bump
+wip (incl. NEXT: line) / prior_defer_reason
 
-The essay's missing ingredient was outcome data. It now exists:
-`autonomy.jsonl` holds 410 `fire_outcome` records (67 judged:
-helped/neutral/hindered/ignored), each joinable to its `fire` event by
-`fire_id` (present on all post-Phase-1 fires). Relevant fields:
+== situation ==            ← all currently INVISIBLE to triage
+local_time (weekday + clock)
+user_last_turn age         ← presence/engagement
+recent_exchange (last ~2 turns, clipped)
+hot_user_concerns (top 3 by strength)
+autonomous_fires_last_24h (+ unacknowledged count)
+```
 
-- from `fire`: `concern_text`, `instruction`, `started_at`,
-  `react_iters`, `react_exit_reason`, `response_brief`
-- from `fire_outcome`: `outcome`, `valence`, `user_impact`,
-  `latency_turns`, `evidence`
-- from `triage`: `verdict` (defer/fire/reset), `reason` — the prompted
-  judgment this model would eventually inform
+Rationale: triage today (`concerns.py:_triage_fire_candidate`) sees
+only the concern-local slice, but judged outcomes ("ignored") are
+mostly facts about *the user at that moment*. Text (not a feature
+vector) because G1 showed content carries the ranking power (AP 0.634
+with embeddings vs 0.338 without) and text transfers to unseen
+concerns.
 
-Hardware: the 5060 Ti is idle for exactly this class of job (use the
-safe-pin recipe — CUDA index reversal hazard between torch and
-nvidia-smi ordering).
+**Telemetry urgency:** the situational slice is unreconstructable
+retroactively — autonomy.jsonl doesn't capture it. Every triage that
+runs without state logging is training data lost forever. Step 1 below
+is therefore decision-free and should ship ahead of everything else.
 
-## v1: offline toy experiment (no agent integration)
+## 2. Insertion point
 
-**Question:** from the fire-time context alone (concern text,
-instruction, time-of-day, recency features — nothing observed after
-the fire), can a small trained model predict the judged outcome better
-than (a) base rates, (b) the prompted backend asked the same question?
+One consumption site: entry of `_triage_fire_candidate` (the flow
+already funnels every autonomous action through it).
 
-- **Label:** binary — helped+neutral vs hindered+ignored (n=67:
-  53 vs 14). Secondary: regress `valence`.
-- **Models, in order:**
-  1. Frozen small embedder over the fire context + logistic head —
-     the legible control, hours of work.
-  2. A very-small LM (≤1B, e.g. a Qwen-class 0.6B) LoRA-tuned to emit
-     the verdict — the actual idea under test, and the variant that
-     supports "repeatedly trained."
-- **Evaluation:** leave-one-out (n is far too small for a held-out
-  split); AUROC plus precision at the current operating point.
-  Reference number: prompted triage precision 0.791 — not directly
-  comparable (triage selects which fires happen; this predicts among
-  fired), so treat it as context, not the bar. The bar for G1 is
-  beating (a) and (b) above.
+- **G2 shadow:** render state → scorer → v; both appended to the
+  triage/fire autonomy events. No behavior change. Scorer down →
+  null + fail open (triage's own failure discipline).
+- **G3 act (later, one knob):** v becomes an evidence line in the
+  triage prompt ("disposition: fires like this have landed badly,
+  v=0.81") — the prompted LLM keeps the verdict, reasoning stays
+  legible in `triage_reason`. Explicitly NOT a hard gate in the first
+  cycle (opaque; scorer becomes a single point of failure). Modulating
+  activation dynamics instead was considered and rejected: it acts
+  before any judgment sees context.
 
-### The research bet: variants
+Labels keep arriving via existing machinery (reflection stage 6
+fire-outcome capture). Serving: separate small process on the 5060 Ti
+(safe-pin recipe) or CPU; short timeout.
 
-67 labels is not a training set. The essay's closing line ("requires
-inventive replay") is the proposed answer, and it is the part with
-genuine research risk:
+## 3. Trajectory structure: per-concern WIP chains
 
-- **Paraphrase variants:** LLM-rewritten fire contexts, label
-  preserved. Cheap, probably safe, probably low-value (embedders
-  already give this invariance).
-- **Counterfactual variants:** LLM-perturbed contexts *with reasoned
-  label flips* ("same fire at 3am / when the user is mid-task →
-  ignored"). This is where sample efficiency would come from — and
-  where label noise sneaks in, since the variant labels are
-  model-opinion, not observation. Mitigation: train on variants,
-  evaluate **only** on real judged records. If variants don't move
-  real-data LOO performance, the bet fails cleanly.
-- **Auxiliary signal (optional):** the 343 unjudged fires still carry
-  weak labels (`react_exit_reason`, response length, subsequent user
-  turn or silence). Pretrain on those, fine-tune on judged.
+The RL is honest, not decorative, because trajectories already exist
+in the flow: successive fires of one concern each read and *rewrite*
+the WIP summary.
 
-## Gates
+- state  = (concern, WIP, situation) at threshold
+- action = fire / defer / reset
+- next   = rewritten WIP at next threshold
+- episode = concern lifetime; terminal = satisfied/retired
+- value  = discounted future helped-ness of the concern's remaining arc
 
-- **G1 (offline, this note's scope):** toy beats base rate and the
-  prompted-backend predictor on real judged records under LOO.
-  Fail → write down the numbers, stop.
-- **G2 (shadow):** score live fire decisions, log-only, alongside
-  triage. Compare against outcomes as they accrue. No behavior change,
-  so no composite row needed; a ledger row anyway when it lands, per
-  ship-gate discipline.
-- **G3 (act):** disposition score becomes an input to triage or to
-  concern-activation dynamics — an M-track knob like any other,
-  gated on the composite bench. Not designed here.
+TD across consecutive fires of the same concern is the first real
+credit-assignment target (a fire that "helped" but left WIP in a
+doomed configuration was actually bad). Current judged data is
+bandit-shaped (latency ~1 turn), so v1 objective is fitted value
+regression; TD arrives when the logs contain enough multi-fire arcs.
 
-## Risks and honest caveats
+## 4. Imagination and its discipline
 
-- **Coverage bias:** judged fires are 0.216 of observable ones —
-  labels oversample fires Bruce reacted to. The model learns "of the
-  fires that get noticed, which land well," which is adjacent to, not
-  identical to, "which fires should happen."
-- **Nonstationarity:** the concern mix changes (658 of 1263 fires are
-  one PV-monitor concern). Rolling-window retraining helps; per-concern
-  leakage in LOO must be controlled (leave-one-concern-out as a
-  robustness check).
-- **Auditability:** constitutive, not fixable — a disposition that
-  could fully explain itself would be episodic memory (essay's caveat).
-  G2/G3 keep the prompted triage's stated reason alongside the score.
-- **Goodhart:** once G3 modulates firing, the label source (user
-  reaction) is influenced by the model. Park until G3.
+Offline training job, per cycle:
+
+1. **Real transitions** from shadow logs + judged outcomes — few,
+   precious, the anchor and the only evaluation data.
+2. **Imagined variants**: big LLM conditioned on a *real* logged
+   state perturbs the situational slice (same fire at 2am /
+   mid-Factorio / three unacknowledged fires pending) and rolls
+   forward to an imagined outcome.
+3. **Calibration gate (go/no-go for imagination):** the simulator
+   must predict real held-out judged outcomes above an agreement
+   threshold before its imagined labels are admitted. The zero-shot
+   backend already FAILED this test (AUROC 0.452, G1) — so the
+   simulator needs few-shot conditioning on the judged history, or a
+   cloud model offline; if neither clears the bar, imagination waits.
+   Imagination may amplify the real signal, never substitute for it.
+4. **Tiny LM**: fitted value regression on real (high weight) +
+   admitted-imagined (low weight); evaluated ONLY on real judged
+   records against the frozen Stage-A anchor. Can't beat the anchor →
+   deleted, not shipped.
+
+## Stage A results (the anchor) — 2026-07-24, commit 07550b73
+
+`bench/disposition/g1.py`, 67 judged fires (14 bad), base rate 0.209:
+
+| model | split | AUROC | CI95 | AP |
+|---|---|---|---|---|
+| embed+lr | LOO | 0.730 | [0.514, 0.909] | 0.634 |
+| embed+lr | leave-one-concern-out | 0.757 | [0.533, 0.932] | 0.664 |
+| numeric-lr | LOO | 0.682 | [0.498, 0.851] | 0.338 |
+| prompted backend | zero-shot | 0.452 | [0.304, 0.605] | 0.201 |
+
+Real outcome data contains learnable state→value signal; it
+generalizes to unseen concerns; zero-shot prompting does not recover
+it. n is small — "proceed," not "proven."
+(Gotcha, recorded: legacy `utils/llm_api.LLM('vllm')` posts
+template-less raw completions and degenerates on gemma; the production
+client is `src/chat/backend.py:_ChatBackend`.)
+
+## Build order
+
+1. **`render_disposition_state()` + shadow state logging at triage.**
+   Small, urgent, decision-free — the dataset only grows with
+   wall-clock time. Ship first.
+2. Wire embed+lr as interim shadow scorer (already trained).
+3. Simulator-calibration experiment offline (imagination go/no-go).
+4. Tiny LM on real + admitted-imagined; beat the anchor or stop.
+5. TD over WIP chains when multi-fire arcs accumulate.
+6. G3 coupling as a normal composite-gated M-cycle knob.
+
+## Open decisions (Bruce)
+
+- Contents of the situational slice — anything not logged from day
+  one is gone. Proposed list in §1.
+- Confirm step 1 ships ahead of the rest.
+- Simulator choice for the calibration experiment (few-shot local vs
+  cloud offline).
+
+## Risks (unchanged from v1 draft)
+
+Coverage bias (judged = 0.216 of observable — labels oversample fires
+Bruce reacted to); concern-mix nonstationarity (rolling window +
+leave-one-concern-out checks); auditability loss is constitutive
+(G2/G3 keep the prompted reason alongside the score); Goodhart once
+G3 modulates firing (the label source becomes model-influenced —
+park until then).
 
 ## Out of scope
 
-Backend weight changes (roadmap exclusion stands); replacing the
-prompted triage; any write path into agent state before G3; online /
-incremental learning (retrain-from-scratch only).
+Backend weight changes; replacing prompted triage; learned state
+summarization (v1); online/incremental training (retrain-from-scratch
+only).
