@@ -245,11 +245,12 @@ class ToolsMixin:
              "inside this loop."),
             ("inspect",
              "`{\"thought\": \"<one terse sentence>\", \"tool\": \"inspect\", \"query\": <string>}` — "
-             "query your own codebase. A separate subagent (geofenced read-only to `src/`, list/read/grep "
-             "primitives) navigates the source and returns a synthesized answer with file:line citations. Use "
-             "when the user asks how you work, where something is implemented, what a module does, or to verify "
-             "a claim about your own code. The query is opaque to you — phrase it as a natural-language question "
-             "(e.g. \"where is the ReAct dispatch defined?\", \"what tools does the chat loop wire up?\")."),
+             "query your own codebase. A separate subagent (geofenced read-only to the repo root — `src/`, "
+             "`docs/`, `tests/`, `bench/`; list/read/grep primitives) navigates the tree and returns a "
+             "synthesized answer with file:line citations. Use when the user asks how you work, where something "
+             "is implemented, what a module does, to read a design doc, or to verify a claim about your own "
+             "code. The query is opaque to you — phrase it as a natural-language question (e.g. \"where is the "
+             "ReAct dispatch defined?\", \"what does the learned-disposition design doc say?\")."),
         ]
         external_repo = self._get_external_repo()
         if external_repo is not None:

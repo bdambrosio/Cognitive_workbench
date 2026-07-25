@@ -20,6 +20,15 @@ _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _SRC_DIR = os.path.dirname(_THIS_DIR)
 if _SRC_DIR not in sys.path:
     sys.path.insert(0, _SRC_DIR)
+# Geofence root for the self-inspect subagent. The repo root, not _SRC_DIR:
+# docs/, tests/, and bench/ are part of the substrate she is asked about,
+# and scoping to src/ left her unable to read her own design docs. Safe to
+# widen because the subagent is git-aware inside a checkout — list uses
+# `git ls-files`, read refuses gitignored paths, and grep is ripgrep with
+# gitignore honored. scenarios/*/ is gitignored, so live world state
+# (resources.json, autonomy.jsonl, disposition_state.jsonl) stays out of
+# reach; only the 16 tracked scenario YAMLs are visible.
+_REPO_ROOT = os.path.dirname(_SRC_DIR)
 
 from utils.json_utils import repair_json_string  # noqa: E402
 
@@ -709,7 +718,7 @@ class ReactMixin:
             from chat.code_subagent import inspect as _inspect
             answer = _inspect(
                 query=str(query),
-                repo_root=Path(_SRC_DIR),
+                repo_root=Path(_REPO_ROOT),
                 llm_backend=self.backend,
                 trace_dir=self._inspect_traces_dir(),
             )
