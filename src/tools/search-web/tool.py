@@ -1,7 +1,7 @@
 """
 LLM-assisted web search + synthesize.
 
-Primary:  OpenAI GPT-5.4-mini + web_search via Responses API (cheaper)
+Primary:  OpenAI GPT-5.6 Luna + web_search via Responses API (cheaper)
 Fallback: Claude Sonnet + web_search tool
 
 Env vars:
@@ -57,7 +57,7 @@ warnings.filterwarnings('ignore', category=UserWarning)
 # Constants
 # ------------------------------
 OPENAI_API_URL = "https://api.openai.com/v1/responses"
-OPENAI_MODEL = "gpt-5.4-mini"
+OPENAI_MODEL = "gpt-5.6-luna"
 
 CLAUDE_API_URL = "https://api.anthropic.com/v1/messages"
 CLAUDE_MODEL = "claude-sonnet-4-5-20250929"
@@ -116,7 +116,7 @@ def _extract_domain(url: str) -> str:
 def _call_openai_web_search(query: str, timeout: float = 90.0,
                             heartbeat=None) -> Optional[Dict[str, Any]]:
     """
-    OpenAI GPT-5.4-mini call with web_search tool via Responses API.
+    OpenAI GPT-5.6 Luna call with web_search tool via Responses API.
 
     Returns parsed dict with 'synthesis' and 'sources', or None on failure.
     """
@@ -374,7 +374,7 @@ def llm_search(query: str, llm_generate=None, max_chars: int = 8000,
                wall_time_limit: float = 90.0, heartbeat=None,
                grobid_url: str = None) -> Optional[Dict[str, Any]]:
     """
-    Search using OpenAI GPT-5.4-mini (primary) or Claude Sonnet (fallback).
+    Search using OpenAI GPT-5.6 Luna (primary) or Claude Sonnet (fallback).
 
     Tries OpenAI Responses API first (cheaper). Falls back to Claude if
     OPENAI_API_KEY is not set or the call fails.

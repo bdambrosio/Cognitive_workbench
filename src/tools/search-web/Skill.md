@@ -7,7 +7,7 @@ args:
 
 # search-web
 
-Search the web using an LLM with built-in web search (OpenAI GPT-5.4-mini primary, Claude Sonnet fallback). The LLM performs searches, evaluates results, and returns a single synthesized note with source attribution.
+Search the web using an LLM with built-in web search (OpenAI GPT-5.6 Luna primary, Claude Sonnet fallback). The LLM performs searches, evaluates results, and returns a single synthesized note with source attribution.
 
 ## Query guidance
 
