@@ -284,6 +284,17 @@ class ToolsMixin:
             "or routing/interface state. v0.1 does NOT do traffic capture or IDS log inspection. Phrase as a "
             "natural-language question (e.g. \"what hosts are on my LAN at 192.168.1.0/24?\", \"what TCP ports "
             "am I listening on?\", \"what's my default gateway?\")."))
+        tools.append(("justify",
+            "`{\"thought\": \"<one terse sentence>\", \"tool\": \"justify\"}` — "
+            "READ-ONLY provenance audit of your own most recent reply in this conversation. Returns that "
+            "reply's factual claims, each typed by grounding (retrieved / memory / user_asserted / context / "
+            "inferred / model_prior) with the recorded evidence resolved: search sources with URLs, recalled "
+            "memory notes with dates, the user's own words. Use when the user asks you to justify or source "
+            "what you said ('justify your response', 'why should I believe that?', 'where did that come "
+            "from?'). Takes no arguments — it always audits your most recent reply here. Present the returned "
+            "trail faithfully: cite only the evidence it contains, never add sources of your own, and say "
+            "plainly when a claim is model_prior (your background knowledge) or inferred rather than "
+            "retrieved. If it returns EMPTY, relay the stated reason honestly."))
         # Auto-discovered tools from src/tools/ (each exposes react_invoke).
         # Rendered between the built-in subagents and the display/respond
         # actions so the prompt's tool ordering matches its mental model:

@@ -143,7 +143,7 @@ updated *between* turns.
 3. **Respond** — the reply ships.
 4. **Reflect** — asynchronous post-turn updates: memories, discourse state,
    companion model, user-concern adds/updates/closes, agent-concern
-   extraction. The reply does not wait.
+   extraction, claim attribution. The reply does not wait.
 
 **Push state vs pull state.** Push state is always rendered into the
 system prompt: top-K recalled memories from a FAISS-indexed collection, the
@@ -156,12 +156,27 @@ currently summarized. Writes happen only via reflection; there is no
 in-loop write tool.
 
 **Tools.** Built-ins (`process_text`, `recall`, `inspect`,
-`inspect_external`, `security`, `display`, `respond`) plus a
+`inspect_external`, `security`, `justify`, `display`, `respond`) plus a
 drop-in registry: every directory under `src/tools/` with a `Skill.md` and
 a `tool.py` exposing `react_invoke` is discovered at startup — currently
 web search, page fetch, calculator, email check, Obsidian, Semantic
 Scholar, stock quotes, company financial statements, image generation,
 shell scripts, and others. No core edits to add one.
+
+**Provenance and justification.** Every tool step records structured
+provenance (`tool_meta` — e.g. the full source list behind a web search)
+into the reasoning trace, and a post-turn pass decomposes each reply into
+typed claims — `retrieved` / `memory` / `user_asserted` / `context` /
+`inferred` / `model_prior`, with resolvable refs — appended to
+`claims.jsonl`. The `justify` built-in is the read path: asked "justify
+your response / why should I believe that?", the agent renders the
+previous reply's claims and their recorded evidence (search sources with
+URLs, recalled notes with dates) deterministically from the persisted
+records — no LLM in the read, so the trail can't be embellished. A reply
+answered from parametric memory shows up as exactly that: `model_prior`,
+no refs. `tools/trace_claim.py` audits the same joins offline. No numeric
+confidence scores anywhere by design; see
+[docs/provenance-verifiability.md](docs/provenance-verifiability.md).
 
 **Geofenced subagents.** Persona-less ReAct loops scoped to a typed
 surface; from the parent's vantage each call is one step, and per-call
@@ -290,7 +305,8 @@ Each character in each world gets a `memory/` directory.
   `discourse_state_<entity>.txt`.
 - **Append-only history:** `conversation.txt`, `reasoning_trace.jsonl`
   (per-iteration ReAct records), `memories.jsonl` (write provenance),
-  `autonomy.jsonl` (concern fires + triage verdicts).
+  `autonomy.jsonl` (concern fires + triage verdicts), `claims.jsonl`
+  (per-reply claims with typed grounding + evidence refs).
 - **FAISS-indexed collections:** `memories`, `reasoning_history`,
   `agent_concerns`, `user_concerns`, `agent_threads`. Concerns and threads
   are first-class notes — user concerns carry their evolving context,
@@ -423,6 +439,9 @@ Key entrypoints, by need:
 
 - [BACKGROUND.md](BACKGROUND.md) — research stance: what LLMs already
   know, the Socratic approach, why an information space.
+- [docs/provenance-verifiability.md](docs/provenance-verifiability.md) —
+  staged verifiability: traceable → cited (live) → evidenced →
+  tamper-evident.
 - [docs/STATUS.md](docs/STATUS.md) — every design doc classified against
   the live code (LIVE / ASPIRATIONAL / SUPERSEDED / REFERENCE).
 - [docs/substack_sensors_vs_tools.md](docs/substack_sensors_vs_tools.md),

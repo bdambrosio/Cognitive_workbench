@@ -1,9 +1,12 @@
 # Provenance & Verifiability — Levels Plan and Status
 
-**Status 2026-08-01: Levels 1–2 implemented, uncommitted, live-session
-validation pending.** All code compiled, unit-verified, and validated
-offline against real trace records; 73/73 existing tests pass. Nothing
-has run in a live Jill session yet.
+**Status 2026-08-02: Levels 1–2 committed (`0e3d0fd8`) and
+live-validated; `justify` read path implemented.** Live validation
+(2026-08-02, turn 2182 — a real search-web turn): `tool_meta` captured
+with the full structured source list, 10 claims written to
+`claims.jsonl` all with resolvable refs, `trace_claim turn:2182` green
+end-to-end. The `justify` ReAct tool (below) closes the loop: Jill can
+now answer "justify your response" from the persisted records.
 
 ## Goal
 
@@ -76,14 +79,41 @@ Correct retrieved/$step refs, inferred-with-premises, and model_prior
 detection (Mariana Trench figure NOT credited to a source). End-to-end
 `trace_claim` audit green; dangling-ref path exits 1.
 
+`justify` read path (2026-08-02): a no-argument ReAct built-in
+("justify your response" / "why should I believe that?"). Deterministic
+and LLM-free — renders the most recent reply-to-this-source's claims
+plus a resolved evidence index (search sources with URLs from
+`tool_meta`, recalled notes with dates from `memories.jsonl`, the
+user's words) directly from the persisted records, so the trail cannot
+be re-synthesized or embellished. Matching on trace `source` skips
+interleaved autonomous fires. If the turn has no claims record yet,
+`justify` attributes ON DEMAND (same `attribute_claims`, persisted via
+the same writer) rather than waiting: post-turn attribution runs last
+behind discourse + reflection and landed ~2.5 min after the reply in
+live testing (turn 2187, 2026-08-02) — a poll can't win that race. A
+duplicate write from the still-queued post-turn job is benign
+(last-match-wins join); on-demand also covers turns that predate claim
+attribution. Files: `src/chat/claims.py` (module-level lookups +
+`render_justification` + `_run_justify`), dispatch in
+`src/chat/react.py`, catalog entry in `src/chat/tools.py`; tests in
+`tests/test_justify.py`. The lookups intentionally duplicate ~15 lines
+of `tools/trace_claim.py`, which stays standalone stdlib-only by
+design.
+
 ## Next steps (in order)
 
-1. **Live validation** — next Jill session with a web search: check the
-   newest trace record for `tool_meta`, wait for post-turn claims, run
-   `python tools/trace_claim.py --world jill_chat turn:<N>`.
+1. **Re-validate `justify` live** — first live test (2026-08-02, turn
+   2188) proved the dispatch + honest-EMPTY path but lost the race to
+   the post-turn executor (hence on-demand attribution above); retest
+   after restart. Same session also showed the system catching a real
+   hallucination: turn 2187 (Satisfactory aluminum advice, no search)
+   attributed as 9/9 `model_prior`, refs [] — and the advice was in
+   fact substantially wrong. Whether Jill *should* have searched there
+   is a disposition question, out of scope for provenance.
 2. **Autonomous-turn claims** — post-turn work is skipped on autonomous
    fires, so outward-facing (Telegram/Bluesky) replies currently get no
-   claim pass; arguably they need it most.
+   claim pass; arguably they need it most. `justify` already reports
+   this gap honestly when asked during an autonomous run.
 3. **Provenance probe bench** (Level-2 acceptance gate) — probes with
    known sources, judge scores whether claims + refs resolve via
    trace_claim; `bench/memory_recall` style. Build after a few live

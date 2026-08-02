@@ -72,7 +72,7 @@ REACT_ACTION_SCHEMA: Dict[str, Any] = {
 
 # Tools the model can emit. Validated structurally in _parse_react_action;
 # the dispatcher in _run_react_loop knows how to run each.
-_REACT_TOOLS = ('process_text', 'recall', 'inspect', 'inspect_external', 'security', 'display', 'respond', 'yield')
+_REACT_TOOLS = ('process_text', 'recall', 'inspect', 'inspect_external', 'security', 'justify', 'display', 'respond', 'yield')
 
 # Per-iteration auto-binding: $step1, $step2, ... names the result of each
 # action so subsequent actions can reference it. Scoped to the current turn
@@ -548,6 +548,8 @@ class ReactMixin:
             elif tool == 'security':
                 q = self._resolve_react_value(action.get('query', ''), log)
                 obs = self._run_security(q)
+            elif tool == 'justify':
+                obs = self._run_justify(source)
             elif tool == 'display':
                 content = self._resolve_react_value(action.get('content', ''), log)
                 fmt = (action.get('format') or 'markdown').strip().lower()
@@ -581,7 +583,7 @@ class ReactMixin:
                 # Tool list shown to the model on bad emission. Built-ins
                 # are stable; the discovered set comes from the registry.
                 builtin = ["process_text", "recall", "inspect", "security",
-                           "display", "respond"]
+                           "justify", "display", "respond"]
                 if self._get_external_repo() is not None:
                     builtin.insert(builtin.index("inspect") + 1, "inspect_external")
                 avail = ", ".join(builtin + sorted(self._discovered_tools.keys()))

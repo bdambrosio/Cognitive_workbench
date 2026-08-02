@@ -24,6 +24,7 @@ import hashlib
 import logging
 import json
 import re
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set
 
 logger = logging.getLogger('chat_loop')
@@ -170,6 +171,169 @@ def attribute_claims(record: Dict[str, Any],
     return claims
 
 
+# ── justify: deterministic read path over the persisted provenance ──────
+#
+# The `justify` ReAct tool renders "why should I believe this?" from the
+# records exactly as persisted (claims.jsonl + reasoning_trace.jsonl +
+# memories.jsonl) — no LLM in the read path, so the trail cannot be
+# re-synthesized or embellished. Module-level over a memory dir, same
+# offline-equals-production property as attribute_claims.
+#
+# tools/trace_claim.py implements the same lookups independently: it is
+# a standalone stdlib-only CLI by design (auditable without the src tree
+# on the path), so the ~15 shared lines are deliberately not extracted.
+
+_JUSTIFY_CLIP = 300
+
+
+def _clip(s: Any, cap: int = _JUSTIFY_CLIP) -> str:
+    s = str(s)
+    return s if len(s) <= cap else s[:cap] + f' …[+{len(s) - cap} chars]'
+
+
+def _scan_jsonl_last_match(path: Path, key: str, value: Any
+                           ) -> Optional[Dict[str, Any]]:
+    """Last matching record wins — same join semantics as the sidecar
+    writers (a turn re-attributed, or a seq reused by an old session,
+    is superseded by the latest record)."""
+    if not path.is_file():
+        return None
+    found: Optional[Dict[str, Any]] = None
+    with open(path, encoding='utf-8') as f:
+        for line in f:
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if rec.get(key) == value:
+                found = rec
+    return found
+
+
+def claims_for_turn(memory_dir: Path, turn_seq: int
+                    ) -> Optional[Dict[str, Any]]:
+    return _scan_jsonl_last_match(
+        Path(memory_dir) / 'claims.jsonl', 'turn_seq', turn_seq)
+
+
+def latest_turn_for_source(memory_dir: Path, source: str
+                           ) -> Optional[Dict[str, Any]]:
+    """Most recent reasoning-trace record for this conversation. Matching
+    on `source` naturally excludes autonomous fires (their source is the
+    character itself), so interleaved autonomous turns don't shadow the
+    reply the user is asking about."""
+    path = Path(memory_dir) / 'reasoning_trace.jsonl'
+    if not path.is_file():
+        return None
+    found: Optional[Dict[str, Any]] = None
+    with open(path, encoding='utf-8') as f:
+        for line in f:
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if rec.get('source') == source:
+                found = rec
+    return found
+
+
+def note_sidecar_lookup(memory_dir: Path, note_id: str
+                        ) -> Optional[Dict[str, Any]]:
+    """First write event for the note in memories.jsonl (notes are
+    written once; later events for the same id are edits/supersessions
+    and the original text is what the claim cited)."""
+    path = Path(memory_dir) / 'memories.jsonl'
+    if not path.is_file():
+        return None
+    with open(path, encoding='utf-8') as f:
+        for line in f:
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if rec.get('note_id') == note_id:
+                return rec
+    return None
+
+
+_GROUNDING_KEY = (
+    "Grounding key: retrieved = stated in a tool observation that turn; "
+    "memory = recalled from a persisted memory note; user_asserted = the "
+    "user's own words that turn; context = earlier conversation; inferred = "
+    "derived by reasoning from the cited evidence; model_prior = background "
+    "knowledge — nothing recorded that turn supports it.")
+
+
+def render_justification(claims_rec: Dict[str, Any],
+                         trace_rec: Dict[str, Any],
+                         memory_dir: Path) -> str:
+    """Render one turn's attributed claims plus a resolved evidence index
+    as plain text. Deterministic — everything comes from the persisted
+    records; nothing is summarized or re-judged by a model."""
+    seq = claims_rec.get('turn_seq')
+    replied_to = _clip(trace_rec.get('user_input') or '(autonomous turn)', 150)
+    claims = claims_rec.get('claims') or []
+    lines = [f"Provenance trail for your previous reply "
+             f"(turn {seq}, replying to: {replied_to!r})."]
+    if not claims:
+        lines.append(
+            "That reply made no checkable factual claims (greetings, "
+            "opinions, questions and offers are not claims).")
+        return '\n'.join(lines)
+
+    lines.append(f"\nClaims ({len(claims)}):")
+    cited: List[str] = []
+    for i, c in enumerate(claims, 1):
+        refs = c.get('refs') or []
+        ref_txt = f" ← {', '.join(refs)}" if refs else ""
+        lines.append(f"{i}. [{c.get('grounding')}{ref_txt}] {c.get('claim')}")
+        for r in refs:
+            if r not in cited:
+                cited.append(r)
+
+    tool_meta = trace_rec.get('tool_meta') or {}
+    ev: List[str] = []
+    for ref in cited:
+        if ref == 'user_input':
+            ev.append(f"user_input — the user's own words that turn: "
+                      f"{_clip(trace_rec.get('user_input') or '')!r}")
+        elif ref.startswith('$step'):
+            tm = tool_meta.get(ref)
+            if not isinstance(tm, dict):
+                ev.append(f"{ref} — tool observation that turn "
+                          f"(no structured metadata recorded)")
+                continue
+            ev.append(f"{ref} — {tm.get('tool')}:")
+            for entry in (tm.get('meta') or []):
+                md = (entry or {}).get('tool_metadata') or {}
+                query = md.get('query')
+                sources = md.get('sources') or []
+                if query:
+                    ev.append(f"    query: {query}")
+                for s in sources:
+                    if isinstance(s, dict):
+                        ev.append(f"    - {s.get('title') or s.get('domain') or '?'}"
+                                  f" — {s.get('url') or ''}")
+                if not query and not sources and md:
+                    ev.append(f"    {_clip(json.dumps(md, default=str))}")
+        elif ref.startswith('Note_'):
+            rec = note_sidecar_lookup(memory_dir, ref)
+            if rec is not None:
+                date = str(rec.get('ts') or '')[:10]
+                ev.append(f"{ref} — memory written {date}: "
+                          f"{_clip(rec.get('text') or '')!r}")
+            else:
+                ev.append(f"{ref} — recalled memory "
+                          f"(not found in memories.jsonl sidecar)")
+        else:
+            ev.append(f"{ref} — unrecognized ref form")
+    if ev:
+        lines.append("\nEvidence:")
+        lines.extend(ev)
+    lines.append("\n" + _GROUNDING_KEY)
+    return '\n'.join(lines)
+
+
 class ClaimsMixin:
     """Mixin for ChatLoop — post-turn claim extraction."""
 
@@ -234,3 +398,34 @@ class ClaimsMixin:
             'reply_sha1': hashlib.sha1(reply.encode('utf-8')).hexdigest(),
             'claims': claims,
         }, character=self.character_name)
+
+    def _run_justify(self, source: str) -> str:
+        """Backend for the ReAct `justify` tool: render the provenance
+        trail of the most recent reply to this conversation. Read-only
+        and LLM-free — the observation is the persisted records."""
+        memory_dir = self._memory_dir()
+        trace_rec = latest_turn_for_source(memory_dir, source)
+        if trace_rec is None:
+            return ("EMPTY: no prior reply to this conversation in the "
+                    "reasoning trace — nothing to justify yet.")
+        seq = trace_rec.get('turn_seq')
+        claims_rec = claims_for_turn(memory_dir, seq)
+        if claims_rec is None:
+            if trace_rec.get('autonomous'):
+                return ("EMPTY: the previous turn here was autonomous; "
+                        "claim attribution does not yet cover autonomous "
+                        "turns, so no trail exists for it.")
+            # Attribute on demand rather than waiting on the post-turn
+            # executor — claims run last there, behind discourse and
+            # reflection, which is minutes on a local backend (live
+            # validation 2026-08-02: turn 2187's claims landed ~2.5 min
+            # after the reply). A duplicate write from the still-queued
+            # post-turn job is benign: claims_for_turn is last-match-wins.
+            # Also covers turns persisted before claim attribution existed.
+            self._extract_and_log_claims(int(seq))
+            claims_rec = claims_for_turn(memory_dir, seq)
+        if claims_rec is None:
+            return (f"EMPTY: claim attribution for turn {seq} did not "
+                    f"produce a record (see warning log).")
+        return "OK: " + render_justification(claims_rec, trace_rec,
+                                             memory_dir)
