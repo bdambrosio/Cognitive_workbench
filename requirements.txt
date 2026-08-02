@@ -1,12 +1,14 @@
 # Cognitive Workbench — runtime dependencies for the chat subproject.
 # Development / test deps live in requirements-dev.txt.
 #
-# Tested on Python 3.10+.
+# Tested on Python 3.10+. Current venv (2026-07-23): uv-managed CPython 3.13
+# (`uv venv --managed-python --python 3.13 --seed zenoh_venv`) — deliberately
+# decoupled from /usr/bin/python3 so OS release upgrades can't break it.
 
 # --- Core ---
 PyYAML>=6.0
 requests>=2.31.0
-eclipse-zenoh>=1.4.0      # pub/sub backbone (launcher ready signal, frontends)
+eclipse-zenoh>=1.6.0      # pub/sub backbone (launcher ready signal, frontends)
 sympy>=1.12.0
 
 # --- CLI frontend (--cli) ---
@@ -23,19 +25,23 @@ uvicorn[standard]>=0.35.0
 
 # --- LLM clients ---
 # Cloud:
-anthropic>=0.39.0         # server: anthropic
-openai>=1.98.0            # server: openai / openrouter / xai (Bearer auth)
+anthropic>=0.96.0         # server: anthropic
+openai>=2.0.0             # server: openai / openrouter / xai (Bearer auth)
 # Local serving (only required if launcher brings up an SGLang runtime;
 # pure-cloud setups can skip these — they are large installs):
-sglang>=0.3.0
-transformers>=4.30.0
-torch>=2.9.1
+# NOTE: current sglang releases depend on a pre-release flash-attn-4 build,
+# which resolvers exclude by default — a plain install silently falls back to
+# an older sglang (and 0.5.2's metadata is broken: missing pybase64 dep).
+# To install/upgrade to current: `uv pip install --prerelease=allow -U sglang`.
+sglang
+transformers>=4.57.0      # sglang pins an exact transformers version
+torch>=2.9.1              # sglang pins an exact torch version
 
 # --- Memory / push-state ---
 numpy>=2.3.0
 scipy>=1.16.0
-sentence-transformers>=2.7.0
-faiss-cpu>=1.7.0          # in-process FAISS collections (memories, concerns, ...)
+sentence-transformers>=3.0.0
+faiss-cpu>=1.12.0         # in-process FAISS collections (memories, concerns, ...)
 
 # --- Tools (used by chat tool implementations under src/tools/) ---
 unstructured>=0.10.0      # fetch_text HTML extraction
@@ -57,6 +63,8 @@ opentelemetry-sdk>=1.38.0
 # --- Legacy / non-chat tree (kept for benches and older code paths) ---
 PyQt6>=6.0.0              # legacy desktop UI (not used by chat mode)
 spacy>=3.7.0              # test_space.py / legacy NLP
+                          # (also requires the en_core_web_sm model, not on
+                          #  PyPI: `python -m spacy download en_core_web_sm`)
 zstandard>=0.22.0         # training-data compression (LoRA tooling)
 safetensors>=0.4.0        # LoRA adapter storage
 imageio>=2.30.0           # utils/create-log-gif*.py
