@@ -79,6 +79,7 @@ class CapturingResourceManager:
         self._notes: Dict[str, str] = {}
         self._collections: Dict[str, List[str]] = {}
         self._creation_order: List[str] = []
+        self._note_meta: Dict[str, Dict[str, Any]] = {}
 
     # ---- Note creation ----------------------------------------------------
     def create_note(self, character_name: str, content: Any, format_type: str,
@@ -88,6 +89,16 @@ class CapturingResourceManager:
         nid = f"StubNote_{next(self._counter)}"
         self._notes[nid] = "" if content is None else str(content)
         self._creation_order.append(nid)
+        # Retain provenance instead of destroying it: tools assemble
+        # source URLs / paths / queries into `tool_metadata` (via
+        # extra_props) and the real manager reifies them. Stash them here
+        # so `tool_meta()` can surface them to the ReAct trace.
+        meta: Dict[str, Any] = {"source_skill": source_skill,
+                                "source_value": source_value}
+        tm = (extra_props or {}).get("tool_metadata")
+        if isinstance(tm, dict) and tm:
+            meta["tool_metadata"] = tm
+        self._note_meta[nid] = meta
         return True, nid, None, None
 
     def update_note_content(self, note_id: str, new_content: Any,
@@ -161,6 +172,13 @@ class CapturingResourceManager:
                 chunks.append(self.get_collection_text(rid, separator=separator))
         return separator.join(c for c in chunks if c)
 
+    def tool_meta(self) -> List[Dict[str, Any]]:
+        """Captured per-note provenance (creation order): each entry has
+        `source_skill`/`source_value` plus `tool_metadata` when the tool
+        supplied one. Empty list if nothing was captured."""
+        return [self._note_meta[rid] for rid in self._creation_order
+                if rid in self._note_meta]
+
 
 def translate_result(result: Any, *,
                      manager: Optional[CapturingResourceManager] = None,
@@ -185,7 +203,9 @@ def translate_result(result: Any, *,
         empty_text: fallback message when status=success but no text
             can be recovered.
 
-    Returns: `{"status": "ok"|"error"|"empty", "text": str}`.
+    Returns: `{"status": "ok"|"error"|"empty", "text": str}`, plus
+    `"meta"` (list of captured per-note provenance dicts) when the
+    manager captured any `tool_metadata` during the run.
     """
     if not isinstance(result, dict):
         return {"status": "error",
@@ -201,7 +221,12 @@ def translate_result(result: Any, *,
                 text = manager.get_resource_text(rid)
         if not text:
             return {"status": "empty", "text": empty_text}
-        return {"status": "ok", "text": str(text)}
+        out: Dict[str, Any] = {"status": "ok", "text": str(text)}
+        if manager is not None:
+            meta = [m for m in manager.tool_meta() if m.get("tool_metadata")]
+            if meta:
+                out["meta"] = meta
+        return out
 
     reason = result.get("reason") or result.get("value") or "failed"
     return {"status": "error", "text": str(reason)}

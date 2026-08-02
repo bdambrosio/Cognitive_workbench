@@ -120,7 +120,8 @@ class ConversationStore:
         except Exception as e:
             self.logger.warning(f'conversation collection trim failed: {e}')
 
-    def record_incoming(self, source: str, text: str, close: bool = False) -> bool:
+    def record_incoming(self, source: str, text: str, close: bool = False,
+                        modality: Optional[str] = None) -> bool:
         entity = self._normalize_entity(source)
         dialog_id = self._get_or_start_dialog(entity)
         turn = {
@@ -134,6 +135,10 @@ class ConversationStore:
             "dialog_id": dialog_id,
             "close": bool(close)
         }
+        # Provenance: voice vs typed turn. Only stamped when the transport
+        # supplied it, so older records keep their shape.
+        if modality:
+            turn["modality"] = modality
         ok = self._append_turn(turn)
         if ok:
             self._dialog_turn_counts[entity] = self._dialog_turn_counts.get(entity, 0) + 1

@@ -57,6 +57,7 @@ Categories:
 | [jill-self-extension.md](jill-self-extension.md) | Recursive tool construction; Phase 2a (judgment/propose-only) SHIPPED 2026-06 — capability-gap capture → self-extension concern; Phase 1/2b (generative author-test-restart path) unbuilt |
 | [knowledge-base-system.md](knowledge-base-system.md) | Obsidian-backed three-tier knowledge base; obsidian tool (read/search/write→Notes) exists, decomposition/curation system doesn't |
 | [learned-disposition-design.md](learned-disposition-design.md) | Tiny-LM state→value learning over fire decisions (RL on imagined trajectories, real judged outcomes as anchor); G1 offline anchor passed 2026-07-24 (`bench/disposition/`), build-order step 1 — state capture + render — SHIPPED 2026-07-25 (`src/chat/disposition.py`, shadow-log only); scorer, imagination gate, and triage coupling unbuilt. Descends from substack-gut-feeling-draft.md |
+| [provenance-verifiability.md](provenance-verifiability.md) | Staged verifiability toward "justify your response" (claim-graph, no invented numerics); Levels 1–2 IMPLEMENTED 2026-08-01 (`src/chat/claims.py`, `tools/trace_claim.py`, tool_meta in reasoning trace, `[Note_N · date]` recall tags, monotonic turn_seq) — uncommitted, offline-validated, live validation pending; Levels 3–4 (content-addressed evidence, tamper-evidence) unbuilt |
 
 ## SUPERSEDED — deleted 2026-06-11 and 2026-07-19
 

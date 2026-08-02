@@ -199,6 +199,13 @@ class ToolsMixin:
             return f"ERROR: {name} returned non-dict ({type(result).__name__})"
         status = result.get("status")
         text = str(result.get("text", "")).strip()
+        # Structured provenance (source URLs / queries / paths) returned by
+        # the tool. Never enters the prompt text — stashed for the ReAct
+        # loop to attach to this iter's trace record, mirroring the
+        # `_pending_tool_image` single-slot pattern.
+        meta = result.get("meta")
+        if isinstance(meta, list) and meta:
+            self._pending_tool_meta = {"tool": name, "meta": meta}
         if status == "ok":
             # A tool may optionally return an image for the model to SEE
             # (e.g. camera-capture). The image bytes never enter the text log:

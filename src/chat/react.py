@@ -168,18 +168,22 @@ class ReactMixin:
                     "literal inline text or a `$stepN` binding.")
         return None
 
-    def _run_process_text(self, source_text: str, instruction: str) -> str:
+    def _run_process_text(self, source_text: str, instruction: str,
+                          cited_sources: Optional[List[Dict[str, Any]]] = None
+                          ) -> str:
         """Apply a focused LLM pass to source_text using the given instruction.
         Used by the ReAct process_text tool.
 
         The persona block is passed as system context so output respects
         Jill's voice (fair witness, no sycophancy, grounded specifics). The
         citation rule is added explicitly because the persona doesn't
-        codify it: when the source contains a 'Sources:' block (the format
-        web-search results use), the output must cite by domain or
-        publication name rather than 'the source' / 'the writeup'.
+        codify it: `cited_sources` is the structured source list attached
+        to the $stepN binding this call is processing (set by the ReAct
+        dispatch from the step's tool_meta) — when present, the output
+        must cite by domain or publication name rather than 'the source'
+        / 'the writeup'.
         """
-        has_sources = isinstance(source_text, str) and 'Sources:' in source_text
+        has_sources = bool(cited_sources)
         sys_parts = [
             f"You are {self.character_name}. The user has asked you to apply an "
             "instruction to a source text. Output ONLY the transformed result — "
@@ -245,7 +249,7 @@ class ReactMixin:
             pass
 
     def _run_react_loop(self, source: str, user_text: str, orientation: str,
-                        recall: Optional[List[Tuple[str, str, str]]] = None,
+                        recall: Optional[List[Tuple[str, str, str, Optional[str], Optional[str]]]] = None,
                         agent_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None,
                         user_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None,
                         image_url: Optional[str] = None
@@ -308,6 +312,17 @@ class ReactMixin:
         # it. Single slot (most-recent-wins) and reset each turn: a fresh frame
         # replaces the old one, and stale frames don't leak across turns.
         self._pending_tool_image = None
+
+        # Structured provenance from the most recent discovered-tool call
+        # (source URLs, query, paths). Consumed right after dispatch into
+        # the iter record; reset here so stale meta can't leak across turns.
+        self._pending_tool_meta = None
+
+        # $stepN binding → structured source list ({url,domain,title,...})
+        # for steps whose tool_meta carried sources (search-web). This is
+        # the structural signal for process_text's citation discipline —
+        # replaces the old `'Sources:' in text` substring test. Per-turn.
+        self._step_sources: Dict[str, List[Dict[str, Any]]] = {}
 
         # Intentional-yield handoff: when an autonomous run exits via the
         # `yield` action, the follow-up instruction lands here for the
@@ -512,7 +527,15 @@ class ReactMixin:
                     # failure rather than mistaking it for content.
                     obs = f'ERROR: process_text rejected: {diag}'
                 else:
-                    obs = self._run_process_text(src, ins)
+                    # Citation discipline fires on a structural signal: the
+                    # source is a $stepN binding whose step carried
+                    # structured sources — not on substring inspection of
+                    # the text.
+                    cited = None
+                    if isinstance(raw_src, str):
+                        cited = self._step_sources.get(raw_src.strip())
+                    obs = self._run_process_text(src, ins,
+                                                 cited_sources=cited)
             elif tool == 'recall':
                 q = self._resolve_react_value(action.get('query', ''), log)
                 obs = self._run_remember(q)
@@ -546,6 +569,14 @@ class ReactMixin:
                            "run.")
             elif tool in self._discovered_tools:
                 obs = self._dispatch_discovered_tool(tool, action, log)
+                if self._pending_tool_meta is not None:
+                    iters[-1]['tool_meta'] = self._pending_tool_meta
+                    srcs = [s for m in (self._pending_tool_meta.get('meta') or [])
+                            for s in ((m.get('tool_metadata') or {}).get('sources') or [])
+                            if isinstance(s, dict)]
+                    if srcs:
+                        self._step_sources[binding] = srcs
+                    self._pending_tool_meta = None
             else:
                 # Tool list shown to the model on bad emission. Built-ins
                 # are stable; the discovered set comes from the registry.

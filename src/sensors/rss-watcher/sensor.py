@@ -46,12 +46,17 @@ def run(context):
     capped = new_items[:MAX_PER_CYCLE]
     overflow = total_new - len(capped)
 
-    # Build Note content: one title per line, with overflow header if needed
+    # Build Note content: one title per line (with source URL when the
+    # feed provides one — dropping it here would lose the only pointer
+    # back to the article), plus overflow header if needed
     lines = []
     if overflow > 0:
         lines.append(f"[{overflow} additional new titles not shown]")
     for item in capped:
-        lines.append(item['title'])
+        if item['url']:
+            lines.append(f"{item['title']} — {item['url']}")
+        else:
+            lines.append(item['title'])
     note_content = "\n".join(lines)
 
     # Write to persistent Note '_rss_pending_titles' so the goal can read it

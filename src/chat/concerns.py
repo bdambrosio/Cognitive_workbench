@@ -305,19 +305,11 @@ class ConcernsMixin:
         return self._memory_dir() / 'autonomy.jsonl'
 
     def _write_autonomy_event(self, event: Dict[str, Any]) -> None:
-        """Append one event record to autonomy.jsonl. Stamps `ts` and
-        `character` if not already set. Best-effort — failures log a
-        warning but don't disrupt the autonomous turn."""
-        path = self._autonomy_log_path()
-        record = dict(event)
-        record.setdefault('ts', datetime.now(timezone.utc).isoformat())
-        record.setdefault('character', self.character_name)
-        try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with open(path, 'a', encoding='utf-8') as f:
-                f.write(json.dumps(record, ensure_ascii=False) + '\n')
-        except Exception as e:
-            logger.warning(f"[{self.character_name}] autonomy.jsonl write failed: {e}")
+        """Append one event record to autonomy.jsonl (stamps ts/character;
+        best-effort — see utils.file_utils.append_jsonl)."""
+        from utils.file_utils import append_jsonl
+        append_jsonl(self._autonomy_log_path(), event,
+                     character=self.character_name)
 
     @staticmethod
     def _seed_concern_name(ident) -> str:

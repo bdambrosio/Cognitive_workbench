@@ -90,7 +90,12 @@ class MemoriesMixin:
                         "category": category,
                         "polarity": polarity,
                         "entity": entity,
-                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        # Provenance: same turn pointer memories.jsonl
+                        # records, kept on the note itself so audit tools
+                        # can walk memory → reasoning_trace turn without
+                        # the sidecar. (created_at is auto-stamped by
+                        # create_note; passing it here was a silent drop.)
+                        "source_turn_seq": getattr(self, '_turn_seq', None),
                     },
                 )
                 if not success or not note_id:
@@ -144,13 +149,17 @@ class MemoriesMixin:
             return score
 
     def _recall(self, query: str, k: int = 3, threshold: float = 0.5
-                ) -> List[Tuple[str, str, str]]:
+                ) -> List[Tuple[str, str, str, Optional[str], Optional[str]]]:
         """Semantic search over the memories Collection. Returns ranked
-        (text, category, polarity) tuples, highest score first. Category
-        is read from the source note's properties; pre-taxonomy memories
-        without a category default to 'fact'. Polarity is 'positive' or
-        'negative'; pre-J memories without a polarity default to
-        'positive'. Empty list on miss / not yet indexed / any error.
+        (text, category, polarity, note_id, created_at) tuples, highest
+        score first. Category is read from the source note's properties;
+        pre-taxonomy memories without a category default to 'fact'.
+        Polarity is 'positive' or 'negative'; pre-J memories without a
+        polarity default to 'positive'. note_id/created_at are None when
+        the chunk's source note is missing — they carry provenance
+        (claim-level citation, recency display) and must survive to the
+        prompt render and the reasoning trace, not die in this tuple.
+        Empty list on miss / not yet indexed / any error.
 
         Re-ranks by recency-adjusted score: fetch up to 2*k candidates
         from FAISS, apply a saturating age penalty (see _recency_adjust),
@@ -166,7 +175,7 @@ class MemoriesMixin:
                     mode='semantic', limit=fetch, threshold=threshold)
             if not ok or not results:
                 return []
-            scored: List[Tuple[float, str, str, str]] = []
+            scored: List[Tuple[float, str, str, str, Optional[str], Optional[str]]] = []
             for r in results:
                 if not isinstance(r, dict):
                     continue
@@ -199,9 +208,11 @@ class MemoriesMixin:
                             created_at = ca
                 base_score = float(r.get('score') or 0.0)
                 adj = self._recency_adjust(base_score, created_at)
-                scored.append((adj, doc.strip(), cat, pol))
+                scored.append((adj, doc.strip(), cat, pol, note_id or None,
+                               created_at))
             scored.sort(key=lambda x: x[0], reverse=True)
-            return [(text, cat, pol) for _adj, text, cat, pol in scored[:k]]
+            return [(text, cat, pol, nid, ca)
+                    for _adj, text, cat, pol, nid, ca in scored[:k]]
         except Exception as e:
             logger.warning(f"[{self.character_name}] _recall failed: {e}")
             return []
@@ -216,19 +227,11 @@ class MemoriesMixin:
         return self._memory_dir() / 'memories.jsonl'
 
     def _write_memory_event(self, event: Dict[str, Any]) -> None:
-        """Append one event record to memories.jsonl. Stamps `ts` and
-        `character` if not already set. Best-effort — failures log a
-        warning but don't disrupt the write that triggered the event."""
-        path = self._memories_log_path()
-        record = dict(event)
-        record.setdefault('ts', datetime.now(timezone.utc).isoformat())
-        record.setdefault('character', self.character_name)
-        try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with open(path, 'a', encoding='utf-8') as f:
-                f.write(json.dumps(record, ensure_ascii=False) + '\n')
-        except Exception as e:
-            logger.warning(f"[{self.character_name}] memories.jsonl write failed: {e}")
+        """Append one event record to memories.jsonl (stamps ts/character;
+        best-effort — see utils.file_utils.append_jsonl)."""
+        from utils.file_utils import append_jsonl
+        append_jsonl(self._memories_log_path(), event,
+                     character=self.character_name)
 
     def _memory_dir(self) -> 'Path':
         """Per-world per-agent memory directory — substrate the active-recall

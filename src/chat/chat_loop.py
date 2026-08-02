@@ -50,6 +50,7 @@ from chat.backend import _ChatBackend  # noqa: E402
 from chat.memories import (  # noqa: E402,F401 — mixin + back-compat re-exports
     MemoriesMixin, _MEMORIES_COLLECTION_NAME, _MEMORY_CATEGORIES)
 from chat.threads import ThreadsMixin, _AGENT_THREADS_COLLECTION_NAME  # noqa: E402,F401
+from chat.claims import ClaimsMixin  # noqa: E402
 from chat.reflection import (  # noqa: E402,F401
     ReflectionMixin, _REFLECT_FRAME_OK, _CONCERN_INSTRUCTION_NARROWNESS_RULE,
     _REFLECT_STAGE6_RULE)
@@ -114,9 +115,9 @@ logger = logging.getLogger('chat_loop')
 
 # ─── ChatLoop ───────────────────────────────────────────────────────────────
 
-class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
-               ConcernsMixin, DispositionMixin, ToolsMixin, PromptsMixin,
-               ZenohMixin):
+class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
+               ReactMixin, ConcernsMixin, DispositionMixin, ToolsMixin,
+               PromptsMixin, ZenohMixin):
     def __init__(
         self,
         character_name: str,
@@ -1017,7 +1018,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
                            iters: List[Dict[str, Any]],
                            final_response: str,
                            exit_reason: str,
-                           recall: Optional[List[Tuple[str, str, str]]] = None,
+                           recall: Optional[List[Tuple[str, str, str, Optional[str], Optional[str]]]] = None,
                            image_ref: Optional[str] = None) -> None:
         """Append one ReAct session to <memory>/chat_trace.txt as the
         literal byte-stream that was sent to the LLM, with no editorial
@@ -1068,7 +1069,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
                                   final_response: str,
                                   exit_reason: str,
                                   orientation: str = '',
-                                  recall: Optional[List[Tuple[str, str, str]]] = None,
+                                  recall: Optional[List[Tuple[str, str, str, Optional[str], Optional[str]]]] = None,
                                   agent_concerns: Optional[List[Any]] = None,
                                   user_concerns: Optional[List[Any]] = None,
                                   autonomous: bool = False,
@@ -1085,11 +1086,29 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
         faithful record of awareness window per turn without duplicating
         prior trace content."""
         try:
+            # Seed the counter from the existing trace on the session's
+            # first write so turn_seq stays globally monotonic across
+            # restarts (line N = turn N). Without this, turn_seq restarts
+            # at 1 each session and the sidecar joins (memories.jsonl /
+            # claims.jsonl source_turn_seq) become ambiguous.
+            if self._turn_seq == 0:
+                path = self._reasoning_trace_path()
+                if path.is_file():
+                    try:
+                        with open(path, encoding='utf-8') as f:
+                            self._turn_seq = sum(1 for _ in f)
+                    except Exception as e:
+                        logger.warning(
+                            f"[{self.character_name}] turn_seq seed failed: {e}")
             self._turn_seq += 1
 
             # Build working_log as literal text from iters: per-iter raw
             # action emission + bound $stepN observation, untruncated.
             log_lines: List[str] = []
+            # Structured tool provenance keyed by the $stepN binding whose
+            # observation it accompanies (set by the ReAct loop right after
+            # dispatch, so the binding is always in this iter's appended).
+            tool_meta: Dict[str, Any] = {}
             for i, it in enumerate(iters):
                 raw = (it.get('raw') or '').strip()
                 log_lines.append(f"--- iter {i+1} ---")
@@ -1097,6 +1116,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
                 for label, content in (it.get('appended') or []):
                     if isinstance(label, str) and label.startswith('$step'):
                         log_lines.append(f"{label}: {content}")
+                        if it.get('tool_meta'):
+                            tool_meta[label] = it['tool_meta']
             working_log = "\n".join(log_lines)
 
             # Snapshot per-turn state — flatten concerns and recall to
@@ -1121,8 +1142,15 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
                     concerns_at_turn.append(f"[user] {item}")
             recall_at_turn: List[str] = []
             for item in (recall or []):
-                if isinstance(item, tuple) and len(item) >= 2:
-                    recall_at_turn.append(f"[{item[0]}] {item[1]}")
+                if isinstance(item, tuple) and len(item) >= 5:
+                    text, cat, pol, note_id, created_at = item[:5]
+                    day = str(created_at or '')[:10]
+                    tag_parts = [p for p in (note_id, cat, day) if p]
+                    if pol == 'negative':
+                        tag_parts.append('avoid')
+                    recall_at_turn.append(f"[{' '.join(tag_parts)}] {text}")
+                elif isinstance(item, tuple) and len(item) >= 2:
+                    recall_at_turn.append(f"[{item[1]}] {item[0]}")
                 else:
                     recall_at_turn.append(str(item))
 
@@ -1143,6 +1171,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
                 'working_log': working_log,
                 'raw_response': final_response or '',
             }
+            if tool_meta:
+                record['tool_meta'] = tool_meta
             if image_ref:
                 record['image_ref'] = image_ref
             # Fire-outcome join key: lets a trajectory builder assemble
@@ -1168,7 +1198,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
     # Per-turn handling
     # ------------------------------------------------------------------
 
-    def _post_turn_work_tracked(self, source: str, close: bool) -> None:
+    def _post_turn_work_tracked(self, source: str, close: bool,
+                                turn_seq: Optional[int] = None) -> None:
         """Wrapper around _post_turn_work that toggles _post_turn_busy
         for /status visibility. Always clears the flag on exit, success
         or failure. _post_turn_busy is set EITHER here at entry OR by
@@ -1177,13 +1208,15 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
         can't get stuck if _post_turn_work raises."""
         self._post_turn_busy = True
         try:
-            self._post_turn_work(source, close)
+            self._post_turn_work(source, close, turn_seq)
         finally:
             self._post_turn_busy = False
 
-    def _post_turn_work(self, source: str, close: bool) -> None:
+    def _post_turn_work(self, source: str, close: bool,
+                        turn_seq: Optional[int] = None) -> None:
         """Background side-effect job for one turn: discourse update,
-        reflection (memory writes), optional dialog close, autosave.
+        reflection (memory writes), claim attribution, optional dialog
+        close, autosave.
 
         Runs on the post-turn executor (single worker) so jobs are
         sequential per character. Failure-tolerant: any exception is
@@ -1205,6 +1238,17 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
             except Exception as e:
                 logger.warning(
                     f"[{self.character_name}] thread centroid update failed: {e}")
+            # Claim-level provenance (Level-2 verifiability): decompose
+            # this turn's reply into attributed claims → claims.jsonl.
+            # Reads the persisted trace record, so it audits exactly
+            # what is durable. turn_seq is None when no trace was
+            # written (pre-loop crash).
+            if turn_seq is not None:
+                try:
+                    self._extract_and_log_claims(turn_seq)
+                except Exception as e:
+                    logger.warning(
+                        f"[{self.character_name}] claim attribution failed: {e}")
             if close:
                 self.store.close_dialog(source)
             # Autosave. Memories written above land on disk here; without
@@ -1289,7 +1333,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
                 image_ref = image_url
 
         if not autonomous:
-            self.store.record_incoming(source, text, close=close)
+            self.store.record_incoming(source, text, close=close,
+                                       modality=modality)
             self._append_conversation_entry(
                 'in', source, text, meta=f'close={close}')
 
@@ -1489,6 +1534,10 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
                 orientation=orientation, recall=recall,
                 agent_concerns=agent_concerns, user_concerns=user_concerns,
                 autonomous=autonomous, image_ref=image_ref, fire_id=fire_id)
+        # This turn's trace seq, for the post-turn claim-attribution pass.
+        # None when the trace was skipped (pre-loop crash) — _turn_seq
+        # would still hold the PREVIOUS turn's value in that case.
+        claims_turn_seq = self._turn_seq if iters else None
 
         # Post-turn work (discourse + reflection + close + persist) is
         # ~5-15s of LLM calls and conceptually a side effect of the turn.
@@ -1521,16 +1570,17 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ReflectionMixin, ReactMixin,
             # Run reflection inline so a benchmark harness can snapshot
             # state immediately after the call returns and see fully-resolved
             # memory/concern writes from this turn.
-            self._post_turn_work_tracked(source, close)
+            self._post_turn_work_tracked(source, close, claims_turn_seq)
         else:
             try:
                 self._post_turn_busy = True
                 self._post_turn_executor.submit(
-                    self._post_turn_work_tracked, source, close)
+                    self._post_turn_work_tracked, source, close,
+                    claims_turn_seq)
             except RuntimeError:
                 # Executor already shut down (process tearing down).
                 # Fall back to synchronous so nothing is silently dropped.
-                self._post_turn_work_tracked(source, close)
+                self._post_turn_work_tracked(source, close, claims_turn_seq)
 
     # ------------------------------------------------------------------
     # Tick handler — Phase C autonomy entry point.

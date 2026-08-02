@@ -1017,6 +1017,10 @@ class InfospaceResourceManager:
                           # Memory polarity: 'positive' (default) or
                           # 'negative' for explicit dispreferences.
                           'polarity',
+                          # Memory provenance: reasoning_trace turn_seq the
+                          # memory was written from (same pointer as
+                          # memories.jsonl, kept on the note for audit).
+                          'source_turn_seq',
                           # reasoning_history (awareness feed) fields
                           'user_text', 'autonomous', 'exit_reason', 'n_iters', 'compressed',
                           'parent_id', 'order', 'span', 'section', 'source', 'entity', 'edge',
@@ -1034,7 +1038,20 @@ class InfospaceResourceManager:
         for key in allowed_fields:
             if key in extra_props:
                 note_data['properties'][key] = extra_props[key]
-        
+        # Silent drops of un-allowlisted extra_props keys have caused
+        # repeated provenance-loss bugs (see comments above). Warn once
+        # per (source_skill, key) so new losses surface without spamming.
+        dropped = set(extra_props or ()) - allowed_fields
+        if dropped:
+            if not hasattr(self, '_warned_dropped_props'):
+                self._warned_dropped_props = set()
+            fresh = {(source_skill, k) for k in dropped} - self._warned_dropped_props
+            if fresh:
+                self._warned_dropped_props |= fresh
+                logger.warning(
+                    f"create_note: dropping extra_props keys not in allowed_fields "
+                    f"(source_skill={source_skill}): {sorted(k for _s, k in fresh)}")
+
         # Register in registry
         self.resource_registry[note_id] = note_data
         

@@ -46,3 +46,25 @@ def atomic_write_text(path: Union[str, Path], content: str,
 def atomic_write_json(path: Union[str, Path], obj: Any, indent: int = 2) -> None:
     """Atomically replace ``path`` with ``obj`` serialized as JSON."""
     atomic_write_text(path, json.dumps(obj, indent=indent))
+
+
+def append_jsonl(path: Union[str, Path], record: dict,
+                 character: str = '') -> None:
+    """Append one record to an append-only jsonl log, stamping ``ts``
+    (UTC ISO) and ``character`` if the caller didn't set them. Creates
+    parent dirs on first write. Best-effort: failures log a warning and
+    return — an event-log write must never disrupt the turn that
+    produced it. Canonical writer for memories.jsonl / autonomy.jsonl /
+    claims.jsonl-style event streams."""
+    from datetime import datetime, timezone
+    path = Path(path)
+    rec = dict(record)
+    rec.setdefault('ts', datetime.now(timezone.utc).isoformat())
+    if character:
+        rec.setdefault('character', character)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + '\n')
+    except Exception as e:
+        logger.warning(f"append_jsonl: write to {path} failed: {e}")

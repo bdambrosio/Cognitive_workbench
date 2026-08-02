@@ -170,7 +170,7 @@ class PromptsMixin:
         )
 
     def _build_system_prompt(self, source: str, orientation: str,
-                             recall: Optional[List[Tuple[str, str, str]]] = None,
+                             recall: Optional[List[Tuple[str, str, str, Optional[str], Optional[str]]]] = None,
                              agent_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None,
                              user_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None) -> str:
         """Build the persona/state portion of the system prompt — shared base
@@ -288,11 +288,19 @@ class PromptsMixin:
             # are prefixed `[avoid] ` so the model treats them as boundaries
             # rather than positive facts.
             grouped: Dict[str, List[str]] = {c: [] for c in _MEMORY_CATEGORIES}
-            for text, cat, pol in recall:
+            for text, cat, pol, note_id, created_at in recall:
                 if cat not in grouped:
                     cat = 'fact'
                 marker = '[avoid] ' if pol == 'negative' else ''
-                grouped[cat].append(f"{marker}{text}")
+                # Provenance tag: memory id + write date, so the model can
+                # cite a memory ("per what you told me in May") and age-
+                # discount stale ones, and so claim attribution can point
+                # at the exact note. Untagged when the source note is gone.
+                tag = ''
+                if note_id:
+                    day = str(created_at or '')[:10]
+                    tag = f"[{note_id} · {day}] " if day else f"[{note_id}] "
+                grouped[cat].append(f"{tag}{marker}{text}")
 
             body_lines: List[str] = []
             for cat in self._CATEGORY_RENDER_ORDER:
@@ -312,7 +320,10 @@ class PromptsMixin:
                     "agreements that may need follow-up; facts are background "
                     "specifics about " + source + ". Items marked `[avoid]` "
                     "are explicit rejections — do not act on them as if "
-                    "they were positive preferences.\n\n"
+                    "they were positive preferences. The `[Note_N · date]` "
+                    "tag is each memory's id and write date — use the date "
+                    "to judge staleness; never echo the raw Note_N id in "
+                    "conversation.\n\n"
                     + "\n".join(body_lines)
                 )
         disc = self._discourse_state.get(source, '').strip()
@@ -330,7 +341,7 @@ class PromptsMixin:
 
     def _build_react_system_prompt(self, source: str, orientation: str,
                                    now_str: str,
-                                   recall: Optional[List[Tuple[str, str, str]]] = None,
+                                   recall: Optional[List[Tuple[str, str, str, Optional[str], Optional[str]]]] = None,
                                    agent_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None,
                                    user_concerns: Optional[List[Tuple[str, str, float, Dict[str, Any]]]] = None) -> str:
         base = self._build_system_prompt(

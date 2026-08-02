@@ -413,8 +413,9 @@ def react_invoke(args, *, character_name=None, backend=None, logger=None):
 
     Bypasses the legacy `tool()` (which wraps note persistence we don't
     need in chat) and calls `llm_search` directly. Formats synthesis +
-    sources into one text observation; the `Sources:` block triggers
-    process_text's citation discipline downstream.
+    sources into one text observation; the structured `meta` sources are
+    what trigger process_text's citation discipline downstream (the
+    ReAct loop maps them to this step's binding).
     """
     query = args.get("query", "")
     if not isinstance(query, str) or not query.strip():
@@ -449,7 +450,12 @@ def react_invoke(args, *, character_name=None, backend=None, logger=None):
     text = synthesis
     if src_lines:
         text = f"{synthesis}\n\nSources:\n" + "\n".join(src_lines)
-    return {"status": "ok", "text": text}
+    # `meta` carries the full structured source list (uncapped, unlike the
+    # prose block above) so the reasoning trace keeps a durable
+    # claim→URL record even after downstream passes strip URLs.
+    return {"status": "ok", "text": text,
+            "meta": [{"source_skill": "search-web",
+                      "tool_metadata": {"query": query, "sources": sources}}]}
 
 
 def tool(input_value, **kwargs):

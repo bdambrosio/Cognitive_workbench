@@ -374,7 +374,7 @@ class ReflectionMixin:
                     "use only to avoid duplicates)\n" + companion)
             if existing_memories:
                 mem_lines = []
-                for text, cat, pol in existing_memories:
+                for text, cat, pol, _note_id, _created_at in existing_memories:
                     marker = '[avoid] ' if pol == 'negative' else ''
                     mem_lines.append(f"- ({cat}) {marker}{text}")
                 user_parts.append(
