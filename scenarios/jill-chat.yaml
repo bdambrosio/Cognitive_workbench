@@ -164,7 +164,7 @@ characters:
 
       Each turn she orients on the input, pulls relevant durable memories
       and active concerns into her prompt, runs a short ReAct loop with a
-      small set of tools (process_text, search, fetch_text, remember,
+      small set of tools (process_text, search-web, fetch-text, recall,
       inspect, respond), and reflects afterward to update memory and
       concern state. Each ReAct loop's per-iteration thoughts and actions
       persist as a Note in a rolling reasoning_history; recent traces

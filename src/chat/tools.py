@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _SRC_DIR = os.path.dirname(_THIS_DIR)
@@ -165,6 +165,20 @@ class ToolsMixin:
                 f"[{self.character_name}] could not load tool {name}: {e}")
             self._tool_module_cache[name] = None
             return None
+
+    def _canonical_tool_name(self, tool: Any) -> Optional[str]:
+        """Resolve an emitted tool name against the discovered registry,
+        tolerating hyphen/underscore drift ('fetch_text' → 'fetch-text').
+        Exact match wins; the separator-swapped spelling is the only
+        fallback. Returns None when neither spelling is registered."""
+        if not isinstance(tool, str):
+            return None
+        if tool in self._discovered_tools:
+            return tool
+        for cand in (tool.replace('_', '-'), tool.replace('-', '_')):
+            if cand != tool and cand in self._discovered_tools:
+                return cand
+        return None
 
     def _dispatch_discovered_tool(self, name: str, action: Dict[str, Any],
                                   log: List[Tuple[str, str]]) -> str:

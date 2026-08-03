@@ -569,8 +569,8 @@ class ReactMixin:
                     obs = ("ERROR: `yield` requires a non-empty `next` field "
                            "— the imperative instruction for the follow-up "
                            "run.")
-            elif tool in self._discovered_tools:
-                obs = self._dispatch_discovered_tool(tool, action, log)
+            elif (canon := self._canonical_tool_name(tool)) is not None:
+                obs = self._dispatch_discovered_tool(canon, action, log)
                 if self._pending_tool_meta is not None:
                     iters[-1]['tool_meta'] = self._pending_tool_meta
                     srcs = [s for m in (self._pending_tool_meta.get('meta') or [])
