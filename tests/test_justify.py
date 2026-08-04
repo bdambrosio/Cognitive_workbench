@@ -123,9 +123,10 @@ def test_render_justification_full_trail(tmp_path):
     md = _memory_dir(tmp_path)
     _populate(md)
     out = render_justification(CLAIMS[0], TRACE[1], md)
-    # Every claim present with its grounding tag.
-    assert "[retrieved ← $step1] There is no direct world copy/paste." in out
-    assert "[model_prior] The game engine is Unreal." in out
+    # Every claim present with its grounding tag and reduced grade.
+    assert ("[retrieved ← $step1 | probable] "
+            "There is no direct world copy/paste.") in out
+    assert "[model_prior | unverified] The game engine is Unreal." in out
     # The verified quote renders under its claim.
     assert 'quote: "there is no direct copy/paste of world objects"' in out
     # Evidence resolved: search source URL, query, note text with date.
@@ -134,10 +135,12 @@ def test_render_justification_full_trail(tmp_path):
     assert "Note_7 — memory written 2026-07-27" in out
     assert "User prefers modular factory builds." in out
     assert "user_input — the user's own words" in out
-    # Grounding profile summarizes the validated grounding counts, and
-    # the model_prior claim triggers the audit note.
+    # Grounding profile summarizes the validated grounding counts; the
+    # untagged model_prior claim is the weakest link and triggers the
+    # volatility audit note.
     assert ("Grounding profile: 1 inferred, 1 memory, 1 model_prior, "
             "1 retrieved, 1 user_asserted") in out
+    assert "Weakest link: claim 5 (unverified — model_prior, untagged)." in out
     assert "Audit note: model_prior claims rest on training data" in out
     # Grounding key present.
     assert "model_prior = background" in out
@@ -153,6 +156,7 @@ def test_render_justification_no_audit_note_without_prior(tmp_path):
     out = render_justification(claims_rec, TRACE[1], md)
     assert "Grounding profile: 1 retrieved" in out
     assert "Audit note:" not in out
+    assert "Weakest link" not in out  # nothing below probable
 
 
 def test_render_justification_no_claims(tmp_path):
@@ -221,6 +225,100 @@ def test_attribute_claims_no_quote_field_unchanged():
                     "grounding": "user_asserted", "refs": ["user_input"]}]
 
 
+# ── reducer goldens: the incident rows from the taxonomy caps table ────
+
+def test_reducer_spacex_shape(tmp_path):
+    """model_prior x volatile -> suspect; prior-rooted inference ->
+    unverified; weakest link is the volatile prior."""
+    md = _memory_dir(tmp_path)
+    claims_rec = {"turn_seq": 5, "claims": [
+        {"claim": "SpaceX is a private company.",
+         "grounding": "model_prior", "refs": [], "volatility": "volatile"},
+        {"claim": "There is no public share price to track.",
+         "grounding": "inferred", "refs": [], "inference": "deduction"},
+    ]}
+    out = render_justification(claims_rec, {"turn_seq": 5,
+                                            "user_input": "q"}, md)
+    assert ("[model_prior (volatile) | suspect] "
+            "SpaceX is a private company.") in out
+    assert ("[inferred (deduction) | unverified] "
+            "There is no public share price to track.") in out
+    assert "Weakest link: claim 1 (suspect — model_prior, volatile)." in out
+    assert "Audit note: model_prior claims rest on training data" in out
+    assert "cites no recorded evidence" in out  # hidden-premise key
+
+
+def test_reducer_qwen_shape(tmp_path):
+    """negation-from-absence x inadequate probe -> suspect even though
+    the inference cites recorded evidence."""
+    md = _memory_dir(tmp_path)
+    claims_rec = {"turn_seq": 5, "claims": [
+        {"claim": "Qwen3.8-27B is unavailable.",
+         "grounding": "inferred", "refs": ["$step1"],
+         "inference": "negation-from-absence",
+         "query_adequacy": "inadequate"},
+    ]}
+    out = render_justification(claims_rec, {"turn_seq": 5,
+                                            "user_input": "q"}, md)
+    assert ("[inferred (negation-from-absence, inadequate probe) "
+            "← $step1 | suspect] Qwen3.8-27B is unavailable.") in out
+    assert "Audit note: a claim infers non-existence" in out
+
+
+def test_reducer_stable_prior_stays_quiet(tmp_path):
+    """model_prior x stable -> probable; no weakest link, no volatility
+    note — the false-positive direction the tags exist to fix."""
+    md = _memory_dir(tmp_path)
+    claims_rec = {"turn_seq": 5, "claims": [
+        {"claim": "Paris is the capital of France.",
+         "grounding": "model_prior", "refs": [], "volatility": "stable"},
+    ]}
+    out = render_justification(claims_rec, {"turn_seq": 5,
+                                            "user_input": "q"}, md)
+    assert ("[model_prior (stable) | probable] "
+            "Paris is the capital of France.") in out
+    assert "Weakest link" not in out
+    assert "Audit note:" not in out
+
+
+def test_reducer_circular_and_adequacy_default():
+    from chat.claims import grade_claim
+    assert grade_claim({"claim": "x", "grounding": "inferred",
+                        "refs": ["$step1"],
+                        "inference": "circular-support"}) == "suspect"
+    # negation-from-absence with UNKNOWN adequacy: middle ground.
+    assert grade_claim({"claim": "x", "grounding": "inferred",
+                        "refs": ["$step1"],
+                        "inference": "negation-from-absence"}) == "unverified"
+    assert grade_claim({"claim": "x", "grounding": "inferred",
+                        "refs": ["$step1"],
+                        "inference": "entailment"}) == "probable"
+
+
+# ── tag validation at attribution ──────────────────────────────────────
+
+def test_attribute_claims_tag_validation():
+    out = attribute_claims(_attribution_record(), _canned_llm([
+        # Valid: volatility on model_prior.
+        {"claim": "a", "grounding": "model_prior", "refs": [],
+         "volatility": "volatile"},
+        # Invalid value: dropped, claim kept.
+        {"claim": "b", "grounding": "model_prior", "refs": [],
+         "volatility": "very-volatile"},
+        # Misplaced: volatility is not defined for retrieved.
+        {"claim": "c", "grounding": "retrieved", "refs": ["$step1"],
+         "volatility": "volatile", "polarity": "presence"},
+        # query_adequacy only rides on negation-from-absence.
+        {"claim": "d", "grounding": "inferred", "refs": ["$step1"],
+         "inference": "deduction", "query_adequacy": "adequate"},
+    ]))
+    assert out[0]["volatility"] == "volatile"
+    assert "volatility" not in out[1]
+    assert "volatility" not in out[2] and out[2]["polarity"] == "presence"
+    assert out[3]["inference"] == "deduction"
+    assert "query_adequacy" not in out[3]
+
+
 # ── _run_justify observation protocol ──────────────────────────────────
 
 class _Backend:
@@ -276,7 +374,8 @@ def test_run_justify_attributes_on_demand(tmp_path):
     obs = stub._run_justify("User")
     assert stub.backend.calls == 1
     assert obs.startswith("OK: Provenance trail")
-    assert "[retrieved ← $step1] There is no direct world copy/paste." in obs
+    assert ("[retrieved ← $step1 | probable] "
+            "There is no direct world copy/paste.") in obs
     # The on-demand pass persisted the record (durable, not one-shot).
     assert claims_for_turn(md, 12) is not None
 

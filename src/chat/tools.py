@@ -313,9 +313,11 @@ class ToolsMixin:
             "trail faithfully: cite only the evidence it contains, never attribute sources to the original "
             "reply that the trail does not record, and say plainly when a claim is model_prior (your "
             "background knowledge) or inferred rather than retrieved. Then AUDIT the trail before replying: "
-            "if a load-bearing claim is model_prior about a temporally contingent fact (company status, "
-            "prices, releases, anything that may have changed since training), verify it with a tool in this "
-            "same turn. Report what you verify as a check performed now, separate from the recorded trail — "
+            "each claim carries an ordinal grade (verified > probable > unverified > suspect) and any "
+            "'Audit note:' lines name specific checks for the weaknesses found — perform those checks with "
+            "tools in this same turn, prioritizing the weakest link (e.g. verify a volatile model_prior "
+            "fact; re-probe a negation drawn from an inadequate query). "
+            "Report what you verify as a check performed now, separate from the recorded trail — "
             "and if it contradicts the original reply, lead with the correction rather than defending the "
             "reply. If justify returns EMPTY, relay the stated reason honestly."))
         # Auto-discovered tools from src/tools/ (each exposes react_invoke).

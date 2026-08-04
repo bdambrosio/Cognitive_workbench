@@ -32,6 +32,29 @@ logger = logging.getLogger('chat_loop')
 CLAIM_GROUNDINGS = ('retrieved', 'memory', 'user_asserted', 'context',
                     'inferred', 'model_prior')
 
+# Taxonomy tags (docs/justification-taxonomy.md). Closed vocabularies,
+# assigned semantically by the attribution LLM and validated here; an
+# absent tag is always valid and never lowers a grade below the
+# untagged default.
+VOLATILITY_TAGS = ('volatile', 'stable')          # model_prior / memory
+POLARITY_TAGS = ('presence', 'absence')           # retrieved
+ADEQUACY_TAGS = ('adequate', 'inadequate')        # negation-from-absence
+INFERENCE_TAGS = ('entailment', 'deduction', 'calculation',
+                  'generalization', 'extrapolation', 'analogy',
+                  'causal-attribution', 'negation-from-absence',
+                  'evidence-repurposing', 'circular-support',
+                  'paraphrase', 'corroboration')  # inferred
+
+# Ordinal grades, best to worst. refuted/conflict exist in the taxonomy
+# but are never produced by this reducer (they require a verification
+# pass or disagreeing evidence, neither of which v1 models).
+GRADES = ('verified', 'probable', 'unverified', 'suspect')
+_GRADE_RANK = {g: i for i, g in enumerate(GRADES)}
+
+
+def _worst(*grades: str) -> str:
+    return max(grades, key=lambda g: _GRADE_RANK[g])
+
 # Prompt-size caps for the attribution call: per-line and total caps on
 # the working log (observations are untruncated in the trace and can be
 # very large).
@@ -72,6 +95,31 @@ premises ($stepN / Note_N / user_input).
 - model_prior: from the assistant's background knowledge; nothing in this \
 turn's records supports it. refs = [].
 
+Additionally tag claims where the tag clearly applies (closed \
+vocabularies; OMIT any tag you are unsure of — an absent tag is valid):
+- model_prior and memory claims — "volatility": "volatile" (a fact of a \
+kind that CAN change after a training cutoff: what state an organization \
+is in, prices, versions, roles, availability, schedules — even if it has \
+held for years) or "stable" (definitions, mathematics, settled past \
+events). Judge the KIND of fact, not your confidence in it; when unsure, \
+use volatile.
+- retrieved claims — "polarity": "presence" (the observation contains \
+the finding) or "absence" (the claim rests on the observation NOT \
+containing something).
+- inferred claims — "inference", one of: entailment (restates the cited \
+evidence), deduction (follows logically from the cited premises), \
+calculation (arithmetic/unit/date transform), generalization (instances \
+to a rule), extrapolation (projects a trend forward), analogy (maps \
+from a similar case), causal-attribution (cause from sequence or \
+correlation), negation-from-absence (didn't find it, so it doesn't \
+exist), evidence-repurposing (evidence gathered for a different \
+question), circular-support (the conclusion, restated, is among its own \
+premises), paraphrase (restates a source without a verbatim anchor), \
+corroboration (multiple independent sources agree).
+- negation-from-absence claims only — "query_adequacy": "adequate" (the \
+probe was designed to find the thing if it existed) or "inadequate" \
+(the evidence came from a probe shaped for a different question).
+
 Attribution discipline:
 - Attribute by CONTENT SUPPORT, not co-occurrence. A tool having been \
 called does not make a claim "retrieved" — the observation text must \
@@ -85,7 +133,9 @@ if no verbatim span supports the claim, omit the field.
 
 Output ONLY a JSON object of the form \
 {{"claims": [{{"claim": "...", "grounding": "...", "refs": ["..."], \
-"quote": "..."}}]}}. "quote" appears only on retrieved claims. \
+"quote": "...", "volatility": "...", "polarity": "...", \
+"inference": "...", "query_adequacy": "..."}}]}}. "quote" appears only \
+on retrieved claims; tag fields only where defined above and known. \
 Use an empty list if the reply makes no factual claims."""
 
 
@@ -181,6 +231,27 @@ def attribute_claims(record: Dict[str, Any],
                 f"for claim {text[:80]!r}")
         claim_rec = {'claim': text, 'grounding': grounding,
                      'refs': [r.strip() for r in refs]}
+        # Taxonomy tags: keep only values from the closed vocabulary on
+        # a grounding the tag is defined for; drop everything else with
+        # a log line. An absent tag is always valid.
+        tag_rules = (
+            ('volatility', VOLATILITY_TAGS, grounding in ('model_prior',
+                                                          'memory')),
+            ('polarity', POLARITY_TAGS, grounding == 'retrieved'),
+            ('inference', INFERENCE_TAGS, grounding == 'inferred'),
+            ('query_adequacy', ADEQUACY_TAGS,
+             item.get('inference') == 'negation-from-absence'),
+        )
+        for field, vocab, applicable in tag_rules:
+            val = item.get(field)
+            if val is None:
+                continue
+            if applicable and val in vocab:
+                claim_rec[field] = val
+            else:
+                logger.warning(
+                    f"claim attribution: dropped tag {field}={val!r} "
+                    f"({grounding=}) for claim {text[:80]!r}")
         # A quote must be a verbatim span of the PERSISTED working log
         # (the LLM saw a capped rendering, so anything it copied honestly
         # is a substring of the original). A failed check means the
@@ -284,6 +355,105 @@ def note_sidecar_lookup(memory_dir: Path, note_id: str
     return None
 
 
+# Edge-type caps for inferred claims (taxonomy: inference edge types).
+# Types absent from this map (entailment, deduction, calculation,
+# corroboration) carry the premise grade through uncapped.
+_INFERENCE_CAPS = {
+    'generalization': 'probable',
+    'extrapolation': 'probable',
+    'paraphrase': 'probable',
+    'analogy': 'unverified',
+    'causal-attribution': 'unverified',
+    'evidence-repurposing': 'unverified',
+    'circular-support': 'suspect',
+}
+
+
+def grade_claim(c: Dict[str, Any]) -> str:
+    """Deterministic ordinal grade for one attributed claim — plain code
+    over grounding + validated taxonomy tags, per the caps in
+    docs/justification-taxonomy.md. Untagged claims grade exactly as
+    before tags existed (legacy records keep their current behavior)."""
+    g = c.get('grounding')
+    if g == 'model_prior':
+        v = c.get('volatility')
+        if v == 'stable':
+            return 'probable'
+        if v == 'volatile':
+            return 'suspect'
+        return 'unverified'
+    if g == 'inferred':
+        refs = c.get('refs') or []
+        # Evidence-rooted inference starts at its premises' grade (flat
+        # v1: recorded evidence reads probable); an inference citing no
+        # evidence at all is prior-rooted.
+        base = 'probable' if refs else 'unverified'
+        inf = c.get('inference')
+        if inf == 'negation-from-absence':
+            adequacy = c.get('query_adequacy')
+            cap = {'adequate': 'probable',
+                   'inadequate': 'suspect'}.get(adequacy, 'unverified')
+        else:
+            cap = _INFERENCE_CAPS.get(inf, 'verified')
+        return _worst(base, cap)
+    # retrieved / memory / user_asserted / context: recorded evidence or
+    # testimony — probable. (verified needs quote x primary-source; no
+    # source ledger in v1. aged-memory cap needs evidence dates; ditto.)
+    return 'probable'
+
+
+def _weakest_claim(claims: List[Dict[str, Any]]) -> Optional[int]:
+    """Index of the worst-graded claim (first among ties), or None when
+    nothing grades below probable — no point flagging a healthy trail."""
+    worst_i, worst_rank = None, _GRADE_RANK['probable']
+    for i, c in enumerate(claims):
+        rank = _GRADE_RANK[grade_claim(c)]
+        if rank > worst_rank:
+            worst_i, worst_rank = i, rank
+    return worst_i
+
+
+def _audit_notes(claims: List[Dict[str, Any]],
+                 record_has_quotes: bool) -> List[str]:
+    """Review keys for the taxonomy patterns present in this trail,
+    strongest first, capped at three so the observation stays readable.
+    Pure pattern → text; the checks themselves are the model's to run."""
+    notes: List[str] = []
+    if any(c.get('inference') == 'circular-support' for c in claims):
+        notes.append(
+            "a claim's support includes its own conclusion (circular). "
+            "Strike the conclusion from the premises — if nothing "
+            "remains, the claim is ungrounded; verify it independently.")
+    if any(c.get('grounding') == 'model_prior' and
+           c.get('volatility') != 'stable' for c in claims):
+        notes.append(
+            "model_prior claims rest on training data with a cutoff. If "
+            "any such claim concerns a current or changeable fact, "
+            "verify it with a tool now before affirming it; if "
+            "verification contradicts the original reply, lead with the "
+            "correction.")
+    if any(c.get('inference') == 'negation-from-absence' for c in claims):
+        notes.append(
+            "a claim infers non-existence from not finding something. "
+            "Check the probe: was it designed to find the thing if it "
+            "existed (right venue, existence-shaped query)? If not, run "
+            "a targeted existence probe now.")
+    if record_has_quotes and any(
+            c.get('grounding') == 'retrieved' and not c.get('quote')
+            for c in claims):
+        notes.append(
+            "a retrieved claim has no verbatim quote — the "
+            "paraphrase-drift signature. Re-check that the observation "
+            "actually contains what the claim asserts.")
+    if any(c.get('grounding') == 'inferred' and not c.get('refs')
+           for c in claims):
+        notes.append(
+            "an inference cites no recorded evidence — its premises are "
+            "unstated, usually background knowledge. Name them; they "
+            "inherit the model_prior checks above.")
+    return notes[:3]
+
+
 _GROUNDING_KEY = (
     "Grounding key: retrieved = stated in a tool observation that turn; "
     "memory = recalled from a persisted memory note; user_asserted = the "
@@ -291,7 +461,9 @@ _GROUNDING_KEY = (
     "derived by reasoning from the cited evidence; model_prior = background "
     "knowledge — nothing recorded that turn supports it. Quoted spans are "
     "verbatim excerpts machine-checked against the persisted tool "
-    "observation at attribution time.")
+    "observation at attribution time. Grades (verified > probable > "
+    "unverified > suspect) are reduced deterministically from grounding "
+    "plus tags — see docs/justification-taxonomy.md.")
 
 
 def render_justification(claims_rec: Dict[str, Any],
@@ -316,7 +488,12 @@ def render_justification(claims_rec: Dict[str, Any],
     for i, c in enumerate(claims, 1):
         refs = c.get('refs') or []
         ref_txt = f" ← {', '.join(refs)}" if refs else ""
-        lines.append(f"{i}. [{c.get('grounding')}{ref_txt}] {c.get('claim')}")
+        tag = c.get('volatility') or c.get('inference') or ''
+        if tag and c.get('query_adequacy'):
+            tag += f", {c['query_adequacy']} probe"
+        tag_txt = f" ({tag})" if tag else ""
+        lines.append(f"{i}. [{c.get('grounding')}{tag_txt}{ref_txt} | "
+                     f"{grade_claim(c)}] {c.get('claim')}")
         if c.get('quote'):
             lines.append(f'   quote: "{_clip(c["quote"])}"')
         for r in refs:
@@ -370,16 +547,19 @@ def render_justification(claims_rec: Dict[str, Any],
     lines.append("\nGrounding profile: " + ", ".join(
         f"{n} {g}" for g, n in
         sorted(profile.items(), key=lambda kv: (-kv[1], kv[0]))))
-    # Structural audit trigger: fires on the validated grounding counts,
-    # placed in the observation so the model reads it at exactly the
-    # moment it decides whether the trail alone answers the user.
-    if profile.get('model_prior'):
-        lines.append(
-            "Audit note: model_prior claims rest on training data with a "
-            "cutoff. If any such claim concerns a current or changeable "
-            "fact, verify it with a tool now before affirming it; if "
-            "verification contradicts the original reply, lead with the "
-            "correction.")
+    weak_i = _weakest_claim(claims)
+    if weak_i is not None:
+        c = claims[weak_i]
+        why = c.get('volatility') or c.get('inference') or 'untagged'
+        lines.append(f"Weakest link: claim {weak_i + 1} "
+                     f"({grade_claim(c)} — {c.get('grounding')}, {why}).")
+    # Structural audit triggers: review keys for the taxonomy patterns
+    # this trail exhibits, placed in the observation so the model reads
+    # them at exactly the moment it decides whether the trail alone
+    # answers the user.
+    for note in _audit_notes(claims,
+                             any(c.get('quote') for c in claims)):
+        lines.append(f"Audit note: {note}")
     lines.append("\n" + _GROUNDING_KEY)
     return '\n'.join(lines)
 
