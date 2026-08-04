@@ -168,13 +168,23 @@ provenance (`tool_meta` — e.g. the full source list behind a web search)
 into the reasoning trace, and a post-turn pass decomposes each reply into
 typed claims — `retrieved` / `memory` / `user_asserted` / `context` /
 `inferred` / `model_prior`, with resolvable refs — appended to
-`claims.jsonl`. The `justify` built-in is the read path: asked "justify
-your response / why should I believe that?", the agent renders the
-previous reply's claims and their recorded evidence (search sources with
-URLs, recalled notes with dates) deterministically from the persisted
-records — no LLM in the read, so the trail can't be embellished. A reply
-answered from parametric memory shows up as exactly that: `model_prior`,
-no refs. `tools/trace_claim.py` audits the same joins offline. No numeric
+`claims.jsonl`. Retrieved claims carry verbatim quotes machine-checked
+against the persisted observation, and every claim is tagged from a
+closed taxonomy (volatility, inference type — see
+[docs/justification-taxonomy.md](docs/justification-taxonomy.md)) and
+reduced deterministically to an ordinal grade (`verified > probable >
+unverified > suspect`). The `justify` built-in is the read path: asked
+"justify your response / why should I believe that?", the agent renders
+the previous reply's graded claims and their recorded evidence (search
+sources with URLs, recalled notes with dates) deterministically from the
+persisted records — no LLM in the read, so the trail can't be
+embellished — then audits the weakest link: a volatile `model_prior`
+claim triggers in-turn verification, with correction-first phrasing if
+the check refutes the original reply. Suspect-graded replies also spawn
+a background verification concern that posts an unprompted correction
+only if refuted (autonomy mode only). A reply answered from parametric
+memory shows up as exactly that: `model_prior`, no refs.
+`tools/trace_claim.py` audits the same joins offline. No numeric
 confidence scores anywhere by design; see
 [docs/provenance-verifiability.md](docs/provenance-verifiability.md).
 

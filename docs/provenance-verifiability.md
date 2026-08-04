@@ -1,12 +1,15 @@
 # Provenance & Verifiability — Levels Plan and Status
 
-**Status 2026-08-02: Levels 1–2 committed (`0e3d0fd8`) and
-live-validated; `justify` read path implemented.** Live validation
-(2026-08-02, turn 2182 — a real search-web turn): `tool_meta` captured
-with the full structured source list, 10 claims written to
-`claims.jsonl` all with resolvable refs, `trace_claim turn:2182` green
-end-to-end. The `justify` ReAct tool (below) closes the loop: Jill can
-now answer "justify your response" from the persisted records.
+**Status 2026-08-04: Levels 1–2 live-validated; epistemic grader v1
+(taxonomy tags + ordinal grades + self-audit) SHIPPED and
+live-validated on all three branches; Stage 5 background verification
+SHIPPED, live validation pending.** Commits: `0e3d0fd8` (L1–2),
+`8cf87812` (justify read path), `f30d3f05` + `ad9bbda5` (quotes,
+taxonomy, grades, audit notes), `8c1396e0` (Stage 5). Live arc
+2026-08-03/04: the SpaceX probe exercised refute (suspect volatile
+prior → search → led with retraction, turn 2231), confirm (suspect →
+search → affirmed with new evidence, turn 2236), and quiet (stable
+prior → probable, no search, turn 2239).
 
 ## Goal
 
@@ -16,13 +19,14 @@ a reply decomposes to typed grounding (tool observation, recalled memory,
 user assertion, inference, or model prior) with pointers that a
 deterministic walker can resolve to the exact recorded evidence.
 
-Target consumer (later levels): a verifier with two separable layers —
-a **structural checker** (decidable: every ref resolves, hashes match,
-no dangling pointers; `tools/trace_claim.py` is its kernel) and an
-**epistemic grader** (LLM/entailment judgments per inference step,
-graded not proven). Design vocabulary borrowed from assurance cases
-(claim / evidence / warrant / defeater); justification logic (Artemov)
-is the formal skin if one is ever needed.
+The verifier has two separable layers — a **structural checker**
+(decidable: every ref resolves, quotes are verbatim substrings of the
+persisted observation, no dangling pointers; `tools/trace_claim.py` is
+its kernel) and an **epistemic grader** (v1 built — see below: closed
+taxonomy tags assigned semantically, then a deterministic ordinal
+reduction; never numeric). Design vocabulary borrowed from assurance
+cases (claim / evidence / warrant / defeater); justification logic
+(Artemov) is the formal skin if one is ever needed.
 
 **Design commitment — no invented numerics.** The claim schema carries
 NO confidence numbers. Uncertainty is represented by the grounding type
@@ -100,16 +104,56 @@ attribution. Files: `src/chat/claims.py` (module-level lookups +
 of `tools/trace_claim.py`, which stays standalone stdlib-only by
 design.
 
+## Epistemic grader v1 + self-audit (2026-08-04)
+
+Taxonomy: `docs/justification-taxonomy.md` — closed vocabulary of leaf
+dimensions (volatility, source-grade, quote, polarity, age, testimony),
+12 inference edge types (incl. negation-from-absence + query-adequacy,
+evidence-repurposing, circular-support), and structural conditions;
+each entry carries a review key and a grade effect. Admission rule: an
+entry stays only if it moves a grade or redirects a min-path.
+
+Mechanics (all off the query path — attribution is post-turn, grading
+is at justify time):
+- Attribution also emits a verbatim `quote` per retrieved claim,
+  machine-checked as a (whitespace-normalized) substring of the
+  persisted `working_log`; synthesized quotes dropped, claim kept.
+- Attribution tags claims from the closed vocabularies (validated like
+  groundings; absent tag = legacy behavior). Volatility prompt wording
+  is load-bearing: "judge the KIND of fact, not your confidence; when
+  unsure, volatile" — the offline replay gate caught the local backend
+  tagging "SpaceX is private" as stable, which would have suppressed
+  the audit. Gate any vocab change with a replay over real trace
+  records through the live backend.
+- `grade_claim()` reduces grounding × tags to an ordinal grade
+  (`verified > probable > unverified > suspect`; conflict off-scale)
+  deterministically; `render_justification` shows per-claim grades, a
+  weakest-link line, and pattern-driven audit notes (top 3 by
+  severity). The self-audit hinge: the model can't reliably re-answer
+  a stale fact, but reliably answers the *category* question ("is this
+  the kind of fact that goes stale?") — so the audit note sends it to
+  tools instead of its prior, with the retraction pre-licensed ("lead
+  with the correction").
+- Honesty guard: `justify` audits the most recent reply only; a trail
+  must never be reconstructed from recall (paraphrase-as-provenance
+  laundering, observed live turn 2219).
+
+Stage 5 — background verification (`8c1396e0`): post-turn suspect
+grades spawn a one-shot verification concern (user-yield vehicle,
+`via: suspect_verification` in autonomy.jsonl) that probes each
+suspect claim and posts a correction only if refuted; silent on
+confirmed. Gates: `--autonomy` only, user-facing turns only, post-turn
+path only; loop-free by construction (autonomous fires get no claim
+pass). No cooldown yet — watch for chattiness.
+
 ## Next steps (in order)
 
-1. **Re-validate `justify` live** — first live test (2026-08-02, turn
-   2188) proved the dispatch + honest-EMPTY path but lost the race to
-   the post-turn executor (hence on-demand attribution above); retest
-   after restart. Same session also showed the system catching a real
-   hallucination: turn 2187 (Satisfactory aluminum advice, no search)
-   attributed as 9/9 `model_prior`, refs [] — and the advice was in
-   fact substantially wrong. Whether Jill *should* have searched there
-   is a disposition question, out of scope for provenance.
+1. **Validate Stage 5 live** — refute probe: a volatile fact changed
+   post-cutoff (e.g. Apple's announced Cook→Ternus CEO transition,
+   Apr 2026); confirm probe: a volatile fact still true (e.g. max
+   Raspberry Pi RAM). Expect: attribution ~2.5 min post-reply, concern
+   fires next tick, then either an unprompted correction or silence
+   with the check recorded in autonomy.jsonl + the concern trace.
 2. **Autonomous-turn claims** — post-turn work is skipped on autonomous
    fires, so outward-facing (Telegram/Bluesky) replies currently get no
    claim pass; arguably they need it most. `justify` already reports
@@ -119,6 +163,12 @@ design.
    trace_claim; `bench/memory_recall` style. Build after a few live
    sessions produce real claims to calibrate against.
 4. **Level 3** — content-addressed evidence snapshots at ingestion.
+
+Deferred deliberately: Relations-based justification-graph storage +
+cross-turn recursion through Note leaves, source-grade ledger, AND/OR
+refs bit, oracle argument-audit, numeric calibration (waits on
+accumulated grade/outcome pairs, which Stage 5 now produces as a side
+effect).
 
 Known limits: old-format records (no `[Note_N]` recall tags) yield
 'memory' claims with refs dropped; cross-session `source_turn_seq` joins
