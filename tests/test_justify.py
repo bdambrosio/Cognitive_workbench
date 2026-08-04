@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from chat.claims import (
     ClaimsMixin,
+    attribute_claims,
     claims_for_turn,
     latest_turn_for_source,
     note_sidecar_lookup,
@@ -41,7 +42,9 @@ TRACE = [
     {"turn_seq": 12, "source": "User", "autonomous": False,
      "user_input": "Can I copy/paste blueprints?",
      "raw_response": "No direct copy; use the Designer.",
-     "working_log": "$step1 OK: search results",
+     "working_log": "$step1:\nOK: the wiki states there is no direct "
+                    "copy/paste of world objects; the Designer tool is "
+                    "the supported path.\n",
      "tool_meta": {"$step1": {"tool": "search-web", "meta": [
          {"source_skill": "search-web", "tool_metadata": {
              "query": "blueprint copy paste",
@@ -62,7 +65,8 @@ CLAIMS = [
     {"turn_seq": 12, "source": "User", "reply_sha1": "ab" * 20,
      "claims": [
          {"claim": "There is no direct world copy/paste.",
-          "grounding": "retrieved", "refs": ["$step1"]},
+          "grounding": "retrieved", "refs": ["$step1"],
+          "quote": "there is no direct copy/paste of world objects"},
          {"claim": "The user asked about blueprints.",
           "grounding": "user_asserted", "refs": ["user_input"]},
          {"claim": "The user prefers modular builds.",
@@ -122,14 +126,33 @@ def test_render_justification_full_trail(tmp_path):
     # Every claim present with its grounding tag.
     assert "[retrieved ← $step1] There is no direct world copy/paste." in out
     assert "[model_prior] The game engine is Unreal." in out
+    # The verified quote renders under its claim.
+    assert 'quote: "there is no direct copy/paste of world objects"' in out
     # Evidence resolved: search source URL, query, note text with date.
     assert "https://wiki.example/bp" in out
     assert "query: blueprint copy paste" in out
     assert "Note_7 — memory written 2026-07-27" in out
     assert "User prefers modular factory builds." in out
     assert "user_input — the user's own words" in out
+    # Grounding profile summarizes the validated grounding counts, and
+    # the model_prior claim triggers the audit note.
+    assert ("Grounding profile: 1 inferred, 1 memory, 1 model_prior, "
+            "1 retrieved, 1 user_asserted") in out
+    assert "Audit note: model_prior claims rest on training data" in out
     # Grounding key present.
     assert "model_prior = background" in out
+
+
+def test_render_justification_no_audit_note_without_prior(tmp_path):
+    md = _memory_dir(tmp_path)
+    _populate(md)
+    claims_rec = {"turn_seq": 12, "claims": [
+        {"claim": "There is no direct world copy/paste.",
+         "grounding": "retrieved", "refs": ["$step1"]},
+    ]}
+    out = render_justification(claims_rec, TRACE[1], md)
+    assert "Grounding profile: 1 retrieved" in out
+    assert "Audit note:" not in out
 
 
 def test_render_justification_no_claims(tmp_path):
@@ -149,6 +172,53 @@ def test_render_justification_missing_note_and_meta(tmp_path):
                                             "user_input": "q"}, md)
     assert "no structured metadata recorded" in out
     assert "not found in memories.jsonl sidecar" in out
+
+
+# ── quote verbatim check ───────────────────────────────────────────────
+
+def _attribution_record():
+    return {"turn_seq": 12, "source": "User",
+            "user_input": "Can I copy/paste blueprints?",
+            "raw_response": "No direct copy; use the Designer.",
+            "working_log": "$step1:\nOK: the wiki states there is no\n"
+                           "direct copy/paste of world objects; the\n"
+                           "Designer tool is the supported path.\n",
+            "recall_hits": []}
+
+
+def _canned_llm(claims):
+    return lambda messages: json.dumps({"claims": claims})
+
+
+def test_attribute_claims_keeps_verbatim_quote():
+    # Quote spans a line wrap in the observation — whitespace-normalized
+    # matching must still accept it.
+    out = attribute_claims(_attribution_record(), _canned_llm([
+        {"claim": "There is no direct copy/paste.",
+         "grounding": "retrieved", "refs": ["$step1"],
+         "quote": "there is no direct copy/paste of world objects"},
+    ]))
+    assert out[0]["quote"] == "there is no direct copy/paste of world objects"
+
+
+def test_attribute_claims_drops_synthesized_quote():
+    out = attribute_claims(_attribution_record(), _canned_llm([
+        {"claim": "A mod is needed for bulk capture.",
+         "grounding": "retrieved", "refs": ["$step1"],
+         "quote": "bulk capture requires installing a mod"},
+    ]))
+    # Claim survives; the unverifiable quote does not.
+    assert out[0]["claim"] == "A mod is needed for bulk capture."
+    assert "quote" not in out[0]
+
+
+def test_attribute_claims_no_quote_field_unchanged():
+    out = attribute_claims(_attribution_record(), _canned_llm([
+        {"claim": "The user asked about blueprints.",
+         "grounding": "user_asserted", "refs": ["user_input"]},
+    ]))
+    assert out == [{"claim": "The user asked about blueprints.",
+                    "grounding": "user_asserted", "refs": ["user_input"]}]
 
 
 # ── _run_justify observation protocol ──────────────────────────────────

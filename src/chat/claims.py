@@ -40,6 +40,13 @@ _LOG_CAP = 10_000
 
 _STEP_LABEL_RE = re.compile(r'^\$step\d+', re.MULTILINE)
 _NOTE_ID_RE = re.compile(r'\[(Note_\d+)')
+_WS_RE = re.compile(r'\s+')
+
+
+def _ws_normalize(s: str) -> str:
+    """Collapse whitespace runs for the quote-verbatim check, so an
+    honest copy isn't invalidated by line wrapping in the observation."""
+    return _WS_RE.sub(' ', s).strip()
 
 _ATTRIBUTION_SYS = """\
 You are {character}'s provenance auditor. Given one conversational turn's \
@@ -53,7 +60,9 @@ assistant's own actions. Skip: greetings, opinions, questions, offers \
 
 Assign each claim exactly one grounding:
 - retrieved: the claim's content appears in a tool observation this turn. \
-refs = the $stepN binding(s) whose observation contains it.
+refs = the $stepN binding(s) whose observation contains it. Also include \
+"quote": a short excerpt (under 300 chars) copied character-for-character \
+from that observation which contains or directly entails the claim.
 - memory: the content comes from a recalled memory. refs = its Note_N id(s).
 - user_asserted: the user stated it this turn. refs = ["user_input"].
 - context: from earlier conversation shown in the prompt, not this turn's \
@@ -69,10 +78,14 @@ called does not make a claim "retrieved" — the observation text must \
 contain or directly entail the claim. If the reply asserts more than the \
 evidence contains, the unsupported part is model_prior or inferred.
 - Do not invent refs; use only refs from the ALLOWED REFS list.
+- Quotes are machine-checked against the persisted observation and \
+dropped if they do not match verbatim. Never paraphrase inside "quote"; \
+if no verbatim span supports the claim, omit the field.
 - No numeric confidence scores of any kind.
 
 Output ONLY a JSON object of the form \
-{{"claims": [{{"claim": "...", "grounding": "...", "refs": ["..."]}}]}}. \
+{{"claims": [{{"claim": "...", "grounding": "...", "refs": ["..."], \
+"quote": "..."}}]}}. "quote" appears only on retrieved claims. \
 Use an empty list if the reply makes no factual claims."""
 
 
@@ -166,8 +179,23 @@ def attribute_claims(record: Dict[str, Any],
             logger.warning(
                 f"claim attribution: dropped invalid refs {dropped} "
                 f"for claim {text[:80]!r}")
-        claims.append({'claim': text, 'grounding': grounding,
-                       'refs': [r.strip() for r in refs]})
+        claim_rec = {'claim': text, 'grounding': grounding,
+                     'refs': [r.strip() for r in refs]}
+        # A quote must be a verbatim span of the PERSISTED working log
+        # (the LLM saw a capped rendering, so anything it copied honestly
+        # is a substring of the original). A failed check means the
+        # excerpt was synthesized, not copied — drop the quote, keep the
+        # claim: attribution stands, citation doesn't.
+        quote = item.get('quote')
+        if isinstance(quote, str) and quote.strip():
+            log_text = record.get('working_log') or ''
+            if _ws_normalize(quote) in _ws_normalize(log_text):
+                claim_rec['quote'] = quote.strip()
+            else:
+                logger.warning(
+                    f"claim attribution: quote failed verbatim check for "
+                    f"claim {text[:80]!r}; dropped")
+        claims.append(claim_rec)
     return claims
 
 
@@ -261,7 +289,9 @@ _GROUNDING_KEY = (
     "memory = recalled from a persisted memory note; user_asserted = the "
     "user's own words that turn; context = earlier conversation; inferred = "
     "derived by reasoning from the cited evidence; model_prior = background "
-    "knowledge — nothing recorded that turn supports it.")
+    "knowledge — nothing recorded that turn supports it. Quoted spans are "
+    "verbatim excerpts machine-checked against the persisted tool "
+    "observation at attribution time.")
 
 
 def render_justification(claims_rec: Dict[str, Any],
@@ -287,6 +317,8 @@ def render_justification(claims_rec: Dict[str, Any],
         refs = c.get('refs') or []
         ref_txt = f" ← {', '.join(refs)}" if refs else ""
         lines.append(f"{i}. [{c.get('grounding')}{ref_txt}] {c.get('claim')}")
+        if c.get('quote'):
+            lines.append(f'   quote: "{_clip(c["quote"])}"')
         for r in refs:
             if r not in cited:
                 cited.append(r)
@@ -330,6 +362,24 @@ def render_justification(claims_rec: Dict[str, Any],
     if ev:
         lines.append("\nEvidence:")
         lines.extend(ev)
+
+    profile: Dict[str, int] = {}
+    for c in claims:
+        g = str(c.get('grounding'))
+        profile[g] = profile.get(g, 0) + 1
+    lines.append("\nGrounding profile: " + ", ".join(
+        f"{n} {g}" for g, n in
+        sorted(profile.items(), key=lambda kv: (-kv[1], kv[0]))))
+    # Structural audit trigger: fires on the validated grounding counts,
+    # placed in the observation so the model reads it at exactly the
+    # moment it decides whether the trail alone answers the user.
+    if profile.get('model_prior'):
+        lines.append(
+            "Audit note: model_prior claims rest on training data with a "
+            "cutoff. If any such claim concerns a current or changeable "
+            "fact, verify it with a tool now before affirming it; if "
+            "verification contradicts the original reply, lead with the "
+            "correction.")
     lines.append("\n" + _GROUNDING_KEY)
     return '\n'.join(lines)
 

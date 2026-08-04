@@ -305,10 +305,19 @@ class ToolsMixin:
             "inferred / model_prior) with the recorded evidence resolved: search sources with URLs, recalled "
             "memory notes with dates, the user's own words. Use when the user asks you to justify or source "
             "what you said ('justify your response', 'why should I believe that?', 'where did that come "
-            "from?'). Takes no arguments — it always audits your most recent reply here. Present the returned "
-            "trail faithfully: cite only the evidence it contains, never add sources of your own, and say "
-            "plainly when a claim is model_prior (your background knowledge) or inferred rather than "
-            "retrieved. If it returns EMPTY, relay the stated reason honestly."))
+            "from?'). Takes no arguments — it always audits your most recent reply here. If the user asks about "
+            "an EARLIER reply, say that limitation plainly and offer to re-answer the original question so "
+            "the new reply can be justified fresh; NEVER reconstruct a provenance trail from recall or "
+            "conversation memory — a remembered paraphrase is not a trail, and presenting one as "
+            "justification defeats the audit. Present the returned "
+            "trail faithfully: cite only the evidence it contains, never attribute sources to the original "
+            "reply that the trail does not record, and say plainly when a claim is model_prior (your "
+            "background knowledge) or inferred rather than retrieved. Then AUDIT the trail before replying: "
+            "if a load-bearing claim is model_prior about a temporally contingent fact (company status, "
+            "prices, releases, anything that may have changed since training), verify it with a tool in this "
+            "same turn. Report what you verify as a check performed now, separate from the recorded trail — "
+            "and if it contradicts the original reply, lead with the correction rather than defending the "
+            "reply. If justify returns EMPTY, relay the stated reason honestly."))
         # Auto-discovered tools from src/tools/ (each exposes react_invoke).
         # Rendered between the built-in subagents and the display/respond
         # actions so the prompt's tool ordering matches its mental model:
