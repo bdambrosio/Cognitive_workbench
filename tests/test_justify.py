@@ -340,15 +340,25 @@ class _Backend:
 class _Stub(ClaimsMixin):
     character_name = "TestJill"
 
-    def __init__(self, md: Path, backend=None):
+    def __init__(self, md: Path, backend=None, autonomy=False):
         self._md = Path(md)
         self.backend = backend or _Backend()
+        self._autonomy_enabled = autonomy
+        self.spawned = []          # (text, instruction, kwargs)
+        self.autonomy_events = []
 
     def _memory_dir(self) -> Path:
         return self._md
 
     def _reasoning_trace_path(self) -> Path:
         return self._md / "reasoning_trace.jsonl"
+
+    def _add_agent_concern(self, text, instruction=None, **kwargs):
+        self.spawned.append((text, instruction, kwargs))
+        return f"Note_test_{len(self.spawned)}"
+
+    def _write_autonomy_event(self, event):
+        self.autonomy_events.append(event)
 
 
 def test_run_justify_ok(tmp_path):
@@ -385,6 +395,81 @@ def test_run_justify_attribution_fails(tmp_path):
     _write_jsonl(md / "reasoning_trace.jsonl", TRACE)
     obs = _Stub(md, _Backend(raise_instead=True))._run_justify("User")
     assert obs.startswith("EMPTY: claim attribution for turn 12")
+
+
+# ── Stage 5: suspect-verification spawn ────────────────────────────────
+
+_SUSPECT_RECORD = {
+    "turn_seq": 30, "source": "User", "autonomous": False,
+    "user_input": "How much will the share price drop on Thursday?",
+    "raw_response": "It is a private company; nothing to track.",
+}
+
+_SUSPECT_CLAIMS = [
+    {"claim": "SpaceX is a private company.",
+     "grounding": "model_prior", "refs": [], "volatility": "volatile"},
+    {"claim": "There is no public share price to track.",
+     "grounding": "inferred", "refs": [], "inference": "deduction"},
+]
+
+
+def test_suspect_spawn_fires_on_suspect(tmp_path):
+    stub = _Stub(_memory_dir(tmp_path), autonomy=True)
+    new_id = stub._maybe_spawn_suspect_verification(
+        _SUSPECT_RECORD, _SUSPECT_CLAIMS)
+    assert new_id is not None
+    (text, instruction, kwargs), = stub.spawned
+    # The one suspect claim is named; the unverified one is not.
+    assert "SpaceX is a private company." in instruction
+    assert "There is no public share price" not in instruction
+    assert "lead with the correction" in instruction
+    assert "Silent" in instruction
+    assert kwargs["category"] == "one_shot"
+    assert kwargs["skip_recurrence"] is True
+    assert stub.autonomy_events[0]["via"] == "suspect_verification"
+
+
+def test_suspect_spawn_quiet_without_suspects(tmp_path):
+    stub = _Stub(_memory_dir(tmp_path), autonomy=True)
+    ok_claims = [{"claim": "x", "grounding": "model_prior", "refs": [],
+                  "volatility": "stable"},
+                 {"claim": "y", "grounding": "retrieved",
+                  "refs": ["$step1"]}]
+    assert stub._maybe_spawn_suspect_verification(
+        _SUSPECT_RECORD, ok_claims) is None
+    assert stub.spawned == []
+
+
+def test_suspect_spawn_gated_off(tmp_path):
+    # Autonomy off → never spawns, even on suspect claims.
+    stub = _Stub(_memory_dir(tmp_path), autonomy=False)
+    assert stub._maybe_spawn_suspect_verification(
+        _SUSPECT_RECORD, _SUSPECT_CLAIMS) is None
+    # Autonomous turns get no spawn (and no loop: verification fires are
+    # autonomous, so they can never re-trigger themselves).
+    stub2 = _Stub(tmp_path / "memory", autonomy=True)
+    rec = dict(_SUSPECT_RECORD, autonomous=True)
+    assert stub2._maybe_spawn_suspect_verification(
+        rec, _SUSPECT_CLAIMS) is None
+
+
+def test_on_demand_attribution_does_not_spawn(tmp_path):
+    """The justify path attributes with spawn_verification off — the
+    justify turn performs the audit itself."""
+    md = _memory_dir(tmp_path)
+    _write_jsonl(md / "reasoning_trace.jsonl", TRACE)  # no claims.jsonl
+
+    class _SuspectBackend(_Backend):
+        def chat(self, messages, **kwargs):
+            self.calls += 1
+            return json.dumps({"claims": [
+                {"claim": "It is private.", "grounding": "model_prior",
+                 "refs": [], "volatility": "volatile"}]})
+
+    stub = _Stub(md, backend=_SuspectBackend(), autonomy=True)
+    obs = stub._run_justify("User")
+    assert obs.startswith("OK: Provenance trail")
+    assert stub.spawned == []
 
 
 def test_run_justify_autonomous_uncovered(tmp_path):

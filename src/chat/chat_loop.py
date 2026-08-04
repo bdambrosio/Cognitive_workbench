@@ -1245,7 +1245,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             # written (pre-loop crash).
             if turn_seq is not None:
                 try:
-                    self._extract_and_log_claims(turn_seq)
+                    self._extract_and_log_claims(turn_seq,
+                                                 spawn_verification=True)
                 except Exception as e:
                     logger.warning(
                         f"[{self.character_name}] claim attribution failed: {e}")

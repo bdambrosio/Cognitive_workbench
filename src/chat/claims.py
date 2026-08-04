@@ -599,10 +599,16 @@ class ClaimsMixin:
                 f"[{self.character_name}] trace read for claims failed: {e}")
         return found
 
-    def _extract_and_log_claims(self, turn_seq: int) -> None:
+    def _extract_and_log_claims(self, turn_seq: int,
+                                spawn_verification: bool = False) -> None:
         """Attribute the turn's reply claims and append to claims.jsonl.
         Best-effort; reads the PERSISTED trace record so attribution
-        audits exactly what is durable, not in-memory state."""
+        audits exactly what is durable, not in-memory state.
+
+        spawn_verification is set only by the post-turn path: suspect
+        grades then spawn a background verification concern. The justify
+        on-demand path leaves it off — the justify turn itself performs
+        the audit, so a background double-check would duplicate it."""
         record = self._load_trace_record(turn_seq)
         if record is None:
             logger.warning(
@@ -628,6 +634,83 @@ class ClaimsMixin:
             'reply_sha1': hashlib.sha1(reply.encode('utf-8')).hexdigest(),
             'claims': claims,
         }, character=self.character_name)
+        if spawn_verification:
+            try:
+                self._maybe_spawn_suspect_verification(record, claims)
+            except Exception as e:
+                logger.warning(
+                    f"[{self.character_name}] suspect-verification spawn "
+                    f"failed for turn {turn_seq}: {e}")
+
+    def _maybe_spawn_suspect_verification(self, record: Dict[str, Any],
+                                          claims: List[Dict[str, Any]]
+                                          ) -> Optional[str]:
+        """Stage 5: answer now, audit behind. When post-turn grading finds
+        suspect claims in a delivered reply, spawn a one-shot agent_concern
+        (same vehicle as user-yield continuations) that verifies them in
+        the background and posts a correction ONLY if one is refuted.
+        Silent on confirmed — the success path leaves no message.
+
+        No loop risk: verification fires are autonomous turns, which get
+        no claim pass, so they can never re-trigger this. Returns the new
+        concern id, or None when nothing warranted a spawn."""
+        if not getattr(self, '_autonomy_enabled', False):
+            return None
+        if record.get('autonomous'):
+            return None
+        suspects = [c for c in claims if grade_claim(c) == 'suspect']
+        if not suspects:
+            return None
+        source = str(record.get('source') or 'User')
+        seq = record.get('turn_seq')
+        user_input = ' '.join(str(record.get('user_input') or '').split())
+        reply = ' '.join(str(record.get('raw_response') or '').split())
+        claim_lines = '\n'.join(
+            f"{i}. {c.get('claim')} "
+            f"[{c.get('grounding')}, {c.get('volatility') or c.get('inference')}]"
+            for i, c in enumerate(suspects, 1))
+        instruction = (
+            f"Background verification (auto-spawned after post-turn claim "
+            f"grading of my reply to {source}, turn {seq}). These claims "
+            f"from that reply graded suspect — volatile background "
+            f"knowledge or weak inference, unverified at answer time:\n\n"
+            f"{claim_lines}\n\n"
+            f"The exchange, for context:\n"
+            f"They said: {user_input[:300]}\n"
+            f"I replied: {reply[:500]}\n\n"
+            f"Verify each claim above now with targeted tools (search-web, "
+            f"fetch-text) — design each probe to test the claim directly. "
+            f"If verification REFUTES any claim, post a brief correction "
+            f"to the conversation: lead with the correction, cite what "
+            f"you found now, and do not defend the original reply. "
+            f"Silent if every claim is confirmed or the checks are "
+            f"inconclusive — this verification reports nothing on "
+            f"success.")
+        from chat.concerns import _AGENT_CONCERN_FIRE_THRESHOLD
+        new_id = self._add_agent_concern(
+            text=f"verify suspect claims from my reply to {source}",
+            entity=source, provenance='inferred', seed=False, name='',
+            rhythm_hours=1, rhythm_source='urgency',
+            instruction=instruction,
+            skip_recurrence=True,
+            category='one_shot',
+            extra_properties={
+                'activation': max(0.0,
+                                  _AGENT_CONCERN_FIRE_THRESHOLD - 0.1),
+            },
+        )
+        if new_id:
+            logger.info(
+                f"[{self.character_name}] spawned suspect-verification "
+                f"concern {new_id} for turn {seq} "
+                f"({len(suspects)} suspect claim(s))")
+            self._write_autonomy_event({
+                'event': 'successor_spawned',
+                'parent_concern_id': None,
+                'successor_concern_id': new_id,
+                'via': 'suspect_verification',
+            })
+        return new_id
 
     def _run_justify(self, source: str) -> str:
         """Backend for the ReAct `justify` tool: render the provenance
