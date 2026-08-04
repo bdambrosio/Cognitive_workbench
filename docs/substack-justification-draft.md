@@ -173,6 +173,50 @@ No weakest link, no audit notes, no search. One claim, graded, quiet. Before the
 
 Three branches, all observed live: **refute** (suspect → verify → lead with the retraction), **confirm** (suspect → verify → affirm, with better evidence), **quiet** (stable → probable → done). A justification that has survived adversarial verification is a much stronger object than a rendered trail; a trail that knows when *not* to escalate is one you can afford to read often.
 
+## Where this sits in the landscape
+
+Fair question: is any of this new? Component by component, mostly no —
+and the convergence is itself informative. Claim decomposition with
+independent verification is now a recognized research pattern:
+[MARCH](https://aclanthology.org/2026.acl-long.1828.pdf) (ACL 2026)
+decomposes replies into atomic propositions and has a checker re-answer
+them from retrieved evidence without seeing the original output — the
+same separation our attribution pass enforces. Typed provenance is
+becoming a research object: a [mid-2026
+survey](https://arxiv.org/abs/2606.04990) defines execution provenance
+as "the typed graph of an agent execution" with claim-support relations,
+essentially formalizing the graph we're building toward. Post-hoc
+research-and-revise goes back to RARR; the volatility dimension has a
+direct ancestor in FreshQA's fast-changing/never-changing question
+taxonomy. And citation-at-generation is commodity at the frontier —
+though notably, those products ground only *retrieved* content. None has
+a `model_prior` class: the frontier has no representation at all for
+"nothing supports this," which we'd argue is the most important type in
+the schema.
+
+What we have not found elsewhere is the combination. Specifically: a
+justification read path with *no model between the records and the
+rendering* (the verification literature adds more LLM opinions to the
+pile; it doesn't remove the LLM from the record-reading); grading by
+*named failure pattern* with a deterministic ordinal reduction, rather
+than confidence scores; and the audit-behind loop — deliver instantly,
+grade minutes later, verify silently, and send an unprompted correction
+into a persistent relationship. That last one is structurally
+unavailable to one-shot API products: a stateless endpoint has no
+channel for a correction five minutes after the answer, and no memory
+for the retraction to close the loop in.
+
+One more observation, since this work runs on a mid-size local model:
+the architecture isn't just viable at that scale — it's worth *more*
+there. Frontier deployments compensate for stale priors by searching
+eagerly at answer time and eating the cost. A local model can't afford
+always-search, has a staler prior, and runs where latency is precious —
+so "answer from prior now, audit structurally behind" converts
+architecture into a substitute for scale. And the machinery never asks
+the model for anything harder than a category question, which is exactly
+the difficulty class mid-size models handle reliably. The weaker the
+prior, the more the audit trail earns.
+
 ## What this is and isn't
 
 The trail is honest about *grounding*, not a guarantee of *truth*. A `model_prior` claim can be perfectly correct; a `retrieved` claim can faithfully cite a wrong source. What the structure guarantees is narrower and, we'd argue, more valuable: the question "what does this claim rest on?" has an answer that is checked rather than composed, and the question "which part should I doubt first?" now has one too.
