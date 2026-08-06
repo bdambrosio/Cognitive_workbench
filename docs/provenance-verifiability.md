@@ -1,15 +1,26 @@
 # Provenance & Verifiability — Levels Plan and Status
 
-**Status 2026-08-04: Levels 1–2 live-validated; epistemic grader v1
+**Status 2026-08-06: Levels 1–2 live-validated; epistemic grader v1
 (taxonomy tags + ordinal grades + self-audit) SHIPPED and
 live-validated on all three branches; Stage 5 background verification
-SHIPPED, live validation pending.** Commits: `0e3d0fd8` (L1–2),
-`8cf87812` (justify read path), `f30d3f05` + `ad9bbda5` (quotes,
-taxonomy, grades, audit notes), `8c1396e0` (Stage 5). Live arc
-2026-08-03/04: the SpaceX probe exercised refute (suspect volatile
-prior → search → led with retraction, turn 2231), confirm (suspect →
-search → affirmed with new evidence, turn 2236), and quiet (stable
-prior → probable, no search, turn 2239).
+SHIPPED and live-validated, including the unprompted-correction
+branch.** Commits: `0e3d0fd8` (L1–2), `8cf87812` (justify read path),
+`f30d3f05` + `ad9bbda5` (quotes, taxonomy, grades, audit notes),
+`8c1396e0` (Stage 5). Live arc 2026-08-03/04: the SpaceX probe
+exercised refute (suspect volatile prior → search → led with
+retraction, turn 2231), confirm (suspect → search → affirmed with new
+evidence, turn 2236), and quiet (stable prior → probable, no search,
+turn 2239). Stage 5 arcs: confirm/silent 2026-08-04 (turn 2247 →
+Note_5933, deduped against a fresh justify-turn verification, user saw
+nothing); unprompted correction 2026-08-06 (turn 2295: one
+model_prior × volatile mechanism claim graded suspect → Note_6016
+spawned ~30 s post-reply → probe found no support → correction posted
+~12 min after the original reply, correction-first, no defense). Note
+the 2295 correction was an epistemic downgrade (asserted mechanism →
+"my own inference, not documented"), not a fact reversal — a
+*reclassify* outcome the refute/confirm/silent design didn't name;
+absence-of-support was treated as soft refutation of an overclaim
+rather than "inconclusive → silent". Accepted behavior for now.
 
 ## Goal
 
@@ -148,12 +159,13 @@ pass). No cooldown yet — watch for chattiness.
 
 ## Next steps (in order)
 
-1. **Validate Stage 5 live** — refute probe: a volatile fact changed
-   post-cutoff (e.g. Apple's announced Cook→Ternus CEO transition,
-   Apr 2026); confirm probe: a volatile fact still true (e.g. max
-   Raspberry Pi RAM). Expect: attribution ~2.5 min post-reply, concern
-   fires next tick, then either an unprompted correction or silence
-   with the check recorded in autonomy.jsonl + the concern trace.
+1. ~~**Validate Stage 5 live**~~ — DONE 2026-08-06 (see status above).
+   Both branches observed: confirm/silent (turn 2247) and unprompted
+   correction (turn 2295). Still unobserved but no longer gating: a
+   hard refute (verified positive contradiction of a changed fact) —
+   the 2295 correction was absence-of-support → downgrade. Cooldown
+   watch remains live (two suspect_verification spawns within 40 min
+   on 2026-08-06; only one produced a visible message).
 2. **Autonomous-turn claims** — post-turn work is skipped on autonomous
    fires, so outward-facing (Telegram/Bluesky) replies currently get no
    claim pass; arguably they need it most. `justify` already reports
