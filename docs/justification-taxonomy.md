@@ -96,6 +96,13 @@ testimony for world-facts.
   world (verify if load-bearing)? A user premise that *contradicts* your
   prior on a checkable fact is a verification trigger, not an error to
   correct. *(The SpaceX lesson, user-side.)*
+- **Assistant-side:** the assistant is likewise authoritative for its own
+  current state. A claim restating operational state visible in the turn's
+  records (the active-concerns block) grounds `context`, never
+  `model_prior`; self-state the records do NOT show stays `model_prior`
+  and earns its background check. *(The turn-2316 lesson: a concern-list
+  reply graded 8× suspect and spawned a verification of the assistant's
+  own self-description.)*
 
 ## Inference edge types
 

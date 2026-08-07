@@ -88,8 +88,9 @@ refs = the $stepN binding(s) whose observation contains it. Also include \
 from that observation which contains or directly entails the claim.
 - memory: the content comes from a recalled memory. refs = its Note_N id(s).
 - user_asserted: the user stated it this turn. refs = ["user_input"].
-- context: from earlier conversation shown in the prompt, not this turn's \
-input or tools. refs = [].
+- context: from the assistant's own prompt — earlier conversation, or the \
+ASSISTANT STATE section (its active concerns and operational state) — not \
+this turn's input or tools. refs = [].
 - inferred: derived by reasoning over other evidence this turn. refs = the \
 premises ($stepN / Note_N / user_input).
 - model_prior: from the assistant's background knowledge; nothing in this \
@@ -121,6 +122,10 @@ probe was designed to find the thing if it existed) or "inadequate" \
 (the evidence came from a probe shaped for a different question).
 
 Attribution discipline:
+- The assistant is authoritative for its own current state. A claim \
+describing the assistant's own concerns, tasks, tools, or configuration \
+that is supported by the ASSISTANT STATE section is "context", never \
+model_prior — it restates recorded state, not background knowledge.
 - Attribute by CONTENT SUPPORT, not co-occurrence. A tool having been \
 called does not make a claim "retrieved" — the observation text must \
 contain or directly entail the claim. If the reply asserts more than the \
@@ -184,8 +189,15 @@ def attribute_claims(record: Dict[str, Any],
 
     allowed = valid_refs_for(record)
     recall_block = '\n'.join(str(h) for h in (record.get('recall_hits') or []))
+    # The replying model saw its own active concerns in its prompt; the
+    # attributor must see them too, or self-state claims have no visible
+    # support and fall through to model_prior (live miss: turn 2316).
+    state_block = _cap_working_log('\n'.join(
+        str(c) for c in (record.get('active_concerns') or [])))
     user_parts = [
         f"## ALLOWED REFS\n{', '.join(sorted(allowed))}",
+        f"## ASSISTANT STATE (the assistant's own active concerns, shown "
+        f"in its prompt this turn)\n{state_block or '(none)'}",
         f"## User input\n{record.get('user_input') or '(none — autonomous turn)'}",
         f"## Recalled memories\n{recall_block or '(none)'}",
         f"## Working log (tool calls and observations)\n"
