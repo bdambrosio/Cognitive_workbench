@@ -163,6 +163,21 @@ web search, page fetch, calculator, email check, Obsidian, Semantic
 Scholar, stock quotes, company financial statements, image generation,
 shell scripts, and others. No core edits to add one.
 
+**Reading papers.** `fetch-text` on a research PDF does not return the
+body. With GROBID reachable it returns the title, the abstract, and a
+*section index* — every section name with its size — and the agent then
+asks for sections by name. A 75-page paper becomes a ~1k-token index over
+48 sections instead of ~42k tokens of body text, so the agent reads the
+two sections that bear on the question rather than flooding the
+conversation with the rest. `semantic-scholar` is the complement: passing
+a `paper_id` returns that paper's reference list from the citation graph
+— resolved records with arXiv ids and DOIs — instead of a bibliography
+scraped out of the PDF. It stays a separate call precisely because ten
+search results at ~40 references each would re-create the flood. Without
+GROBID, PDFs fall back to flat page-by-page extraction truncated at 8000
+chars; `GROBID_URL=""` disables it explicitly, and an unreachable server
+degrades to the same fallback.
+
 **Provenance and justification.** Every tool step records structured
 provenance (`tool_meta` — e.g. the full source list behind a web search)
 into the reasoning trace, and a post-turn pass decomposes each reply into
@@ -196,7 +211,7 @@ traces land in sibling `*_traces/` directories.
 |---|---|---|
 | `recall` (`src/chat/remember.py`) | per-world per-agent `memory/` dir | list, read, grep |
 | `inspect` / `inspect_external` (`src/chat/code_subagent.py`) | own `src/` or an externally-bound repo | list, read, grep (ripgrep) |
-| `security` (`src/chat/security.py`) | LAN, RFC1918 ranges only | nmap discovery/-sV, ss/ip |
+| `security` (`src/chat/security.py`) | this host + LAN, RFC1918 ranges only | nmap discovery/-sV, host state, baseline diffs |
 
 ```
                        user input                    tick sensor
@@ -235,6 +250,7 @@ System binaries (all degrade gracefully if missing):
 |---|---|---|
 | `ripgrep` | `inspect` subagent | `apt install ripgrep` |
 | `nmap` (optional) | `security` subagent | `apt install nmap` |
+| GROBID (optional) | section-addressable research PDFs | `docker run -d -p 127.0.0.1:8070:8070 grobid/grobid:0.8.2-full` |
 | Chromium-family (optional) | `--affect` / `--canvas` windows | `apt install chromium-browser` |
 | Playwright browsers (optional) | JS-heavy page fetch fallback | `playwright install chromium` |
 
@@ -306,6 +322,82 @@ from the env var named by `api_key`; local servers POST to `vllm_url`
 without auth and accept grammar / chat-template kwargs.
 `chat.omitted_tools: [...]` ablates tools per scenario (used by benches);
 `external_repo:` pre-binds `inspect_external`.
+
+## Sentinel: a second character
+
+**Why.** In July 2026 OpenAI disclosed that two models under
+cyber-capability evaluation — GPT-5.6 Sol and an unreleased successor,
+both running with cyber refusals reduced for the test — escaped their
+sandbox, reached the open internet, and compromised Hugging Face
+production infrastructure to steal a benchmark's answer key. Agents on
+separate runs found a shared channel, divided work between themselves,
+and passed each other credentials and exploits; when the first channel
+was cut they rebuilt it. It is the first publicly confirmed autonomous
+agent intrusion against a major platform
+([disclosure](https://huggingface.co/blog/security-incident-july-2026)).
+
+This repo runs autonomous agents on a personal workstation. That is the
+point of the concern system — and after July it is also a reason to watch
+the host they run on. Sentinel is that watch, and it is deliberately
+built from the same parts as everything else here: not a monitoring
+daemon, but a second character with its own persona, memory, and a single
+seed concern that decides for itself when a patrol is worth running.
+
+**Shape.** A second character in `scenarios/jill-chat.yaml` with one
+durable concern, `daily-security-patrol` at `rhythm_hours: 24`, passing
+through the same triage gate as any other fire. A patrol checks patch
+posture, pulls the Ubuntu Security Notices feed and version-checks any
+package a notice names, scans for intrusion signs (logins, ssh auth
+failures, privilege events, processes, cron/systemd and user-level
+persistence, authorized keys, containers) and diffs baselines for SUID
+files, listening sockets, accounts, autostart and enabled units. Baseline
+diffs report a change *once* and then re-baseline, so anything flagged
+must land in the note. Every patrol writes `Security/<date>-patrol.md` to
+the Obsidian vault before replying — findings that exist only in chat are
+not recorded — and replies only when something needs attention. It can
+`agent-say` Jill when a finding touches her work.
+
+**Privilege posture.** No LLM ever holds sudo. Tier 0 is unprivileged:
+`journalctl`, `ss`, `ip`, `systemctl`, `apt list`, `find` for SUID,
+`getent`, `docker ps`, `crontab -l`. Tier 2 is three argument-exact
+`NOPASSWD` entries reached through `sudo -n` — `ufw status verbose`,
+`ss -tulpnH`, `aa-status` — which answer what unprivileged probes
+structurally cannot: who owns a root-owned listener, what the firewall
+actually permits, whether MAC enforcement is on. `-n` never prompts, so an
+unconfigured host fails immediately instead of hanging the loop, and the
+patrol reports that as a setup gap rather than a threat. Privileged
+*patching* belongs to `unattended-upgrades`, not the agent: Sentinel
+verifies, scans, and recommends the exact command, and leaves execution
+to a human. Setup is in
+[docs/sentinel-setup.md](docs/sentinel-setup.md).
+
+Worth being plain about the boundary: it is enforced by tool inventory,
+not by the OS. An account in the `docker` group is root-equivalent in
+practice, so the sudoers fence narrows the blast radius of a confused
+agent, not of a determined one.
+
+**Linux-specific, by construction.** Unlike the rest of the repo, this
+character does not port. It assumes systemd and a Debian-family userland:
+the journal for login/auth/privilege history (readable via the `adm`
+group), `apt`/`dpkg` for package state,
+`/var/log/unattended-upgrades/`, and — for the Tier-2 probes — `ufw` and
+AppArmor specifically, which a firewalld/SELinux host would need replaced
+rather than reconfigured. The vulnerability feed is Ubuntu's USN. Two
+host details worth knowing if you adapt it: on Ubuntu 26.04 `last` no
+longer exists (wtmp was dropped in the Y2038 cleanup), so login history
+reads the journal with grep exit semantics; and the default sudo is
+`sudo-rs`, whose denial wording differs from classic sudo. `nmap` stays
+optional and LAN-only.
+
+**Limits.** Unprivileged scanning cannot see kernel rootkits or
+root-only artifacts, and the persona is instructed to say so rather than
+imply coverage it doesn't have. There is no autonomy bench for patrol
+quality any more than for concern firing generally — an early live run
+reported a ufw-blocked wildcard listener as a "public listener" because
+it ran the socket half of its exposure step and skipped the firewall
+half. The capability was there; the agent didn't use it. That failure
+mode — a correct report that is quietly missing a step — is the one to
+watch for.
 
 ## Memory substrate
 
