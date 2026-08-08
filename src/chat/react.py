@@ -512,7 +512,7 @@ class ReactMixin:
             #                       tool is currently broken" — do not
             #                       retry the same call.
             # New tools must follow the same convention. See src/chat/
-            # AGENTS.md for the author-facing rule.
+            # CLAUDE.md for the author-facing rule.
             # ----------------------------------------------------------
             if tool == 'process_text':
                 raw_src = action.get('source', '')
@@ -592,7 +592,12 @@ class ReactMixin:
                     builtin.insert(builtin.index("inspect") + 1, "inspect_external")
                 if getattr(self, '_peers', None):
                     builtin.insert(builtin.index("display"), "agent-say")
-                avail = ", ".join(builtin + sorted(self._discovered_tools.keys()))
+                # Omitted tools must not appear here either — this branch is
+                # exactly where an omitted tool lands, and listing it back
+                # would invite the retry it was dropped to prevent.
+                _omitted = set(getattr(self, '_omitted_tools', None) or [])
+                discovered = sorted(set(self._discovered_tools) - _omitted)
+                avail = ", ".join(builtin + discovered)
                 obs = f"ERROR: unknown tool {tool!r}; available: {avail}"
 
             _append_log(binding, obs)

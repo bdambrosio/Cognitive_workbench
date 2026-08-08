@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Served from the world server itself, so 'self' covers the vendored
+     three.js and the module graph. Sockets are restricted to loopback. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self';
+               script-src 'self';
+               style-src 'self' 'unsafe-inline';
+               img-src 'self' data:;
+               connect-src ws://127.0.0.1:* http://127.0.0.1:*;">
+<title>Jill — world</title>
+<style>
+  html, body { margin:0; padding:0; height:100%; overflow:hidden;
+               background:#8fb7d9; font:13px/1.45 system-ui, sans-serif; }
+  canvas { display:block; }
+  #hud { position:fixed; left:10px; bottom:10px; color:#fff;
+         text-shadow:0 1px 3px rgba(0,0,0,.7); pointer-events:none; }
+  #hud b { font-weight:600; }
+  #veil { position:fixed; inset:0; display:flex; align-items:center;
+          justify-content:center; background:rgba(12,20,28,.72);
+          color:#eef4f8; cursor:pointer; text-align:center; }
+  #veil div { max-width:30rem; }
+  #veil h1 { font-size:1.25rem; margin:0 0 .5rem; font-weight:600; }
+  #veil p { margin:.25rem 0; opacity:.85; }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+<div id="hud"></div>
+<div id="veil"><div>
+  <h1>Click to enter the world</h1>
+  <p><b>W A S D</b> walk &nbsp;·&nbsp; <b>mouse</b> look &nbsp;·&nbsp; <b>shift</b> run</p>
+  <p><b>F</b> first/third-person &nbsp;·&nbsp; <b>M</b> drop marker &nbsp;·&nbsp; <b>Esc</b> release cursor</p>
+</div></div>
+<script type="module" src="./world.js"></script>
+</body>
+</html>

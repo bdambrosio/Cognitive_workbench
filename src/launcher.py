@@ -329,15 +329,19 @@ def _parse_size(s: str, default: str) -> str:
 
 def _launch_widget_window(
     label: str,
-    html_path: str,
+    url: str,
     size: str,
     pos: str,
     browser: Optional[str],
 ) -> Optional[subprocess.Popen]:
-    """Open html_path as a chromium app-mode window. Uses --user-data-dir
+    """Open url as a chromium app-mode window. Uses --user-data-dir
     pointed at a fresh tmp profile to prevent the WM from inheriting a
     previous 'maximized' state — the cause of the affect window opening
-    full-screen on snap chromium."""
+    full-screen on snap chromium.
+
+    Takes a full URL rather than a path: affect and canvas pass file://,
+    the world passes http:// because it loads ES modules, which Chrome
+    refuses to fetch cross-origin from a file:// document."""
     b = _resolve_browser(browser)
     if not b:
         logger.warning(
@@ -347,7 +351,7 @@ def _launch_widget_window(
     profile_dir = f"/tmp/jill-{label}-{os.getpid()}"
     cmd = [
         b,
-        f'--app=file://{html_path}',
+        f'--app={url}',
         f'--window-size={size}',
         f'--window-position={pos}',
         f'--user-data-dir={profile_dir}',
@@ -386,7 +390,7 @@ def launch_affect_display(size: str, pos: str, browser: Optional[str]
     time.sleep(0.4)
     html = os.path.join(_THIS_DIR := os.path.dirname(os.path.abspath(__file__)),
                         'affect', 'display', 'static', 'index.html')
-    win = _launch_widget_window('affect', html, size, pos, browser)
+    win = _launch_widget_window('affect', f'file://{html}', size, pos, browser)
     if win is not None:
         procs.append(win)
     return procs
@@ -412,7 +416,102 @@ def launch_canvas_display(character: str, size: str, pos: str,
     time.sleep(0.4)
     html = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                         'canvas', 'display', 'static', 'index.html')
-    win = _launch_widget_window('canvas', html, size, pos, browser)
+    win = _launch_widget_window('canvas', f'file://{html}', size, pos, browser)
+    if win is not None:
+        procs.append(win)
+    return procs
+
+
+def _tool_names_with_prefix(prefix: str) -> List[str]:
+    """Skill.md `name:` values for one tool family.
+
+    Keys on the declared name rather than the directory: at least one tool
+    in the tree declares a name that differs from its folder (underscores
+    vs hyphens), and omitted_tools matches the declared name.
+    """
+    names: List[str] = []
+    tools_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tools')
+    if not os.path.isdir(tools_dir):
+        return names
+    for entry in sorted(os.listdir(tools_dir)):
+        skill = os.path.join(tools_dir, entry, 'Skill.md')
+        if not os.path.isfile(skill):
+            continue
+        try:
+            with open(skill, encoding='utf-8') as f:
+                for line in f:
+                    if line.startswith('name:'):
+                        declared = line.split(':', 1)[1].strip()
+                        if declared.startswith(prefix) or entry.startswith(prefix):
+                            names.append(declared)
+                        break
+        except OSError as e:
+            logger.warning(f"embodiment: could not read {skill}: {e}")
+    return names
+
+
+def apply_embodiment_selection(characters, world: bool, factorio: bool) -> None:
+    """Drop the tool family for whichever embodiment is not selected.
+
+    Mutates each character's `chat.omitted_tools` in place. With neither
+    flag the catalogs are left exactly as configured — removing tools from
+    an existing workflow on an unrelated launch would be a nasty surprise —
+    but that is also the state in which both families compete, so it warns.
+    """
+    if world:
+        drop, keep = 'fac-', 'the shared world'
+    elif factorio:
+        drop, keep = 'world-', 'the Factorio factory'
+    else:
+        if _tool_names_with_prefix('world-') and _tool_names_with_prefix('fac-'):
+            logger.warning(
+                "no embodiment selected: both the fac-* and world-* tool "
+                "families are advertised, and a spatial request may go to "
+                "either. Pass --world or --factorio to disambiguate.")
+        return
+
+    omit = _tool_names_with_prefix(drop)
+    if not omit:
+        return
+    for _name, config in characters:
+        chat_cfg = config.setdefault('chat', {}) or {}
+        config['chat'] = chat_cfg
+        existing = list(chat_cfg.get('omitted_tools') or [])
+        chat_cfg['omitted_tools'] = existing + [t for t in omit
+                                                if t not in existing]
+    logger.info(f"embodiment: {keep} selected; dropped {len(omit)} "
+                f"{drop}* tools from every catalog")
+
+
+def launch_world_display(occupants: str, size: str, pos: str,
+                         browser: Optional[str]) -> List[subprocess.Popen]:
+    """Spawn the world server + chromium window.
+
+    One process, not the bridge/publisher pair the other surfaces use: the
+    world is authoritative shared state rather than a latest-wins payload,
+    so the same object has to answer the browser and the agent tools.
+
+    `occupants` is the WORLD_OCCUPANTS spec, e.g. "Bruce:human,Jill:agent".
+    """
+    procs: List[subprocess.Popen] = []
+    env = os.environ.copy()
+    env['WORLD_OCCUPANTS'] = occupants
+    http_port = env.get('WORLD_HTTP_PORT', '8791')
+    try:
+        server = subprocess.Popen(
+            [sys.executable, '-m', 'world.display'],
+            env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        procs.append(server)
+        logger.info(f"world server launched (occupants={occupants}, "
+                    f"http://127.0.0.1:{http_port})")
+    except Exception as e:
+        logger.error(f"world: failed to launch server: {e}")
+        return procs
+    # Terrain generation plus two listeners; give it longer than the
+    # widget bridges before pointing a browser at it.
+    time.sleep(1.2)
+    win = _launch_widget_window(
+        'world', f'http://127.0.0.1:{http_port}/', size, pos, browser)
     if win is not None:
         procs.append(win)
     return procs
@@ -578,6 +677,28 @@ def main():
                         help='Canvas window size WxH or W,H (default: 820x640).')
     parser.add_argument('--canvas-pos', default='540,60',
                         help='Canvas window position X,Y (default: 540,60).')
+    # One embodiment at a time. Advertising both tool families at once is
+    # what sent "come to me at -18, 25" to fac-status: fifteen fac-* tools
+    # against two world-* ones, and the factory wins the semantic match.
+    embodiment = parser.add_mutually_exclusive_group()
+    embodiment.add_argument('--world', action='store_true',
+                            help='Launch the shared walkable world and give the '
+                                 'characters bodies in it. You occupy it too — '
+                                 'WASD to walk, F for first/third person. Drops '
+                                 'the fac-* tools from every catalog.')
+    embodiment.add_argument('--factorio', action='store_true',
+                            help='Select the Factorio factory as the embodiment '
+                                 '(drops the world-* tools). Does not start the '
+                                 'server or bridge — run factorio/up.sh for that.')
+    parser.add_argument('--world-size', default='1100x720',
+                        help='World window size WxH or W,H (default: 1100x720).')
+    parser.add_argument('--world-pos', default='120,90',
+                        help='World window position X,Y (default: 120,90).')
+    parser.add_argument('--world-player', default='Bruce',
+                        help='Your name in the world (default: Bruce).')
+    parser.add_argument('--world-characters', nargs='*', default=None,
+                        help='Which characters get a body in the world '
+                             '(default: every launched character).')
     parser.add_argument('--browser', default=None,
                         help='Browser binary for widget windows (default: auto-detect '
                              'chromium/chrome/brave/edge).')
@@ -620,6 +741,10 @@ def main():
     if not characters:
         print("No characters defined in scenario")
         return
+
+    # Embodiment selection must happen before any ChatLoop is built — the
+    # catalog is assembled from chat.omitted_tools at construction.
+    apply_embodiment_selection(characters, args.world, args.factorio)
 
     # Add infospace flag and map name
     for _name, cfg in characters:
@@ -681,6 +806,18 @@ def main():
             service_procs.extend(launch_canvas_display(
                 character=primary_character,
                 size=canvas_size, pos=args.canvas_pos, browser=args.browser))
+    if args.world:
+        # Occupants are config, not code: the human plus whichever
+        # characters are given bodies. Adding Sentinel is a name here.
+        embodied = (args.world_characters
+                    if args.world_characters is not None
+                    else [name for name, _ in characters])
+        spec = ','.join([f'{args.world_player}:human']
+                        + [f'{name}:agent' for name in embodied])
+        world_size = _parse_size(args.world_size, '1100,720')
+        service_procs.extend(launch_world_display(
+            occupants=spec, size=world_size, pos=args.world_pos,
+            browser=args.browser))
 
     # ---- URL listener (shared; sensors drain the queue) ----
     # Start if any character declares a browser-visits sensor

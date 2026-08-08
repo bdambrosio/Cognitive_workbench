@@ -11,7 +11,11 @@ import logging
 import os
 from typing import Any, Dict, Optional
 
-import requests
+# Shared with world_link and any future bridge-backed tool family. Re-exported
+# below so `from utils.factorio_link import run_tool, ...` keeps working.
+from utils.tool_helpers import (  # noqa: F401
+    BridgeError, fmt_pos, parse_number, request_json, run_tool,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,28 +28,17 @@ DIRECTIONS = {"north": 0, "east": 4, "south": 8, "west": 12}
 _DIRECTION_NAMES = {v: k for k, v in DIRECTIONS.items()}
 
 
-class BridgeError(Exception):
-    """Bridge unreachable or returned a non-JSON/non-200 transport failure."""
-
-
 def base_url() -> str:
     return os.environ.get("FACTORIO_URL", "http://localhost:3004").rstrip("/")
 
 
 def _request(method: str, path: str, **kwargs) -> Dict[str, Any]:
-    url = base_url() + path
-    try:
-        resp = requests.request(method, url, timeout=_HTTP_TIMEOUT_S, **kwargs)
-    except requests.ConnectionError as e:
-        raise BridgeError(
-            f"factorio bridge unreachable at {base_url()} — the factory is "
-            f"offline (start it with factorio/up.sh) [{e}]"
-        )
-    except requests.RequestException as e:
-        raise BridgeError(f"factorio bridge request failed: {e}")
-    if resp.status_code != 200:
-        raise BridgeError(f"bridge HTTP {resp.status_code} on {path}: {resp.text[:300]}")
-    return resp.json()
+    # Kept as a module-level indirection: tests/test_fac_tools.py patches
+    # this symbol to stand in for the bridge.
+    return request_json(
+        base_url(), method, path, timeout_s=_HTTP_TIMEOUT_S,
+        offline_hint="the factory is offline (start it with factorio/up.sh)",
+        **kwargs)
 
 
 def bridge_get(path: str, params: Optional[dict] = None) -> Dict[str, Any]:
@@ -54,17 +47,6 @@ def bridge_get(path: str, params: Optional[dict] = None) -> Dict[str, Any]:
 
 def bridge_post(path: str, body: Optional[dict] = None) -> Dict[str, Any]:
     return _request("POST", path, json=body or {})
-
-
-def run_tool(fn, logger_=None):
-    """Standard react_invoke wrapper: fn() -> {status, text}, with transport
-    failures surfaced as ERROR text instead of a raised exception."""
-    log = logger_ or logger
-    try:
-        return fn()
-    except BridgeError as e:
-        log.warning(f"factorio tool: {e}")
-        return {"status": "error", "text": str(e)}
 
 
 # ----------------------------------------------------------------- coercion
@@ -83,19 +65,6 @@ def parse_direction(value, default: Optional[int] = None):
     if d not in _DIRECTION_NAMES:
         return None, f"direction number must be one of 0/4/8/12 (N/E/S/W), got {d}"
     return d, None
-
-
-def parse_number(args: dict, name: str, required: bool = True, default=None):
-    """Returns (value, error_text)."""
-    raw = args.get(name)
-    if raw is None:
-        if required:
-            return None, f"missing required arg: {name}"
-        return default, None
-    try:
-        return float(raw), None
-    except (TypeError, ValueError):
-        return None, f"{name} must be a number, got {raw!r}"
 
 
 def parse_transfer_args(args: dict):
@@ -123,15 +92,6 @@ def parse_transfer_args(args: dict):
 
 def fmt_direction(d) -> str:
     return _DIRECTION_NAMES.get(d, str(d))
-
-
-def fmt_pos(x, y=None) -> str:
-    if isinstance(x, dict):
-        x, y = x.get("x"), x.get("y")
-    try:
-        return f"({float(x):.1f}, {float(y):.1f})"
-    except (TypeError, ValueError):
-        return f"({x}, {y})"
 
 
 def fmt_deviation(dev: dict) -> str:

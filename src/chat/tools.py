@@ -170,14 +170,26 @@ class ToolsMixin:
         """Resolve an emitted tool name against the discovered registry,
         tolerating hyphen/underscore drift ('fetch_text' → 'fetch-text').
         Exact match wins; the separator-swapped spelling is the only
-        fallback. Returns None when neither spelling is registered."""
+        fallback. Returns None when neither spelling is registered, or
+        when the tool is omitted for this scenario.
+
+        Omitted tools resolve to None rather than being dispatched. Dropping
+        them from the catalog alone is not enough: the last few turns'
+        working logs are re-injected into every prompt, so a tool used
+        before an ablation — or before an embodiment switch — is still
+        demonstrated in context and gets re-emitted from memory (live miss:
+        turn 2360, fac-status called under --world with the fac-* family
+        already dropped). Returning None routes it to react.py's
+        unknown-tool branch, whose error lists what *is* available, so the
+        correction is self-serving. It also makes the cspred ablation cells
+        honest — an ablated tool is now genuinely unreachable, not merely
+        unadvertised."""
         if not isinstance(tool, str):
             return None
-        if tool in self._discovered_tools:
-            return tool
-        for cand in (tool.replace('_', '-'), tool.replace('-', '_')):
-            if cand != tool and cand in self._discovered_tools:
-                return cand
+        omitted = set(self._omitted_tools or [])
+        for cand in (tool, tool.replace('_', '-'), tool.replace('-', '_')):
+            if cand in self._discovered_tools:
+                return None if cand in omitted else cand
         return None
 
     def _dispatch_discovered_tool(self, name: str, action: Dict[str, Any],

@@ -399,6 +399,13 @@ characters:
         schedule: "1m"
       - name: factorio-telemetry
         schedule: "2m"
+      # The push half of world embodiment: without it she can only ever
+      # respond, never initiate — she has no way to notice Bruce arriving.
+      # Edge-triggered with hysteresis, so a quiet world costs nothing and
+      # someone loitering at the boundary does not flap. Silent when the
+      # world server is down, which is every chat-only session.
+      - name: world-presence
+        schedule: "30s"
 
   # Desktop security agent (2026-08-08). Second character so Bruce can
   # talk to it directly (/char Sentinel in the CLI); the launcher's peer
