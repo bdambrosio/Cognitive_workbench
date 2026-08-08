@@ -63,10 +63,11 @@ _RFC1918_NETWORKS = [
 # and runs without elevated privileges (some output detail — like PIDs
 # in `ss -tlnp` — is reduced when run as a non-privileged user).
 _SYSTEM_STATE_COMMANDS: Dict[str, List[str]] = {
-    'sockets':    ['ss', '-tlnp'],
-    'routes':     ['ip', 'route', 'show'],
-    'arp':        ['ip', 'neigh', 'show'],
-    'interfaces': ['ip', '-br', 'addr', 'show'],
+    'sockets':     ['ss', '-tlnp'],
+    'udp_sockets': ['ss', '-ulnp'],
+    'routes':      ['ip', 'route', 'show'],
+    'arp':         ['ip', 'neigh', 'show'],
+    'interfaces':  ['ip', '-br', 'addr', 'show'],
 }
 
 # host_state categories → argv. Same discipline as system_state: every
@@ -91,7 +92,31 @@ _HOST_STATE_COMMANDS: Dict[str, List[str]] = {
     'timers':        ['systemctl', 'list-timers', '--all', '--no-pager'],
     'enabled_units': ['systemctl', 'list-unit-files', '--state=enabled',
                       '--no-pager'],
+    'failed_units':  ['systemctl', 'list-units', '--failed', '--no-pager'],
     'upgradable':    ['apt', 'list', '--upgradable'],
+    'containers':    ['docker', 'ps', '--all', '--no-trunc',
+                      '--format', '{{.Names}}\t{{.Image}}\t{{.Ports}}\t'
+                                  '{{.Status}}'],
+    # Privilege-use and account-management events. No -g, so an empty
+    # journal is rc 0 with no output.
+    'privilege_events': ['journalctl', '-t', 'sudo', '-t', 'su',
+                         '-t', 'useradd', '-t', 'usermod', '-t', 'groupadd',
+                         '--since', '-7d', '--no-pager', '-q'],
+}
+
+# Tier 2 — privileged read-only probes reached through `sudo -n` with
+# argument-exact NOPASSWD entries (see docs/sentinel-setup.md). These
+# answer questions unprivileged probes structurally cannot: which
+# process owns a root-owned listener, what the firewall actually
+# permits, whether MAC enforcement is in place. `-n` never prompts, so
+# an unconfigured host fails immediately instead of hanging the loop.
+# Full paths are mandatory — the sudoers entry matches the path as
+# invoked, and sudo's secure_path applies. aa-status is used rather
+# than its apparmor_status symlink so the fenced path is unambiguous.
+_SUDO_HOST_COMMANDS: Dict[str, List[str]] = {
+    'firewall':        ['sudo', '-n', '/usr/sbin/ufw', 'status', 'verbose'],
+    'listener_owners': ['sudo', '-n', '/usr/bin/ss', '-tulpnH'],
+    'apparmor':        ['sudo', '-n', '/usr/sbin/aa-status'],
 }
 
 # journalctl -g adopts grep exit semantics: rc 1 means "no matching
@@ -112,8 +137,19 @@ _UNATTENDED_LOG_TAIL_LINES = 120
 _BASELINE_CATEGORIES: Dict[str, List[str]] = {
     'suid':          ['find', '/', '-xdev', '-perm', '-4000', '-type', 'f'],
     'sockets':       ['ss', '-tlnH'],
+    'udp_sockets':   ['ss', '-ulnH'],
     'enabled_units': ['systemctl', 'list-unit-files', '--state=enabled',
                       '--no-legend', '--plain', '--no-pager'],
+    'user_units':    ['systemctl', '--user', 'list-unit-files',
+                      '--state=enabled', '--no-legend', '--plain',
+                      '--no-pager'],
+    # A second uid-0 entry or an unexpected new account is a classic
+    # persistence move, and /etc/passwd is world-readable.
+    'accounts':      ['getent', 'passwd'],
+    # Desktop autostart is the most-used user-level persistence surface
+    # and needs no privilege to write, so diffing it matters.
+    'autostart':     ['find', str(Path.home() / '.config' / 'autostart'),
+                      '-maxdepth', '1', '-type', 'f'],
 }
 
 
@@ -163,12 +199,13 @@ def _build_system_prompt() -> str:
         "host must be a single RFC1918 IP. Output: per-port lines like "
         "`<host> <port>/<state>/<proto>/<service>/<version>`. Up to ~120s.\n"
         '3. {"thought": "...", "tool": "system_state", "category": '
-        '"<sockets|routes|arp|interfaces>"} — read-only system probe. '
-        "Categories:\n"
-        "    `sockets`    — listening TCP sockets (ss -tlnp)\n"
-        "    `routes`     — IP routing table (ip route show)\n"
-        "    `arp`        — ARP / IPv6 neighbor table (ip neigh show)\n"
-        "    `interfaces` — interface addresses (ip -br addr show)\n"
+        '"<sockets|udp_sockets|routes|arp|interfaces>"} — read-only '
+        "system probe. Categories:\n"
+        "    `sockets`     — listening TCP sockets (ss -tlnp)\n"
+        "    `udp_sockets` — listening UDP sockets (ss -ulnp)\n"
+        "    `routes`      — IP routing table (ip route show)\n"
+        "    `arp`         — ARP / IPv6 neighbor table (ip neigh show)\n"
+        "    `interfaces`  — interface addresses (ip -br addr show)\n"
         '4. {"thought": "...", "tool": "host_state", "category": '
         '"<category>"} — read-only local-host probe, fixed commands, no '
         "arguments. Categories:\n"
@@ -177,21 +214,43 @@ def _build_system_prompt() -> str:
         "days, from the journal\n"
         "    `auth_failures`  — sshd failed/invalid auth, last 24h "
         "(journalctl; needs adm/systemd-journal group)\n"
+        "    `privilege_events` — sudo/su/useradd/usermod/groupadd "
+        "activity, last 7 days\n"
         "    `suid`           — SUID file inventory on the root "
         "filesystem (find -perm -4000; ~1 min)\n"
         "    `cron`           — user crontab, /etc/crontab, /etc/cron.d "
         "contents, periodic-dir listings\n"
         "    `timers`         — systemd timers (list-timers --all)\n"
         "    `enabled_units`  — enabled systemd unit files\n"
+        "    `failed_units`   — systemd units in a failed state\n"
+        "    `user_persistence` — ~/.config/autostart, enabled "
+        "systemd --user units, shell startup files. Plantable WITHOUT "
+        "root, so a user-account compromise shows here first.\n"
+        "    `accounts`       — uid-0, regular, and shell-bearing "
+        "system accounts from /etc/passwd\n"
         "    `ssh_keys`       — ~/.ssh/authorized_keys contents\n"
+        "    `ssh_config`     — auth-relevant sshd directives\n"
+        "    `containers`     — docker containers (running and stopped) "
+        "with their published ports\n"
         "    `upgradable`     — packages with pending upgrades (apt list)\n"
         "    `unattended_log` — tail of the unattended-upgrades log\n"
+        "  Privileged categories (fenced `sudo -n`, argument-exact "
+        "NOPASSWD entries; unavailable until configured, which reports "
+        "as EMPTY and is a SETUP GAP, never a finding):\n"
+        "    `firewall`        — ufw status verbose (the actual "
+        "ruleset, not just whether ufw is enabled)\n"
+        "    `listener_owners` — ss -tulpnH with PID/program for ALL "
+        "listeners including root-owned ones. Unprivileged `sockets` "
+        "shows root-owned listeners with NO process attribution, so "
+        "this is the only way to name what holds an open port.\n"
+        "    `apparmor`        — aa-status profile detail\n"
         '5. {"thought": "...", "tool": "package_version", "packages": '
         '"<name1 name2 ...>"} — installed version + status via dpkg-query '
         "(max 40 names per call). Use to cross-reference a security "
         "notice against what is actually installed.\n"
         '6. {"thought": "...", "tool": "baseline_diff", "category": '
-        '"<suid|sockets|enabled_units>"} — diff current state against the '
+        '"<suid|sockets|udp_sockets|enabled_units|user_units|accounts|'
+        'autostart>"} — diff current state against the '
         "last stored snapshot; reports ADDED/REMOVED entries, then "
         "updates the snapshot. First call establishes the baseline. "
         "NOTE: because the snapshot updates on every call, a reported "
@@ -217,8 +276,15 @@ def _build_system_prompt() -> str:
         "    * 'What's my IP / interface?' → system_state(interfaces).\n"
         "    * 'What's my default gateway?' → system_state(routes).\n"
         "    * 'Any signs of intrusion?' → host_state over logins, "
-        "auth_failures, processes, cron, ssh_keys + baseline_diff over "
-        "suid, sockets, enabled_units.\n"
+        "auth_failures, privilege_events, processes, cron, "
+        "user_persistence, ssh_keys, containers + baseline_diff over "
+        "suid, sockets, accounts, autostart, enabled_units.\n"
+        "    * 'What is exposed / is the firewall right?' → "
+        "system_state(sockets) and (udp_sockets) for what listens, then "
+        "host_state(listener_owners) to name the owning process and "
+        "host_state(firewall) for what the ruleset actually permits. A "
+        "listener on 0.0.0.0 is reachable from the network; one on "
+        "127.0.0.1 is not. Say which, explicitly.\n"
         "    * 'Are we patched?' → host_state(upgradable) + "
         "host_state(unattended_log); package_version for specific CVE/"
         "USN cross-checks.\n"
@@ -228,8 +294,15 @@ def _build_system_prompt() -> str:
         "shows PID/program only for processes the current user owns. "
         "auth_failures and unattended_log need adm/systemd-journal group "
         "membership; the SUID walk cannot enter root-only directories; "
-        "kernel-level rootkits are invisible to every probe here. Note "
-        "these limitations honestly in your final answer if relevant.\n"
+        "unprivileged probes cannot see /root, other users' crontabs, or "
+        "modified system binaries; kernel-level rootkits are invisible to "
+        "every probe here. Note these limitations honestly in your final "
+        "answer if relevant, and never let a clean scan imply coverage "
+        "you did not have.\n"
+        "- **Fenced-probe absence is not a finding.** When a privileged "
+        "category returns EMPTY because its sudoers entry is missing, "
+        "that is unconfigured tooling. Report it as a setup gap and do "
+        "not retry it in the same run.\n"
         "- **Don't loop blindly.** If discover on a /16 returns 200 "
         "hosts, narrow to a /24 rather than scanning each individually. "
         "If nmap fails for one target, don't retry the same call.\n"
@@ -436,12 +509,180 @@ def _host_cron_report() -> str:
     return '\n\n'.join(sections)
 
 
+def _run_sudo(cat: str) -> str:
+    """Run a Tier-2 fenced probe. Distinguishes 'sudoers entry absent'
+    (a setup state, reported as EMPTY with a pointer) from a genuine
+    command failure, so an unconfigured host doesn't read as a scan
+    finding."""
+    cmd = _SUDO_HOST_COMMANDS[cat]
+    if shutil.which('sudo') is None:
+        return "ERROR: sudo is not on PATH"
+    if not Path(cmd[2]).exists():
+        return (f"EMPTY: {Path(cmd[2]).name} is not installed on this host "
+                f"— {cat} is unavailable")
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True,
+                              timeout=_HOST_STATE_TIMEOUT, check=False,
+                              stdin=subprocess.DEVNULL)
+    except subprocess.TimeoutExpired:
+        return f"ERROR: {cat} timed out (>{int(_HOST_STATE_TIMEOUT)}s)"
+    except Exception as e:
+        return f"ERROR: {cat} failed to launch: {e}"
+    err = (proc.stderr or '').strip()
+    if proc.returncode != 0:
+        low = err.lower()
+        # Wording varies across sudo versions: "a password is required"
+        # (classic), "interactive authentication is required" (sudo-rs,
+        # Ubuntu 25.10+), "not allowed to execute" / "may not run"
+        # (entry present but this command not permitted).
+        if ('password is required' in low
+                or 'interactive authentication is required' in low
+                or 'authentication is required' in low
+                or 'not allowed to execute' in low
+                or 'may not run' in low):
+            return (f"EMPTY: {cat} needs a sudoers entry that is not "
+                    "installed on this host — the privileged probes are "
+                    "unconfigured, which is a setup gap, NOT a security "
+                    "finding. See docs/sentinel-setup.md.")
+        return (f"ERROR: {cat} exited {proc.returncode}: "
+                + ' | '.join(err.splitlines()[:3]))
+    out = (proc.stdout or '').strip()
+    if not out:
+        return f"EMPTY: {cat} returned no output"
+    return _truncate('OK: ' + out, 'category')
+
+
+def _host_accounts_report() -> str:
+    """Login-capable and uid-0 accounts from the world-readable passwd
+    database. A second uid-0 account, or a system account that has
+    grown a login shell, is the signal worth surfacing."""
+    out, err = _run_argv(['getent', 'passwd'], _HOST_STATE_TIMEOUT)
+    if err:
+        return err
+    uid0, human, shelled = [], [], []
+    nologin = ('/usr/sbin/nologin', '/sbin/nologin', '/bin/false',
+               '/usr/bin/false')
+    for line in (out or '').splitlines():
+        parts = line.split(':')
+        if len(parts) < 7:
+            continue
+        name, uid, shell = parts[0], parts[2], parts[6]
+        try:
+            uid_i = int(uid)
+        except ValueError:
+            continue
+        entry = f'{name} uid={uid} shell={shell}'
+        if uid_i == 0:
+            uid0.append(entry)
+        elif 1000 <= uid_i < 65534:
+            human.append(entry)
+        elif shell not in nologin:
+            shelled.append(entry)
+    sections = [
+        '## uid 0 (root-equivalent)\n' + ('\n'.join(uid0) or '(none)'),
+        '## regular accounts (uid 1000-65533)\n' + ('\n'.join(human) or '(none)'),
+        '## system accounts with a login shell\n'
+        + ('\n'.join(shelled) or '(none)'),
+    ]
+    return '\n\n'.join(sections)
+
+
+def _host_user_persistence_report() -> str:
+    """User-level persistence surfaces. All writable without privilege,
+    which is exactly why they matter: nothing here needs root to plant,
+    so a compromise of the user account lands here first."""
+    home = Path.home()
+    sections: List[str] = []
+
+    autostart = home / '.config' / 'autostart'
+    if autostart.is_dir():
+        entries = []
+        for f in sorted(autostart.iterdir()):
+            if not f.is_file():
+                continue
+            try:
+                st = f.stat()
+                entries.append(f'{f.name}  ({st.st_size}b, mtime '
+                               f'{datetime.fromtimestamp(st.st_mtime).isoformat(timespec="seconds")})')
+            except OSError as e:
+                entries.append(f'{f.name}  (stat failed: {e})')
+        sections.append('## ~/.config/autostart\n'
+                        + ('\n'.join(entries) if entries else '(empty)'))
+    else:
+        sections.append('## ~/.config/autostart\n(missing)')
+
+    out, err = _run_argv(['systemctl', '--user', 'list-unit-files',
+                          '--state=enabled', '--no-legend', '--plain',
+                          '--no-pager'], _HOST_STATE_TIMEOUT)
+    sections.append('## enabled systemd --user units\n'
+                    + (err or out or '(none)'))
+
+    rc_lines = []
+    for rel in ('.bashrc', '.bash_profile', '.profile', '.bash_login',
+                '.zshrc', '.config/systemd/user'):
+        p = home / rel
+        if not p.exists():
+            continue
+        try:
+            st = p.stat()
+            kind = 'dir' if p.is_dir() else f'{st.st_size}b'
+            rc_lines.append(
+                f'{rel}  ({kind}, mtime '
+                f'{datetime.fromtimestamp(st.st_mtime).isoformat(timespec="seconds")})')
+        except OSError as e:
+            rc_lines.append(f'{rel}  (stat failed: {e})')
+    sections.append('## shell startup files (mtime — recent edits are the '
+                    'signal)\n' + ('\n'.join(rc_lines) or '(none)'))
+    return '\n\n'.join(sections)
+
+
+def _host_ssh_config_report() -> str:
+    """Authentication-relevant sshd settings. sshd_config is
+    world-readable; the *effective* config would need `sshd -T` (root),
+    so absent directives mean the compiled-in default applies."""
+    paths = [Path('/etc/ssh/sshd_config')]
+    drop_in = Path('/etc/ssh/sshd_config.d')
+    if drop_in.is_dir():
+        paths.extend(sorted(p for p in drop_in.glob('*.conf')))
+    interesting = ('passwordauthentication', 'permitrootlogin',
+                   'pubkeyauthentication', 'permitemptypasswords',
+                   'port', 'listenaddress', 'allowusers', 'allowgroups',
+                   'kbdinteractiveauthentication',
+                   'challengeresponseauthentication')
+    sections = []
+    for p in paths:
+        body = _read_file_tail(p, 500)
+        if body is None:
+            sections.append(f'## {p}\n(unreadable)')
+            continue
+        hits = [ln.strip() for ln in body.splitlines()
+                if ln.strip() and not ln.strip().startswith('#')
+                and ln.strip().split()[0].lower() in interesting]
+        sections.append(f'## {p}\n' + ('\n'.join(hits)
+                                       or '(no auth-relevant directives set)'))
+    sections.append('NOTE: directives absent above run at sshd defaults '
+                    '(PasswordAuthentication yes, PermitRootLogin '
+                    'prohibit-password). The effective merged config needs '
+                    '`sshd -T`, which requires root.')
+    return '\n\n'.join(sections)
+
+
 def _tool_host_state(category: str) -> str:
     cat = (category or '').strip().lower()
     valid_cats = sorted(list(_HOST_STATE_COMMANDS.keys())
-                        + ['cron', 'ssh_keys', 'unattended_log'])
+                        + list(_SUDO_HOST_COMMANDS.keys())
+                        + ['cron', 'ssh_keys', 'unattended_log', 'accounts',
+                           'user_persistence', 'ssh_config'])
+    if cat in _SUDO_HOST_COMMANDS:
+        return _run_sudo(cat)
     if cat == 'cron':
         return _truncate('OK: ' + _host_cron_report(), 'category')
+    if cat == 'accounts':
+        return _truncate('OK: ' + _host_accounts_report(), 'category')
+    if cat == 'user_persistence':
+        return _truncate('OK: ' + _host_user_persistence_report(), 'category')
+    if cat == 'ssh_config':
+        return _truncate('OK: ' + _host_ssh_config_report(), 'category')
     if cat == 'ssh_keys':
         path = Path.home() / '.ssh' / 'authorized_keys'
         body = _read_file_tail(path, 100)
@@ -529,7 +770,7 @@ def _canonicalize_baseline(cat: str, out: str) -> List[str]:
     """Reduce probe output to a stable, sorted line set so snapshots
     don't diff on volatile columns or ordering."""
     lines = [ln for ln in out.splitlines() if ln.strip()]
-    if cat == 'sockets':
+    if cat in ('sockets', 'udp_sockets'):
         # ss -tlnH: State Recv-Q Send-Q Local:Port Peer:Port [Process].
         # Keep only the local address:port — queue counters are volatile
         # and the process column is privilege-dependent.
@@ -539,7 +780,7 @@ def _canonicalize_baseline(cat: str, out: str) -> List[str]:
             if len(fields) >= 4:
                 keep.append(fields[3])
         lines = keep
-    elif cat == 'enabled_units':
+    elif cat in ('enabled_units', 'user_units'):
         # --plain --no-legend: "<unit> <state> [preset]". Keep unit+state.
         lines = [' '.join(ln.split()[:2]) for ln in lines]
     return sorted(set(lines))

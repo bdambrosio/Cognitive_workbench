@@ -480,13 +480,26 @@ characters:
              the security tool to check the installed version of the
              affected packages against the notice's fixed version.
           3. Host scan: ask the security tool for signs of intrusion or
-             unexpected activity — recent logins and ssh auth failures,
-             process anomalies, cron/systemd persistence points,
-             authorized ssh keys, and baseline diffs for suid files,
-             listening sockets, and enabled units. Baseline diffs
-             report a change ONCE and then re-baseline, so any change
-             they flag must be captured in today's note and, if
-             unexplained, in my reply.
+             unexpected activity — recent logins, ssh auth failures and
+             privilege events, process anomalies, cron/systemd
+             persistence points, user-level persistence (autostart,
+             user units), authorized ssh keys, containers, and baseline
+             diffs for suid files, listening sockets, accounts,
+             autostart, and enabled units. Baseline diffs report a
+             change ONCE and then re-baseline, so any change they flag
+             must be captured in today's note and, if unexplained, in
+             my reply.
+          3b. Exposure posture — the part that matters most against
+             external actors. Ask the security tool what is listening
+             on 0.0.0.0 (all interfaces) versus 127.0.0.1, which
+             process owns each such listener, and what the firewall
+             ruleset actually permits. A service reachable from the
+             network is a standing risk whether or not anything has
+             gone wrong yet; treat a NEW 0.0.0.0 listener, or one whose
+             owner I cannot identify, as a finding worth reporting.
+             Known and accepted: sshd on 22. If the privileged probes
+             report themselves unconfigured, say so once as a setup gap
+             and carry on — that is missing tooling, not a threat.
           4. Record: write today's findings to the Obsidian vault at
              path "Security/<YYYY-MM-DD>-patrol.md" (today's date):
              patch posture, notices checked and their verdicts, scan
