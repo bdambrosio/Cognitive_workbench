@@ -172,6 +172,14 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # _handle_tick entry; everything else (cadence math, concern
         # types) is unaffected by the flag.
         self._autonomy_enabled = bool(character_config.get('autonomy_enabled', False))
+        # Co-resident agents this character can message (agent-say tool +
+        # reply routing). Injected by the launcher from the scenario's
+        # character list; empty for single-character scenarios, which
+        # leaves the tool unregistered and routing inert.
+        self._peers: List[str] = [
+            str(p) for p in (character_config.get('peers') or []) if str(p)]
+        # Hop count of the turn currently in flight (0 = not agent-sourced).
+        self._current_turn_hops: int = 0
         # Schema-level affordance gate. Tool names listed here are filtered
         # out of the ReAct tool catalog (and any related guidance) so the
         # agent's affordance representation matches what's actually
@@ -1263,7 +1271,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                            autonomous_concern_id: Optional[str] = None,
                            image_url: Optional[str] = None,
                            modality: Optional[str] = None,
-                           fire_id: Optional[str] = None) -> None:
+                           fire_id: Optional[str] = None,
+                           hops: int = 0) -> None:
         """Drive one turn through the ReAct loop. The autonomous path
         (autonomous=True) reuses the same prompt construction so Jill's
         voice stays consistent and traces share format. Divergences are
@@ -1286,6 +1295,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         }
         self._affect.set_trigger('autonomous' if autonomous else 'user')
         self._affect.set_mode('thinking')
+        self._current_turn_hops = max(0, int(hops or 0))
         try:
             self._process_user_turn_inner(
                 source, text, close,
@@ -1295,6 +1305,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                 fire_id=fire_id)
         finally:
             self._current_turn = None
+            self._current_turn_hops = 0
             self._affect.set_mode('idle')
 
     def _process_user_turn_inner(self, source: str, text: str, close: bool,
@@ -1428,7 +1439,10 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # in that case — there's no user waiting for an ack — but keep the
         # "(no reply)" rewrite for the trace/store/CLI coda so /status and
         # autonomy logs still show that the concern fired and ran clean.
-        intentionally_silent = autonomous and not reply
+        # Agent-sourced turns may also end in silence (a peer exchange
+        # reaching its natural close) — no human is waiting for an ack,
+        # so skip the "(no reply)" publish exactly like autonomous runs.
+        intentionally_silent = (autonomous or source in self._peers) and not reply
         if not reply:
             reply = "(no reply)"
 
@@ -1442,6 +1456,13 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             # turn (a resolved name) still gets spoken (cw-voice-sensor-plan.md §10).
             speak = (not autonomous) and modality == VOICE_MODALITY
             self._publish_say(reply, speak=speak)
+            # Agent-exchange reply routing: a turn sourced by a co-resident
+            # agent gets this reply delivered back to that agent's inbox
+            # (hop-budgeted in _route_reply_to_peer). The /action publish
+            # above still happens, so the human sees both sides.
+            if source in self._peers and reply != '(no reply)':
+                self._route_reply_to_peer(source, reply,
+                                          self._current_turn_hops)
         self._last_reply_at = datetime.now(timezone.utc).isoformat()
         logger.info(f"[{self.character_name}] -> {source} ({act_type}): {reply!r}")
 
@@ -1952,12 +1973,14 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                 close = bool(msg.get('close', False))
                 image_url = msg.get('image_url')
                 modality = msg.get('modality')
+                hops = int(msg.get('hops') or 0)
                 img_tag = ' [+image]' if image_url else ''
                 logger.info(f"[{self.character_name}] <- {source}: {text!r} (close={close}){img_tag}")
 
                 try:
                     self._process_user_turn(source, text, close,
-                                            image_url=image_url, modality=modality)
+                                            image_url=image_url, modality=modality,
+                                            hops=hops)
                 except Exception as e:
                     logger.error(f"[{self.character_name}] turn handling crashed: {e}")
                     import traceback

@@ -1,0 +1,50 @@
+# Cognitive Workbench — minimal two-agent scenario (agent-say smoke test
+# and multi-agent experimentation baseline). Two chat-mode characters in
+# one launcher; the launcher injects each one's peers so the agent-say
+# tool registers and agent-sourced replies route back automatically.
+#
+#   python3 launcher.py duo-test.yaml --cli
+#
+# In the CLI, @Ann / @Bob (or the character-switch command) addresses
+# each agent; both agents' replies appear labeled.
+
+world_config:
+  world_name: "duo_test"
+
+llm_config:
+  sgl_model_path: null
+  reasoning_parser: null
+
+setting: |
+  Cognitive Workbench, two-agent chat session. Ann and Bob are separate
+  agents sharing one workbench; each can message the other with the
+  agent-say tool, and the human user can address either directly.
+
+characters:
+  Ann:
+    mode: chat
+    llm_config:
+      server: local
+      model: ""
+      vllm_url: http://127.0.0.1:5000
+      is_reasoning_model: false
+    character: |
+      Ann is terse, direct, and cooperative. She answers plainly and
+      keeps messages short and self-contained.
+    capabilities: |
+      Ann converses, remembers, and can use tools mid-turn, including
+      messaging her co-resident agent Bob via agent-say.
+
+  Bob:
+    mode: chat
+    llm_config:
+      server: local
+      model: ""
+      vllm_url: http://127.0.0.1:5000
+      is_reasoning_model: false
+    character: |
+      Bob is terse, direct, and cooperative. He answers plainly and
+      keeps messages short and self-contained.
+    capabilities: |
+      Bob converses, remembers, and can use tools mid-turn, including
+      messaging his co-resident agent Ann via agent-say.

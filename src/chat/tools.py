@@ -328,6 +328,24 @@ class ToolsMixin:
         # finish (respond).
         for _name, _meta in self._discovered_tools.items():
             tools.append((_name, self._render_discovered_tool_entry(_name, _meta)))
+        # Agent-to-agent messaging — only when the scenario has co-resident
+        # peers (launcher injects config['peers'] from the character list).
+        peers = getattr(self, '_peers', None) or []
+        if peers:
+            tools.append(("agent-say",
+                "`{\"thought\": \"<one terse sentence>\", \"tool\": \"agent-say\", "
+                "\"to\": <agent name>, \"text\": <string|$stepN>}` — "
+                f"send a message to a co-resident agent (available: {', '.join(peers)}). "
+                "Non-terminal — the loop continues; follow with `respond` (or a silent "
+                "exit on autonomous runs) as usual. The peer processes your message as "
+                "its own turn; its reply, if any, arrives LATER as a new turn from that "
+                "agent's name — never wait for it inside this loop. Use agent-say to "
+                "INITIATE contact, delegate, or ask a peer something. When you are "
+                "ANSWERING a turn that came FROM an agent, just use `respond` — it is "
+                "delivered back to that agent automatically; agent-say would "
+                "double-send. Exchanges carry a hard hop budget, so long ping-pong "
+                "conversations get cut off: make each message complete and "
+                "self-contained rather than chatty."))
         tools.append(("display",
             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"display\", "
             "\"content\": <string|$stepN>, \"format\": \"markdown\"|\"html\"}` — "

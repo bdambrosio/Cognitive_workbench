@@ -72,7 +72,7 @@ REACT_ACTION_SCHEMA: Dict[str, Any] = {
 
 # Tools the model can emit. Validated structurally in _parse_react_action;
 # the dispatcher in _run_react_loop knows how to run each.
-_REACT_TOOLS = ('process_text', 'recall', 'inspect', 'inspect_external', 'security', 'justify', 'display', 'respond', 'yield')
+_REACT_TOOLS = ('process_text', 'recall', 'inspect', 'inspect_external', 'security', 'justify', 'agent-say', 'display', 'respond', 'yield')
 
 # Per-iteration auto-binding: $step1, $step2, ... names the result of each
 # action so subsequent actions can reference it. Scoped to the current turn
@@ -550,6 +550,10 @@ class ReactMixin:
                 obs = self._run_security(q)
             elif tool == 'justify':
                 obs = self._run_justify(source)
+            elif tool == 'agent-say':
+                to = str(action.get('to') or '')
+                msg_text = self._resolve_react_value(action.get('text', ''), log)
+                obs = self._run_agent_say(to, msg_text)
             elif tool == 'display':
                 content = self._resolve_react_value(action.get('content', ''), log)
                 fmt = (action.get('format') or 'markdown').strip().lower()
@@ -586,6 +590,8 @@ class ReactMixin:
                            "justify", "display", "respond"]
                 if self._get_external_repo() is not None:
                     builtin.insert(builtin.index("inspect") + 1, "inspect_external")
+                if getattr(self, '_peers', None):
+                    builtin.insert(builtin.index("display"), "agent-say")
                 avail = ", ".join(builtin + sorted(self._discovered_tools.keys()))
                 obs = f"ERROR: unknown tool {tool!r}; available: {avail}"
 

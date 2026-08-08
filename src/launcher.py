@@ -824,6 +824,12 @@ def main():
 
     # ---- Launch agent threads ----
     shutdown_event = threading.Event()
+    # Co-resident peers: each character learns the others' names so chat
+    # mode can offer the agent-say tool and route agent-sourced replies.
+    _all_names = [n for n, _ in characters]
+    for name, config in characters:
+        config['peers'] = [n for n in _all_names if n != name]
+
     threads: List[threading.Thread] = []
     for name, config in characters:
         t = threading.Thread(target=run_agent, args=(name, config, runtime, tokenizer, shutdown_event), name=f"agent-{name}", daemon=True)
