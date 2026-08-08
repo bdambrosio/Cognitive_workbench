@@ -8,6 +8,10 @@ import logging
 from urllib.request import Request, urlopen
 GROBID_URL = "http://localhost:8070/api/processFulltextDocument"
 
+# Full-text parsing of a long paper takes tens of seconds; without a
+# bound a wedged GROBID would hang the calling ReAct loop indefinitely.
+_GROBID_TIMEOUT = 120
+
 logger = logging.getLogger(__name__)
 
 def _unixify_title(title: str) -> str:
@@ -101,7 +105,8 @@ def parse_pdf_grobid(pdf_filepath=None, pdf_url=None, title=None, chunk_size=100
     try:
         with open(pdf_filepath, 'rb') as f:
             files = {'input': f}
-            response = requests.post(url, files=files)
+            response = requests.post(url, files=files,
+                                     timeout=_GROBID_TIMEOUT)
         if response.status_code != 200:
             logger.error(f'GROBID Error {response.status_code}')
             return None
@@ -261,7 +266,8 @@ def extract_references_grobid(pdf_filepath=None, pdf_url=None, grobid_url=None):
     try:
         with open(pdf_filepath, 'rb') as f:
             files = {'input': f}
-            response = requests.post(url, files=files)
+            response = requests.post(url, files=files,
+                                     timeout=_GROBID_TIMEOUT)
         if response.status_code != 200:
             logger.error(f'GROBID Error {response.status_code}')
             return None

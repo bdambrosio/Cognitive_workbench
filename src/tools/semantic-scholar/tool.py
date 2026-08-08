@@ -7,6 +7,7 @@ import logging
 import os
 import time
 import requests
+import urllib.parse
 from typing import List, Dict, Any, Optional
 from urllib.error import HTTPError, URLError
 # infospace_executor was the planner-side runtime; the chat ReAct loop
@@ -176,127 +177,202 @@ def _search_papers_direct(query: str, limit: int, api_key: str = None) -> List[D
       SearchUnavailable so callers can distinguish "search broken/throttled"
       from "search ran and found nothing" ([]).
     """
-    import subprocess
-    import urllib.parse
-    
     # Define the API endpoint URL
     url = f"http://api.semanticscholar.org/graph/v1/paper/search"
 
     # Define the query parameters
     query_params = {"query": query, "limit": limit, "fields":"paperId,title,abstract,authors,externalIds,year,citationCount,venue,openAccessPdf,url"}
 
-    # Define headers with API key (if provided)
-    headers = {}
-    if api_key:
-        headers["x-api-key"] = api_key
+    data = _s2_request(url, query_params, api_key)
+    logger.info(f"Found {len(data.get('data', []))} papers")
+    results = []
+    for paper in data.get("data", []):
+        abstract = paper.get("abstract", "No abstract available")
+        title = paper.get("title", "Untitled")
+        # Safely extract author names - handle various API response formats
+        authors = []
+        for a in paper.get("authors", []):
+            if isinstance(a, dict):
+                author_name = a.get("name") or a.get("authorId") or "Unknown"
+            elif isinstance(a, str):
+                author_name = a
+            else:
+                # Fallback: try to convert to string
+                author_name = str(a) if a else "Unknown"
+            authors.append(str(author_name))  # Ensure it's always a string
+        year = paper.get("year", 0)
+        citations = paper.get("citationCount", 0)
+        venue = paper.get("venue", "")
+        paper_id = paper.get("paperId", "")
 
-    # Rate limit handling with exponential backoff
+        # Get PDF URL
+        pdf_url = None
+        open_access = paper.get("openAccessPdf")
+        if open_access:
+            pdf_url = open_access.get("url")
+
+        # Get DOI
+        doi = None
+        external_ids = paper.get("externalIds", {})
+        if external_ids:
+            doi = external_ids.get("DOI")
+            # Try ArXiv as fallback
+            if not pdf_url and "ArXiv" in external_ids:
+                arxiv_id = external_ids["ArXiv"]
+                pdf_url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
+
+        if not ((type(abstract) == str and len(abstract) > 0) and pdf_url):
+            logger.debug(f"skipping paper {title} because it has no abstract or PDF URL: {abstract} {pdf_url}")
+            continue
+        result = {
+            "text": abstract,
+            "format": "paper",
+            "metadata": {
+                "title": title,
+                "authors": authors,
+                "year": year,
+                "citations": citations,
+                "venue": venue,
+                "paper_id": paper_id,
+                "doi": doi,
+                "pdf_url": pdf_url,
+                "uri": pdf_url  # Standardized URI field for consistency with search-web and search primitives
+            },
+            "char_count": len(abstract)
+        }
+        results.append(result)
+        logger.info(f"Found paper: {title}")
+
+    return results
+
+
+def fetch_references(paper_id: str, limit: int = 40) -> Dict[str, Any]:
+    """Structured reference list for one paper, straight from the S2 graph.
+
+    These are resolved graph entities, not strings scraped out of a
+    bibliography: each carries its own paperId, so a reference can be
+    followed without a title lookup. GROBID's citation parser is the
+    fallback for PDFs S2 has no record of, not the primary path.
+
+    Returns {"title", "total", "references": [...]}; raises
+    SearchUnavailable on a transport/API failure.
+    """
+    api_key = os.getenv("SEMANTIC_SCHOLAR_API_KEY") or None
+    pid = (paper_id or '').strip()
+    if not pid:
+        raise SearchUnavailable("paper_id is required to fetch references")
+    url = f"https://api.semanticscholar.org/graph/v1/paper/{urllib.parse.quote(pid, safe=':')}"
+    params = {"fields": "title,references.paperId,references.title,"
+                        "references.year,references.authors,"
+                        "references.venue,references.externalIds"}
+    data = _s2_request(url, params, api_key)
+    refs = []
+    for r in (data.get("references") or []):
+        if not isinstance(r, dict):
+            continue
+        ext = r.get("externalIds") or {}
+        refs.append({
+            "title": r.get("title") or "(untitled)",
+            "year": r.get("year"),
+            "authors": [a.get("name") for a in (r.get("authors") or [])
+                        if isinstance(a, dict) and a.get("name")],
+            "venue": r.get("venue") or "",
+            "paper_id": r.get("paperId"),
+            "doi": ext.get("DOI"),
+            "arxiv": ext.get("ArXiv"),
+        })
+    return {"title": data.get("title") or "(unknown paper)",
+            "total": len(refs),
+            "references": refs[:max(1, int(limit))]}
+
+
+def _s2_request(url: str, params: Dict[str, Any],
+                api_key: str = None) -> Dict[str, Any]:
+    """One GET against the S2 graph API with exponential backoff.
+
+    Retries only 429 (2s, 4s, 8s). Every other failure raises
+    SearchUnavailable so callers can tell "S2 is broken/throttled" from
+    "S2 ran and found nothing". Shared by search and reference lookup so
+    the retry policy has exactly one implementation.
+    """
+    headers = {"x-api-key": api_key} if api_key else {}
     max_retries = 3
-    base_delay = 2.0  # Start with 2 seconds
-    
+    base_delay = 2.0
+
     for attempt in range(max_retries + 1):
-        # Send the API request
         try:
-            response = requests.get(url, params=query_params, headers=headers)
+            response = requests.get(url, params=params, headers=headers,
+                                    timeout=30)
         except requests.RequestException as e:
             logger.error(f"Semantic Scholar request failed: {e}")
             raise SearchUnavailable(f"Semantic Scholar unreachable: {e}") from e
 
-        # Check response status
         if response.status_code == 200:
-            data = response.json()   
-            logger.info(f"Found {len(data.get('data', []))} papers")
-            results = []
-            for paper in data.get("data", []):
-                abstract = paper.get("abstract", "No abstract available")
-                title = paper.get("title", "Untitled")
-                # Safely extract author names - handle various API response formats
-                authors = []
-                for a in paper.get("authors", []):
-                    if isinstance(a, dict):
-                        author_name = a.get("name") or a.get("authorId") or "Unknown"
-                    elif isinstance(a, str):
-                        author_name = a
-                    else:
-                        # Fallback: try to convert to string
-                        author_name = str(a) if a else "Unknown"
-                    authors.append(str(author_name))  # Ensure it's always a string
-                year = paper.get("year", 0)
-                citations = paper.get("citationCount", 0)
-                venue = paper.get("venue", "")
-                paper_id = paper.get("paperId", "")
-                
-                # Get PDF URL
-                pdf_url = None
-                open_access = paper.get("openAccessPdf")
-                if open_access:
-                    pdf_url = open_access.get("url")
-                
-                # Get DOI
-                doi = None
-                external_ids = paper.get("externalIds", {})
-                if external_ids:
-                    doi = external_ids.get("DOI")
-                    # Try ArXiv as fallback
-                    if not pdf_url and "ArXiv" in external_ids:
-                        arxiv_id = external_ids["ArXiv"]
-                        pdf_url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
-                
-                if not ((type(abstract) == str and len(abstract) > 0) and pdf_url):
-                    logger.debug(f"skipping paper {title} because it has no abstract or PDF URL: {abstract} {pdf_url}")
-                    continue
-                result = {
-                    "text": abstract,
-                    "format": "paper",
-                    "metadata": {
-                        "title": title,
-                        "authors": authors,
-                        "year": year,
-                        "citations": citations,
-                        "venue": venue,
-                        "paper_id": paper_id,
-                        "doi": doi,
-                        "pdf_url": pdf_url,
-                        "uri": pdf_url  # Standardized URI field for consistency with search-web and search primitives
-                    },
-                    "char_count": len(abstract)
-                }
-                results.append(result)
-                logger.info(f"Found paper: {title}")
-            
-            return results
-        
-        elif response.status_code == 429:
-            # Rate limit exceeded
+            return response.json()
+
+        if response.status_code == 429:
             if attempt < max_retries:
                 delay = base_delay * (2 ** attempt)
                 logger.warning(f"Rate limit (429) on attempt {attempt + 1}/{max_retries + 1}. Waiting {delay}s before retry...")
                 time.sleep(delay)
                 continue
-            else:
-                logger.error(f"Rate limit exceeded after {max_retries} retries. Giving up.")
-                raise SearchUnavailable(
-                    f"Semantic Scholar is rate-limited (429 after {max_retries} retries) — "
-                    "transient availability problem, not an empty result; retry later")
-
-        else:
-            # Deterministic error — retrying won't help, fail fast
-            logger.error(f"Semantic Scholar API error {response.status_code}: {response.text[:200]}")
-            hint = " (likely invalid/expired API key)" if response.status_code == 403 else ""
+            logger.error(f"Rate limit exceeded after {max_retries} retries. Giving up.")
             raise SearchUnavailable(
-                f"Semantic Scholar returned HTTP {response.status_code}{hint} — "
-                "search unavailable, not an empty result")
-        
+                f"Semantic Scholar is rate-limited (429 after {max_retries} retries) — "
+                "transient availability problem, not an empty result; retry later")
+
+        # Deterministic error — retrying won't help, fail fast
+        logger.error(f"Semantic Scholar API error {response.status_code}: {response.text[:200]}")
+        hint = " (likely invalid/expired API key)" if response.status_code == 403 else ""
+        raise SearchUnavailable(
+            f"Semantic Scholar returned HTTP {response.status_code}{hint} — "
+            "search unavailable, not an empty result")
+
+
 def react_invoke(args, *, character_name=None, backend=None, logger=None):
     """ReAct entry-point — see Skill.md for the args contract."""
     from utils.chat_tool_stub import build_tool_kwargs, CapturingResourceManager, translate_result
-    query = args.get("query", "")
-    if not isinstance(query, str) or not query.strip():
-        return {"status": "error", "text": "semantic-scholar requires non-empty `query`"}
     try:
         limit = int(args.get("limit", 10))
     except (TypeError, ValueError):
         limit = 10
+
+    # Reference mode: an explicit paper_id selects a citation lookup
+    # instead of a search. Kept as a separate call rather than folded into
+    # every search result — 10 papers x ~40 references each would be a
+    # multi-thousand-line observation, and the agent wants the references
+    # of one chosen paper, not of everything it just found.
+    paper_id = args.get("paper_id")
+    if isinstance(paper_id, str) and paper_id.strip():
+        try:
+            data = fetch_references(paper_id, limit=args.get("limit", 40))
+        except SearchUnavailable as e:
+            return {"status": "error", "text": f"semantic-scholar: {e}"}
+        refs = data["references"]
+        if not refs:
+            return {"status": "empty",
+                    "text": f"Semantic Scholar has no reference list for "
+                            f"{data['title']!r} — its record may predate "
+                            f"reference indexing. For an unindexed PDF, "
+                            f"extract references from the PDF itself."}
+        lines = [f"References of {data['title']!r} "
+                 f"({data['total']} total, showing {len(refs)}):"]
+        for i, r in enumerate(refs, 1):
+            who = ", ".join(r["authors"][:2])
+            if len(r["authors"]) > 2:
+                who += " et al."
+            link = (f" arXiv:{r['arxiv']}" if r.get("arxiv")
+                    else (f" doi:{r['doi']}" if r.get("doi") else ""))
+            venue = f" — {r['venue']}" if r.get("venue") else ""
+            lines.append(f"{i}. {r['title']} ({r.get('year') or 'n.d.'})"
+                         f" — {who or 'unknown'}{venue}{link}")
+        return {"status": "ok", "text": "\n".join(lines)}
+
+    query = args.get("query", "")
+    if not isinstance(query, str) or not query.strip():
+        return {"status": "error",
+                "text": "semantic-scholar requires non-empty `query` "
+                        "(or a `paper_id` to list that paper's references)"}
 
     mgr = CapturingResourceManager()
     result = tool(query, **build_tool_kwargs(

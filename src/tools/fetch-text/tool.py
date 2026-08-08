@@ -12,7 +12,7 @@ from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 from urllib.parse import urljoin, urlparse
 from html.parser import HTMLParser
-from typing import Any
+from typing import Any, Dict, List, Optional
 import pymupdf
 import warnings
 # InfospaceExecutor was removed with the OODA cleanup. The runtime
@@ -59,6 +59,34 @@ def _success(executor: Any, result: str, extra: dict | None = None):
 
 _REACT_OBS_CAP = 8000  # cap fetched text in the ReAct working log
 
+# GROBID gives research PDFs a section structure pymupdf cannot; it is
+# optional, and any failure falls back to pymupdf's flat page text.
+_GROBID_DEFAULT_URL = "http://localhost:8070/api/processFulltextDocument"
+
+# Inline the abstract with the section index when it is small enough to be
+# free — it is what the caller almost always wants first, and including it
+# saves a whole extra round trip.
+_INLINE_ABSTRACT_CAP = 2500
+
+
+def _resolve_section(requested: str, names: List[str]) -> Optional[str]:
+    """Map a requested section name onto one from the index: exact, then
+    case-insensitive, then an unambiguous case-insensitive prefix. Returns
+    None when nothing matches or a prefix is ambiguous — this resolves an
+    identifier the caller read off our own index, so it stays literal
+    rather than guessing at intent."""
+    req = (requested or '').strip()
+    if not req:
+        return None
+    if req in names:
+        return req
+    low = req.lower()
+    ci = [n for n in names if n.lower() == low]
+    if len(ci) == 1:
+        return ci[0]
+    pref = [n for n in names if n.lower().startswith(low)]
+    return pref[0] if len(pref) == 1 else None
+
 
 def react_invoke(args, *, character_name=None, backend=None, logger=None):
     """ReAct entry-point — see Skill.md for the args contract."""
@@ -75,6 +103,44 @@ def react_invoke(args, *, character_name=None, backend=None, logger=None):
     # fetch-text stashes the extracted text in extra.text.
     out = translate_result(result, manager=mgr, text_key="extra.text",
                            empty_text=f"no text extracted from {url}")
+
+    # Section-addressable path: available when GROBID parsed the PDF into
+    # a section index (research papers). Everything else falls through to
+    # the flat capped text below.
+    extra = (result.get("extra") or {}) if isinstance(result, dict) else {}
+    sections = extra.get("sections") or []
+    section_text = extra.get("section_text") or {}
+    if out["status"] == "ok" and sections:
+        names = [s["name"] for s in sections]
+        requested = args.get("section")
+        if isinstance(requested, str) and requested.strip():
+            name = _resolve_section(requested, names)
+            if name is None:
+                return {"status": "error",
+                        "text": (f"no section named {requested!r} in this "
+                                 f"document. Available sections: "
+                                 + ", ".join(names))}
+            body = section_text.get(name, "")
+            if len(body) > _REACT_OBS_CAP:
+                body = (body[:_REACT_OBS_CAP].rstrip()
+                        + f"\n…[section truncated at {_REACT_OBS_CAP} chars]")
+            out["text"] = f"## {name}\n\n{body}"
+            return out
+        title = ((extra.get("metadata") or {}).get("pdf_metadata") or {}).get("title") or ""
+        total = sum(s["chars"] for s in sections)
+        lines = [f"# {title}" if title else "# (untitled document)", ""]
+        abstract = next((section_text.get(n, "") for n in names
+                         if n.strip().lower() == "abstract"), "")
+        if abstract and len(abstract) <= _INLINE_ABSTRACT_CAP:
+            lines += ["## Abstract", "", abstract, ""]
+        lines.append(f"Section index ({len(sections)} sections, "
+                     f"{total:,} chars of body text — not shown). Request "
+                     f"one with the same url plus `\"section\": \"<name>\"`:")
+        for s in sections:
+            lines.append(f"  - {s['name']}  ({s['chars']:,} chars)")
+        out["text"] = "\n".join(lines)
+        return out
+
     if out["status"] == "ok" and len(out["text"]) > _REACT_OBS_CAP:
         out["text"] = out["text"][:_REACT_OBS_CAP].rstrip() + \
             f"\n…[truncated at {_REACT_OBS_CAP} chars]"
@@ -119,8 +185,15 @@ def tool(url_or_content: str, runtime=None, **kwargs) -> str:
     if not executor:
         return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
 
-    # Extract grobid_url and pdf_parser from kwargs (from YAML config)
+    # Extract grobid_url and pdf_parser from kwargs (from YAML config).
+    # build_tool_kwargs does not carry grobid_url, so the chat path always
+    # arrived here with None and every PDF silently took the pymupdf
+    # branch. Fall back to the environment: GROBID_URL unset means the
+    # standard local endpoint, GROBID_URL="" disables GROBID outright.
+    # An unreachable server just raises and falls through to pymupdf.
     grobid_url = kwargs.get('grobid_url')
+    if grobid_url is None:
+        grobid_url = os.environ.get('GROBID_URL', _GROBID_DEFAULT_URL)
     pdf_parser = kwargs.get('pdf_parser')
     
     if not url_or_content or not isinstance(url_or_content, str):
@@ -471,6 +544,23 @@ def _extract_pdf_text(content: bytes, url: str, grobid_url: str = None, pdf_pars
             if grobid_result:
                 # Concatenate chunks with section headers
                 chunks = grobid_result.get('chunks', [])
+                # Group chunks under their section heading, preserving
+                # document order. This index is what makes a paper
+                # addressable: the caller reads the section list first and
+                # asks for the one or two sections it needs, instead of
+                # pulling the whole body (a long paper runs to ~40k tokens)
+                # into a context it has to keep re-sending.
+                ordered: List[str] = []
+                by_section: Dict[str, List[str]] = {}
+                for section_title, section_text in chunks:
+                    name = str(section_title or '').strip() or 'Untitled section'
+                    if name not in by_section:
+                        by_section[name] = []
+                        ordered.append(name)
+                    by_section[name].append(section_text or '')
+                section_text_map = {
+                    n: "\n\n".join(by_section[n]).strip() for n in ordered}
+
                 if chunks:
                     chunk_texts = []
                     for section_title, section_text in chunks:
@@ -480,7 +570,7 @@ def _extract_pdf_text(content: bytes, url: str, grobid_url: str = None, pdf_pars
                     full_text = grobid_result['abstract']
                 else:
                     full_text = ""
-                
+
                 pdf_title = (grobid_result.get("title") or "").strip()
                 if pdf_title:
                     full_text = f"# {pdf_title}\n\n{full_text}"
@@ -497,6 +587,9 @@ def _extract_pdf_text(content: bytes, url: str, grobid_url: str = None, pdf_pars
                             "creator": ""
                         }
                     },
+                    "sections": [{"name": n, "chars": len(section_text_map[n])}
+                                 for n in ordered],
+                    "section_text": section_text_map,
                     "page_count": len(chunks) if chunks else 0,
                     "char_count": len(full_text)
                 }
