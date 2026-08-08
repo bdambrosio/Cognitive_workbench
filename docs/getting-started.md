@@ -112,12 +112,26 @@ in the scenario to have the launcher bring up a shared SGLang runtime.
 
 ### GROBID (PDF parsing)
 
-GROBID extracts structured text from PDFs; without it the system falls
-back to PyMuPDF.
+GROBID extracts structured text from PDFs. With it, `fetch-text` returns
+a research paper as a section index you can read section by section;
+without it the system falls back to flat PyMuPDF extraction capped at
+8000 chars.
 
 ```bash
-docker run -d -p 8070:8070 grobid/grobid:latest
+docker run -d --name grobid-server -p 127.0.0.1:8070:8070 grobid/grobid:0.8.2-full
+curl -s http://127.0.0.1:8070/api/isalive    # expect: true
 ```
+
+Bind to `127.0.0.1`, not `0.0.0.0` — GROBID has no authentication, and
+publishing it on all interfaces exposes an unauthenticated document
+parser to the LAN.
+
+`fetch-text` resolves the endpoint from `GROBID_URL`, defaulting to
+`http://localhost:8070/api/processFulltextDocument`. A bare host:port is
+accepted (the `/api/processFulltextDocument` path is appended); set
+`GROBID_URL=""` to disable GROBID and force the PyMuPDF path. An
+unreachable server degrades to the same fallback rather than failing the
+fetch.
 
 ## Troubleshooting
 
