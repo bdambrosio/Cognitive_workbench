@@ -3,7 +3,9 @@
 Classification of every doc against the live codebase. Full review
 **2026-06-09** (superseded set deleted 2026-06-11); second full review
 **2026-07-19** (four entrypoint docs rewritten, drifted docs given
-status banners, second superseded set deleted — list below).
+status banners, second superseded set deleted — list below); third pass
+**2026-08-08** (essay/draft cleanup, third superseded set deleted, index
+reconciled against the tree).
 
 Context: the OODA executive, incremental planner (Stage 0–3, envisioning,
 vision eval), GoalScheduler, and task-execution machinery were deleted
@@ -36,7 +38,9 @@ Categories:
 | [game-embodiment-assessment.md](game-embodiment-assessment.md) | Factorio-vs-Satisfactory assessment + v1 plan (role, controls, success criteria); **v1 complete — both success criteria passed** (cooperative session 2026-07-15, CLI grounding 2026-07-17); results narrative in cohabitation-writeup.md |
 | [harness-m0-m1-status.md](harness-m0-m1-status.md) | M0 complete (baseline 0.720 ± 0.007 frozen 2026-07-09, ship gate live), M1 collection running; next steps + session commit trail |
 | [m1-collection-inputs.md](m1-collection-inputs.md) | Exemplar user inputs for M1 fire-outcome collection: reaction forms per outcome, latency spread, anti-patterns, cadence |
+| [justification-taxonomy.md](justification-taxonomy.md) | Closed claim taxonomy (volatility, inference type) + deterministic reduction to ordinal grades; the read path is the `justify` built-in |
 | [self-awareness-benchmarks.md](self-awareness-benchmarks.md) | Four-tier self-awareness bench (`bench/introspective_fidelity/`); verified 2026-07-19 |
+| [sentinel-setup.md](sentinel-setup.md) | Sentinel desktop-security character: Tier 0 unprivileged probes, Tier 2 argument-exact sudoers fence, `adm`-group prerequisite; sudoers installed + verified live 2026-08-08. Ubuntu/systemd-specific (ufw + AppArmor) |
 | [sensor_spec.md](sensor_spec.md) | Sensor system (`src/sensors/`, `sensor_runner.py`, SKILL.md metadata); banner 2026-07-19 — machinery live, OODA framing + launcher-integration section stale |
 | [sensor_spec_change_order_1.md](sensor_spec_change_order_1.md) | Sensor disposition field; banner 2026-07-19 — data contract live, `trigger`/`alert` semantics inert (only `inform` meaningful) |
 | [substack_awareness_evaluation.md](substack_awareness_evaluation.md) | Self-awareness bench writeup (implemented suite) |
@@ -49,8 +53,7 @@ Categories:
 | Doc | Covers |
 |---|---|
 | [capability-gap-reuse-gating.md](capability-gap-reuse-gating.md) | Reuse-gating self-extension proposals via an `inspect` pass; Option A shipped but found insufficient live 2026-06-19 — under review (author skeptical it's worth the machinery; superseded in intent by harness-roadmap M4) |
-| [cognitive_graph_spec.md](cognitive_graph_spec.md) | CognitiveGraph data structure — store built (`src/cognitive_graph.py`) but OODA-era integration removed; unpopulated/dormant in the live runtime (banner 2026-07-19) |
-| [cognitive_graph_explorer.md](cognitive_graph_explorer.md) | Graph tab visualization — non-functional under the live runtime (queries the deleted executive node; banner 2026-07-19) |
+| [cognitive_graph_spec.md](cognitive_graph_spec.md) | CognitiveGraph data structure — store built (`src/cognitive_graph.py`) but OODA-era integration removed; unpopulated/dormant in the live runtime (banner 2026-07-19). Retained: reasoning-graph revival under consideration 2026-07-27 |
 | [fire-outcome-capture.md](fire-outcome-capture.md) | Signed per-ledger outcome capture for autonomous fires — Phase 1 (capture, reflection stage 6) implemented 2026-07 (commit 8a2bacf7); Phase 2 (outcome-modulated dynamics) gated on data |
 | [harness-roadmap.md](harness-roadmap.md) | Measurement-gated improvement loop (M0 frozen composite bench → fire-outcome data → weakness-mining cycles → re-grounded self-extension) — adopted 2026-07-08; M0 complete, M1 running (see harness-m0-m1-status.md); M2–M5 unbuilt |
 | [jill-integration.md](jill-integration.md) | Jill↔ChatterBot head binding design; voice sensor + say path + head/camera tools live, rest design |
@@ -59,10 +62,20 @@ Categories:
 | [learned-disposition-design.md](learned-disposition-design.md) | Tiny-LM state→value learning over fire decisions (RL on imagined trajectories, real judged outcomes as anchor); G1 offline anchor passed 2026-07-24 (`bench/disposition/`), build-order step 1 — state capture + render — SHIPPED 2026-07-25 (`src/chat/disposition.py`, shadow-log only); scorer, imagination gate, and triage coupling unbuilt. Descends from substack-gut-feeling-draft.md |
 | [provenance-verifiability.md](provenance-verifiability.md) | Staged verifiability toward "justify your response" (claim-graph, no invented numerics); Levels 1–2 LIVE-VALIDATED; epistemic grader v1 SHIPPED 2026-08-04 (`f30d3f05`/`ad9bbda5`: verbatim-quote checks, [justification-taxonomy.md](justification-taxonomy.md) tags, ordinal grades + weakest-link + audit notes in `justify`) — refute/confirm/quiet branches all live-validated (SpaceX turns 2231/2236, Canberra 2239); Stage 5 background verification of suspect replies SHIPPED `8c1396e0` and LIVE-VALIDATED 2026-08-06 (confirm/silent turn 2247; unprompted correction turn 2295 — epistemic downgrade posted ~12 min post-reply); autonomous-turn claims + probe bench next; Levels 3–4 unbuilt |
 
-## SUPERSEDED — deleted 2026-06-11 and 2026-07-19
+## SUPERSEDED — deleted 2026-06-11, 2026-07-19 and 2026-08-08
 
 Banner-stamped docs describing deleted machinery are removed from the
 tree (recover any via `git log --diff-filter=D -- docs/<name>`).
+
+**2026-08-08 set**: cognitive_graph_explorer.md (documented the Resource
+Browser Graph tab, which queries the executive node deleted 2026-05-02
+and renders nothing; its node vocabulary — triage nominations, spawned
+tasks/goals, OODA assessments — was produced only by the deleted
+pipeline), journey_note_trace_qualia_self_model.md (v1, explicitly
+retracted by its own v2, which narrows the qualia claim to the
+deflationary small-q reading and names the conflation as v1's mistake).
+Also removed the same day, outside this index: three essay/draft files
+and the justification substack drafts.
 
 **2026-07-19 set** (all described the deleted OODA/planner/executor era,
 verified against code before removal): METHOD_TOOLS.md,
@@ -98,15 +111,14 @@ SPACEMAP_ARCHITECTURE.md
 
 | Doc | Covers |
 |---|---|
-| [# When AI Agents Talk, Nobody's Listenin.md](<# When AI Agents Talk, Nobody's Listenin.md>) | Essay on agent-to-agent conversation |
 | [cohabitation-writeup.md](cohabitation-writeup.md) | DRAFT essay: five days living with the Factorio agent — records both v1 criteria passed, the perception-layer lessons, FLE upstream issues |
 | [cw-voice-sensor-plan.md](cw-voice-sensor-plan.md) | Historical build plan behind the shipped voice sensor (implemented 2026-06-19; retained for planning rationale) |
 | [design_note_agreements_rag.md](design_note_agreements_rag.md) | Discourse/agreements design; write-side (triage+CRUD + date-stamp aging) implemented 2026-06-11, read-side RAG-push deferred |
 | [design_note_threads.md](design_note_threads.md) | Threads design discussion (threads shipped 2026-05; see `src/chat/`) |
 | [financial-analysis-tools-plan.md](financial-analysis-tools-plan.md) | Historical plan behind `get-financial-statements` (shipped 2026-06-19); PDF half redirected to code_subagent |
 | [introspective_fidelity_benchmark_v01.md](introspective_fidelity_benchmark_v01.md) | Introspective-fidelity bench methodology |
-| [journey_note_trace_qualia_self_model.md](journey_note_trace_qualia_self_model.md) | Audit-record essay: trace/qualia self-model |
-| [journey_note_trace_qualia_self_model_v2.md](journey_note_trace_qualia_self_model_v2.md) | v2 of the above |
+| [journey_note_trace_qualia_self_model_v2.md](journey_note_trace_qualia_self_model_v2.md) | Audit-record essay: trace/qualia self-model. v1 deleted 2026-08-08 — this revision retracts its framing, so read this one only |
+| [justification-technical-note.md](justification-technical-note.md) | Technical note (2026-08) on auditable justification: the failure that motivated it, and what a justification record has to be to count as one. Companion to the live spec in provenance-verifiability.md |
 | [metadata-is-a-relation.md](metadata-is-a-relation.md) | Data-model essay (note: metadata is implemented as nested properties, not relations) |
 | [substack-gut-feeling-draft.md](substack-gut-feeling-draft.md) | DRAFT essay: gut feelings as index-free memory (valence compression) — the origin idea behind learned-disposition-design.md |
 | [user_concern_model.md](user_concern_model.md) | Historical user-concern design; the shipped model differs (per-turn decay/bump + reflection, not patch ops — see banner + concerns-architecture.md) |

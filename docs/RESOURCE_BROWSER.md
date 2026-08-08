@@ -7,7 +7,9 @@
 > tab queries the deleted executive node and is non-functional under the
 > live ChatLoop runtime.
 
-Standalone web-based browser for viewing Notes and Collections in a running map_node.
+Standalone web-based browser for viewing Notes and Collections in a
+running agent, reached over Zenoh (queryables served by
+`src/chat/zenoh_io.py`).
 
 ## Features
 
@@ -63,7 +65,7 @@ Open browser to: `http://localhost:3001`
 ## Troubleshooting
 
 **No resources showing:**
-- Ensure map_node is running
+- Ensure the agent is running
 - Check map name matches (default: infolab)
 - Click Refresh button
 

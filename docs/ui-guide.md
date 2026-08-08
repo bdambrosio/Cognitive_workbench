@@ -34,8 +34,8 @@ resource deletion, and concern management from the UI. Can also run
 standalone: `python src/resource_browser.py`. See
 [RESOURCE_BROWSER.md](RESOURCE_BROWSER.md).
 
-(The Graph tab queries the deleted executive node and is currently
-non-functional — see [cognitive_graph_explorer.md](cognitive_graph_explorer.md).)
+(The Graph tab queries the executive node deleted 2026-05-02 and renders
+nothing under the live runtime.)
 
 ---
 
