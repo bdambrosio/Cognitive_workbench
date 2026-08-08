@@ -481,3 +481,63 @@ def test_run_justify_autonomous_uncovered(tmp_path):
     obs = stub._run_justify("Jill")
     assert obs.startswith("EMPTY: the previous turn here was autonomous")
     assert stub.backend.calls == 0
+
+
+# --- elided-observation restoration (turn 2349 regression) ------------
+# The stored trace caps each observation so the record stays cheap to
+# re-inject, but attribution reads the same field as evidence. Before
+# `observations_full`, facts the model had read verbatim past the cap
+# were graded model_prior with empty refs — a false "I guessed this"
+# about content it actually sourced.
+
+_CAPPED = ("--- iter 1 ---\nACTION: {\"tool\": \"fetch-text\"}\n"
+           "$step1: OK: head of the section"
+           " …[observation capped at 1000 chars]\n")
+
+
+def test_restore_observations_puts_elided_text_back():
+    from chat.claims import _restore_observations
+    out = _restore_observations(
+        _CAPPED, {"$step1": "OK: head of the section AND THE ELIDED TAIL"})
+    assert "AND THE ELIDED TAIL" in out
+    assert "observation capped at" not in out
+    assert out.startswith("--- iter 1 ---")
+
+
+def test_restore_observations_noop_without_field():
+    """Records written before the field existed must pass through."""
+    from chat.claims import _restore_observations
+    assert _restore_observations(_CAPPED, {}) == _CAPPED
+
+
+def test_restore_observations_skips_unmatched_labels():
+    from chat.claims import _restore_observations
+    assert _restore_observations(_CAPPED, {"$step9": "x"}) == _CAPPED
+    uncapped = "--- iter 1 ---\n$step1: complete already\n"
+    assert _restore_observations(uncapped, {"$step1": "x"}) == uncapped
+
+
+def test_quote_from_restored_span_survives_verbatim_check():
+    """The attributor is shown the restored log, so a quote copied from a
+    previously elided span must verify against it — checking against the
+    capped `working_log` would drop honest citations."""
+    record = {
+        "raw_response": "The tail value was 47.",
+        "working_log": _CAPPED,
+        "observations_full": {
+            "$step1": "OK: head of the section, and the tail value was 47."},
+    }
+    claims = attribute_claims(
+        record,
+        lambda _m: json.dumps({"claims": [{
+            "claim": "The tail value was 47",
+            "grounding": "retrieved",
+            "refs": ["$step1"],
+            "quote": "the tail value was 47",
+        }]}),
+        character_name="TestAgent")
+    assert len(claims) == 1
+    assert claims[0]["grounding"] == "retrieved"
+    assert claims[0]["refs"] == ["$step1"]
+    assert claims[0]["quote"] == "the tail value was 47", \
+        "quote copied from the restored span was dropped"

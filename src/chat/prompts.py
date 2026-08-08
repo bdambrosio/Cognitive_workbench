@@ -46,6 +46,17 @@ _REASONING_HISTORY_FULL = 3          # of those, how many in full vs compressed
 
 _REASONING_HISTORY_OBS_CAP = 1000    # per-iter observation cap in stored trace
 
+# When the cap above elides part of an observation, the untruncated text
+# is kept under record['observations_full'] for claim attribution only —
+# the attributor cannot otherwise distinguish "no evidence for this
+# claim" from "the evidence was cut out of my view", and silently grades
+# read-from-source facts as model_prior (live miss: turn 2349, where the
+# cut fell mid-sentence and split one paper sentence across both
+# groundings). Bounded by what the ReAct loop actually hands the model,
+# so the trace never stores more than the model saw, and the field is
+# omitted entirely on turns where nothing was truncated.
+_ATTRIBUTION_OBS_CAP = 8000
+
 
 class PromptsMixin:
     """Mixin for ChatLoop — moved verbatim from chat_loop.py."""
@@ -207,6 +218,20 @@ class PromptsMixin:
                 "about my own architecture may be stale — verify with "
                 "inspect or exec-script before asserting them.\n\n"
                 + substrate)
+        # Which body she actually has, probed at session start
+        # (chat_loop._compute_embodiment_line). Persona text can only say
+        # "when X is up…"; this says which is up. Self-model is left alone —
+        # an embodiment is environment, not substrate.
+        embodiment = getattr(self, '_embodiment_line', '') or ''
+        if embodiment:
+            parts.append(
+                "## Embodiment (probed at session start)\n"
+                "Which world I am actually in right now. Measured, not "
+                "configured — if the persona describes an embodiment that "
+                "is not listed as LIVE below, I do not have that body this "
+                "session. A surface can come up or go down mid-session, so "
+                "a tool's own error is the authority if they disagree.\n\n"
+                + embodiment)
         # When an external repo is bound for the session, append a single
         # capabilities line so the persona-level account reflects what the
         # ReAct surface actually exposes. Self-model is intentionally left

@@ -56,10 +56,13 @@ def _worst(*grades: str) -> str:
     return max(grades, key=lambda g: _GRADE_RANK[g])
 
 # Prompt-size caps for the attribution call: per-line and total caps on
-# the working log (observations are untruncated in the trace and can be
-# very large).
+# the working log. Observations in the stored trace are capped at
+# _REASONING_HISTORY_OBS_CAP (added 2026-08-08 to bound trace growth);
+# _restore_observations puts the elided text back before these caps
+# apply, so the total below has to accommodate a restored observation
+# rather than the 1000-char stub.
 _LINE_CAP = 800
-_LOG_CAP = 10_000
+_LOG_CAP = 24_000
 
 _STEP_LABEL_RE = re.compile(r'^\$step\d+', re.MULTILINE)
 _NOTE_ID_RE = re.compile(r'\[(Note_\d+)')
@@ -95,6 +98,16 @@ this turn's input or tools. refs = [].
 premises ($stepN / Note_N / user_input).
 - model_prior: from the assistant's background knowledge; nothing in this \
 turn's records supports it. refs = [].
+
+An observation may be shown to you truncated, marked "…[capped]" or \
+"…[working log capped]". The assistant read the whole thing; you are \
+seeing less than it saw. Absence of evidence in a truncated observation \
+is NOT evidence the claim came from background knowledge. When a claim \
+is the kind of specific detail the truncated observation was plainly \
+carrying — a further item in a list it had begun, another figure from \
+the same table or passage — attribute it to that $stepN as retrieved and \
+omit "quote" (you cannot copy text you were not shown) rather than \
+grading it model_prior.
 
 Additionally tag claims where the tag clearly applies (closed \
 vocabularies; OMIT any tag you are unsure of — an absent tag is valid):
@@ -144,6 +157,34 @@ on retrieved claims; tag fields only where defined above and known. \
 Use an empty list if the reply makes no factual claims."""
 
 
+_OBS_CAP_MARKER_RE = re.compile(r' …\[observation capped at \d+ chars\]')
+
+
+def _restore_observations(working_log: str,
+                          observations_full: Dict[str, str]) -> str:
+    """Put elided observation text back into the working log.
+
+    The stored trace caps each observation so the record stays cheap to
+    re-inject into later prompts, but attribution reads the same field
+    as evidence — and a truncated observation is indistinguishable from
+    an absent one, so facts the model read verbatim get graded
+    model_prior. Records written before `observations_full` existed
+    simply have nothing to restore.
+    """
+    if not observations_full:
+        return working_log
+    out = working_log
+    for label, text in observations_full.items():
+        start = out.find(f"\n{label}: ")
+        if start < 0:
+            continue
+        marker = _OBS_CAP_MARKER_RE.search(out, start)
+        if marker is None:
+            continue      # not the capped rendering this entry describes
+        out = out[:start] + f"\n{label}: {text}" + out[marker.end():]
+    return out
+
+
 def _cap_working_log(working_log: str) -> str:
     lines = []
     total = 0
@@ -188,6 +229,12 @@ def attribute_claims(record: Dict[str, Any],
         return []
 
     allowed = valid_refs_for(record)
+    # Evidence view: elided observations restored. Also the reference the
+    # verbatim quote check runs against — the attributor is shown this
+    # text, so a quote copied from a restored span must verify against it
+    # rather than against the capped stored log.
+    restored_log = _restore_observations(
+        record.get('working_log') or '', record.get('observations_full') or {})
     recall_block = '\n'.join(str(h) for h in (record.get('recall_hits') or []))
     # The replying model saw its own active concerns in its prompt; the
     # attributor must see them too, or self-state claims have no visible
@@ -201,7 +248,7 @@ def attribute_claims(record: Dict[str, Any],
         f"## User input\n{record.get('user_input') or '(none — autonomous turn)'}",
         f"## Recalled memories\n{recall_block or '(none)'}",
         f"## Working log (tool calls and observations)\n"
-        f"{_cap_working_log(record.get('working_log') or '') or '(no tool calls)'}",
+        f"{_cap_working_log(restored_log) or '(no tool calls)'}",
         f"## REPLY to decompose\n{reply}",
     ]
     messages = [
@@ -264,15 +311,14 @@ def attribute_claims(record: Dict[str, Any],
                 logger.warning(
                     f"claim attribution: dropped tag {field}={val!r} "
                     f"({grounding=}) for claim {text[:80]!r}")
-        # A quote must be a verbatim span of the PERSISTED working log
-        # (the LLM saw a capped rendering, so anything it copied honestly
-        # is a substring of the original). A failed check means the
-        # excerpt was synthesized, not copied — drop the quote, keep the
-        # claim: attribution stands, citation doesn't.
+        # A quote must be a verbatim span of the evidence the attributor
+        # was shown (the restored log — a superset of the stored one). A
+        # failed check means the excerpt was synthesized, not copied —
+        # drop the quote, keep the claim: attribution stands, citation
+        # doesn't.
         quote = item.get('quote')
         if isinstance(quote, str) and quote.strip():
-            log_text = record.get('working_log') or ''
-            if _ws_normalize(quote) in _ws_normalize(log_text):
+            if _ws_normalize(quote) in _ws_normalize(restored_log):
                 claim_rec['quote'] = quote.strip()
             else:
                 logger.warning(

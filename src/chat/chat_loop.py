@@ -79,7 +79,8 @@ from chat.tools import ToolsMixin, _TOOLS_DIR as _TOOLS_DIR  # noqa: E402,F401
 from chat.prompts import (  # noqa: E402,F401
     PromptsMixin, _REASONING_HISTORY_COLLECTION_NAME,
     _REASONING_HISTORY_RING_SIZE, _REASONING_HISTORY_RECENT,
-    _REASONING_HISTORY_FULL, _REASONING_HISTORY_OBS_CAP)
+    _REASONING_HISTORY_FULL, _REASONING_HISTORY_OBS_CAP,
+    _ATTRIBUTION_OBS_CAP)
 from chat.disposition import DispositionMixin  # noqa: E402
 from chat.zenoh_io import ZenohMixin  # noqa: E402
 
@@ -343,6 +344,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # the harness changed rather than needing to think to ask
         # (docs/substack_sensors_vs_tools.md). '' → no prompt section.
         self._substrate_line = self._compute_substrate_line()
+        self._embodiment_line = self._compute_embodiment_line()
         self._init_agent_concerns()
         self._init_user_concerns()
         self._init_agent_threads()
@@ -396,6 +398,46 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
     # ------------------------------------------------------------------
 
     _SUBSTRATE_MARKER = 'substrate_marker.json'
+
+    # Embodiment surfaces, probed rather than declared. Each entry is
+    # (label, base-url resolver, health path, what having this body means).
+    # Adding a surface is a row here, not prose in a persona file.
+    _EMBODIMENT_SURFACES = (
+        ('shared world', 'utils.world_link', '/health',
+         "you have a body in a walkable terrain alongside Bruce — perceive "
+         "with world-look, move with world-move. This is where 'come to me' "
+         "or 'where are you' refer to unless the factory is named."),
+        ('Factorio factory', 'utils.factorio_link', '/status',
+         "you are embodied as a junior factory engineer via the fac-* tools."),
+    )
+
+    def _compute_embodiment_line(self) -> str:
+        """Which bodies actually exist this session, by probing for them.
+
+        Persona text can only ever say "when X is up…" — it cannot know
+        which surface is running, and a character configured before a new
+        surface existed will confidently reach for the old one (live miss:
+        turn 2358, where 'come to me at -18, 25' went to fac-status because
+        the only embodiment the persona described was Factorio). Probed
+        once at session start, like the substrate line.
+        """
+        import importlib
+        import requests
+
+        lines = []
+        for label, module_path, health_path, meaning in self._EMBODIMENT_SURFACES:
+            try:
+                base = importlib.import_module(module_path).base_url()
+            except Exception as e:
+                logger.debug(f"embodiment: {label} module unavailable: {e}")
+                continue
+            try:
+                requests.get(base + health_path, timeout=0.6).raise_for_status()
+                lines.append(f"- **{label}: LIVE** ({base}) — {meaning}")
+            except Exception:
+                lines.append(f"- {label}: not running — those tools will "
+                             f"report the bridge is offline.")
+        return "\n".join(lines)
 
     def _compute_substrate_line(self, repo_root: Optional[Path] = None) -> str:
         """One-line harness provenance for the system prompt: current
@@ -1144,6 +1186,9 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             # observation it accompanies (set by the ReAct loop right after
             # dispatch, so the binding is always in this iter's appended).
             tool_meta: Dict[str, Any] = {}
+            # Untruncated observations for claim attribution, populated
+            # only for the steps the cap below actually elides.
+            observations_full: Dict[str, str] = {}
             for i, it in enumerate(iters):
                 raw = (it.get('raw') or '').strip()
                 log_lines.append(f"--- iter {i+1} ---")
@@ -1159,6 +1204,10 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                         # so quotes still verify against what is kept here.
                         content = str(content or '')
                         if len(content) > _REASONING_HISTORY_OBS_CAP:
+                            # Keep what the model actually read, for
+                            # attribution only — see _ATTRIBUTION_OBS_CAP.
+                            observations_full[label] = \
+                                content[:_ATTRIBUTION_OBS_CAP]
                             content = (
                                 content[:_REASONING_HISTORY_OBS_CAP].rstrip()
                                 + f" …[observation capped at "
@@ -1221,6 +1270,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             }
             if tool_meta:
                 record['tool_meta'] = tool_meta
+            if observations_full:
+                record['observations_full'] = observations_full
             if image_ref:
                 record['image_ref'] = image_ref
             # Fire-outcome join key: lets a trajectory builder assemble
