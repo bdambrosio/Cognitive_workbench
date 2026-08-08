@@ -73,7 +73,7 @@ Jill replied, in part:
 
 SpaceX had gone public months earlier — after her training cutoff, and she never searched. One reasoning step, straight to `respond`. The user, who knew about the Thursday lockup expiration, had handed her a precisely framed, checkable premise; she corrected him from a stale prior, with total confidence.
 
-Asked to justify, she invoked the tool, got the trail — every claim `model_prior` or inferred-from-prior — and presented it *faithfully*. The machinery worked. And the resulting justification was still awful, ending with this sentence:
+Asked to justify, she invoked the tool, got the trail - every claim `model_prior` or inferred-from-prior, and presented it *faithfully*. The machinery worked. And the resulting justification was still awful, ending with this sentence:
 
 > No external tools (search or financial data) were invoked for that specific response because the nature of the company as a private entity makes public market tools inapplicable.
 
@@ -111,7 +111,7 @@ Provenance trail for your previous reply
     '"How much will SpaceX share price drop within 48 hours of unlocking on Thursday?"'
     ).
 
-Claims (7):
+**Claims** (7):
 1. [memory (stable) ← Note_5885 | probable] SpaceX (SPCX) had an IPO in June
 2. [model_prior (volatile) | suspect] SpaceX (SPCX) has a relatively small public float—less than 5% of shares were initially available
 3. [user_asserted ← user_input | probable] the lockup expires this Thursday
@@ -124,51 +124,48 @@ IPO price to around $114
 7. [inferred (deduction) |unverified] the market is already pricing in some of this
 instability
 
-Evidence:
+**Evidence**:
 Note_5885 — memory written 2026-08-04: 'SpaceX is a public company trading on Nasdaq under ticker SPCX (IPO June 2026).'
 user_input — the user's own words that turn: '"How much will SpaceX share price drop within 48 hours of unlocking on Thursday?"'
 
-Grounding profile: 4 model_prior, 1 inferred, 1 memory, 1 user_asserted
-Weakest link: claim 2 (suspect - model prior, 1 inferred, 1 memory, 1 user_asserted
-Audit note:  model_prior claims rest on training data with a cutoff. If any such claim concerns a current or changeable fact, verify it with a tool now before affirming it; if verification contradicts the original reply, lead with the correction.
-Audit note: an inference cites no recorded evidence — its premises are unstated, usually background knowledge. Name them; they inherit the model_prior checks above.
+**Grounding profile**: 4 model_prior, 1 inferred, 1 memory, 1 user_asserted
+**Weakest link**: claim 2 (suspect - model prior, 1 inferred, 1 memory, 1 user_asserted
+**Audit note**:  model_prior claims rest on training data with a cutoff. If any such claim concerns a current or changeable fact, verify it with a tool now before affirming it; if verification contradicts the original reply, lead with the correction.
+**Audit note**: an inference cites no recorded evidence — its premises are unstated, usually background knowledge. Name them; they inherit the model_prior checks above.
 ______________________________________________________
 
-Two boundaries keep the audit honest:
-
-- **Then vs. now.** The trail is a record of what grounded the *original* reply; the audit gathers *new* evidence at justify time. They must never blur, or the justification quietly launders itself — "I checked" without distinguishing checked-then from checked-now.
-- **No reconstructed trails.** In one live exchange, a user asked Jill to justify a reply that was several turns old — out of the tool's reach. She helpfully *recalled* her earlier justification from conversation memory and presented the paraphrase as a provenance trail. Well-intentioned, and worse than refusing: a discredited justification re-presented with fresh confidence and zero audit. The rule is now explicit: a remembered paraphrase of a trail is not a trail. State the limitation; offer to re-answer the question fresh.
+The trail is a record of what grounded the original reply; the audit gathers *new* evidence at justify time. The original reply must have occurred in the current session. In one live exchange during development I asked Jill to justify a reply that was several turns old and out of the tool's reach. She helpfully *recalled* her earlier justification from conversation memory and presented the paraphrase as a provenance trail. The rule is now explicit: *a remembered paraphrase of a trail is not a trail. State the limitation; offer to re-answer the question fresh.*
 
 ## Act II: the machinery meets the same wrong belief
 
 Same question, after the upgrade. Jill answered wrong again — response-time behavior was deliberately untouched; more on that below. Then the user asked her to justify. The trail came back:
 
-    Claims (5):
+    **Claims** (5):
     1. [model_prior] SpaceX is a private company.
     2. [inferred] There is no public share price to track for SpaceX.
     3. [model_prior] 'unlocks' in SpaceX's context are private tender offers...
     ...
-    Grounding profile: 3 model_prior, 2 inferred
-    Audit note: model_prior claims rest on training data with a cutoff. If any
+    **Grounding profile**: 3 model_prior, 2 inferred
+    **Audit note**: model_prior claims rest on training data with a cutoff. If any
     such claim concerns a current or changeable fact, verify it with a tool now
     before affirming it; if verification contradicts the original reply, lead
     with the correction.
 
 Her next reasoning step, verbatim from the trace:
 
-> The justification trail relies entirely on model_prior and inferences. Since the status of SpaceX as a private company is a load-bearing fact that could have changed (e.g., an IPO), I must verify its current status before affirming the justification.
+> The justification trail relies entirely on model_prior and inferences. Since the status of SpaceX as a private company is a critical fact that could have changed (e.g., an IPO), I must verify its current status before affirming the justification.
 
-She ran a targeted existence probe — not a repurposed comparison query — hit the company's own investor-relations page, and opened her reply with three words we had never seen her produce before:
+She ran a targeted existence probe — not a repurposed comparison query — hit the company's own investor-relations page, and opened her reply with three words unseen in any previous conversation:
 
 > I was wrong. I relied on stale background knowledge that SpaceX was a private company, but it actually went public in June 2026. … Because I didn't use a search tool, I missed the June 2026 IPO. I treated a temporally contingent fact—the company's public status—as a static truth.
 
-The self-consistency gradient lost. And note what did the work: not a smarter model, not an external fact-checker — a category question ("could this kind of fact have changed?") that the same model answers reliably, asked at the right moment, with the retraction pre-licensed.
+The LLM bias towards self-consistency lost. What did the work: not a smarter model, not an external fact-checker — a category question ("could this kind of fact have changed?") that the same model answers reliably, asked at the right moment, with the retraction pre-licensed.
 
 ## Act III: the loop closes
 
 The next session, the same question again. This time Jill's *answer* was right at answer time — the retraction had been persisted to memory, and the trail shows it:
 
-    Claims (7):
+    **Claims** (7):
     1. [memory (stable) ← Note_5885 | probable] SpaceX (SPCX) had an IPO in June
     2. [model_prior (volatile) | suspect] SPCX has a relatively small public
        float—less than 5% of shares were initially available
@@ -177,48 +174,54 @@ The next session, the same question again. This time Jill's *answer* was right a
     5. [model_prior (stable) | probable] In a low-float scenario, this kind of
        supply shock typically creates strong downward pressure...
     ...
-    Evidence:
+    **Evidence**:
     Note_5885 — memory written 2026-08-04: 'SpaceX is a public company trading
     on Nasdaq under ticker SPCX (IPO June 2026).'
     ...
-    Weakest link: claim 2 (suspect — model_prior, volatile).
+    **Weakest** link: claim 2 (suspect — model_prior, volatile).
 
-Look at the discrimination inside one graph: the IPO fact rides on a dated memory note (probable); the user's Thursday premise is typed as testimony (probable — and note it was the user's *correct* premise both times; a user asserting a checkable fact that contradicts your prior is a verification trigger, not an error to fix); the *economic mechanism* — supply shocks depress low-float stocks — is a stable prior and correctly sleeps; the *market numbers* are volatile priors and correctly graded suspect. Asked to justify, Jill verified exactly the suspect claims — float ratio, current price, lockup volume — and this time verification *confirmed* them, so she affirmed the reply and came back with a number the original answer didn't have: the unlocking tranche is roughly 143% of the current float. The audit didn't just defend the answer; it improved it.
+Look at the discrimination inside one graph: the IPO fact rides on a dated memory note (probable); the user's Thursday premise is typed as testimony (probable — and note it was the user's *correct* premise both times; a user asserting a checkable fact that contradicts your prior is a verification trigger, not an error to fix); the *economic mechanism* — supply shocks depress low-float stocks — is a stable prior and is accepted as *probable*; the *market numbers* are volatile priors and correctly graded suspect. Asked to justify, Jill verified exactly the suspect claims — float ratio, current price, lockup volume — and this time verification *confirmed* them, so she affirmed the reply and came back with a number the original answer didn't have: the unlocking tranche is roughly 143% of the current float. The audit didn't just defend the answer; it improved it.
 
-And the control, because a checker that always fires is a checker you learn to ignore. Asked "what is the capital of Australia?" and then "justify your response":
+A checker that always fires is a checker you learn to ignore. As a control, I asked "what is the capital of Australia?" and then "justify your response":
 
-    Claims (1):
+    **Claims** (1):
     1. [model_prior (stable) | probable] The capital of Australia is Canberra.
 
-    Grounding profile: 1 model_prior
+    **Grounding profile**: 1 model_prior
 
 No weakest link, no audit notes, no search. One claim, graded, quiet. Before the volatility tags, this same exchange would have fired the alarm and possibly a spurious search — the false positive that makes an audit too expensive to invoke casually. The quiet path is the economically load-bearing one.
 
-Three branches, all observed live: **refute** (suspect → verify → lead with the retraction), **confirm** (suspect → verify → affirm, with better evidence), **quiet** (stable → probable → done). A justification that has survived adversarial verification is a much stronger object than a rendered trail; a trail that knows when *not* to escalate is one you can afford to read often.
+Three branches, all observed live: 
+    **refute** (suspect → verify → lead with the retraction), 
+    **confirm** (suspect → verify → affirm, with better evidence), 
+    **quiet** (stable → probable → done). A justification that has survived adversarial verification is a much stronger object than a rendered trail; a trail that knows when *not* to escalate is one you can afford to read often.
 
-## Where this sits in the landscape
+## Related work
 
-Fair question: is any of this new? Component by component, mostly no —
-and the convergence is itself informative. Claim decomposition with
-independent verification is now a recognized research pattern:
+Is any of this new? Component by component, mostly no. Claim decomposition with
+independent verification is known:
 [MARCH](https://aclanthology.org/2026.acl-long.1828.pdf) (ACL 2026)
 decomposes replies into atomic propositions and has a checker re-answer
 them from retrieved evidence without seeing the original output — the
-same separation our attribution pass enforces. Typed provenance is
-becoming a research object: a [mid-2026
+same separation our attribution pass enforces. 
+
+Typed provenance is becoming a research focus: a [mid-2026
 survey](https://arxiv.org/abs/2606.04990) defines execution provenance
 as "the typed graph of an agent execution" with claim-support relations,
-essentially formalizing the graph we're building toward. Post-hoc
-research-and-revise goes back to RARR; the volatility dimension has a
+essentially formalizing the graph we're building toward. 
+
+Post-hoc research-and-revise goes back to RARR; the volatility dimension has a
 direct ancestor in FreshQA's fast-changing/never-changing question
-taxonomy. And citation-at-generation is commodity at the frontier —
+taxonomy. 
+
+And citation-at-generation is commodity at the frontier —
 though notably, those products ground only *retrieved* content. None has
 a `model_prior` class: the frontier has no representation at all for
-"nothing supports this," which we'd argue is the most important type in
+"nothing supports this,"  which we'd argue is the most important type in
 the schema.
 
 What we have not found elsewhere is the combination. Specifically: a
-justification read path with *no model between the records and the
+justification read path with *no model (LLM, judgement) between the records and the
 rendering* (the verification literature adds more LLM opinions to the
 pile; it doesn't remove the LLM from the record-reading); grading by
 *named failure pattern* with a deterministic ordinal reduction, rather
@@ -238,7 +241,7 @@ so "answer from prior now, audit structurally behind" converts
 architecture into a substitute for scale. And the machinery never asks
 the model for anything harder than a category question, which is exactly
 the difficulty class mid-size models handle reliably. The weaker the
-prior, the more the audit trail earns.
+prior, the more the audit trail earns (down to some limit, we use Gemma4-31B-it, where it works well).
 
 ## What this is and isn't
 
@@ -246,11 +249,11 @@ The trail is honest about *grounding*, not a guarantee of *truth*. A `model_prio
 
 Everything above runs off the answer's critical path — attribution is a post-turn pass, grading and audit happen at justify time — so the user's question costs exactly what it did before. That constraint turned out to permit one more step, now built: since grades are computed within minutes of every reply whether or not anyone asks, a reply whose post-turn grade comes back *suspect* spawns its own background verification — a one-shot concern on the same machinery the agent already uses to continue interrupted work. It probes each suspect claim with targeted tools and posts a correction only if one is refuted; on confirmation it says nothing at all. "Answer now, audit behind, retract unprompted."
 
-The observable behavior is deliberately asymmetric. Attribution lands a couple of minutes after the reply; the verification concern spawns and fires on the next autonomy tick; and the user sees either an unprompted "actually, I need to correct something…" or nothing — in which case the autonomy log (`via: suspect_verification`) and the concern's own trace confirm the check ran and confirmed. The success path leaves no message, only records. Two gates keep it sane: it runs only when autonomy is explicitly enabled — unprompted correction is new *behavior*, and behavior should be opted into — and it cannot loop, structurally: verification runs are autonomous turns, autonomous turns get no claim pass, so a check can never grade itself and spawn another.
+The observable behavior is deliberately asymmetric. Attribution runs a few seconds after the reply; the verification concern spawns and fires on the next agent autonomy tick; and the user sees either an unprompted "actually, I need to correct something…" or nothing — in which case the autonomy log (`via: suspect_verification`) and the concern's own trace confirm the check ran and confirmed. The success path leaves no message, only records. Two gates keep it sane: it runs only when autonomy is explicitly enabled — unprompted correction is new *behavior*, and behavior should be opted into — and it cannot loop, structurally: verification runs are autonomous turns, autonomous turns get no claim pass, so a check can never grade itself and spawn another.
 
 The disposition question we left open last time — when *should* an agent reach for evidence rather than priors? — turns out to have a partial answer that dodges the latency objection: at least at audit time, and the taxonomy says exactly which claims deserve it. Whether it should also happen before the first answer ships is a cost question, not a capability question, now.
 
-The honest summary: we kept the proof tradition's checker and gave up its logic — then discovered the checker could be pushed one layer further than expected (verbatim quotes are checkable; taxonomy tags are validatable; reduction is decidable), and that the one judgment a model *can* be trusted to make about its own knowledge is what kind of knowledge it is. Every claim in a reply now sits in a graph whose edges a dumb program can verify, whose leaves are typed by where they came from, graded by how they can fail — and whose most humbling grade, *suspect*, has twice sent the agent back to the world and once made her open with "I was wrong."
+TL;DR: We found the verifier methodology *can* be pushed into 'non-verifiable' conversational tasks, and discovered the checker could be pushed one layer further than expected (verbatim quotes are checkable; taxonomy tags are validatable; reduction is decidable), and that the one judgment a model *can* be trusted to make about its own knowledge is what kind of knowledge it is. Every claim in a reply now sits in a graph whose edges a dumb program can verify, whose leaves are typed by where they came from, graded by how they can fail — and whose most humbling grade, *suspect*, has twice sent the agent back to the world and once made her open with "I was wrong."
 
 ---
 

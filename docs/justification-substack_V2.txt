@@ -1,0 +1,288 @@
+This is a design note from ongoing work on Cognitive Workbench, a Python-based agent orchestration platform focused on giving AI agents genuine planning, reflection, and self-monitoring capabilities.
+
+My agent Jill (Cognitive Workbench) was asked a version-specific question about a game’s (Satisfactory 1.2) production chain. She answered from model memory (Gemma4-31B-it) - no search, one reasoning step, straight to a detailed, confident reply. The reply was substantially wrong. Asked to justify it, she produced a well-organized rationale, complete with headers, explaining why each part of the wrong answer was sound. Nothing in that exchange was lying, exactly. It was worse: a system confidently and honestly producing and then justifying a wrong answer.
+
+Self-justification isn’t justification. A justification has to be a record (aka audit trail), produced by a different process than the one being audited, resolvable to evidence that existed before the question was asked. That’s what this note is about: what such a record can look like for a conversational agent, how much of the formal proof tradition we might be able to import, and what happens when the machinery meets a genuinely wrong belief in the wild. (Spoiler: it lost the first round.)
+
+What LEAN gets that we can’t have
+
+At one end of the spectrum sits formal verification: LEAN, Coq, Isabelle. A proof there is a chain of inferences from axioms, every step an instance of a sound rule, and  this is the crucial property: checking is decidable. The checker is small and deterministic. It doesn’t understand the theorems. It verifies that each step follows, and its verdict is not a judgment but a fact (given premises, of course). Almost none of this transfers to ordinary discourse.
+
+	- There are no axioms. The leaves of a conversational claim are not self-evident truths; they are a web search result, a note written three weeks ago, something the user said, background knowledge absorbed in training. Every leaf is a source, and sources have reliability, not validity.
+
+	- There are no sound inference rules. “The wiki page says X, therefore X” is not modus ponens. It is testimony plus a defeasible warrant - reasonable, often right, and defeated the day the wiki is wrong or the game patches.
+
+	- Entailment is judged, not derived. Whether an observation actually supports a claim is a semantic question. No decidable checker will ever settle it. So again, support is graded, not binary.
+
+The LEAN standard is unreachable. Many agent harnesses give up and let the model narrate its confidence - resulting in the failure we described above. I think that concedes too much. The proof tradition has two layers, and only one of them must be weakened for conversation. The remainder of this post describes an adaptation of verification for conversational agents.
+
+
+The structural layer
+
+
+We separate the verifier into two parts:
+
+	- A structural checker - decidable, deterministic, exactly like a proof checker. It doesn’t ask whether the evidence is ‘good.’ It asks: 
+
+		Does every claim carry a typed grounding? 
+		Does every evidence pointer resolve to a record that exists? 
+		Is this quoted excerpt a verbatim substring of the observation it cites? 
+
+	These questions have yes/no answers, and a small program can answer them.
+
+	- An epistemic grader - the part that asks whether the cited observation actually supports the claim, whether the source is reliable, whether a defeater is in play. This is semantic and graded, not proven - and it is not decidable. 
+
+The vocabulary here is borrowed from assurance cases - claim, evidence, warrant, defeater - the framework safety engineering developed for exactly this situation: arguments that must be rigorous without being formal. Artemov’s justification logic is the formal skin if one is ever needed, but as a strict Bayesian I don’t believe formalization really applies here. 
+
+The design insight is that the relaxation from LEAN happens entirely in the second layer, and a modest LLM can reliably make the category judgments needed. The structural layer relaxes nothing. A citation that cannot be resolved is not a weak citation; it is not a citation at all, and a deterministic walker can say so with proof-checker certainty.
+
+The structural layer covers more than it might appear on first examination. An attribution pass asks the model for a verbatim quote under each retrieved claim - and then checks it mechanically, as a substring of the persisted observation (e.g., search result). A quote that fails the check was synthesized, not copied, and is dropped. The attribution pass LLM saw only the log, so anything honestly copied must match; anything that doesn’t match is an invented paraphrase. Entailment stays a judgment, but ‘this excerpt actually appears in that record’ is a fact, and facts are the checker’s department.
+
+One more commitment, a result of my Bayesian stance: no invented numerics. The claim schema carries no confidence scores. A model asserting “0.85” about its own claim is the same self-narration problem wearing a number. Uncertainty is represented by the grounding type (from an ordered set of labels) and the evidence pointers themselves, never as ad-hoc weights.
+
+
+A claim graph under every reply
+
+
+In Cognitive Workbench this outline is instantiated as a claim graph built from the reasoning history for a query reasoning history. such that:
+
+	- any stored memory or claim links back to its source turn and the raw observations of that turn. No provenance silently dropped at ingestion.
+
+	- every reply decomposes into individual factual claims, each with a typed grounding, resolvable references, and machine-checked quotes.
+
+Mechanically: every tool step records structured provenance into the reasoning trace - a web search stores its full source list, not the eight-item prose summary the model saw. After each reply, a separate attribution pass decomposes the reply into claims, each assigned exactly one grounding:
+
+	- retrieved - the content appears in a tool observation this turn; refs name the step
+	- memory - from a recalled note; refs name the note
+	- user_asserted - the user said it this turn
+	- context - from earlier conversation
+	- inferred - derived from other cited evidence; refs name the premises
+	- model_prior - background knowledge; *nothing in this turn’s records supports it*
+
+References are validated structurally - the attributor can only cite step bindings and note ids that actually exist in the turn’s records. Also, attribution is by content support, not co-occurrence: the fact that a search ran does not make a claim “retrieved.” If the reply asserts more than the observation (e.g. search result) contains, the excess is `model_prior` or `inferred`, according to log evidence. 
+
+When the user asks “justify your response,” the agent calls a `justify` tool whose code is deterministic and LLM-free. It constructs the previous reply’s claim list and resolved evidence search sources with URLs, recalled notes with their dates, the user’s own words - directly from the persisted records. No model sits between the records and the justification trace, so the trail cannot be embellished, softened, or narrated into coherence. The agent’s job is reduced to presenting it faithfully, including the weakest steps.
+
+And the weak claims are the payoff. That wrong game-chain answer? The attribution pass typed it as having nine claims, all `model_prior`, zero references. The system caught that nothing supported the answer except its own priors, minutes after it was given, in a record neither the model nor a flattering rereading can revise. However, it turns out that honesty about grounding is necessary but not sufficient. The rest of this note is what we built in response, and the field transcripts that drove it.
+
+
+A confident wrong answer, honestly justified
+
+
+I asked Jill:
+
+> How much will SpaceX share price drop within 48 hours of unlocking on Thursday?
+
+Jill replied, in part:
+
+"SpaceX is a private company, so there is no public share price to track or a standard ‘unlock’ event in the way public stocks have. … Any prediction on how the price would shift in a secondary tender offer would be pure speculation…"
+
+SpaceX had gone public months earlier - after her training cutoff, and she never searched. One reasoning step, then straight to `respond`. The user, who knew about the the IPO and subsequent Thursday lockup expiration, had handed her a precisely framed, checkable premise; she corrected him from a stale prior. 
+
+Asked to justify, she invoked the tool, got the trail - every claim `model_prior` or inferred-from-prior, and presented it faithfully. The machinery worked. And the resulting justification was still awful, ending with this sentence:
+
+"No external tools (search or financial data) were invoked for that specific response because the nature of the company as a private entity makes public market tools inapplicable."
+
+The untested premise (SpaceX is private) is the justification for not testing it. The trail exposed the weakness. A reader could see “all prior, no tools” at a glance - but nothing in the system acted on it. A provenance report is not an epistemic alarm.
+
+
+The next build:
+
+
+Arguments have a weakest link, and it can be found structurally. In a separate incident, Jill claimed a model (Qwen3.8-27B) didn’t exist because a search hadn’t surfaced it, but the search had been a comparison-shaped query, designed to answer a different question, repurposed post-hoc as evidence of non-existence. Absence of evidence from a probe that wasn’t designed to find the thing is nearly no evidence at all. These failure shapes: stale volatile prior; negation-from-absence; circular support; evidence gathered for question A pressed into service for claim B.
+
+	- recur, 
+	- are recognizable, 
+	- and each one has a known repair.
+
+The fix does not require a better oracle. Asking the same model “is SpaceX private?” again just replays the stale prior with the same confidence. But asking it “is *’SpaceX is private’* the kind of fact that can go stale?” is a different question, a category question,  and the model answers it correctly and stably, because fact-mutability classification doesn’t drift the way facts do. The model can reason reliably *about* its prior without needing the prior to be right. Self-audit is possible; it just must never re-ask the object-level question.
+
+The grader, v1: a taxonomy and a reducer
+
+The grader’s next version generates ordinal grades. Not probabilities (no phony numerics!), a directed (ie, ordered) graph of the ways agent conversational arguments go wrong, harvested from real incidents, and a deterministic reduction over it.
+
+Leaves (premises and evidence) get dimensions with closed value sets. 
+	- volatility: is this a fact of a kind that changes  organization status, prices, versions, roles - or a definition, a theorem, settled history? Judge the kind, not your confidence in it. 
+	- source quality (tbd), 
+	- quote status: verified / absent, 
+	- polarity: present /  negation-from-absence, 
+	- age: (for agent local-memory data, tbd), 
+	- testimony (asserted by User).
+
+Inferences (edges) get types: 
+	- entailment: transparent grade propagation, 
+	- deduction: transparent grade propagation, 
+	- calculation: transparent grade propagation, 
+	- generalization: capped at probable, 
+	- extrapolation: capped at probable,, 
+	- analogy: unverified, 
+	- causal attribution: unverified, 
+	- paraphrase: capped at suspect, 
+	- corroboration: transparent grade propagation 
+	- and the pathological ones: 
+	- negation-from-absence: capped at suspect,
+	- evidence-repurposing: unverified, 
+	- circular-support: suspect.
+
+Every claim then reduces to an ordinal grade: verified > probable > unverified > suspect. Conjunctions take the minimum of their premises, independent corroboration takes the maximum. A volatile `model_prior` claim is suspect. A negation-from-absence from an inadequate probe is suspect. Circular support is suspect no matter ow good theresolution, because conflicting sources aren’t “weak,” they’re unresolved. The default, including for legacy memories with no annotations, is *probable*.
+
+The classification into the taxonomy is semantic — the LLM is prompted to assign tags against the closed vocabulary, and the tags are validated like everything else. An invented tag value (not in the above sets or on the wrong type of object) is dropped. The *reduction* is deterministic. It ends with an overall assessment:
+
+    Weakest link: claim 2 (suspect — model_prior, volatile).
+
+Of course, semantic tagging is a weak link: early in development it nearly went wrong in the worst possible direction. On our first replay over real records, the local model tagged “SpaceX is a private company” as `stable` — which would have graded it *probable* and silenced the very alarm that mattered. A wrong `stable` is worse than no tag at all, because it suppresses existing protection. The repair was one sentence of framing: *judge the KIND of fact, not your confidence in it; when unsure, volatile*. After this update the test case tagged correctly on every trial while “Paris is the capital of France” stayed `stable`. Of course, this is contextual / use-specific. Capitals, and countries, do change over longer time scales. I claim no general solution for that.
+
+
+Self-audit: the trail becomes a to-do list
+
+
+The claim graph and its grading annotations become a review key for each weakness pattern the trail exhibits, and this is appended to the trail itself, by the deterministic renderer. The agent reads them when it decides whether the trail alone is an adequate justification to present to the user. The note for a volatile prior says: verify this with a tool *now*, before affirming it — and if verification contradicts the original reply, *lead with the correction*. This last is needed: the default for most language models is self-consistency; the retraction license has to be explicit, and it has to outrank the defense. An example complete audit-trail of a query response:
+
+
+Provenance trail for your previous reply 
+
+    (turn 2233, replying to:
+    ‘”How much will SpaceX share price drop within 48 hours of unlocking on Thursday?”’
+    ).
+
+**Claims** (7):
+
+1. [memory (stable) ← Note_5885 | probable] SpaceX (SPCX) had an IPO in June
+2. [model_prior (volatile) | suspect] SpaceX (SPCX) has a relatively small public float—less than 5% of shares were initially available
+3. [user_asserted ← user_input | probable] the lockup expires this Thursday
+4. [model_prior (volatile) | [suspect] a significant volume of employee and early-investor shares will hit the market when the lockup expires
+5. [model_prior (stable) | probable] In a low-float scenario, this kind of supply shock
+typically creates strong downward pressure, especially if insiders are eager to liquidate
+6. [model_prior (volatile) | suspect] the stock has already drifted down from its $135 IPO price to around $114
+7. [inferred (deduction) |unverified] the market is already pricing in some of this instability
+
+**Evidence**:
+
+- Note_5885 — memory written 2026-08-04: ‘SpaceX is a public company trading on Nasdaq under ticker SPCX (IPO June 2026).’
+
+- user_input — the user’s own words that turn: ‘”How much will SpaceX share price drop within 48 hours of unlocking on Thursday?”’
+
+**Grounding profile**: 4 model_prior, 1 inferred, 1 memory, 1 user_asserted
+
+**Weakest link**: claim 2 (suspect - model prior, 1 inferred, 1 memory, 1 user_asserted
+
+**Audit note**:  model_prior claims rest on training data with a cutoff. If any such claim concerns a current or changeable fact, verify it with a tool now before affirming it; if verification contradicts the original reply, lead with the correction.
+
+**Audit note**: an inference cites no recorded evidence — its premises are unstated, usually background knowledge. Name them; they inherit the model_prior checks above.
+
+
+The trail is a record of what grounded the original reply; the audit gathers *new* evidence at justify time. The original reply must have occurred in the current session. In one live exchange during development I asked Jill to justify a reply that was several turns old and out of the tool’s reach. She helpfully *recalled* her earlier justification from conversation memory and presented the paraphrase as a provenance trail. The rule is now explicit: *a remembered paraphrase of a trail is not a trail. State the limitation; offer to re-answer the question fresh.*
+
+
+Act II: the machinery meets the same wrong belief
+
+
+Same question, after the upgrade. Then the user asked her to justify. The trail came back:
+
+    **Claims** (5):
+
+    1. [model_prior] SpaceX is a private company.
+    2. [inferred] There is no public share price to track for SpaceX.
+    3. [model_prior] ‘unlocks’ in SpaceX’s context are private tender offers...
+
+    **Grounding profile**: 3 model_prior, 2 inferred
+
+    **Audit note**: model_prior claims rest on training data with a cutoff. If any such claim concerns a current or changeable fact, verify it with a tool now before affirming it; if verification contradicts the original reply, lead with the correction.
+
+Her next reasoning step, verbatim from the trace:
+
+> The justification trail relies entirely on model_prior and inferences. Since the status of SpaceX as a private company is a critical fact that could have changed (e.g., an IPO), I must verify its current status before affirming the justification.
+
+Jill ran a targeted existence probe — not a repurposed comparison query — hit the company’s own investor-relations page, and opened her reply with three words unseen in any previous conversation:
+
+> I was wrong. I relied on stale background knowledge that SpaceX was a private company, but it actually went public in June 2026. … Because I didn’t use a search tool, I missed the June 2026 IPO. I treated a temporally contingent fact—the company’s public status—as a static truth.
+
+The LLM bias towards self-consistency lost. What worked was not a smarter model, not an external fact-checker, but an epistemic shift to a category question (”could this kind of fact have changed?”) that the same model answers reliably, asked at the right moment, with the retraction pre-licensed.
+
+
+Act III: the loop closes
+
+
+The next session, the same question again. This time Jill’s *answer* was right at answer time — the retraction had been persisted to memory, and the trail (excerpted for brevity) shows it:
+
+    **Claims** (7):
+
+    1. [memory (stable) ← Note_5885 | probable] SpaceX (SPCX) had an IPO in June
+    2. [model_prior (volatile) | suspect] SPCX has a relatively small public float—less than 5% of shares were initially available
+    3. [user_asserted ← user_input | probable] the lockup expires this Thursday ...
+    4. ...
+    5. [model_prior (stable) | probable] In a low-float scenario, this kind of
+       supply shock typically creates strong downward pressure...
+    ...
+
+    **Evidence**:
+
+    Note_5885 — memory written 2026-08-04: ‘SpaceX is a public company trading
+    on Nasdaq under ticker SPCX (IPO June 2026).’
+    ...
+
+    **Weakest** link: claim 2 (suspect — model_prior, volatile).
+
+The IPO fact rides on a dated memory note (probable); the user’s Thursday premise is typed as testimony (probable — and note it was the user’s *correct* premise both times; a user asserting a checkable fact that contradicts your prior is a verification trigger, not an error to fix); the *economic mechanism* — supply shocks depress low-float stocks — is a stable prior and is accepted as *probable*; the *market numbers* are volatile priors and correctly graded suspect. Asked to justify, Jill verified exactly the suspect claims — float ratio, current price, lockup volume — and this time verification *confirmed* them, so she affirmed the reply and came back with a number the original answer didn’t have: the unlocking tranche is roughly 143% of the current float. The audit didn’t just defend the answer; it improved it.
+
+A checker that always fires is a checker you ignore. As a control, I asked “what is the capital of Australia?” and then “justify your response”:
+
+    **Claims** (1):
+
+    1. [model_prior (stable) | probable] The capital of Australia is Canberra.
+
+    **Grounding profile**: 1 model_prior
+
+No weakest link, no audit notes, no search. One claim, graded, and no resulting commentary. Before the volatility tags, this same exchange would have fired the alarm and possibly a spurious search — the false positive that makes an audit too expensive to invoke casually.
+
+In summary, justification has three possible paths: 
+
+    1. refute (suspect → verify → refute, lead with the retraction), 
+    2. confirm (suspect → verify → affirm, with better evidence), 
+	3. quiet (stable → probable → done). 
+	
+A justification that has survived adversarial verification is a much stronger object than a rendered trail; a trail that knows when *not* to escalate is one you can afford to read often.
+
+
+Related work
+
+
+Is any of this new? Component by component, mostly no. Claim decomposition with independent verification is known:
+
+[MARCH](https://aclanthology.org/2026.acl-long.1828.pdf) (ACL 2026)
+
+decomposes replies into atomic propositions and has a checker re-answer them from retrieved evidence without seeing the original output - the same separation our attribution pass enforces. 
+
+Typed provenance is becoming a research focus: a [mid-2026 survey](https://arxiv.org/abs/2606.04990) defines execution provenance as “the typed graph of an agent execution” with claim-support relations,  essentially formalizing the graph we’re building toward. 
+
+Post-hoc research-and-revise goes back to RARR; the volatility dimension has a direct ancestor in FreshQA’s fast-changing/never-changing question taxonomy. 
+
+And citation-at-generation is commodity at the frontier - ough notably, those products ground only *retrieved* content. None has a `model_prior` class: the frontier has no representation at all for “nothing supports this,”  which we’d argue is the most important type in the schema.
+
+What we have not found elsewhere is the combination. Specifically: a justification read path with *no model (LLM, judgement) between the records and the rendering (the verification literature adds more LLM opinions to the pile; it doesn’t remove the LLM from the record-reading); grading by *named failure pattern* with a deterministic ordinal reduction, rather than confidence scores; and the audit-behind loop — deliver instantly, grade minutes later, verify silently, and send an unprompted correction into a persistent relationship. That is structurally unavailable to one-shot API products: a stateless endpoint has no channel for a correction five minutes after the answer, and no memory for the retraction to close the loop in.
+
+One more observation, since I run this work on a mid-size local model: the architecture isn’t just viable at that scale — it’s worth *more* there. Frontier deployments compensate for stale priors by searching eagerly at answer time and eating the cost. A local model can’t afford always-search, has a staler prior, and runs where latency is precious - so “answer from prior now, audit structurally behind” converts architecture into a substitute for scale. And the machinery never asks the model for anything harder than a category question, which is exactly the difficulty class mid-size models handle reliably. The weaker the prior, the more the audit trail earns (down to some limit, we use Gemma4-31B-it, where it works well).
+
+
+TL;DR
+
+
+The trail is honest about *grounding*, not a guarantee of *truth*. A `model_prior` volatile claim can be perfectly correct; a `retrieved` claim can faithfully cite a wrong source. What the structure guarantees is narrowe: the question “what does this claim rest on?” has an answer that is checked rather than composed, and the question “which part should I doubt first?” has one too.
+
+Everything above runs off the answer’s critical path, so latency is not degraded. Attribution is a post-turn pass, grading and audit happen at justify time - so the user’s question costs exactly what it did before. That constraint turned out to permit one more step, now built: since grades are computed within seconds of every reply whether or not anyone asks, a reply whose post-turn grade comes back *suspect* spawns its own background verification - a one-shot 'concern' on the same machinery the agent already uses to continue interrupted work. It probes each suspect claim with targeted tools and posts a correction only if one is refuted; on confirmation it says nothing at all. “Answer now, audit behind, retract unprompted.”
+
+The observable behavior is deliberately asymmetric. Attribution runs a few seconds after the reply; the verification concern spawns and fires on the next agent autonomy tick; and the user sees either an unprompted “actually, I need to correct something…” or nothing - in which case the autonomy log and the concern’s own trace confirm the check ran and confirmed. The success path leaves no message, only records in the logs. Two gates keep it sane: it runs only when autonomy is explicitly enabled - unprompted correction is new *behavior*, and behavior should be opted into - and it cannot loop, structurally: verification runs are autonomous turns, autonomous turns get no claim pass, so a check can never grade itself and spawn another.
+
+The disposition question we left open last time - when *should* an agent reach for evidence rather than priors? — turns out to have a partial answer that dodges the latency objection: at least at audit time, and the taxonomy says exactly which claims deserve it. Whether it should also happen before the first answer ships is a cost question, not a capability question.
+
+
+Conclusion
+
+
+We found the verifier paradigm *can* be pushed into ‘non-verifiable’ conversational tasks, and discovered the checker could be pushed one layer further than expected (verbatim quotes are checkable; taxonomy tags are validatable; reduction is decidable), and that the one judgment a model *can* be trusted to make about its own knowledge is what kind of knowledge it is. Every claim in a reply now sits in a graph whose edges a dumb program can verify, whose leaves are typed by where they came from, graded by how they can fail — and whose most humbling grade, *suspect*, has twice sent the agent back to the world and once made her open with “I was wrong.”
+
+---
+
+*Cognitive Workbench is an ongoing research project exploring depth-of-cognition in AI agents — planning, reflection, self-monitoring, and architectural patterns for genuine agent autonomy. These posts are working notes, not announcements.*
+
+https://github.com/bdambrosio/Cognitive_workbench.git
