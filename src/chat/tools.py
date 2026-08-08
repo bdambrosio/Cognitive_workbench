@@ -291,13 +291,18 @@ class ToolsMixin:
                 "\"what does the README say about installation?\", \"where is the main entry point?\")."))
         tools.append(("security",
             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"security\", \"query\": <string>}` — "
-            "investigate LAN / local-system network state. A separate subagent (read-only typed primitives: "
-            "nmap host discovery + service scan, ss/ip for sockets/routes/arp/interfaces; targets restricted to "
-            "RFC1918 ranges) runs the probes and returns a synthesized answer. Use when the user asks about LAN "
-            "hosts, what's listening locally, what services a host exposes, suspicious activity on the network, "
-            "or routing/interface state. v0.1 does NOT do traffic capture or IDS log inspection. Phrase as a "
-            "natural-language question (e.g. \"what hosts are on my LAN at 192.168.1.0/24?\", \"what TCP ports "
-            "am I listening on?\", \"what's my default gateway?\")."))
+            "investigate LAN state or local host security state. A separate subagent (read-only typed "
+            "primitives: nmap host discovery + service scan, ss/ip for sockets/routes/arp/interfaces with "
+            "targets restricted to RFC1918 ranges; host probes for processes, logins, ssh auth failures, "
+            "SUID files, cron/systemd persistence points, authorized SSH keys, pending upgrades, the "
+            "unattended-upgrades log, installed package versions; baseline diffing of SUID files / listening "
+            "sockets / enabled units against the last stored snapshot) runs the probes and returns a "
+            "synthesized answer. Use for LAN hosts, what's listening locally, what services a host exposes, "
+            "signs of intrusion or unexpected host activity, persistence-point review, and patch posture. "
+            "All probes are unprivileged — no traffic capture, no root-only scanners. Phrase as a "
+            "natural-language question (e.g. \"what hosts are on my LAN at 192.168.1.0/24?\", \"any signs "
+            "of intrusion in the last day?\", \"did unattended-upgrades run, and is anything still "
+            "pending?\")."))
         tools.append(("justify",
             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"justify\"}` — "
             "READ-ONLY provenance audit of your own most recent reply in this conversation. Returns that "

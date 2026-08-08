@@ -823,6 +823,7 @@ class ReactMixin:
                 query=str(query),
                 llm_backend=self.backend,
                 trace_dir=self._security_traces_dir(),
+                baseline_dir=self._memory_dir() / 'security_baselines',
             )
         except Exception as e:
             logger.warning(f"[{self.character_name}] security subagent raised: {e}")
