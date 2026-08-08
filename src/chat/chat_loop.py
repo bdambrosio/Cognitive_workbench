@@ -113,6 +113,16 @@ logger = logging.getLogger('chat_loop')
 
 
 
+def _common_prefix_len(a: str, b: str) -> int:
+    """Length of the shared leading run of two strings. Used to write
+    successive ReAct prompts as deltas in the debug trace."""
+    n = min(len(a), len(b))
+    i = 0
+    while i < n and a[i] == b[i]:
+        i += 1
+    return i
+
+
 # ─── ChatLoop ───────────────────────────────────────────────────────────────
 
 class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
@@ -1056,9 +1066,26 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                 lines.append('SYSTEM:')
                 lines.append(first.get('system', ''))
                 lines.append('')
-                for it in iters:
-                    lines.append('USER:')
-                    lines.append(it.get('user', ''))
+                prev_user = ''
+                for idx, it in enumerate(iters):
+                    usr = it.get('user', '')
+                    if idx == 0:
+                        lines.append('USER:')
+                        lines.append(usr)
+                    else:
+                        # Every iteration re-sends the whole working log
+                        # (react.py rebuilds usr_msg from a growing
+                        # appendage), so writing each one in full made this
+                        # file quadratic in observation size — the reason it
+                        # reached hundreds of MB. Record only what changed;
+                        # the first USER plus these deltas reconstruct the
+                        # exact byte stream.
+                        shared = _common_prefix_len(prev_user, usr)
+                        lines.append(
+                            f'USER: [+{len(usr) - shared} chars; first '
+                            f'{shared} unchanged from previous iteration]')
+                        lines.append(usr[shared:])
+                    prev_user = usr
                     lines.append('')
                     lines.append('ASSISTANT:')
                     lines.append(it.get('raw', ''))
@@ -1123,6 +1150,19 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                 log_lines.append(f"ACTION: {raw}")
                 for label, content in (it.get('appended') or []):
                     if isinstance(label, str) and label.startswith('$step'):
+                        # Cap the stored observation. This record is
+                        # re-injected in full into the next few turns'
+                        # prompts (_get_reasoning_history_block), so an
+                        # uncapped observation is paid for repeatedly long
+                        # after the turn that produced it. Claim
+                        # attribution renders the log at 800 chars/line,
+                        # so quotes still verify against what is kept here.
+                        content = str(content or '')
+                        if len(content) > _REASONING_HISTORY_OBS_CAP:
+                            content = (
+                                content[:_REASONING_HISTORY_OBS_CAP].rstrip()
+                                + f" …[observation capped at "
+                                  f"{_REASONING_HISTORY_OBS_CAP} chars]")
                         log_lines.append(f"{label}: {content}")
                         if it.get('tool_meta'):
                             tool_meta[label] = it['tool_meta']

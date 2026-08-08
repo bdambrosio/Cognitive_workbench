@@ -26,11 +26,19 @@ logger = logging.getLogger('chat_loop')
 # Note in the `reasoning_history` collection. Last N entries surface in the
 # user-message prefix between conversation history and current input. Most
 # recent _REASONING_HISTORY_FULL render in full; older ones render as a
-# compressed action-sequence digest. Ring-bounded — older traces beyond
-# _REASONING_HISTORY_RING_SIZE are pruned at write time.
+# compressed action-sequence digest.
 _REASONING_HISTORY_COLLECTION_NAME = "reasoning_history"
 
-_REASONING_HISTORY_RING_SIZE = 50    # on-disk cap
+# NOT APPLIED — deliberately. reasoning_trace.jsonl is append-only and
+# pruning it would (a) discard the analytical history the provenance and
+# disposition work reads, and (b) break turn_seq, which chat_loop seeds by
+# counting lines in this file: after a prune the counter restarts mid-
+# history and the sidecar joins (memories.jsonl / claims.jsonl
+# source_turn_seq) silently point at the wrong turns. Per-record growth is
+# bounded by _REASONING_HISTORY_OBS_CAP instead. Archiving old records is a
+# manual operation; if it is ever automated, seed turn_seq from the last
+# record's turn_seq rather than the line count first.
+_REASONING_HISTORY_RING_SIZE = 50    # on-disk cap (unused; see above)
 
 _REASONING_HISTORY_RECENT = 6        # surfaced in the prompt
 

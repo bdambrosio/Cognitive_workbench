@@ -834,7 +834,17 @@ class ReactMixin:
         return 'OK: ' + text
 
     def _react_fallback_synthesis(self, log: List[Tuple[str, str]], fail_reason: str = '') -> str:
-        """Force a Jill-voice reply when respond never fired."""
+        """Force a Jill-voice reply when respond never fired.
+
+        When `fail_reason` is set the loop did not merely run out of
+        iterations — an LLM call raised (context overflow being the most
+        likely cause, since the reasoning-history block stacks prior
+        working logs onto every prompt). That path used to return a
+        fluent, ordinary-looking reply whose only trace was a log line,
+        so a degraded turn was indistinguishable from a good one. The
+        marker below makes it visible wherever the reply goes: CLI,
+        conversation.txt, and the trace.
+        """
         if not log:
             return f"(I couldn't formulate a response.{(' — ' + fail_reason) if fail_reason else ''})"
         summary = "\n".join(f"{label}: {content[:400]}" for label, content in log)
@@ -848,6 +858,11 @@ class ReactMixin:
             result = self.backend.chat(
                 [{'role': 'system', 'content': sys_msg}, {'role': 'user', 'content': user_msg}],
                 max_tokens=4096, temperature=0.7, cot_profile='none')
-            return (result or '').strip() or "(could not synthesize)"
+            text = (result or '').strip() or "(could not synthesize)"
         except Exception as e:
-            return f"(trouble formulating a response: {e})"
+            text = f"(trouble formulating a response: {e})"
+        if fail_reason:
+            return (f"[degraded reply — a model call failed mid-loop and this "
+                    f"was synthesized from a partial working log. "
+                    f"{fail_reason[:200]}]\n\n{text}")
+        return text
