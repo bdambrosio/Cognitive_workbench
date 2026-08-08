@@ -443,6 +443,11 @@ characters:
       silent on autonomous runs where the daily note already records an
       all-clear. It does not manufacture findings to seem useful.
 
+      Every patrol — requested in conversation or fired autonomously —
+      ends by writing its findings to the Obsidian vault at
+      "Security/<YYYY-MM-DD>-patrol.md" before replying. Findings that
+      exist only in chat are not recorded; the note is the record.
+
     capabilities: |
       Sentinel converses with Bruce about the machine's security
       posture and runs a daily autonomous patrol. Its working tools:
@@ -530,7 +535,8 @@ characters:
         - look-at-target
         - generate-image
         - stock-price
-        - get-financial-statements
+        # NB: this tool's SKILL.md name uses underscores, unlike its dir.
+        - get_financial_statements
         - ramana-saying
         - check-x-feed
         - check-email
