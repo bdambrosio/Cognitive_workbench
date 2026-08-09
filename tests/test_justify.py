@@ -147,16 +147,43 @@ def test_render_justification_full_trail(tmp_path):
 
 
 def test_render_justification_no_audit_note_without_prior(tmp_path):
+    """A healthy trail off a directly-retrieved observation raises nothing.
+
+    The observation here is fetch-text — bytes this harness pulled — so
+    the model-synthesis note does not apply and no claim grades below
+    probable.
+    """
     md = _memory_dir(tmp_path)
     _populate(md)
+    trace = dict(TRACE[1])
+    trace["tool_meta"] = {"$step1": {"tool": "fetch-text", "meta": []}}
     claims_rec = {"turn_seq": 12, "claims": [
         {"claim": "There is no direct world copy/paste.",
          "grounding": "retrieved", "refs": ["$step1"]},
     ]}
-    out = render_justification(claims_rec, TRACE[1], md)
+    out = render_justification(claims_rec, trace, md)
     assert "Grounding profile: 1 retrieved" in out
     assert "Audit note:" not in out
     assert "Weakest link" not in out  # nothing below probable
+
+
+def test_render_flags_model_synthesised_observation(tmp_path):
+    """A trail resting wholly on search-web is one model's account of its
+    reading — the render has to say so, per claim and once as an audit
+    note, even though every claim grades probable and nothing is a
+    'weakest link'."""
+    md = _memory_dir(tmp_path)
+    _populate(md)
+    claims_rec = {"turn_seq": 12, "claims": [
+        {"claim": "There is no direct world copy/paste.",
+         "grounding": "retrieved", "refs": ["$step1"],
+         "quote": "the wiki states there is no direct copy/paste"},
+    ]}
+    out = render_justification(claims_rec, TRACE[1], md)
+    assert "not from a source document" in out
+    assert "model-synthesised observation" in out
+    assert "every claim rests on a model-synthesised observation" in out
+    assert "Weakest link" not in out  # still nothing below probable
 
 
 def test_render_justification_no_claims(tmp_path):

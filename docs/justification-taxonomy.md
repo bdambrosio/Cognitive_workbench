@@ -63,6 +63,25 @@ filings/IR/official docs/repo of record (primary); ungraded outlet
 - **Effect:** quote-verified × primary → **verified**. unknown → cap
   **probable**. unreliable → cap **suspect**.
 
+### mediation: `direct` | `mediated`
+Whether this harness retrieved the evidence or is reading a model's
+account of it. Derived from the tool, not tagged by the attributor:
+fetched bytes, API rows, file text and deterministic renders are
+`direct`; anything an LLM wrote is `mediated`, including
+local-ground-truth subagents (`inspect`, `security`, `recall`) whose
+underlying reads were real but whose *observation* is a synthesis of
+them. Orthogonal to source-grade: that axis asks how authoritative a
+source is, this one asks whether we actually read it.
+- **Review key (mediated):** a verbatim quote against a synthesis proves
+  the synthesis said it, not that the source did. If the claim is
+  load-bearing, fetch the named source and check it.
+- **Effect:** currently surfaced in the render, not a cap — with
+  source-grade unimplemented every recorded-evidence path already
+  returns **probable**, so a cap would be inert. When source-grade
+  lands, `mediated` must cap at **probable** so a synthesis cannot be
+  promoted to **verified** on the strength of a verbatim match against
+  itself.
+
 ### quote: `verified` | `absent`
 Whether a verbatim span, machine-matched against the persisted
 observation, anchors the leaf (the citation machinery).

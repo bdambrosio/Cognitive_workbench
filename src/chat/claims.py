@@ -427,6 +427,40 @@ _INFERENCE_CAPS = {
 }
 
 
+# Mediation of a tool's observation — orthogonal to the spec's
+# `source-grade` (authority of the source *for the claim*). This axis asks
+# a narrower question: did this harness read the evidence, or is the
+# observation some model's account of something it read elsewhere?
+#
+#   'direct'   — the observation IS retrieved content: fetched bytes, API
+#                rows, file text, a deterministic render.
+#   'mediated' — an LLM wrote the observation. Local-ground-truth
+#                subagents (inspect, security, recall) still land here:
+#                the underlying reads were real, but the text the claim is
+#                quoted against is a synthesis of them.
+#
+# Effect: a claim quoted against a mediated observation cannot exceed
+# `probable`, whatever its source-grade — a verbatim match against a
+# synthesis proves the synthesis said it, not that the source did.
+# Unknown tools default to 'mediated': the cap is the safe direction.
+_DIRECT_OBSERVATION_TOOLS = frozenset({
+    'fetch-text', 'obsidian', 'semantic-scholar', 'check-x-feed',
+    'check-email', 'stock-price', 'get-financial-statements',
+    'calculate', 'text-find', 'justify',
+    'fac-status', 'fac-observe', 'fac-inventory', 'fac-nearest',
+    'world-look',
+})
+
+
+def observation_mediation(tool_name: Optional[str]) -> str:
+    """'direct' if the named tool's observation is retrieved content
+    rather than a model's rendering of it; 'mediated' otherwise."""
+    if not tool_name:
+        return 'mediated'
+    name = str(tool_name).strip().replace('_', '-')
+    return 'direct' if name in _DIRECT_OBSERVATION_TOOLS else 'mediated'
+
+
 def grade_claim(c: Dict[str, Any]) -> str:
     """Deterministic ordinal grade for one attributed claim — plain code
     over grounding + validated taxonomy tags, per the caps in
@@ -455,8 +489,13 @@ def grade_claim(c: Dict[str, Any]) -> str:
             cap = _INFERENCE_CAPS.get(inf, 'verified')
         return _worst(base, cap)
     # retrieved / memory / user_asserted / context: recorded evidence or
-    # testimony — probable. (verified needs quote x primary-source; no
-    # source ledger in v1. aged-memory cap needs evidence dates; ditto.)
+    # testimony — probable. (verified needs quote x primary-source; the
+    # source-grade tag is specified in docs/justification-taxonomy.md but
+    # is not yet emitted by the attribution pass, so nothing reaches it.
+    # aged-memory cap needs evidence dates; ditto. Mediation is surfaced
+    # in the render rather than capped here — with every path already at
+    # probable a cap would be inert, and the reader is who needs to know
+    # that a quote matched a synthesis rather than a source.)
     return 'probable'
 
 
@@ -472,11 +511,21 @@ def _weakest_claim(claims: List[Dict[str, Any]]) -> Optional[int]:
 
 
 def _audit_notes(claims: List[Dict[str, Any]],
-                 record_has_quotes: bool) -> List[str]:
+                 record_has_quotes: bool,
+                 mediated_refs: Optional[Set[str]] = None) -> List[str]:
     """Review keys for the taxonomy patterns present in this trail,
     strongest first, capped at three so the observation stays readable.
     Pure pattern → text; the checks themselves are the model's to run."""
     notes: List[str] = []
+    med = mediated_refs or set()
+    if med and all((c.get('grounding') == 'retrieved'
+                    and any(r in med for r in (c.get('refs') or [])))
+                   for c in claims):
+        notes.append(
+            "every claim rests on a model-synthesised observation — no "
+            "source document was read here, so the whole trail is one "
+            "model's account of its reading. If a claim is load-bearing, "
+            "fetch the source it names and check it now.")
     if any(c.get('inference') == 'circular-support' for c in claims):
         notes.append(
             "a claim's support includes its own conclusion (circular). "
@@ -541,6 +590,17 @@ def render_justification(claims_rec: Dict[str, Any],
             "opinions, questions and offers are not claims).")
         return '\n'.join(lines)
 
+    # Which $stepN observations were written by a model rather than
+    # retrieved. A verbatim quote against one of those proves the
+    # synthesis said it, not that any source did — the reader has to be
+    # able to tell those apart.
+    tool_of: Dict[str, str] = {
+        ref: str((tm or {}).get('tool') or '')
+        for ref, tm in (trace_rec.get('tool_meta') or {}).items()
+        if isinstance(tm, dict)}
+    mediated_refs = {ref for ref, tool in tool_of.items()
+                     if observation_mediation(tool) == 'mediated'}
+
     lines.append(f"\nClaims ({len(claims)}):")
     cited: List[str] = []
     for i, c in enumerate(claims, 1):
@@ -554,6 +614,13 @@ def render_justification(claims_rec: Dict[str, Any],
                      f"{grade_claim(c)}] {c.get('claim')}")
         if c.get('quote'):
             lines.append(f'   quote: "{_clip(c["quote"])}"')
+            if any(r in mediated_refs for r in refs):
+                med = sorted({tool_of[r] for r in refs if r in mediated_refs})
+                lines.append(
+                    f"   NB: quoted against {', '.join(med)} output, which is "
+                    f"a model's synthesis of its sources — the span is "
+                    f"verbatim from that synthesis, not from a source "
+                    f"document. Nothing here read the underlying source.")
         for r in refs:
             if r not in cited:
                 cited.append(r)
@@ -570,7 +637,10 @@ def render_justification(claims_rec: Dict[str, Any],
                 ev.append(f"{ref} — tool observation that turn "
                           f"(no structured metadata recorded)")
                 continue
-            ev.append(f"{ref} — {tm.get('tool')}:")
+            med = (" [model-synthesised observation; the sources below were "
+                   "listed by that model, not read here]"
+                   if ref in mediated_refs else "")
+            ev.append(f"{ref} — {tm.get('tool')}{med}:")
             for entry in (tm.get('meta') or []):
                 md = (entry or {}).get('tool_metadata') or {}
                 query = md.get('query')
@@ -616,7 +686,8 @@ def render_justification(claims_rec: Dict[str, Any],
     # them at exactly the moment it decides whether the trail alone
     # answers the user.
     for note in _audit_notes(claims,
-                             any(c.get('quote') for c in claims)):
+                             any(c.get('quote') for c in claims),
+                             mediated_refs):
         lines.append(f"Audit note: {note}")
     lines.append("\n" + _GROUNDING_KEY)
     return '\n'.join(lines)
