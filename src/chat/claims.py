@@ -668,6 +668,31 @@ def render_justification(claims_rec: Dict[str, Any],
         lines.append("\nEvidence:")
         lines.extend(ev)
 
+    # Source composition — counts only, no quality judgment. The split
+    # that matters is read-here vs named-by-a-model: the authority of a
+    # source says nothing about a claim's support until someone opens it.
+    read_here: Set[str] = set()
+    named_only: Set[str] = set()
+    for ref in cited:
+        tm = tool_meta.get(ref)
+        if not isinstance(tm, dict):
+            continue
+        bucket = named_only if ref in mediated_refs else read_here
+        for entry in (tm.get('meta') or []):
+            for s in ((entry or {}).get('tool_metadata') or {}).get('sources') or []:
+                if isinstance(s, dict) and (s.get('domain') or s.get('url')):
+                    bucket.add(str(s.get('domain') or s.get('url')))
+    named_only -= read_here
+    if read_here or named_only:
+        parts = [f"{len(read_here) + len(named_only)} distinct source "
+                 f"domain(s)"]
+        parts.append(f"{len(read_here)} read here")
+        parts.append(f"{len(named_only)} named in a model-synthesised "
+                     f"observation but not opened")
+        lines.append("\nSource composition: " + ", ".join(parts))
+        if named_only:
+            lines.append("  not opened: " + ", ".join(sorted(named_only)))
+
     profile: Dict[str, int] = {}
     for c in claims:
         g = str(c.get('grounding'))

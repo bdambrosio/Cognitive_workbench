@@ -186,6 +186,38 @@ def test_render_flags_model_synthesised_observation(tmp_path):
     assert "Weakest link" not in out  # still nothing below probable
 
 
+def test_render_source_composition_splits_read_from_named(tmp_path):
+    """Composition counts domains and says which were opened here.
+
+    No quality judgment — the split that matters before any tiering is
+    read-here vs named-by-a-model, since a source nobody opened cannot
+    support a claim however authoritative it is.
+    """
+    md = _memory_dir(tmp_path)
+    _populate(md)
+    trace = dict(TRACE[1])
+    trace["tool_meta"] = {
+        "$step1": {"tool": "search-web", "meta": [
+            {"tool_metadata": {"sources": [
+                {"url": "https://wiki.example/bp", "domain": "wiki.example"},
+                {"url": "https://news.example/x", "domain": "news.example"}]}}]},
+        "$step2": {"tool": "fetch-text", "meta": [
+            {"tool_metadata": {"sources": [
+                {"url": "https://wiki.example/bp", "domain": "wiki.example"}]}}]},
+    }
+    claims_rec = {"turn_seq": 12, "claims": [
+        {"claim": "a", "grounding": "retrieved", "refs": ["$step1"]},
+        {"claim": "b", "grounding": "retrieved", "refs": ["$step2"]},
+    ]}
+    out = render_justification(claims_rec, trace, md)
+    # wiki.example was opened, so it counts as read even though search
+    # also named it; news.example was only ever named.
+    assert "2 distinct source domain(s), 1 read here" in out
+    assert "not opened: news.example" in out
+    # Not every claim is mediated now, so the blanket audit note is gone.
+    assert "every claim rests on a model-synthesised observation" not in out
+
+
 def test_render_justification_no_claims(tmp_path):
     md = _memory_dir(tmp_path)
     out = render_justification({"turn_seq": 5, "claims": []},
