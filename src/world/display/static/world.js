@@ -17,10 +17,13 @@ const avatars = new Map();   // name -> {group, target, nameplate}
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x9dc4e0);
-scene.fog = new THREE.Fog(0x9dc4e0, 60, 210);
+// Haze, not concealment — entity visibility is decided server-side and
+// filtered out of the state stream. Tuned to the 384 m world so distant
+// terrain reads as distance rather than as a wall of sky.
+scene.fog = new THREE.Fog(0x9dc4e0, 90, 360);
 
 const camera = new THREE.PerspectiveCamera(
-  70, innerWidth / innerHeight, 0.1, 600);
+  70, innerWidth / innerHeight, 0.1, 900);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -195,7 +198,9 @@ function nameplate(text, color) {
   g.strokeText(text, 128, 32);
   g.fillStyle = color; g.fillText(text, 128, 32);
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: new THREE.CanvasTexture(cv), depthTest: false, transparent: true }));
+    map: new THREE.CanvasTexture(cv), transparent: true }));
+  // depthTest stays on: with it off a nameplate reads through a hill, and
+  // the human could identify someone the fog has already hidden.
   sprite.scale.set(3.2, 0.8, 1);
   sprite.position.y = BODY_H + 0.75;
   return sprite;

@@ -36,6 +36,8 @@ logger = logging.getLogger('world.server')
 WS_PORT = int(os.environ.get('WORLD_WS_PORT', '8790'))
 HTTP_PORT = int(os.environ.get('WORLD_HTTP_PORT', '8791'))
 TICK_HZ = 20.0
+# Recompute per-viewer visibility every N ticks (20 Hz tick -> ~4 Hz).
+_VIS_EVERY_TICKS = 5
 SEED = int(os.environ.get('WORLD_SEED', '20260808'))
 STATIC_DIR = Path(__file__).resolve().parent / 'display' / 'static'
 
@@ -58,6 +60,7 @@ class World:
         self._terrain_payload = self.terrain.payload()
         self._tree_xz = None          # lazily built for spawn clearance
         self._marker_seq = 0
+        self._vis_cache: Dict[str, tuple] = {}
 
     # -- setup ----------------------------------------------------------
 
@@ -236,6 +239,41 @@ class World:
         with self._lock:
             return self.state.to_json()
 
+    def snapshot_for(self, viewer: Optional[str]) -> str:
+        """State as one occupant can perceive it.
+
+        The browser is a viewer like any other. Without this it receives
+        every position and every marker while the agents' tools are fogged
+        — which hands the human an information advantage in exactly the
+        experiments the fog exists to make possible.
+
+        Visibility is recomputed on a slower cadence than the 20 Hz tick
+        and cached: a ray-march per entity per client per tick is real CPU,
+        and someone appearing a fraction of a second late is imperceptible.
+        Positions still stream at full rate; only the visible *set* is
+        cached.
+        """
+        with self._lock:
+            me = self.state.occupants.get(viewer or '')
+            if me is None:
+                return self.state.to_json()      # unbound viewer: no fog
+            cached = self._vis_cache.get(me.name)
+            if cached is None or self.state.tick - cached[0] >= _VIS_EVERY_TICKS:
+                names = {o.name for o in self.state.occupants.values()
+                         if o.name == me.name
+                         or self.terrain.can_see(me.x, me.z, o.x, o.z)}
+                marks = {m.id for m in self.state.markers
+                         if self.terrain.can_see(me.x, me.z, m.x, m.z)}
+                self._vis_cache[me.name] = (self.state.tick, names, marks)
+            else:
+                _, names, marks = cached
+            visible = WorldState(
+                occupants={o.name: o for o in self.state.occupants.values()
+                           if o.name in names},
+                markers=[m for m in self.state.markers if m.id in marks],
+                tick=self.state.tick, ts=self.state.ts)
+            return visible.to_json()
+
     def terrain_payload(self) -> Dict[str, Any]:
         return self._terrain_payload
 
@@ -408,10 +446,12 @@ def _make_handler(world: World):
 async def _serve(world: World) -> None:
     import websockets
 
-    clients: Set[Any] = set()
+    clients: Dict[Any, Optional[str]] = {}
 
     async def handler(ws):
-        clients.add(ws)
+        # Each connection is bound to the occupant it drives, so its view
+        # can be fogged from that body's vantage.
+        clients[ws] = world.human_name()
         logger.info(f"world: browser connected ({len(clients)} total)")
         try:
             await ws.send(json.dumps({'type': 'terrain',
@@ -423,6 +463,8 @@ async def _serve(world: World) -> None:
                 except ValueError:
                     continue
                 if msg.get('type') == 'input':
+                    if msg.get('name'):
+                        clients[ws] = str(msg['name'])
                     world.set_human_pose(
                         str(msg.get('name') or ''), float(msg.get('x', 0)),
                         float(msg.get('z', 0)), float(msg.get('heading', 0)))
@@ -432,7 +474,7 @@ async def _serve(world: World) -> None:
         except Exception as e:
             logger.debug(f"world: ws closed: {e}")
         finally:
-            clients.discard(ws)
+            clients.pop(ws, None)
 
     async with websockets.serve(handler, '127.0.0.1', WS_PORT,
                                 max_size=2 ** 22):
@@ -444,13 +486,11 @@ async def _serve(world: World) -> None:
             now = time.monotonic()
             world.step(min(now - last, 0.25))   # clamp after a stall
             last = now
-            if clients:
-                payload = world.snapshot_json()
-                for ws in list(clients):
-                    try:
-                        await ws.send(payload)
-                    except Exception:
-                        clients.discard(ws)
+            for ws, viewer in list(clients.items()):
+                try:
+                    await ws.send(world.snapshot_for(viewer))
+                except Exception:
+                    clients.pop(ws, None)
 
 
 def parse_occupants(spec: str) -> List[tuple]:

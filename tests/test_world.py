@@ -460,9 +460,13 @@ def test_terrain_occludes_inside_sight_range():
     """The radius is not doing all the work — a rise between two points
     inside range must break line of sight."""
     t = terrain_mod.generate(SEED)
-    step = 25
-    pts = [(x, z) for x in range(-100, 101, step)
-           for z in range(-100, 101, step)]
+    # Sample the whole world, not a fixed box — the extent is a constant
+    # that has already moved once, and a box that no longer covers the map
+    # would let this silently stop testing anything.
+    half = int(terrain_mod.EXTENT_M / 2) - 10
+    step = max(10, half // 9)
+    pts = [(x, z) for x in range(-half, half + 1, step)
+           for z in range(-half, half + 1, step)]
     blocked = [(a, b) for a in pts for b in pts if a != b
                and math.hypot(a[0] - b[0], a[1] - b[1]) <= t.sight_range(*a)
                and not t.line_of_sight(a[0], a[1], b[0], b[1])]

@@ -16,9 +16,13 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 
-EXTENT_M = 250.0          # world is EXTENT_M square
-GRID_N = 257              # heightmap samples per axis (~1 m resolution)
-HEIGHT_SCALE_M = 14.0     # peak-to-trough of the terrain
+EXTENT_M = 384.0          # world is EXTENT_M square
+GRID_N = 385              # heightmap samples per axis (~1 m resolution)
+# Peak-to-trough relief. Scale this with EXTENT_M: the same relief spread
+# over a wider world is a flatter world, and terrain stops occluding
+# anything. At 384 m with the old 14 m, only 1% of in-range pairs were
+# blocked by a rise and the fog degenerated into a plain radius.
+HEIGHT_SCALE_M = 22.0
 WATER_Y = 1.15            # anything below this is pond
 MAX_WALK_SLOPE = 0.62     # rise/run above which a slope is not walkable
 
@@ -32,8 +36,9 @@ FOREST_SIGHT_M = 22.0     # standing among trees
 
 # Candidates before biome rejection; roughly a third survive, all of them
 # in the forest half. InstancedMesh draws the survivors in one call.
-TREE_TARGET = 9000
-ROCK_TARGET = 600
+# Scaled with area so density stays constant when EXTENT_M changes.
+TREE_TARGET = 21000
+ROCK_TARGET = 1400
 
 
 def _upsample(lattice: np.ndarray, n: int) -> np.ndarray:
