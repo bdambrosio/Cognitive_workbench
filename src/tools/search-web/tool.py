@@ -432,7 +432,13 @@ def react_invoke(args, *, character_name=None, backend=None, logger=None):
     synthesis = str(result["synthesis"]).strip()
     sources = result.get("sources", []) or []
     src_lines = []
-    for s in sources[:8]:
+    # Every source is listed. The old [:8] cap left the tail out of the
+    # observation while `meta` kept it, so the synthesis could name a
+    # source (it is told to attribute inline) whose URL the reading agent
+    # never saw — and a later justify pass would resolve that source from
+    # meta and present a URL the answering turn could not have cited.
+    # Live case: turn 2384, 10 sources, cfr.org and cpj.org both cut.
+    for s in sources:
         domain = (s.get("domain") or "").strip()
         url = (s.get("url") or "").strip()
         title = (s.get("title") or "").strip()
