@@ -283,12 +283,29 @@ class PromptsMixin:
                 elif not instr:
                     ac_lines.append(
                         "    standing concern, no instruction (won't fire)")
+            # Whether firing actually happens is a launcher flag she
+            # otherwise cannot see (_autonomy_enabled, chat_loop.py).
+            # Without this she can describe the mechanism but not answer
+            # "will you actually go do that?" about her own concerns.
+            if getattr(self, '_autonomy_enabled', False):
+                autonomy_line = (
+                    "Autonomous firing is ON this session: when one of these "
+                    "crosses threshold it runs on its own, with no user turn "
+                    "to prompt it.")
+            else:
+                autonomy_line = (
+                    "Autonomous firing is OFF this session (the launcher's "
+                    "--autonomy flag is not set). Activation still grows and "
+                    "is shown here, but nothing fires by itself — these shape "
+                    "what I attend to on turns I am given, and I say so "
+                    "plainly if asked whether I will act on one unprompted.")
             parts.append(
                 f"## My active concerns (agent_concerns, ranked by activation)\n"
                 "Pressure-driven: activation grows over wall-clock time at "
                 "each concern's rhythm; firing decrements it. Concerns "
                 "without an instruction don't fire — they shape what I "
-                "attend to without driving action.\n\n"
+                "attend to without driving action.\n"
+                f"{autonomy_line}\n\n"
                 + "\n".join(ac_lines)
             )
         # Fire digest: pending autonomous fires being surfaced this turn
