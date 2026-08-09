@@ -53,27 +53,92 @@ def _headers() -> Dict[str, str]:
     return h
 
 
+# ------------------------------
+# Path resolution
+# ------------------------------
+# Reads and writes have opposite requirements, so they get separate
+# resolvers:
+#
+#   read/search/list — reach the whole vault and must reproduce real
+#     filenames byte-for-byte. Vault notes routinely contain spaces
+#     (Web Clipper names files after the page title), and the previous
+#     shared normalizer replaced them with underscores on every action,
+#     404ing every such read and dropping those files from search
+#     entirely.
+#   write — fenced into CW/<agent>/ so an agent cannot overwrite the
+#     user's own notes. The path is resolved first and prefixed after,
+#     which is what makes the fence hold: whatever `..` climbing a
+#     caller attempts is collapsed before the prefix goes on.
+#
+# Both reject paths that climb above the vault root. The REST API
+# resolves dot segments server-side, so a path is only safe once they
+# are gone here.
+
+CW_WRITE_ROOT = "CW"
+
+
+class VaultPathError(ValueError):
+    """A path escaped the vault root, or resolved to nothing."""
+
+
 def _sanitize_filename(name: str) -> str:
-    """Replace spaces with underscores in a filename (no extension change)."""
+    """Replace spaces with underscores in a filename (no extension change).
+    Applied to newly written filenames only — never to a path being read,
+    where the name must match what is actually on disk."""
     return name.replace(' ', '_')
 
 
-def _normalize_path(file_path: str) -> str:
-    """Normalize a vault-relative path for the REST API (ensure leading /).
-    Also sanitizes the filename component (spaces → underscores)."""
-    if file_path.startswith("/vault/"):
-        file_path = file_path[7:]
-    elif file_path.startswith("vault/"):
-        file_path = file_path[6:]
-    # Sanitize only the filename, not directory components
-    if '/' in file_path:
-        parts = file_path.rsplit('/', 1)
-        file_path = parts[0] + '/' + _sanitize_filename(parts[1])
-    else:
-        file_path = _sanitize_filename(file_path)
-    if not file_path.startswith("/"):
-        file_path = "/" + file_path
-    return file_path
+def _vault_segments(file_path: str) -> List[str]:
+    """Split a vault-relative path into clean segments, resolving '.' and
+    '..' and rejecting any path that climbs above the vault root."""
+    raw = str(file_path or '').replace('\\', '/')
+    for prefix in ("/vault/", "vault/"):
+        if raw.startswith(prefix):
+            raw = raw[len(prefix):]
+            break
+    segments: List[str] = []
+    for seg in raw.split('/'):
+        if seg in ('', '.'):
+            continue
+        if seg == '..':
+            if not segments:
+                raise VaultPathError(
+                    f"path climbs above the vault root: {file_path!r}")
+            segments.pop()
+            continue
+        segments.append(seg)
+    return segments
+
+
+def _resolve_read_path(file_path: str, directory: bool = False) -> str:
+    """Vault path for a read/list/search fetch. Whole vault is in scope;
+    filenames are preserved exactly. Raises VaultPathError on escape."""
+    segments = _vault_segments(file_path)
+    if not segments:
+        if directory:
+            return "/"
+        raise VaultPathError(f"empty vault path: {file_path!r}")
+    path = "/" + "/".join(segments)
+    return path + "/" if directory else path
+
+
+def _resolve_write_path(file_path: str, agent_name: Optional[str]) -> str:
+    """Vault path for a write, fenced into CW/<agent>/. Any path an agent
+    supplies is interpreted relative to its own area — including one that
+    names somewhere else in the vault, which nests under the agent's area
+    rather than escaping it. The caller reports the resolved path back, so
+    the placement is visible rather than silent."""
+    agent = _sanitize_filename(str(agent_name or "chat").strip()) or "chat"
+    agent = agent.replace("/", "_").replace("\\", "_")
+    if agent in ("..", "."):
+        agent = "chat"
+    segments = _vault_segments(file_path)
+    if not segments:
+        raise VaultPathError(f"empty vault path: {file_path!r}")
+    segments[-1] = _sanitize_filename(segments[-1])
+    if segments[:2] != [CW_WRITE_ROOT, agent]:
+        segments = [CW_WRITE_ROOT, agent] + segments
+    return "/" + "/".join(segments)
 
 # ------------------------------
 # Helpers for creating Notes/Collections
@@ -115,7 +180,10 @@ def _action_read(executor, agent_name, resource_manager, **kwargs):
     if not path:
         return _fail(executor, 'path parameter required for read action')
 
-    norm = _normalize_path(path)
+    try:
+        norm = _resolve_read_path(path)
+    except VaultPathError as e:
+        return _fail(executor, str(e))
     url = f"{OBSIDIAN_URL.rstrip('/')}/vault{norm}"
     try:
         resp = requests.get(url, headers=_headers(), timeout=10.0)
@@ -156,7 +224,10 @@ def _action_write(executor, agent_name, resource_manager, **kwargs):
         body = '---\n' + yaml.dump(frontmatter, default_flow_style=False).rstrip() + '\n---\n\n'
     body += content
 
-    norm = _normalize_path(path)
+    try:
+        norm = _resolve_write_path(path, agent_name)
+    except VaultPathError as e:
+        return _fail(executor, str(e))
     url = f"{OBSIDIAN_URL.rstrip('/')}/vault{norm}"
     try:
         resp = requests.put(
@@ -189,7 +260,10 @@ def _action_list(executor, agent_name, resource_manager, **kwargs):
     # Ensure trailing slash for directory listing
     if not path.endswith('/'):
         path += '/'
-    norm = _normalize_path(path)
+    try:
+        norm = _resolve_read_path(path, directory=True)
+    except VaultPathError as e:
+        return _fail(executor, str(e))
     url = f"{OBSIDIAN_URL.rstrip('/')}/vault{norm}"
     try:
         resp = requests.get(url, headers=_headers(), timeout=10.0)
@@ -342,7 +416,11 @@ def _action_search(executor, agent_name, resource_manager, **kwargs):
 
 def _fetch_note_content(file_path: str, headers: Dict[str, str]) -> Optional[str]:
     """Fetch the content of a note from Obsidian Local REST API."""
-    norm = _normalize_path(file_path)
+    try:
+        norm = _resolve_read_path(file_path)
+    except VaultPathError as e:
+        logger.warning(f"obsidian: skipping unreadable path {file_path!r}: {e}")
+        return None
     url = f"{OBSIDIAN_URL.rstrip('/')}/vault{norm}"
     try:
         response = requests.get(url, headers=headers, timeout=10.0)
