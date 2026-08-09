@@ -577,10 +577,23 @@ class ReactMixin:
                 obs = self._dispatch_discovered_tool(canon, action, log)
                 if self._pending_tool_meta is not None:
                     iters[-1]['tool_meta'] = self._pending_tool_meta
+                    # _step_sources drives process_text's citation
+                    # requirement, whose premise is that the observation
+                    # carries a 'Sources:' bibliography to cite BY. Only a
+                    # mediated observation has one: a synthesis over
+                    # sources it lists. A direct fetch's "source" is the
+                    # document itself — its own URL is not something to
+                    # attribute to, and for an internal endpoint
+                    # (an InfluxDB query, the factorio bridge) there is no
+                    # publication to name. Gating here keeps the trail
+                    # record complete for every tool while leaving the
+                    # citation path where it belongs.
+                    from chat.claims import observation_mediation
                     srcs = [s for m in (self._pending_tool_meta.get('meta') or [])
                             for s in ((m.get('tool_metadata') or {}).get('sources') or [])
                             if isinstance(s, dict)]
-                    if srcs:
+                    if srcs and observation_mediation(
+                            self._pending_tool_meta.get('tool')) == 'mediated':
                         self._step_sources[binding] = srcs
                     self._pending_tool_meta = None
             else:

@@ -104,6 +104,27 @@ def react_invoke(args, *, character_name=None, backend=None, logger=None):
     out = translate_result(result, manager=mgr, text_key="extra.text",
                            empty_text=f"no text extracted from {url}")
 
+    # Structured provenance for the document this harness actually read.
+    # search-web records the sources a model *named*; until this landed
+    # nothing recorded a source anyone here opened, so a justify trail
+    # could not distinguish a read document from a summarised one — every
+    # source in the corpus arrived via search-web. Attached before the
+    # section branches below so all ok paths carry it.
+    if out.get("status") == "ok":
+        _extra = (result.get("extra") or {}) if isinstance(result, dict) else {}
+        _md = _extra.get("metadata") or {}
+        _title = ((_md.get("pdf_metadata") or {}).get("title")
+                  or (_md.get("html_metadata") or {}).get("title") or "")
+        try:
+            _domain = urlparse(url).netloc.lower().removeprefix("www.")
+        except ValueError as e:
+            logger.warning(f"fetch-text: cannot parse domain from {url!r}: {e}")
+            _domain = ""
+        out["meta"] = [{"source_skill": "fetch-text",
+                        "tool_metadata": {"sources": [
+                            {"url": url, "domain": _domain,
+                             "title": _title, "excerpt": ""}]}}]
+
     # Section-addressable path: available when GROBID parsed the PDF into
     # a section index (research papers). Everything else falls through to
     # the flat capped text below.
