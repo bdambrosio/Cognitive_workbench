@@ -33,6 +33,18 @@ utility. If several sites need it and none exists, add one helper in
 `utils/`. When a duplicate has crept in, consolidate rather than add a
 third.
 
+## KISS — and let the user carry a little
+
+Review every plan for unnecessary complexity before proposing it. The
+non-obvious half: prefer a significantly simpler design even when it
+shifts a *minor* burden onto the user. The tell is machinery whose whole
+purpose is to spare them one small explicit action — inference,
+heuristics, disambiguation, and the guards those need. Name the trade
+and let them choose; ask when unsure which way it falls.
+
+Distinct from feature creep (that's about scope — do less). This is
+about where the work sits when the feature is agreed.
+
 ## Surgical changes
 
 Touch only what the request requires; match surrounding style even where
