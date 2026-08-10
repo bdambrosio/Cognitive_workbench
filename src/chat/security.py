@@ -47,7 +47,12 @@ logger = logging.getLogger(__name__)
 _MAX_ITERS = 12
 _MAX_OBS_CHARS = 8_000
 _NMAP_TIMEOUT_DISCOVERY = 60.0
-_NMAP_TIMEOUT_SERVICES = 120.0
+# nmap's own per-host cap, so it returns partial results instead of being
+# killed, and the outer subprocess cap as a backstop above it. Ordered so
+# the inner one always fires first — if the subprocess timeout wins, the
+# data is gone.
+_NMAP_HOST_TIMEOUT = 45.0
+_NMAP_TIMEOUT_SERVICES = 60.0
 _SYSTEM_STATE_TIMEOUT = 5.0
 
 # Wall clock for one whole security() call. The per-probe timeouts above
@@ -421,11 +426,32 @@ def _tool_scan_services(host: str) -> str:
     # and `-oG` discards the result: grepable output carries only Host,
     # Ports, Protocols, Ignored State, OS, Seq Index, IP ID and Status
     # (nmap(1)), with no field for script output. So the parse below never
-    # saw a line of it. Measured: `-sV --script=safe -F` against localhost
-    # did not finish in 120s; without it a host answers in seconds. If
-    # script output is ever wanted, it needs a different output format,
-    # not a longer timeout.
-    cmd = ['nmap', '-sV', '-F', '-T3', '-oG', '-', '--', target]
+    # saw a line of it. If script output is ever wanted, it needs a
+    # different output format, not a longer timeout.
+    #
+    # Dropping it was NOT sufficient, and why is instructive: cost here is
+    # driven by unresponsive hosts, not by port count. Measured 2026-08-10
+    # against 192.168.68.1, `-sV -F -T3` still ran past 130s, because
+    # nmap's default retransmit ladder plus a redundant host-discovery pass
+    # stall on every filtered port. The three flags below fix that, and each
+    # SENDS LESS than before rather than more:
+    #   -Pn              `discover` already proved the host up; repeating
+    #                    discovery per scan is waste, and on a host that
+    #                    blocks ping it is a stall.
+    #   --host-timeout   nmap returns what it has and marks the rest
+    #                    `Status: Timeout`. This is the important one: when
+    #                    the subprocess timeout fires instead, nmap is
+    #                    KILLED and every partial result is discarded —
+    #                    that is what produced "all scans timed out, no
+    #                    data at all" for a nine-host sweep.
+    #   --max-retries 1  a LAN, not the open internet; the default ladder
+    #                    is where the time goes.
+    # Timing stays -T3 deliberately (see above). After: 11.7s with full
+    # service detail on a responsive host, and a clean partial answer on
+    # the gateway that previously ran past 130s.
+    cmd = ['nmap', '-sV', '-F', '-Pn', '-T3',
+           '--host-timeout', f'{int(_NMAP_HOST_TIMEOUT)}s',
+           '--max-retries', '1', '-oG', '-', '--', target]
     try:
         proc = subprocess.run(
             cmd, capture_output=True, text=True,
@@ -445,6 +471,16 @@ def _tool_scan_services(host: str) -> str:
     for line in (proc.stdout or '').splitlines():
         if line.startswith('Host:') and ('Ports:' in line or 'Status:' in line):
             lines.append(line)
+    # `--host-timeout` expiring is a clean exit with no port data, so it
+    # reaches here as a Status line and would render as OK — a scan that
+    # learned nothing, reported as a success. Say so instead: this host is
+    # slow or heavily filtered, and re-running it unchanged will not help.
+    if lines and not any('Ports:' in ln for ln in lines) and any(
+            'Status: Timeout' in ln for ln in lines):
+        return (f"EMPTY: {target} did not answer enough of the scan within "
+                f"{int(_NMAP_HOST_TIMEOUT)}s to identify any service — it is "
+                f"up but slow or heavily filtered. No service data for this "
+                f"host; do not retry it unchanged.")
     if not lines:
         return f"EMPTY: nmap scan returned no port info for {target}"
     return _truncate('OK: ' + "\n".join(lines), 'host')

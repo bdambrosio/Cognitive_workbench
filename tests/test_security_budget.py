@@ -37,6 +37,32 @@ def test_scan_services_does_not_run_nse_scripts(monkeypatch):
     assert '--script=safe' not in seen['cmd']
     assert '-F' in seen['cmd'] and '-sV' in seen['cmd']
     assert seen['cmd'][-1] == '192.168.68.1'
+    # Cost is driven by unresponsive hosts, not port count: -F alone still
+    # ran past 130s on a filtered gateway. -Pn drops a redundant discovery
+    # pass (discover already proved the host up), --max-retries trims the
+    # retransmit ladder, and --host-timeout is what lets nmap RETURN its
+    # partial results instead of being killed with everything discarded.
+    assert '-Pn' in seen['cmd']
+    assert '--host-timeout' in seen['cmd']
+    assert seen['cmd'][seen['cmd'].index('--max-retries') + 1] == '1'
+    # The inner cap must fire before the outer one, or the data is lost.
+    assert sec._NMAP_HOST_TIMEOUT < seen['timeout'] == sec._NMAP_TIMEOUT_SERVICES
+
+
+def test_host_timeout_with_no_ports_is_empty_not_ok(monkeypatch):
+    """--host-timeout expiring is a clean exit carrying only a Status line.
+    Rendered as OK it is a scan that learned nothing reported as success."""
+    class _Proc:
+        returncode = 0
+        stdout = ("Host: 192.168.68.1 (_gateway)\tStatus: Up\n"
+                  "Host: 192.168.68.1 (_gateway)\tStatus: Timeout\n")
+        stderr = ""
+
+    monkeypatch.setattr(sec.shutil, 'which', lambda _n: '/usr/bin/nmap')
+    monkeypatch.setattr(sec.subprocess, 'run', lambda cmd, **kw: _Proc())
+    out = sec._tool_scan_services('192.168.68.1')
+    assert out.startswith('EMPTY:')
+    assert 'do not retry it unchanged' in out
 
 
 def test_a_shared_deadline_is_not_reset_by_a_second_call(tmp_path, monkeypatch):
