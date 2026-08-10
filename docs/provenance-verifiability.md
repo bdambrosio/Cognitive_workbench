@@ -137,7 +137,7 @@ is at justify time):
   the audit. Gate any vocab change with a replay over real trace
   records through the live backend.
 - `grade_claim()` reduces grounding × tags to an ordinal grade
-  (`verified > probable > unverified > suspect`; conflict off-scale)
+  (`sourced > probable > unverified > suspect`; conflict off-scale)
   deterministically; `render_justification` shows per-claim grades, a
   weakest-link line, and pattern-driven audit notes (top 3 by
   severity). The self-audit hinge: the model can't reliably re-answer

@@ -187,7 +187,7 @@ typed claims — `retrieved` / `memory` / `user_asserted` / `context` /
 against the persisted observation, and every claim is tagged from a
 closed taxonomy (volatility, inference type — see
 [docs/justification-taxonomy.md](docs/justification-taxonomy.md)) and
-reduced deterministically to an ordinal grade (`verified > probable >
+reduced deterministically to an ordinal grade (`sourced > probable >
 unverified > suspect`). The `justify` built-in is the read path: asked
 "justify your response / why should I believe that?", the agent renders
 the previous reply's graded claims and their recorded evidence (search

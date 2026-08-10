@@ -19,11 +19,17 @@ Reduction over the tags is plain code, no LLM.
 
 ## Ordinal scale
 
-    verified > probable > unverified > suspect > refuted
+    sourced > probable > unverified > suspect > refuted
 
-- **verified** — mechanically checked this session: verbatim quote matched
+- **sourced** — mechanically checked this session: verbatim quote matched
   against the persisted observation, deterministic recomputation, or a
-  primary-source retrieval performed now.
+  primary-source retrieval performed now. Named `sourced` rather than
+  `verified` deliberately: the audit notes instruct the agent to *verify*
+  a weak claim with a tool, and a grade whose name is the natural English
+  description of that act gets claimed as an outcome of it (turn 2403 —
+  a correct verification reported as "upgraded to verified", a grade
+  change no code emitted). Only the reducer assigns grades; no name
+  reachable by performing a check can stay honest.
 - **probable** — supported, no flagged weakness. **The default**, including
   legacy Notes/Collections with no annotations (`provenance-missing`).
 - **unverified** — rests on unchecked prior, testimony, or paraphrase for
@@ -60,7 +66,7 @@ filings/IR/official docs/repo of record (primary); ungraded outlet
 (unknown — the default web grade); on the user-curated unreliable ledger.
 - **Review key (unknown):** is a primary source for this claim cheaply
   reachable? Prefer it when the claim is load-bearing.
-- **Effect:** quote-verified × primary → **verified**. unknown → cap
+- **Effect:** quote-matched × primary → **sourced**. unknown → cap
   **probable**. unreliable → cap **suspect**.
 
 ### mediation: `direct` | `mediated`
@@ -79,17 +85,17 @@ source is, this one asks whether we actually read it.
   source-grade unimplemented every recorded-evidence path already
   returns **probable**, so a cap would be inert. When source-grade
   lands, `mediated` must cap at **probable** so a synthesis cannot be
-  promoted to **verified** on the strength of a verbatim match against
+  promoted to **sourced** on the strength of a verbatim match against
   itself.
 
-### quote: `verified` | `absent`
+### quote: `matched` | `absent`
 Whether a verbatim span, machine-matched against the persisted
 observation, anchors the leaf (the citation machinery).
-- **Review key (verified):** does the quoted span *entail* the claim —
+- **Review key (matched):** does the quoted span *entail* the claim —
   support, not co-occurrence?
 - **Review key (absent, on retrieved):** why is there no quotable span?
   A retrieved claim with no span is the paraphrase-drift signature.
-- **Effect:** verified → floor **probable**; absent on retrieved → cap
+- **Effect:** matched → floor **probable**; absent on retrieved → cap
   **probable**.
 
 ### polarity: `presence` | `absence`
@@ -132,7 +138,7 @@ its premises unless noted.
 Conclusion is contained in / directly restated by the cited evidence.
 - **Review:** does the span actually contain it?
 - **Effect:** min(premises), no penalty. The only edge that can carry
-  **verified** upward.
+  **sourced** upward.
 
 ### `deduction`
 Follows logically from jointly held premises.
@@ -143,7 +149,7 @@ Follows logically from jointly held premises.
 ### `calculation`
 Arithmetic / unit / date transform.
 - **Review:** recompute with the calculate tool.
-- **Effect:** **verified** if recomputed, else min(premises).
+- **Effect:** **sourced** if recomputed, else min(premises).
 
 ### `generalization`
 Instances → rule.
@@ -235,7 +241,7 @@ The reply denies the user's checkable premise on non-verified grounds.
 | negation-from-absence × inadequate query | suspect | Qwen3.8-27B "unavailable" |
 | circular-support | suspect | "tools inapplicable because private" |
 | paraphrase of a prior justification | cap probable | justify-via-recall laundering |
-| quote-verified × source-primary | verified | ir.spacex.com correction |
+| quote-matched × source-primary | sourced | ir.spacex.com correction |
 | aged memory × volatile | unverified | (anticipated: stale Note re-cited) |
 
 ## Storage sketch (Relations)

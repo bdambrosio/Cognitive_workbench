@@ -48,7 +48,15 @@ INFERENCE_TAGS = ('entailment', 'deduction', 'calculation',
 # Ordinal grades, best to worst. refuted/conflict exist in the taxonomy
 # but are never produced by this reducer (they require a verification
 # pass or disagreeing evidence, neither of which v1 models).
-GRADES = ('verified', 'probable', 'unverified', 'suspect')
+#
+# The top grade is `sourced`, not `verified`. The audit notes tell the
+# model to *verify* a weak claim with a tool; having done so, calling the
+# claim "verified" is the obvious English move — and it names a formal
+# grade only this reducer can assign. Observed live at turn 2403: a
+# correct verification reported as "upgraded to verified", a grade change
+# that appears nowhere in the tool output. The collision was in the
+# vocabulary, not the reasoning, so the word is what changed.
+GRADES = ('sourced', 'probable', 'unverified', 'suspect')
 _GRADE_RANK = {g: i for i, g in enumerate(GRADES)}
 
 
@@ -573,10 +581,10 @@ def grade_claim(c: Dict[str, Any]) -> str:
             cap = {'adequate': 'probable',
                    'inadequate': 'suspect'}.get(adequacy, 'unverified')
         else:
-            cap = _INFERENCE_CAPS.get(inf, 'verified')
+            cap = _INFERENCE_CAPS.get(inf, GRADES[0])   # absent = no cap
         return _worst(base, cap)
     # retrieved / memory / user_asserted / context: recorded evidence or
-    # testimony — probable. (verified needs quote x primary-source; the
+    # testimony — probable. (sourced needs quote x primary-source; the
     # source-grade tag is specified in docs/justification-taxonomy.md but
     # is not yet emitted by the attribution pass, so nothing reaches it.
     # aged-memory cap needs evidence dates; ditto. Mediation is surfaced
@@ -655,9 +663,25 @@ _GROUNDING_KEY = (
     "derived by reasoning from the cited evidence; model_prior = background "
     "knowledge — nothing recorded that turn supports it. Quoted spans are "
     "verbatim excerpts machine-checked against the persisted tool "
-    "observation at attribution time. Grades (verified > probable > "
+    "observation at attribution time. Grades (sourced > probable > "
     "unverified > suspect) are reduced deterministically from grounding "
-    "plus tags — see docs/justification-taxonomy.md.")
+    "plus tags — see docs/justification-taxonomy.md.\n"
+    # The reducer's own account of its ceiling. Without it a bare grade
+    # begs "why?" and gets an invented answer: at turn 2408 the reply
+    # explained four probable grades as caused by the observation being a
+    # model synthesis, which is false — mediation is not a cap, and those
+    # claims would grade probable against a document read byte-for-byte.
+    # Prohibiting the explanation has not worked (three catalog attempts);
+    # stating the true one leaves nothing to invent. Update this text if
+    # source-grade ever starts being emitted.
+    "Ceiling: no claim can reach `sourced` yet — that grade requires a "
+    "source-grade tag the attribution pass does not emit, so every "
+    "recorded-evidence claim (retrieved / memory / user_asserted / "
+    "context) grades `probable` flat. Mediation and a missing quote are "
+    "reported above but are NOT applied as caps: they lowered nothing "
+    "here, and a claim quoted against a synthesis grades the same as one "
+    "read from the source. Anything below `probable` was lowered only by "
+    "the grounding and tags shown on that claim.")
 
 
 def render_justification(claims_rec: Dict[str, Any],
@@ -687,6 +711,15 @@ def render_justification(claims_rec: Dict[str, Any],
         if isinstance(tm, dict)}
     mediated_refs = {ref for ref, tool in tool_of.items()
                      if observation_mediation(tool) == 'mediated'}
+    # Which refs recorded structured metadata (a query, sources). Every
+    # step is named now, so "mediated" alone no longer implies there is a
+    # bibliography behind it: a named-but-empty step is a model's own text
+    # over material already in the turn, with nothing to cite.
+    listed_refs = {
+        ref for ref, tm in (trace_rec.get('tool_meta') or {}).items()
+        if isinstance(tm, dict) and any(
+            (e or {}).get('tool_metadata')
+            for e in (tm.get('meta') or []) if isinstance(e, dict))}
 
     lines.append(f"\nClaims ({len(claims)}):")
     cited: List[str] = []
@@ -703,11 +736,15 @@ def render_justification(claims_rec: Dict[str, Any],
             lines.append(f'   quote: "{_clip(c["quote"])}"')
             if any(r in mediated_refs for r in refs):
                 med = sorted({tool_of[r] for r in refs if r in mediated_refs})
+                over = ("a model's synthesis of the sources it listed"
+                        if any(r in listed_refs for r in refs) else
+                        "a model's own text over material already in this "
+                        "turn, with no source outside it")
                 lines.append(
                     f"   NB: quoted against {', '.join(med)} output, which is "
-                    f"a model's synthesis of its sources — the span is "
-                    f"verbatim from that synthesis, not from a source "
-                    f"document. Nothing here read the underlying source.")
+                    f"{over} — the span is verbatim from that, not from a "
+                    f"source document. Nothing here read the underlying "
+                    f"source.")
         for r in refs:
             if r not in cited:
                 cited.append(r)
@@ -724,11 +761,22 @@ def render_justification(claims_rec: Dict[str, Any],
                 ev.append(f"{ref} — tool observation that turn "
                           f"(no structured metadata recorded)")
                 continue
-            med = (" [model-synthesised observation; the sources below were "
-                   "listed by that model, not read here]"
-                   if ref in mediated_refs else "")
-            ev.append(f"{ref} — {tm.get('tool')}{med}:")
-            for entry in (tm.get('meta') or []):
+            # A step can be named without carrying sources (every built-in
+            # is: process_text, recall, justify…). Say which case it is —
+            # "the sources below" must not head an empty list.
+            entries = [e for e in (tm.get('meta') or []) if isinstance(e, dict)]
+            listed = ref in listed_refs
+            if ref not in mediated_refs:
+                med = ""
+            elif listed:
+                med = (" [model-synthesised observation; the sources below "
+                       "were listed by that model, not read here]")
+            else:
+                med = (" [model-synthesised observation — this tool's own "
+                       "output over what was already in the turn; no source "
+                       "outside the conversation was read for it]")
+            ev.append(f"{ref} — {tm.get('tool')}{med}" + (":" if listed else ""))
+            for entry in entries:
                 md = (entry or {}).get('tool_metadata') or {}
                 query = md.get('query')
                 sources = md.get('sources') or []
@@ -744,8 +792,37 @@ def render_justification(claims_rec: Dict[str, Any],
             rec = note_sidecar_lookup(memory_dir, ref)
             if rec is not None:
                 date = str(rec.get('ts') or '')[:10]
+                # source_turn_seq has been written on every memory (note
+                # property + sidecar) since memories existed and never
+                # rendered. It is the one hop that turns "recalled from a
+                # note" into a followable trail: the note came from a turn,
+                # and that turn has a trail of its own. Naming the number
+                # is enough — the user can ask for it.
+                #
+                # But only when the number still resolves. Seqs restarted
+                # at 1 each session until seeding landed, so an old
+                # memory's seq now points at an unrelated recent turn
+                # (live: Note_4191, written 2026-07-14 "from turn 14",
+                # whose seq-14 record is a 2026-07-17 turn). Same date =
+                # the same turn, since reflection writes the memory right
+                # after the reply; a midnight-boundary miss degrades to
+                # "unresolvable", which is the safe direction.
+                src_turn = rec.get('source_turn_seq')
+                from_turn = ""
+                if src_turn:
+                    origin = latest_turn_for_source(
+                        memory_dir, trace_rec.get('source'), src_turn)
+                    same_day = (origin is not None
+                                and str(origin.get('ts'))[:10]
+                                == str(rec.get('ts'))[:10])
+                    from_turn = (
+                        f" (written from turn {src_turn} — justify "
+                        f"{src_turn} for that turn's own trail)" if same_day
+                        else f" (written from turn {src_turn}, an earlier "
+                             f"session's numbering that no longer resolves — "
+                             f"do not justify that number)")
                 ev.append(f"{ref} — memory written {date}: "
-                          f"{_clip(rec.get('text') or '')!r}")
+                          f"{_clip(rec.get('text') or '')!r}{from_turn}")
             else:
                 ev.append(f"{ref} — recalled memory "
                           f"(not found in memories.jsonl sidecar)")

@@ -196,6 +196,49 @@ def test_render_flags_model_synthesised_observation(tmp_path):
     assert "Weakest link" not in out  # still nothing below probable
 
 
+def test_named_step_without_sources_is_flagged_mediated_not_bibliographic(tmp_path):
+    """A claim quoted against a `process_text` synthesis must carry the
+    mediation warning — that step is a second model pass over the turn's
+    own material, the likeliest place for drift to enter. Before every
+    step was named, such a ref was absent from tool_meta and so got no
+    mediation verdict at all, while the same claim against search-web got
+    one. It must not promise "the sources below" either: there are none.
+    """
+    md = _memory_dir(tmp_path)
+    _populate(md)
+    trace = dict(TRACE[1])
+    trace["tool_meta"] = {
+        "$step1": {"tool": "search-web", "meta": [
+            {"tool_metadata": {"sources": [
+                {"url": "https://wiki.example/bp", "domain": "wiki.example"}]}}]},
+        "$step2": {"tool": "process_text", "meta": []},
+    }
+    claims_rec = {"turn_seq": 12, "claims": [
+        {"claim": "a", "grounding": "retrieved", "refs": ["$step2"],
+         "quote": "there is no direct copy/paste of world objects"},
+    ]}
+    out = render_justification(claims_rec, trace, md)
+    assert "quoted against process_text output" in out
+    assert "a model's own text over material already in this turn" in out
+    assert "the sources below" not in out
+    assert "$step2 — process_text [model-synthesised observation" in out
+    # No dangling colon: nothing is listed under this step.
+    assert "was read for it]:" not in out
+
+
+def test_grounding_key_states_the_ceiling_it_computed(tmp_path):
+    """The reducer explains its own ceiling. A bare grade begs "why?" and
+    gets an invented answer — turn 2408 explained four probable grades as
+    caused by the observation being a model synthesis, which is false
+    (mediation is not a cap). Stating the true reason leaves nothing to
+    invent."""
+    md = _memory_dir(tmp_path)
+    _populate(md)
+    out = render_justification(CLAIMS[0], TRACE[1], md)
+    assert "no claim can reach `sourced` yet" in out
+    assert "NOT applied as caps" in out
+
+
 def test_render_source_composition_splits_read_from_named(tmp_path):
     """Composition counts domains and says which were opened here.
 
@@ -233,6 +276,44 @@ def test_render_justification_no_claims(tmp_path):
     out = render_justification({"turn_seq": 5, "claims": []},
                                {"turn_seq": 5, "user_input": "hi"}, md)
     assert "no checkable factual claims" in out
+
+
+def test_memory_names_its_originating_turn_only_when_it_resolves(tmp_path):
+    """A memory's source_turn_seq becomes a followable hop only if the
+    number still points at the turn that wrote it. Seqs restarted at 1
+    each session before seeding landed, so an old memory's seq now names
+    an unrelated recent turn — inviting `justify` on it would render a
+    real, well-formed trail for the wrong text."""
+    md = _memory_dir(tmp_path)
+    _write_jsonl(md / "reasoning_trace.jsonl", [
+        {"turn_seq": 10, "source": "User", "autonomous": False,
+         "ts": "2026-07-20T10:00:00+00:00",
+         "user_input": "old question", "raw_response": "old answer",
+         "working_log": ""},
+        {"turn_seq": 12, "source": "User", "autonomous": False,
+         "ts": "2026-07-27T10:00:00+00:00",
+         "user_input": "q", "raw_response": "a", "working_log": ""},
+    ])
+    _write_jsonl(md / "memories.jsonl", [
+        {"event": "write", "note_id": "Note_A", "text": "fresh memory",
+         "ts": "2026-07-20T10:00:09+00:00", "source_turn_seq": 10},
+        {"event": "write", "note_id": "Note_B", "text": "old memory",
+         "ts": "2026-06-01T10:00:09+00:00", "source_turn_seq": 10},
+        {"event": "write", "note_id": "Note_C", "text": "pre-provenance",
+         "ts": "2026-06-01T10:00:09+00:00"},
+    ])
+    claims_rec = {"turn_seq": 12, "source": "User", "claims": [
+        {"claim": "a", "grounding": "memory", "refs": ["Note_A"]},
+        {"claim": "b", "grounding": "memory", "refs": ["Note_B"]},
+        {"claim": "c", "grounding": "memory", "refs": ["Note_C"]},
+    ]}
+    out = render_justification(claims_rec, {"turn_seq": 12, "source": "User",
+                                            "user_input": "q"}, md)
+    assert "written from turn 10 — justify 10 for that turn's own trail" in out
+    assert ("written from turn 10, an earlier session's numbering that no "
+            "longer resolves") in out
+    # A memory with no recorded originating turn says nothing about one.
+    assert "Note_C — memory written 2026-06-01: 'pre-provenance'" in out
 
 
 def test_render_justification_missing_note_and_meta(tmp_path):

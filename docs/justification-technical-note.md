@@ -168,7 +168,7 @@ reconstruction is refused, with an offer to re-answer fresh.
 
 ### Grading: a failure taxonomy and a deterministic reducer
 
-The grader assigns ordinal grades — `verified > probable > unverified >
+The grader assigns ordinal grades — `sourced > probable > unverified >
 suspect` — via a closed taxonomy of the ways conversational arguments
 go wrong, harvested from real incidents, plus a deterministic reduction.
 No probabilities.
@@ -176,7 +176,7 @@ No probabilities.
 **Leaves** (premises and evidence) carry dimensions with closed value
 sets: *volatility* (is this the kind of fact that changes — org status,
 prices, versions — or a definition, a theorem, settled history?),
-*source grade*, *quote status* (machine-verified / absent), *polarity*
+*source grade*, *quote status* (machine-matched / absent), *polarity*
 (a finding vs. a lack of findings), *age*, and *testimony*
 (authoritative for the speaker's own states; testimony for
 world-facts).

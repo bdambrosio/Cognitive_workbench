@@ -622,6 +622,18 @@ class ReactMixin:
                 avail = ", ".join(builtin + discovered)
                 obs = f"ERROR: unknown tool {tool!r}; available: {avail}"
 
+            # Name the step's tool even when it carried no structured
+            # metadata. `justify` derives mediation from tool_meta, so a
+            # step absent from it got no mediation verdict at all: a claim
+            # quoted against a `process_text` synthesis rendered with no
+            # warning, while the same claim quoted against `search-web`
+            # got one. That is backwards — process_text is a second model
+            # pass over an observation, the likeliest place for drift to
+            # enter. Corpus at the time of the fix: 240 claim-refs to
+            # steps with metadata, 183 to steps with none (justify 101,
+            # process_text 26, recall 17, inspect 6, world-look 9).
+            if not iters[-1].get('tool_meta'):
+                iters[-1]['tool_meta'] = {'tool': tool, 'meta': []}
             _append_log(binding, obs)
             iters[-1]['appended'] = log[pre_log_len:]
             # Tool observations follow the documented OK:/EMPTY:/ERROR: prefix

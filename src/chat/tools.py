@@ -351,7 +351,7 @@ class ToolsMixin:
             "grounding plus tags, so any rationale you offer for why something is graded as it is would be "
             "invented. Say plainly when a claim is model_prior (your "
             "background knowledge) or inferred rather than retrieved. Then AUDIT the trail before replying: "
-            "each claim carries an ordinal grade (verified > probable > unverified > suspect) and any "
+            "each claim carries an ordinal grade (sourced > probable > unverified > suspect) and any "
             "'Audit note:' lines name specific checks for the weaknesses found — perform those checks with "
             "tools in this same turn, prioritizing the weakest link (e.g. verify a volatile model_prior "
             "fact; re-probe a negation drawn from an inadequate query). "
