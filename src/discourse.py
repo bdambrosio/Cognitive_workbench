@@ -36,20 +36,40 @@ _LOG_DIR.mkdir(parents=True, exist_ok=True)
 file_handler = logging.FileHandler(_LOG_DIR / 'discourse_module.log', mode='w')
 file_handler.setLevel(logging.INFO)
 
-_handlers = [file_handler]
-if not _cli_mode:
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.WARNING)
-    _handlers.insert(0, console_handler)
+_LOG_FORMATTER = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S')
+file_handler.setFormatter(_LOG_FORMATTER)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    handlers=_handlers,
-    force=True
-)
 logger = logging.getLogger('discourse')
+
+# Own the process's logging ONLY when this module IS the process. As a
+# library (chat_loop imports it for the discourse pass) `force=True`
+# removed and CLOSED the launcher's character_launcher.log handler the
+# first time a post-turn discourse stage ran, redirecting every logger in
+# the process here — 17 minutes of a live session logged to the wrong
+# file, and the launcher log looking like the process had died.
+if __name__ == '__main__':
+    _handlers = [file_handler]
+    if not _cli_mode:
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.WARNING)
+        _handlers.insert(0, console_handler)
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+        handlers=_handlers,
+        force=True
+    )
+else:
+    # Imported: keep this module's own file, on this module's own logger.
+    # Records still reach the host's handlers by propagation.
+    logger.setLevel(logging.INFO)
+    if not any(isinstance(h, logging.FileHandler)
+               and getattr(h, 'baseFilename', '') == file_handler.baseFilename
+               for h in logger.handlers):
+        logger.addHandler(file_handler)
 
 map_types = None
 

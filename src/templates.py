@@ -16,14 +16,15 @@ from utils.zenoh_utils import datetime_handler
 from dataclasses import dataclass
 import os
 
-# Configure logging with unbuffered output
-# Console handler with WARNING level (less verbose)
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.WARNING)
-
-# File handler with INFO level (full logging). Anchor to <repo>/logs/
-# (parent of src/) so all logs land in one place regardless of cwd.
-handlers_list = [console_handler]
+# This module is only ever imported (no __main__), so it must not
+# configure the ROOT logger: `basicConfig(force=True)` removes and CLOSES
+# whatever handlers the host process installed. It did — importing
+# format_utils, which imports this, silently killed the launcher's
+# character_launcher.log handler mid-session. A library gets its own
+# logger and its own handler; records still reach the host's handlers by
+# propagation.
+logger = logging.getLogger('executive_node')
+logger.setLevel(logging.INFO)
 try:
     _log_dir = os.path.join(os.path.dirname(__file__), '..', 'logs')
     os.makedirs(_log_dir, exist_ok=True)
@@ -32,19 +33,15 @@ try:
     file_handler.setLevel(logging.WARNING)
     if os.getenv('CWB_DEBUG', '') in ('1', 'true', 'yes', 'on'):
         file_handler.setLevel(logging.INFO)
-    handlers_list.append(file_handler)
-except Exception:
-    # Fall back to console-only if file handler setup fails
-    pass
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    handlers=handlers_list,
-    force=True
-)
-logger = logging.getLogger('executive_node')
+    file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'))
+    if not any(isinstance(h, logging.FileHandler)
+               and getattr(h, 'baseFilename', '') == file_handler.baseFilename
+               for h in logger.handlers):
+        logger.addHandler(file_handler)
+except Exception as e:
+    logger.warning(f"executive_node log file handler setup failed: {e}")
 
 # Import LLM client
 import os

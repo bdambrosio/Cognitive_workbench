@@ -35,6 +35,7 @@ import logging
 import re
 import shutil
 import subprocess
+import time
 
 from utils.json_utils import repair_json_string
 from datetime import datetime, timezone
@@ -48,6 +49,16 @@ _MAX_OBS_CHARS = 8_000
 _NMAP_TIMEOUT_DISCOVERY = 60.0
 _NMAP_TIMEOUT_SERVICES = 120.0
 _SYSTEM_STATE_TIMEOUT = 5.0
+
+# Wall clock for one whole security() call. The per-probe timeouts above
+# bound a single probe, not the run: a topology question walks the LAN one
+# host at a time, and 12 iterations × 120s put a live LAN sweep at ~24
+# minutes — during which the character's inbox loop is blocked and every
+# message to it queues (observed 2026-08-10: Sentinel unreachable for 20+
+# minutes, and the ReAct loop then called security a SECOND time, each
+# call with its own fresh iteration budget). Checked before dispatching a
+# probe, so overshoot is at most one probe.
+_CALL_BUDGET = 300.0
 
 # RFC1918 networks — the only ranges we'll scan. 169.254/16 (link-local),
 # 100.64/10 (CGNAT), and 127/8 (loopback) are NOT included; if a future
@@ -402,10 +413,19 @@ def _tool_scan_services(host: str) -> str:
     # returns a literal list (not a generator), and next() on a list raises
     # 'list object is not an iterator'.
     target = str(net.network_address)
-    # --script=safe: run only NSE scripts categorized as non-intrusive.
-    # -T3: default timing (avoids -T4/-T5 aggressive modes that can
-    # trip rate-limiting on the target).
-    cmd = ['nmap', '-sV', '--script=safe', '-T3', '-oG', '-', '--', target]
+    # -F: top-100 ports. -sV: service/version detection. -T3: default
+    # timing (avoids -T4/-T5, which can trip rate-limiting on the target).
+    #
+    # `--script=safe` was here and is gone. It ran the whole non-intrusive
+    # NSE category against every open port, which cost minutes per host —
+    # and `-oG` discards the result: grepable output carries only Host,
+    # Ports, Protocols, Ignored State, OS, Seq Index, IP ID and Status
+    # (nmap(1)), with no field for script output. So the parse below never
+    # saw a line of it. Measured: `-sV --script=safe -F` against localhost
+    # did not finish in 120s; without it a host answers in seconds. If
+    # script output is ever wanted, it needs a different output format,
+    # not a longer timeout.
+    cmd = ['nmap', '-sV', '-F', '-T3', '-oG', '-', '--', target]
     try:
         proc = subprocess.run(
             cmd, capture_output=True, text=True,
@@ -908,6 +928,7 @@ def security(query: str, llm_backend, trace_dir: Path,
 
     answer = ''
     exit_reason = 'max_iters'
+    deadline = time.monotonic() + _CALL_BUDGET
     for i in range(_MAX_ITERS):
         messages = [
             {'role': 'system', 'content': sys_prompt},
@@ -938,7 +959,22 @@ def security(query: str, llm_backend, trace_dir: Path,
             break
 
         binding = f'$step{i+1}'
-        if tool == 'discover':
+        if time.monotonic() >= deadline:
+            # Budget spent. Refuse the probe rather than the answer: the
+            # model still gets a turn to report what it has, and the
+            # iteration cap ends the loop if it asks for another probe
+            # anyway. Not silent — a truncated survey the caller believes
+            # is complete is worse than a short one that says so.
+            logger.warning(
+                f"security: call budget of {int(_CALL_BUDGET)}s spent at "
+                f"iter {i+1}; refusing further probes")
+            obs = (f"ERROR: this security call has used its whole time "
+                   f"budget ({int(_CALL_BUDGET)}s) and no further probes "
+                   f"will run. Respond NOW with what the log above already "
+                   f"shows, and say plainly which part of the question you "
+                   f"did not get to — do not present a partial survey as a "
+                   f"complete one.")
+        elif tool == 'discover':
             obs = _tool_discover(action.get('cidr', ''))
         elif tool == 'scan_services':
             obs = _tool_scan_services(action.get('host', ''))
