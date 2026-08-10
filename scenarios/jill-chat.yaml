@@ -461,6 +461,42 @@ characters:
       # her a clipping is not itself a request to discuss it.
       - name: obsidian-clipper
         schedule: "60s"
+      # News ingress (2026-08-10). Relevance is hers to judge against her
+      # active concerns — there is no keyword filter, deliberately, and the
+      # agent_concern bump still runs on sensor turns so an item can pull
+      # the concern it bears on toward firing. She may also say nothing,
+      # which sensor turns could not do before f9605adb.
+      #
+      # `schedule` is the real cost control, not the feed count: every poll
+      # that finds a new title becomes a full ReAct turn, so turns/day is
+      # bounded by polls/day. These twelve feeds measured ~71 items/day
+      # (2026-08-10), which at 60m batches ~3 per turn and stays well under
+      # the sensor's 10-per-cycle cap. Shorten it only if the reports turn
+      # out to be worth reading.
+      #
+      # Deliberately absent: arXiv (cs.AI alone lists 295 entries/day — it
+      # would fill every cycle and permanently overflow the cap; paper
+      # discovery belongs in the semantic-scholar tool, invoked on purpose),
+      # Ubuntu security notices (Sentinel's patrol already fetches them),
+      # and WSJ/Reuters/SemiAnalysis, whose public feeds parse fine but
+      # serve entries hundreds of days old — the worst failure mode here,
+      # since a stale feed reports nothing forever and looks healthy.
+      - name: rss-watcher
+        schedule: "60m"
+        parameters:
+          feeds:
+            - "https://www.theguardian.com/world/rss"
+            - "https://www.theregister.com/headlines.atom"
+            - "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml"
+            - "https://www.theguardian.com/technology/artificialintelligenceai/rss"
+            - "https://simonwillison.net/atom/everything/"
+            - "https://hnrss.org/best"
+            - "https://www.phoronix.com/rss.php"
+            - "https://feeds.arstechnica.com/arstechnica/index"
+            - "https://deepmind.google/blog/rss.xml"
+            - "https://importai.substack.com/feed"
+            - "https://spectrum.ieee.org/feeds/topic/robotics.rss"
+            - "https://www.factorio.com/blog/rss"
 
   # Desktop security agent (2026-08-08). Second character so Bruce can
   # talk to it directly (/char Sentinel in the CLI); the launcher's peer
