@@ -898,8 +898,20 @@ def _write_trace(trace_dir: Path, query: str,
         return None
 
 
+def call_deadline() -> float:
+    """A fresh monotonic deadline for security work.
+
+    A caller that may invoke security() several times in ONE turn must
+    compute this ONCE and pass the same value to every call, so the
+    budgets share one clock instead of multiplying. Without that, a
+    per-call cap bounds nothing: the parent ReAct loop simply calls again
+    and gets a fresh budget (observed 2026-08-10, twice in one turn)."""
+    return time.monotonic() + _CALL_BUDGET
+
+
 def security(query: str, llm_backend, trace_dir: Path,
-             baseline_dir: Optional[Path] = None) -> str:
+             baseline_dir: Optional[Path] = None,
+             deadline: Optional[float] = None) -> str:
     """Run the security investigation subagent. Returns the
     synthesized answer string, suitable for binding to a $stepN
     observation in Jill's parent ReAct loop. Side effect: writes a
@@ -914,6 +926,9 @@ def security(query: str, llm_backend, trace_dir: Path,
         trace_dir: where to write the per-call subagent trace.
         baseline_dir: where baseline_diff stores per-category snapshots;
             None disables baseline_diff with an in-loop error.
+        deadline: monotonic time after which no further probes run. Pass
+            one shared value for every call in a turn (see call_deadline);
+            omit it and this call gets its own _CALL_BUDGET.
     """
     if not query or not query.strip():
         return "(security: empty query)"
@@ -928,7 +943,11 @@ def security(query: str, llm_backend, trace_dir: Path,
 
     answer = ''
     exit_reason = 'max_iters'
-    deadline = time.monotonic() + _CALL_BUDGET
+    # Whichever runs out first: this call's own budget, or the caller's
+    # shared one. min() means a second call in the same turn inherits
+    # what's left rather than starting over.
+    own = time.monotonic() + _CALL_BUDGET
+    deadline = own if deadline is None else min(float(deadline), own)
     for i in range(_MAX_ITERS):
         messages = [
             {'role': 'system', 'content': sys_prompt},
@@ -968,9 +987,10 @@ def security(query: str, llm_backend, trace_dir: Path,
             logger.warning(
                 f"security: call budget of {int(_CALL_BUDGET)}s spent at "
                 f"iter {i+1}; refusing further probes")
-            obs = (f"ERROR: this security call has used its whole time "
-                   f"budget ({int(_CALL_BUDGET)}s) and no further probes "
-                   f"will run. Respond NOW with what the log above already "
+            obs = (f"ERROR: security work has used its whole time budget "
+                   f"({int(_CALL_BUDGET)}s for this turn) and no further "
+                   f"probes will run — calling this tool again will not "
+                   f"help. Respond NOW with what the log above already "
                    f"shows, and say plainly which part of the question you "
                    f"did not get to — do not present a partial survey as a "
                    f"complete one.")

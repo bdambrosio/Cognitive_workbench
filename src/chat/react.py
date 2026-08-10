@@ -857,12 +857,20 @@ class ReactMixin:
         if not query or not str(query).strip():
             return "EMPTY: security query was empty"
         try:
-            from chat.security import security as _security
+            from chat.security import security as _security, call_deadline
+            # One deadline for all security work in this turn. Set on first
+            # use (a turn that never asks doesn't start a clock) and reset
+            # per turn by _process_user_turn. Without sharing it, the
+            # per-call cap bounds nothing — this loop can call the subagent
+            # again and again, each time with a fresh budget.
+            if getattr(self, '_turn_security_deadline', None) is None:
+                self._turn_security_deadline = call_deadline()
             answer = _security(
                 query=str(query),
                 llm_backend=self.backend,
                 trace_dir=self._security_traces_dir(),
                 baseline_dir=self._memory_dir() / 'security_baselines',
+                deadline=self._turn_security_deadline,
             )
         except Exception as e:
             logger.warning(f"[{self.character_name}] security subagent raised: {e}")

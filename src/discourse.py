@@ -33,7 +33,12 @@ _cli_mode = os.getenv('CWB_CLI_MODE', '') == '1'
 from pathlib import Path as _Path
 _LOG_DIR = _Path(__file__).resolve().parent.parent / "logs"
 _LOG_DIR.mkdir(parents=True, exist_ok=True)
-file_handler = logging.FileHandler(_LOG_DIR / 'discourse_module.log', mode='w')
+# mode='a', not 'w': as a library this handler is created when chat_loop
+# first imports the module — mid-session — so 'w' truncated the file and
+# took the running session's discourse history with it. It destroyed the
+# only copy of the 2026-08-10 incident log, which was in here because of
+# the root-logger hijack fixed above.
+file_handler = logging.FileHandler(_LOG_DIR / 'discourse_module.log', mode='a')
 file_handler.setLevel(logging.INFO)
 
 _LOG_FORMATTER = logging.Formatter(

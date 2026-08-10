@@ -39,6 +39,34 @@ def test_scan_services_does_not_run_nse_scripts(monkeypatch):
     assert seen['cmd'][-1] == '192.168.68.1'
 
 
+def test_a_shared_deadline_is_not_reset_by_a_second_call(tmp_path, monkeypatch):
+    """The per-call cap bounds nothing on its own: the parent ReAct loop
+    can call security() again and get a fresh budget (it did, twice in one
+    turn). A caller passing one deadline for the whole turn must see the
+    second call inherit what is left — here, nothing."""
+    probes = {'n': 0}
+
+    class _Backend:
+        def chat(self, messages, **kw):
+            if 'BUDGET' in messages[-1]['content'] or 'time budget' in messages[-1]['content']:
+                return '{"tool": "respond", "text": "out of budget"}'
+            return '{"tool": "discover", "cidr": "192.168.68.0/24"}'
+
+    def _probe(_cidr):
+        probes['n'] += 1
+        return 'OK: Host: 192.168.68.1 () Status: Up'
+
+    monkeypatch.setattr(sec, '_tool_discover', _probe)
+    monkeypatch.setattr(sec.time, 'monotonic', lambda: 0.0)
+    shared = sec.call_deadline()          # 0 + _CALL_BUDGET
+    # Turn's clock is now spent; a fresh call must not restart it.
+    monkeypatch.setattr(sec.time, 'monotonic', lambda: sec._CALL_BUDGET + 1.0)
+    answer = sec.security('what is on my LAN?', _Backend(), tmp_path,
+                          deadline=shared)
+    assert probes['n'] == 0
+    assert 'budget' in answer.lower()
+
+
 def test_call_budget_refuses_probes_not_the_answer(tmp_path, monkeypatch):
     """Past the wall-clock budget, the next probe is refused and the model
     is told to answer with what it has and name the gap. The per-probe

@@ -169,6 +169,15 @@ class ZenohMixin:
         # become typed events on the inbox; unknown sensors fall through to
         # the empty-text drop below.
         if isinstance(source, str) and source == 'sensor:tick':
+            # Collapse ticks: one pending heartbeat is as good as ten. The
+            # consumer clears the flag as it dequeues, so a tick arriving
+            # during a turn is still delivered — just once.
+            if self._tick_pending:
+                logger.debug(
+                    f"[{self.character_name}] tick coalesced (one already "
+                    f"queued)")
+                return
+            self._tick_pending = True
             self._inbox.put({'kind': 'tick'})
             return
 

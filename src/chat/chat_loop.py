@@ -365,6 +365,14 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
 
         # ---- Zenoh wiring ----
         self._inbox: "queue.Queue[dict]" = queue.Queue()
+        # A tick already queued and not yet handled. Ticks are a heartbeat,
+        # not events: a long turn blocks the inbox, so a 20-minute turn used
+        # to be followed by ~20 back-to-back autonomy passes on drain. Safe
+        # to collapse because activation growth is elapsed-time based
+        # (_grow_agent_concerns_per_tick reads last_activation_update_at),
+        # so one tick after a gap grows exactly as much as the ticks it
+        # replaced would have.
+        self._tick_pending: bool = False
         self._zenoh_session = None
         self._action_pub = None
         self._sense_sub = None
@@ -1423,6 +1431,10 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # leak this turn's number into the next one, which would hand two
         # replies the same seq.
         self._pending_turn_seq = None
+        # Shared clock for this turn's security work — see _run_security.
+        # Reset here for the same reason: a leaked deadline would make the
+        # next turn refuse its first probe.
+        self._turn_security_deadline = None
         try:
             self._process_user_turn_inner(
                 source, text, close,
@@ -2092,6 +2104,10 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
 
                 kind = msg.get('kind', 'user')
                 if kind == 'tick':
+                    # Clear BEFORE handling: a tick arriving while this one
+                    # runs must still be queued, or a long autonomy pass
+                    # would swallow the next heartbeat entirely.
+                    self._tick_pending = False
                     logger.debug(f"[{self.character_name}] <- tick")
                     try:
                         self._handle_tick()
