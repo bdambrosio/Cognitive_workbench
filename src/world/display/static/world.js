@@ -5,9 +5,9 @@
 // Bruce walks on and what Jill reasons about are the same surface.
 
 import * as THREE from './vendor/three.module.js';
+import { buildRig, animateRig } from './avatars.js';
 
 const EYE_H = 1.62;          // camera height when first-person
-const BODY_H = 1.75;
 const WALK = 1.7, RUN = 3.4; // m/s, matching WALK_SPEED_MS server-side
 const SEND_HZ = 20;
 
@@ -169,7 +169,7 @@ function markerMesh(m) {
     new THREE.MeshLambertMaterial({ color: 0xffd34d }));
   flag.position.y = 2.05;
   group.add(flag);
-  group.add(nameplate(m.label, '#ffd34d'));
+  group.add(nameplate(m.label, '#ffd34d', 2.5));   // just above the flag
   group.position.set(m.x, m.y, m.z);
   scene.add(group);
   return group;
@@ -188,7 +188,7 @@ function applyMarkers(list) {
 
 // ---------------------------------------------------------------- avatars
 
-function nameplate(text, color) {
+function nameplate(text, color, y) {
   const cv = document.createElement('canvas');
   cv.width = 256; cv.height = 64;
   const g = cv.getContext('2d');
@@ -202,32 +202,29 @@ function nameplate(text, color) {
   // depthTest stays on: with it off a nameplate reads through a hill, and
   // the human could identify someone the fog has already hidden.
   sprite.scale.set(3.2, 0.8, 1);
-  sprite.position.y = BODY_H + 0.75;
+  sprite.position.y = y;
   return sprite;
 }
 
 function makeAvatar(o) {
   const group = new THREE.Group();
-  const body = new THREE.Mesh(
-    new THREE.CapsuleGeometry(0.32, BODY_H - 0.64, 6, 12),
-    new THREE.MeshLambertMaterial({ color: new THREE.Color(o.color) }));
-  body.position.y = BODY_H / 2;
-  group.add(body);
-  // A small brow marks which way they are facing, readable from a distance.
-  const brow = new THREE.Mesh(
-    new THREE.BoxGeometry(0.42, 0.12, 0.12),
-    new THREE.MeshLambertMaterial({ color: 0x21262c }));
-  brow.position.set(0, BODY_H - 0.28, 0.3);
-  group.add(brow);
-  const plate = nameplate(o.name, o.color);
+  // Species form and its gait motion live in avatars.js; the group here
+  // still owns world position and heading, so an avatar can bob inside a
+  // group that is being lerped toward its reported position.
+  const { rig, headTop, sway } = buildRig(o);
+  group.add(rig);
+  const plate = nameplate(o.name, o.color, headTop + 0.55);
   group.add(plate);
   // Start where they actually are. Leaving this at the origin makes an
   // occupant you have only just seen glide in across the whole map.
   group.position.set(o.x, o.y, o.z);
   group.rotation.y = o.heading;
   scene.add(group);
-  return { group, plate, target: new THREE.Vector3(o.x, o.y, o.z),
-           heading: o.heading };
+  // Phase from the name so two occupants walking together don't bob in
+  // lockstep, which reads as one rig drawn twice.
+  const phase = [...o.name].reduce((a, c) => a + c.charCodeAt(0), 0) % 7;
+  return { group, plate, rig, sway, phase, gait: o.gait || 'idle',
+           target: new THREE.Vector3(o.x, o.y, o.z), heading: o.heading };
 }
 
 function applyState(occupants) {
@@ -237,6 +234,8 @@ function applyState(occupants) {
     let a = avatars.get(o.name);
     if (!a) { a = makeAvatar(o); avatars.set(o.name, a); }
     if (o.name === me) { a.group.visible = thirdPerson; continue; }
+    // Server gait drives the walk bob for agents, who do have goals.
+    a.gait = o.gait || 'idle';
     a.target.set(o.x, o.y, o.z);
     a.heading = o.heading;
   }
@@ -280,7 +279,15 @@ addEventListener('keydown', (e) => {
 });
 addEventListener('keyup', (e) => keys.delete(e.code));
 
+// Whether WE moved this frame. The server's `gait` is unusable for the
+// human: set_human_pose marks 'walk' on every input packet while step()
+// forces 'idle' for anyone without a goal, and a human never has one — so
+// it flips on the race between the two 20 Hz loops. Local input is the
+// honest source for our own bob.
+let selfMoving = false;
+
 function movePlayer(dt) {
+  selfMoving = false;
   if (!terrain) return;
   let fwd = 0, strafe = 0;
   if (keys.has('KeyW')) fwd += 1;
@@ -301,6 +308,7 @@ function movePlayer(dt) {
   if (nx < -half || nx > half || nz < -half || nz > half) return;
   if (heightAt(nx, nz) < terrain.waterY) return;   // don't wade in
   player.x = nx; player.z = nz;
+  selfMoving = true;
 }
 
 function updateCamera() {
@@ -382,7 +390,11 @@ function frame(now) {
   movePlayer(dt);
   // Others glide toward their last reported position: server state lands at
   // 20 Hz, the display runs faster, and un-smoothed updates read as stutter.
+  const tsec = now / 1000;
+  const mine = avatars.get(me);
+  if (mine) mine.gait = selfMoving ? 'walk' : 'idle';
   for (const [name, a] of avatars) {
+    animateRig(a, tsec);
     if (name === me) continue;
     a.group.position.lerp(a.target, Math.min(dt * 9, 1));
     const d = a.heading - a.group.rotation.y;

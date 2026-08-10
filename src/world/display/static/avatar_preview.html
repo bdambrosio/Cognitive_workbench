@@ -1,0 +1,86 @@
+<!doctype html>
+<!-- Avatar preview harness. Renders the occupant rigs side by side on flat
+     ground so the shapes can be judged directly: in-world you mostly see
+     one avatar, from behind, in fog, and the veil wants a click first.
+
+     Lives beside world.js so the world server serves it under the same
+     origin and CSP the real page uses — which is the point, since a rig
+     that only renders outside the app has not been checked. With any
+     --world session up:
+
+       http://127.0.0.1:8791/avatar_preview.html?view=front|side|back|far
+
+     Every listed species plus one unlisted name, alternating idle/walk so
+     a single still shows the bob and the tail sway. -->
+<html lang="en">
+<head><meta charset="utf-8" /><title>world avatars — preview</title>
+<style>html,body{margin:0;height:100%;background:#9dc4e0;overflow:hidden}
+canvas{display:block}
+#tag{position:fixed;left:8px;bottom:6px;font:12px system-ui;color:#fff;
+     text-shadow:0 1px 2px #0008}</style></head>
+<body>
+<div id="tag"></div>
+<script type="module">
+import * as THREE from './vendor/three.module.js';
+import { buildRig, animateRig } from './avatars.js';
+
+const view = new URLSearchParams(location.search).get('view') || 'front';
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9dc4e0);
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 200);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// Same lighting rig as world.js, so colours read as they will in world.
+scene.add(new THREE.HemisphereLight(0xcfe4f5, 0x4a5a3c, 0.9));
+const sun = new THREE.DirectionalLight(0xfff3d6, 1.05);
+sun.position.set(60, 90, 30);
+scene.add(sun);
+// NB: scene.add() returns the scene, not the mesh — rotate the mesh first.
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(60, 60),
+  new THREE.MeshLambertMaterial({ color: 0x6f8f57 }));
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+const CAST = [
+  { name: 'Bruce',    color: '#f2b544' },
+  { name: 'Jill',     color: '#8ab4f8' },
+  { name: 'Sentinel', color: '#7ddc94' },
+  { name: 'Nobody',   color: '#c39bf5' },   // unlisted -> default shape
+];
+
+const rigs = [];
+CAST.forEach((o, i) => {
+  const holder = new THREE.Group();
+  const { rig, headTop, sway } = buildRig(o);
+  holder.add(rig);
+  holder.position.set((i - (CAST.length - 1) / 2) * 1.9, 0, 0);
+  // Face the camera for 'front', away for 'back', profile for 'side'.
+  holder.rotation.y = { front: 0, back: Math.PI, side: Math.PI / 2,
+                        far: 0 }[view] ?? 0;
+  scene.add(holder);
+  // Alternating gait so the walk bob and the tail sway are both visible in
+  // one still, and so a frozen screenshot shows both states.
+  rigs.push({ rig, sway, gait: i % 2 ? 'walk' : 'idle',
+              phase: i * 1.7, headTop, name: o.name });
+});
+
+const dist = view === 'far' ? 26 : 6.4;
+camera.position.set(0, view === 'far' ? 3.2 : 1.5, dist);
+camera.lookAt(0, view === 'far' ? 1.0 : 1.0, 0);
+document.getElementById('tag').textContent =
+  `view=${view} · ${CAST.map(c => c.name).join('  ')} · alternating idle/walk`;
+
+const t0 = performance.now();
+function frame(now) {
+  const t = (now - t0) / 1000;
+  for (const a of rigs) animateRig(a, t);
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
