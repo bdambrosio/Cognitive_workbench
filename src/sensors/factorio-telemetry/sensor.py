@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 _THIS = os.path.dirname(os.path.abspath(__file__))
@@ -22,6 +23,12 @@ logger = logging.getLogger(__name__)
 
 _STATE_PATH = Path("~/.cache/cognitive/factorio-telemetry/state.json").expanduser()
 _MAX_CHAT_EVENTS = 10
+
+# When the bridge first went unreachable in this process, or None while it
+# is answering. Module state, like the other sensors' seen-sets: a restart
+# re-reports the outage once, which is correct — a fresh process has not
+# told anyone yet.
+_unreachable = {'since': None}
 
 
 def _load_state():
@@ -55,8 +62,23 @@ def run(context):
     try:
         chat, telemetry = _snapshot(watch_items)
     except BridgeError as e:
-        logger.warning(f"factorio-telemetry: {e}")
+        # One line per outage, not per poll. A 2-minute schedule against a
+        # bridge that is usually down produced 2,163 identical WARNINGs in
+        # one log — enough to bury everything else. Still logged (never
+        # swallowed), and the recovery is logged too, so the outage has
+        # both edges in the record.
+        if not _unreachable['since']:
+            _unreachable['since'] = datetime.now(timezone.utc).isoformat()
+            logger.warning(
+                f"factorio-telemetry: {e} — suppressing repeats until the "
+                f"bridge answers again")
+        else:
+            logger.debug(f"factorio-telemetry: still unreachable: {e}")
         return {"status": "nothing", "content": "", "metadata": {}}
+    if _unreachable['since']:
+        logger.warning(f"factorio-telemetry: bridge reachable again "
+                       f"(unreachable since {_unreachable['since']})")
+        _unreachable['since'] = None
 
     players = sorted(telemetry.get("players") or [])
     production = telemetry.get("production") or {}

@@ -333,18 +333,30 @@ class ReflectionMixin:
         "lists empty and capability_gap null."
     )
 
-    def _reflect_and_remember(self, source: str) -> Tuple[List[str], List[str], List[str]]:
+    def _reflect_and_remember(self, source: str, entity: Optional[str] = None
+                              ) -> Tuple[List[str], List[str], List[str]]:
         """Run a single reflection LLM call over the latest exchange; persist
         memories, user_concerns, agent_concerns. Returns the three written-text
-        lists. Failure-tolerant: any error path returns three empty lists."""
+        lists. Failure-tolerant: any error path returns three empty lists.
+
+        `source` selects which exchange to reflect over. `entity` is who the
+        result is ABOUT — defaults to source, and they are the same for
+        every human channel. They come apart for sensor turns: the exchange
+        to read is the sensor's report, but the memories and concerns it
+        yields belong to the human counterpart, not to the machine that
+        pushed the text (live: 21 memories and 2 user_concerns filed under
+        `sensor:factorio-telemetry`, among them standing instructions the
+        user had given).
+        """
         if not self._memories_collection_id:
             return ([], [], [])
+        entity = entity or source
         try:
             dialog = self._build_dialog(source, limit=4)
             if not dialog:
                 return ([], [], [])
             convo = "\n".join(f"{t['source']}: {t['text']}" for t in dialog)
-            companion = self._companion_state.get(source, '').strip()
+            companion = self._companion_state.get(entity, '').strip()
             # Show the LLM the existing concerns from BOTH collections so it
             # doesn't re-derive ones we already track. Two compact sections,
             # one per collection.
@@ -363,7 +375,7 @@ class ReflectionMixin:
             # to pre-capture behavior. Load failure → [] (stays pending).
             pending_fires = self._load_pending_fire_outcomes()
             sys_msg = self._REFLECT_SYS.format(
-                character=self.character_name, entity=source,
+                character=self.character_name, entity=entity,
                 narrowness_rule=_CONCERN_INSTRUCTION_NARROWNESS_RULE)
             if pending_fires:
                 sys_msg += "\n\n" + _REFLECT_STAGE6_RULE
@@ -477,7 +489,7 @@ class ReflectionMixin:
             for text, category, polarity in raw_memories:
                 if len(text) > 240:
                     text = text[:240].rstrip()
-                if self._remember(text, entity=source, category=category,
+                if self._remember(text, entity=entity, category=category,
                                   polarity=polarity):
                     mems_written.append(text)
 
@@ -485,7 +497,7 @@ class ReflectionMixin:
             for text, context in raw_user_concerns:
                 if len(text) > 240:
                     text = text[:240].rstrip()
-                if self._add_user_concern(text, entity=source, context=context):
+                if self._add_user_concern(text, entity=entity, context=context):
                     user_cons_written.append(text)
 
             # Updates: the exchange materially developed an existing
@@ -541,7 +553,7 @@ class ReflectionMixin:
                 if len(text) > 240:
                     text = text[:240].rstrip()
                 if self._add_agent_concern(
-                        text, entity=source,
+                        text, entity=entity,
                         provenance='asserted',
                         seed=False,
                         rhythm_hours=c.get('rhythm_hours'),

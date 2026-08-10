@@ -33,6 +33,28 @@ _near: dict = {}
 
 _NOTHING = {'status': 'nothing', 'content': '', 'metadata': {}}
 
+# character -> reason this sensor is currently blind, or absent while the
+# world answers. One log line per outage edge: enough to tell a working
+# sensor with nothing to report from one that cannot see at all.
+_blind: dict = {}
+
+
+def _note_outage(me: str, reason: str) -> None:
+    if _blind.get(me) is None:
+        logger.warning(f"world-presence[{me}]: {reason} — no presence events "
+                       f"will be emitted until the world answers; "
+                       f"suppressing repeats")
+        _blind[me] = reason
+    else:
+        logger.debug(f"world-presence[{me}]: still blind: {reason}")
+
+
+def _clear_outage(me: str) -> None:
+    if _blind.get(me) is not None:
+        logger.warning(f"world-presence[{me}]: world answering again "
+                       f"(was: {_blind[me]})")
+        _blind[me] = None
+
 
 def _describe(look: dict, arrived: list, departed: list) -> str:
     """A self-contained situation report.
@@ -82,12 +104,17 @@ def run(context):
         look = world_get('/look', {'name': me, 'radius': _LOOK_RADIUS_M})
     except BridgeError as e:
         # A world that is not running is the normal case for a chat-only
-        # session; stay quiet rather than erroring every cycle.
-        logger.debug(f"world-presence: world unreachable: {e}")
+        # session, so this is not an error every cycle — but it must be
+        # visible ONCE. At DEBUG it wasn't: a sensor silently returning
+        # NOTHING because the world is unreachable looked exactly like one
+        # returning NOTHING because nobody moved, and the logs could not
+        # tell "working, quiet" from "not working at all".
+        _note_outage(me, f"world unreachable: {e}")
         return _NOTHING
     if look.get('error'):
-        logger.debug(f"world-presence: {look['error']}")
+        _note_outage(me, str(look['error']))
         return _NOTHING
+    _clear_outage(me)
 
     was_near = _near.get(me)
     prior = was_near or set()

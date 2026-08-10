@@ -124,6 +124,31 @@ def _common_prefix_len(a: str, b: str) -> int:
     return i
 
 
+# Source prefix that sensor_runner stamps on every non-tick sensor push
+# (`sensor:<name>`). A structural marker written by the publisher, not a
+# guess about content — the check below is protocol parsing, not
+# classification.
+SENSOR_SOURCE_PREFIX = 'sensor:'
+
+# Who a turn is *about* when nobody said anything. Sensor turns arrive
+# with a machine as their source; attributing what they teach to that
+# machine produced 21 memories and 2 discourse segments filed under
+# `sensor:factorio-telemetry` — including agreements actually made with
+# the user. prompts.py already falls back to 'User' for the same reason
+# on self-sourced turns.
+HUMAN_COUNTERPART = 'User'
+
+
+def is_sensor_source(source: str) -> bool:
+    """True for a turn pushed by a sensor rather than said by someone.
+
+    Such a turn is neither a user turn nor an autonomous fire: no one is
+    waiting for a reply, and there is no person on the other side to model.
+    Every gate that used to key on `autonomous` alone needs this too.
+    """
+    return str(source or '').startswith(SENSOR_SOURCE_PREFIX)
+
+
 # ─── ChatLoop ───────────────────────────────────────────────────────────────
 
 class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
@@ -1327,7 +1352,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
     # ------------------------------------------------------------------
 
     def _post_turn_work_tracked(self, source: str, close: bool,
-                                turn_seq: Optional[int] = None) -> None:
+                                turn_seq: Optional[int] = None,
+                                from_sensor: bool = False) -> None:
         """Wrapper around _post_turn_work that toggles _post_turn_busy
         for /status visibility. Always clears the flag on exit, success
         or failure. _post_turn_busy is set EITHER here at entry OR by
@@ -1336,12 +1362,13 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         can't get stuck if _post_turn_work raises."""
         self._post_turn_busy = True
         try:
-            self._post_turn_work(source, close, turn_seq)
+            self._post_turn_work(source, close, turn_seq, from_sensor)
         finally:
             self._post_turn_busy = False
 
     def _post_turn_work(self, source: str, close: bool,
-                        turn_seq: Optional[int] = None) -> None:
+                        turn_seq: Optional[int] = None,
+                        from_sensor: bool = False) -> None:
         """Background side-effect job for one turn: claim attribution,
         discourse update, reflection (memory writes), thread centroids,
         optional dialog close, autosave.
@@ -1378,10 +1405,32 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             # written (pre-loop crash).
             if turn_seq is not None:
                 _stage('claims', self._extract_and_log_claims, turn_seq, True)
-            _stage('discourse', self._update_discourse_async, source)
+            # Discourse tracks shared premises and standing decisions —
+            # things two parties agreed. A sensor pushed a report; it
+            # agreed to nothing. Running this on sensor turns built two
+            # discourse segments under `sensor:factorio-telemetry` holding
+            # agreements actually made with the user.
+            if not from_sensor:
+                _stage('discourse', self._update_discourse_async, source)
             # Reflection runs after discourse so it can see the latest
             # companion state and avoid duplicating it.
-            _stage('reflection', self._reflect_and_remember, source)
+            #
+            # It still runs for sensor turns — what a sensor turn teaches
+            # is often worth keeping (a tool's real limits, a standing
+            # instruction restated in game chat) — but attributed to the
+            # human counterpart, not to the machine that pushed the text.
+            # The dialog it reflects over is still the sensor's, so the
+            # event itself is what gets read.
+            #
+            # The human path passes one argument, exactly as before: every
+            # stage here is wrapped in a try/except that logs and moves on,
+            # so an arity change on the common path would turn any stale
+            # caller into a silently skipped reflection.
+            if from_sensor:
+                _stage('reflection', self._reflect_and_remember, source,
+                       HUMAN_COUNTERPART)
+            else:
+                _stage('reflection', self._reflect_and_remember, source)
             # Stage 5: drift active thread centroids toward the
             # current turn's embedding, weighted by thread activation.
             # No-op if no threads, no embedding, or all activations
@@ -1500,22 +1549,38 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # the user model). Order: decay first so a fresh mention's
         # full bump prevails over the same-turn decay step.
         self._pending_fire_digest = []
+        from_sensor = is_sensor_source(source)
         if not autonomous:
-            self._decay_user_concerns_per_turn()
-            self._bump_user_concerns_on_input(text)
+            # user_concern strength models what the USER is preoccupied
+            # with. A sensor turn is not the user saying anything, so it
+            # must not decay or bump it: with rss-watcher on, every poll
+            # carrying a headline would decay every concern and bump
+            # whichever ones the news happened to match.
+            if not from_sensor:
+                self._decay_user_concerns_per_turn()
+                self._bump_user_concerns_on_input(text)
             # Evidence bump for agent_concerns: same input, same gating.
             # Decay is service-based for agent concerns, so bump only.
+            # Kept for sensor turns on purpose — a feed item pulling the
+            # concern it bears on toward firing is the whole point of
+            # watching a feed.
             self._bump_agent_concerns_on_input(text)
             # Fire-outcome aging: each user turn widens the reaction
             # window on pending autonomous fires; records past the cap
             # resolve to 'unobserved' (docs/fire-outcome-capture.md §4).
-            self._age_pending_fire_outcomes()
-            # Fire digest: surface each surviving pending fire once in
-            # this turn's prompt so the user gets a reaction opportunity
-            # inside the judgment window. Rendered by
-            # _build_system_prompt; empty on autonomous turns (a fire
-            # shouldn't be prompted to talk about other fires).
-            self._pending_fire_digest = self._take_unsurfaced_pending_fires()
+            #
+            # Both of these are about the USER getting a chance to react,
+            # so a sensor turn must not consume them. _take_unsurfaced_*
+            # MARKS a fire surfaced: spending that on a turn the user
+            # never sees would retire the reaction opportunity unused.
+            if not from_sensor:
+                self._age_pending_fire_outcomes()
+                # Fire digest: surface each surviving pending fire once in
+                # this turn's prompt so the user gets a reaction
+                # opportunity inside the judgment window. Rendered by
+                # _build_system_prompt; empty on autonomous turns (a fire
+                # shouldn't be prompted to talk about other fires).
+                self._pending_fire_digest = self._take_unsurfaced_pending_fires()
 
         # WIP-review inventory: only a wip_reviewer concern's own fire
         # sees the WIP accumulated across the other concerns. Failure
@@ -1581,7 +1646,14 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # Agent-sourced turns may also end in silence (a peer exchange
         # reaching its natural close) — no human is waiting for an ack,
         # so skip the "(no reply)" publish exactly like autonomous runs.
-        intentionally_silent = (autonomous or source in self._peers) and not reply
+        # A sensor turn joins the list: nobody asked, so nobody is waiting
+        # for an ack. Until this was here, "otherwise stay silent" — which
+        # rss-watcher's own report asks for — was not representable: the
+        # only terminal action on a non-autonomous turn is `respond`, so an
+        # empty reply published "(no reply)" to the user. Every one of 99
+        # factorio sensor turns replied.
+        intentionally_silent = (
+            (autonomous or from_sensor or source in self._peers) and not reply)
         if not reply:
             reply = "(no reply)"
 
@@ -1739,17 +1811,19 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             # Run reflection inline so a benchmark harness can snapshot
             # state immediately after the call returns and see fully-resolved
             # memory/concern writes from this turn.
-            self._post_turn_work_tracked(source, close, claims_turn_seq)
+            self._post_turn_work_tracked(source, close, claims_turn_seq,
+                                         from_sensor)
         else:
             try:
                 self._post_turn_busy = True
                 self._post_turn_executor.submit(
                     self._post_turn_work_tracked, source, close,
-                    claims_turn_seq)
+                    claims_turn_seq, from_sensor)
             except RuntimeError:
                 # Executor already shut down (process tearing down).
                 # Fall back to synchronous so nothing is silently dropped.
-                self._post_turn_work_tracked(source, close, claims_turn_seq)
+                self._post_turn_work_tracked(source, close, claims_turn_seq,
+                                             from_sensor)
 
     # ------------------------------------------------------------------
     # Tick handler — Phase C autonomy entry point.
