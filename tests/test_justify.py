@@ -61,8 +61,18 @@ TRACE = [
      "raw_response": "digest2", "working_log": ""},
 ]
 
+def _sha1_of_reply(turn_seq: int) -> str:
+    """The reply hash justify checks the claims record against. Computed
+    from the fixture rather than hardcoded so it cannot drift out of sync
+    with TRACE and silently start exercising the mismatch path."""
+    import hashlib
+    rec = next(r for r in TRACE if r["turn_seq"] == turn_seq)
+    return hashlib.sha1(
+        str(rec["raw_response"]).strip().encode("utf-8")).hexdigest()
+
+
 CLAIMS = [
-    {"turn_seq": 12, "source": "User", "reply_sha1": "ab" * 20,
+    {"turn_seq": 12, "source": "User", "reply_sha1": _sha1_of_reply(12),
      "claims": [
          {"claim": "There is no direct world copy/paste.",
           "grounding": "retrieved", "refs": ["$step1"],
@@ -381,14 +391,24 @@ def test_attribute_claims_tag_validation():
 # ── _run_justify observation protocol ──────────────────────────────────
 
 class _Backend:
-    """Canned attribution backend for the on-demand path."""
+    """Canned attribution backend for the on-demand path.
+
+    Mirrors the two real-backend attributes the claims path reads:
+    `is_cloud` (picks the token floor) and `last_finish_reason` (drives
+    retry-on-truncation). Both are set in ChatBackend.__init__, so the
+    production code reads them directly rather than defensively.
+    """
 
     def __init__(self, raise_instead=False):
         self.raise_instead = raise_instead
         self.calls = 0
+        self.is_cloud = False
+        self.last_finish_reason = 'stop'
+        self.max_tokens_seen = []
 
     def chat(self, messages, **kwargs):
         self.calls += 1
+        self.max_tokens_seen.append(kwargs.get('max_tokens'))
         if self.raise_instead:
             raise RuntimeError("backend down")
         return json.dumps({"claims": [
@@ -398,6 +418,15 @@ class _Backend:
 
 class _Stub(ClaimsMixin):
     character_name = "TestJill"
+
+    # Read the real tables rather than copying the numbers: the whole
+    # point of the claims path sourcing its budget from them is that the
+    # two cannot drift, and a hardcoded copy here would hide exactly the
+    # drift these tests exist to catch.
+    from chat.chat_loop import ChatLoop as _CL
+    _PROFILE_TOKEN_FLOOR_LOCAL = _CL._PROFILE_TOKEN_FLOOR_LOCAL
+    _PROFILE_TOKEN_FLOOR_CLOUD = _CL._PROFILE_TOKEN_FLOOR_CLOUD
+    del _CL
 
     def __init__(self, md: Path, backend=None, autonomy=False):
         self._md = Path(md)
@@ -450,10 +479,139 @@ def test_run_justify_attributes_on_demand(tmp_path):
 
 
 def test_run_justify_attribution_fails(tmp_path):
+    """A hard failure is ERROR, not EMPTY, and records nothing.
+
+    EMPTY means "ran clean, nothing to show", which reads as retryable and
+    produced the retry-then-apologise loop at turn 2393. The message must
+    also not suggest waiting: this path attributes on demand.
+    """
     md = _memory_dir(tmp_path)
     _write_jsonl(md / "reasoning_trace.jsonl", TRACE)
     obs = _Stub(md, _Backend(raise_instead=True))._run_justify("User")
-    assert obs.startswith("EMPTY: claim attribution for turn 12")
+    assert obs.startswith("ERROR:")
+    assert "turn 12" in obs
+    assert "nothing to wait for" in obs
+    # A failure must never manufacture a record — claims: [] is a real
+    # finding ("no checkable claims"), not a failure mode.
+    assert claims_for_turn(md, 12) is None
+    assert not (md / "claims.jsonl").exists() or \
+        (md / "claims.jsonl").read_text().strip() == ""
+
+
+def test_attribution_budget_comes_from_the_floor_table(tmp_path):
+    """The regression test for turn 2393.
+
+    The claims call reaches backend.chat directly and so never got
+    _make_llm_callable's profile floor; a literal 1600 truncated the JSON
+    on long replies and the whole pass was dropped silently.
+    """
+    md = _memory_dir(tmp_path)
+    _write_jsonl(md / "reasoning_trace.jsonl", TRACE)
+
+    local = _Backend()
+    _Stub(md, local)._extract_and_log_claims(12)
+    assert local.max_tokens_seen == [_Stub._PROFILE_TOKEN_FLOOR_LOCAL["none"]]
+    assert local.max_tokens_seen[0] >= 16384
+
+    md2 = tmp_path / "cloud" / "memory"
+    md2.mkdir(parents=True)
+    _write_jsonl(md2 / "reasoning_trace.jsonl", TRACE)
+    cloud = _Backend()
+    cloud.is_cloud = True
+    _Stub(md2, cloud)._extract_and_log_claims(12)
+    assert cloud.max_tokens_seen == [_Stub._PROFILE_TOKEN_FLOOR_CLOUD["none"]]
+
+
+class _TruncatingBackend(_Backend):
+    """First call returns a cut-off claims array, second returns valid JSON."""
+
+    def chat(self, messages, **kwargs):
+        self.calls += 1
+        self.max_tokens_seen.append(kwargs.get("max_tokens"))
+        if self.calls == 1:
+            self.last_finish_reason = "length"
+            return ('{"claims": [{"claim": "a", "grounding": "retrieved", '
+                    '"refs": ["$step1"]}, {"claim": "b", "grou')
+        self.last_finish_reason = "stop"
+        return json.dumps({"claims": [
+            {"claim": "a", "grounding": "retrieved", "refs": ["$step1"]},
+            {"claim": "b", "grounding": "retrieved", "refs": ["$step1"]}]})
+
+
+def test_truncated_attribution_salvages_then_retries_bigger(tmp_path):
+    md = _memory_dir(tmp_path)
+    _write_jsonl(md / "reasoning_trace.jsonl", TRACE)
+    be = _TruncatingBackend()
+    stub = _Stub(md, be)
+    stub._extract_and_log_claims(12)
+    # Salvage recovered the one complete claim, so the first pass returned
+    # a partial rather than None — the retry then supersedes it.
+    rec = claims_for_turn(md, 12)
+    assert rec is not None
+    assert len(rec["claims"]) == 2
+    assert "incomplete" not in rec
+    assert be.max_tokens_seen[-1] == be.max_tokens_seen[0] * 2
+
+
+def test_salvage_recovers_complete_claims_and_drops_the_partial():
+    from chat.claims import _salvage_truncated_claims
+    cut = ('```json\n{\n  "claims": [\n'
+           '    {"claim": "first", "grounding": "retrieved", "refs": ["$step1"]},\n'
+           '    {"claim": "second", "grounding": "retrieved", "refs": ["$step1"]},\n'
+           '    {"claim": "third", "groun')
+    out = _salvage_truncated_claims(cut)
+    assert [c["claim"] for c in out] == ["first", "second"]
+    # Nothing complete to recover → None, so the caller can still tell a
+    # truncated pass from an empty finding.
+    assert _salvage_truncated_claims('{"claims": [{"claim": "only par') is None
+    assert _salvage_truncated_claims("not json at all") is None
+
+
+def test_already_attributed_turn_is_not_re_attributed(tmp_path):
+    """justify attributes on demand, so the post-turn job often arrives to
+    find the work done. Re-running costs another call and appends a
+    duplicate line."""
+    md = _memory_dir(tmp_path)
+    _write_jsonl(md / "reasoning_trace.jsonl", TRACE)
+    stub = _Stub(md, _Backend())
+    stub._extract_and_log_claims(12)                       # on-demand
+    stub._extract_and_log_claims(12, spawn_verification=True)  # post-turn
+    assert stub.backend.calls == 1
+    lines = [l for l in (md / "claims.jsonl").read_text().splitlines() if l.strip()]
+    assert len(lines) == 1
+
+
+def test_stale_record_for_a_different_reply_does_not_suppress(tmp_path):
+    """The skip matches reply_sha1 and source, not turn_seq alone — a seq
+    can repeat across old sessions."""
+    md = _memory_dir(tmp_path)
+    _write_jsonl(md / "reasoning_trace.jsonl", TRACE)
+    _write_jsonl(md / "claims.jsonl", [{
+        "turn_seq": 12, "source": "User", "reply_sha1": "0" * 40,
+        "claims": [{"claim": "stale", "grounding": "retrieved",
+                    "refs": ["$step1"]}],
+    }])
+    stub = _Stub(md, _Backend())
+    stub._extract_and_log_claims(12)
+    assert stub.backend.calls == 1                      # ran anyway
+    assert claims_for_turn(md, 12)["claims"][0]["claim"] != "stale"
+
+
+def test_partial_record_renders_a_coverage_caveat(tmp_path):
+    md = _memory_dir(tmp_path)
+    _write_jsonl(md / "reasoning_trace.jsonl", TRACE)
+    _write_jsonl(md / "claims.jsonl", [{
+        "turn_seq": 12, "source": "User",
+        "incomplete": {"reason": "length", "recovered": 1},
+        "claims": [{"claim": "a", "grounding": "retrieved", "refs": ["$step1"]}],
+    }])
+    # Backend returns a complete pass, so the re-attempt supersedes the
+    # partial and the caveat is gone.
+    stub = _Stub(md, _Backend())
+    obs = stub._run_justify("User")
+    assert stub.backend.calls == 1
+    assert obs.startswith("OK: Provenance trail")
+    assert "PARTIAL TRAIL" not in obs
 
 
 # ── Stage 5: suspect-verification spawn ────────────────────────────────
@@ -600,3 +758,174 @@ def test_quote_from_restored_span_survives_verbatim_check():
     assert claims[0]["refs"] == ["$step1"]
     assert claims[0]["quote"] == "the tail value was 47", \
         "quote copied from the restored span was dropped"
+
+
+# ── post-turn stage isolation (Ship 2) ─────────────────────────────────
+
+def test_post_turn_stages_are_isolated_and_claims_run_first():
+    """One failing stage must not skip the rest, and claims must lead.
+
+    Claims used to run 4th, behind three LLM stages, so it landed 37-98s
+    after the reply and any exception escaping an earlier stage skipped it
+    entirely. Calls the real ChatLoop method against a fake self.
+    """
+    from chat.chat_loop import ChatLoop
+
+    order = []
+
+    class _Fake:
+        character_name = "TestJill"
+
+        def _extract_and_log_claims(self, seq, spawn_verification=False):
+            order.append("claims")
+
+        def _update_discourse_async(self, source):
+            order.append("discourse")
+            raise RuntimeError("discourse exploded")
+
+        def _reflect_and_remember(self, source):
+            order.append("reflection")
+
+        def _update_thread_centroids(self):
+            order.append("centroids")
+
+        def _persist_to_disk(self):
+            order.append("persist")
+
+    ChatLoop._post_turn_work(_Fake(), "User", False, 12)
+    # Claims first, and the discourse blow-up did not stop what follows.
+    assert order[0] == "claims"
+    assert order == ["claims", "discourse", "reflection", "centroids",
+                     "persist"]
+
+
+def test_post_turn_survives_a_failing_claims_stage():
+    """The isolation cuts both ways: claims failing must not cost the
+    turn its memory writes."""
+    from chat.chat_loop import ChatLoop
+
+    order = []
+
+    class _Fake:
+        character_name = "TestJill"
+
+        def _extract_and_log_claims(self, seq, spawn_verification=False):
+            order.append("claims")
+            raise RuntimeError("attribution exploded")
+
+        def _update_discourse_async(self, source):
+            order.append("discourse")
+
+        def _reflect_and_remember(self, source):
+            order.append("reflection")
+
+        def _update_thread_centroids(self):
+            order.append("centroids")
+
+        def _persist_to_disk(self):
+            order.append("persist")
+
+    ChatLoop._post_turn_work(_Fake(), "User", False, 12)
+    assert order == ["claims", "discourse", "reflection", "centroids",
+                     "persist"]
+
+
+# ── by-turn targeting (Ship 3) ─────────────────────────────────────────
+
+def test_justify_targets_an_earlier_turn_by_seq(tmp_path):
+    """The user reads the turn number off the reply and names it, so an
+    older answer stays auditable instead of being lost the moment another
+    turn lands."""
+    md = _memory_dir(tmp_path)
+    _populate(md)
+    stub = _Stub(md, _Backend())
+    obs = stub._run_justify("User", 10)          # not the latest (12)
+    assert obs.startswith("OK: Provenance trail")
+    assert "turn 10" in obs
+    assert "old question" in obs                 # echoes what it answered
+
+
+def test_justify_by_seq_cannot_reach_another_conversation(tmp_path):
+    """Seqs are global, conversations are not. The source predicate is
+    what stops a number naming a peer's or another channel's turn."""
+    md = _memory_dir(tmp_path)
+    trace = TRACE + [{"turn_seq": 77, "source": "Sentinel", "autonomous": False,
+                      "user_input": "patrol?", "raw_response": "all clear",
+                      "working_log": ""}]
+    _write_jsonl(md / "reasoning_trace.jsonl", trace)
+    obs = _Stub(md, _Backend())._run_justify("User", 77)
+    assert obs.startswith("EMPTY: no reply to this conversation with turn "
+                          "number 77")
+    assert "reconstruct a trail from memory" in obs
+
+
+def test_justify_by_seq_prefers_the_live_record_on_a_collision(tmp_path):
+    """Seqs 1..50 repeat across pre-seeding sessions; the later record is
+    the live one."""
+    md = _memory_dir(tmp_path)
+    trace = [
+        {"turn_seq": 7, "source": "User", "autonomous": False,
+         "user_input": "ancient", "raw_response": "stale answer",
+         "working_log": ""},
+        {"turn_seq": 7, "source": "User", "autonomous": False,
+         "user_input": "recent", "raw_response": "live answer",
+         "working_log": ""},
+    ]
+    _write_jsonl(md / "reasoning_trace.jsonl", trace)
+    assert latest_turn_for_source(md, "User", 7)["raw_response"] == \
+        "live answer"
+
+
+def test_justify_rejects_a_claims_record_for_a_different_reply(tmp_path):
+    """reply_sha1 finally earns its keep: a stale claims record under a
+    reused seq would render a real trail for the wrong text."""
+    md = _memory_dir(tmp_path)
+    _write_jsonl(md / "reasoning_trace.jsonl", TRACE)
+    _write_jsonl(md / "claims.jsonl", [{
+        "turn_seq": 12, "source": "User", "reply_sha1": "f" * 40,
+        "claims": [{"claim": "belongs to another reply",
+                    "grounding": "retrieved", "refs": ["$step1"]}],
+    }])
+    stub = _Stub(md, _Backend())
+    obs = stub._run_justify("User")
+    assert stub.backend.calls == 1               # re-attributed
+    assert "belongs to another reply" not in obs
+
+
+def test_justify_defaults_to_latest_when_no_seq_given(tmp_path):
+    md = _memory_dir(tmp_path)
+    _populate(md)
+    obs = _Stub(md, _Backend())._run_justify("User")
+    assert "turn 12" in obs and "Can I copy/paste blueprints?" in obs
+
+
+# ── turn number shown to the user matches the recorded turn ────────────
+
+def test_assigned_seq_is_stable_within_a_turn_and_advances_between(tmp_path):
+    """The number shown beside a reply must be the number that reply is
+    recorded under — otherwise 'justify 2393' audits the wrong text.
+
+    _assign_turn_seq is called twice per turn: once before publish (to
+    display) and once from the trace write. Both must yield the same value.
+    """
+    from chat.chat_loop import ChatLoop
+
+    trace = tmp_path / "reasoning_trace.jsonl"
+    _write_jsonl(trace, [{"turn_seq": n} for n in range(1, 2393)])
+
+    class _Fake(ChatLoop):
+        def __init__(self):
+            self.character_name = "TestJill"
+            self._turn_seq = 0
+
+        def _reasoning_trace_path(self):
+            return trace
+
+    loop = _Fake()
+    # Seeded from the line count, not restarted at 1.
+    first = loop._assign_turn_seq()
+    assert first == 2393
+    assert loop._assign_turn_seq() == 2393      # idempotent within the turn
+
+    loop._pending_turn_seq = None               # next turn
+    assert loop._assign_turn_seq() == 2394

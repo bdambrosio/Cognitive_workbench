@@ -210,9 +210,59 @@ def valid_refs_for(record: Dict[str, Any]) -> Set[str]:
     return refs
 
 
+def _salvage_truncated_claims(raw: str) -> Optional[List[Dict[str, Any]]]:
+    """Recover the complete claim objects from a cut-off attribution.
+
+    Schema-aware on purpose, and local to this module rather than in
+    json_utils: "drop the trailing partial element" is only sound because
+    a claims array's elements are independent. Returns None when nothing
+    complete can be recovered, so the caller can still distinguish a
+    truncated pass from an empty finding.
+    """
+    text = str(raw or '')
+    start = text.find('"claims"')
+    if start < 0:
+        return None
+    bracket = text.find('[', start)
+    if bracket < 0:
+        return None
+    out: List[Dict[str, Any]] = []
+    depth, obj_start, in_str, esc = 0, None, False, False
+    for i in range(bracket + 1, len(text)):
+        ch = text[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == '\\':
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == '{':
+            if depth == 0:
+                obj_start = i
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0 and obj_start is not None:
+                try:
+                    item = json.loads(text[obj_start:i + 1])
+                except json.JSONDecodeError:
+                    break
+                if isinstance(item, dict):
+                    out.append(item)
+                obj_start = None
+        elif ch == ']' and depth == 0:
+            break
+    return out or None
+
+
 def attribute_claims(record: Dict[str, Any],
                      llm_chat: Callable[[List[Dict[str, str]]], str],
-                     character_name: str = 'the assistant'
+                     character_name: str = 'the assistant',
+                     status: Optional[Dict[str, Any]] = None
                      ) -> Optional[List[Dict[str, Any]]]:
     """Decompose record['raw_response'] into attributed claims.
 
@@ -221,6 +271,11 @@ def attribute_claims(record: Dict[str, Any],
     Returns the validated claims list ([] = reply carries no factual
     claims), or None when the LLM call or parse failed — the distinction
     matters downstream: [] is a finding, None is a pass that didn't run.
+
+    `status`, when given, is filled in with what happened: 'truncated' and
+    'salvaged' when the output was cut off and partially recovered,
+    'error' with a short reason when the pass produced nothing. The caller
+    needs that to mark a partial record and to say why a trail is missing.
     """
     from utils.json_utils import repair_json_string
 
@@ -260,12 +315,31 @@ def attribute_claims(record: Dict[str, Any],
         raw = llm_chat(messages)
     except Exception as e:
         logger.warning(f"claim attribution LLM call failed: {e}")
+        if status is not None:
+            status['error'] = f"backend call failed: {e}"
         return None
     obj = repair_json_string(raw or '')
     if not isinstance(obj, dict) or not isinstance(obj.get('claims'), list):
+        # repair_json_string cannot rescue a truncated claims array — it
+        # closes braces, never the array, and a half-written trailing
+        # claim would survive if it did. Salvage the complete objects and
+        # drop the partial one, so a cut-off pass yields a marked-partial
+        # trail instead of nothing.
+        salvaged = _salvage_truncated_claims(raw or '')
+        if salvaged is None:
+            logger.warning(
+                f"claim attribution unparseable output ({len(str(raw))} chars, "
+                f"unsalvageable): {str(raw)[:200]!r}")
+            if status is not None:
+                status['error'] = 'output unparseable'
+            return None
         logger.warning(
-            f"claim attribution unparseable output: {str(raw)[:200]!r}")
-        return None
+            f"claim attribution truncated; salvaged {len(salvaged)} complete "
+            f"claim(s) from {len(str(raw))} chars of output")
+        if status is not None:
+            status['truncated'] = True
+            status['salvaged'] = len(salvaged)
+        obj = {'claims': salvaged}
 
     claims: List[Dict[str, Any]] = []
     for item in obj['claims']:
@@ -373,12 +447,22 @@ def claims_for_turn(memory_dir: Path, turn_seq: int
         Path(memory_dir) / 'claims.jsonl', 'turn_seq', turn_seq)
 
 
-def latest_turn_for_source(memory_dir: Path, source: str
+def latest_turn_for_source(memory_dir: Path, source: str,
+                           turn_seq: Optional[int] = None
                            ) -> Optional[Dict[str, Any]]:
-    """Most recent reasoning-trace record for this conversation. Matching
-    on `source` naturally excludes autonomous fires (their source is the
-    character itself), so interleaved autonomous turns don't shadow the
-    reply the user is asking about."""
+    """Reasoning-trace record for this conversation: the most recent, or
+    the one with `turn_seq` when given.
+
+    Matching on `source` naturally excludes autonomous fires (their source
+    is the character itself), so interleaved autonomous turns don't shadow
+    the reply the user is asking about. The same predicate is what keeps a
+    turn_seq from reaching into another conversation's trail — seqs are
+    global, conversations are not, so a bare seq lookup could render a
+    peer's or another channel's turn here.
+
+    Last match wins: seqs 1..50 repeat across pre-seeding sessions, and the
+    later record is the live one.
+    """
     path = Path(memory_dir) / 'reasoning_trace.jsonl'
     if not path.is_file():
         return None
@@ -389,8 +473,11 @@ def latest_turn_for_source(memory_dir: Path, source: str
                 rec = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if rec.get('source') == source:
-                found = rec
+            if rec.get('source') != source:
+                continue
+            if turn_seq is not None and rec.get('turn_seq') != turn_seq:
+                continue
+            found = rec
     return found
 
 
@@ -773,21 +860,105 @@ class ClaimsMixin:
         if not reply or reply == '(no reply)':
             return
 
+        # Already attributed? `justify` attributes on demand, so when the
+        # user asks immediately the post-turn job arrives to find the work
+        # done. Re-running costs another 11-20s call and appends a
+        # duplicate line. Match on reply_sha1 and source, not turn_seq
+        # alone — a seq can repeat across old sessions, and a stale record
+        # for a different reply must not suppress a real pass.
+        existing = claims_for_turn(self._memory_dir(), turn_seq)
+        if (existing is not None
+                and not existing.get('incomplete')
+                and existing.get('source') == record.get('source')
+                and existing.get('reply_sha1') == hashlib.sha1(
+                    reply.encode('utf-8')).hexdigest()):
+            logger.info(
+                f"[{self.character_name}] claims: turn {turn_seq} already "
+                f"attributed ({len(existing.get('claims') or [])} claim(s)); "
+                f"skipping re-attribution")
+            if spawn_verification:
+                try:
+                    self._maybe_spawn_suspect_verification(
+                        record, existing.get('claims') or [])
+                except Exception as e:
+                    logger.warning(
+                        f"[{self.character_name}] suspect-verification spawn "
+                        f"failed for turn {turn_seq}: {e}")
+            return
+
+        # Budget comes from the same floor table _make_llm_callable uses,
+        # so the two cannot drift. This call reaches self.backend.chat
+        # directly and so never got that floor: the old literal 1600 cut
+        # the JSON mid-object on any reply with many quoted claims and the
+        # whole pass was dropped (live: turns 2393/2396, three
+        # finish=length failures, no record written).
+        floor = (self._PROFILE_TOKEN_FLOOR_CLOUD if self.backend.is_cloud
+                 else self._PROFILE_TOKEN_FLOOR_LOCAL)
+        budget = max(1600, int(floor.get('none', 0)))
+        attempts = {'n': 0}
+
         def llm_chat(messages):
-            return self.backend.chat(messages, max_tokens=1600,
+            # Retry once at double budget when the backend reports it ran
+            # out of room. Lives here rather than in attribute_claims so
+            # that function stays pure and offline-runnable.
+            attempts['n'] += 1
+            cap = budget * 2 if attempts['n'] > 1 else budget
+            return self.backend.chat(messages, max_tokens=cap,
                                      temperature=0.2, cot_profile='none')
 
+        status: Dict[str, Any] = {}
         claims = attribute_claims(record, llm_chat,
-                                  character_name=self.character_name)
+                                  character_name=self.character_name,
+                                  status=status)
+        # Retry whenever the first pass ran out of room — whether it was
+        # unsalvageable (claims is None) or salvaged into a partial. A
+        # partial beats nothing, but a complete pass beats a partial, so
+        # the bigger attempt wins if it produces one.
+        ran_out = (status.get('truncated')
+                   or (claims is None
+                       and self.backend.last_finish_reason in ('length',
+                                                               'max_tokens')))
+        if ran_out:
+            logger.info(
+                f"[{self.character_name}] claims: retrying turn {turn_seq} "
+                f"at {budget * 2} tokens after a truncated first pass")
+            retry_status: Dict[str, Any] = {}
+            retry = attribute_claims(record, llm_chat,
+                                     character_name=self.character_name,
+                                     status=retry_status)
+            # Keep the retry only if it is genuinely better: complete when
+            # the first was partial, or non-empty when the first was None.
+            if retry is not None and (claims is None
+                                      or not retry_status.get('truncated')
+                                      or len(retry) > len(claims)):
+                claims, status = retry, retry_status
         if claims is None:
-            return  # already logged; nothing durable to write
+            # Nothing durable to write. Never write claims: [] here — that
+            # is a real finding ("no checkable claims") and must not be
+            # manufactured by a failure.
+            logger.warning(
+                f"[{self.character_name}] claims: attribution produced no "
+                f"record for turn {turn_seq} "
+                f"({status.get('error') or 'unknown'}; "
+                f"finish={self.backend.last_finish_reason}, "
+                f"attempts={attempts['n']})")
+            return
         from utils.file_utils import append_jsonl
-        append_jsonl(self._claims_log_path(), {
+        rec: Dict[str, Any] = {
             'turn_seq': turn_seq,
             'source': record.get('source'),
             'reply_sha1': hashlib.sha1(reply.encode('utf-8')).hexdigest(),
             'claims': claims,
-        }, character=self.character_name)
+        }
+        if status.get('truncated'):
+            rec['incomplete'] = {'reason': 'length',
+                                 'recovered': int(status.get('salvaged') or 0)}
+        append_jsonl(self._claims_log_path(), rec, character=self.character_name)
+        logger.info(
+            f"[{self.character_name}] claims: turn {turn_seq} attributed "
+            f"{len(claims)} claim(s)"
+            + (" (PARTIAL — output was truncated)"
+               if status.get('truncated') else ""))
         if spawn_verification:
             try:
                 self._maybe_spawn_suspect_verification(record, claims)
@@ -866,17 +1037,50 @@ class ClaimsMixin:
             })
         return new_id
 
-    def _run_justify(self, source: str) -> str:
+    def _run_justify(self, source: str,
+                     turn_seq: Optional[int] = None) -> str:
         """Backend for the ReAct `justify` tool: render the provenance
-        trail of the most recent reply to this conversation. Read-only
-        and LLM-free — the observation is the persisted records."""
+        trail of a reply to this conversation — the most recent, or the
+        one the user named by turn number. Read-only, and the observation
+        is built from persisted records alone.
+
+        That last property is what the old most-recent-only rule was
+        really protecting: a trail must never be reconstructed from recall
+        or conversation memory (paraphrase-as-provenance, observed live at
+        turn 2219). Neither attribute_claims nor render_justification can
+        reach anything but the records, so auditing by turn number is
+        exactly as laundering-proof as auditing the latest reply.
+        """
         memory_dir = self._memory_dir()
-        trace_rec = latest_turn_for_source(memory_dir, source)
+        trace_rec = latest_turn_for_source(memory_dir, source, turn_seq)
         if trace_rec is None:
+            if turn_seq is not None:
+                return (f"EMPTY: no reply to this conversation with turn "
+                        f"number {turn_seq}. Check the number against the "
+                        f"one shown beside the reply. Do NOT substitute a "
+                        f"different turn and do NOT reconstruct a trail "
+                        f"from memory.")
             return ("EMPTY: no prior reply to this conversation in the "
                     "reasoning trace — nothing to justify yet.")
         seq = trace_rec.get('turn_seq')
         claims_rec = claims_for_turn(memory_dir, seq)
+        # Guard the join. reply_sha1 has been written since attribution
+        # existed and never once read; it is what catches a claims record
+        # belonging to a different reply under the same seq (seqs 1..50
+        # repeat across pre-seeding sessions). A stale record is worse
+        # than none: it renders a real, well-formed trail for the wrong
+        # text. Treat as absent and re-attribute.
+        if claims_rec is not None:
+            reply_txt = str(trace_rec.get('raw_response') or '').strip()
+            expected = hashlib.sha1(reply_txt.encode('utf-8')).hexdigest()
+            recorded = claims_rec.get('reply_sha1')
+            if (claims_rec.get('source') != trace_rec.get('source')
+                    or (recorded is not None and recorded != expected)):
+                logger.warning(
+                    f"[{self.character_name}] justify: claims record for turn "
+                    f"{seq} does not match that turn's reply "
+                    f"(source/sha1 mismatch); re-attributing")
+                claims_rec = None
         if claims_rec is None:
             if trace_rec.get('autonomous'):
                 return ("EMPTY: the previous turn here was autonomous; "
@@ -891,8 +1095,27 @@ class ClaimsMixin:
             # Also covers turns persisted before claim attribution existed.
             self._extract_and_log_claims(int(seq))
             claims_rec = claims_for_turn(memory_dir, seq)
+        elif claims_rec.get('incomplete'):
+            # A partial record from a truncated pass. Try once for a
+            # complete one; last-match-wins means the better result stands.
+            self._extract_and_log_claims(int(seq))
+            claims_rec = claims_for_turn(memory_dir, seq) or claims_rec
         if claims_rec is None:
-            return (f"EMPTY: claim attribution for turn {seq} did not "
-                    f"produce a record (see warning log).")
-        return "OK: " + render_justification(claims_rec, trace_rec,
-                                             memory_dir)
+            # ERROR, not EMPTY: per the observation convention EMPTY means
+            # "ran clean, nothing to show", which reads as a retryable
+            # wait and produced the retry-then-apologise loop at turn 2393.
+            return (f"ERROR: provenance attribution for turn {seq} failed, so "
+                    f"no trail was recorded. Tell the user plainly that the "
+                    f"audit for that reply could not be produced. Do NOT "
+                    f"reconstruct a trail from memory or recall, and do NOT "
+                    f"say the record is still being written — this tool "
+                    f"attributes on demand, so there is nothing to wait for "
+                    f"and calling it again unchanged will fail the same way.")
+        out = render_justification(claims_rec, trace_rec, memory_dir)
+        inc = claims_rec.get('incomplete')
+        if isinstance(inc, dict):
+            out = (f"PARTIAL TRAIL — attribution was cut off after "
+                   f"{inc.get('recovered')} claim(s); anything the reply "
+                   f"asserted beyond that point is unattributed here. Present "
+                   f"it as covering only part of the reply.\n\n" + out)
+        return "OK: " + out

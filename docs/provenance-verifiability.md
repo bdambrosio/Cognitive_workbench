@@ -145,9 +145,22 @@ is at justify time):
   the kind of fact that goes stale?") — so the audit note sends it to
   tools instead of its prior, with the retraction pre-licensed ("lead
   with the correction").
-- Honesty guard: `justify` audits the most recent reply only; a trail
-  must never be reconstructed from recall (paraphrase-as-provenance
-  laundering, observed live turn 2219).
+- Honesty guard: a trail is built from persisted records alone and must
+  never be reconstructed from recall (paraphrase-as-provenance
+  laundering, observed live turn 2219). `justify` audited only the most
+  recent reply as a proxy for that invariant; the proxy cost real
+  auditability — once another turn landed, the reply you wanted to check
+  was unreachable, and a failed audit made its own apology the newest
+  turn. `justify` now takes an optional `turn_seq`, and the invariant is
+  enforced where it actually lives: neither `attribute_claims` nor
+  `render_justification` can read anything but the records, so auditing
+  by turn number is exactly as laundering-proof as auditing the latest.
+  The number is supplied by the USER — each reply is displayed with its
+  turn number — not inferred by the model, which would risk rendering a
+  real trail for the wrong text. Cross-conversation reach is blocked by
+  the `source` predicate in `latest_turn_for_source`, and a claims record
+  belonging to a different reply under a reused seq (seqs 1..50 repeat
+  across pre-seeding sessions) is caught by verifying `reply_sha1`.
 
 Stage 5 — background verification (`8c1396e0`): post-turn suspect
 grades spawn a one-shot verification concern (user-yield vehicle,

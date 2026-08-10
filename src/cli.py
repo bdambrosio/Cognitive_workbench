@@ -76,11 +76,15 @@ def _clean_agent_text(text: str) -> str:
     return text.strip()
 
 
-def _print_agent(character: str, text: str):
+def _print_agent(character: str, text: str, turn_seq=None):
     text = _clean_agent_text(text)
     if not text:
         return
-    print(f"\n{C.CYAN}{C.BOLD}{character}{C.RESET} {C.DIM}[{_ts()}]{C.RESET}")
+    # The turn number rides the header, not the text: it is how you name
+    # this reply later ("justify 2393") without having to be on the most
+    # recent turn.
+    seq = f" {C.DIM}#{turn_seq}{C.RESET}" if turn_seq is not None else ""
+    print(f"\n{C.CYAN}{C.BOLD}{character}{C.RESET} {C.DIM}[{_ts()}]{C.RESET}{seq}")
     for line in text.split('\n'):
         print(f"  {line}")
     print()
@@ -687,7 +691,7 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
                         # Keep only last 5 to bound memory
                         if len(recent) > 5:
                             del recent[0]
-                    _print_agent(character, text)
+                    _print_agent(character, text, data.get('turn_seq'))
                 return
 
             if action_type == 'ask':

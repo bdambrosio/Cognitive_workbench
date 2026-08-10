@@ -549,7 +549,16 @@ class ReactMixin:
                 q = self._resolve_react_value(action.get('query', ''), log)
                 obs = self._run_security(q)
             elif tool == 'justify':
-                obs = self._run_justify(source)
+                raw_seq = action.get('turn_seq')
+                try:
+                    want_seq = (int(raw_seq) if raw_seq not in (None, '')
+                                else None)
+                except (TypeError, ValueError):
+                    want_seq = None
+                    logger.warning(
+                        f"[{self.character_name}] justify: unusable turn_seq "
+                        f"{raw_seq!r}; auditing the most recent reply instead")
+                obs = self._run_justify(source, want_seq)
             elif tool == 'agent-say':
                 to = str(action.get('to') or '')
                 msg_text = self._resolve_react_value(action.get('text', ''), log)

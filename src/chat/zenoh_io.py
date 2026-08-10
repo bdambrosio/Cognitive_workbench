@@ -184,7 +184,8 @@ class ZenohMixin:
         msg['hops'] = int(hops_val) if isinstance(hops_val, (int, float)) else 0
         self._inbox.put(msg)
 
-    def _publish_say(self, text: str, *, speak: bool = False) -> None:
+    def _publish_say(self, text: str, *, speak: bool = False,
+                     turn_seq: Optional[int] = None) -> None:
         if not self._action_pub:
             return
         payload = {
@@ -193,6 +194,14 @@ class ZenohMixin:
             'text': text,
             'timestamp': datetime.now(timezone.utc).isoformat(),
         }
+        # Display-layer only: the CLI shows this beside the timestamp so
+        # the user can name a turn when asking for its provenance
+        # ("justify 2393"). Deliberately NOT folded into `text` — that
+        # would flow into the conversation store, discourse and memory,
+        # and the character would start reading its own seq markers back
+        # out of its prompt.
+        if turn_seq is not None:
+            payload['turn_seq'] = int(turn_seq)
         try:
             self._action_pub.put(json.dumps(payload).encode('utf-8'))
         except Exception as e:

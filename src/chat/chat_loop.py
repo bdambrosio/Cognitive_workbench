@@ -402,6 +402,13 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
     # Embodiment surfaces, probed rather than declared. Each entry is
     # (label, base-url resolver, health path, what having this body means).
     # Adding a surface is a row here, not prose in a persona file.
+    # This turn's seq once assigned, cleared at turn end. Assigned before
+    # the reply is published so the CLI can show the user which turn they
+    # are reading, and reused by the trace write so both agree. Declared
+    # at class level so it exists however the object was constructed —
+    # several tests build a ChatLoop without running __init__.
+    _pending_turn_seq: Optional[int] = None
+
     _EMBODIMENT_SURFACES = (
         ('shared world', 'utils.world_link', '/health',
          "you have a body in a walkable terrain alongside Bruce — perceive "
@@ -1073,6 +1080,34 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                 f"({kind}/{entity}) failed: {e}"
             )
 
+    def _assign_turn_seq(self) -> int:
+        """Assign this turn's seq, seeding from the trace on first use.
+
+        Idempotent within a turn: `_pending_turn_seq` holds the number
+        once assigned, so calling this before publish (to show the user
+        which turn they are reading) and again from
+        `_write_reasoning_history` yields the same value.
+
+        Seeding keeps turn_seq globally monotonic across restarts (line N
+        = turn N). Without it turn_seq restarts at 1 each session and the
+        sidecar joins (memories.jsonl / claims.jsonl source_turn_seq)
+        become ambiguous.
+        """
+        if self._pending_turn_seq is not None:
+            return self._pending_turn_seq
+        if self._turn_seq == 0:
+            path = self._reasoning_trace_path()
+            if path.is_file():
+                try:
+                    with open(path, encoding='utf-8') as f:
+                        self._turn_seq = sum(1 for _ in f)
+                except Exception as e:
+                    logger.warning(
+                        f"[{self.character_name}] turn_seq seed failed: {e}")
+        self._turn_seq += 1
+        self._pending_turn_seq = self._turn_seq
+        return self._turn_seq
+
     def _write_react_trace(self, source: str, user_text: str,
                            log: List[Tuple[str, str]],
                            iters: List[Dict[str, Any]],
@@ -1163,21 +1198,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         faithful record of awareness window per turn without duplicating
         prior trace content."""
         try:
-            # Seed the counter from the existing trace on the session's
-            # first write so turn_seq stays globally monotonic across
-            # restarts (line N = turn N). Without this, turn_seq restarts
-            # at 1 each session and the sidecar joins (memories.jsonl /
-            # claims.jsonl source_turn_seq) become ambiguous.
-            if self._turn_seq == 0:
-                path = self._reasoning_trace_path()
-                if path.is_file():
-                    try:
-                        with open(path, encoding='utf-8') as f:
-                            self._turn_seq = sum(1 for _ in f)
-                    except Exception as e:
-                        logger.warning(
-                            f"[{self.character_name}] turn_seq seed failed: {e}")
-            self._turn_seq += 1
+            self._assign_turn_seq()
 
             # Build working_log as literal text from iters: per-iter raw
             # action emission + bound $stepN observation, untruncated.
@@ -1313,47 +1334,57 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
 
     def _post_turn_work(self, source: str, close: bool,
                         turn_seq: Optional[int] = None) -> None:
-        """Background side-effect job for one turn: discourse update,
-        reflection (memory writes), claim attribution, optional dialog
-        close, autosave.
+        """Background side-effect job for one turn: claim attribution,
+        discourse update, reflection (memory writes), thread centroids,
+        optional dialog close, autosave.
 
         Runs on the post-turn executor (single worker) so jobs are
-        sequential per character. Failure-tolerant: any exception is
-        logged but does not propagate out of the executor (the main
-        thread is no longer here to receive it anyway).
+        sequential per character. Each stage is isolated: one failing
+        stage no longer skips the rest. The outer handler stays as a
+        backstop — any exception is logged but does not propagate out of
+        the executor (the main thread is no longer here to receive it).
+
+        Claim attribution runs FIRST. It is the only stage a user can
+        demand synchronously (`justify`), and the only one whose input —
+        the persisted trace record — is already final when the job
+        starts. Behind discourse and reflection it landed 37-98s after
+        the reply (measured); ahead of them it is ~11-20s. Nothing here
+        depends on it running late: claims cite Note_N ids from PRIOR
+        turns' recall hits, not memories this turn's reflection writes.
+        The cost is that reflection's memory writes land that much later,
+        which no one can observe — unlike a missing trail.
         """
-        try:
-            self._update_discourse_async(source)
-            # Reflection runs after discourse so it can see the latest
-            # companion state and avoid duplicating it.
-            self._reflect_and_remember(source)
-            # Stage 5: drift active thread centroids toward the
-            # current turn's embedding, weighted by thread activation.
-            # No-op if no threads, no embedding, or all activations
-            # below threshold. In-place property mutation; the
-            # _persist_to_disk below handles save.
+        def _stage(name: str, fn, *args) -> None:
             try:
-                self._update_thread_centroids()
+                fn(*args)
             except Exception as e:
                 logger.warning(
-                    f"[{self.character_name}] thread centroid update failed: {e}")
+                    f"[{self.character_name}] post-turn stage {name!r} "
+                    f"failed: {e}")
+
+        try:
             # Claim-level provenance (Level-2 verifiability): decompose
             # this turn's reply into attributed claims → claims.jsonl.
             # Reads the persisted trace record, so it audits exactly
             # what is durable. turn_seq is None when no trace was
             # written (pre-loop crash).
             if turn_seq is not None:
-                try:
-                    self._extract_and_log_claims(turn_seq,
-                                                 spawn_verification=True)
-                except Exception as e:
-                    logger.warning(
-                        f"[{self.character_name}] claim attribution failed: {e}")
+                _stage('claims', self._extract_and_log_claims, turn_seq, True)
+            _stage('discourse', self._update_discourse_async, source)
+            # Reflection runs after discourse so it can see the latest
+            # companion state and avoid duplicating it.
+            _stage('reflection', self._reflect_and_remember, source)
+            # Stage 5: drift active thread centroids toward the
+            # current turn's embedding, weighted by thread activation.
+            # No-op if no threads, no embedding, or all activations
+            # below threshold. In-place property mutation; the
+            # _persist_to_disk below handles save.
+            _stage('thread_centroids', self._update_thread_centroids)
             if close:
-                self.store.close_dialog(source)
+                _stage('close_dialog', self.store.close_dialog, source)
             # Autosave. Memories written above land on disk here; without
             # this, a SIGINT mid-job loses the turn's memory updates.
-            self._persist_to_disk()
+            _stage('persist', self._persist_to_disk)
         except Exception as e:
             logger.warning(f"[{self.character_name}] post-turn work failed: {e}")
 
@@ -1387,6 +1418,11 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         self._affect.set_trigger('autonomous' if autonomous else 'user')
         self._affect.set_mode('thinking')
         self._current_turn_hops = max(0, int(hops or 0))
+        # Fresh slot per turn. Reset here rather than at the end of the
+        # inner turn so a crash between assignment and completion cannot
+        # leak this turn's number into the next one, which would hand two
+        # replies the same seq.
+        self._pending_turn_seq = None
         try:
             self._process_user_turn_inner(
                 source, text, close,
@@ -1537,6 +1573,13 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         if not reply:
             reply = "(no reply)"
 
+        # Assign this turn's seq now, before publish, so the reply can
+        # carry the number the user needs to ask for its provenance
+        # later ("justify 2393"). The trace write reuses the same value.
+        # Only when a trace will actually be written — otherwise the
+        # counter would advance past the line count it is seeded from.
+        turn_seq_for_reply = self._assign_turn_seq() if iters else None
+
         act_type = 'auto_say' if autonomous else 'say'
         self.store.record_outgoing(source, reply, act_type=act_type, close=close)
         self._append_conversation_entry(
@@ -1546,7 +1589,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             # turn's modality, not the speaker's identity, so an attributed voice
             # turn (a resolved name) still gets spoken (cw-voice-sensor-plan.md §10).
             speak = (not autonomous) and modality == VOICE_MODALITY
-            self._publish_say(reply, speak=speak)
+            self._publish_say(reply, speak=speak,
+                              turn_seq=turn_seq_for_reply)
             # Agent-exchange reply routing: a turn sourced by a co-resident
             # agent gets this reply delivered back to that agent's inbox
             # (hop-budgeted in _route_reply_to_peer). The /action publish
