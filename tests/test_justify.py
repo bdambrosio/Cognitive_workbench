@@ -344,6 +344,61 @@ def _canned_llm(claims):
     return lambda messages: json.dumps({"claims": claims})
 
 
+def test_attributor_sees_the_harness_provenance_it_was_told(tmp_path):
+    """The Substrate block is prompt content, so a claim restating it is
+    `context` — but the attributor could not see it. Live at turn 2447:
+    "you definitely look like a crow" came straight out of a commit subject
+    in that block, graded model_prior/volatile -> suspect (the worst grade
+    available), and spawned a background job to web-verify a fact recorded
+    in this repo's git log. Same fix as active_concerns at turn 2316."""
+    from chat.claims import attribute_claims
+
+    rec = {
+        "turn_seq": 2447, "source": "User",
+        "user_input": "Do I look like a crow?",
+        "raw_response": "Yes, you definitely look like a crow.",
+        "working_log": "$step1 OK: Bruce (the human) - 0.8 m away",
+        "active_concerns": ["[agent 1.00] Track what the user wants"],
+        "substrate": ("running commit 51f86f04; 1 commit(s) since my last "
+                      "session: world: creature avatars - Bruce a crow, "
+                      "Jill a kitten, Sentinel an owl"),
+        "embodiment": "body: the shared world",
+        "recall_hits": [],
+    }
+    seen = {}
+
+    def _llm(messages):
+        seen["sys"], seen["user"] = messages[0]["content"], messages[-1]["content"]
+        return '{"claims": []}'
+
+    attribute_claims(rec, _llm, character_name="Jill")
+    state = seen["user"][seen["user"].index("## ASSISTANT STATE"):
+                         seen["user"].index("## User input")]
+    assert "Bruce a crow" in state, "the substrate line must be visible"
+    assert "[harness provenance]" in state and "[body]" in state
+    # Concerns still there — this adds a channel, it does not replace one.
+    assert "Track what the user wants" in state
+    # And the rule tells the attributor what to do with it.
+    assert "code revision it is running" in seen["sys"]
+
+
+def test_no_harness_provenance_recorded_is_simply_absent():
+    """Legacy records predate the fields; they must render as before."""
+    from chat.claims import attribute_claims
+
+    seen = {}
+
+    def _llm(messages):
+        seen["user"] = messages[-1]["content"]
+        return '{"claims": []}'
+
+    attribute_claims({"turn_seq": 1, "raw_response": "hi there.",
+                      "active_concerns": ["[agent 1.00] x"]},
+                     _llm, character_name="Jill")
+    assert "[harness provenance]" not in seen["user"]
+    assert "[agent 1.00] x" in seen["user"]
+
+
 def test_attribute_claims_keeps_verbatim_quote():
     # Quote spans a line wrap in the observation — whitespace-normalized
     # matching must still accept it.

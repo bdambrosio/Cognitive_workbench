@@ -100,8 +100,9 @@ from that observation which contains or directly entails the claim.
 - memory: the content comes from a recalled memory. refs = its Note_N id(s).
 - user_asserted: the user stated it this turn. refs = ["user_input"].
 - context: from the assistant's own prompt — earlier conversation, or the \
-ASSISTANT STATE section (its active concerns and operational state) — not \
-this turn's input or tools. refs = [].
+ASSISTANT STATE section (its active concerns, and the harness provenance and \
+body it was told about itself at session start) — not this turn's input or \
+tools. refs = [].
 - inferred: derived by reasoning over other evidence this turn. refs = the \
 premises ($stepN / Note_N / user_input).
 - model_prior: from the assistant's background knowledge; nothing in this \
@@ -144,9 +145,13 @@ probe was designed to find the thing if it existed) or "inadequate" \
 
 Attribution discipline:
 - The assistant is authoritative for its own current state. A claim \
-describing the assistant's own concerns, tasks, tools, or configuration \
-that is supported by the ASSISTANT STATE section is "context", never \
-model_prior — it restates recorded state, not background knowledge.
+describing the assistant's own concerns, tasks, tools, configuration, the \
+code revision it is running or the body it has, that is supported by the \
+ASSISTANT STATE section, is "context", never model_prior — it restates \
+recorded state, not background knowledge. This holds for what a commit \
+subject in that section says the harness now does: read there, it is \
+context, however much it also sounds like something the model might \
+simply know.
 - Attribute by CONTENT SUPPORT, not co-occurrence. A tool having been \
 called does not make a claim "retrieved" — the observation text must \
 contain or directly entail the claim. If the reply asserts more than the \
@@ -302,12 +307,26 @@ def attribute_claims(record: Dict[str, Any],
     # The replying model saw its own active concerns in its prompt; the
     # attributor must see them too, or self-state claims have no visible
     # support and fall through to model_prior (live miss: turn 2316).
-    state_block = _cap_working_log('\n'.join(
-        str(c) for c in (record.get('active_concerns') or [])))
+    # Operational self-state the replying model was shown: its concerns,
+    # plus the harness provenance it was told at session start (which commit
+    # it runs, what body it has). All three are prompt content, so a claim
+    # restating them is `context` — but only if the attributor can see them.
+    # It could not see the substrate line, and turn 2447's "you look like a
+    # crow" — lifted verbatim from a commit subject in that block — graded
+    # model_prior/volatile → suspect, then spawned a background job to go
+    # web-verify a fact recorded in this repo's git log.
+    state_lines = [str(c) for c in (record.get('active_concerns') or [])]
+    for key, label in (('substrate', 'harness provenance'),
+                       ('embodiment', 'body')):
+        val = str(record.get(key) or '').strip()
+        if val:
+            state_lines.append(f"[{label}] {val}")
+    state_block = _cap_working_log('\n'.join(state_lines))
     user_parts = [
         f"## ALLOWED REFS\n{', '.join(sorted(allowed))}",
-        f"## ASSISTANT STATE (the assistant's own active concerns, shown "
-        f"in its prompt this turn)\n{state_block or '(none)'}",
+        f"## ASSISTANT STATE (the assistant's own active concerns, plus the "
+        f"harness provenance and body it was told at session start — all of "
+        f"it shown in its prompt this turn)\n{state_block or '(none)'}",
         f"## User input\n{record.get('user_input') or '(none — autonomous turn)'}",
         f"## Recalled memories\n{recall_block or '(none)'}",
         f"## Working log (tool calls and observations)\n"

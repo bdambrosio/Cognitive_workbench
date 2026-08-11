@@ -68,6 +68,43 @@ one-off; it is the only case anyone looked at.
 Consequence for the design: this is not a taxonomy gap and not a note
 attribute. See "turn_num" below.
 
+## 2026-08-11: finding 1's third channel, and the cheap half shipped
+
+Turn 2447, "do I look like a crow?" — one claim, `model_prior × volatile →
+suspect`, the worst grade available. Jill ran `justify`, **disputed her own
+trail**, and named the real source with a verbatim quote: the Substrate
+block in her system prompt, `running commit 51f86f04; 1 commit(s) since my
+last session: world: creature avatars — Bruce a crow, Jill a kitten,
+Sentinel an owl`. All three parts of that check out — `git log --oneline
+47bb48e8..51f86f04` is exactly that one commit, her session marker recorded
+head `51f86f04`, and `world-look` really did only say `Bruce (the human)`,
+with no species in it. She was right and the trail was wrong.
+
+Same structural cause as the reasoning-history case, one more channel: the
+attributor's evidence view is ALLOWED REFS, ASSISTANT STATE, user input,
+recall hits, working log, reply. The Substrate and Embodiment lines live in
+the *system* prompt and were invisible, so a claim lifted from them had no
+visible support and fell through to model_prior by construction.
+
+It cost a real fire: the suspect grade spawned `Note_6374` fourteen seconds
+later, to go verify with web tools whether Bruce looks like a crow — a fact
+recorded in this repo's git log and nowhere else. Abandoned by hand through
+the live process's `control/concern_manage` queryable.
+
+**Shipped**, because unlike the reasoning-history block this half is nearly
+free — two short lines, machine-generated from `git`, not model text:
+`_write_react_trace` records `substrate` and `embodiment`, and
+`attribute_claims` folds them into ASSISTANT STATE tagged `[harness
+provenance]` / `[body]`. No new ref form: `context` already covers the
+assistant's own prompt, and the discipline note now says so explicitly for
+a commit subject, which is the case most likely to read as something the
+model simply knows. Absent on legacy records, which render exactly as
+before. Turn 2447 is the regression test.
+
+Still open, and still the expensive half: re-served answers from the
+reasoning-history block, where the laundering risk argues for verbatim
+quoting against the persisted reply before any `turn:N` ref exists.
+
 ## Reviewing the weather turn (2407 / 2408) — two more ships
 
 Turn 2407: `search-web` → `process_text` → `respond`, one weather.gov

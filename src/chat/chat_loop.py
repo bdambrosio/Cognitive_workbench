@@ -1322,6 +1322,19 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                 'working_log': working_log,
                 'raw_response': final_response or '',
             }
+            # Harness provenance the turn was told about itself: which
+            # commit it is running and what body it has, both injected into
+            # the system prompt at session start. Recorded because claim
+            # attribution reads this record — without them a claim taken
+            # from the Substrate block has no visible support and grades
+            # model_prior, which is how "you look like a crow" came back
+            # `suspect` at turn 2447 while the commit subject naming the
+            # avatars was sitting in the prompt. Same reason
+            # `active_concerns` is here (turn 2316). Two short lines.
+            for key in ('_substrate_line', '_embodiment_line'):
+                val = str(getattr(self, key, '') or '').strip()
+                if val:
+                    record[key.strip('_')] = val
             if tool_meta:
                 record['tool_meta'] = tool_meta
             if observations_full:
