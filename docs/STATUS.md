@@ -43,6 +43,7 @@ Categories:
 | [sentinel-setup.md](sentinel-setup.md) | Sentinel desktop-security character: Tier 0 unprivileged probes, Tier 2 argument-exact sudoers fence, `adm`-group prerequisite; sudoers installed + verified live 2026-08-08. Ubuntu/systemd-specific (ufw + AppArmor) |
 | [sensor_spec.md](sensor_spec.md) | Sensor system (`src/sensors/`, `sensor_runner.py`, SKILL.md metadata); banner 2026-07-19 — machinery live, OODA framing + launcher-integration section stale |
 | [sensor_spec_change_order_1.md](sensor_spec_change_order_1.md) | Sensor disposition field; banner 2026-07-19 — data contract live, `trigger`/`alert` semantics inert (only `inform` meaningful) |
+| [shared-world.md](shared-world.md) | Shared walkable 3D world behind `--world` (`src/world/`): terrain, authoritative server + ports, `world-*` tools, world-presence sensor, and the creature avatars (crow / kitten / owl) with their preview harness. Written 2026-08-10 against the code |
 | [substack_awareness_evaluation.md](substack_awareness_evaluation.md) | Self-awareness bench writeup (implemented suite) |
 | [substack_sensors_vs_tools.md](substack_sensors_vs_tools.md) | Tools-pull vs sensors-push essay; matches live architecture |
 | [trace_grounded_introspectionv3.md](trace_grounded_introspectionv3.md) | Trace-as-input introspection; reasoning_history injection verified live 2026-07-19 |

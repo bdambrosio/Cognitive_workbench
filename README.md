@@ -278,6 +278,7 @@ Key launcher flags (see `python launcher.py --help` for the full set):
 | `--affect` / `--canvas` | processing-state and rich-display widget windows |
 | `--ui` | FastAPI trace-inspection UI on :3000 |
 | `--telegram` | Telegram DM bridge (needs `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALLOWED_CHAT_IDS`) |
+| `--world` | shared walkable world you and the characters occupy together — WASD to walk, F for first/third person ([docs/shared-world.md](docs/shared-world.md)) |
 
 A typical session:
 
@@ -438,6 +439,9 @@ src/
   tools/                 drop-in ReAct tools (Skill.md + tool.py each)
   sensors/               drop-in sensors (tick, rss-watcher, …)
   affect/  canvas/       widget publishers + WS bridges + HTML
+  world/                 shared walkable 3D world behind --world: terrain,
+                         authoritative server, browser renderer, creature
+                         avatars (see docs/shared-world.md)
   cli.py · resource_browser.py · telegram_bridge.py · launcher.py
 scenarios/               YAML configs
 bench/                   eval harnesses (each with its own README)
