@@ -86,6 +86,14 @@ _SYSTEM_STATE_COMMANDS: Dict[str, List[str]] = {
     'interfaces':  ['ip', '-br', 'addr', 'show'],
 }
 
+# `connections` is not in the table above: raw `ss` output ran to 160
+# rows on a normal desktop, 109 of them one browser, which truncated the
+# observation and buried anything worth seeing. _connections_report
+# aggregates instead — see there.
+_CONNECTIONS_CMD = ['ss', '-tunp', 'state', 'established']
+# Above this many distinct peers a process is reported as a count only.
+_CONNECTIONS_FANOUT = 12
+
 # host_state categories → argv. Same discipline as system_state: every
 # command is hardcoded, read-only, argument-list-only, unprivileged. The
 # LLM picks a category name; it never supplies arguments. Categories that
@@ -151,6 +159,12 @@ _UNATTENDED_LOG_TAIL_LINES = 120
 # machine-stable output forms so snapshots don't diff on volatile
 # columns (queue counters, ordering).
 _BASELINE_CATEGORIES: Dict[str, List[str]] = {
+    # LAN membership. The kernel's neighbour table is populated by
+    # traffic that happens anyway, so reading it costs nothing and no
+    # privilege; run discover() first to make coverage deliberate
+    # rather than opportunistic. Canonicalized to bare MAC addresses —
+    # see _canonicalize_baseline for why.
+    'arp':           ['ip', 'neigh', 'show'],
     'suid':          ['find', '/', '-xdev', '-perm', '-4000', '-type', 'f'],
     'sockets':       ['ss', '-tlnH'],
     'udp_sockets':   ['ss', '-ulnH'],
@@ -197,7 +211,8 @@ def _build_system_prompt() -> str:
         "upgrades ran, `package_version` to check installed versions "
         "against a security notice (e.g. an Ubuntu USN).\n"
         "6. **Change detection.** `baseline_diff(category)` compares "
-        "current SUID files / listening sockets / enabled units against "
+        "current SUID files / listening sockets / enabled units / LAN "
+        "neighbours against "
         "the last stored snapshot — new entries are the interesting ones.\n"
         "Traffic-anomaly detection (signature-based IDS) is NOT in this "
         "toolset — Suricata/Zeek log inspection lands when those tools "
@@ -215,13 +230,15 @@ def _build_system_prompt() -> str:
         "host must be a single RFC1918 IP. Output: per-port lines like "
         "`<host> <port>/<state>/<proto>/<service>/<version>`. Up to ~120s.\n"
         '3. {"thought": "...", "tool": "system_state", "category": '
-        '"<sockets|udp_sockets|routes|arp|interfaces>"} — read-only '
-        "system probe. Categories:\n"
+        '"<sockets|udp_sockets|routes|arp|interfaces|connections>"} — '
+        "read-only system probe. Categories:\n"
         "    `sockets`     — listening TCP sockets (ss -tlnp)\n"
         "    `udp_sockets` — listening UDP sockets (ss -ulnp)\n"
         "    `routes`      — IP routing table (ip route show)\n"
         "    `arp`         — ARP / IPv6 neighbor table (ip neigh show)\n"
         "    `interfaces`  — interface addresses (ip -br addr show)\n"
+        "    `connections` — ESTABLISHED outbound/inbound connections "
+        "and their processes (ss -tunp): where this host is talking to\n"
         '4. {"thought": "...", "tool": "host_state", "category": '
         '"<category>"} — read-only local-host probe, fixed commands, no '
         "arguments. Categories:\n"
@@ -266,9 +283,15 @@ def _build_system_prompt() -> str:
         "notice against what is actually installed.\n"
         '6. {"thought": "...", "tool": "baseline_diff", "category": '
         '"<suid|sockets|udp_sockets|enabled_units|user_units|accounts|'
-        'autostart>"} — diff current state against the '
+        'autostart|arp>"} — diff current state against the '
         "last stored snapshot; reports ADDED/REMOVED entries, then "
-        "updates the snapshot. First call establishes the baseline. "
+        "updates the snapshot. `arp` is LAN membership, keyed by MAC "
+        "address: an ADDED entry is a device that has not been on this "
+        "network before, and system_state(arp) then gives its address. "
+        "Run discover() on the local subnet first if you want that "
+        "coverage to be deliberate rather than whatever happened to "
+        "talk to this host. "
+        "First call establishes the baseline. "
         "NOTE: because the snapshot updates on every call, a reported "
         "change must be surfaced in your final answer — it will not be "
         "reported again next call.\n"
@@ -509,10 +532,76 @@ def _run_argv(cmd: List[str], timeout: float,
     return (proc.stdout or '').strip(), None
 
 
+def _connections_report() -> str:
+    """Established connections as unique process→peer pairs, off-box first.
+
+    Answers "where is this host talking to" — the question a compromise
+    shows up in, and the one every other category here misses by looking
+    only at what can reach us.
+
+    Aggregated rather than listed: a browser alone holds a hundred-odd
+    sockets to a few dozen hosts, so the raw output is mostly repetition
+    and would truncate before the interesting rows. Collapsing to
+    (process, peer) with a count keeps the whole picture inside the
+    observation budget. Loopback is counted, not listed: local service
+    traffic is expected here and is not egress.
+    """
+    out, err = _run_argv(_CONNECTIONS_CMD, _SYSTEM_STATE_TIMEOUT)
+    if err:
+        return err
+    pairs: Dict[tuple, int] = {}
+    loopback = 0
+    for ln in (out or '').splitlines()[1:]:      # drop the header row
+        fields = ln.split()
+        if len(fields) < 5:
+            continue
+        peer = fields[4]
+        proc = '?'
+        if len(fields) > 5:
+            m = re.search(r'\("([^"]+)"', fields[5])
+            if m:
+                proc = m.group(1)
+        if peer.startswith(('127.', '[::1]', '::1')):
+            loopback += 1
+            continue
+        pairs[(proc, peer)] = pairs.get((proc, peer), 0) + 1
+    if not pairs:
+        return (f"EMPTY: no off-box established connections "
+                f"({loopback} loopback)")
+
+    by_proc: Dict[str, list] = {}
+    for (proc, peer), n in pairs.items():
+        by_proc.setdefault(proc, []).append((peer, n))
+
+    lines, summarized = [], []
+    for proc in sorted(by_proc):
+        peers = sorted(by_proc[proc])
+        # A browser fans out to a hundred hosts and reviewing that list
+        # teaches nobody anything; a process with a handful of peers is
+        # exactly what can be read. So list the readable ones and give
+        # the fan-out a count — the count still moves if it changes.
+        if len(peers) > _CONNECTIONS_FANOUT:
+            summarized.append(f"  {proc:<18} {len(peers)} distinct peers "
+                              f"(too many to review; not listed)")
+            continue
+        lines.append(f"  {proc}:")
+        lines.extend(f"      {peer:<30} x{n}" for peer, n in peers)
+
+    head = (f"Off-box established connections by process. "
+            f"{loopback} loopback connection(s) not listed; addresses not "
+            f"resolved. What to notice is a process talking somewhere "
+            f"unrelated to what that process is for.")
+    body = '\n'.join(lines + (["", "High fan-out, listed as counts only:"]
+                              if summarized else []) + summarized)
+    return _truncate('OK: ' + head + '\n' + body, 'category')
+
+
 def _tool_system_state(category: str) -> str:
     cat = (category or '').strip().lower()
+    if cat == 'connections':
+        return _connections_report()
     if cat not in _SYSTEM_STATE_COMMANDS:
-        valid = ', '.join(sorted(_SYSTEM_STATE_COMMANDS.keys()))
+        valid = ', '.join(sorted(_SYSTEM_STATE_COMMANDS.keys()) + ['connections'])
         return f"ERROR: unknown category {category!r}; valid: {valid}"
     out, err = _run_argv(_SYSTEM_STATE_COMMANDS[cat], _SYSTEM_STATE_TIMEOUT)
     if err:
@@ -835,6 +924,22 @@ def _canonicalize_baseline(cat: str, out: str) -> List[str]:
             fields = ln.split()
             if len(fields) >= 4:
                 keep.append(fields[3])
+        lines = keep
+    elif cat == 'arp':
+        # `ip neigh show` lines are "<ip> dev <if> lladdr <mac> <state>".
+        # Reduce to the MAC alone: the IP moves with DHCP, the state
+        # (REACHABLE/STALE/DELAY) changes minute to minute, and a
+        # dual-homed host lists the same device once per interface — all
+        # three would diff on every run and bury a real arrival. The MAC
+        # is the device's identity, so "a MAC I have not seen before" is
+        # the signal. Entries with no lladdr are unresolved probes, not
+        # devices, and are dropped. When something new does appear, read
+        # system_state('arp') for the address behind it.
+        keep = []
+        for ln in lines:
+            fields = ln.split()
+            if 'lladdr' in fields:
+                keep.append(fields[fields.index('lladdr') + 1].lower())
         lines = keep
     elif cat in ('enabled_units', 'user_units'):
         # --plain --no-legend: "<unit> <state> [preset]". Keep unit+state.
