@@ -200,6 +200,7 @@ characters:
         - check-email
         - obsidian
         - exec-script
+        - agent-activity
 
   Jack:
     mode: chat
@@ -339,3 +340,4 @@ characters:
         - check-email
         - obsidian
         - exec-script
+        - agent-activity

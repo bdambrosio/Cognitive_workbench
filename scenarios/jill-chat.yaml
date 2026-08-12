@@ -463,6 +463,10 @@ characters:
     # returns so existing benchmarks see no behavioral change.
     # factorio-telemetry is the factory event ingress (game chat, joins,
     # flow stops, new alerts); quiet when the bridge or server is down.
+    chat:
+      omitted_tools:
+        - agent-activity
+
     sensors:
       - name: tick
         schedule: "1m"
@@ -685,14 +689,41 @@ characters:
              Known and accepted: sshd on 22. If the privileged probes
              report themselves unconfigured, say so once as a setup gap
              and carry on — that is missing tooling, not a threat.
-          4. Record: write today's findings to the Obsidian vault at
+          4. Perimeter and egress. Two questions the exposure check
+             above does not reach.
+             First, who else is on this LAN: run baseline_diff(arp),
+             which is keyed by MAC address, so an ADDED entry is a
+             device that has not been on this network before. Run
+             discover on the local subnet first if you want that
+             coverage deliberate rather than opportunistic — the
+             neighbour table only knows hosts that happened to talk to
+             this machine. A new device is a question ("is this yours?"),
+             not a finding; phones and visitors join home networks.
+             Second, where this host is talking to:
+             system_state(connections) groups established off-box
+             connections by process. Browsers fan out to a hundred hosts
+             and are reported as a count — that is not the interesting
+             part. The interesting part is a process whose peers do not
+             follow from what that process is for.
+          5. Agent activity: the host probes above cannot see the vector
+             this workbench is most exposed to. Jill reads RSS feeds,
+             clipped pages and mail — text an outsider can influence —
+             while holding tools that reach the network. Use
+             agent-activity to review her outbound-capable calls since
+             the last patrol. Read the argument of each call, not just
+             the tool name: that string is where anything being carried
+             out would travel. A call whose argument does not follow
+             from what she was doing is worth pulling the turn for. Say
+             plainly when nothing stands out — that is the expected
+             result and reporting it is not padding.
+          6. Record: write today's findings to the Obsidian vault at
              path "Security/<YYYY-MM-DD>-patrol.md" (today's date;
              writes land under my own area, so the real path will come
              back as "CW/Sentinel/Security/..." — that is expected):
              patch posture, notices checked and their verdicts, scan
              results, baseline changes, and open questions. The note is
              the durable record — complete beats brief there.
-          5. Report: if anything needs Bruce's attention — a security
+          7. Report: if anything needs Bruce's attention — a security
              upgrade unattended-upgrades will not cover, an installed
              package a notice says is vulnerable, a baseline change or
              observation I cannot explain — reply with a short summary
@@ -901,3 +932,4 @@ characters:
         - check-email
         - obsidian
         - exec-script
+        - agent-activity
