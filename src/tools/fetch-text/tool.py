@@ -69,23 +69,9 @@ _GROBID_DEFAULT_URL = "http://localhost:8070/api/processFulltextDocument"
 _INLINE_ABSTRACT_CAP = 2500
 
 
-def _resolve_section(requested: str, names: List[str]) -> Optional[str]:
-    """Map a requested section name onto one from the index: exact, then
-    case-insensitive, then an unambiguous case-insensitive prefix. Returns
-    None when nothing matches or a prefix is ambiguous — this resolves an
-    identifier the caller read off our own index, so it stays literal
-    rather than guessing at intent."""
-    req = (requested or '').strip()
-    if not req:
-        return None
-    if req in names:
-        return req
-    low = req.lower()
-    ci = [n for n in names if n.lower() == low]
-    if len(ci) == 1:
-        return ci[0]
-    pref = [n for n in names if n.lower().startswith(low)]
-    return pref[0] if len(pref) == 1 else None
+# Shared with doc-read, which addresses local files the same way — see
+# utils/doc_sections.
+from utils.doc_sections import resolve_section as _resolve_section  # noqa: E402
 
 
 def react_invoke(args, *, character_name=None, backend=None, logger=None):
