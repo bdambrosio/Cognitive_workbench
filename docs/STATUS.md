@@ -15,7 +15,41 @@ fire-time triage and per-concern WIP as of 2026-06), infospace
 Notes/Collections, SKILL.md tools and sensors, resource browser / affect /
 canvas displays.
 
-Categories:
+## What this system is, as a coordinate
+
+`Diving into Reliable Self-Evolving Agents: A Survey` (ICLR submission
+53157) classifies a self-evolving agent by the deepest part of its
+retained state that a change actually alters *and* persists into later
+independent tasks. Retained state is X = (θ trainable parameters, σ
+scaffold, U improver, C criterion), giving L0 output, L1 model, L2
+scaffold, L3 improver, L4 criterion. Classification follows the changed
+object, not the algorithm that changed it.
+
+CW is **L2 with a human improver**. Three of the five levels are
+deliberate non-goals rather than unbuilt features, and saying so is the
+point of recording this here:
+
+- **L0** — the ReAct turn. Trajectory and output change, nothing is
+  retained. Most of what an observer watches Jill do is L0.
+- **L1** — empty. Nothing here trains θ. `learned-disposition-design.md`
+  would be the first, and is shadow-logging only.
+- **L2** — where CW lives: concerns, memories, threads, WIP, the tool
+  catalog, sensors, and the ReAct harness itself. All persist and change
+  later behaviour. Note that Jill's memory writes are an L2 loop that
+  runs unattended.
+- **L3** — deliberately absent. Jill proposes tools; a human judges,
+  builds, tests, installs. The procedure that produces tools is not
+  itself modified, and the survey is explicit that a new artifact alone
+  is not an L3 transition. `jill-self-extension.md` Phase 2b is what
+  crosses this line.
+- **L4** — deliberately absent, and load-bearing. The criterion (frozen
+  composite bench, ship gate, Bruce's judgement) sits outside the update
+  boundary. The survey's central reliability claim is that an
+  improvement claim is credible only when the evidence *and the decision
+  rule* remain outside the control of the update they judge.
+
+## Categories
+
 - **LIVE** — accurately describes current code/behavior
 - **ASPIRATIONAL** — design for something not (or only partially) built; not invalidated by the deletions
 - **SUPERSEDED** — described deleted or replaced machinery; these docs were removed (recover via git history)

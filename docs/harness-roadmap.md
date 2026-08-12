@@ -355,6 +355,23 @@ counter-scoped to intentional yield per the objections above).
   docs with the measured delta and a cause hypothesis.
 - **Cost rides along.** Token counts in every ledger entry; a quality
   gain bought with 3× tokens is a tradeoff to see, not a win.
+- **A reused held-out set stops being held out.** M0's frozen composite
+  is what makes a ship-gate decision mean anything: evidence outside the
+  boundary of the update it judges. But every cycle measured against it
+  leaks a little of it back into the design — *"repeated access can turn
+  a nominally external check into development feedback"* (`Diving into
+  Reliable Self-Evolving Agents: A Survey`, on the persistence limit).
+  Freezing the set does not stop this; only spending it does. By M5 the
+  gate is partly development feedback, and nothing in this roadmap
+  currently arrests that.
+
+  The response is protocol rather than a bigger bench. Declare per cycle
+  what the evidence covers and what it does not — every check has a
+  coverage boundary, and an undeclared one reads as full coverage. Fix
+  the stopping rule before the run, not after seeing the delta. And hold
+  a reserve slice that is *spent*: measured once at a milestone, then
+  retired, so at least one reading per milestone is of a set the design
+  has never seen.
 
 ## 4. Do-nothing option (per project rules)
 
