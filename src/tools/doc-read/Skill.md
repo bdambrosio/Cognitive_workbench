@@ -42,6 +42,15 @@ If that title is not what you expected from the user's description, say
 so before reviewing it. Reviewing a paper the user did not ask about,
 accurately, is still the wrong answer.
 
+Then act on the mismatch, because noticing it is not concluding
+anything. The document in front of you is the authority on what it is. A
+title you remember, or that a search called the closest match, is a
+guess about it and never evidence — so when the two disagree, the
+remembered one is what gives way. Do not go looking inside this document
+for the paper you expected; say plainly that this is a different
+document and ask, rather than reviewing the one you have as though it
+were the one you wanted.
+
 ## Examples
 
 ```json
