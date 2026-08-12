@@ -734,9 +734,18 @@ def main():
     # ---- Parse characters ----
     characters = parse_characters(config_data, llm_config, world_config, setting, alt_llm_config)
 
-    # Command-line override
+    # Command-line override: a subset of the scenario, not a substitute for
+    # it. Building fresh empty configs here dropped mode/prompt/sensors and
+    # sent every named character down the deleted OODA branch.
     if args.characters:
-        characters = [(n.capitalize(), {}) for n in args.characters]
+        wanted = [n.capitalize() for n in args.characters]
+        known = {n for n, _ in characters}
+        unknown = [n for n in wanted if n not in known]
+        if unknown:
+            print(f"Not in {args.config_file}: {', '.join(unknown)}. "
+                  f"Available: {', '.join(sorted(known))}")
+            return
+        characters = [(n, c) for n, c in characters if n in wanted]
 
     if not characters:
         print("No characters defined in scenario")

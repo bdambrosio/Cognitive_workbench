@@ -241,6 +241,64 @@ def _build_image_envelope_inner(text: str, image_url: str) -> str:
     })
 
 
+# Names may be comma-separated with spaces around the commas: "@jill, jack".
+# A tighter pattern took "@jill, jack go" as one recipient and a message
+# beginning "jack go", which drops a partner without saying anything.
+_ADDRESSED_RE = re.compile(
+    r'^@([\w\-]+(?:\s*,\s*[\w\-]+)*)(?:\s+(.*))?$', re.S)
+
+
+def _parse_addressed(line: str, character_names: List[str]):
+    """Split a leading `@name[,name...] text` address off a prose line.
+
+    Returns (targets, text, error); targets is None when the line is not
+    addressed at all. `@all` names everyone. Matching is case-insensitive
+    with a prefix fallback, the same rule the /@name command form uses.
+
+    This exists because a shared task has to reach both partners in the
+    same instant. Switching with /char and typing twice delivers in
+    sequence, which lets the first agent start — and possibly finish —
+    before the second has been asked, and that difference lands in the
+    middle of whatever the run was trying to measure.
+    """
+    m = _ADDRESSED_RE.match(line)
+    if not m:
+        return None, None, None
+    raw, text = m.group(1), (m.group(2) or '').strip()
+    if not text:
+        return None, None, "nothing to send — put a message after the name"
+    if text.startswith('/'):
+        return None, None, ("commands go to one agent at a time: use "
+                            f"/@{raw.split(',')[0].strip()} {text}")
+    # "@jill @jack go" would otherwise send "@jack go" to Jill alone.
+    if text.startswith('@'):
+        head = text[1:].split(maxsplit=1)[0] if len(text) > 1 else ''
+        if head and any(cn.lower().startswith(head.lower())
+                        for cn in character_names):
+            return None, None, ("address several with one @ and commas: "
+                                f"@{raw},{head} <message>")
+
+    wanted = [w.strip() for w in raw.split(',') if w.strip()]
+    if any(w.lower() == 'all' for w in wanted):
+        return list(character_names), text, None
+
+    targets, unknown = [], []
+    for w in wanted:
+        match = next((cn for cn in character_names
+                      if cn.lower() == w.lower()), None)
+        if match is None:
+            match = next((cn for cn in character_names
+                          if cn.lower().startswith(w.lower())), None)
+        if match is None:
+            unknown.append(w)
+        elif match not in targets:
+            targets.append(match)
+    if unknown:
+        return None, None, (f"unknown: {', '.join('@' + u for u in unknown)}. "
+                            f"Available: {', '.join(character_names)}, @all")
+    return targets, text, None
+
+
 # ---------------------------------------------------------------------------
 # Command parser
 # ---------------------------------------------------------------------------
@@ -593,7 +651,10 @@ def _print_help():
   /external-repo                 Show the currently bound external repo (if any)
 
 {C.BOLD}Navigation:{C.RESET}
-  @<agent> /<command>            Send command to a specific agent
+  @<agent> <message>             Send prose to one agent without switching
+  @<a>,<b> <message>             ...or to several at once, delivered together
+  @all <message>                 ...or to every character
+  /@<agent> /<command>           Send a command to a specific agent
   /char <name>                   Switch active character
   /ui                            Open web UI in browser
   /resources                     Open resource browser in browser
@@ -649,6 +710,9 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
     command_publisher = zenoh_session.declare_publisher(
         f"cognitive/{active_character}/command"
     )
+    # Publishers for @-addressed prose, declared on first use and kept for
+    # the session. Separate from sense_publisher, which follows /char.
+    addressed_pubs: Dict[str, Any] = {}
 
     # Shared state
     state: Dict[str, Any] = {
@@ -748,7 +812,7 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
     # Banner
     print()
     print(f"{C.BOLD}Cognitive Workbench CLI{C.RESET}")
-    print(f"Character: {C.CYAN}{active_character}{C.RESET}  |  Type /help for commands  |  /img <path|url> [caption], /paste [caption] for image  |  Alt+Enter for newline  |  Ctrl+D to exit")
+    print(f"Character: {C.CYAN}{active_character}{C.RESET}  |  Type /help for commands  |  @name/@all <msg> to address others  |  /img <path|url> [caption], /paste [caption] for image  |  Alt+Enter for newline  |  Ctrl+D to exit")
     print()
 
     import os
@@ -840,6 +904,37 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
                 tag = 'url' if image_url.startswith(('http://', 'https://')) else 'data-uri'
                 _print_info(f"→ sent to {active_character} (image: {tag}, caption: {caption!r})")
                 continue
+
+            # @-addressed prose: "@jill,jack find the marker", "@all hold".
+            # Reaches agents other than the active one without switching to
+            # them, and reaches several in one keystroke. Commands keep the
+            # single-target /@name form below.
+            if line.startswith('@'):
+                targets, addressed_text, err = _parse_addressed(
+                    line, character_names)
+                if err:
+                    _print_error(err)
+                    continue
+                if targets:
+                    inner = json.dumps({'source': 'User',
+                                        'text': addressed_text})
+                    envelope = json.dumps({
+                        'timestamp': datetime.now().isoformat(),
+                        'sequence_id': 0,
+                        'mode': 'text',
+                        'content': inner,
+                    })
+                    # One envelope, published to each inbox back to back —
+                    # the closest to simultaneous this transport offers.
+                    for name in targets:
+                        pub = addressed_pubs.get(name)
+                        if pub is None:
+                            pub = zenoh_session.declare_publisher(
+                                f"cognitive/{name}/sense_data")
+                            addressed_pubs[name] = pub
+                        pub.put(envelope)
+                    _print_info(f"→ sent to {', '.join(targets)}")
+                    continue
 
             # Slash-command (with optional @agent targeting)
             if line.startswith('/'):
