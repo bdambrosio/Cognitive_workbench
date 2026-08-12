@@ -18,7 +18,7 @@ sys.path.insert(0, str(SRC))
 from utils import world_link  # noqa: E402
 from world import terrain as terrain_mod  # noqa: E402
 from world.server import World, parse_occupants  # noqa: E402
-from world.state import Occupant  # noqa: E402
+from world.state import ARRIVE_TOL_M, Occupant  # noqa: E402
 
 SEED = 4242
 
@@ -60,9 +60,11 @@ def test_walkable_rejects_water_and_out_of_bounds():
     t = terrain_mod.generate(SEED)
     assert not t.walkable(10_000, 0)
     assert not t.walkable(0, -10_000)
-    # Every point below the water line is unwalkable, by construction.
-    wet = [(x, z) for x in range(-100, 101, 7) for z in range(-100, 101, 7)
-           if t.height_at(x, z) < terrain_mod.WATER_Y]
+    # Every point below the water line is unfit to be placed on. Read off
+    # the grid: the old metre scan covered ±100 m and this seed's ponds sit
+    # near the edge, so the loop ran zero times and passed vacuously.
+    wet = _wet_points(t)
+    assert wet, "seed has no water to test"
     for x, z in wet:
         assert not t.walkable(x, z)
 
@@ -78,10 +80,53 @@ def test_walkable_rejects_steep_slope(monkeypatch):
 def test_payload_carries_what_the_renderer_needs():
     p = terrain_mod.generate(SEED).payload()
     assert set(p) >= {"grid_n", "extent_m", "water_y", "heights_b64",
-                      "trees", "rocks"}
+                      "forest_b64", "speed", "trees", "rocks"}
     import base64
     raw = base64.b64decode(p["heights_b64"])
     assert len(raw) == terrain_mod.GRID_N ** 2 * 4      # float32 per node
+    # The browser computes speed_factor itself, so it needs both the field
+    # and the constants — a second formula over different data would drift.
+    assert len(base64.b64decode(p["forest_b64"])) == terrain_mod.GRID_N ** 2
+    assert set(p["speed"]) == {"slope_easy", "slope_hard", "slope_cost",
+                               "forest_cost", "min_factor"}
+
+
+def test_speed_factor_holds_a_two_to_one_band():
+    t = terrain_mod.generate(SEED)
+    half = terrain_mod.EXTENT_M / 2 - 2
+    pts = [(x, z) for x in range(int(-half), int(half), 11)
+           for z in range(int(-half), int(half), 11)]
+    factors = [t.speed_factor(x, z) for x, z in pts]
+    assert min(factors) == pytest.approx(terrain_mod.MIN_SPEED_FACTOR)
+    assert max(factors) <= 1.0
+    # The band is the whole point: wide enough that area stops predicting
+    # time, narrow enough that no ground is a wall.
+    assert max(factors) / min(factors) == pytest.approx(2.0, abs=0.05)
+
+
+def _wet_points(t):
+    """World coordinates of pond cells, nearest the origin first. Read off
+    the grid rather than scanned in metres — ponds are under 1% of the map
+    and a coarse metre scan can miss them entirely."""
+    n, extent = terrain_mod.GRID_N, terrain_mod.EXTENT_M
+    half, inb = extent / 2, extent / 2 - 2
+    pts = []
+    for iz, ix in zip(*(t.heights < terrain_mod.WATER_Y).nonzero()):
+        x = ix / (n - 1) * extent - half
+        z = iz / (n - 1) * extent - half
+        if abs(x) < inb and abs(z) < inb:
+            pts.append((float(x), float(z)))
+    pts.sort(key=lambda p: math.hypot(*p))
+    return pts
+
+
+def test_water_is_the_slowest_ground_and_still_passable():
+    t = terrain_mod.generate(SEED)
+    wet = _wet_points(t)
+    assert wet, "seed has no water to test"
+    for x, z in wet:
+        assert t.speed_factor(x, z) == pytest.approx(
+            terrain_mod.MIN_SPEED_FACTOR)
 
 
 # ----------------------------------------------------------------- state
@@ -122,7 +167,7 @@ def test_goal_walk_arrives_and_stops():
     jill = w.state.occupants["Jill"]
     target = w.resolve_target("Jill", "Bruce")
     accepted = w.set_goal("Jill", target["x"], target["z"])
-    assert accepted["accepted"] and accepted["eta_s"] > 1.0
+    assert accepted["accepted"] and accepted["eta_s_best_case"] > 1.0
 
     start = (jill.x, jill.z)
     for _ in range(20):                 # one second of ticks
@@ -136,6 +181,59 @@ def test_goal_walk_arrives_and_stops():
             break
     assert jill.goal is None and jill.gait == "idle"
     assert jill.distance_to(w.state.occupants["Bruce"]) < 4.0
+
+
+def test_travel_into_water_is_slowed_not_blocked():
+    """Nothing is impassable. A goal in a pond is accepted and reached —
+    the old behaviour refused the goal outright, which meant an agent could
+    be told 'no' by the terrain instead of discovering a cost."""
+    w = _world()
+    pts = _wet_points(w.terrain)
+    assert pts, "seed has no water to test"
+    wet = pts[0]
+    jill = w.state.occupants["Jill"]
+    # Approach from the origin side, so the start stays inside the world.
+    jill.x = wet[0] - math.copysign(6.0, wet[0])
+    jill.z = wet[1]
+    accepted = w.set_goal("Jill", wet[0], wet[1])
+    assert accepted.get("accepted"), accepted
+
+    for _ in range(20 * 120):
+        w.step(1 / 20)
+        if jill.goal is None:
+            break
+    assert jill.goal is None, "wading should finish, not strand the walker"
+    assert math.hypot(jill.x - wet[0], jill.z - wet[1]) < ARRIVE_TOL_M + 0.1
+
+
+def test_slow_ground_takes_longer_than_open_ground():
+    """The mechanism the co-op search rests on: equal distances are not
+    equal times, so an even split of area is an uneven split of work."""
+    w = _world()
+    jill = w.state.occupants["Jill"]
+
+    def seconds_over(x0, z0, x1, z1):
+        jill.x, jill.z, jill.goal = x0, z0, None
+        w.set_goal("Jill", x1, z1)
+        ticks = 0
+        while jill.goal is not None and ticks < 20 * 600:
+            w.step(1 / 20)
+            ticks += 1
+        return ticks / 20
+
+    half = terrain_mod.EXTENT_M / 2 - 40
+    legs = []
+    for x in range(int(-half), int(half), 23):
+        for z in range(int(-half), int(half), 23):
+            legs.append((w.terrain.speed_factor(x, z), float(x), float(z)))
+    legs.sort()
+    slow, fast = legs[0], legs[-1]
+
+    d = 30.0
+    slow_s = seconds_over(slow[1], slow[2], slow[1] + d, slow[2])
+    fast_s = seconds_over(fast[1], fast[2], fast[1] + d, fast[2])
+    assert slow_s > fast_s * 1.1, (
+        f"slow ground {slow_s:.1f}s vs open {fast_s:.1f}s over {d} m")
 
 
 def test_move_rejections():
@@ -203,7 +301,7 @@ def fake_bridge(monkeypatch):
                     "bearing_deg": 90, "pos": [10.0, 2.0], "gait": "walk",
                     "looking_at_me": True, "in_my_view": False}],
             }
-        return {"accepted": True, "distance_m": 9.4, "eta_s": 5.5,
+        return {"accepted": True, "distance_m": 9.4, "eta_s_best_case": 5.5,
                 "from": [1.0, 2.0]}
 
     monkeypatch.setattr(world_link, "_request", fake_request)
@@ -349,10 +447,10 @@ def _sensor():
     return mod
 
 
-def _look_at(distance_m):
+def _look_at(distance_m, goal=None):
     return {
         "me": {"name": "Jill", "pos": [0.0, 0.0], "heading_deg": 0,
-               "gait": "idle", "goal": None},
+               "gait": "walk" if goal else "idle", "goal": goal},
         "ground": "plains, flat ground, elevation 3.0 m",
         "tree_count": 4, "radius_m": 40, "extent_m": 250,
         "occupants": [{
@@ -365,9 +463,10 @@ def _look_at(distance_m):
 @pytest.fixture
 def sensor(monkeypatch):
     mod = _sensor()
-    state = {"distance": 40.0}
+    state = {"distance": 40.0, "goal": None}
     monkeypatch.setattr(mod, "world_get",
-                        lambda *a, **k: _look_at(state["distance"]))
+                        lambda *a, **k: _look_at(state["distance"],
+                                                 state["goal"]))
     return mod, state
 
 
@@ -400,6 +499,32 @@ def test_arrival_fires_once_and_carries_state(sensor):
     assert "8.0 m" in r["content"] and "plains" in r["content"]
     assert "stay silent" in r["content"], "must not force a reply"
     assert _run(mod)["status"] == "nothing", "must not re-fire while near"
+
+
+def test_arrival_at_goal_wakes_the_walker(sensor):
+    """The other edge. A searcher walking away from its partner meets
+    nobody, so proximity never fires and it sleeps through its own
+    arrival — observed three times in one run, 2026-08-12."""
+    mod, state = sensor
+    state["goal"] = [96.0, 96.0]
+    _run(mod)                           # seed: already walking
+    assert _run(mod)["status"] == "nothing", "still walking is not an event"
+    state["goal"] = None                # server cleared it: arrived
+    r = _run(mod)
+    assert r["status"] == "ok"
+    assert r["metadata"]["reached_goal"] is True
+    assert r["metadata"]["arrived"] == []      # nobody came near
+    assert "arrived" in r["content"]
+    # Level carried, so the woken turn can act without a world-look first.
+    assert "plains" in r["content"]
+    assert _run(mod)["status"] == "nothing", "must not re-fire once stopped"
+
+
+def test_walking_state_alone_is_not_an_event(sensor):
+    mod, state = sensor
+    _run(mod)                           # seed: idle
+    state["goal"] = [10.0, 10.0]        # posting a goal is not an arrival
+    assert _run(mod)["status"] == "nothing"
 
 
 def test_hysteresis_band_does_not_flap(sensor):

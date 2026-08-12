@@ -38,10 +38,12 @@ def _impl(args, character_name):
 
     dest = f"toward {toward}" if toward else f"to ({body['x']:.1f}, {body['z']:.1f})"
     return {"status": "ok",
-            "text": (f"Walking {dest} — {resp['distance_m']} m, about "
-                     f"{resp['eta_s']} s. You are moving now; this call does "
-                     f"not wait for you to arrive. Use world-look on a later "
-                     f"turn to see where you got to.")}
+            "text": (f"Walking {dest} — {resp['distance_m']} m, "
+                     f"{resp['eta_s_best_case']} s at best. Rough or wooded "
+                     f"ground on the way can take up to twice that, and you "
+                     f"will only know which by walking it. You are moving "
+                     f"now; this call does not wait for you to arrive. Use "
+                     f"world-look on a later turn to see where you got to.")}
 
 
 def react_invoke(args, *, character_name=None, backend=None, logger=None):

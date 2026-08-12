@@ -31,6 +31,21 @@ _LOOK_RADIUS_M = 40.0
 # baseline has not been seeded yet for this process.
 _near: dict = {}
 
+# character -> whether it had a walking goal at the last poll. The other
+# edge this sensor watches: goal set, then goal gone, means arrived.
+#
+# Without it an agent that posts a goal and ends its turn is asleep until
+# somebody walks past it. Nothing else wakes it: proximity is about other
+# occupants, and a searcher walking away from its partner meets nobody.
+# Observed 2026-08-12 three times in one run — an agent reached its
+# sector, had the ground in front of it, and said nothing until it was
+# prodded. Since travel is never blocked (terrain only slows), a goal that
+# clears means the walk finished; it has no other way to end.
+#
+# A walk that starts and finishes between two polls raises no event. That
+# is correct: it was shorter than the poll interval, so nobody waited.
+_walking: dict = {}
+
 _NOTHING = {'status': 'nothing', 'content': '', 'metadata': {}}
 
 # character -> reason this sensor is currently blind, or absent while the
@@ -56,7 +71,8 @@ def _clear_outage(me: str) -> None:
         _blind[me] = None
 
 
-def _describe(look: dict, arrived: list, departed: list) -> str:
+def _describe(look: dict, arrived: list, departed: list,
+              reached: bool = False) -> str:
     """A self-contained situation report.
 
     Non-tick sensors arrive as user-like turns, so this has to read as an
@@ -64,6 +80,9 @@ def _describe(look: dict, arrived: list, departed: list) -> str:
     """
     me = look['me']
     lines = []
+    if reached:
+        lines.append(f"You have arrived at ({me['pos'][0]}, {me['pos'][1]}) "
+                     f"— the walk you posted is finished.")
     for name in arrived:
         lines.append(f"{name} has come near you in the world.")
     for name in departed:
@@ -127,24 +146,33 @@ def run(context):
         if float(o['distance_m']) <= threshold:
             now_near.add(o['name'])
 
+    was_walking = _walking.get(me)
+    now_walking = bool((look.get('me') or {}).get('goal'))
+
     if was_near is None:
-        # Cold start: seed the baseline, say nothing. Who is already here
-        # is the Embodiment block's job, not an arrival.
+        # Cold start: seed both baselines, say nothing. Who is already here
+        # is the Embodiment block's job, not an arrival — and a walk already
+        # in progress at seeding time will still report when it ends.
         _near[me] = now_near
+        _walking[me] = now_walking
         logger.info(f"world-presence[{me}]: baseline seeded "
-                    f"({len(now_near)} nearby), no event emitted")
+                    f"({len(now_near)} nearby, walking={now_walking}), "
+                    f"no event emitted")
         return _NOTHING
 
     arrived = sorted(now_near - prior)
     departed = sorted(prior - now_near)
+    reached = bool(was_walking) and not now_walking
     _near[me] = now_near
-    if not arrived and not departed:
+    _walking[me] = now_walking
+    if not arrived and not departed and not reached:
         return _NOTHING
 
-    logger.info(f"world-presence[{me}]: arrived={arrived} departed={departed}")
+    logger.info(f"world-presence[{me}]: arrived={arrived} "
+                f"departed={departed} reached_goal={reached}")
     return {
         'status': 'ok',
-        'content': _describe(look, arrived, departed),
+        'content': _describe(look, arrived, departed, reached),
         'metadata': {'arrived': arrived, 'departed': departed,
-                     'near': sorted(now_near)},
+                     'reached_goal': reached, 'near': sorted(now_near)},
     }

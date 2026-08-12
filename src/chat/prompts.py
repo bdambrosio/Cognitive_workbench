@@ -232,6 +232,20 @@ class PromptsMixin:
                 "session. A surface can come up or go down mid-session, so "
                 "a tool's own error is the authority if they disagree.\n\n"
                 + embodiment)
+        # Position, unlike the probe above, is re-measured every turn —
+        # it is the one embodiment fact that changes while the agent
+        # stands still, and the only current state the prompt used to
+        # omit. See chat_loop._world_position_line for what that cost.
+        position = self._world_position_line()
+        if position:
+            parts.append(
+                "## Where I am in the shared world (measured this turn)\n"
+                "Read from the world just now. This supersedes any position "
+                "I remember from an earlier turn or an earlier session: the "
+                "world does not persist across restarts, so a remembered "
+                "position is a record of where I was, never evidence of "
+                "where I am.\n\n"
+                + position)
         # When an external repo is bound for the session, append a single
         # capabilities line so the persona-level account reflects what the
         # ReAct surface actually exposes. Self-model is intentionally left

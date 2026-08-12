@@ -465,6 +465,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         import requests
 
         lines = []
+        live = set()
         for label, module_path, health_path, meaning in self._EMBODIMENT_SURFACES:
             try:
                 base = importlib.import_module(module_path).base_url()
@@ -474,10 +475,52 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             try:
                 requests.get(base + health_path, timeout=0.6).raise_for_status()
                 lines.append(f"- **{label}: LIVE** ({base}) — {meaning}")
+                live.add(label)
             except Exception:
                 lines.append(f"- {label}: not running — those tools will "
                              f"report the bridge is offline.")
+        # Which surfaces answered, as a set rather than a re-read of the
+        # prose above — _world_position_line needs the fact, not the line.
+        self._embodiment_live = live
         return "\n".join(lines)
+
+    def _world_position_line(self) -> str:
+        """Where this body actually is, measured this turn.
+
+        The embodiment probe says the world is live; it does not say where
+        the agent is standing, and position was the one piece of current
+        state the prompt omitted. The world does not persist across
+        restarts but durable memory does, so an agent with no measured
+        position reasons from a remembered one — and states it with
+        confidence. Observed 2026-08-12: both characters opened a fresh
+        session asserting the previous session's coordinates, to the
+        decimal, having been re-spawned elsewhere.
+
+        Per-turn, not cached with the session-start probe: this is the
+        one embodiment fact that changes while the agent stands still.
+        Empty when the world was not live at session start or has stopped
+        answering — a missing line beats a stale one, and the tools report
+        their own errors.
+        """
+        if 'shared world' not in getattr(self, '_embodiment_live', set()):
+            return ''
+        try:
+            from utils.world_link import compass, world_get
+            look = world_get('/look', {'name': self.character_name})
+            if look.get('error'):
+                logger.debug(f"world position: {look['error']}")
+                return ''
+            me = look['me']
+            line = (f"I am at ({me['pos'][0]}, {me['pos'][1]}) facing "
+                    f"{compass(me['heading_deg'])} — {look['ground']}. "
+                    f"I can see about {look['sight_m']:.0f} m from here.")
+            if me.get('goal'):
+                line += (f" I am walking toward ({me['goal'][0]:.1f}, "
+                         f"{me['goal'][1]:.1f}) and have not arrived yet.")
+            return line
+        except Exception as e:
+            logger.debug(f"world position unavailable: {e}")
+            return ''
 
     def _compute_substrate_line(self, repo_root: Optional[Path] = None) -> str:
         """One-line harness provenance for the system prompt: current

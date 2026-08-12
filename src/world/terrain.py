@@ -24,7 +24,27 @@ GRID_N = 385              # heightmap samples per axis (~1 m resolution)
 # blocked by a rise and the fog degenerated into a plain radius.
 HEIGHT_SCALE_M = 22.0
 WATER_Y = 1.15            # anything below this is pond
-MAX_WALK_SLOPE = 0.62     # rise/run above which a slope is not walkable
+MAX_WALK_SLOPE = 0.62     # rise/run above which ground is unfit to stand on
+
+# Travel cost. Nothing is impassable — ground is only ever slower — and the
+# whole band is 2:1, because the point is to break the identity between a
+# sector's area and the time to search it, not to model terrain. Once area
+# stops predicting time, an even split is the wrong split, one searcher
+# finishes early, and the only way either learns that is to walk it and say
+# so. That is the conversation the world exists to provoke.
+#
+# The weights are graded against what this generator actually produces:
+# slope sits between 0.05 and 0.25 over most of the map and only 9% of it
+# is steeper than 0.25, while the forest field is uniform by construction
+# and covers half the world. So forest carries most of the cost — and it
+# carries it where sight_range() has already cut vision to 22 m, which is
+# the useful part: the slow ground is the blind ground, so a partner's
+# report is worth most exactly where you can least check it.
+SLOPE_EASY = 0.05         # at or below this, slope costs nothing
+SLOPE_HARD = 0.30         # at or above this, slope costs all it can
+SLOPE_COST = 0.20         # speed lost to the steepest ground
+FOREST_COST = 0.30        # speed lost to the densest forest
+MIN_SPEED_FACTOR = 0.50   # wading, and the floor for everything else
 
 # Sight. Without a limit, world-look hands every agent every position and
 # there is never a reason to ask anyone anything — communication becomes
@@ -112,11 +132,31 @@ class Terrain:
         return -half <= x <= half and -half <= z <= half
 
     def walkable(self, x: float, z: float) -> bool:
+        """Ground fit to be *placed* on — spawns and props. Not a movement
+        test: travel is never blocked, only slowed (see speed_factor)."""
         if not self.in_bounds(x, z):
             return False
         if self.height_at(x, z) < WATER_Y:
             return False                       # pond
         return self.slope_at(x, z) <= MAX_WALK_SLOPE
+
+    def forest_at(self, x: float, z: float) -> float:
+        """Raw forest density in [0, 1]. biome_at is this thresholded; the
+        continuous value is what travel cost reads, so the treeline slows
+        you gradually instead of at a step."""
+        gx, gz = self._grid_coords(x, z)
+        return float(self.forest[int(gz), int(gx)])
+
+    def speed_factor(self, x: float, z: float) -> float:
+        """Fraction of walking pace this ground allows, in
+        [MIN_SPEED_FACTOR, 1.0]. Water is the slowest thing there is, and
+        it is still passable — you wade."""
+        if self.height_at(x, z) < WATER_Y:
+            return MIN_SPEED_FACTOR
+        slope_t = (self.slope_at(x, z) - SLOPE_EASY) / (SLOPE_HARD - SLOPE_EASY)
+        cost = (SLOPE_COST * min(max(slope_t, 0.0), 1.0)
+                + FOREST_COST * min(max(self.forest_at(x, z), 0.0), 1.0))
+        return max(1.0 - cost, MIN_SPEED_FACTOR)
 
     def biome_at(self, x: float, z: float) -> str:
         gx, gz = self._grid_coords(x, z)
@@ -159,14 +199,25 @@ class Terrain:
         return self.line_of_sight(x1, z1, x2, z2)
 
     def describe(self, x: float, z: float) -> str:
-        """One line of terrain context, for agent perception."""
+        """One line of terrain context, for agent perception.
+
+        Carries the going as well as the look of the place. Without it an
+        occupant has no way to notice its sector is slow except by tracking
+        elapsed time, and then there is nothing to report to a partner but
+        lateness."""
         h = self.height_at(x, z)
         slope = self.slope_at(x, z)
         grade = ('flat' if slope < 0.08 else
                  'gently sloping' if slope < 0.25 else
                  'steep')
+        factor = self.speed_factor(x, z)
+        going = ('wading' if h < WATER_Y else
+                 'heavy going' if factor < 0.7 else
+                 'slow going' if factor < 0.88 else
+                 'easy going')
         return (f"{self.biome_at(x, z)}, {grade} ground, "
-                f"elevation {h:.1f} m")
+                f"elevation {h:.1f} m, {going} "
+                f"({factor * 100:.0f}% of walking pace)")
 
     # -- wire format ----------------------------------------------------
 
@@ -175,12 +226,24 @@ class Terrain:
         float32 rather than a JSON array — 66k numbers is ~600 KB of text
         and ~264 KB of bytes."""
         heights32 = self.heights.astype(np.float32).tobytes()
+        # Forest goes too, because the browser has to compute the same
+        # speed_factor the server does — a second formula over different
+        # data is the drift this module exists to prevent. uint8 is ample
+        # for a speed multiplier and half the bytes of float32; it leaves
+        # the two sides disagreeing by at most FOREST_COST/255 ≈ 0.0012,
+        # measured, against a band of 0.5. Heights stay float32 because
+        # the mesh is built from them and the eye is less forgiving.
+        forest8 = (np.clip(self.forest, 0.0, 1.0) * 255.0).astype(np.uint8)
         return {
             'seed': self.seed,
             'extent_m': EXTENT_M,
             'grid_n': GRID_N,
             'water_y': WATER_Y,
             'heights_b64': base64.b64encode(heights32).decode('ascii'),
+            'forest_b64': base64.b64encode(forest8.tobytes()).decode('ascii'),
+            'speed': {'slope_easy': SLOPE_EASY, 'slope_hard': SLOPE_HARD,
+                      'slope_cost': SLOPE_COST, 'forest_cost': FOREST_COST,
+                      'min_factor': MIN_SPEED_FACTOR},
             'trees': self.trees,
             'rocks': self.rocks,
         }

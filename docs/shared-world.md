@@ -21,7 +21,7 @@ every catalog — with fifteen `fac-*` tools against three `world-*` ones,
 | Piece | What it is |
 |---|---|
 | `src/world/server.py` | Authoritative state. WS `8790` (state out at 20 Hz, browser input in), HTTP `8791` (agent tools + static files). Every mutation goes through one lock. |
-| `src/world/terrain.py` | Deterministic heightmap from a seed: 384 m square, ~1 m grid, 22 m of relief, water below `y=1.15`, ~21k trees. Walkability and sight lines live here too. |
+| `src/world/terrain.py` | Deterministic heightmap from a seed: 384 m square, ~1 m grid, 22 m of relief, water below `y=1.15`, ~21k trees. Sight lines and travel cost live here too. |
 | `src/world/state.py` | `Occupant` (name, `kind`, position, heading, gait, colour) and `Marker`. |
 | `src/world/display/static/world.js` | Browser renderer. Samples the same bilinear heightmap formula as `terrain.height_at()`, so what Bruce walks on and what Jill reasons about are one surface. |
 | `src/world/display/static/avatars.js` | What an occupant looks like — see below. |
@@ -38,6 +38,40 @@ Visibility is decided server-side and filtered out of the state stream, so
 an occupant you cannot see is not in your data. The display's fog is haze
 over that, not the mechanism — 70 m sight in the open, 22 m among trees.
 
+## Travel cost
+
+Nothing is impassable. Ground is only ever slower, over a band of exactly
+2:1 — open and level at full pace, wading at half, forest and slope in
+between. `walkable()` survives as a *placement* predicate for spawns and
+props; it is no longer consulted by movement, so a goal is never refused
+and a walker is never stranded partway.
+
+The band exists to break the identity between a sector's area and the time
+to search it. Once area stops predicting time, an even split is the wrong
+split, one searcher finishes early, and the only way the other learns that
+is to walk it and say so.
+
+Two things make it perceptible rather than merely true. `world-look`
+reports the going where you stand ("heavy going (61% of walking pace)"),
+so an occupant reads its own pace instead of inferring it from elapsed
+time; and `world-move` returns `eta_s_best_case`, deliberately naive,
+because integrating the real cost would hand out for free the answer that
+is supposed to be worth walking for. Measured on the default seed: a
+single 134 m leg ranged 0.99–1.55 m/s, while whole 96 m sectors differ by
+only about 1.2x — the variation is along a route, not between regions.
+
+Forest weighs more than slope because this generator makes it so: slope
+sits between 0.05 and 0.25 over most of the map and never once exceeds the
+old `MAX_WALK_SLOPE`, while the forest field is uniform by construction
+and covers half the world. It also puts the cost where sight is already
+cut to 22 m, so the slow ground is the blind ground.
+
+The browser computes the same factor from the same constants, shipped in
+the terrain payload alongside a uint8 forest field. Both sides were
+measured to agree within 0.0012 — the uint8 quantum. Getting this wrong
+does not look like a bug; it looks like Bruce and Jill crossing identical
+ground at different speeds and neither of them noticing.
+
 ## Avatars
 
 Abstract low-poly creatures, a dozen primitives each, in `avatars.js`:
@@ -47,6 +81,7 @@ Abstract low-poly creatures, a dozen primitives each, in `avatars.js`:
 | Bruce | crow | pale beak, fan tail, slate-blue wings |
 | Jill | kitten | ears, muzzle and whiskers, curled tail that sways when walking |
 | Sentinel | owl | large facial discs with amber eyes, ear tufts, squat body |
+| Jack | hare | ears three times a cat's, lateral eyes, low haunches, pale scut |
 | anyone else | the original capsule | a dark brow |
 
 Three constraints shape them, and each is load-bearing:

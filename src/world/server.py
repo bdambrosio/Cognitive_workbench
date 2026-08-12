@@ -139,13 +139,14 @@ class World:
                 if dist <= ARRIVE_TOL_M:
                     occ.goal, occ.gait = None, 'idle'
                     continue
-                stride = min(WALK_SPEED_MS * dt, dist)
+                # Nothing blocks: the ground under you only sets your pace,
+                # so a straight line always gets there and the cost of the
+                # route is what varies. Sampling the factor where you stand
+                # rather than where you are going keeps this a plain
+                # integration of cost along the path.
+                speed = WALK_SPEED_MS * self.terrain.speed_factor(occ.x, occ.z)
+                stride = min(speed * dt, dist)
                 nx, nz = occ.x + dx / dist * stride, occ.z + dz / dist * stride
-                if not self.terrain.walkable(nx, nz):
-                    # No pathfinder in v1: stop where the straight line
-                    # fails and let the next world-look see the obstacle.
-                    occ.goal, occ.gait = None, 'idle'
-                    continue
                 occ.x, occ.z = nx, nz
                 occ.y = self.terrain.height_at(nx, nz)
                 occ.heading = math.atan2(dx, dz)
@@ -156,12 +157,14 @@ class World:
     def set_human_pose(self, name: str, x: float, z: float,
                        heading: float) -> None:
         """Browser-driven movement. The browser integrates input for
-        responsiveness; the server still validates and owns ground height."""
+        responsiveness — including the terrain speed factor, from the same
+        constants — so the server takes the pose and owns ground height.
+        Bounds are still the server's call; pace is not."""
         with self._lock:
             occ = self.state.occupants.get(name)
             if occ is None or occ.kind != 'human':
                 return
-            if self.terrain.walkable(x, z):
+            if self.terrain.in_bounds(x, z):
                 occ.x, occ.z = x, z
                 occ.y = self.terrain.height_at(x, z)
             occ.heading = heading
@@ -174,14 +177,16 @@ class World:
                 return {'error': f"no occupant named {name!r} in this world"}
             if not self.terrain.in_bounds(x, z):
                 return {'error': f"({x:.1f}, {z:.1f}) is outside the world"}
-            if not self.terrain.walkable(x, z):
-                return {'error': f"({x:.1f}, {z:.1f}) is not walkable "
-                                 f"({self.terrain.describe(x, z)})"}
             dist = math.hypot(x - occ.x, z - occ.z)
             occ.goal = [x, z]
             occ.gait = 'walk'
+            # Best case, not a forecast: the ground between here and there
+            # can cost up to twice this, and finding that out by walking it
+            # is what gives an occupant something worth telling a partner.
+            # Integrating the real cost here would hand out that answer for
+            # free and there would be nothing to report.
             return {'accepted': True, 'distance_m': round(dist, 1),
-                    'eta_s': round(dist / WALK_SPEED_MS, 1),
+                    'eta_s_best_case': round(dist / WALK_SPEED_MS, 1),
                     'from': [round(occ.x, 1), round(occ.z, 1)]}
 
     def add_marker(self, by: str, label: str,

@@ -63,13 +63,44 @@ function heightAt(x, z) {
          (h10 * (1 - tx) + h11 * tx) * tz;
 }
 
+// Travel cost, mirroring terrain.speed_factor() against the same fields and
+// the same constants — which ride in on the payload rather than being
+// duplicated here, because a divergence would mean Bruce and the agents
+// crossing identical ground at different speeds and neither of them noticing.
+function slopeAt(x, z) {
+  const dx = (heightAt(x + 1, z) - heightAt(x - 1, z)) / 2;
+  const dz = (heightAt(x, z + 1) - heightAt(x, z - 1)) / 2;
+  return Math.hypot(dx, dz);
+}
+
+function forestAt(x, z) {
+  const { forest, gridN, extent } = terrain;
+  const half = extent / 2;
+  const gx = Math.min(Math.max(((x + half) / extent) * (gridN - 1), 0), gridN - 1);
+  const gz = Math.min(Math.max(((z + half) / extent) * (gridN - 1), 0), gridN - 1);
+  return forest[Math.floor(gz) * gridN + Math.floor(gx)] / 255;
+}
+
+function speedFactor(x, z) {
+  if (!terrain || !terrain.speed) return 1;
+  const s = terrain.speed;
+  if (heightAt(x, z) < terrain.waterY) return s.min_factor;
+  const t = (slopeAt(x, z) - s.slope_easy) / (s.slope_hard - s.slope_easy);
+  const cost = s.slope_cost * Math.min(Math.max(t, 0), 1)
+             + s.forest_cost * Math.min(Math.max(forestAt(x, z), 0), 1);
+  return Math.max(1 - cost, s.min_factor);
+}
+
 function buildTerrain(msg) {
   const bin = atob(msg.heights_b64);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   const heights = new Float32Array(bytes.buffer);
-  terrain = { heights, gridN: msg.grid_n, extent: msg.extent_m,
-              waterY: msg.water_y };
+  const fbin = atob(msg.forest_b64);
+  const forest = new Uint8Array(fbin.length);
+  for (let i = 0; i < fbin.length; i++) forest[i] = fbin.charCodeAt(i);
+  terrain = { heights, forest, gridN: msg.grid_n, extent: msg.extent_m,
+              waterY: msg.water_y, speed: msg.speed };
 
   const n = msg.grid_n, extent = msg.extent_m;
   const geo = new THREE.PlaneGeometry(extent, extent, n - 1, n - 1);
@@ -296,7 +327,8 @@ function movePlayer(dt) {
   if (keys.has('KeyA')) strafe -= 1;
   if (!fwd && !strafe) return;
   const len = Math.hypot(fwd, strafe);
-  const speed = (keys.has('ShiftLeft') || keys.has('ShiftRight') ? RUN : WALK) * dt;
+  const base = keys.has('ShiftLeft') || keys.has('ShiftRight') ? RUN : WALK;
+  const speed = base * speedFactor(player.x, player.z) * dt;
   // yaw 0 looks along +z, matching the server's heading convention.
   // Strafe is negated against the naive form: three.js cameras look down
   // their local -z, so with forward = +z the screen-right direction is
@@ -306,7 +338,6 @@ function movePlayer(dt) {
   const nz = player.z + ((fwd / len) * cos + (strafe / len) * sin) * speed;
   const half = terrain.extent / 2 - 1;
   if (nx < -half || nx > half || nz < -half || nz > half) return;
-  if (heightAt(nx, nz) < terrain.waterY) return;   // don't wade in
   player.x = nx; player.z = nz;
   selfMoving = true;
 }

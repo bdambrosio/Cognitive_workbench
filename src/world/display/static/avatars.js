@@ -186,6 +186,61 @@ function owl(accent) {
   return { rig: g, headTop: 1.78, sway: null };
 }
 
+// ---------------------------------------------------------------- hare
+
+function hare(accent) {
+  const g = new THREE.Group();
+  const FUR = 0x9a8f7d, DARK = 0x6b6152, INNER = 0xd9a1a6, SCUT = 0xf0ece1;
+  // Low and haunched, with the height spent on ears instead of on the
+  // body. That inverts the owl's mass distribution — squat body, tall
+  // head — so the two stay apart in silhouette even though both are
+  // shorter-bodied than the crow.
+  legs(g, DARK, 0.26, 0.52, 0.14);
+  const body = part(new THREE.CapsuleGeometry(0.29, 0.40, 5, 10),
+                    FUR, 0, 0.78, -0.02);
+  body.rotation.x = -0.18;            // haunches down, chest up
+  g.add(body);
+  collar(g, accent, 1.04, 0.28);
+  const HEAD_Y = 1.28, HEAD_R = 0.26, HEAD_Z = 0.06;
+  g.add(part(new THREE.SphereGeometry(HEAD_R, 12, 10), FUR, 0, HEAD_Y, HEAD_Z));
+  const FACE_Z = HEAD_Z + HEAD_R * 0.86;
+  // The ears are the whole point: at 26 m they are what separates a hare
+  // from a cat, whose cones are a third this length. Splayed slightly so
+  // they read as two from the front rather than merging into one mass.
+  for (const s of [-1, 1]) {
+    const ear = part(new THREE.ConeGeometry(0.098, 0.54, 5),
+                     FUR, s * 0.13, HEAD_Y + 0.42, -0.02);
+    ear.rotation.z = s * 0.20;
+    ear.rotation.x = -0.10;
+    g.add(ear);
+    const inner = part(new THREE.ConeGeometry(0.05, 0.34, 5),
+                       INNER, s * 0.132, HEAD_Y + 0.40, 0.026);
+    inner.rotation.z = s * 0.20;
+    inner.rotation.x = -0.10;
+    g.add(inner);
+    // Eyes sit far around the side — a prey animal's field of view, and
+    // the cheapest way to not read as another cat. Facing is carried by
+    // the muzzle instead, which is why that stays dead centre.
+    g.add(part(new THREE.SphereGeometry(0.052, 8, 6), 0x241f1a,
+               s * 0.215, HEAD_Y + 0.05, HEAD_Z + 0.09));
+  }
+  const muzzle = part(new THREE.SphereGeometry(0.115, 10, 8),
+                      SCUT, 0, HEAD_Y - 0.09, FACE_Z - 0.03);
+  muzzle.scale.set(0.95, 0.8, 0.9);
+  g.add(muzzle);
+  g.add(part(new THREE.SphereGeometry(0.04, 8, 6), INNER,
+             0, HEAD_Y - 0.065, FACE_Z + 0.06));
+  // Scut: small, pale, and high on the rump — visible from behind, which
+  // is the view you mostly get of someone walking away from you.
+  const scut = part(new THREE.SphereGeometry(0.10, 8, 6),
+                    SCUT, 0, 0.86, -0.30);
+  scut.scale.set(1.0, 0.9, 0.7);
+  g.add(scut);
+  // No sway: animateRig forces its sway object to a -0.75 z baseline,
+  // which is the kitten tail's rest angle and nonsense for anything else.
+  return { rig: g, headTop: 1.86, sway: null };
+}
+
 // ------------------------------------------------------------- default
 
 // Anyone not named below keeps the shape this world always had, so an
@@ -203,7 +258,7 @@ function person(accent) {
 // Presentation lookup on a stable identity, not an inference about text:
 // the same kind of table as the server's colour palette. An unlisted name
 // falls through to `person`, so a rename costs a shape, never a crash.
-const SPECIES = { Bruce: crow, Jill: kitten, Sentinel: owl };
+const SPECIES = { Bruce: crow, Jill: kitten, Sentinel: owl, Jack: hare };
 
 export function buildRig(occupant) {
   const make = SPECIES[occupant.name] || person;
