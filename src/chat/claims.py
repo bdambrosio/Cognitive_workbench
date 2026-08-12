@@ -1079,6 +1079,18 @@ class ClaimsMixin:
             return None
         if record.get('autonomous'):
             return None
+        # User-facing replies only. A peer exchange is the wrong audience
+        # for this: the correction path posts to the conversation, and the
+        # claims in a message to a partner are typically first-person
+        # reports of what this agent just did or saw. Restated on a later
+        # turn those carry no in-turn evidence, so the attributor grades
+        # them model_prior/volatile and this fired a web search against an
+        # agent's own eyes — observed 2026-08-12, twice in one run, on
+        # "I've spotted a marker at (62.1, 101.6)". The real repair is a
+        # `context turn:N` ref form so a prior-turn observation grades as
+        # context; until that exists, don't audit peer traffic.
+        if str(record.get('source') or '') in (getattr(self, '_peers', None) or []):
+            return None
         suspects = [c for c in claims if grade_claim(c) == 'suspect']
         if not suspects:
             return None

@@ -793,6 +793,22 @@ def test_suspect_spawn_quiet_without_suspects(tmp_path):
     assert stub.spawned == []
 
 
+def test_suspect_spawn_skips_peer_exchanges(tmp_path):
+    """A reply to a co-resident agent is not audited. Its claims are
+    first-person reports of what this agent did or saw; restated a turn
+    later they carry no in-turn evidence and grade model_prior/volatile,
+    which fired a web search against an agent's own eyes (2026-08-12,
+    "I've spotted a marker at (62.1, 101.6)"). User-facing replies still
+    spawn — the same record from the User does."""
+    stub = _Stub(_memory_dir(tmp_path), autonomy=True)
+    stub._peers = ["Jack", "Sentinel"]
+    assert stub._maybe_spawn_suspect_verification(
+        dict(_SUSPECT_RECORD, source="Jack"), _SUSPECT_CLAIMS) is None
+    assert stub.spawned == []
+    assert stub._maybe_spawn_suspect_verification(
+        _SUSPECT_RECORD, _SUSPECT_CLAIMS) is not None
+
+
 def test_suspect_spawn_gated_off(tmp_path):
     # Autonomy off → never spawns, even on suspect claims.
     stub = _Stub(_memory_dir(tmp_path), autonomy=False)
