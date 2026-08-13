@@ -417,7 +417,14 @@ class ToolsMixin:
         tools.append(("respond",
             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"respond\", \"text\": <string|$stepN>}` — "
             "final reply, exits loop. Must be in your voice; pass search-web/fetch-text results through process_text "
-            "first or write the reply yourself."))
+            "first or write the reply yourself. "
+            "Describe only work you ACTUALLY DID in this run — the actions above are the "
+            "whole record of it. Never report being partway through, having vetted or "
+            "polished or narrowed something, unless the steps that did so are visibly in "
+            "this run. If you owe work you have not started, either start it now or exit "
+            "with `yield`; do NOT `respond` with a progress report on work that has not "
+            "happened. Saying 'I haven't started this yet' is always available and always "
+            "better than inventing a status."))
         from chat.react import REACT_MAX_ITERS
         tools.append(("yield",
             "`{\"thought\": \"<one terse sentence>\", \"tool\": \"yield\", "

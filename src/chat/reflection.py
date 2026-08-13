@@ -54,6 +54,7 @@ _REFLECT_FRAME_OK = 'none'
 # format placeholders — appended after .format(), so literal braces in
 # the JSON example are safe.
 _REFLECT_STAGE6_RULE = (
+    "This turn has a sixth stage — six in total, not five.\n"
     "STAGE 6 — fire outcomes. For each act listed under \"## Recent "
     "autonomous acts awaiting outcome\", judge ONLY from evidence "
     "visible in this exchange whether the user's words or behavior show "
@@ -74,7 +75,8 @@ class ReflectionMixin:
     """Mixin for ChatLoop — moved verbatim from chat_loop.py."""
 
     # Reflection prompt: extract durable episodic specifics from the latest
-    # exchange. Two-stage decision:
+    # exchange. Six stages (1-5 inline; 6 appended only when the pending-fire
+    # registry is non-empty). The two that shape everything downstream:
     #   (a) Frame check. If the exchange is a hypothetical / role-play /
     #       counterfactual / instructional frame, suppress all writes. The
     #       cost of poisoning memory with frame-bound content is asymmetric
@@ -87,7 +89,11 @@ class ReflectionMixin:
     # fresh re-read" — names, places, commitments, stable preferences.
     _REFLECT_SYS = (
         "You watch chats between {character} and {entity}. Your job has "
-        "four stages.\n\n"
+        "five stages, labelled STAGE 1 through STAGE 5 below. Work through "
+        "every one of them before emitting the JSON — a stage with nothing "
+        "to report still needs its key present and empty. (Some turns add "
+        "a STAGE 6 at the end; when it is there, it is part of the job "
+        "too.)\n\n"
         "STAGE 1 — Frame check. Classify the latest exchange as one of:\n"
         "- `hypothetical`: 'imagine that…', 'suppose…', 'what if…'\n"
         "- `roleplay`: user asked {character} to take on a persona, character, or voice\n"
@@ -183,7 +189,12 @@ class ReflectionMixin:
         "- Items already covered by an existing agent_concern in the prompt\n"
         "- Speculative inferences without textual support\n"
         "- Requests the user-driven turn already fulfilled this exchange — "
-        "skip them entirely rather than logging an unfireable record\n"
+        "skip them entirely rather than logging an unfireable record. "
+        "FULFILLED means the work was actually DONE this exchange, not "
+        "that {character} said she would do it or reported being partway "
+        "through. A commitment she made but has not executed is work in "
+        "progress and MUST be captured (see rhythm_hours case (a)) — that "
+        "concern is the only thing that will make the work happen.\n"
         "Schema per agent_concern:\n"
         "- `text` (≤120 chars): short summary of what the concern is about.\n"
         "- `instruction` (string|null): the procedure {character} executes "
@@ -201,17 +212,31 @@ class ReflectionMixin:
         "range 51.5–57.5V. Flag if stale (>10m) or out of range. Silent on "
         "healthy for auto-checks; manual checks always report raw values.\"\n"
         "- `rhythm_hours` (int|null): target fire interval in hours. MUST be "
-        "one of {{1, 2, 4, 8, 12, 24, 168}} or null. Pick from the underlying "
+        "one of {{1, 2, 4, 8, 12, 24, 168}} or null. First ask WHICH KIND "
+        "of concern this is:\n"
+        "  (a) WORK IN PROGRESS — {character} committed to producing "
+        "something this exchange and has NOT finished it (a search she "
+        "owes, a draft, her half of a split with another agent). There is "
+        "no external event to wait for; the only thing gating it is that "
+        "she hasn't done it yet. ALWAYS rhythm_hours 1 — the tightest "
+        "rung. Never 4+: a person waiting on a deliverable is not an "
+        "event that recurs on a cadence.\n"
+        "      NOTE: if the work can simply be continued right now, the "
+        "ReAct loop's `yield` action is the better vehicle and reflection "
+        "need not author a concern at all. Author one here when the "
+        "commitment surfaced in an exchange that has already ended.\n"
+        "  (b) RECURRING ATTENTION — something in the world happens on a "
+        "cadence and {character} should check it. Pick from the underlying "
         "signal, not how often you'd nag the user:\n"
         "    hourly events (breaking news, intraday): 1 or 2\n"
         "    several-times-a-day work / project: 4 or 8\n"
         "    daily event (S&P close, daily roundup): 12 or 24\n"
         "    weekly check-in (project, hobby): 168\n"
         "    null = no autonomous fire (concern still logs).\n"
-        "- `rhythm_source` (\"external\"|\"urgency\"|\"default\"):\n"
-        "    `external` if user specified rhythm or topic has natural cadence\n"
-        "    `urgency` if user signaled importance ('track this closely')\n"
-        "    `default` if you guessed (default to 168 / weekly when guessing)\n"
+        "    If case (b) and you genuinely cannot tell the cadence, guess "
+        "168 (weekly) — the conservative choice for a recurring check. "
+        "This fallback is for case (b) ONLY: case (a) is never a guess, "
+        "it is always 1.\n"
         "- `category` (\"one_shot\"|\"durable\"): `one_shot` = a finite task — "
         "do it once at the right moment, then it is complete and gone "
         "('send me that link tomorrow'). rhythm_hours = when it should "
@@ -224,7 +249,11 @@ class ReflectionMixin:
         "{entity} agreed to stop tracking it, asked {character} to drop "
         "it, or declared it obsolete — put its EXACT text in "
         "`agent_concerns_closed`. Entries marked [seed] are architectural "
-        "baseline and can never be closed. Absence of mention is NOT "
+        "baseline and can never be closed. Entries marked [system] are "
+        "machine-scheduled follow-up work {character} owes (e.g. verifying "
+        "her own shaky claims); they are never closed here — the runtime "
+        "retires them when the work completes, and closing one would be "
+        "{character} cancelling her own audit. Absence of mention is NOT "
         "closure evidence; close only on explicit assent or instruction "
         "this exchange.\n\n"
         "STAGE 5 — Capability gap. If, during THIS exchange, {character} "
@@ -245,7 +274,6 @@ class ReflectionMixin:
         "     \"text\": \"...\",\n"
         "     \"instruction\": \"<imperative>|null\",\n"
         "     \"rhythm_hours\": <int|null>,\n"
-        "     \"rhythm_source\": \"external|urgency|default\",\n"
         "     \"category\": \"one_shot|durable\"\n"
         "   }}, ...],\n"
         "   \"agent_concerns_closed\": [\"<exact text of an existing agent_concern>\", ...],\n"
@@ -262,7 +290,6 @@ class ReflectionMixin:
         "    \"text\": \"Track S&P 500 closing price daily.\",\n"
         "    \"instruction\": \"Search for today's S&P 500 close and summarize the day's move.\",\n"
         "    \"rhythm_hours\": 24,\n"
-        "    \"rhythm_source\": \"external\",\n"
         "    \"category\": \"durable\"\n"
         "  }}]}}\n\n"
         "WORKED EXAMPLE 1b (one-time task). {entity}: \"Tomorrow morning, "
@@ -275,7 +302,22 @@ class ReflectionMixin:
         "    \"text\": \"Remind {entity} to call the dentist tomorrow morning.\",\n"
         "    \"instruction\": \"Remind {entity} to call the dentist.\",\n"
         "    \"rhythm_hours\": 12,\n"
-        "    \"rhythm_source\": \"external\",\n"
+        "    \"category\": \"one_shot\"\n"
+        "  }}]}}\n\n"
+        "WORKED EXAMPLE 1c (work in progress). {entity} asked {character} "
+        "and another agent to split a research task; {character} agreed to "
+        "take two of the categories and said she'd report back, but the "
+        "exchange ended with her having run no searches.\n"
+        "Output (a deliverable she owes and has NOT done → tightest rhythm, "
+        "one_shot; NOT a daily/weekly cadence — nobody is waiting on an "
+        "event, they are waiting on her):\n"
+        "{{\"frame\": \"none\", \"memories\": [],\n"
+        "  \"user_concerns\": [], \"user_concerns_updated\": [], \"user_concerns_closed\": [],\n"
+        "  \"agent_concerns\": [{{\n"
+        "    \"text\": \"Finish my half of the research split and report back.\",\n"
+        "    \"instruction\": \"Run the searches for the categories I took, "
+        "apply the agreed filters, and send the ranked results.\",\n"
+        "    \"rhythm_hours\": 1,\n"
         "    \"category\": \"one_shot\"\n"
         "  }}]}}\n\n"
         "WORKED EXAMPLE 2. {entity}: \"I'm thinking about how concerns and "
@@ -405,11 +447,18 @@ class ReflectionMixin:
                     "## Existing user_concerns (do NOT re-emit; emit only "
                     "NEW user_concerns this exchange surfaced)\n" + "\n".join(lines))
             if existing_agent:
-                # [seed] tag: tells the closure stage which entries are
-                # architectural baseline (never closable) so it doesn't
-                # waste a closure the apply step would refuse anyway.
+                # [seed] / [system] tags: tell the closure stage which
+                # entries are never closable so it doesn't waste a closure
+                # the apply step would refuse anyway. [system] = machine-
+                # scheduled follow-up (claim verification); only the
+                # runtime retires those, on completion.
+                def _tag(p):
+                    p = p or {}
+                    if p.get('seed'):
+                        return " [seed]"
+                    return " [system]" if p.get('system_spawned') else ""
                 lines = [
-                    f"- {text}" + (" [seed]" if (p or {}).get('seed') else "")
+                    f"- {text}{_tag(p)}"
                     for _nid, text, _a, p in existing_agent]
                 user_parts.append(
                     "## Existing agent_concerns (do NOT re-emit; emit only "
@@ -552,6 +601,14 @@ class ReflectionMixin:
                 text = c.get('text', '')
                 if len(text) > 240:
                     text = text[:240].rstrip()
+                # rhythm_source is no longer solicited by the prompt — its
+                # only runtime consumer is a legacy pre-category fallback
+                # in _is_one_shot_concern, so asking the model for it cost
+                # prompt space and a decision it made badly (observed:
+                # 'urgency' paired with a 24h rhythm). Reflection-authored
+                # concerns are all 'default' now, which is accurate: as far
+                # as provenance goes, this stage is guessing. The parser
+                # still reads the key if a model volunteers it.
                 if self._add_agent_concern(
                         text, entity=entity,
                         provenance='asserted',

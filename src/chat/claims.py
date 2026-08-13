@@ -1128,8 +1128,15 @@ class ClaimsMixin:
             skip_recurrence=True,
             category='one_shot',
             extra_properties={
-                'activation': max(0.0,
-                                  _AGENT_CONCERN_FIRE_THRESHOLD - 0.1),
+                # Prime AT threshold so the next tick fires it, matching
+                # the yield/successor spawn paths in concerns.py.
+                'activation': _AGENT_CONCERN_FIRE_THRESHOLD,
+                # System-spawned: reflection must not be able to close
+                # this. Observed live 2026-08-13 — a verification concern
+                # was spawned and closed by the very next reflection 17s
+                # later, so four ungrounded claims were never checked.
+                # The audit trail looked healthy while the audit never ran.
+                'system_spawned': True,
             },
         )
         if new_id:

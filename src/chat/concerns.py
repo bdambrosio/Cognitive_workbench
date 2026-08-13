@@ -569,11 +569,20 @@ class ConcernsMixin:
     @staticmethod
     def _is_one_shot_concern(props: Dict[str, Any]) -> bool:
         """Is this agent_concern a finite task (continuation spawn) rather
-        than a standing concern? Seeds are never one-shot. New spawns carry
-        an explicit category='one_shot'; notes created before the category
-        stamp are recognized by the markers both continuation routes have
-        always written: successor_of, or rhythm_source='urgency' (the two
-        spawn paths are the only pre-category writers of 'urgency')."""
+        than a standing concern? Seeds are never one-shot.
+
+        The rhythm_source fallback below is LEGACY-ONLY. _add_agent_concern
+        always stamps `category` (normalizing to 'durable'), so every
+        concern created through it takes the `if category` branch; the
+        fallback is reached only by notes predating that stamp. For those,
+        the spawn paths were the only writers of 'urgency', which is what
+        makes the inference sound.
+
+        Keep it that way: reflection no longer solicits rhythm_source at
+        all (dropped from the prompt 2026-08-13), so the spawn paths are
+        again its only writers. If some future caller starts writing
+        'urgency' on durable concerns, this fallback becomes wrong for any
+        note that also lacks a category."""
         if props.get('seed'):
             return False
         category = props.get('category')
@@ -642,6 +651,15 @@ class ConcernsMixin:
                 logger.info(
                     f"[{self.character_name}] agent-concern close refused — "
                     f"{nid} is a seed (architectural baseline)")
+                continue
+            if props.get('system_spawned'):
+                # Machine-scheduled follow-up work (e.g. suspect-claim
+                # verification). The exchange that triggers it can never
+                # contain assent to drop it, so any close here is the
+                # model retiring its own audit.
+                logger.info(
+                    f"[{self.character_name}] agent-concern close refused — "
+                    f"{nid} is system-spawned (not reflection's to close)")
                 continue
             ok, err = self._set_concern_status(nid, 'abandoned')
             if ok:
@@ -2095,12 +2113,14 @@ class ConcernsMixin:
             skip_recurrence=True,
             category='one_shot',
             extra_properties={
-                # Prime activation just below threshold so the next tick's
-                # growth pushes it over — same priming as successors. The
-                # provenance trail lives in autonomy.jsonl (via: user_yield);
-                # no dedicated note property (create_note whitelists fields).
-                'activation': max(0.0,
-                                  _AGENT_CONCERN_FIRE_THRESHOLD - 0.1),
+                # Prime AT threshold so the next tick fires it — same
+                # priming as successors. This path runs inside a user
+                # turn, outside _handle_tick entirely, so there is no
+                # same-tick re-fire to guard against. The provenance trail
+                # lives in autonomy.jsonl (via: user_yield) rather than on
+                # the note — a reader-facing choice, not a constraint:
+                # extra_properties do persist (see 'system_spawned').
+                'activation': _AGENT_CONCERN_FIRE_THRESHOLD,
             },
         )
         if not new_id:
@@ -2154,11 +2174,14 @@ class ConcernsMixin:
             extra_properties={
                 'successor_of': parent_id,
                 'successor_depth': new_depth,
-                # Prime activation just below threshold so the next tick's
-                # growth pushes it over without making the spawn itself
-                # eligible (avoids re-firing in the same tick window).
-                'activation': max(0.0,
-                                  _AGENT_CONCERN_FIRE_THRESHOLD - 0.1),
+                # Prime AT threshold so the next tick fires it (≤ tick
+                # interval). Previously primed 0.1 below to avoid
+                # re-firing in the same tick window, which cost ~10min
+                # of growth at rhythm_hours=1 — but the guard is already
+                # structural: _handle_tick computes its fire list before
+                # dispatching, so a concern spawned during a fire cannot
+                # appear in that same tick's batch.
+                'activation': _AGENT_CONCERN_FIRE_THRESHOLD,
             },
         )
         if not new_id:
