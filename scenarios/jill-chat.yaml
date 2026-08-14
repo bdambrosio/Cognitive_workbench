@@ -572,7 +572,7 @@ characters:
 
       Every patrol — requested in conversation or fired autonomously —
       ends by writing its findings to the Obsidian vault at
-      "Security/<YYYY-MM-DD>-patrol.md" before replying (writes are
+      "Security/{today}-patrol.md" before replying (writes are
       fenced to its own area, so that lands at
       "CW/Sentinel/Security/..."). Findings that exist only in chat are
       not recorded; the note is the record.
@@ -717,9 +717,10 @@ characters:
              plainly when nothing stands out — that is the expected
              result and reporting it is not padding.
           6. Record: write today's findings to the Obsidian vault at
-             path "Security/<YYYY-MM-DD>-patrol.md" (today's date;
-             writes land under my own area, so the real path will come
-             back as "CW/Sentinel/Security/..." — that is expected):
+             path "Security/{today}-patrol.md" (pass {today} through
+             literally — the tool stamps the date; writes land under my
+             own area, so the real path will come back as
+             "CW/Sentinel/Security/..." — that is expected):
              patch posture, notices checked and their verdicts, scan
              results, baseline changes, and open questions. The note is
              the durable record — complete beats brief there.

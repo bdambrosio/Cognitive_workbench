@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import time
+from datetime import datetime
 import requests
 import yaml
 from typing import List, Dict, Any, Optional
@@ -499,6 +500,18 @@ def tool(input_value=None, **kwargs):
     handler = _ACTIONS.get(action)
     if not handler:
         return _fail(executor, f"Unknown action '{action}'. Valid: {', '.join(_ACTIONS.keys())}")
+
+    # Dated note paths are stamped here rather than by the model. A prompt
+    # that says "write Security/<YYYY-MM-DD>-patrol.md" leaves the date to
+    # the LLM, and it gets it wrong: Sentinel filed a 2026-08-15 patrol note
+    # on the 14th, two minutes after the 08-14 one, with a correct clock in
+    # its prompt the whole time. `{today}` in any path resolves here instead.
+    # Local date, not UTC — these are daily notes, read against the calendar
+    # on the wall.
+    path = kwargs.get('path')
+    if isinstance(path, str) and '{today}' in path:
+        kwargs['path'] = path.replace('{today}',
+                                      datetime.now().strftime('%Y-%m-%d'))
 
     # Pass input_value through for search backward compat
     kwargs['input_value'] = input_value

@@ -3,7 +3,7 @@ name: obsidian
 description: Read, search, write, and list notes in the user's Obsidian vault. You can READ and SEARCH the whole vault — the user's own notes, web clippings, everything. You can only WRITE inside your own area (CW/<your name>/); any path you give for a write is placed there, so you can never overwrite the user's notes. The write observation tells you the actual path written — use that path to read it back. Multi-action — set `action` first, then provide the args required by that action.
 args:
   action: required string — one of "read", "search", "write", "list"
-  path: required for read/write/list — vault-relative path, e.g. "Clippings/article.md" or "KnowledgeBases/". Real note names often contain spaces; pass them exactly as they appear. For write, the path is taken relative to your own area.
+  path: required for read/write/list — vault-relative path, e.g. "Clippings/article.md" or "KnowledgeBases/". Real note names often contain spaces; pass them exactly as they appear. For write, the path is taken relative to your own area. `{today}` anywhere in the path is replaced with the current date as YYYY-MM-DD — write it literally rather than filling the date in yourself.
   query: required for search — search query text
   content: required for write — markdown text to write (may be a `$stepN` binding)
   frontmatter: optional for write — YAML frontmatter fields to prepend (flat dict of strings)
@@ -19,6 +19,15 @@ Access the user's Obsidian vault via the Local REST API plugin.
 - **`search`** — find notes by query. Needs `query`. Filename matches first, then content matches. Whole vault in scope.
 - **`write`** — create or overwrite a file **inside your own area**. Needs `path` and `content`. Optional `frontmatter` prepended as YAML.
 - **`list`** — list directory contents. Needs `path` (directory, e.g. `"KnowledgeBases/"`). Whole vault in scope.
+
+## Dated paths
+
+A path may contain `{today}`, which is replaced with the current date in
+`YYYY-MM-DD` form before the vault is touched — `Security/{today}-patrol.md`
+becomes `Security/2026-08-14-patrol.md`. Pass the token literally; don't
+substitute the date yourself. It works for every action, so reading back
+today's note uses the same path you wrote it with. For any other date, write
+it out in full.
 
 ## Write scope
 
