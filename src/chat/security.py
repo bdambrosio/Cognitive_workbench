@@ -118,6 +118,14 @@ _HOST_STATE_COMMANDS: Dict[str, List[str]] = {
                       '--no-pager'],
     'failed_units':  ['systemctl', 'list-units', '--failed', '--no-pager'],
     'upgradable':    ['apt', 'list', '--upgradable'],
+    # Host identity for security-notice triage. A USN names an Ubuntu
+    # release and a kernel flavour; without both of these, applicability
+    # cannot be decided and every kernel notice in the feed looks like it
+    # might apply. `uname -rv` is the RUNNING kernel — compare it against
+    # package_version('linux-image-generic') to catch patched-but-not-
+    # rebooted, which no package query can show on its own.
+    'kernel':        ['uname', '-rv'],
+    'os_release':    ['cat', '/etc/os-release'],
     'containers':    ['docker', 'ps', '--all', '--no-trunc',
                       '--format', '{{.Names}}\t{{.Image}}\t{{.Ports}}\t'
                                   '{{.Status}}'],
@@ -181,6 +189,20 @@ _BASELINE_CATEGORIES: Dict[str, List[str]] = {
     'autostart':     ['find', str(Path.home() / '.config' / 'autostart'),
                       '-maxdepth', '1', '-type', 'f'],
 }
+
+# Categories whose snapshot accumulates instead of tracking current state.
+# The kernel evicts neighbour entries for hosts that go quiet, so a
+# point-in-time image of `ip neigh show` answers "who spoke recently", not
+# "who have I ever seen" — and a device that naps for a day reads as a new
+# arrival every time it wakes. Storing the union makes an ADDED entry mean
+# first-ever sighting, which is what the MAC-keyed canonicalization was
+# for. REMOVED is vacuous under a union and is suppressed for these
+# categories: a device falling out of the cache is not an event.
+#
+# The other categories are genuine current-state inventories — a SUID bit
+# or an enabled unit that disappears is itself worth reporting — so they
+# keep replace-on-write semantics.
+_CUMULATIVE_BASELINES = frozenset({'arp'})
 
 
 def _build_system_prompt() -> str:
@@ -267,6 +289,8 @@ def _build_system_prompt() -> str:
         "with their published ports\n"
         "    `upgradable`     — packages with pending upgrades (apt list)\n"
         "    `unattended_log` — tail of the unattended-upgrades log\n"
+        "    `kernel`         — running kernel version (uname -rv)\n"
+        "    `os_release`     — Ubuntu release identity (/etc/os-release)\n"
         "  Privileged categories (fenced `sudo -n`, argument-exact "
         "NOPASSWD entries; unavailable until configured, which reports "
         "as EMPTY and is a SETUP GAP, never a finding):\n"
@@ -286,8 +310,15 @@ def _build_system_prompt() -> str:
         'autostart|arp>"} — diff current state against the '
         "last stored snapshot; reports ADDED/REMOVED entries, then "
         "updates the snapshot. `arp` is LAN membership, keyed by MAC "
-        "address: an ADDED entry is a device that has not been on this "
-        "network before, and system_state(arp) then gives its address. "
+        "address, and its snapshot is cumulative — an ADDED entry is a "
+        "MAC never seen on this network before, and REMOVED is never "
+        "reported (a device going quiet is not an event). "
+        "Before reporting an ADDED device, identify it: system_state(arp) "
+        "gives the address behind the MAC, and discover()/scan_services() "
+        "on that address say whether anything is reachable there. Report "
+        "what you found, and say plainly when the answer is that you "
+        "could not tell — an unidentified MAC is an inventory question, "
+        "not yet evidence of an intruder. "
         "Run discover() on the local subnet first if you want that "
         "coverage to be deliberate rather than whatever happened to "
         "talk to this host. "
@@ -338,6 +369,20 @@ def _build_system_prompt() -> str:
         "every probe here. Note these limitations honestly in your final "
         "answer if relevant, and never let a clean scan imply coverage "
         "you did not have.\n"
+        "- **A security notice is not a finding until it applies here.** "
+        "A USN names an Ubuntu release and specific package flavours, and "
+        "the feed carries notices for every release and flavour Ubuntu "
+        "supports — most will be for releases this host does not run "
+        "(older LTS, cloud/embedded kernels). Before reporting one, "
+        "establish applicability: host_state(os_release) for the release, "
+        "host_state(kernel) for the running kernel, and package_version "
+        "for the versions actually installed. If the release or flavour "
+        "does not match, say the notice does not apply and move on — do "
+        "not report it as unverified. If it does match, compare the "
+        "installed version against the notice's fixed version and say "
+        "which side of it this host is on. 'Cannot determine the "
+        "installed version' is not available to you: package_version "
+        "answers that directly.\n"
         "- **Fenced-probe absence is not a finding.** When a privileged "
         "category returns EMPTY because its sudoers entry is missing, "
         "that is unconfigured tooling. Report it as a setup gap and do "
@@ -974,24 +1019,33 @@ def _tool_baseline_diff(category: str, baseline_dir: Optional[Path]) -> str:
             logger.warning(f"security: unreadable baseline {snap_path}: {e}")
             previous = None
 
+    have_previous = (previous is not None
+                     and isinstance(previous.get('lines'), list))
+    prev_lines = (set(str(x) for x in previous['lines'])
+                  if have_previous else set())
+    cumulative = cat in _CUMULATIVE_BASELINES
+    to_store = sorted(prev_lines | set(current)) if cumulative else current
+
     now = datetime.now(timezone.utc).isoformat()
     try:
         baseline_dir.mkdir(parents=True, exist_ok=True)
         snap_path.write_text(
-            json.dumps({'captured_at': now, 'lines': current}, indent=1),
+            json.dumps({'captured_at': now, 'lines': to_store}, indent=1),
             encoding='utf-8')
     except OSError as e:
         logger.warning(f"security: baseline write failed for {cat}: {e}")
         return f"ERROR: could not write snapshot {snap_path}: {e}"
 
-    if previous is None or not isinstance(previous.get('lines'), list):
+    if not have_previous:
         return (f"OK: no prior {cat} snapshot — baseline established now "
-                f"({len(current)} entries). Diffs start from the next call.")
-    prev_lines = set(str(x) for x in previous['lines'])
+                f"({len(to_store)} entries). Diffs start from the next call.")
     added = [ln for ln in current if ln not in prev_lines]
-    removed = sorted(prev_lines - set(current))
+    removed = [] if cumulative else sorted(prev_lines - set(current))
     when = previous.get('captured_at', 'unknown time')
     if not added and not removed:
+        if cumulative:
+            return (f"OK: no {cat} entries beyond the {len(prev_lines)} "
+                    f"already known (last seen {when})")
         return (f"OK: {cat} unchanged since snapshot of {when} "
                 f"({len(current)} entries)")
     parts = [f"{cat} changed since snapshot of {when}:"]
@@ -999,7 +1053,12 @@ def _tool_baseline_diff(category: str, baseline_dir: Optional[Path]) -> str:
         parts.append('ADDED:\n' + '\n'.join(f'  + {ln}' for ln in added))
     if removed:
         parts.append('REMOVED:\n' + '\n'.join(f'  - {ln}' for ln in removed))
-    parts.append('(snapshot updated to current state)')
+    if cumulative:
+        parts.append(f'(snapshot is cumulative — {len(to_store)} entries '
+                     f'now known; entries are never dropped, so ADDED means '
+                     f'first-ever sighting)')
+    else:
+        parts.append('(snapshot updated to current state)')
     return _truncate('OK: ' + '\n'.join(parts), 'category')
 
 
