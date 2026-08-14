@@ -144,8 +144,11 @@ def tool(input_value: Any, runtime=None, **kwargs) -> str:
         # LLM evaluation
         prompt = f"Does this match '{predicate}'? Respond 'true' or 'false' only.\n\nContent: {content_str}"
         try:
-            # Use unified llm_generate callback (required)
-            response = llm_generate(messages=[prompt], max_tokens=10, temperature=0.0, is_json=False)
+            # Use unified llm_generate callback (required). enable_thinking=False
+            # so a reasoning backend doesn't spend the whole 10-token budget in
+            # the think block and return nothing; ignored by non-thinking models.
+            response = llm_generate(messages=[prompt], max_tokens=10, temperature=0.0,
+                                    is_json=False, enable_thinking=False)
             if not response.success:
                 logger.error(f"LLM evaluation failed for {note_id}: {response.error}")
                 continue

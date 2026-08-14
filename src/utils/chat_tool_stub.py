@@ -253,6 +253,10 @@ def make_llm_generate(backend):
 
     _ChatBackend wants `messages=[{role, content}]` and returns a bare
     string. This shim translates both ends.
+
+    `enable_thinking` passes straight through to `_ChatBackend.chat()` so a
+    tool that wants a one-word answer on a tight budget can suppress the
+    thinking channel (see assess / filter-semantic).
     """
     from types import SimpleNamespace
 
@@ -260,7 +264,7 @@ def make_llm_generate(backend):
         return None
 
     def llm_generate(messages, max_tokens=600, temperature=0.4,
-                     is_json=False, stops=None, **kw):
+                     is_json=False, stops=None, enable_thinking=None, **kw):
         msg_list = []
         for m in messages or []:
             if isinstance(m, str):
@@ -274,6 +278,7 @@ def make_llm_generate(backend):
                 temperature=temperature,
                 stops=stops or [],
                 is_json=is_json,
+                enable_thinking=enable_thinking,
             )
         except Exception as e:
             return SimpleNamespace(text="", success=False, error=str(e))

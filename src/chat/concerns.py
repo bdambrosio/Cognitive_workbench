@@ -1834,10 +1834,18 @@ class ConcernsMixin:
 
         verdict, reason = 'fire', ''
         try:
+            # 4096, not the 512 this used to be: on a reasoning backend the
+            # thinking channel shares this budget and wants ~600 tokens before
+            # the verdict JSON starts, so 512 leaves no margin — and a
+            # truncated verdict fails open to fire, which is the expensive
+            # direction. Live triage against Qwen3.8 was still parsing at 512;
+            # this is headroom for the long-WIP case, not a fix for an
+            # observed break. Non-thinking backends emit the same ~60-token
+            # envelope either way — it is a cap, not a target.
             raw = self.backend.chat(
                 [{'role': 'system', 'content': sys_msg},
                  {'role': 'user', 'content': user_msg}],
-                max_tokens=512, temperature=0.2, cot_profile='none')
+                max_tokens=4096, temperature=0.2, cot_profile='none')
             data = repair_json_string(raw or '')
             if isinstance(data, dict) and data.get('verdict') in ('fire', 'defer', 'reset'):
                 verdict = data['verdict']

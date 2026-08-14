@@ -80,8 +80,12 @@ def tool(input_value, runtime=None, **kwargs):
     chunks = segment_text_boundary_aware(input_value, max_chunk_size=16000)
     
     if len(chunks) == 1:
-        # Single chunk - direct test
-        return _test_chunk(input_value, predicate, kwargs)
+        # Single chunk - direct test. _test_chunk returns a bare "true"/"false";
+        # box it the way the multi-chunk path below does, so both paths return
+        # the uniform dict every caller expects (the ReAct wrapper's
+        # translate_result rejects a bare string).
+        return _succeed(executor, _test_chunk(input_value, predicate, kwargs),
+                        {"matched_chunk": 1, "total_chunks": 1})
     
     # Multiple chunks - OR aggregation (true if ANY chunk matches)
     logger.info(f"assess: long document ({len(chunks)} chunks), using OR aggregation")
@@ -114,12 +118,19 @@ Answer (true or false):"""
     llm_generate = kwargs.get('llm_generate') if kwargs else None
     if not llm_generate:
         raise ValueError("llm_generate callback is required")
+    # enable_thinking=False: a reasoning model would spend its whole
+    # 10-token budget inside the think block and return nothing (Qwen3.8
+    # wants ~100 thinking tokens for this one-word answer), and any stop
+    # marker it mentions while thinking truncates the turn. Non-thinking
+    # backends ignore the flag — it is a chat-template kwarg unused by
+    # their templates.
     response = llm_generate(
         messages=[prompt],
         max_tokens=10,
         temperature=0.0,
         is_json=False,
-        stops=['</end>']
+        stops=['</end>'],
+        enable_thinking=False
     )
     
     # Send heartbeat after LLM call
