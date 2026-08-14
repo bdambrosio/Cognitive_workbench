@@ -1813,6 +1813,14 @@ class ConcernsMixin:
             "NOW is actually warranted. Consider: is there anything new since "
             "the last fire, is the work already done (see work-in-progress), "
             "and would acting help?\n\n"
+            "Weigh the evidence by its age. Work-in-progress and my own "
+            "earlier defer reason are snapshots written at the last fire and "
+            "may describe a world that has since moved on — in particular, "
+            "work can be completed on a turn that was not a fire, which "
+            "leaves those fields describing it as still pending. Anything "
+            "labelled as measured now supersedes them. When a concern waits "
+            "on a precondition, decide it from measured state, never from "
+            "the fact that I said last time it had not happened yet.\n\n"
             "Respond ONLY with JSON, no prose, no markdown. Shapes:\n"
             "  {\"verdict\": \"fire\"}                          ← act now\n"
             "  {\"verdict\": \"defer\", \"reason\": \"<short>\"}  ← not now; re-ask later or on new evidence\n"
@@ -1827,9 +1835,24 @@ class ConcernsMixin:
         if props.get('last_bumped_at'):
             lines.append(f"Last evidence bump: {props['last_bumped_at']}")
         if props.get('triage_reason'):
-            lines.append(f"Previous defer reason: {props['triage_reason']}")
+            # Labelled as a prior judgement rather than a fact. Unlabelled, it
+            # reads as evidence and anchors: Jack deferred a search three times
+            # on "currently in transit", each defer restating the one before,
+            # while he had been standing at the destination for nine minutes.
+            lines.append(
+                "My own reason for deferring last time (a prior judgement, "
+                "not evidence — re-check it against measured state): "
+                f"{props['triage_reason']}")
         if wip:
             lines.append(f"Work-in-progress from earlier fires:\n{wip}")
+        # Measured now, and last so it reads as the freshest thing here. This
+        # is the only current-world fact triage gets; without it a concern
+        # waiting on "once I arrive" is judged by a snapshot written before
+        # arrival, and defers forever. Empty for agents with no live world,
+        # which leaves the prompt exactly as it was.
+        position = self._world_position_line()
+        if position:
+            lines.append(f"Where I am, measured now: {position}")
         user_msg = "\n".join(lines)
 
         verdict, reason = 'fire', ''
