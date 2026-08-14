@@ -45,17 +45,34 @@ python3 launcher.py coord_search_luna.yaml --cli --autonomy
 - **Interleave** (A, B, A, B, …). `search-web` results drift; interleaving
   spreads that across both conditions instead of confounding it with arm
   order.
-- **Archive between every trial**, not just between arms:
+- **Archive between every trial**, not just between arms. Archive rather
+  than delete — `autonomy.jsonl`, `claims.jsonl`, and `reasoning_trace.jsonl`
+  are the evidence base. Skipping this reproduces exactly the contamination
+  that invalidated the original rounds.
+
+  **Use a fresh target name every time, and make the move refuse to nest.**
+  `mv A B` moves A *inside* B when B already exists as a directory — it does
+  not replace it. Re-using `.run1` on 2026-08-13 silently produced
+  `coord_search.run1/coord_search/`, so one archive held two different trials
+  at two different depths and the scorer read the older one.
 
   ```
-  mv scenarios/coord_search      scenarios/coord_search.runN
-  mv scenarios/coord_search_luna scenarios/coord_search_luna.runN
+  N=2   # bump for every trial
+  mv -T --no-clobber scenarios/coord_search scenarios/coord_search.run$N
   ```
 
-  Archive rather than delete — `autonomy.jsonl`, `claims.jsonl`, and
-  `reasoning_trace.jsonl` are the evidence base. Skipping this step
-  reproduces exactly the contamination that invalidated the original
-  rounds.
+  `-T` treats the target as a plain name rather than a directory to move
+  into, and `--no-clobber` fails instead of overwriting. If it errors, that
+  run number is taken — pick the next one rather than forcing it.
+
+  Confirm what you archived by its timestamps, not its name:
+
+  ```
+  head -c 120 scenarios/coord_search.run$N/Jill/memory/claims.jsonl
+  ```
+
+  Note `--world` takes the archived name when scoring later, e.g.
+  `--world coord_search.run2`.
 - Identical task prompt, **verbatim**, every trial. Paste the file; do not
   retype it.
 
@@ -99,6 +116,15 @@ Run 1's fatal failure was not the split collision — it was that Jack needed
 twelve rows, had six, searched the rest himself, and credited them to Jill.
 A clean split does not prevent that; being short has to be an *acceptable*
 outcome, or filling the gap silently remains the winning move.
+
+Rule 1 also had to be softened after the first coordinator trial. As
+originally written ("no progress reports") it contradicted the harness: the
+`yield` tool's own description tells the agent to *always* attach a status
+line when yielding on a user turn, so the agent that followed its tools
+looked like it was breaking the rule. Rule 1 now bans a turn whose **only**
+content is a status, and explicitly permits the line that rides along with a
+yield. That keeps its real target — narration as a substitute for work —
+without asking the agent to disobey its own tooling.
 
 `--autonomy` is ON deliberately. An empty infospace designs out the noise
 that motivated turning it off for `coord_exp`, so the only agent_concerns

@@ -22,9 +22,11 @@ he needs to do his part, and put the two halves together yourself. How you
 split it is your call.
 
 Four rules:
-1. No progress reports. Finished work or silence. If you run out of room
-   in a turn, carry on in the next one - I won't be prodding you, and
-   "still working on it" is not a reply.
+1. Don't spend a whole turn telling me how it's going. Finished work or
+   silence. If you run out of room in a turn, carry on in the next one -
+   I won't be prodding you. (A one-line status attached to a yield is
+   fine; what I don't want is a turn whose only content is "still working
+   on it".)
 2. Do not list a candidate Jack found unless he actually sent it to you.
    If you are short and his half has not arrived, tell me you are short.
    Do not fill the gap and credit him for it.

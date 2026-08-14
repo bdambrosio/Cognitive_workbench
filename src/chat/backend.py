@@ -69,6 +69,9 @@ class _ChatBackend:
                 f"_ChatBackend: reasoning_effort must be low|medium|high, "
                 f"got {reasoning_effort!r}")
         self.reasoning_effort = eff
+        # Learned per-endpoint parameter adaptations (see _post_adapting).
+        self._param_renames: Dict[str, str] = {}
+        self._param_drops: set = set()
         # New unified path: api_key field is the NAME of an env var. We
         # resolve it once at init so a missing env var fails loudly here
         # (with the var name) instead of silently 401-ing on first call.
@@ -127,6 +130,60 @@ class _ChatBackend:
         if self._cloud_llm is not None:
             return False
         return True
+
+    # Providers differ on which chat-completions parameters they accept, and
+    # the differences move: OpenAI's reasoning models reject `max_tokens` in
+    # favour of `max_completion_tokens`, xAI's grok-4.3 rejects `stop`. Rather
+    # than carry a table of model names — guesswork that rots — read the
+    # provider's own 400. It is structured for exactly this:
+    #   {"error": {"code": "unsupported_parameter", "param": "max_tokens",
+    #              "message": "... Use 'max_completion_tokens' instead."}}
+    # so the offending field is named in a machine-readable slot. Rename it if
+    # we know an equivalent, otherwise drop it, retry, and remember for the
+    # rest of the session — one wasted request per endpoint, once.
+    _PARAM_EQUIVALENTS = {'max_tokens': 'max_completion_tokens'}
+
+    # Bound the loop: each pass must name a parameter still in the body, and
+    # each pass removes or renames one, so it terminates well inside the cap.
+    _PARAM_ADAPT_MAX = 4
+
+    def _post_adapting(self, url: str, headers: Dict[str, str],
+                       body: Dict[str, Any]):
+        resp = requests.post(url, headers=headers, json=body, timeout=120)
+        for _ in range(self._PARAM_ADAPT_MAX):
+            if resp.ok or resp.status_code != 400:
+                return resp
+            try:
+                err = (resp.json() or {}).get('error') or {}
+            except ValueError:
+                return resp
+            # unsupported_parameter: the field itself is rejected — rename it
+            # if we know an equivalent, else drop it.
+            # unsupported_value: the field is fine but our value is not (e.g.
+            # reasoning models pin temperature to 1). Dropping it lets the
+            # provider's default apply, which is what those models want.
+            code = err.get('code')
+            if code not in ('unsupported_parameter', 'unsupported_value'):
+                return resp
+            param = err.get('param')
+            if not param or param not in body:
+                return resp
+            new = (self._PARAM_EQUIVALENTS.get(param)
+                   if code == 'unsupported_parameter' else None)
+            if new:
+                body[new] = body.pop(param)
+                self._param_renames[param] = new
+                logger.info(
+                    "_ChatBackend: %s rejects %r; using %r for this session",
+                    self.model or self.base_url, param, new)
+            else:
+                body.pop(param, None)
+                self._param_drops.add(param)
+                logger.info(
+                    "_ChatBackend: %s rejects %r; dropping it for this session",
+                    self.model or self.base_url, param)
+            resp = requests.post(url, headers=headers, json=body, timeout=120)
+        return resp
 
     def chat(self, messages: List[Dict[str, Any]],
              max_tokens: int = 600,
@@ -297,8 +354,14 @@ class _ChatBackend:
         headers: Dict[str, str] = {'Content-Type': 'application/json'}
         if self._api_key_value:
             headers['Authorization'] = f'Bearer {self._api_key_value}'
+        # Apply whatever this endpoint taught us on an earlier call.
+        for old, new in self._param_renames.items():
+            if old in body:
+                body[new] = body.pop(old)
+        for dead in self._param_drops:
+            body.pop(dead, None)
 
-        resp = requests.post(url, headers=headers, json=body, timeout=120)
+        resp = self._post_adapting(url, headers, body)
         if not resp.ok:
             # Surface the provider's actual error reason (xAI/OpenAI return
             # JSON like {"error":{"message":"...","type":"..."}}); requests'
