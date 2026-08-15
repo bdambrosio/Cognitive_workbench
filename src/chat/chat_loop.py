@@ -208,6 +208,13 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # _handle_tick entry; everything else (cadence math, concern
         # types) is unaffected by the flag.
         self._autonomy_enabled = bool(character_config.get('autonomy_enabled', False))
+        # Per-call reasoning opt-in (launcher --reasoning). None means the
+        # field is never sent, so a server serving a non-reasoning model —
+        # or one launched with enable_thinking=false — behaves exactly as
+        # before. When set, only the ReAct action call and the orientation
+        # /triage pass request it; both have token budgets (8192 / 16384)
+        # with room for a thinking channel.
+        self._reasoning_effort = character_config.get('reasoning_effort') or None
         # Co-resident agents this character can message (agent-say tool +
         # reply routing). Injected by the launcher from the scenario's
         # character list; empty for single-character scenarios, which

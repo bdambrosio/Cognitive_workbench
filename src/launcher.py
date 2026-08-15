@@ -652,6 +652,12 @@ def main():
                         help='Enable autonomous concern firing in chat mode (off by default; '
                              'when off, the tick handler is a no-op so benchmarks and chat '
                              'scenarios behave identically regardless of active concerns).')
+    parser.add_argument('--reasoning', action='store_true',
+                        help='Request reasoning_effort=low on the two call sites that '
+                             'benefit (ReAct action selection, orientation/triage). Off by '
+                             'default so non-reasoning backends (e.g. Gemma4, whose chat '
+                             'template defaults enable_thinking false) are unaffected — the '
+                             'field is only sent when this flag is set.')
     parser.add_argument('--head-aliveness', action='store_true',
                         help='Drive gentle idle micro-gaze on the ChatterBot head '
                              '(off by default; no-op if the bot is unreachable).')
@@ -760,6 +766,7 @@ def main():
         cfg['is_infospace'] = True
         cfg['map_name'] = world_name
         cfg['autonomy_enabled'] = bool(args.autonomy)
+        cfg['reasoning_effort'] = 'low' if args.reasoning else None
         cfg['head_aliveness_enabled'] = bool(args.head_aliveness)
         cfg['voice_enabled'] = bool(args.voice)
         cfg['voice_wake_word'] = args.wake

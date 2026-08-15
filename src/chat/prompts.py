@@ -105,7 +105,8 @@ class PromptsMixin:
                 goals_compact=[],
                 recent_context=recent_str,
                 activity_state='chat-only (no autonomous activity)',
-                llm_generate=self._make_llm_callable('triage'),
+                llm_generate=self._make_llm_callable(
+                    'triage', reasoning_effort=self._reasoning_effort),
                 narrator_persona=self.persona,
                 narrator_self_model=self.self_model,
                 companion_state=companion,

@@ -311,12 +311,14 @@ class _ChatBackend:
         if stops and not self.is_cloud:
             body['stop'] = stops
         # Reasoning effort: scenario-declared baseline, optionally
-        # overridden per call. Only sent when scenario declared a baseline
-        # (self.reasoning_effort is not None) — non-reasoning models
-        # would just ignore it but no point shipping it.
-        if self.reasoning_effort is not None:
-            effective = (reasoning_effort if reasoning_effort is not None
-                         else self.reasoning_effort)
+        # overridden per call. Sent whenever either is set, so a call site
+        # can opt into reasoning without the scenario declaring a baseline
+        # — vLLM maps this into chat_template_kwargs and derives
+        # enable_thinking from it, which lets a server launched with
+        # enable_thinking=false stay off everywhere except these calls.
+        effective = (reasoning_effort if reasoning_effort is not None
+                     else self.reasoning_effort)
+        if effective is not None:
             body['reasoning_effort'] = effective
 
         # Skip grammar / chat_template_kwargs when going to a cloud endpoint
