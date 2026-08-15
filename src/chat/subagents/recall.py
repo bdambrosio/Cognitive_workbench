@@ -28,6 +28,18 @@ logger = logging.getLogger(__name__)
 _MAX_ITERS = 10
 _MAX_READ_CHARS = 10_000
 _MAX_GREP_HITS = 50
+# Per-hit and total ceilings on grep output. `read` has been capped since
+# it was written; grep was not, and one line of chat_trace.txt is a whole
+# ReAct emission — a 50-hit whole-dir grep measured 100KB, which buries
+# the answer and swamps the subagent's own 4096-token budget.
+_MAX_GREP_HIT_CHARS = 600
+_MAX_GREP_OUT_CHARS = 10_000
+# Whole-dir grep skips files above this size. chat_trace.txt is a 339MB
+# append-only archive that sorts second in the directory, so it dominated
+# every untargeted search. Skipping is reported, not silent, and an
+# explicit `file=` argument still searches anything — the cap is about
+# what a blind sweep touches, not about what is reachable.
+_GREP_MAX_FILE_BYTES = 8_000_000
 
 
 def _build_system_prompt(memory_dir: Path, thread_context: str = "") -> str:
@@ -305,7 +317,10 @@ def _tool_grep(memory_dir: Path, pattern: str,
         return f"(grep: invalid regex: {e})"
 
     targets: List[Path] = []
+    skipped: List[Path] = []
     if file:
+        # Explicit target: no size skip. Anything in the memory dir stays
+        # reachable when the caller names it.
         path = _safe_resolve(memory_dir, file)
         if path is None or not path.is_file():
             return f"(grep: file not found or out-of-scope: {file!r})"
@@ -313,9 +328,17 @@ def _tool_grep(memory_dir: Path, pattern: str,
     else:
         if not memory_dir.is_dir():
             return "(grep: memory dir does not exist)"
-        targets = sorted(p for p in memory_dir.iterdir() if p.is_file())
+        for p in sorted(memory_dir.iterdir()):
+            if not p.is_file():
+                continue
+            try:
+                too_big = p.stat().st_size > _GREP_MAX_FILE_BYTES
+            except OSError:
+                too_big = False
+            (skipped if too_big else targets).append(p)
 
     hits: List[str] = []
+    out_chars = 0
     for path in targets:
         is_jsonl = (path.suffix == '.jsonl')
         records = _load_jsonl(path) if is_jsonl else None
@@ -327,23 +350,42 @@ def _tool_grep(memory_dir: Path, pattern: str,
                             # Structured render with one-level deref so
                             # the caller doesn't have to re-read the
                             # matched record to use it.
-                            hits.append(
-                                f"{path.name}:{i}\n"
-                                + _format_jsonl_record(records[i - 1], records))
+                            hit = (f"{path.name}:{i}\n"
+                                   + _format_jsonl_record(records[i - 1], records))
                         else:
-                            hits.append(f"{path.name}:{i}|{ln.rstrip()}")
-                        if len(hits) >= _MAX_GREP_HITS:
+                            hit = f"{path.name}:{i}|{ln.rstrip()}"
+                        if len(hit) > _MAX_GREP_HIT_CHARS:
+                            hit = (hit[:_MAX_GREP_HIT_CHARS]
+                                   + f"…(hit truncated at "
+                                   f"{_MAX_GREP_HIT_CHARS} chars)")
+                        hits.append(hit)
+                        out_chars += len(hit) + 2
+                        if (len(hits) >= _MAX_GREP_HITS
+                                or out_chars >= _MAX_GREP_OUT_CHARS):
                             break
         except Exception as e:
             hits.append(f"{path.name}:0|(read error: {e})")
-        if len(hits) >= _MAX_GREP_HITS:
+        if len(hits) >= _MAX_GREP_HITS or out_chars >= _MAX_GREP_OUT_CHARS:
             break
-    if not hits:
-        return "(no matches)"
-    out = "\n\n".join(hits)
+
+    # Report the skip even on a miss: "(no matches)" on its own would let
+    # the caller conclude the memory dir lacks something that simply was
+    # not searched.
+    notes: List[str] = []
     if len(hits) >= _MAX_GREP_HITS:
-        out += f"\n(grep capped at {_MAX_GREP_HITS} hits)"
-    return out
+        notes.append(f"(grep capped at {_MAX_GREP_HITS} hits)")
+    if out_chars >= _MAX_GREP_OUT_CHARS:
+        notes.append(f"(grep output capped at {_MAX_GREP_OUT_CHARS} chars; "
+                     f"narrow the pattern)")
+    if skipped:
+        listed = ', '.join(f"{p.name} ({p.stat().st_size // 1_000_000}MB)"
+                           for p in skipped)
+        notes.append(f"(not searched, too large for a whole-directory grep: "
+                     f"{listed} — pass file=\"<name>\" to search one directly)")
+
+    if not hits:
+        return "\n".join(["(no matches)"] + notes)
+    return "\n".join(["\n\n".join(hits)] + notes)
 
 
 
