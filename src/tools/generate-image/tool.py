@@ -41,6 +41,10 @@ _SERVE_SH = os.environ.get(
     "GENERATE_IMAGE_SERVE_SH",
     "/home/bruce/Downloads/Bonsai-Image-Demo/scripts/serve.sh")
 _FRONTEND_PORT = os.environ.get("GENERATE_IMAGE_FRONTEND_PORT", "3100")
+# Which GPU the image backend runs on, in PCI_BUS_ID order (so it matches
+# nvidia-smi). 0 is the 5060 Ti here; 1 holds the live vLLM. See the pin
+# in _spawn_serve for why the order matters.
+_IMAGE_GPU = os.environ.get("GENERATE_IMAGE_GPU", "0")
 _BOOT_TIMEOUT_S = int(os.environ.get("GENERATE_IMAGE_BOOT_TIMEOUT", "240"))
 
 # Bonsai is distilled for 4 steps; the studio's fast preset is 512×512.
@@ -77,6 +81,18 @@ def _spawn_serve():
     env = dict(os.environ,
                BACKEND_PORT=str(_BACKEND_PORT),
                FRONTEND_PORT=_FRONTEND_PORT)
+    # Pin the image backend to the spare card. Without this it inherits the
+    # agent's environment, which sets no CUDA vars, so torch falls back to
+    # its default FASTEST_FIRST device order — and that REVERSES nvidia-smi
+    # on this box: torch's cuda:0 is the RTX PRO 6000 running the live vLLM
+    # (97GB, ~0 free), not the 5060 Ti. The image backend would allocate on
+    # the inference card and OOM, or disturb the running model.
+    # CUDA_DEVICE_ORDER=PCI_BUS_ID makes the index match nvidia-smi, where
+    # 0 is the 5060 Ti. Both must be set together; setting VISIBLE_DEVICES
+    # alone still selects by the reversed order. Respect an explicit
+    # override so a different host can point elsewhere.
+    env.setdefault("CUDA_DEVICE_ORDER", "PCI_BUS_ID")
+    env.setdefault("CUDA_VISIBLE_DEVICES", _IMAGE_GPU)
     # GpuPipeline.__init__ eagerly requires a path for BOTH the ternary and
     # binary arms, but serve.sh only sets the binary path when the binary model
     # is installed. We only ever request the ternary arm, so the binary arm is
