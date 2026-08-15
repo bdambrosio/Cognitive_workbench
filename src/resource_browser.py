@@ -89,47 +89,53 @@ class ResourceBrowser:
             return self.get_html()
         
         @self.app.get("/api/resources")
-        async def list_resources():
+        async def list_resources(character: str = ""):
             """Get list of all resources from map_node."""
-            return self.query_resources()
+            return self.query_resources(character)
         
         @self.app.get("/api/resource/{resource_id}")
-        async def get_resource(resource_id: str):
+        async def get_resource(resource_id: str, character: str = ""):
             """Get specific resource content."""
-            return self.query_resource(resource_id)
+            return self.query_resource(resource_id, character)
         
         @self.app.delete("/api/resource/{resource_id}")
-        async def delete_resource(resource_id: str):
+        async def delete_resource(resource_id: str, character: str = ""):
             """Delete a resource."""
-            return self.delete_resource_via_zenoh(resource_id)
+            return self.delete_resource_via_zenoh(resource_id, character)
 
         @self.app.put("/api/resource/{resource_id}")
-        async def update_resource(resource_id: str, request: Request):
+        async def update_resource(resource_id: str, request: Request,
+                                  character: str = ""):
             """Update a Note's content."""
             body = await request.json()
             content = body.get('content', '')
-            return self.update_resource_via_zenoh(resource_id, content)
+            return self.update_resource_via_zenoh(resource_id, content, character)
 
         @self.app.get("/api/graph/entities")
-        async def graph_entities():
+        async def graph_entities(character: str = ""):
             """Get entity index summary for graph explorer."""
-            return self.query_graph_entities()
+            return self.query_graph_entities(character)
 
         @self.app.post("/api/graph/subgraph")
-        async def graph_subgraph(request: Request):
+        async def graph_subgraph(request: Request, character: str = ""):
             """Get subgraph expansion or search results."""
             body = await request.json()
-            return self.query_graph_subgraph(body)
+            return self.query_graph_subgraph(body, character)
 
         @self.app.get("/api/concerns")
-        async def list_concerns():
+        async def list_concerns(character: str = ""):
             """Get concerns from executive_node."""
-            return self.query_concerns()
+            return self.query_concerns(character)
 
         @self.app.get("/api/context")
-        async def get_context():
-            """Return browser context (map, character) for frontend."""
-            return {"map": self.map_name, "character": self.character_name}
+        async def get_context(character: str = ""):
+            """Return browser context (map, character) for frontend.
+
+            Echoes the requested character so the page reports the agent it
+            is actually showing, not the one the process was launched with.
+            """
+            return {"map": self.map_name,
+                    "character": self._effective_character(character)}
 
         @self.app.post("/api/concern/{character}/manage")
         async def manage_concern(character: str, request: Request):
@@ -137,19 +143,36 @@ class ResourceBrowser:
             body = await request.json()
             return self.manage_concern_via_zenoh(character, body)
     
-    def _key_prefix(self) -> str:
-        """Return Zenoh key prefix for the target character (or wildcard fallback)."""
-        if self.character_name:
-            return f"cognitive/{self.character_name}"
+    def _key_prefix(self, character: str = "") -> str:
+        """Return Zenoh key prefix for the target character (or wildcard fallback).
+
+        `character` is the per-request override supplied as a ?character=
+        query param; it falls back to the one passed at launch. Per-request
+        rather than per-process so one browser on one port can switch
+        agents — a multi-agent session otherwise needs a process and a port
+        each, and the edit path breaks entirely without a concrete name.
+        """
+        c = self._effective_character(character)
+        if c:
+            return f"cognitive/{c}"
         return "cognitive/*"
 
-    def query_resources(self) -> Dict:
+    def _effective_character(self, character: str = "") -> str:
+        return (character or self.character_name or "").strip()
+
+    def _target(self, character: str = ""):
+        """BEST_MATCHING when a character is known, ALL when wildcarding."""
+        from zenoh import QueryTarget
+        return (QueryTarget.BEST_MATCHING if self._effective_character(character)
+                else QueryTarget.ALL)
+
+    def query_resources(self, character: str = "") -> Dict:
         """Query executive_node for resource list."""
-        key = f"{self._key_prefix()}/resources"
+        key = f"{self._key_prefix(character)}/resources"
         logger.info(f"Querying: {key}")
 
         from zenoh import QueryTarget, ConsolidationMode
-        target = QueryTarget.BEST_MATCHING if self.character_name else QueryTarget.ALL
+        target = self._target(character)
         best = None
         best_count = -1
         for reply in self.session.get(key, target=target, consolidation=ConsolidationMode.NONE, timeout=2.0):
@@ -177,9 +200,9 @@ class ResourceBrowser:
 
         return {'success': False, 'error': 'No response from executive_node'}
     
-    def query_resource(self, resource_id: str) -> Dict:
+    def query_resource(self, resource_id: str, character: str = "") -> Dict:
         """Query executive_node for specific resource."""
-        key = f"{self._key_prefix()}/resource/{resource_id}"
+        key = f"{self._key_prefix(character)}/resource/{resource_id}"
         logger.info(f"Querying: {key}")
 
         from zenoh import QueryTarget, ConsolidationMode
@@ -190,9 +213,9 @@ class ResourceBrowser:
 
         return {'success': False, 'error': f'Resource {resource_id} not found'}
     
-    def delete_resource_via_zenoh(self, resource_id: str) -> Dict:
+    def delete_resource_via_zenoh(self, resource_id: str, character: str = "") -> Dict:
         """Delete resource via Zenoh query to executive_node."""
-        key = f"{self._key_prefix()}/resource/remove/{resource_id}"
+        key = f"{self._key_prefix(character)}/resource/remove/{resource_id}"
         logger.info(f"Deleting resource: {key}")
         
         from zenoh import QueryTarget, ConsolidationMode
@@ -203,9 +226,9 @@ class ResourceBrowser:
         
         return {'success': False, 'error': f'No response from executive_node for deletion'}
 
-    def update_resource_via_zenoh(self, resource_id: str, content: str) -> Dict:
+    def update_resource_via_zenoh(self, resource_id: str, content: str, character: str = "") -> Dict:
         """Update Note content via Zenoh query to executive_node."""
-        key = f"{self._key_prefix()}/resource/update/{resource_id}"
+        key = f"{self._key_prefix(character)}/resource/update/{resource_id}"
         logger.info(f"Updating resource: {key}")
 
         payload = json.dumps({'content': content}).encode('utf-8')
@@ -218,9 +241,9 @@ class ResourceBrowser:
 
         return {'success': False, 'error': f'No response from executive_node for update'}
 
-    def query_graph_entities(self) -> Dict:
+    def query_graph_entities(self, character: str = "") -> Dict:
         """Query executive_node for entity index summary."""
-        key = f"{self._key_prefix()}/graph/entities"
+        key = f"{self._key_prefix(character)}/graph/entities"
         logger.info(f"Querying graph entities: {key}")
 
         from zenoh import QueryTarget, ConsolidationMode
@@ -230,9 +253,9 @@ class ResourceBrowser:
 
         return {'success': False, 'error': 'No response from executive_node for graph entities'}
 
-    def query_graph_subgraph(self, params: Dict) -> Dict:
+    def query_graph_subgraph(self, params: Dict, character: str = "") -> Dict:
         """Query executive_node for cognitive graph subgraph."""
-        key = f"{self._key_prefix()}/graph/subgraph"
+        key = f"{self._key_prefix(character)}/graph/subgraph"
         logger.info(f"Querying graph subgraph: {key}")
         payload = json.dumps(params).encode('utf-8')
 
@@ -243,13 +266,13 @@ class ResourceBrowser:
 
         return {'success': False, 'error': 'No response from executive_node for graph subgraph'}
 
-    def query_concerns(self) -> Dict:
+    def query_concerns(self, character: str = "") -> Dict:
         """Query executive_node for concerns (user + derived + activations)."""
-        key = f"{self._key_prefix()}/concerns"
+        key = f"{self._key_prefix(character)}/concerns"
         logger.info(f"Querying concerns: {key}")
 
         from zenoh import QueryTarget, ConsolidationMode
-        target = QueryTarget.BEST_MATCHING if self.character_name else QueryTarget.ALL
+        target = self._target(character)
         for reply in self.session.get(key, target=target, consolidation=ConsolidationMode.NONE, timeout=2.0):
             if reply.ok:
                 try:
@@ -609,7 +632,7 @@ class ResourceBrowser:
         
         async function refreshResources() {
             try {
-                const response = await fetch('/api/resources');
+                const response = await fetch(apiUrl('/api/resources'));
                 const data = await response.json();
                 
                 if (data.success) {
@@ -669,7 +692,7 @@ class ResourceBrowser:
             }
             
             try {
-                const response = await fetch(`/api/resource/${resourceId}`, {
+                const response = await fetch(apiUrl(`/api/resource/${resourceId}`), {
                     method: 'DELETE'
                 });
                 const data = await response.json();
@@ -701,7 +724,7 @@ class ResourceBrowser:
             selectedResource = resourceId;
             
             try {
-                const response = await fetch(`/api/resource/${resourceId}`);
+                const response = await fetch(apiUrl(`/api/resource/${resourceId}`));
                 const data = await response.json();
                 
                 console.log('Received data:', data);
@@ -790,7 +813,7 @@ class ResourceBrowser:
             const textarea = document.getElementById('content-text');
             const newContent = textarea.value;
             try {
-                const response = await fetch(`/api/resource/${resourceId}`, {
+                const response = await fetch(apiUrl(`/api/resource/${resourceId}`), {
                     method: 'PUT',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({content: newContent})
@@ -1028,7 +1051,7 @@ class ResourceBrowser:
 
         async function expandFromNode(d) {
             try {
-                const resp = await fetch('/api/graph/subgraph', {
+                const resp = await fetch(apiUrl('/api/graph/subgraph'), {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({seed_ids: [d.node_id], max_hops: 1})
                 });
@@ -1048,7 +1071,7 @@ class ResourceBrowser:
             // Also load entity sidebar if entities are among the checked types
             if (seedTypes.includes('entity')) {
                 try {
-                    const resp = await fetch('/api/graph/entities');
+                    const resp = await fetch(apiUrl('/api/graph/entities'));
                     const data = await resp.json();
                     if (data.success) {
                         const linked = data.entities.filter(e => e.graph_node_id);
@@ -1066,7 +1089,7 @@ class ResourceBrowser:
             graphNodes = []; graphEdges = [];
             graphG.selectAll('*').remove();
             try {
-                const sgResp = await fetch('/api/graph/subgraph', {
+                const sgResp = await fetch(apiUrl('/api/graph/subgraph'), {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({seed_types: seedTypes, max_hops: 1})
                 });
@@ -1083,7 +1106,7 @@ class ResourceBrowser:
             try {
                 graphNodes = []; graphEdges = [];
                 graphG.selectAll('*').remove();
-                const resp = await fetch('/api/graph/subgraph', {
+                const resp = await fetch(apiUrl('/api/graph/subgraph'), {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({seed_ids: [graphNodeId], max_hops: 1})
                 });
@@ -1096,7 +1119,7 @@ class ResourceBrowser:
             const q = document.getElementById('graph-search').value.trim();
             if (!q) return;
             try {
-                const resp = await fetch('/api/graph/subgraph', {
+                const resp = await fetch(apiUrl('/api/graph/subgraph'), {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({query: q, k: 10})
                 });
@@ -1134,7 +1157,7 @@ class ResourceBrowser:
         // ── Concerns tab ──────────────────────────────────────────
         async function loadConcerns() {
             try {
-                const resp = await fetch('/api/concerns');
+                const resp = await fetch(apiUrl('/api/concerns'));
                 const data = await resp.json();
                 if (!data.success) return;
 
@@ -1456,9 +1479,24 @@ class ResourceBrowser:
             }
         }
 
+        // Character comes from the ?character= query param, falling back to
+        // whatever the process was launched with. Set before any fetch so
+        // every request carries it — and so the edit paths below always
+        // have a concrete name (they alert and bail without one).
+        window.characterName =
+            new URLSearchParams(window.location.search).get('character') || '';
+
+        // Append the active character to an API path.
+        function apiUrl(path) {
+            const c = window.characterName || '';
+            if (!c) return path;
+            return path + (path.includes('?') ? '&' : '?')
+                        + 'character=' + encodeURIComponent(c);
+        }
+
         // Load context (character name) on startup
-        fetch('/api/context').then(r => r.json()).then(data => {
-            window.characterName = data.character || '';
+        fetch(apiUrl('/api/context')).then(r => r.json()).then(data => {
+            window.characterName = window.characterName || data.character || '';
             if (data.character) {
                 document.getElementById('map-name').textContent = `${data.map} · ${data.character}`;
             }

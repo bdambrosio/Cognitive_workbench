@@ -1929,20 +1929,28 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
     _AUTONOMOUS_FIRE_CAP = 2
 
     def _handle_tick(self) -> None:
-        """Per-tick autonomy pass. No-op when --autonomy is off.
-        When on: grows activations, identifies fire-eligible concerns,
-        runs up to _AUTONOMOUS_FIRE_CAP ReAct loops on their instructions,
-        prints a CLI preamble + coda per fire, a deferral note if any are
-        dropped, and appends one JSONL record per event to
+        """Per-tick pass. Housekeeping always; firing only with --autonomy.
+        When autonomy is on: grows activations, identifies fire-eligible
+        concerns, runs up to _AUTONOMOUS_FIRE_CAP ReAct loops on their
+        instructions, prints a CLI preamble + coda per fire, a deferral
+        note if any are dropped, and appends one JSONL record per event to
         <memory>/autonomy.jsonl.
         """
+        # Stale sweep runs unconditionally. It used to sit below the
+        # autonomy gate, which made garbage collection a feature of
+        # autonomous operation: with --autonomy off, satisfied and
+        # abandoned concerns were tombstoned by nothing and accumulated
+        # forever. That bit exactly when it hurt most — a session started
+        # with autonomy off *in order to* clean up concerns safely was the
+        # one session guaranteed not to clean up any. Sweeping is
+        # housekeeping, not behaviour; only firing is behaviour.
+        self._sweep_stale_agent_concerns()
         if not self._autonomy_enabled:
             return
         # Grow first, then check — ensures activations reflect elapsed
-        # time before the fire decision. The stale sweep sits between:
-        # a concern past its lifetime must not fire on the same tick.
+        # time before the fire decision. The sweep above already ran, so a
+        # concern past its lifetime cannot fire on this tick.
         self._grow_agent_concerns_per_tick()
-        self._sweep_stale_agent_concerns()
         fired = self._check_and_fire_agent_concerns()
         if not fired:
             return

@@ -393,7 +393,12 @@ def _parse_command(line: str) -> Optional[dict]:
     if cmd == 'ui':
         return {'cmd': '_open', 'url': 'http://localhost:3000'}
     if cmd == 'resources':
-        return {'cmd': '_open', 'url': 'http://localhost:3001'}
+        # /resources [character]. The character rides in the query string,
+        # so switching agents is a page load rather than a browser restart:
+        # same port every time, no process management, and opening the URL
+        # is itself the refresh. Resolved in the handler, which is where
+        # the active character is in scope.
+        return {'cmd': '_open_resources', 'character': args[0] if args else ''}
 
     _print_error(f"Unknown command: /{cmd}  (type /help for commands)")
     return None
@@ -656,8 +661,10 @@ def _print_help():
   @all <message>                 ...or to every character
   /@<agent> /<command>           Send a command to a specific agent
   /char <name>                   Switch active character
-  /ui                            Open web UI in browser
-  /resources                     Open resource browser in browser
+  /ui                            Open web UI (needs --ui at launch)
+  /resources [character]         Open resource browser for an agent
+                                 (needs --resource-browser at launch;
+                                  defaults to the active character)
   /verbose                       Toggle verbose mode
   /help                          Show this help
 
@@ -1001,6 +1008,20 @@ def run_cli(zenoh_session, character_names: List[str], shutdown_event: threading
                     import webbrowser
                     webbrowser.open(parsed['url'])
                     _print_system(f"Opened {parsed['url']}")
+                    continue
+
+                # Resource browser, scoped to one agent via query param.
+                if cmd == '_open_resources':
+                    import webbrowser
+                    import urllib.parse
+                    who = parsed.get('character') or active_character
+                    url = 'http://localhost:3001/'
+                    if who:
+                        url += '?character=' + urllib.parse.quote(who)
+                    webbrowser.open(url)
+                    _print_system(
+                        f"Opened resource browser for {who or 'all agents'} "
+                        f"({url})")
                     continue
 
                 # Send command to the command channel (or targeted agent)
