@@ -4,7 +4,7 @@ Calculate tool - numerically evaluate mathematical expressions using SymPy.
 
 from typing import Any, Dict, Optional
 from sympy import (
-    sympify, N, pi, E,
+    sympify, N, pi, E, Basic,
     sin, cos, tan, asin, acos, atan,
     sqrt, log, ln, exp, Abs, factorial,
     solve, Eq
@@ -21,6 +21,21 @@ def _fail(executor: Any, reason: str, extra: Optional[Dict[str, Any]] = None):
 
 def _success(executor: Any, result: str, extra: Optional[Dict[str, Any]] = None):
     return executor._create_uniform_return("success", value=result, extra=extra)
+
+
+def _format_value(value: Any, precision: int) -> str:
+    """Render one result. Exact stays exact; only genuine floats reach N().
+
+    N() is a float evaluation, so routing everything through it answered `17!`
+    with 3.556874281e+14 and would render the roots of x**2 - 4 = 0 as
+    -2.000000000, 2.000000000. Non-Basic values are what multi-symbol solve
+    hands back (dicts of substitutions) — they have no numeric form to take.
+    """
+    if not isinstance(value, Basic):
+        return str(value)
+    if value.is_Integer or value.is_Rational:
+        return str(value)
+    return str(N(value, precision))
 
 
 def react_invoke(args, *, character_name=None, backend=None, logger=None):
@@ -83,7 +98,22 @@ def tool(input_value, runtime=None, **kwargs):
         return _fail(executor, "input_value must be a string expression")
 
     variables = kwargs.get("variables", {}) or {}
+
+    # N() counts SIGNIFICANT DIGITS, not decimal places. precision=0 asks for
+    # zero significant digits and SymPy duly answers `0.e+14` — a wrong number
+    # wearing a success flag, which is the one thing a tool observation must
+    # never be. Fail loudly instead.
     precision = kwargs.get("precision", 10)
+    try:
+        precision = int(precision)
+    except (TypeError, ValueError):
+        return _fail(executor, f"precision must be an integer, got {precision!r}")
+    if precision < 1:
+        return _fail(
+            executor,
+            f"precision is significant digits, not decimal places, and must "
+            f"be >= 1 (got {precision}). Omit it for the default of 10 — exact "
+            f"integer and rational results are returned exactly either way.")
 
     if not isinstance(variables, dict):
         return _fail(executor, "variables must be a dictionary")
@@ -127,6 +157,19 @@ def tool(input_value, runtime=None, **kwargs):
         return _fail(executor, f"Invalid mathematical expression: {e}")
 
     # ----------------------------
+    # An explicit solve(...) is already done
+    # ----------------------------
+    # `solve` is in local_dict as the real function, so sympify CALLS it and
+    # hands back a plain list of roots — not a node left in the tree. The old
+    # `expr.func == solve` test below could therefore never match, and the
+    # list fell into `.subs` instead ("'list' object has no attribute 'subs'").
+    if isinstance(expr, (list, tuple)):
+        if not expr:
+            return _success(executor, "")
+        return _success(
+            executor, ", ".join(_format_value(s, precision) for s in expr))
+
+    # ----------------------------
     # Substitute variables
     # ----------------------------
     try:
@@ -135,23 +178,19 @@ def tool(input_value, runtime=None, **kwargs):
         return _fail(executor, f"Variable substitution failed: {e}")
 
     # ----------------------------
-    # Handle solve(...)
+    # Solve an equation
     # ----------------------------
-    if expr.func == solve:
+    # The `=` rewrite above produces Eq(lhs, rhs), which is what actually
+    # arrives here for the documented `x**2 - 4 = 0` form.
+    if isinstance(expr, Eq):
         try:
-            if len(expr.args) == 2:
-                solutions = solve(expr.args[0], expr.args[1])
-            else:
-                solutions = solve(expr.args[0])
-
-            if not solutions:
-                return _success(executor, "")
-
-            result = ", ".join(str(N(sol, precision)) for sol in solutions)
-            return _success(executor, result)
-
+            solutions = solve(expr)
         except Exception as e:
             return _fail(executor, f"Equation solving failed: {e}")
+        if not solutions:
+            return _success(executor, "")
+        return _success(
+            executor, ", ".join(_format_value(s, precision) for s in solutions))
 
     # ----------------------------
     # Reject unresolved symbols
@@ -162,10 +201,12 @@ def tool(input_value, runtime=None, **kwargs):
         return _fail(executor, f"Unresolved symbols in expression: {symbols}")
 
     # ----------------------------
-    # Numeric evaluation
+    # Evaluate
     # ----------------------------
+    # _format_value keeps exact results exact — at the default precision N()
+    # answered `17!` with 3.556874281e+14, and no value a caller could
+    # reasonably pick from the arg description gave the integer.
     try:
-        result = str(N(expr, precision))
-        return _success(executor, result)
+        return _success(executor, _format_value(expr, precision))
     except Exception as e:
         return _fail(executor, f"Numeric evaluation failed: {e}")
