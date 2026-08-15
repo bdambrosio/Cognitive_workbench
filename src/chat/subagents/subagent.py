@@ -36,6 +36,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+from chat.react import REACT_ACTION_SCHEMA
 from utils.json_utils import repair_json_string
 from utils.subagent_trace import write_subagent_trace
 
@@ -49,6 +50,21 @@ class Subagent:
     max_iters: int = 12
     max_tokens: int = 4096
     temperature: float = 0.2
+
+    # Structured-output constraint on the action emission. All three
+    # subagents already prompt for the main loop's shape — {thought, tool,
+    # ...args} — so this reuses REACT_ACTION_SCHEMA rather than defining a
+    # second one that would drift from it.
+    #
+    # Added 2026-08-15 after a model swap. The judgement call before that
+    # was "not yet": zero unparseable emissions in ~1400 traced iterations
+    # since May. That evidence was model-specific. On the first run against
+    # Gemma-4-31B the failure mode returned immediately — 9 unparseable
+    # emissions in a single 12-iteration call, which burned the whole call.
+    # An unbounded denylist of models that happen to emit clean JSON is not
+    # a robustness story; the schema makes it structural. _ChatBackend
+    # applies it on local engines only and skips it on cloud paths.
+    response_schema: Optional[Dict[str, Any]] = REACT_ACTION_SCHEMA
 
     def __init__(self, llm_backend, trace_dir: Path, *,
                  reasoning_effort: Optional[str] = None,
@@ -111,7 +127,8 @@ class Subagent:
                 raw = self.llm_backend.chat(
                     messages, max_tokens=self.max_tokens,
                     temperature=self.temperature,
-                    reasoning_effort=self.reasoning_effort)
+                    reasoning_effort=self.reasoning_effort,
+                    response_schema=self.response_schema)
             except Exception as e:
                 logger.warning(
                     f"{self.label}: llm call failed at iter {i+1}: {e}")

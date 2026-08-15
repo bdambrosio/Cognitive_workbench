@@ -203,13 +203,27 @@ def test_iteration_caps_currently_differ():
     assert rem._MAX_ITERS == 10, 'recall runs a tighter budget than the rest'
 
 
-def test_only_the_main_loop_has_a_response_schema():
-    """react.py forces schema-valid JSON; the subagents do not. Recorded
-    because it is the most consequential capability gap between them."""
-    import chat.react as react
-    assert hasattr(react, 'REACT_ACTION_SCHEMA')
-    for mod in (sec, rem, cs):
-        assert not hasattr(mod, 'REACT_ACTION_SCHEMA')
+@pytest.mark.parametrize('run,mod,label', RUNNERS)
+def test_every_subagent_sends_the_response_schema(run, mod, label, tmp_path):
+    """Structured output reaches all four entry points.
+
+    Until 2026-08-15 only the main loop forced schema-valid JSON, on the
+    evidence that subagents had produced zero unparseable emissions in
+    ~1400 traced iterations. That held for one model; the first run against
+    Gemma-4-31B produced 9 unparseable emissions in a single call. The
+    schema is what makes it structural rather than model-dependent.
+    """
+    backend = FakeBackend([_respond('ok')])
+    run(backend, tmp_path)
+    assert backend.calls[0].get('response_schema') is not None
+
+
+def test_subagents_reuse_the_main_loop_schema_rather_than_a_copy():
+    """One schema definition, so the two cannot drift apart."""
+    from chat.react import REACT_ACTION_SCHEMA
+    from chat.subagents.subagent import Subagent
+    assert Subagent.response_schema is REACT_ACTION_SCHEMA
+    assert REACT_ACTION_SCHEMA['required'] == ['thought', 'tool']
 
 
 # --------------------------------------------------------------------
