@@ -87,6 +87,12 @@ from chat.zenoh_io import ZenohMixin  # noqa: E402
 
 logger = logging.getLogger('chat_loop')
 
+# Conversation turns rendered into the prompt by default. Scenarios may
+# override via chat.history_limit, but none needs to: the default lives
+# here so a change reaches every scenario at once, rather than having to
+# be hand-copied into each and going stale in the ones that are missed.
+_DEFAULT_HISTORY_LIMIT = 20
+
 
 
 
@@ -189,13 +195,22 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # ---- Feature flags (on by default per project decision) ----
         self.discourse_enabled = bool((character_config.get('discourse') or {}).get('enabled', True))
         self.orientation_enabled = bool((character_config.get('orientation') or {}).get('enabled', True))
-        self.history_limit = int((character_config.get('chat') or {}).get('history_limit', 20))
-        # Max tokens per ReAct action emission. Default is generous so
-        # respond/display content has room. Benchmarks that hit hard questions
-        # where the model dumps a runaway into an unbounded tool arg can lower
-        # this (e.g. 4096) so the runaway truncates before chat()'s HTTP read
-        # timeout fires — letting the parse-retry recover instead of erroring
-        # the whole turn out of the loop.
+        # Conversation turns rendered into the prompt. A behavioural
+        # choice — how much context a character carries — so it stays a
+        # scenario knob, but the DEFAULT lives here and no scenario needs
+        # to state it. Per-turn size is bounded separately by prompts.
+        # _cap_turn, so this count no longer implies an unbounded prompt.
+        self.history_limit = int((character_config.get('chat') or {}).get(
+            'history_limit', _DEFAULT_HISTORY_LIMIT))
+        # Max tokens per ReAct action emission — a CEILING, not a
+        # reservation the caller must size against the server. _ChatBackend
+        # clamps this down when prompt + output would exceed the served
+        # model's context window, so a scenario does not have to know
+        # max_model_len (it cannot: the window belongs to whichever model
+        # the server currently holds, and that changes without the YAML).
+        # Override only for genuine scenario reasons — jill-benchmark-hle
+        # lowers it to 4096 so a runaway tool arg truncates before the HTTP
+        # read timeout, letting the parse-retry recover.
         self.react_max_tokens = int((character_config.get('chat') or {}).get('react_max_tokens', 8192))
         # Benchmark mode: run post-turn reflection inline (rather than on the
         # background executor) so probe-time state snapshots see fully-resolved

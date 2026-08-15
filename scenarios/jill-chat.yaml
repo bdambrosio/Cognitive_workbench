@@ -464,16 +464,6 @@ characters:
     # factorio-telemetry is the factory event ingress (game chat, joins,
     # flow stops, new alerts); quiet when the bridge or server is down.
     chat:
-      # Context budget. The server runs --max-model-len 131072; the ReAct
-      # call reserves react_max_tokens for OUTPUT, so the usable prompt is
-      # (max_model_len - react_max_tokens). On 2026-08-15 a turn failed with
-      # a 400 at 57,145 prompt + 8,192 output against a 65,336 limit —
-      # over by one token, and the whole turn was lost to fallback
-      # synthesis. history_limit bounds the prompt by TURN COUNT, not
-      # tokens, so a session with large pastes reaches the ceiling well
-      # before 20 turns.
-      react_max_tokens: 6144
-      history_limit: 10
       omitted_tools:
         - agent-activity
 
@@ -763,16 +753,6 @@ characters:
     # (world_name unplumbed) — advertising it would just waste patrol
     # iterations on a guaranteed error.
     chat:
-      # Context budget. The server runs --max-model-len 131072; the ReAct
-      # call reserves react_max_tokens for OUTPUT, so the usable prompt is
-      # (max_model_len - react_max_tokens). On 2026-08-15 a turn failed with
-      # a 400 at 57,145 prompt + 8,192 output against a 65,336 limit —
-      # over by one token, and the whole turn was lost to fallback
-      # synthesis. history_limit bounds the prompt by TURN COUNT, not
-      # tokens, so a session with large pastes reaches the ceiling well
-      # before 20 turns.
-      react_max_tokens: 6144
-      history_limit: 10
       omitted_tools:
         - fac-connect
         - fac-craft
@@ -925,16 +905,6 @@ characters:
         schedule: "30s"
 
     chat:
-      # Context budget. The server runs --max-model-len 131072; the ReAct
-      # call reserves react_max_tokens for OUTPUT, so the usable prompt is
-      # (max_model_len - react_max_tokens). On 2026-08-15 a turn failed with
-      # a 400 at 57,145 prompt + 8,192 output against a 65,336 limit —
-      # over by one token, and the whole turn was lost to fallback
-      # synthesis. history_limit bounds the prompt by TURN COUNT, not
-      # tokens, so a session with large pastes reaches the ceiling well
-      # before 20 turns.
-      react_max_tokens: 6144
-      history_limit: 10
       omitted_tools:
         - fac-connect
         - fac-craft

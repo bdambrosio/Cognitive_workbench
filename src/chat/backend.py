@@ -117,6 +117,10 @@ class _ChatBackend:
         # stop_reason='max_tokens') apart from genuinely malformed output
         # when an emission fails to parse. Set on every chat() return path.
         self.last_finish_reason: Optional[str] = None
+        # Server context window, fetched lazily from /v1/models on the
+        # first local call. Sentinel None = not yet asked; 0 = asked and
+        # the server did not say, so stop asking.
+        self._server_max_model_len: Optional[int] = None
 
     @property
     def supports_image_input(self) -> bool:
@@ -146,6 +150,82 @@ class _ChatBackend:
     # Bound the loop: each pass must name a parameter still in the body, and
     # each pass removes or renames one, so it terminates well inside the cap.
     _PARAM_ADAPT_MAX = 4
+
+    # Rough chars-per-token for the prompt estimate. Deliberately low so
+    # the estimate over-counts tokens and the clamp errs toward reserving
+    # less output — an answer that is shorter than asked beats a 400.
+    _CHARS_PER_TOKEN = 3.0
+    # Slack for the chat template's own scaffolding (role headers, the
+    # generation prompt, a thinking-channel opener) which the character
+    # count above does not see.
+    _CLAMP_MARGIN_TOKENS = 512
+
+    def _server_window(self) -> int:
+        """Context window of the served model, or 0 if unknown.
+
+        Asked once, from /v1/models. The window belongs to whichever model
+        the server currently holds — not to any scenario — which is why
+        this is discovered here rather than declared in YAML. A scenario
+        cannot know it, and on a rig where the backend is swapped several
+        times a day, a hand-copied value is wrong the moment it changes.
+        """
+        if self._server_max_model_len is not None:
+            return self._server_max_model_len
+        self._server_max_model_len = 0
+        try:
+            resp = requests.get(f'{self.base_url}/v1/models', timeout=10)
+            if resp.ok:
+                for m in (resp.json() or {}).get('data') or []:
+                    win = m.get('max_model_len')
+                    if isinstance(win, int) and win > 0:
+                        self._server_max_model_len = win
+                        logger.info(
+                            "_ChatBackend: server context window is %d tokens",
+                            win)
+                        break
+        except Exception as e:
+            logger.warning(f"_ChatBackend: could not read /v1/models: {e}")
+        return self._server_max_model_len
+
+    def _clamp_max_tokens(self, messages: List[Dict[str, Any]],
+                          max_tokens: int) -> int:
+        """Shrink the output reservation so prompt + output fits the window.
+
+        vLLM rejects at admission when prompt_tokens + max_tokens exceeds
+        max_model_len — no tokens generated, whole turn lost to fallback
+        synthesis. Observed 2026-08-15 at 57,145 + 8,192 against 65,336:
+        over by one token.
+
+        Clamping beats retrying: nothing is spent discovering the limit.
+        It cannot rescue a prompt that alone exceeds the window — that
+        needs history trimming, which is _cap_turn's job — but it removes
+        the failure mode where a reservation the caller chose blindly is
+        what tips it over.
+        """
+        window = self._server_window()
+        if not window or self.is_cloud:
+            # Cloud providers meter reasoning separately and max_tokens
+            # caps visible output only, so this arithmetic does not apply.
+            return max_tokens
+        chars = sum(len(str(m.get('content', '') or '')) for m in messages)
+        est_prompt = int(chars / self._CHARS_PER_TOKEN) + self._CLAMP_MARGIN_TOKENS
+        room = window - est_prompt
+        if room >= max_tokens:
+            return max_tokens
+        if room < 256:
+            # Nothing useful left to reserve. Send the floor and let the
+            # server decide — a 400 here is honest, and the caller's
+            # fallback path handles it. Silently emitting a 20-token reply
+            # would look like the model had nothing to say.
+            logger.warning(
+                "_ChatBackend: estimated prompt %d tokens leaves %d of a "
+                "%d-token window; output reservation cannot be met",
+                est_prompt, room, window)
+            return max(room, 256)
+        logger.info(
+            "_ChatBackend: clamping max_tokens %d -> %d (est prompt %d, "
+            "window %d)", max_tokens, room, est_prompt, window)
+        return room
 
     def _post_adapting(self, url: str, headers: Dict[str, str],
                        body: Dict[str, Any]):
@@ -291,6 +371,7 @@ class _ChatBackend:
             return text
 
         url = f'{self.base_url}/v1/chat/completions'
+        max_tokens = self._clamp_max_tokens(messages, max_tokens)
         body: Dict[str, Any] = {
             'messages': messages,
             'temperature': temperature,
