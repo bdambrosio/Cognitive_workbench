@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from utils.json_utils import repair_json_string
+from utils.subagent_trace import write_subagent_trace
 
 logger = logging.getLogger(__name__)
 
@@ -354,46 +355,13 @@ def _parse_action(raw: str) -> Optional[Dict[str, Any]]:
     return obj if isinstance(obj, dict) else None
 
 
-def _write_trace(trace_dir: Path, query: str,
-                 iters: List[Dict[str, Any]], answer: str,
-                 exit_reason: str) -> Optional[Path]:
-    try:
-        trace_dir.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H-%M-%SZ')
-        path = trace_dir / f'remember_{ts}.txt'
-        lines = [
-            '=' * 80,
-            f'[remember] {ts} exit={exit_reason} iters={len(iters)}',
-            '=' * 80,
-            f'Query: {query}',
-            '',
-        ]
-        for i, it in enumerate(iters, start=1):
-            lines.append(f'--- iter {i} ---')
-            lines.append('ACTION:')
-            if it.get('action') is not None:
-                lines.append(json.dumps(it['action'], indent=2))
-            else:
-                lines.append('(unparseable; raw follows)')
-                lines.append(it.get('raw', ''))
-            obs = it.get('observation', '')
-            if obs:
-                lines.append('OBSERVATION:')
-                lines.append(obs)
-            lines.append('')
-        lines.append('FINAL ANSWER:')
-        lines.append(answer)
-        path.write_text('\n'.join(lines), encoding='utf-8')
-        return path
-    except Exception as e:
-        logger.warning(f"remember: trace write failed: {e}")
-        return None
 
 
 def remember(query: str, memory_dir: Path, llm_backend,
              trace_dir: Path,
              system_prompt_builder: Optional[Callable[[Path], str]] = None,
-             thread_context: str = ""
+             thread_context: str = "",
+             reasoning_effort: Optional[str] = None
              ) -> str:
     """Run the active-recall subagent. Returns the synthesized answer to
     the query, suitable for binding to a $stepN observation in Jill's
@@ -438,7 +406,8 @@ def remember(query: str, memory_dir: Path, llm_backend,
             {'role': 'user', 'content': _build_user_msg()},
         ]
         try:
-            raw = llm_backend.chat(messages, max_tokens=4096, temperature=0.2)
+            raw = llm_backend.chat(messages, max_tokens=4096, temperature=0.2,
+                                   reasoning_effort=reasoning_effort)
         except Exception as e:
             logger.warning(f"remember: llm call failed at iter {i+1}: {e}")
             answer = f"(remember: llm error at iter {i+1}: {e})"
@@ -488,5 +457,6 @@ def remember(query: str, memory_dir: Path, llm_backend,
             "(remember: hit max iterations without responding; "
             "consider narrowing the query)")
 
-    _write_trace(trace_dir, query, iters, answer, exit_reason)
+    write_subagent_trace(trace_dir, 'remember', query, iters, answer,
+                         exit_reason)
     return answer

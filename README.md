@@ -209,9 +209,9 @@ traces land in sibling `*_traces/` directories.
 
 | Subagent | Scope | Primitives |
 |---|---|---|
-| `recall` (`src/chat/remember.py`) | per-world per-agent `memory/` dir | list, read, grep |
-| `inspect` / `inspect_external` (`src/chat/code_subagent.py`) | own `src/` or an externally-bound repo | list, read, grep (ripgrep) |
-| `security` (`src/chat/security.py`) | this host + LAN, RFC1918 ranges only | nmap discovery/-sV, host state, baseline diffs |
+| `recall` (`src/chat/subagents/recall.py`) | per-world per-agent `memory/` dir | list, read, grep |
+| `inspect` / `inspect_external` (`src/chat/subagents/code_subagent.py`) | own `src/` or an externally-bound repo | list, read, grep (ripgrep) |
+| `security` (`src/chat/subagents/security.py`) | this host + LAN, RFC1918 ranges only | nmap discovery/-sV, host state, baseline diffs |
 
 ```
                        user input                    tick sensor
@@ -435,7 +435,7 @@ src/
     prompts.py           system-prompt assembly, orientation, history render
     zenoh_io.py          Zenoh session + browser/CLI queryables
     backend.py           LLM client (anthropic / OpenAI-compat / local)
-    remember.py · code_subagent.py · security.py   subagents
+    subagents/           recall.py · code_subagent.py · security.py
   tools/                 drop-in ReAct tools (Skill.md + tool.py each)
   sensors/               drop-in sensors (tick, rss-watcher, …)
   affect/  canvas/       widget publishers + WS bridges + HTML
@@ -468,9 +468,13 @@ Discovered at startup; no core edits. Prefix observations `OK:` /
 `type`, `schedule`, `disposition`) and a `sensor.py` exposing
 `run(context)`; reference it from the scenario's `sensors:` list.
 
-**Subagent:** use `src/chat/remember.py` as the template — a static system
+**Subagent:** use `src/chat/subagents/recall.py` as the template — a static system
 prompt (stable across calls, so the backend's KV cache hits), a small set
-of read-only primitives, a `respond` exit, per-call trace files.
+of read-only primitives, a `respond` exit, per-call trace files. This is
+the canonical template; the other subagents are the same shape with
+different primitive sets — `security.py` adds typed system probes and a
+wall-clock budget, `code_subagent.py` backs the `inspect` and
+`inspect_external` tools over a fenced source root.
 
 **Scenario:** copy `scenarios/jill-chat.yaml`, change `world_name` and the
 character block; per-world per-agent directories are created on first run.

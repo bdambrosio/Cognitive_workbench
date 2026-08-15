@@ -1,7 +1,11 @@
 """Security subagent — a thin, persona-less ReAct loop that
 investigates LAN state and local host state via a small set of typed
-primitives. Mirrors the inspect.py pattern: argument-list subprocess,
-geofenced inputs, read-only operations, OK/EMPTY/ERROR observations.
+primitives. Follows the canonical subagent template (`recall.py`, see
+README): argument-list subprocess, geofenced inputs, read-only
+operations, OK/EMPTY/ERROR observations. (This originally read "mirrors
+the inspect.py pattern"; that file was renamed to code_subagent.py on
+2026-05-05, and remember.py to recall.py when the subagents/ package
+was created.)
 
 Used by Jill's chat ReAct loop via the `security` tool. From Jill's
 vantage, a `security` call is one step: she emits a query string,
@@ -38,6 +42,7 @@ import subprocess
 import time
 
 from utils.json_utils import repair_json_string
+from utils.subagent_trace import write_subagent_trace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -1062,40 +1067,6 @@ def _tool_baseline_diff(category: str, baseline_dir: Optional[Path]) -> str:
     return _truncate('OK: ' + '\n'.join(parts), 'category')
 
 
-def _write_trace(trace_dir: Path, query: str,
-                 iters: List[Dict[str, Any]], answer: str,
-                 exit_reason: str) -> Optional[Path]:
-    try:
-        trace_dir.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H-%M-%SZ')
-        path = trace_dir / f'security_{ts}.txt'
-        lines = [
-            '=' * 80,
-            f'[security] {ts} exit={exit_reason} iters={len(iters)}',
-            '=' * 80,
-            f'Query: {query}',
-            '',
-        ]
-        for i, it in enumerate(iters, start=1):
-            lines.append(f'--- iter {i} ---')
-            lines.append('ACTION:')
-            if it.get('action') is not None:
-                lines.append(json.dumps(it['action'], indent=2))
-            else:
-                lines.append('(unparseable; raw follows)')
-                lines.append(it.get('raw', ''))
-            obs = it.get('observation', '')
-            if obs:
-                lines.append('OBSERVATION:')
-                lines.append(obs)
-            lines.append('')
-        lines.append('FINAL ANSWER:')
-        lines.append(answer)
-        path.write_text('\n'.join(lines), encoding='utf-8')
-        return path
-    except Exception as e:
-        logger.warning(f"security: trace write failed: {e}")
-        return None
 
 
 def call_deadline() -> float:
@@ -1111,7 +1082,8 @@ def call_deadline() -> float:
 
 def security(query: str, llm_backend, trace_dir: Path,
              baseline_dir: Optional[Path] = None,
-             deadline: Optional[float] = None) -> str:
+             deadline: Optional[float] = None,
+             reasoning_effort: Optional[str] = None) -> str:
     """Run the security investigation subagent. Returns the
     synthesized answer string, suitable for binding to a $stepN
     observation in Jill's parent ReAct loop. Side effect: writes a
@@ -1154,7 +1126,8 @@ def security(query: str, llm_backend, trace_dir: Path,
             {'role': 'user', 'content': _build_user_msg()},
         ]
         try:
-            raw = llm_backend.chat(messages, max_tokens=4096, temperature=0.2)
+            raw = llm_backend.chat(messages, max_tokens=4096, temperature=0.2,
+                                   reasoning_effort=reasoning_effort)
         except Exception as e:
             logger.warning(f"security: llm call failed at iter {i+1}: {e}")
             answer = f"(security: llm error at iter {i+1}: {e})"
@@ -1221,5 +1194,6 @@ def security(query: str, llm_backend, trace_dir: Path,
         answer = ("(security: hit max iterations without responding; "
                   "consider narrowing the query)")
 
-    _write_trace(trace_dir, query, iters, answer, exit_reason)
+    write_subagent_trace(trace_dir, 'security', query, iters, answer,
+                         exit_reason)
     return answer

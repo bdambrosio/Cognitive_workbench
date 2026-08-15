@@ -44,7 +44,7 @@ import shutil
 import subprocess
 
 from utils.json_utils import repair_json_string
-from datetime import datetime, timezone
+from utils.subagent_trace import write_subagent_trace
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -492,45 +492,11 @@ def _parse_action(raw: str) -> Optional[Dict[str, Any]]:
     return obj if isinstance(obj, dict) else None
 
 
-def _write_trace(trace_dir: Path, query: str,
-                 iters: List[Dict[str, Any]], answer: str,
-                 exit_reason: str, mode: str) -> Optional[Path]:
-    try:
-        trace_dir.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H-%M-%SZ')
-        prefix = 'inspect_external' if mode == 'external' else 'inspect'
-        path = trace_dir / f'{prefix}_{ts}.txt'
-        lines = [
-            '=' * 80,
-            f'[{prefix}] {ts} exit={exit_reason} iters={len(iters)}',
-            '=' * 80,
-            f'Query: {query}',
-            '',
-        ]
-        for i, it in enumerate(iters, start=1):
-            lines.append(f'--- iter {i} ---')
-            lines.append('ACTION:')
-            if it.get('action') is not None:
-                lines.append(json.dumps(it['action'], indent=2))
-            else:
-                lines.append('(unparseable; raw follows)')
-                lines.append(it.get('raw', ''))
-            obs = it.get('observation', '')
-            if obs:
-                lines.append('OBSERVATION:')
-                lines.append(obs)
-            lines.append('')
-        lines.append('FINAL ANSWER:')
-        lines.append(answer)
-        path.write_text('\n'.join(lines), encoding='utf-8')
-        return path
-    except Exception as e:
-        logger.warning(f"code_subagent: trace write failed: {e}")
-        return None
 
 
 def _inspect_loop(query: str, repo_root: Path, llm_backend,
-                  trace_dir: Path, *, mode: str) -> str:
+                  trace_dir: Path, *, mode: str,
+                  reasoning_effort: Optional[str] = None) -> str:
     """Shared loop core. `mode` selects prompt framing and trace filename
     prefix; primitives, parser, and budgets are identical."""
     label = 'inspect_external' if mode == 'external' else 'inspect'
@@ -556,7 +522,8 @@ def _inspect_loop(query: str, repo_root: Path, llm_backend,
             {'role': 'user', 'content': _build_user_msg()},
         ]
         try:
-            raw = llm_backend.chat(messages, max_tokens=4096, temperature=0.2)
+            raw = llm_backend.chat(messages, max_tokens=4096, temperature=0.2,
+                                   reasoning_effort=reasoning_effort)
         except Exception as e:
             logger.warning(f"{label}: llm call failed at iter {i+1}: {e}")
             answer = f"({label}: llm error at iter {i+1}: {e})"
@@ -606,7 +573,7 @@ def _inspect_loop(query: str, repo_root: Path, llm_backend,
         answer = (f"({label}: hit max iterations without responding; "
                   "consider narrowing the query)")
 
-    _write_trace(trace_dir, query, iters, answer, exit_reason, mode)
+    write_subagent_trace(trace_dir, label, query, iters, answer, exit_reason)
     return answer
 
 
@@ -615,7 +582,7 @@ def _inspect_loop(query: str, repo_root: Path, llm_backend,
 # ---------------------------------------------------------------------------
 
 def inspect(query: str, repo_root: Path, llm_backend,
-            trace_dir: Path) -> str:
+            trace_dir: Path, reasoning_effort: Optional[str] = None) -> str:
     """Self-introspection: navigate the agent's own codebase under
     `repo_root` (typically src/) and answer the query.
 
@@ -629,11 +596,12 @@ def inspect(query: str, repo_root: Path, llm_backend,
         trace_dir: where to write the per-call subagent trace.
     """
     return _inspect_loop(query, Path(repo_root), llm_backend, Path(trace_dir),
-                         mode='self')
+                         mode='self', reasoning_effort=reasoning_effort)
 
 
 def inspect_external(query: str, repo_root: Path, llm_backend,
-                     trace_dir: Path) -> str:
+                     trace_dir: Path,
+                     reasoning_effort: Optional[str] = None) -> str:
     """External-codebase inspection: navigate a project repo bound for
     this session (sticky binding via `/set-external-repo` or the YAML
     `external_repo` field). Same primitives as `inspect`, neutral
@@ -647,4 +615,4 @@ def inspect_external(query: str, repo_root: Path, llm_backend,
             directory as `inspect`; filename prefix differentiates).
     """
     return _inspect_loop(query, Path(repo_root), llm_backend, Path(trace_dir),
-                         mode='external')
+                         mode='external', reasoning_effort=reasoning_effort)

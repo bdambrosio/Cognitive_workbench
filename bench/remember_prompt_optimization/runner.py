@@ -12,7 +12,7 @@ Per-session flow (pseudocode):
         loop._process_user_turn(tell)              # populate memory
     for probe in probes:
         for variant in variants:                    # all read-only
-            response[variant] = chat.remember.remember(
+            response[variant] = chat.subagents.recall.remember(
                 probe.question, memory_dir, backend, trace_dir,
                 system_prompt_builder=variant.build)
         loop._process_user_turn(probe.question)     # agent ask, mutates
@@ -56,7 +56,7 @@ SRC_DIR = REPO_ROOT / "src"
 sys.path.insert(0, str(SRC_DIR))
 
 from chat.chat_loop import ChatLoop  # noqa: E402
-from chat.remember import remember as _remember  # noqa: E402
+from chat.subagents.recall import remember as _remember  # noqa: E402
 from launcher import parse_characters  # noqa: E402
 
 logger = logging.getLogger("bench.remember_prompt_optimization")

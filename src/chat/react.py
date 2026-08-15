@@ -689,7 +689,7 @@ class ReactMixin:
 
     def _run_remember(self, query: str) -> str:
         """Backend for the ReAct `recall` tool. Delegates to the
-        active-recall subagent (chat.remember.remember), which runs its
+        active-recall subagent (chat.subagents.recall.remember), which runs its
         own thin ReAct loop over the memory dir. Returns an OK:/EMPTY:/
         ERROR: prefixed observation per the ReAct tool-observation
         convention. Subagent's full per-call trace lands under
@@ -701,7 +701,7 @@ class ReactMixin:
         if not query or not str(query).strip():
             return "EMPTY: remember query was empty"
         try:
-            from chat.remember import remember as _remember
+            from chat.subagents.recall import remember as _remember
             threads = self._get_threads(statuses=('active',))
             thread_context = self._render_threads_for_subagent(threads)
             answer = _remember(
@@ -710,6 +710,7 @@ class ReactMixin:
                 llm_backend=self.backend,
                 trace_dir=self._subagent_traces_dir(),
                 thread_context=thread_context,
+                reasoning_effort=self._reasoning_effort,
             )
         except Exception as e:
             logger.warning(f"[{self.character_name}] remember subagent raised: {e}")
@@ -782,7 +783,7 @@ class ReactMixin:
 
     def _run_inspect(self, query: str) -> str:
         """Backend for the ReAct `inspect` tool. Delegates to the
-        codebase-inspection subagent (chat.code_subagent.inspect), which
+        codebase-inspection subagent (chat.subagents.code_subagent.inspect), which
         runs its own thin ReAct loop over src/ with read-only primitives
         (list, read, grep via ripgrep). Returns an OK:/EMPTY:/ERROR:
         prefixed observation per the ReAct tool-observation convention.
@@ -794,12 +795,13 @@ class ReactMixin:
         if not query or not str(query).strip():
             return "EMPTY: inspect query was empty"
         try:
-            from chat.code_subagent import inspect as _inspect
+            from chat.subagents.code_subagent import inspect as _inspect
             answer = _inspect(
                 query=str(query),
                 repo_root=Path(_REPO_ROOT),
                 llm_backend=self.backend,
                 trace_dir=self._inspect_traces_dir(),
+                reasoning_effort=self._reasoning_effort,
             )
         except Exception as e:
             logger.warning(f"[{self.character_name}] inspect subagent raised: {e}")
@@ -823,12 +825,13 @@ class ReactMixin:
             return ("ERROR: no external repo is bound for this session "
                     "(use /set-external-repo <path> first)")
         try:
-            from chat.code_subagent import inspect_external as _inspect_external
+            from chat.subagents.code_subagent import inspect_external as _inspect_external
             answer = _inspect_external(
                 query=str(query),
                 repo_root=repo,
                 llm_backend=self.backend,
                 trace_dir=self._inspect_traces_dir(),
+                reasoning_effort=self._reasoning_effort,
             )
         except Exception as e:
             logger.warning(f"[{self.character_name}] inspect_external subagent raised: {e}")
@@ -847,7 +850,7 @@ class ReactMixin:
 
     def _run_security(self, query: str) -> str:
         """Backend for the ReAct `security` tool. Delegates to the
-        network-security investigation subagent (chat.security.security),
+        network-security investigation subagent (chat.subagents.security.security),
         which runs its own thin ReAct loop with read-only typed primitives
         (discover, scan_services, system_state via nmap + iproute2).
         Returns an OK:/EMPTY:/ERROR: prefixed observation per the ReAct
@@ -858,7 +861,7 @@ class ReactMixin:
         if not query or not str(query).strip():
             return "EMPTY: security query was empty"
         try:
-            from chat.security import security as _security, call_deadline
+            from chat.subagents.security import security as _security, call_deadline
             # One deadline for all security work in this turn. Set on first
             # use (a turn that never asks doesn't start a clock) and reset
             # per turn by _process_user_turn. Without sharing it, the
@@ -872,6 +875,7 @@ class ReactMixin:
                 trace_dir=self._security_traces_dir(),
                 baseline_dir=self._memory_dir() / 'security_baselines',
                 deadline=self._turn_security_deadline,
+                reasoning_effort=self._reasoning_effort,
             )
         except Exception as e:
             logger.warning(f"[{self.character_name}] security subagent raised: {e}")

@@ -33,7 +33,7 @@ Self-extension is mostly *assembling parts that already exist*:
 |---|---|---|
 | Read her own code to locate a limitation | `inspect` subagent — read-only, geofenced to `src/`, list/read/grep | `src/chat/tools.py` (`inspect` catalog entry) |
 | Run code in isolation with a timeout + human gate | `exec-script` — `subprocess.run` in `scenarios/<world>/fs/`, 120s cap, optional ASK step | `src/tools/exec-script/tool.py` |
-| Pattern for a constrained, persona-less subagent with typed primitives | `security.py` — ReAct loop, typed ops, geofenced inputs, per-call trace | `src/chat/security.py` |
+| Pattern for a constrained, persona-less subagent with typed primitives | `recall.py` is the canonical template (see README) — ReAct loop, geofenced inputs, per-call trace; `security.py` is the same shape with typed system probes and a wall-clock budget | `src/chat/subagents/recall.py` |
 | Iterate-on-failure | ReAct loop + max-iters → successor concern | `src/chat/react.py`, `src/chat/concerns.py` |
 | Per-event audit log | `autonomy.jsonl` (one record per fire/defer/successor) | concerns layer |
 | Tool contract | `src/tools/<name>/` = `Skill.md` (frontmatter: `name`, `description`, `args`) + `tool.py` (`react_invoke(args, *, character_name, backend, logger) -> {status, text[, image]}`) | `src/chat/tools.py` (`_discover_tools`) |

@@ -89,7 +89,7 @@ the patrol fires on the first tick — a catch-up scan on boot is the
 intended behavior.
 
 Scan machinery lives in the `security` subagent
-(`src/chat/security.py`): fixed read-only command vocabulary,
+(`src/chat/subagents/security.py`): fixed read-only command vocabulary,
 argument-list-only subprocess, no shell. Baseline snapshots (SUID
 files, listening sockets, enabled units) are JSON under
 `scenarios/jill_chat/Sentinel/memory/security_baselines/`; a

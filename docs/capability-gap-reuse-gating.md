@@ -24,7 +24,7 @@ financial-analysis chat and proposed wrapping **FMP** and building **`pdf-grep`*
 from scratch — both wrong in the same way:
 
 - FMP duplicated what the existing Alpha Vantage account/key already covers.
-- `pdf-grep` duplicated `src/chat/code_subagent.py`, which already implements
+- `pdf-grep` duplicated `src/chat/subagents/code_subagent.py`, which already implements
   the list/read/grep/geofence architecture a document inspector needs.
 
 In both cases the proposal reasoned from Jill's **tool surface** (the named

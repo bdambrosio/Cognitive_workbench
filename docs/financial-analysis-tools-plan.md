@@ -3,7 +3,7 @@
 Status: **implemented 2026-06-19** — `src/tools/get-financial-statements/`
 ships Decision 1 (Alpha Vantage fundamentals on the existing key, stock-price
 tool shape, free-tier throttle handling). The PDF-inspection half was
-redirected to the existing `src/chat/code_subagent.py` rather than built as a
+redirected to the existing `src/chat/subagents/code_subagent.py` rather than built as a
 separate tool, per Decision 2. Retained as the design rationale.
 (Originally: design only, captured 2026-06-17.)
 
@@ -64,7 +64,7 @@ abstraction.
 
 ## Decision 2 — Document inspection is a *subagent*, NOT `pdf-grep`
 
-We already have a file-set subagent: `src/chat/code_subagent.py`, exposed as
+We already have a file-set subagent: `src/chat/subagents/code_subagent.py`, exposed as
 `inspect` (own `src/`) and `inspect_external` (a bound project repo). Primitives:
 **list / read / grep**, geofenced root with path-traversal+symlink rejection,
 read caps, per-call traces, ReAct loop (`_inspect_loop`). (`remember` is the

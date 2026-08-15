@@ -1,6 +1,6 @@
 # Remember-subagent prompt optimization
 
-Hand-curated A/B harness for the `chat.remember.remember()` subagent
+Hand-curated A/B harness for the `chat.subagents.recall.remember()` subagent
 system prompt. Reuses `bench/memory_recall`'s probes and judge but tests
 multiple candidate prompts against identical primer-populated memory
 state per probe — slash readout is read-only, so all variants are
@@ -21,7 +21,7 @@ bench/remember_prompt_optimization/
 ├── runner.py          # multi-variant primer + slash + agent-ask harness
 ├── score.py           # runs memory_recall judge per variant + writes compare.md
 ├── variants/
-│   ├── v0_baseline.py # current production prompt (chat.remember._build_system_prompt)
+│   ├── v0_baseline.py # current production prompt (chat.subagents.recall._build_system_prompt)
 │   ├── v1_*.py        # candidate variants
 │   └── ...
 └── results/
@@ -53,7 +53,7 @@ The harness imports every `v*.py` it finds and runs all of them per
 probe — a slash readout is read-only, so the variants don't contaminate
 each other within a session.
 
-`v0_baseline.py` re-exports `chat.remember._build_system_prompt` so the
+`v0_baseline.py` re-exports `chat.subagents.recall._build_system_prompt` so the
 current production prompt is treated as just another variant.
 
 ## Running
