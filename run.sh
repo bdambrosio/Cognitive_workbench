@@ -6,12 +6,15 @@
 #   * sources secrets from an untracked .env (keeps keys out of git)
 #   * sets the OpenMP workaround so the embedding model doesn't segfault
 #   * activates the project virtualenv
-#   * runs launcher.py from src/ with the jill-chat-mac.yaml scenario
+#   * runs launcher.py from src/ with the jill-chat.yaml scenario
 #   * points the affect/canvas widgets at a real browser binary
 #
 # Secrets/overrides: optional, in an untracked `.env` beside this script.
-# The current scenario (jill-chat-mac.yaml) talks to a LAN vLLM server, which
-# needs no API key. .env is only needed for the optional Telegram bridge:
+# The current scenario (jill-chat.yaml) talks to a vLLM server, which needs no
+# API key. NOTE: jill-chat.yaml sets vllm_url to 127.0.0.1:5000 — correct when
+# the launcher and the server share a host, but when running this script from
+# the Mac against the Linux box's server, edit that field to the LAN address.
+# .env is only needed for the optional Telegram bridge:
 #     # export TELEGRAM_BOT_TOKEN=...
 #     # export TELEGRAM_ALLOWED_CHAT_IDS=...
 #
@@ -32,7 +35,7 @@ if [[ -f "$REPO_DIR/.env" ]]; then
 fi
 
 # The current scenario points at a LAN vLLM server, which needs no API key.
-# If you switch jill-chat-mac.yaml back to a key-based backend (anthropic/
+# If you switch jill-chat.yaml back to a key-based backend (anthropic/
 # openrouter), export that key in .env or your shell — the launcher fails
 # loudly at startup if a required key is missing.
 
@@ -68,4 +71,4 @@ if [[ -n "${TELEGRAM_BOT_TOKEN:-}" && -n "${TELEGRAM_ALLOWED_CHAT_IDS:-}" ]]; th
 fi
 
 cd "$REPO_DIR/src"
-exec python launcher.py jill-chat-mac.yaml "${FLAGS[@]}" "$@"
+exec python launcher.py jill-chat.yaml "${FLAGS[@]}" "$@"
