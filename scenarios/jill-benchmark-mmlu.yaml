@@ -31,6 +31,18 @@ characters:
   Jill:
     mode: chat
 
+    # Reasoning arm of the 2026-08-15 A/B. The bench runner builds ChatLoop
+    # directly rather than through launcher.py, so the --reasoning flag
+    # cannot reach it; ChatLoop reads this same key off character_config,
+    # which is what the flag sets. Sent per request, where it overrides a
+    # server started with enable_thinking=false — so the server needs no
+    # restart and the two arms differ in exactly this one field.
+    # Left OFF by default: a backend without --reasoning-parser (Gemma-4
+    # was served without one) would have thinking switched on with nothing
+    # to split it out, so it lands in the answer text. Uncomment for the
+    # reasoning arm, against a server that has the parser configured.
+    # reasoning_effort: low
+
     llm_config:
       server: local
       model: ""
@@ -47,6 +59,12 @@ characters:
       # assess, and text-find are kept — they're deterministic / model-side
       # operations that fit a closed-book MCQ test. process_text + respond
       # are built-ins.
+      #
+      # This list is a denylist, so a tool added to src/tools/ after this
+      # scenario was written is available by default. Six had accumulated
+      # by 2026-08-15 (audited against the 38 discovered tools) and are
+      # added below — each is a live external-information path, which is
+      # exactly what closed-book is supposed to exclude.
       omitted_tools:
         - search-web
         - fetch-text
@@ -60,6 +78,14 @@ characters:
         - recall
         - display
         - security
+        # Added 2026-08-15 — external-information paths that post-date the
+        # original list.
+        - check-x-feed              # X/Twitter API
+        - doc-read                  # PDFs on this machine
+        - get-financial-statements  # Alpha Vantage API
+        - ramana-saying             # verbatim corpus lookup
+        - agent-activity            # another character's tool history
+        - camera-capture            # live camera frame
 
     character: |
       Jill is taking a multiple-choice exam. She reads each question
