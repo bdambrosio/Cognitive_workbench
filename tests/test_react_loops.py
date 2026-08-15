@@ -66,10 +66,10 @@ def _run_security(backend, tmp_path, **kw):
                         baseline_dir=tmp_path / 'baselines', **kw)
 
 
-def _run_remember(backend, tmp_path, **kw):
+def _run_recall(backend, tmp_path, **kw):
     mem = tmp_path / 'memory'
     mem.mkdir(parents=True, exist_ok=True)
-    return rem.remember(query='what did we decide?', memory_dir=mem,
+    return rem.recall(query='what did we decide?', memory_dir=mem,
                         llm_backend=backend, trace_dir=tmp_path / 'traces',
                         **kw)
 
@@ -93,7 +93,7 @@ def _run_inspect_external(backend, tmp_path, **kw):
 
 RUNNERS = [
     pytest.param(_run_security, sec, 'security', id='security'),
-    pytest.param(_run_remember, rem, 'remember', id='remember'),
+    pytest.param(_run_recall, rem, 'recall', id='recall'),
     pytest.param(_run_inspect, cs, 'inspect', id='inspect'),
     pytest.param(_run_inspect_external, cs, 'inspect_external',
                  id='inspect_external'),

@@ -43,8 +43,7 @@ import re
 import shutil
 import subprocess
 
-from utils.json_utils import repair_json_string
-from utils.subagent_trace import write_subagent_trace
+from chat.subagents.subagent import Subagent
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -487,104 +486,57 @@ def _tool_grep(repo_root: Path, pattern: str,
 # Loop core
 # ---------------------------------------------------------------------------
 
-def _parse_action(raw: str) -> Optional[Dict[str, Any]]:
-    obj = repair_json_string(raw or '')
-    return obj if isinstance(obj, dict) else None
+class CodeSubagent(Subagent):
+    """Read-only navigation of a source tree under a fixed root.
 
+    `inspect` and `inspect_external` are the SAME class with different
+    configuration, not two subclasses: identical primitives, identical
+    budgets, differing only in geofence root, prompt framing, and label.
+    A subclass pair here would have carried one string each.
 
+    Primitives are git-aware (`git ls-files`, `git check-ignore`,
+    ripgrep). That is correct for a checkout and wrong for the recall
+    subagent's gitignored world directory, which is why the two do not
+    share primitive implementations.
+    """
 
+    max_iters = _MAX_ITERS
 
-def _inspect_loop(query: str, repo_root: Path, llm_backend,
-                  trace_dir: Path, *, mode: str,
-                  reasoning_effort: Optional[str] = None) -> str:
-    """Shared loop core. `mode` selects prompt framing and trace filename
-    prefix; primitives, parser, and budgets are identical."""
-    label = 'inspect_external' if mode == 'external' else 'inspect'
-    if not query or not query.strip():
-        return f"({label}: empty query)"
-    repo_root = Path(repo_root)
-    if not repo_root.is_dir():
-        return f"({label}: repo_root does not exist: {repo_root})"
-    sys_prompt = _build_system_prompt(repo_root, mode)
-    user_prefix = f"Query: {query.strip()}\n\n## Working log\n"
-    log_lines: List[str] = []
-    iters: List[Dict[str, Any]] = []
+    def __init__(self, repo_root: Path, llm_backend, trace_dir: Path, *,
+                 mode: str = 'self',
+                 reasoning_effort: Optional[str] = None):
+        super().__init__(llm_backend, trace_dir,
+                         reasoning_effort=reasoning_effort)
+        self.repo_root = Path(repo_root)
+        self.mode = mode
+        self.label = 'inspect_external' if mode == 'external' else 'inspect'
 
-    def _build_user_msg() -> str:
-        body = user_prefix + ('\n'.join(log_lines) + '\n' if log_lines else '')
-        return body + '\nEmit next action:\n'
+    def precheck(self, query: str) -> Optional[str]:
+        if not query or not query.strip():
+            return f"({self.label}: empty query)"
+        if not self.repo_root.is_dir():
+            return (f"({self.label}: repo_root does not exist: "
+                    f"{self.repo_root})")
+        return None
 
-    answer = ''
-    exit_reason = 'max_iters'
-    for i in range(_MAX_ITERS):
-        messages = [
-            {'role': 'system', 'content': sys_prompt},
-            {'role': 'user', 'content': _build_user_msg()},
-        ]
-        try:
-            raw = llm_backend.chat(messages, max_tokens=4096, temperature=0.2,
-                                   reasoning_effort=reasoning_effort)
-        except Exception as e:
-            logger.warning(f"{label}: llm call failed at iter {i+1}: {e}")
-            answer = f"({label}: llm error at iter {i+1}: {e})"
-            exit_reason = 'llm_error'
-            break
+    def system_prompt(self) -> str:
+        return _build_system_prompt(self.repo_root, self.mode)
 
-        action = _parse_action(raw)
-        iter_rec: Dict[str, Any] = {'raw': raw, 'action': action}
-        iters.append(iter_rec)
-        if action is None:
-            log_lines.append(
-                "NOTE: previous output was unparseable; emit ONE JSON action now.")
-            iter_rec['observation'] = '(unparseable)'
-            continue
+    def primitives(self):
+        return {
+            'list': lambda a: _tool_list(self.repo_root, a.get('path')),
+            'read': lambda a: _tool_read(self.repo_root, a.get('file', ''),
+                                         a.get('start_line'),
+                                         a.get('end_line')),
+            'grep': lambda a: _tool_grep(self.repo_root,
+                                         a.get('pattern', ''), a.get('path')),
+        }
 
-        tool = action.get('tool')
-        if tool == 'respond':
-            answer = str(action.get('text', '') or '').strip() or '(no answer)'
-            exit_reason = 'respond'
-            iter_rec['observation'] = '(respond)'
-            break
-
-        binding = f'$step{i+1}'
-        if tool == 'list':
-            obs = _tool_list(repo_root, action.get('path'))
-        elif tool == 'read':
-            obs = _tool_read(
-                repo_root, action.get('file', ''),
-                action.get('start_line'), action.get('end_line'),
-            )
-        elif tool == 'grep':
-            obs = _tool_grep(
-                repo_root, action.get('pattern', ''),
-                action.get('path'),
-            )
-        else:
-            obs = (f"ERROR: unknown tool {tool!r}; available: "
-                   "list, read, grep, respond")
-
-        iter_rec['observation'] = obs
-        log_lines.append(f"ACTION {i+1}: {json.dumps(action)}")
-        log_lines.append(f"{binding}:")
-        log_lines.append(obs)
-        log_lines.append('')
-
-    if exit_reason == 'max_iters' and not answer:
-        answer = (f"({label}: hit max iterations without responding; "
-                  "consider narrowing the query)")
-
-    write_subagent_trace(trace_dir, label, query, iters, answer, exit_reason)
-    return answer
-
-
-# ---------------------------------------------------------------------------
-# Public entry points
-# ---------------------------------------------------------------------------
 
 def inspect(query: str, repo_root: Path, llm_backend,
             trace_dir: Path, reasoning_effort: Optional[str] = None) -> str:
     """Self-introspection: navigate the agent's own codebase under
-    `repo_root` (typically src/) and answer the query.
+    `repo_root` (typically the repo root) and answer the query.
 
     Args:
         query: natural-language question about the codebase.
@@ -594,9 +546,11 @@ def inspect(query: str, repo_root: Path, llm_backend,
             By convention this is the main character backend; the
             per-scenario llm_config decides the model.
         trace_dir: where to write the per-call subagent trace.
+        reasoning_effort: forwarded to the backend per call; None means
+            the field is never sent (launcher --reasoning sets it).
     """
-    return _inspect_loop(query, Path(repo_root), llm_backend, Path(trace_dir),
-                         mode='self', reasoning_effort=reasoning_effort)
+    return CodeSubagent(repo_root, llm_backend, trace_dir, mode='self',
+                        reasoning_effort=reasoning_effort).run(query)
 
 
 def inspect_external(query: str, repo_root: Path, llm_backend,
@@ -604,8 +558,8 @@ def inspect_external(query: str, repo_root: Path, llm_backend,
                      reasoning_effort: Optional[str] = None) -> str:
     """External-codebase inspection: navigate a project repo bound for
     this session (sticky binding via `/set-external-repo` or the YAML
-    `external_repo` field). Same primitives as `inspect`, neutral
-    prompt framing — this is reading documentation, not introspection.
+    `external_repo` field). Same primitives as `inspect`, neutral prompt
+    framing — this is reading documentation, not introspection.
 
     Args:
         query: natural-language question about the external repo.
@@ -613,6 +567,7 @@ def inspect_external(query: str, repo_root: Path, llm_backend,
         llm_backend: same conventions as `inspect`.
         trace_dir: where to write the per-call subagent trace (same
             directory as `inspect`; filename prefix differentiates).
+        reasoning_effort: same conventions as `inspect`.
     """
-    return _inspect_loop(query, Path(repo_root), llm_backend, Path(trace_dir),
-                         mode='external', reasoning_effort=reasoning_effort)
+    return CodeSubagent(repo_root, llm_backend, trace_dir, mode='external',
+                        reasoning_effort=reasoning_effort).run(query)

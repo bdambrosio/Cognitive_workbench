@@ -21,8 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from utils.json_utils import repair_json_string
-from utils.subagent_trace import write_subagent_trace
+from chat.subagents.subagent import Subagent
 
 logger = logging.getLogger(__name__)
 
@@ -347,25 +346,64 @@ def _tool_grep(memory_dir: Path, pattern: str,
     return out
 
 
-def _parse_action(raw: str) -> Optional[Dict[str, Any]]:
-    """Parse a JSON action emission via the shared tolerant parser
-    (fences, missing braces, bareword keys, etc). Returns None if no
-    dict can be recovered."""
-    obj = repair_json_string(raw or '')
-    return obj if isinstance(obj, dict) else None
 
 
 
 
-def remember(query: str, memory_dir: Path, llm_backend,
-             trace_dir: Path,
-             system_prompt_builder: Optional[Callable[[Path], str]] = None,
-             thread_context: str = "",
-             reasoning_effort: Optional[str] = None
-             ) -> str:
+class RecallSubagent(Subagent):
+    """Active recall over the per-world memory directory.
+
+    Primitives are plain-filesystem, NOT the git-aware ones in
+    code_subagent: the memory dir matches `scenarios/*/` in .gitignore, so
+    `git ls-files` would list nothing and `git check-ignore` would refuse
+    every read. Same three verb names, different implementations, on
+    purpose.
+    """
+
+    label = 'recall'
+    max_iters = _MAX_ITERS
+
+    def __init__(self, memory_dir: Path, llm_backend, trace_dir: Path, *,
+                 system_prompt_builder: Optional[Callable[[Path], str]] = None,
+                 thread_context: str = "",
+                 reasoning_effort: Optional[str] = None):
+        super().__init__(llm_backend, trace_dir,
+                         reasoning_effort=reasoning_effort)
+        self.memory_dir = Path(memory_dir)
+        self._prompt_builder = system_prompt_builder
+        self._thread_context = thread_context
+
+    def precheck(self, query: str) -> Optional[str]:
+        if not query or not query.strip():
+            return f"({self.label}: empty query)"
+        return None
+
+    def system_prompt(self) -> str:
+        if self._prompt_builder is not None:
+            return self._prompt_builder(self.memory_dir)
+        return _build_system_prompt(self.memory_dir,
+                                    thread_context=self._thread_context)
+
+    def primitives(self):
+        return {
+            'list': lambda a: _tool_list(self.memory_dir),
+            'read': lambda a: _tool_read(self.memory_dir, a.get('file', ''),
+                                         a.get('start_line'),
+                                         a.get('end_line')),
+            'grep': lambda a: _tool_grep(self.memory_dir,
+                                         a.get('pattern', ''), a.get('file')),
+        }
+
+
+def recall(query: str, memory_dir: Path, llm_backend,
+           trace_dir: Path,
+           system_prompt_builder: Optional[Callable[[Path], str]] = None,
+           thread_context: str = "",
+           reasoning_effort: Optional[str] = None
+           ) -> str:
     """Run the active-recall subagent. Returns the synthesized answer to
-    the query, suitable for binding to a $stepN observation in Jill's
-    parent ReAct loop. Side effect: writes a trace file under trace_dir.
+    the query, suitable for binding to a $stepN observation in the parent
+    ReAct loop. Side effect: writes a trace file under trace_dir.
 
     Args:
         query: natural-language question to answer.
@@ -383,80 +421,17 @@ def remember(query: str, memory_dir: Path, llm_backend,
             to the default system prompt (Stage 4b). chat_loop builds
             this from the agent_threads Collection at invocation time
             and passes the rendered string in. Empty string disables.
+        reasoning_effort: forwarded to the backend per call; None means
+            the field is never sent (launcher --reasoning sets it).
     """
-    if not query or not query.strip():
-        return "(remember: empty query)"
-    if system_prompt_builder is not None:
-        sys_prompt = system_prompt_builder(memory_dir)
-    else:
-        sys_prompt = _build_system_prompt(memory_dir, thread_context=thread_context)
-    user_prefix = f"Query: {query.strip()}\n\n## Working log\n"
-    log_lines: List[str] = []
-    iters: List[Dict[str, Any]] = []
+    return RecallSubagent(
+        memory_dir, llm_backend, trace_dir,
+        system_prompt_builder=system_prompt_builder,
+        thread_context=thread_context,
+        reasoning_effort=reasoning_effort).run(query)
 
-    def _build_user_msg() -> str:
-        body = user_prefix + ('\n'.join(log_lines) + '\n' if log_lines else '')
-        return body + '\nEmit next action:\n'
 
-    answer = ''
-    exit_reason = 'max_iters'
-    for i in range(_MAX_ITERS):
-        messages = [
-            {'role': 'system', 'content': sys_prompt},
-            {'role': 'user', 'content': _build_user_msg()},
-        ]
-        try:
-            raw = llm_backend.chat(messages, max_tokens=4096, temperature=0.2,
-                                   reasoning_effort=reasoning_effort)
-        except Exception as e:
-            logger.warning(f"remember: llm call failed at iter {i+1}: {e}")
-            answer = f"(remember: llm error at iter {i+1}: {e})"
-            exit_reason = 'llm_error'
-            break
-
-        action = _parse_action(raw)
-        iter_rec: Dict[str, Any] = {'raw': raw, 'action': action}
-        iters.append(iter_rec)
-        if action is None:
-            log_lines.append(
-                "NOTE: previous output was unparseable; emit ONE JSON action now.")
-            iter_rec['observation'] = '(unparseable)'
-            continue
-
-        tool = action.get('tool')
-        if tool == 'respond':
-            answer = str(action.get('text', '') or '').strip() or '(no answer)'
-            exit_reason = 'respond'
-            iter_rec['observation'] = '(respond)'
-            break
-
-        binding = f'$step{i+1}'
-        if tool == 'list':
-            obs = _tool_list(memory_dir)
-        elif tool == 'read':
-            obs = _tool_read(
-                memory_dir, action.get('file', ''),
-                action.get('start_line'), action.get('end_line'),
-            )
-        elif tool == 'grep':
-            obs = _tool_grep(
-                memory_dir, action.get('pattern', ''),
-                action.get('file'),
-            )
-        else:
-            obs = (f"(unknown tool {tool!r}; available: list, read, grep, respond)")
-
-        iter_rec['observation'] = obs
-        log_lines.append(f"ACTION {i+1}: {json.dumps(action)}")
-        log_lines.append(f"{binding}:")
-        log_lines.append(obs)
-        log_lines.append('')
-
-    if exit_reason == 'max_iters' and not answer:
-        answer = (
-            "(remember: hit max iterations without responding; "
-            "consider narrowing the query)")
-
-    write_subagent_trace(trace_dir, 'remember', query, iters, answer,
-                         exit_reason)
-    return answer
+# Back-compat alias: the tool is `recall`, but this function was named
+# remember() for its first three months and the bench harness imports it
+# under that name.
+remember = recall

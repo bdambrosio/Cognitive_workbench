@@ -11,7 +11,14 @@ written to a per-call trace file instead.
                       fenced source root
   security.py       → `security` tool, typed host/LAN probes
 
+All three subclass `Subagent` in `subagent.py`, which owns the control
+loop; a subclass supplies a label, an iteration cap, a system prompt, and
+an ordered map of primitives. Trace format is shared via
+`utils/subagent_trace.py`.
+
 `recall.py` is the canonical template for a new subagent (see README).
-All share the trace format in `utils/subagent_trace.py`; the loop bodies
-are still per-module and are the subject of the planned consolidation.
+What is deliberately NOT shared is the primitive implementations: recall
+reads a gitignored world directory, code_subagent reads a git checkout
+with `git ls-files` / ripgrep. Same verb names, different code, on
+purpose — see the note in `subagent.py`.
 """

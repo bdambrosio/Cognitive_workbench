@@ -689,7 +689,7 @@ class ReactMixin:
 
     def _run_remember(self, query: str) -> str:
         """Backend for the ReAct `recall` tool. Delegates to the
-        active-recall subagent (chat.subagents.recall.remember), which runs its
+        active-recall subagent (chat.subagents.recall.recall), which runs its
         own thin ReAct loop over the memory dir. Returns an OK:/EMPTY:/
         ERROR: prefixed observation per the ReAct tool-observation
         convention. Subagent's full per-call trace lands under
@@ -701,10 +701,10 @@ class ReactMixin:
         if not query or not str(query).strip():
             return "EMPTY: remember query was empty"
         try:
-            from chat.subagents.recall import remember as _remember
+            from chat.subagents.recall import recall as _recall
             threads = self._get_threads(statuses=('active',))
             thread_context = self._render_threads_for_subagent(threads)
-            answer = _remember(
+            answer = _recall(
                 query=str(query),
                 memory_dir=self._memory_dir(),
                 llm_backend=self.backend,

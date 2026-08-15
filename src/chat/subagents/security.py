@@ -41,8 +41,7 @@ import shutil
 import subprocess
 import time
 
-from utils.json_utils import repair_json_string
-from utils.subagent_trace import write_subagent_trace
+from chat.subagents.subagent import Subagent
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -405,9 +404,6 @@ def _build_system_prompt() -> str:
     )
 
 
-def _parse_action(raw: str) -> Optional[Dict[str, Any]]:
-    obj = repair_json_string(raw or '')
-    return obj if isinstance(obj, dict) else None
 
 
 def _is_rfc1918(target: str) -> Optional[ipaddress.IPv4Network]:
@@ -1080,13 +1076,72 @@ def call_deadline() -> float:
     return time.monotonic() + _CALL_BUDGET
 
 
+class SecuritySubagent(Subagent):
+    """LAN and local-host investigation via typed, geofenced probes.
+
+    The outlier among the subagents: its primitives shell out through
+    argument lists (never shell=True), validate every scan target against
+    RFC1918, and one of them — baseline_diff — WRITES, which is why the
+    base class makes no read-only assumption. It is also the only one
+    that runs under a wall-clock deadline, shared across every call in a
+    turn so a second invocation inherits what is left rather than
+    starting a fresh budget.
+    """
+
+    label = 'security'
+    max_iters = _MAX_ITERS
+
+    def __init__(self, llm_backend, trace_dir: Path, *,
+                 baseline_dir: Optional[Path] = None,
+                 deadline: Optional[float] = None,
+                 reasoning_effort: Optional[str] = None):
+        # Whichever runs out first: this call's own budget, or the
+        # caller's shared one. min() means a second call in the same turn
+        # inherits what's left rather than starting over.
+        own = time.monotonic() + _CALL_BUDGET
+        super().__init__(llm_backend, trace_dir,
+                         reasoning_effort=reasoning_effort,
+                         deadline=own if deadline is None
+                         else min(float(deadline), own))
+        self.baseline_dir = baseline_dir
+
+    def precheck(self, query: str) -> Optional[str]:
+        if not query or not query.strip():
+            return f"({self.label}: empty query)"
+        return None
+
+    def system_prompt(self) -> str:
+        return _build_system_prompt()
+
+    def budget_exhausted_observation(self) -> str:
+        return (f"ERROR: security work has used its whole time budget "
+                f"({int(_CALL_BUDGET)}s for this turn) and no further "
+                f"probes will run — calling this tool again will not "
+                f"help. Respond NOW with what the log above already "
+                f"shows, and say plainly which part of the question you "
+                f"did not get to — do not present a partial survey as a "
+                f"complete one.")
+
+    def primitives(self):
+        return {
+            'discover': lambda a: _tool_discover(a.get('cidr', '')),
+            'scan_services': lambda a: _tool_scan_services(a.get('host', '')),
+            'system_state': lambda a: _tool_system_state(a.get('category', '')),
+            'host_state': lambda a: _tool_host_state(a.get('category', '')),
+            'package_version': lambda a: _tool_package_version(
+                a.get('packages', '')),
+            'baseline_diff': lambda a: _tool_baseline_diff(
+                a.get('category', ''), self.baseline_dir),
+        }
+
+
 def security(query: str, llm_backend, trace_dir: Path,
              baseline_dir: Optional[Path] = None,
              deadline: Optional[float] = None,
              reasoning_effort: Optional[str] = None) -> str:
     """Run the security investigation subagent. Returns the
     synthesized answer string, suitable for binding to a $stepN
-    observation in Jill's parent ReAct loop. Side effect: writes a
+    observation in the parent ReAct loop. Side effect: writes a
     per-call trace file under trace_dir, and (baseline_diff only)
     snapshot files under baseline_dir.
 
@@ -1101,99 +1156,9 @@ def security(query: str, llm_backend, trace_dir: Path,
         deadline: monotonic time after which no further probes run. Pass
             one shared value for every call in a turn (see call_deadline);
             omit it and this call gets its own _CALL_BUDGET.
+        reasoning_effort: forwarded to the backend per call; None means
+            the field is never sent (launcher --reasoning sets it).
     """
-    if not query or not query.strip():
-        return "(security: empty query)"
-    sys_prompt = _build_system_prompt()
-    user_prefix = f"Query: {query.strip()}\n\n## Working log\n"
-    log_lines: List[str] = []
-    iters: List[Dict[str, Any]] = []
-
-    def _build_user_msg() -> str:
-        body = user_prefix + ('\n'.join(log_lines) + '\n' if log_lines else '')
-        return body + '\nEmit next action:\n'
-
-    answer = ''
-    exit_reason = 'max_iters'
-    # Whichever runs out first: this call's own budget, or the caller's
-    # shared one. min() means a second call in the same turn inherits
-    # what's left rather than starting over.
-    own = time.monotonic() + _CALL_BUDGET
-    deadline = own if deadline is None else min(float(deadline), own)
-    for i in range(_MAX_ITERS):
-        messages = [
-            {'role': 'system', 'content': sys_prompt},
-            {'role': 'user', 'content': _build_user_msg()},
-        ]
-        try:
-            raw = llm_backend.chat(messages, max_tokens=4096, temperature=0.2,
-                                   reasoning_effort=reasoning_effort)
-        except Exception as e:
-            logger.warning(f"security: llm call failed at iter {i+1}: {e}")
-            answer = f"(security: llm error at iter {i+1}: {e})"
-            exit_reason = 'llm_error'
-            break
-
-        action = _parse_action(raw)
-        iter_rec: Dict[str, Any] = {'raw': raw, 'action': action}
-        iters.append(iter_rec)
-        if action is None:
-            log_lines.append(
-                "NOTE: previous output was unparseable; emit ONE JSON action now.")
-            iter_rec['observation'] = '(unparseable)'
-            continue
-
-        tool = action.get('tool')
-        if tool == 'respond':
-            answer = str(action.get('text', '') or '').strip() or '(no answer)'
-            exit_reason = 'respond'
-            iter_rec['observation'] = '(respond)'
-            break
-
-        binding = f'$step{i+1}'
-        if time.monotonic() >= deadline:
-            # Budget spent. Refuse the probe rather than the answer: the
-            # model still gets a turn to report what it has, and the
-            # iteration cap ends the loop if it asks for another probe
-            # anyway. Not silent — a truncated survey the caller believes
-            # is complete is worse than a short one that says so.
-            logger.warning(
-                f"security: call budget of {int(_CALL_BUDGET)}s spent at "
-                f"iter {i+1}; refusing further probes")
-            obs = (f"ERROR: security work has used its whole time budget "
-                   f"({int(_CALL_BUDGET)}s for this turn) and no further "
-                   f"probes will run — calling this tool again will not "
-                   f"help. Respond NOW with what the log above already "
-                   f"shows, and say plainly which part of the question you "
-                   f"did not get to — do not present a partial survey as a "
-                   f"complete one.")
-        elif tool == 'discover':
-            obs = _tool_discover(action.get('cidr', ''))
-        elif tool == 'scan_services':
-            obs = _tool_scan_services(action.get('host', ''))
-        elif tool == 'system_state':
-            obs = _tool_system_state(action.get('category', ''))
-        elif tool == 'host_state':
-            obs = _tool_host_state(action.get('category', ''))
-        elif tool == 'package_version':
-            obs = _tool_package_version(action.get('packages', ''))
-        elif tool == 'baseline_diff':
-            obs = _tool_baseline_diff(action.get('category', ''), baseline_dir)
-        else:
-            obs = (f"ERROR: unknown tool {tool!r}; available: "
-                   "discover, scan_services, system_state, host_state, "
-                   "package_version, baseline_diff, respond")
-
-        iter_rec['observation'] = obs
-        log_lines.append(f"ACTION {i+1}: {json.dumps(action)}")
-        log_lines.append(f"{binding}:")
-        log_lines.append(obs)
-        log_lines.append('')
-
-    if exit_reason == 'max_iters' and not answer:
-        answer = ("(security: hit max iterations without responding; "
-                  "consider narrowing the query)")
-
-    write_subagent_trace(trace_dir, 'security', query, iters, answer,
-                         exit_reason)
-    return answer
+    return SecuritySubagent(
+        llm_backend, trace_dir, baseline_dir=baseline_dir, deadline=deadline,
+        reasoning_effort=reasoning_effort).run(query)
