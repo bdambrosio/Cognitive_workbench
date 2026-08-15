@@ -42,6 +42,36 @@ _REASONING_HISTORY_RING_SIZE = 50    # on-disk cap (unused; see above)
 
 _REASONING_HISTORY_RECENT = 6        # surfaced in the prompt
 
+# Per-turn ceiling on rendered conversation history.
+#
+# history_limit bounds the prompt by TURN COUNT, which ignores how big a
+# turn is: a session with one large paste reached the context ceiling well
+# before its twentieth turn (2026-08-15, a 400 at 57,145 prompt + 8,192
+# reserved output against 65,336 — over by one token, whole turn lost).
+#
+# A global token budget with oldest-first eviction would be worse: a single
+# large recent turn would evict everything behind it, leaving one turn of
+# context. Capping the CONTRIBUTOR instead makes the worst case
+# history_limit * cap, and no turn can crowd out its neighbours.
+#
+# Measured over 3,784 real turns: median 95 chars, p95 1,456, p99 2,718,
+# max 17,630. At 4,000 this touches 14 turns (0.4%) and preserves 94% of
+# all text — invisible in the common case, bounded in the pathological one.
+# Elided text stays reachable: conversation.txt is on disk and `recall`
+# greps it.
+_HISTORY_TURN_MAX_CHARS = 4000
+
+
+def _cap_turn(text: str) -> str:
+    """Bound one rendered history turn. Keeps the head — the opening of a
+    turn carries its intent; a truncated tail is what the agent can ask
+    `recall` for."""
+    if len(text) <= _HISTORY_TURN_MAX_CHARS:
+        return text
+    return (text[:_HISTORY_TURN_MAX_CHARS]
+            + f"\n…[turn truncated at {_HISTORY_TURN_MAX_CHARS} chars of "
+              f"{len(text)}; use recall to retrieve the rest]")
+
 _REASONING_HISTORY_FULL = 3          # of those, how many in full vs compressed
 
 _REASONING_HISTORY_OBS_CAP = 1000    # per-iter observation cap in stored trace
@@ -503,7 +533,7 @@ class PromptsMixin:
             parts.append("## Conversation history (verbatim session turns)")
             for t in history:
                 who = history_entity if t.get('direction') == 'in' else self.character_name
-                parts.append(f"{who}: {t.get('text', '')}")
+                parts.append(f"{who}: {_cap_turn(str(t.get('text', '')))}")
             parts.append("")
         # Awareness feed: prior ReAct traces (Jill's own thinking from
         # recent turns) sit between conversation history and current
