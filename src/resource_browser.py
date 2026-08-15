@@ -1208,10 +1208,21 @@ class ResourceBrowser:
                     const trendIcon = trend === 'rising' ? '↑' : trend === 'falling' ? '↓' : '→';
                     const statusColor = status === 'active' ? '#4ec9b0' : status === 'satisfied' ? '#569cd6' : status === 'abandoned' ? '#888' : '#ce9178';
                     const barColor = activation > 0.7 ? '#ce9178' : activation > 0.4 ? '#dcdcaa' : '#4ec9b0';
+                    // Seeds are the one kind of concern that comes back from
+                    // YAML on the next session, so deleting one is recoverable
+                    // — but its activation and work-in-progress note are not,
+                    // and the WIP is what keeps consecutive fires from
+                    // starting cold. The badge was 9px outline, smaller than
+                    // both the label and the description and easy to delete
+                    // past. Filled chip plus a row-level stripe, so the whole
+                    // row reads as seed rather than one small span.
                     const seedBadge = isSeed
-                        ? `<span style="color:#dcdcaa;font-size:9px;margin-left:6px;border:1px solid #5a4a30;padding:0 3px;border-radius:2px">SEED</span>`
+                        ? `<span style="color:#1e1e1e;background:#dcdcaa;font-size:10px;font-weight:700;letter-spacing:0.5px;margin-left:6px;padding:1px 5px;border-radius:2px">SEED</span>`
                         : '';
-                    return `<div class="resource-item" onclick="showConcernDetail(${JSON.stringify(c).replace(/"/g, '&quot;')}, 'derived')" style="padding:4px 6px;margin:1px 0;cursor:pointer">
+                    const seedRowStyle = isSeed
+                        ? 'border-left:3px solid #dcdcaa;background:#2a2718;'
+                        : '';
+                    return `<div class="resource-item" onclick="showConcernDetail(${JSON.stringify(c).replace(/"/g, '&quot;')}, 'derived')" style="padding:4px 6px;margin:1px 0;cursor:pointer;${seedRowStyle}">
                         <div style="display:flex;justify-content:space-between;align-items:center">
                             <span style="color:#d4d4d4;font-size:11px">${label}${seedBadge}</span>
                             <span style="color:${statusColor};font-size:9px">${status} ${trendIcon}</span>
@@ -1294,6 +1305,21 @@ class ResourceBrowser:
                         <button onclick="manageConcern('${cid}', 'delete', '${type}')" style="background:#5a2d2d;color:#d4d4d4;border:none;padding:5px 12px;cursor:pointer">Delete</button>
                     `;
                 }
+            }
+
+            // The Delete button is byte-identical for a seed and a derived
+            // concern, and this panel is where the click happens. State the
+            // consequence at the point of decision rather than blocking it:
+            // a deleted seed IS restored from YAML on the next session, so a
+            // confirm dialog would be friction out of proportion — but its
+            // activation and work-in-progress note are not restored, and the
+            // WIP is what stops consecutive fires from starting cold.
+            if (seed && actions) {
+                actions = `<div style="background:#2a2718;border-left:3px solid #dcdcaa;color:#dcdcaa;font-size:11px;padding:6px 8px;margin-bottom:8px">
+                    <b>SEED concern</b> — defined in the scenario YAML. Deleting it
+                    is recoverable: it returns on the next session start. Its
+                    activation and work-in-progress note are not recovered.
+                </div>` + actions;
             }
 
             const statusColor = (status === 'open' || status === 'active') ? '#4ec9b0'
