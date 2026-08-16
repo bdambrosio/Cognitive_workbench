@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from chat.react import REACT_ACTION_SCHEMA
-from utils.json_utils import repair_json_string
+from utils.json_utils import repair_json_string, unparseable_action_note
 from utils.subagent_trace import write_subagent_trace
 
 logger = logging.getLogger(__name__)
@@ -50,6 +50,15 @@ class Subagent:
     max_iters: int = 12
     max_tokens: int = 4096
     temperature: float = 0.2
+
+    # Consecutive unparseable emissions tolerated before the loop gives up
+    # and reports from the working log. The schema below removes the
+    # malformed-shape cause but NOT truncation: a schema-constrained action
+    # still gets cut at max_tokens if the model stuffs a huge payload into
+    # a field. Observed 2026-08-16 — seven identical retries pasting 300
+    # lines of source into `respond.text`, ~6 minutes for zero progress,
+    # each one spending an iteration of max_iters.
+    max_consecutive_unparseable: int = 3
 
     # Structured-output constraint on the action emission. All three
     # subagents already prompt for the main loop's shape — {thought, tool,
@@ -118,6 +127,8 @@ class Subagent:
 
         answer = ''
         exit_reason = 'max_iters'
+        consecutive_unparseable = 0
+        last_unparseable_truncated = False
         for i in range(self.max_iters):
             messages = [
                 {'role': 'system', 'content': sys_prompt},
@@ -141,10 +152,25 @@ class Subagent:
             iter_rec: Dict[str, Any] = {'raw': raw, 'action': action}
             iters.append(iter_rec)
             if action is None:
-                log_lines.append("NOTE: previous output was unparseable; "
-                                 "emit ONE JSON action now.")
+                # Steer the retry by WHY the parse failed. "Unparseable"
+                # alone reads as bad JSON, so a model cut off mid-payload
+                # re-emits the same oversized action verbatim.
+                truncated = getattr(self.llm_backend, 'last_finish_reason',
+                                    None) in ('length', 'max_tokens')
+                consecutive_unparseable += 1
+                last_unparseable_truncated = truncated
+                logger.warning(
+                    f"{self.label}: unparseable emission at iter {i+1} "
+                    f"({consecutive_unparseable}/"
+                    f"{self.max_consecutive_unparseable}, "
+                    f"finish={getattr(self.llm_backend, 'last_finish_reason', None)})")
                 iter_rec['observation'] = '(unparseable)'
+                if consecutive_unparseable >= self.max_consecutive_unparseable:
+                    exit_reason = 'format_failed'
+                    break
+                log_lines.append("NOTE: " + unparseable_action_note(truncated))
                 continue
+            consecutive_unparseable = 0
 
             tool = action.get('tool')
             if tool == 'respond':
@@ -182,6 +208,14 @@ class Subagent:
         if exit_reason == 'max_iters' and not answer:
             answer = (f"({self.label}: hit max iterations without responding; "
                       f"consider narrowing the query)")
+        elif exit_reason == 'format_failed' and not answer:
+            cause = ("the answer was too large to emit — ask for a summary or "
+                     "a narrower line range rather than raw content"
+                     if last_unparseable_truncated
+                     else "it could not emit valid JSON")
+            answer = (f"({self.label}: gave up after "
+                      f"{self.max_consecutive_unparseable} consecutive "
+                      f"unparseable emissions; {cause}.)")
 
         write_subagent_trace(self.trace_dir, self.label, query, iters, answer,
                              exit_reason)

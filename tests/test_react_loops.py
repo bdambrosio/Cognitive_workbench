@@ -27,6 +27,7 @@ import chat.subagents.security as sec           # noqa: E402
 import chat.subagents.recall as rem           # noqa: E402
 import chat.subagents.code_subagent as cs       # noqa: E402
 from chat.react import ReactMixin, REACT_MAX_ITERS  # noqa: E402
+from chat.subagents.subagent import Subagent  # noqa: E402
 
 
 class FakeBackend:
@@ -111,16 +112,58 @@ def test_respond_action_terminates_with_its_text(run, mod, label, tmp_path):
 
 
 @pytest.mark.parametrize('run,mod,label', RUNNERS)
-def test_unparseable_output_burns_an_iteration(run, mod, label, tmp_path):
-    """Unparseable emissions do not abort and do not retry for free —
-    each one costs an iteration. This is the behavior that diverges from
-    the main chat loop, which has dedicated format retries on top of a
-    schema; recorded here so a consolidation has to decide deliberately.
+def test_unparseable_output_gives_up_early(run, mod, label, tmp_path):
+    """Consecutive unparseable emissions stop the loop instead of grinding
+    to the iteration cap.
+
+    Was: each one cost an iteration and the loop ran all 12, recorded here
+    "so a consolidation has to decide deliberately". Decided 2026-08-16 —
+    a code_subagent call spent 7 iterations and ~6 minutes re-emitting the
+    same oversized `respond`, so the loop now bails after
+    `max_consecutive_unparseable`.
     """
     backend = FakeBackend(['not json at all'])
     out = run(backend, tmp_path)
-    assert backend.n_calls == mod._MAX_ITERS
-    assert 'max iterations' in out
+    assert backend.n_calls == Subagent.max_consecutive_unparseable
+    assert 'unparseable' in out
+    assert 'valid JSON' in out
+
+
+@pytest.mark.parametrize('run,mod,label', RUNNERS)
+def test_truncated_emission_is_told_it_was_too_long(run, mod, label,
+                                                    tmp_path):
+    """A parse failure caused by the token limit gets different advice
+    than malformed output — otherwise the model re-emits the same
+    oversized payload verbatim, which is exactly what happened live."""
+
+    class TruncatingBackend(FakeBackend):
+        last_finish_reason = 'length'
+
+        def chat(self, messages, **kwargs):
+            self.prompts.append(messages[-1]['content'])
+            return super().chat(messages, **kwargs)
+
+        prompts: list = []
+
+    backend = TruncatingBackend(['{"tool": "respond", "text": "301|  '])
+    backend.prompts = []
+    out = run(backend, tmp_path)
+
+    assert backend.n_calls == Subagent.max_consecutive_unparseable
+    retries = backend.prompts[1:]
+    assert retries and all('cut off by the token limit' in p for p in retries)
+    assert not any('not valid JSON' in p for p in retries)
+    assert 'too large to emit' in out
+
+
+@pytest.mark.parametrize('run,mod,label', RUNNERS)
+def test_unparseable_counter_resets_on_success(run, mod, label, tmp_path):
+    """The cap counts *consecutive* failures — one stumble mid-loop must
+    not poison a run that recovers."""
+    backend = FakeBackend(['not json at all', _respond('recovered')])
+    out = run(backend, tmp_path)
+    assert backend.n_calls == 2
+    assert 'recovered' in out
 
 
 @pytest.mark.parametrize('run,mod,label', RUNNERS)

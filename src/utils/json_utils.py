@@ -7,6 +7,32 @@ from typing import Dict, Optional
 logger = logging.getLogger(__name__)
 
 
+def unparseable_action_note(truncated: bool) -> str:
+    """Retry instruction to feed back after repair_json_string() returned
+    None, steered by WHY the parse failed.
+
+    A token-limit truncation and genuinely malformed output need opposite
+    advice: the first means "you wrote too much", the second means "you
+    wrote the wrong shape". Telling a truncated emitter only that its
+    output was "unparseable" invites it to re-emit the same oversized
+    payload verbatim — observed 2026-08-16, seven identical retries
+    pasting 300 lines of source into a `respond` text field.
+
+    Callers get `truncated` from the backend's last_finish_reason
+    ('length' / 'max_tokens').
+    """
+    if truncated:
+        return ("Your previous emission was cut off by the token limit before the "
+                "JSON action closed — it was too long. Emit ONE COMPLETE, COMPACT "
+                "JSON action now: a SHORT thought (a single clause), the `tool`, and "
+                "concise args. Keep EVERY field brief — do not dump analysis, source "
+                "code or step-by-step work into `thought` or into any argument value. "
+                "Summarize or cite line ranges instead of quoting, and work the "
+                "problem in small steps across iterations.")
+    return ("Previous output was not valid JSON. Do NOT apologize — emit ONE JSON "
+            "action now: a single object with a short `thought` and a `tool`.")
+
+
 def repair_json_string(json_str: str) -> Optional[Dict]:
     """
     Attempt to repair malformed JSON from LLM output.

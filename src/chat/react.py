@@ -30,7 +30,8 @@ if _SRC_DIR not in sys.path:
 # reach; only the 16 tracked scenario YAMLs are visible.
 _REPO_ROOT = os.path.dirname(_SRC_DIR)
 
-from utils.json_utils import repair_json_string  # noqa: E402
+from utils.json_utils import (repair_json_string,  # noqa: E402
+                              unparseable_action_note)
 
 logger = logging.getLogger('chat_loop')
 
@@ -420,17 +421,7 @@ class ReactMixin:
                     f"(finish={self.backend.last_finish_reason}): {raw[:160]!r}")
                 self._emit_status('parse failed, retrying…')
                 self._affect.incr_llm_retry()
-                if truncated:
-                    note = ("Your previous emission was cut off by the token limit before the "
-                            "JSON action closed — it was too long. Emit ONE COMPLETE, COMPACT "
-                            "JSON action now: a SHORT thought (a single clause), the `tool`, and "
-                            "concise args. Keep EVERY field brief — do not dump analysis or "
-                            "step-by-step work into `thought` or into any argument value. Work "
-                            "the problem in small steps across iterations instead.")
-                else:
-                    note = ("Previous output was not valid JSON. Do NOT apologize — emit ONE JSON "
-                            "action now: a single object with a short `thought` and a `tool`.")
-                _append_log('NOTE', note)
+                _append_log('NOTE', unparseable_action_note(truncated))
                 iters[-1]['appended'] = log[pre_log_len:]
 
             if action is None:
