@@ -93,6 +93,67 @@ logger = logging.getLogger('chat_loop')
 # be hand-copied into each and going stale in the ones that are missed.
 _DEFAULT_HISTORY_LIMIT = 20
 
+# Post-turn work (discourse, companion, reflection, claims, WIP) runs off
+# the main thread so the inbox is freed as soon as the reply ships. It used
+# to get a single-worker pool PER character, which meant Jill could be six
+# deep while Jack sat idle and neither could borrow the other's slot —
+# measured 2026-08-15 as a 6-minute tail for three visible turns.
+#
+# One process-wide pool instead. Characters are threads in one process
+# (launcher.py:988), so this is simply a better allocation of the same
+# capacity: width 2 keeps the concurrent-request ceiling where it was
+# (2 agents x 2 threads == the server's --max-num-seqs 4) while letting one
+# agent use both slots when the other has nothing queued.
+_POST_TURN_POOL_WIDTH = 2
+_post_turn_pool: Optional[ThreadPoolExecutor] = None
+_post_turn_pool_lock = threading.Lock()
+
+
+def _shared_post_turn_pool() -> ThreadPoolExecutor:
+    """The process-wide post-turn pool, created on first use."""
+    global _post_turn_pool
+    if _post_turn_pool is None:
+        with _post_turn_pool_lock:
+            if _post_turn_pool is None:
+                _post_turn_pool = ThreadPoolExecutor(
+                    max_workers=_POST_TURN_POOL_WIDTH,
+                    thread_name_prefix='chat-postturn')
+    return _post_turn_pool
+
+
+class _PostTurnQueue:
+    """One ChatLoop's handle onto the shared pool.
+
+    Exists for `shutdown(wait=True)`: callers use that to mean "my post-turn
+    work has finished" — the benchmark runner relies on it for per-question
+    isolation — and on a shared pool that must NOT mean "stop the pool",
+    which would strand every other character. So this drains only the
+    futures this loop submitted and leaves the pool running.
+    """
+
+    def __init__(self, owner: str):
+        self._owner = owner
+        self._futures: List[Any] = []
+
+    def submit(self, fn, *args, **kwargs):
+        fut = _shared_post_turn_pool().submit(fn, *args, **kwargs)
+        # Prune completed futures so a long session does not accumulate them.
+        self._futures = [f for f in self._futures if not f.done()]
+        self._futures.append(fut)
+        return fut
+
+    def shutdown(self, wait: bool = True) -> None:
+        if not wait:
+            self._futures.clear()
+            return
+        for fut in list(self._futures):
+            try:
+                fut.result()
+            except Exception as e:
+                logger.warning(
+                    f"[{self._owner}] post-turn task failed during drain: {e}")
+        self._futures.clear()
+
 
 
 
@@ -321,13 +382,12 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # thread `_recall` reading the memories collection vs background
         # thread `_remember` writing to it. FAISS is not thread-safe and
         # releases the GIL during its C calls.
-        # _post_turn_executor: single-worker pool for discourse + reflection
-        # so the main thread returns to the inbox immediately after publishing.
+        # _post_turn_executor: handle onto the process-wide post-turn pool
+        # (see _PostTurnQueue) so the main thread returns to the inbox
+        # immediately after publishing. Shared across characters, so one
+        # agent's backlog can use a slot the other is not using.
         self._faiss_lock = threading.Lock()
-        self._post_turn_executor = ThreadPoolExecutor(
-            max_workers=1,
-            thread_name_prefix=f'chat-{character_name}-postturn',
-        )
+        self._post_turn_executor = _PostTurnQueue(character_name)
 
         # ---- Turn-state tracking (for /status) ----
         # _current_turn is set at _process_user_turn entry and cleared
@@ -1023,16 +1083,27 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             # then contaminates state notes and re-injects into chat_reply's
             # system prompt on subsequent turns.
             #
-            # reasoning_effort=low: these reflection passes produce
-            # structured-text output (commitments / agreements / decisions
-            # / companion sections) from a long prompt — synthesis, not
-            # novel reasoning. Medium effort burns analysis tokens that
-            # don't improve output but DO push the final-channel output
-            # past max_tokens, leaving content empty and the update
-            # marked as failed. Override to low; ReAct main loop keeps
-            # the scenario's medium baseline.
-            tracker.llm_generate = self._make_llm_callable(
-                'none', reasoning_effort='low')
+            # No reasoning_effort here. These passes are synthesis from a
+            # long prompt, not novel reasoning, and the original intent of
+            # pinning them to 'low' was to spend FEWER analysis tokens.
+            #
+            # That literal was inert for months — _ChatBackend only
+            # forwarded reasoning_effort when a scenario declared a
+            # baseline, and jill-chat.yaml declares none. Commit a0cb09e3
+            # let a call site opt in without a baseline (so --reasoning
+            # could reach the ReAct loop) and un-suppressed it here as a
+            # side effect. On Gemma-4 the effect inverts: its chat template
+            # has no reasoning_effort variable at all, so vLLM falls back to
+            # enable_thinking = (effort != "none") — the request that asked
+            # for LESS thinking switches thinking ON, from a default of off.
+            #
+            # Measured 2026-08-15: 12,049 characters of reasoning to emit
+            # the 15-character answer "NONE END_TRIAGE", and a 6-minute
+            # post-turn tail for three visible turns.
+            #
+            # Reflection reasoning belongs behind the launcher flag if it is
+            # ever wanted, not behind a literal in the reflection path.
+            tracker.llm_generate = self._make_llm_callable('none')
             new_disc = tracker.analyze_segment(
                 dialog, start=0, end=len(dialog) - 1,
                 previous_discourse_state=prev_disc, tom='',
@@ -1049,8 +1120,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             # executive_node) because chat-mode sessions rarely emit `close`,
             # and the template is built to self-prune slow-moving fields.
             prev_comp = self._companion_state.get(entity, '')
-            tracker.llm_generate = self._make_llm_callable(
-                'none', reasoning_effort='low')
+            # No reasoning_effort — see the note on the discourse call above.
+            tracker.llm_generate = self._make_llm_callable('none')
             new_comp = tracker.update_companion_from_discourse_segment(
                 dialog, character_name=entity, start=0, end=len(dialog) - 1,
                 discourse_state=self._discourse_state.get(entity, ''),
