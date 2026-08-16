@@ -176,6 +176,14 @@ characters:
     sensors:
       - name: tick
         schedule: "1m"
+      # Edge-triggered on an occupant entering or leaving proximity, so a
+      # partner arriving is an event rather than something to be told
+      # about. Added 2026-08-16 after a run where one agent walked 92 m to
+      # the other, arrived, and nothing happened: she had nothing new to
+      # say, he believed he was still walking, and no mechanism existed by
+      # which either could notice.
+      - name: world-presence
+        schedule: "30s"
 
     chat:
       omitted_tools:
@@ -294,6 +302,14 @@ characters:
     sensors:
       - name: tick
         schedule: "1m"
+      # Edge-triggered on an occupant entering or leaving proximity, so a
+      # partner arriving is an event rather than something to be told
+      # about. Added 2026-08-16 after a run where one agent walked 92 m to
+      # the other, arrived, and nothing happened: she had nothing new to
+      # say, he believed he was still walking, and no mechanism existed by
+      # which either could notice.
+      - name: world-presence
+        schedule: "30s"
 
     chat:
       omitted_tools:
