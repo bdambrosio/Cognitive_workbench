@@ -2134,6 +2134,73 @@ class ConcernsMixin:
             return src
         return 'User'
 
+    def _spawn_concern_from_hop_exhaustion(self, peer: str,
+                                           undelivered: str) -> Optional[str]:
+        """Carry a joint activity past a spent hop budget.
+
+        Every other budget in the loop converts exhaustion into a
+        continuation: max_iters synthesizes a remainder, `yield` carries
+        one verbatim, both spawn a concern. The exchange budget alone just
+        dropped the message, so a two-agent activity ceased to exist at
+        hop 7 — the sender believing it had spoken, the peer still waiting,
+        neither able to find out, and nothing on either side recording that
+        an activity was ever underway.
+
+        The instruction names the tool and carries the text, rather than
+        describing the goal. Where the action is known in advance there is
+        no reason to leave it to judgement — a stated intention has now
+        outlived an explicit persona norm three times.
+
+        Bounded by the same depth cap as successor chains: a resumed
+        exchange that spends its budget again may hand off once more, then
+        stops. Raise `chat.hop_budget` for scenarios that want long
+        exchanges; this path is for not losing work, not for running
+        forever."""
+        peer = (peer or '').strip()
+        undelivered = (undelivered or '').strip()
+        if not peer or not undelivered:
+            return None
+        cur_id = (getattr(self, '_current_turn', None) or {}).get(
+            'autonomous_concern_id')
+        depth = 0
+        if cur_id:
+            try:
+                note = self.resource_manager.get_resource(cur_id) or {}
+                depth = int((note.get('properties') or {}).get(
+                    'successor_depth', 0) or 0)
+            except Exception as e:
+                logger.warning(
+                    f"[{self.character_name}] hop-carrier depth lookup "
+                    f"failed for {cur_id}: {e}; treating as depth 0")
+        if depth >= _CONCERN_SUCCESSOR_MAX_DEPTH:
+            logger.info(
+                f"[{self.character_name}] hop-budget carrier refused for "
+                f"{peer} — successor depth {depth} at cap")
+            return None
+        new_id = self._add_agent_concern(
+            text=f"resume my exchange with {peer}",
+            entity=peer, provenance='inferred', seed=False, name='',
+            rhythm_hours=1, rhythm_source='urgency',
+            instruction=(
+                f"My last message to {peer} was not delivered — the hop "
+                f"budget for that exchange was spent. Send it now with "
+                f"agent-say (a fire starts a fresh exchange, so it will go "
+                f"through), then carry on:\n\n{undelivered}"),
+            skip_recurrence=True,
+            category='one_shot',
+            extra_properties={
+                'activation': _AGENT_CONCERN_FIRE_THRESHOLD,
+                'successor_depth': depth + 1,
+                'system_spawned': True,
+            },
+        )
+        if not new_id:
+            return None
+        logger.info(
+            f"[{self.character_name}] spawned hop-budget carrier {new_id} "
+            f"for {peer} (depth {depth + 1}): {undelivered[:100]!r}")
+        return new_id
+
     def _spawn_concern_from_user_yield(self, turn_text: str,
                                        next_slice: str) -> Optional[str]:
         """User-turn intentional yield: a ReAct loop serving a USER (or

@@ -24,12 +24,17 @@ from chat.concerns import _snap_rhythm_hours  # noqa: E402
 
 logger = logging.getLogger('chat_loop')
 
-# Maximum agent→agent legs in one exchange. The hop count travels in the
-# message envelope and increments on every agent-to-agent send (agent-say
-# or reply routing); beyond the budget, delivery is suppressed. This is
-# the structural brake on two agents ping-ponging forever — agent-sourced
-# turns are ordinary turns and do NOT require --autonomy, so this budget
-# is the only loop guard.
+# Default maximum agent→agent legs in one exchange. The hop count travels
+# in the message envelope and increments on every agent-to-agent send
+# (agent-say or reply routing); beyond the budget, delivery is suppressed.
+# This is the structural brake on two agents ping-ponging forever —
+# agent-sourced turns are ordinary turns and do NOT require --autonomy.
+#
+# Per-scenario override: `chat.hop_budget`. Six is right for a working
+# agent that exchanges a few messages and gets on with it; a coordination
+# or improv scenario wants far more. Measured 2026-08-16: a two-agent
+# improv scene ran a clean alternation and died at hop 7 with both parties
+# still mid-topic, which reads as a stall and is only a spent budget.
 AGENT_HOP_BUDGET = 6
 
 
@@ -247,15 +252,25 @@ class ZenohMixin:
         the hop budget: a suppressed leg still appeared on our own
         /action topic, so the human sees the exchange end."""
         next_hops = incoming_hops + 1
-        if next_hops > AGENT_HOP_BUDGET:
+        if next_hops > self.hop_budget:
             logger.info(
                 f"[{self.character_name}] reply to agent {peer} NOT "
-                f"forwarded — hop budget ({AGENT_HOP_BUDGET}) exhausted")
+                f"forwarded — hop budget ({self.hop_budget}) exhausted")
+            # Hand the undelivered leg to a concern rather than dropping
+            # it. The turn is already over, so there is no observation
+            # channel left to tell this agent its message went nowhere;
+            # without a carrier the activity simply ends here.
+            try:
+                self._spawn_concern_from_hop_exhaustion(peer, reply)
+            except Exception as e:
+                logger.warning(
+                    f"[{self.character_name}] hop-budget carrier spawn "
+                    f"failed for {peer}: {e}")
             return
         try:
             self._publish_agent_message(peer, reply, next_hops)
             logger.info(f"[{self.character_name}] reply routed to agent "
-                        f"{peer} (hop {next_hops}/{AGENT_HOP_BUDGET})")
+                        f"{peer} (hop {next_hops}/{self.hop_budget})")
         except Exception as e:
             logger.warning(
                 f"[{self.character_name}] reply routing to {peer} failed: {e}")
@@ -279,8 +294,8 @@ class ZenohMixin:
             hops = getattr(self, '_current_turn_hops', 0) + 1
         else:
             hops = 1
-        if hops > AGENT_HOP_BUDGET:
-            return (f"EMPTY: the hop budget ({AGENT_HOP_BUDGET}) for this "
+        if hops > self.hop_budget:
+            return (f"EMPTY: the hop budget ({self.hop_budget}) for this "
                     f"exchange with {target} is exhausted — the message "
                     f"would not be delivered. Let the exchange rest; if "
                     f"something important remains, tell the user instead.")
@@ -291,7 +306,7 @@ class ZenohMixin:
                 f"[{self.character_name}] agent-say to {target} failed: {e}")
             return f"ERROR: send to {target} failed: {e}"
         logger.info(f"[{self.character_name}] agent-say -> {target} "
-                    f"(hop {hops}/{AGENT_HOP_BUDGET}, {len(body)} chars)")
+                    f"(hop {hops}/{self.hop_budget}, {len(body)} chars)")
         return (f"OK: sent to {target}. Any reply arrives later as a NEW "
                 f"turn from source '{target}' — do not wait for it in this "
                 f"loop; finish this turn normally.")

@@ -82,7 +82,7 @@ from chat.prompts import (  # noqa: E402,F401
     _REASONING_HISTORY_FULL, _REASONING_HISTORY_OBS_CAP,
     _ATTRIBUTION_OBS_CAP)
 from chat.disposition import DispositionMixin  # noqa: E402
-from chat.zenoh_io import ZenohMixin  # noqa: E402
+from chat.zenoh_io import ZenohMixin, AGENT_HOP_BUDGET  # noqa: E402
 
 
 logger = logging.getLogger('chat_loop')
@@ -263,6 +263,12 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # _cap_turn, so this count no longer implies an unbounded prompt.
         self.history_limit = int((character_config.get('chat') or {}).get(
             'history_limit', _DEFAULT_HISTORY_LIMIT))
+        # Agent→agent legs allowed in one exchange (see zenoh_io). Six suits
+        # a working agent that trades a few messages and moves on; a
+        # coordination or improv scenario needs far more, and hitting the
+        # wall reads to everyone — human included — as the agents stalling.
+        self.hop_budget = int((character_config.get('chat') or {}).get(
+            'hop_budget', AGENT_HOP_BUDGET))
         # Max tokens per ReAct action emission — a CEILING, not a
         # reservation the caller must size against the server. _ChatBackend
         # clamps this down when prompt + output would exceed the served

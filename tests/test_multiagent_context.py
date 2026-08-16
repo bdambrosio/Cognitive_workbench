@@ -25,7 +25,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'src'))
 
 from chat.prompts import PromptsMixin, _REASONING_HISTORY_FULL  # noqa: E402
-from chat.concerns import ConcernsMixin  # noqa: E402
+from chat.concerns import (ConcernsMixin,  # noqa: E402
+                           _AGENT_CONCERN_FIRE_THRESHOLD,
+                           _CONCERN_SUCCESSOR_MAX_DEPTH)
 
 
 def _rec(seq, source, autonomous=False, text=None):
@@ -137,3 +139,87 @@ def test_counterpart_falls_back_for_sources_with_no_dialogue():
     concern pointing at an entity get_recent_turns can never resume."""
     for src in ('sensor:world-presence', 'sensor:tick', 'Nobody', '', None):
         assert _Concerns(src)._turn_counterpart() == 'User'
+
+
+# -- hop-budget carrier ----------------------------------------------
+#
+# Every other budget in the loop turns exhaustion into a continuation:
+# max_iters synthesizes a remainder, `yield` carries one verbatim, both
+# spawn a concern. The exchange budget alone dropped the message, so a
+# two-agent activity ended at hop 7 with the sender believing it had
+# spoken and the peer still waiting — and nothing anywhere recording that
+# an activity had been underway.
+
+class _FakeRM:
+    def __init__(self, notes=None):
+        self.notes = notes or {}
+
+    def get_resource(self, nid):
+        return self.notes.get(nid)
+
+
+class _Carrier(ConcernsMixin):
+    character_name = 'Jack'
+    _peers = ['Jill']
+
+    def __init__(self, current_turn=None, notes=None):
+        self._current_turn = current_turn or {}
+        self.resource_manager = _FakeRM(notes)
+        self.added = []
+
+    def _add_agent_concern(self, **kw):
+        self.added.append(kw)
+        return f'Note_{len(self.added)}'
+
+
+def test_carrier_is_addressed_to_the_peer_not_the_user():
+    """entity=<peer> is what makes the resumed turn load the peer thread
+    rather than the User one — without it the continuation wakes up in the
+    wrong conversation."""
+    c = _Carrier()
+    assert c._spawn_concern_from_hop_exhaustion('Jill', 'heading your way')
+    assert c.added[0]['entity'] == 'Jill'
+
+
+def test_carrier_fires_on_the_next_tick():
+    c = _Carrier()
+    c._spawn_concern_from_hop_exhaustion('Jill', 'heading your way')
+    props = c.added[0]['extra_properties']
+    assert props['activation'] == _AGENT_CONCERN_FIRE_THRESHOLD
+    assert props['system_spawned'] is True
+    assert c.added[0]['category'] == 'one_shot'
+
+
+def test_carrier_names_the_tool_and_carries_the_text():
+    """The action is known in advance, so it is stated rather than left to
+    judgement — a stated intention has outlived an explicit persona norm
+    three times."""
+    c = _Carrier()
+    c._spawn_concern_from_hop_exhaustion('Jill', 'the slope levels out here')
+    instr = c.added[0]['instruction']
+    assert 'agent-say' in instr
+    assert 'the slope levels out here' in instr
+
+
+def test_carrier_chain_is_bounded_by_the_successor_depth_cap():
+    """Resuming refills the hop budget, so without a bound two agents
+    could hand off to each other forever at tick rate."""
+    at_cap = {'N': {'properties':
+                    {'successor_depth': _CONCERN_SUCCESSOR_MAX_DEPTH}}}
+    c = _Carrier({'autonomous_concern_id': 'N'}, at_cap)
+    assert c._spawn_concern_from_hop_exhaustion('Jill', 'more') is None
+    assert c.added == []
+
+
+def test_carrier_deepens_the_chain_while_under_the_cap():
+    under = {'N': {'properties': {'successor_depth': 1}}}
+    c = _Carrier({'autonomous_concern_id': 'N'}, under)
+    assert c._spawn_concern_from_hop_exhaustion('Jill', 'more')
+    assert c.added[0]['extra_properties']['successor_depth'] == 2
+
+
+def test_carrier_needs_both_a_peer_and_something_to_say():
+    c = _Carrier()
+    assert c._spawn_concern_from_hop_exhaustion('', 'text') is None
+    assert c._spawn_concern_from_hop_exhaustion('Jill', '   ') is None
+    assert c.added == []

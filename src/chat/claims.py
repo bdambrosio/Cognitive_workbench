@@ -1111,8 +1111,18 @@ class ClaimsMixin:
             f"The exchange, for context:\n"
             f"They said: {user_input[:300]}\n"
             f"I replied: {reply[:500]}\n\n"
-            f"Verify each claim above now with targeted tools (search-web, "
-            f"fetch-text) — design each probe to test the claim directly. "
+            # Naming search-web/fetch-text here sent every audit to the
+            # internet regardless of what the claim was about. Observed
+            # 2026-08-16: "I'm on a slope" and "Jill isn't on a slope" —
+            # both answerable by looking, in one step — were dispatched as
+            # web searches. Say what a good probe IS and let the agent pick
+            # from the tools it actually has.
+            f"Verify each claim above now — design each probe to test the "
+            f"claim directly, using whichever of your tools can actually "
+            f"settle it. Match the probe to the kind of claim: something "
+            f"about your own situation, surroundings or state is settled "
+            f"by observing, not by searching; something about the outside "
+            f"world needs a source. "
             f"If verification REFUTES any claim, post a brief correction "
             f"to the conversation: lead with the correction, cite what "
             f"you found now, and do not defend the original reply. "
