@@ -2150,8 +2150,19 @@ class ConcernsMixin:
                 # same-tick re-fire to guard against. The provenance trail
                 # lives in autonomy.jsonl (via: user_yield) rather than on
                 # the note — a reader-facing choice, not a constraint:
-                # extra_properties do persist (see 'system_spawned').
+                # extra_properties do persist, PROVIDED the key is in
+                # create_note's allowed_fields (they are silently dropped
+                # otherwise — 'system_spawned' below was dropped for its
+                # whole life until the allowlist was fixed 2026-08-16).
                 'activation': _AGENT_CONCERN_FIRE_THRESHOLD,
+                # Same argument _close_agent_concerns already makes for
+                # claim audits: the exchange that spawned this cannot
+                # contain assent to drop it — the user said nothing at
+                # all. Observed 2026-08-16: reflection abandoned a yield
+                # continuation 20s after triage fired it, and the work
+                # survived only by winning the race. It closes on
+                # satisfaction, not on reflection's read of the room.
+                'system_spawned': True,
             },
         )
         if not new_id:
@@ -2213,6 +2224,9 @@ class ConcernsMixin:
                 # dispatching, so a concern spawned during a fire cannot
                 # appear in that same tick's batch.
                 'activation': _AGENT_CONCERN_FIRE_THRESHOLD,
+                # See _spawn_concern_from_user_yield: continuation work is
+                # machine-scheduled, so reflection must not retire it.
+                'system_spawned': True,
             },
         )
         if not new_id:

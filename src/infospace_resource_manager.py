@@ -1005,6 +1005,13 @@ class InfospaceResourceManager:
                           # Designates the agent_concern that proposes new
                           # tools to close capability gaps (self-extension).
                           'self_extension',
+                          # Machine-scheduled follow-up work (claim audits,
+                          # yield continuations) that reflection must not
+                          # retire — see _apply_agent_concern_closures.
+                          # Missing here until 2026-08-16, so the flag was
+                          # dropped at create_note time and that guard never
+                          # fired: zero notes on disk carried it.
+                          'system_spawned',
                           # Fire-time triage cache + per-concern WIP
                           # (running summary of autonomous-fire findings,
                           # kept on the root concern of a successor chain).

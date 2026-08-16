@@ -687,8 +687,10 @@ def test_yield_spawns_successor_verbatim_no_llm(loop):
     assert props["instruction"] == nxt
     assert props["successor_of"] == parent
     assert props["successor_depth"] == 1
-    assert props["activation"] == pytest.approx(
-        _AGENT_CONCERN_FIRE_THRESHOLD - 0.1)
+    # Primed AT threshold, not 0.1 below: the same-tick re-fire this
+    # margin guarded against is prevented structurally instead
+    # (_handle_tick computes its fire list before dispatching).
+    assert props["activation"] == pytest.approx(_AGENT_CONCERN_FIRE_THRESHOLD)
     assert loop._root_concern_id(succ) == parent
 
 
@@ -735,10 +737,40 @@ def test_user_yield_spawns_fresh_concern(loop):
     props = loop.resource_manager.get_resource(nid)["properties"]
     assert props["instruction"] == nxt
     assert "successor_of" not in props  # fresh root, not a successor
-    assert props["activation"] == pytest.approx(
-        _AGENT_CONCERN_FIRE_THRESHOLD - 0.1)
+    # Primed AT threshold so the next tick fires it — verified live
+    # 2026-08-16: spawn 16:29:11, triage fire 16:29:14.
+    assert props["activation"] == pytest.approx(_AGENT_CONCERN_FIRE_THRESHOLD)
     # Fresh root: its own future yields start a normal successor chain.
     assert loop._root_concern_id(nid) == nid
+
+
+def test_reflection_cannot_abandon_a_yield_continuation(loop):
+    """Reflection must not retire continuation work.
+
+    Observed live 2026-08-16 in an isolated single-agent world: a
+    user-turn yield spawned Note_4 at 16:29:11, triage fired it at
+    16:29:34 reflection abandoned it — 20s into the fire. The work
+    survived only because dispatch had already won the race; a slower
+    tick would have lost the continuation silently. `_apply_agent_concern_
+    closures` already refuses seeds and system-spawned claim audits on
+    exactly this reasoning, so both yield spawn paths now carry the flag.
+    """
+    _mute_indexer(loop)
+
+    for nid, label in (
+            (loop._spawn_concern_from_user_yield('the ask', 'the remainder'),
+             'user-turn yield'),
+            (loop._create_successor_concern(make_concern(loop), 'more work'),
+             'autonomous successor')):
+        assert nid, label
+        props = loop.resource_manager.get_resource(nid)['properties']
+        assert props['system_spawned'] is True, label
+
+        text = props['content']
+        shown = [(nid, text, props['activation'], props)]
+        assert loop._apply_agent_concern_closures([text], shown) == [], label
+        assert loop.resource_manager.get_resource(
+            nid)['properties']['status'] == 'active', label
 
 
 def test_user_yield_empty_next_spawns_nothing(loop):
