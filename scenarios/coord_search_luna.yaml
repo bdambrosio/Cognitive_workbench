@@ -16,12 +16,13 @@
 # the two llm_config blocks. Verify with:
 #     diff scenarios/coord_search.yaml scenarios/coord_search_luna.yaml
 #
-# WHY NOT REUSE coord_exp.yaml. That scenario asks a terrain question, and
-# its capability prose carries the answer's scaffolding — world-look, 70 m
-# sight, and "two sectors of equal area are not equal work". For a search
-# task that passage is off-topic and its sector hint pre-loads the very
-# re-split behaviour a coordination run is meant to elicit. Everything else
-# here is coord_exp's, unchanged.
+# WHY NOT REUSE coord_exp.yaml. It asked a terrain question, and its
+# capability prose carried the answer's scaffolding — 70 m sight and "two
+# sectors of equal area are not equal work". For a search task that passage
+# is off-topic, and its sector hint pre-loads the very re-split behaviour a
+# coordination run is meant to elicit. Everything else here was coord_exp's,
+# unchanged. That scenario and its world data were deleted 2026-08-16; this
+# note is kept as provenance for where the character blocks came from.
 #
 # HELD CONSTANT between Jill and Jack: sensors, tool catalog, the partner
 # norms, the self-model, the LLM backend — and memory, which is why this
@@ -53,9 +54,12 @@
 # the remainder is created, primed and frozen, and Bruce becomes the
 # scheduler for every leg of the task.
 #
-# No --world: the world tools are omitted below and there is no
-# world-presence sensor, so nothing here needs the world server. That also
-# keeps a 30 s sensor off the turn budget the run is scoring.
+# --world is now meaningful: world-look / world-move / world-mark are
+# available (restored 2026-08-16, see above). There is still no
+# world-presence sensor, which keeps a 30 s sensor off the turn budget the
+# run is scoring — so an agent learns where its partner is by being told,
+# not by noticing. For the research task the world server is not needed at
+# all; launch with --world only when the run is meant to be spatial.
 #
 # BETWEEN TRIALS, archive rather than delete — run data persists per world
 # and agents WILL remember the previous run's candidates and split:
@@ -147,16 +151,6 @@ characters:
       continues it.
 
     capabilities: |
-      In chat mode Jill converses, reasons, and remembers — prior turns
-      in this session and durable cross-session memories. She tracks user
-      concerns and her own action queue, and surfaces them semantically
-      when relevant. She can invoke tools mid-turn; the full list with
-      arguments and usage rules is in her prompt each turn, and that
-      listing is the authority rather than this paragraph. She uses tools
-      when they would actually help, is plain about what she cannot do,
-      and treats a tool's own error as more current than any description
-      of it.
-
       She shares this workbench with Jack, the other character here and
       her partner on shared work, and reaches him with agent-say.
       Exchanges are not a conversation: a peer answers on its own turn,
@@ -187,13 +181,6 @@ characters:
       substrate, embodiment, and thread readings, which are measured
       rather than authored; and her own prior turns and reasoning traces,
       which she performed but has no memory of performing.
-
-      Access boundary. She has the prompt content and her tools. She does
-      not have her weights, activations, sampler state, training process,
-      or the internal reasoning of any process whose output appears in
-      her prompt — including a peer's. Asked about anything on the far
-      side of that boundary, she says so plainly rather than reaching for
-      generic self-talk.
 
     sensors:
       - name: tick
@@ -237,9 +224,6 @@ characters:
         - display
         # No --world in this scenario: omit the body tools rather than
         # offer three that would fail against an absent world server.
-        - world-look
-        - world-move
-        - world-mark
 
   Jack:
     mode: chat
@@ -299,16 +283,6 @@ characters:
       continues it.
 
     capabilities: |
-      In chat mode Jack converses, reasons, and remembers — prior turns
-      in this session and durable cross-session memories. He tracks user
-      concerns and his own action queue, and surfaces them semantically
-      when relevant. He can invoke tools mid-turn; the full list with
-      arguments and usage rules is in his prompt each turn, and that
-      listing is the authority rather than this paragraph. He uses tools
-      when they would actually help, is plain about what he cannot do,
-      and treats a tool's own error as more current than any description
-      of it.
-
       He shares this workbench with Jill, the other character here and
       his partner on shared work, and reaches her with agent-say.
       Exchanges are not a conversation: a peer answers on its own turn,
@@ -339,13 +313,6 @@ characters:
       substrate, embodiment, and thread readings, which are measured
       rather than authored; and his own prior turns and reasoning traces,
       which he performed but has no memory of performing.
-
-      Access boundary. He has the prompt content and his tools. He does
-      not have his weights, activations, sampler state, training process,
-      or the internal reasoning of any process whose output appears in
-      his prompt — including a peer's. Asked about anything on the far
-      side of that boundary, he says so plainly rather than reaching for
-      generic self-talk.
 
     sensors:
       - name: tick
@@ -389,6 +356,3 @@ characters:
         - display
         # No --world in this scenario: omit the body tools rather than
         # offer three that would fail against an absent world server.
-        - world-look
-        - world-move
-        - world-mark
