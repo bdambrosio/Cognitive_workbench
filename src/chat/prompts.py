@@ -410,10 +410,14 @@ class PromptsMixin:
 
             if body_lines:
                 parts.append(
-                    f"## Recalled memories (from prior conversations with {source})\n"
-                    "Preferences shape how to respond; commitments are open "
-                    "agreements that may need follow-up; facts are background "
-                    "specifics about " + source + ". Items marked `[avoid]` "
+                    "## Recalled memories (semantic match against everything "
+                    "I have remembered — across all my conversations, not "
+                    f"only the one with {source})\n"
+                    "Retrieval is by meaning, so a memory here may have been "
+                    "formed while talking with someone else; do not assume "
+                    f"{source} said it. Preferences shape how to respond; "
+                    "commitments are open agreements that may need follow-up; "
+                    "facts are background specifics. Items marked `[avoid]` "
                     "are explicit rejections — do not act on them as if "
                     "they were positive preferences. The `[Note_N · date]` "
                     "tag is each memory's id and write date — use the date "
@@ -514,6 +518,25 @@ class PromptsMixin:
         )
         return base + react
 
+    def _firing_concern_entity(self) -> str:
+        """Counterpart of the concern currently firing, for autonomous
+        turns. 'User' when there is no concern id, the note has gone, or
+        it names no entity — the value this replaced was that constant."""
+        cid = (getattr(self, '_current_turn', None) or {}).get(
+            'autonomous_concern_id')
+        if not cid:
+            return 'User'
+        try:
+            note = self.resource_manager.get_resource(cid) or {}
+            entity = str((note.get('properties') or {}).get('entity')
+                         or '').strip()
+        except Exception as e:
+            logger.warning(
+                f"[{self.character_name}] firing-concern entity lookup "
+                f"failed for {cid}: {e}; falling back to 'User'")
+            return 'User'
+        return entity or 'User'
+
     def _build_react_user_prefix(self, source: str, user_text: str) -> str:
         """Build the user-message PREFIX for the ReAct loop. Constructed once
         per loop; the working-log entries and the "Emit next action:" trailer
@@ -521,11 +544,13 @@ class PromptsMixin:
         across iterations so KV cache hits, only the log grows). Ends with
         '## Working log\\n' so the first appended entry sits below the header."""
         parts: List[str] = []
-        # On autonomous turns, source is the character itself (the
-        # originator), but the conversation we want surfaced is still the
-        # User dialogue — fall back to 'User' when source is self so the
-        # ReAct loop sees the same context the user-driven path would.
-        history_entity = 'User' if source == self.character_name else source
+        # On autonomous turns `source` is the character itself, so it names
+        # no counterpart. Use the firing concern's entity: work raised while
+        # talking with Jack should resume against the Jack conversation, not
+        # the User one. This line hard-coded 'User' until 2026-08-16, which
+        # was right while there was only ever one counterpart.
+        history_entity = (self._firing_concern_entity()
+                          if source == self.character_name else source)
         history = self.store.get_recent_turns(history_entity, limit=self.history_limit, scope='all')
         if history and history[-1].get('direction') == 'in' and str(history[-1].get('text', '')) == user_text:
             history = history[:-1]
@@ -540,28 +565,50 @@ class PromptsMixin:
         # input. Read once per loop entry — same store-and-append
         # discipline as conversation history: byte-stable across
         # iterations within the loop, fresh on the next loop.
-        reasoning_block = self._get_reasoning_history_block()
+        reasoning_block = self._get_reasoning_history_block(history_entity)
         if reasoning_block:
             parts.append(reasoning_block)
             parts.append("")
-        parts.append("## Current user input")
+        # Name the source. With co-resident agents "user input" was a
+        # false label on every peer turn — the one field naming who is
+        # actually speaking.
+        if source == self.character_name:
+            parts.append("## Current input (my own concern firing)")
+        else:
+            parts.append(f"## Current input (from {source})")
         parts.append(user_text)
         parts.append("")
         parts.append("## Working log (this loop's actions and observations)")
         return "\n".join(parts) + "\n"
+
+    @staticmethod
+    def _trace_origin(rec: Dict[str, Any]) -> str:
+        """Who this trace's turn came from, for the record's header.
+
+        The record has carried `source` and `autonomous` all along; until
+        2026-08-16 neither was rendered, so a Jack turn and a concern fire
+        both appeared under `USER INPUT:`. With several agents co-resident
+        that is not a cosmetic gap — it is the prompt asserting a single
+        relationship where there are three."""
+        if rec.get('autonomous'):
+            return 'autonomous concern fire'
+        return f"turn from {str(rec.get('source') or '?')}"
 
     def _render_trace_record(self, rec: Dict[str, Any], full: bool) -> str:
         """Render a single per-turn record from reasoning_trace.jsonl
         for inclusion in the user-prompt's ## Recent reasoning block.
         full=True renders all per-turn-unique fields (used for recent
         traces and all traces in benchmark_mode); full=False renders a
-        one-line digest (used for older traces in non-benchmark mode)."""
+        one-line digest (used for older traces, and for traces belonging
+        to a different interlocutor — see _get_reasoning_history_block)."""
         seq = int(rec.get('turn_seq', 0))
+        origin = self._trace_origin(rec)
         if not full:
             user_short = (rec.get('user_input') or '')[:60].replace('\n', ' ')
             resp_short = (rec.get('raw_response') or '').replace('\n', ' ')[:200]
-            return f"### trace #{seq}: '{user_short}' → \"{resp_short}\""
-        parts: List[str] = [f"### trace #{seq}"]
+            return (f"### trace #{seq} ({origin}): "
+                    f"'{user_short}' → \"{resp_short}\"")
+        parts: List[str] = [f"### trace #{seq} — {origin}"]
         ts = rec.get('ts')
         if ts:
             parts.append(f"TIMESTAMP: {ts}")
@@ -580,7 +627,11 @@ class PromptsMixin:
             parts.append(
                 f"PRIOR TRACES VISIBLE TO ME AT THIS TURN: {prefix_refs} "
                 "(by turn_seq; resolve via reasoning_trace.jsonl line N)")
-        parts.append(f"USER INPUT: {rec.get('user_input', '')}")
+        if rec.get('autonomous'):
+            parts.append(f"CONCERN INSTRUCTION: {rec.get('user_input', '')}")
+        else:
+            parts.append(f"INPUT FROM {str(rec.get('source') or '?')}: "
+                         f"{rec.get('user_input', '')}")
         if rec.get('image_ref'):
             parts.append(f"IMAGE ATTACHED: {rec['image_ref']}")
         if rec.get('working_log'):
@@ -589,7 +640,7 @@ class PromptsMixin:
             parts.append(f"RAW RESPONSE: {rec['raw_response']}")
         return "\n".join(parts)
 
-    def _get_reasoning_history_block(self) -> str:
+    def _get_reasoning_history_block(self, thread_entity: str = 'User') -> str:
         """Build the ## Recent reasoning block for the user-message prefix.
         Reads structured per-turn records from reasoning_trace.jsonl and
         renders per-turn-unique content (orientation, concerns at the
@@ -603,7 +654,16 @@ class PromptsMixin:
         In benchmark_mode: surfaces ALL session records in full.
         In normal chat mode: last _REASONING_HISTORY_RECENT records,
         most recent _REASONING_HISTORY_FULL in full, older as one-line
-        digest (token budget)."""
+        digest (token budget).
+
+        thread_entity is the interlocutor whose conversation this turn
+        belongs to. The trace file is a single stream across ALL of them,
+        so with co-resident agents a turn answering Jack used to carry
+        User turns at full weight. Records from another interlocutor now
+        render as a digest whatever their recency: enough to know that
+        exchange happened, not enough to dominate this one. Own
+        autonomous fires count as this thread — they are continuation of
+        my own work, not a different relationship."""
         self._last_inject_trace_seqs = []
         records = self._load_reasoning_records()
         if not records:
@@ -611,19 +671,34 @@ class PromptsMixin:
         bench = bool((self.config.get('chat') or {}).get('benchmark_mode'))
         selected = records if bench else records[-_REASONING_HISTORY_RECENT:]
         n = len(selected)
-        full_threshold = 0 if bench else max(0, n - _REASONING_HISTORY_FULL)
+
+        def _same_thread(rec: Dict[str, Any]) -> bool:
+            return (bool(rec.get('autonomous'))
+                    or str(rec.get('source') or '') == thread_entity)
+
+        # Budget the full renderings over THIS thread's records only. Taking
+        # the last _REASONING_HISTORY_FULL of the mixed list instead would
+        # let a burst on the other thread push every same-thread record into
+        # digest — measured on a real two-agent trace, answering Jack gave
+        # zero full traces while three of the six were his.
+        same_idxs = [i for i, r in enumerate(selected) if _same_thread(r)]
+        full_idxs = (set(range(n)) if bench
+                     else set(same_idxs[-_REASONING_HISTORY_FULL:]))
         sections: List[str] = []
         for idx, rec in enumerate(selected):
             seq = int(rec.get('turn_seq', 0))
             if seq:
                 self._last_inject_trace_seqs.append(seq)
             sections.append(self._render_trace_record(
-                rec, full=(idx >= full_threshold)))
+                rec, full=(idx in full_idxs)))
         if not sections:
             return ''
         return ("## Recent reasoning (my own ReAct traces from prior turns — "
-                "per-turn orientation, concerns, recall, user input, working "
-                "log, and raw response. The static prefix and current state "
+                "per-turn orientation, concerns, recall, input, working "
+                "log, and raw response. Each trace is headed by who its "
+                "turn came from: traces from a different interlocutor are "
+                "shown as a one-line digest, since they belong to a "
+                "separate conversation. The static prefix and current state "
                 "above also conditioned each turn; only per-turn-varying "
                 "content is shown here.)\n"
                 + "\n\n".join(sections))

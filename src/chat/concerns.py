@@ -2121,6 +2121,19 @@ class ConcernsMixin:
         depth cap as the reactive max_iters route."""
         return self._create_successor_concern(parent_id, next_slice)
 
+    def _turn_counterpart(self) -> str:
+        """Who the current turn is with, for stamping on a spawned concern.
+
+        Only 'User' and co-resident peers are conversations that
+        `get_recent_turns` can later resume against; a sensor turn
+        (`sensor:factorio-telemetry`) names no dialogue, so it maps to
+        'User' rather than an entity with no history behind it."""
+        src = str((getattr(self, '_current_turn', None) or {}).get('source')
+                  or '').strip()
+        if src == 'User' or src in (getattr(self, '_peers', None) or []):
+            return src
+        return 'User'
+
     def _spawn_concern_from_user_yield(self, turn_text: str,
                                        next_slice: str) -> Optional[str]:
         """User-turn intentional yield: a ReAct loop serving a USER (or
@@ -2137,7 +2150,8 @@ class ConcernsMixin:
         succ_text = (f"continue work I yielded mid-turn: {turn_text[:140]}"
                      if turn_text else "continue work I yielded mid-turn")
         new_id = self._add_agent_concern(
-            text=succ_text, entity='User', provenance='inferred',
+            text=succ_text, entity=self._turn_counterpart(),
+            provenance='inferred',
             seed=False, name='',
             rhythm_hours=1, rhythm_source='urgency',
             instruction=next_slice,
@@ -2207,7 +2221,11 @@ class ConcernsMixin:
         # fires on the next tick without waiting for full growth from
         # 0 — successors carry the parent's not-quite-finished work.
         new_id = self._add_agent_concern(
-            text=succ_text, entity='User', provenance='inferred',
+            text=succ_text,
+            # Inherit the parent's counterpart: a chain continues the
+            # conversation it started in.
+            entity=str(parent_props.get('entity') or 'User'),
+            provenance='inferred',
             seed=False, name='',
             rhythm_hours=1, rhythm_source='urgency',
             instruction=next_slice,
