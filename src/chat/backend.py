@@ -418,8 +418,9 @@ class _ChatBackend:
             # OpenAI-style response_format=json_schema; it forces complete,
             # schema-valid JSON and enforces the thought's maxLength, so a
             # runaway thought can't burn the token budget before the tool
-            # field is emitted. Local engines only — the bench's vLLM
-            # confirmed it works alongside MTP speculative decoding.
+            # field is emitted. The bench's vLLM confirmed it works
+            # alongside MTP speculative decoding. Cloud gets a different
+            # shape — see the is_cloud branch below.
             if response_schema is not None:
                 body['response_format'] = {
                     'type': 'json_schema',
@@ -433,6 +434,34 @@ class _ChatBackend:
             # directives don't work on Qwen3.6 — only this template kwarg does.
             if enable_thinking is False:
                 body['chat_template_kwargs'] = {'enable_thinking': False}
+
+        elif response_schema is not None:
+            # Cloud: force valid JSON, but do NOT send the schema.
+            #
+            # Grammar and chat_template_kwargs are genuinely local-only —
+            # cloud rejects them. response_format is not, and bundling all
+            # three behind one guard left the cloud route as the only path
+            # with no structured-output constraint at all. Measured
+            # 2026-08-16 on gpt-5.6-luna at reasoning_effort=low: 77
+            # unparseable emissions in one run, 76 of them finish=stop —
+            # complete outputs that simply were not JSON.
+            #
+            # json_object rather than json_schema, verified against the
+            # live API rather than assumed:
+            #   strict=true            → 400, "'additionalProperties' is
+            #     required to be supplied and to be false" — and setting it
+            #     false would forbid every tool's own args (text, query, to).
+            #   json_schema non-strict → 200, but the model treats
+            #     required:[thought,tool] as the fields to emit and DROPS
+            #     the args, 3/3 trials. A `respond` with no text.
+            #   json_object            → 200, all fields intact, 3/3.
+            # So the schema is worse than useless here; what is needed is
+            # only the guarantee that the emission parses.
+            #
+            # NOTE the OpenAI contract requires the word "JSON" somewhere in
+            # the messages for this mode. The ReAct system prompt says "ONE
+            # JSON action object", so every caller of this path satisfies it.
+            body['response_format'] = {'type': 'json_object'}
 
         headers: Dict[str, str] = {'Content-Type': 'application/json'}
         if self._api_key_value:
