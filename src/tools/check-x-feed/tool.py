@@ -29,7 +29,7 @@ import requests
 
 _logger = logging.getLogger(__name__)
 
-_API_BASE = "https://api.twitter.com/2"
+_API_BASE = "https://api.x.com/2"
 _STATE_PATH = Path("~/.cache/cognitive/check-x-feed/state.json").expanduser()
 _MEMBERS_TTL_S = 24 * 3600      # refresh List membership daily
 _BOOTSTRAP_RESULTS = 5          # first-ever fetch per member (endpoint minimum)
@@ -64,7 +64,10 @@ def _normalize_list_id(raw: str) -> Optional[str]:
 
 
 class _AuthError(Exception):
-    """Token rejected — abort the whole sweep, the user must fix credentials."""
+    """Request refused for a reason only the account owner can fix — abort
+    the whole sweep. 401 and 403 both land here because the handling is the
+    same (stop, tell the user), but they say different things about what to
+    go fix, so the message distinguishes them."""
 
 
 class _RateLimited(Exception):
@@ -78,8 +81,17 @@ def _get(path: str, token: str, params: dict, log) -> dict:
         params=params,
         timeout=_HTTP_TIMEOUT_S,
     )
-    if resp.status_code in (401, 403):
-        raise _AuthError(f"X API rejected the token (HTTP {resp.status_code}): {resp.text[:200]}")
+    if resp.status_code == 401:
+        raise _AuthError(
+            f"X API rejected the credential (HTTP 401): {resp.text[:200]} — "
+            f"X_BEARER_TOKEN is wrong, revoked, or not an X API bearer token. "
+            f"Get one from console.x.com (app-only Bearer Token).")
+    if resp.status_code == 403:
+        raise _AuthError(
+            f"X API refused this endpoint (HTTP 403): {resp.text[:200]} — the "
+            f"token authenticates, but the account's access level or credit "
+            f"does not cover {path}. That is a plan/billing state at "
+            f"console.x.com, not a bad token.")
     if resp.status_code == 429:
         raise _RateLimited(f"X API rate limit (HTTP 429): {resp.text[:200]}")
     if resp.status_code != 200:
