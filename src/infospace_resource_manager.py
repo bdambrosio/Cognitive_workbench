@@ -1005,6 +1005,11 @@ class InfospaceResourceManager:
                           # Designates the agent_concern that proposes new
                           # tools to close capability gaps (self-extension).
                           'self_extension',
+                          # Concerns whose material arrives from a source
+                          # they poll on a clock: conversation about the
+                          # topic is not evidence that new material exists,
+                          # so _bump_agent_concerns_on_input skips them.
+                          'polled',
                           # Machine-scheduled follow-up work (claim audits,
                           # yield continuations) that reflection must not
                           # retire — see _apply_agent_concern_closures.
@@ -1017,6 +1022,9 @@ class InfospaceResourceManager:
                           # kept on the root concern of a successor chain).
                           'triage_verdict', 'triage_at', 'triage_reason',
                           'wip', 'wip_updated_at',
+                          # Verbatim record of what a concern has actually
+                          # said, kept out of the WIP rewrite on purpose.
+                          'surfaced',
                           # user_concern evolving context (evidence + what
                           # the user appears to want); text stays the
                           # stable handle.

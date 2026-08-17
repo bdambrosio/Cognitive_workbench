@@ -390,6 +390,7 @@ class ConcernsMixin:
             reviewer = bool(seed.get('user_model_reviewer'))
             self_ext = bool(seed.get('self_extension'))
             wip_rev = bool(seed.get('wip_reviewer'))
+            polled = bool(seed.get('polled'))
             domain = str(seed.get('domain') or '').strip()
             rhythm_h = seed.get('rhythm_hours')
             if rhythm_h is None:
@@ -430,7 +431,8 @@ class ConcernsMixin:
                                     f"reindex after text sync failed: {e}")
                         for flag, val in (('user_model_reviewer', reviewer),
                                           ('self_extension', self_ext),
-                                          ('wip_reviewer', wip_rev)):
+                                          ('wip_reviewer', wip_rev),
+                                          ('polled', polled)):
                             if val:
                                 props[flag] = True
                             elif props.get(flag):
@@ -453,6 +455,8 @@ class ConcernsMixin:
                             props['self_extension'] = True
                         if wip_rev and not props.get('wip_reviewer'):
                             props['wip_reviewer'] = True
+                        if polled and not props.get('polled'):
+                            props['polled'] = True
                         if domain and props.get('domain') != domain:
                             props['domain'] = domain
                     # Sync instruction from YAML: config is the source of
@@ -479,6 +483,8 @@ class ConcernsMixin:
                 extra['self_extension'] = True
             if wip_rev:
                 extra['wip_reviewer'] = True
+            if polled:
+                extra['polled'] = True
             if domain:
                 extra['domain'] = domain
             self._add_agent_concern(
@@ -1325,6 +1331,25 @@ class ConcernsMixin:
                     continue
                 props = note.setdefault('properties', {})
                 if props.get('status') != 'active':
+                    continue
+                # A polled concern's material arrives from a source it
+                # checks on a clock, so talking about the topic is not
+                # evidence that anything new is there — Hugging Face does
+                # not publish a paper because we discussed papers. Bumping
+                # one anyway closes a loop: the conversation fires the
+                # concern, the concern surfaces whatever best matches the
+                # conversation, which is the thing already being discussed.
+                # Observed 2026-08-17: hf-papers bumped 89 seconds before a
+                # fire that re-sent a paper from earlier the same day, on a
+                # concern whose rhythm is 24h and which had been firing at
+                # 3-hour gaps. Distinct from concerns whose evidence IS the
+                # conversation — the user-model reviewer's heat coupling and
+                # the capability-gap recurrence signal both depend on this
+                # bump and must keep it.
+                if props.get('polled'):
+                    logger.debug(
+                        f"[{self.character_name}] {nid} matched input but is "
+                        f"polled; not bumping")
                     continue
                 self._apply_agent_concern_evidence_bump(props, now_iso)
         except Exception as e:
@@ -2334,6 +2359,82 @@ class ConcernsMixin:
         if self._is_one_shot_concern(parent_props):
             self._satisfy_agent_concern(parent_id, via='superseded')
         return new_id
+
+    # ------------------------------------------------------------------
+    # Delivery record — what this concern has actually said, to whom.
+    #
+    # Separate from WIP on purpose. WIP answers "where is the work up to"
+    # and is rewritten by an LLM each fire, which is right for a running
+    # summary and fatal for a delivery log: "I sent Bruce the HarnessX
+    # paper" compresses to "Harness focus: HarnessX", which reads as scope
+    # rather than as something already said, and the paper went out three
+    # more times. This list is appended verbatim and never rewritten.
+    #
+    # It is also not the conversation history, which is a 20-turn recency
+    # window — the repeats it has to catch were 34 and 70 turns apart, and
+    # three days apart. Set membership, not recency.
+    #
+    # Rendered into the fire prompt as fact, not as a prohibition: a
+    # status concern SHOULD repeat itself while the fault persists. What
+    # to do about a repeat is each concern's instruction to say.
+    # ------------------------------------------------------------------
+    _SURFACED_KEEP = 12          # entries retained per concern
+    _SURFACED_CHARS = 220        # head-cap per entry; a title lives up front
+
+    def _record_surfaced(self, concern_id: str, entity: str,
+                         reply: str) -> None:
+        """Append what this fire said to the root concern's delivery log."""
+        text = ' '.join(str(reply or '').split())
+        if not text:
+            return
+        try:
+            root_id = self._root_concern_id(concern_id)
+            root = self.resource_manager.get_resource(root_id)
+            if not root:
+                return
+            props = root.setdefault('properties', {})
+            entries = props.get('surfaced')
+            if not isinstance(entries, list):
+                entries = []
+            entries.append({
+                'at': datetime.now(timezone.utc).isoformat(),
+                'to': entity or '',
+                'text': text[:self._SURFACED_CHARS],
+            })
+            props['surfaced'] = entries[-self._SURFACED_KEEP:]
+        except Exception as e:
+            logger.warning(
+                f"[{self.character_name}] surfaced-record failed for "
+                f"{concern_id}: {e}")
+
+    def _surfaced_block(self, concern_id: str) -> str:
+        """Render the delivery log for the fire prompt. '' when empty."""
+        try:
+            root = self.resource_manager.get_resource(
+                self._root_concern_id(concern_id))
+            entries = ((root or {}).get('properties') or {}).get('surfaced')
+        except Exception as e:
+            logger.warning(
+                f"[{self.character_name}] surfaced-render failed for "
+                f"{concern_id}: {e}")
+            return ''
+        if not isinstance(entries, list) or not entries:
+            return ''
+        lines = []
+        for e in entries:
+            if not isinstance(e, dict):
+                continue
+            when = str(e.get('at') or '')[:16].replace('T', ' ')
+            who = str(e.get('to') or '?')
+            lines.append(f"- [{when} → {who}] {e.get('text', '')}")
+        if not lines:
+            return ''
+        return (
+            "\n\nAlready said under this concern (verbatim, most recent "
+            "last). This is a record of what I have actually delivered, "
+            "not a rule: some concerns should repeat while a condition "
+            "holds, others should not repeat at all. My procedure above "
+            "says which.\n" + "\n".join(lines))
 
     def _update_concern_wip(self, concern_id: str, fire_text: str,
                             log: List[Tuple[str, str]], reply: str,

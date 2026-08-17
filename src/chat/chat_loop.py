@@ -637,25 +637,51 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
     # somewhere that has to judge whether anything has changed.
     _COMPANION_VOLATILE = ('STATE OF MIND', 'ON THEIR MIND')
 
+    def _counterpart_for_turn(self, source: str) -> str:
+        """Who this turn is with.
+
+        `source` names it on an ordinary turn. On an autonomous fire it is
+        the character's own name and names nobody, so the firing concern's
+        entity stands in — work raised with Jack resumes against Jack, and
+        anything unattributed falls back to the human.
+
+        One resolver because every per-counterpart lookup must agree on the
+        answer. They did not: history moved to the concern's entity on
+        2026-08-16 while the companion model, the discourse state and the
+        recording of the reply itself each kept keying on `source`. On a
+        fire that meant her own name — no companion model of herself, no
+        discourse with herself, and replies filed into a thread nobody
+        reads. Three different wrong answers to one question.
+        """
+        if source == self.character_name:
+            return self._firing_concern_entity()
+        return source
+
+    def _reply_recipient(self, source: str, silent: bool) -> str:
+        """Whose dialogue this reply belongs in.
+
+        The counterpart, so the next turn reading that thread can see what
+        was already said to them — this side kept keying on `source` after
+        the read side moved, which is how 1632 autonomous messages ended up
+        in a thread with the agent herself.
+
+        Except when the fire said nothing. A silent fire is not a message,
+        and there are far more of them than real ones — 899 on 2026-08-17
+        against a 20-turn history window. Filing those under the
+        counterpart would evict every word the user actually said, which is
+        the very failure the addressing fix exists to prevent. They keep
+        their old home under the agent's own name, as a status log.
+        """
+        return source if silent else self._counterpart_for_turn(source)
+
     def _companion_for_turn(self, source: str) -> Tuple[str, str]:
         """The companion model to read on this turn, as (entity, text).
 
-        Autonomous fires dispatch with source=self.character_name, and
-        there is no companion model of herself — so the block silently
-        vanished from exactly the turns that reason about the user with
-        no user present to key it. A fire told to consider what the user
-        needs was reading the user_concerns list with no model of the
-        person behind it. Fall back to the human counterpart on those
-        turns; every other source keeps its own model, and an entity we
-        have never built one for still gets nothing.
+        Empty for a counterpart we have never built one for, which is the
+        old behaviour for anyone unknown.
         """
-        text = self._companion_state.get(source, '').strip()
-        if text:
-            return source, text
-        if source == self.character_name:
-            return (HUMAN_COUNTERPART,
-                    self._companion_state.get(HUMAN_COUNTERPART, '').strip())
-        return source, ''
+        entity = self._counterpart_for_turn(source)
+        return entity, self._companion_state.get(entity, '').strip()
 
     def _companion_sections(self, text: str, wanted: Tuple[str, ...]) -> str:
         """Extract named sections from a companion model, in the order
@@ -1959,9 +1985,19 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         turn_seq_for_reply = self._assign_turn_seq() if iters else None
 
         act_type = 'auto_say' if autonomous else 'say'
-        self.store.record_outgoing(source, reply, act_type=act_type, close=close)
+        # File the reply under the counterpart it was addressed to, which on
+        # an autonomous turn is the firing concern's entity, not `source`
+        # (the character's own name). The READ side moved to that resolution
+        # on 2026-08-16; this side did not, so every autonomous message went
+        # into a thread with the agent herself — 1632 of them — while every
+        # fire read the User thread. She could not see a word she had said
+        # unprompted, and re-sent the same Hugging Face paper three times in
+        # one day, twice inside an hour. Both sides now agree.
+        reply_entity = self._reply_recipient(source, intentionally_silent)
+        self.store.record_outgoing(reply_entity, reply, act_type=act_type,
+                                   close=close)
         self._append_conversation_entry(
-            'out', source, reply, meta=f'act={act_type} close={close}')
+            'out', reply_entity, reply, meta=f'act={act_type} close={close}')
         if not intentionally_silent:
             # Speak the reply only when the turn arrived by voice — keyed on the
             # turn's modality, not the speaker's identity, so an attributed voice
@@ -2082,6 +2118,16 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # monologue would pollute the memory store. We still need a
         # disk persist so last_acted_at survives a restart.
         if autonomous:
+            # Delivery record, before the WIP rewrite and deliberately not
+            # part of it. Verbatim, synchronous, no LLM — the one thing
+            # here that cannot be summarized away. WIP is a summarizer and
+            # it ate exactly this: "I sent Bruce the HarnessX paper"
+            # compressed to "Harness focus: HarnessX", which reads as scope
+            # rather than as a delivery, and the paper went out three more
+            # times. Only for fires that actually spoke.
+            if autonomous_concern_id and not intentionally_silent:
+                self._record_surfaced(autonomous_concern_id, reply_entity,
+                                      reply)
             # WIP continuity: rewrite the root concern's running summary
             # from this fire's outcome. One LLM call, on the post-turn
             # executor so the inbox loop isn't blocked. Only for fires
@@ -2261,13 +2307,17 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                 f"\n\nPrior work-in-progress from earlier fires of this "
                 f"concern (don't redo what's done):\n{wip}" if wip else ""
             )
+            # Delivery log rides after WIP: the summary says where the work
+            # is, this says what has already gone out. See concerns.
+            # _record_surfaced for why the two cannot be one field.
+            surfaced_section = self._surfaced_block(nid)
             wrapped_instruction = (
                 f"A concern of mine has fired: {text}\n"
                 f"Mode: autonomous\n\n"
                 f"Execute the following procedure now and produce the "
                 f"appropriate output. If the procedure specifies silence "
                 f"under some condition, stay silent.\n\n"
-                f"{instruction}{wip_section}"
+                f"{instruction}{wip_section}{surfaced_section}"
             )
             try:
                 # source=self.character_name marks this turn as agent-

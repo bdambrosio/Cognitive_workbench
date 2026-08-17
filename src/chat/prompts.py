@@ -428,7 +428,10 @@ class PromptsMixin:
                     "conversation.\n\n"
                     + "\n".join(body_lines)
                 )
-        disc = self._discourse_state.get(source, '').strip()
+        # Same counterpart as the companion block above — keyed on
+        # `source` this was empty on every autonomous fire.
+        disc = self._discourse_state.get(
+            self._counterpart_for_turn(source), '').strip()
         if disc:
             parts.append(
                 "## Shared premises and standing decisions (from periodic reflection)\n"
@@ -552,8 +555,7 @@ class PromptsMixin:
         # talking with Jack should resume against the Jack conversation, not
         # the User one. This line hard-coded 'User' until 2026-08-16, which
         # was right while there was only ever one counterpart.
-        history_entity = (self._firing_concern_entity()
-                          if source == self.character_name else source)
+        history_entity = self._counterpart_for_turn(source)
         history = self.store.get_recent_turns(history_entity, limit=self.history_limit, scope='all')
         if history and history[-1].get('direction') == 'in' and str(history[-1].get('text', '')) == user_text:
             history = history[:-1]

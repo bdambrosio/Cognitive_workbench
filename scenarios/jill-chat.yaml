@@ -357,6 +357,7 @@ characters:
         name: hf-papers
         category: durable
         rhythm_hours: 24
+        polled: true
         instruction: |
           Fetch https://huggingface.co/papers for today's papers (fall
           back to a web search for "Hugging Face daily papers today" if
@@ -370,6 +371,15 @@ characters:
           matters to our work, and ask whether they want me to dig in.
           If today's crop has nothing genuinely relevant, stay silent.
 
+          A paper is a hit only ONCE. Before saying anything, read the
+          "Already said under this concern" list: if I have brought this
+          paper up before, it is not news however relevant it still
+          feels, and relevance is exactly what will make it resurface —
+          the paper nearest to what we are currently discussing is the
+          one we have most likely already discussed. Pick the best
+          paper I have NOT already raised, or stay silent. Staying
+          silent is the normal outcome on a day with nothing new.
+
       # X-feed watcher (2026-07-13): hourly sweep of the user's curated
       # X List via the check-x-feed tool (per-account since_id polling,
       # so frequency is ~free; cost tracks feed volume only). Requires
@@ -379,6 +389,7 @@ characters:
         name: x-feed
         category: durable
         rhythm_hours: 1
+        polled: true
         instruction: |
           Call the check-x-feed tool to get posts that appeared since
           the last check. Judge what came back the way the user would:
@@ -428,6 +439,7 @@ characters:
         category: durable
         rhythm_hours: 1
         domain: factorio
+        polled: true
         instruction: |
           First call fac-status. If the game bridge is unreachable, the
           factory is offline — note it in my work-in-progress (once, not
