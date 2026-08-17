@@ -303,8 +303,13 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # leaves the tool unregistered and routing inert.
         self._peers: List[str] = [
             str(p) for p in (character_config.get('peers') or []) if str(p)]
-        # Hop count of the turn currently in flight (0 = not agent-sourced).
+        # Hop count and exchange id of the turn in flight (0 / '' = not
+        # agent-sourced), and the last leg per peer: {'xid','hops','at'}.
+        # Written from the zenoh callback thread as well as this one, so
+        # entries are replaced whole rather than mutated (see zenoh_io).
         self._current_turn_hops: int = 0
+        self._current_turn_xid: str = ''
+        self._peer_exchanges: Dict[str, Dict[str, Any]] = {}
         # Schema-level affordance gate. Tool names listed here are filtered
         # out of the ReAct tool catalog (and any related guidance) so the
         # agent's affordance representation matches what's actually
@@ -1606,7 +1611,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                            image_url: Optional[str] = None,
                            modality: Optional[str] = None,
                            fire_id: Optional[str] = None,
-                           hops: int = 0) -> None:
+                           hops: int = 0, xid: str = '') -> None:
         """Drive one turn through the ReAct loop. The autonomous path
         (autonomous=True) reuses the same prompt construction so Jill's
         voice stays consistent and traces share format. Divergences are
@@ -1630,6 +1635,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         self._affect.set_trigger('autonomous' if autonomous else 'user')
         self._affect.set_mode('thinking')
         self._current_turn_hops = max(0, int(hops or 0))
+        self._current_turn_xid = str(xid or '')
         # Fresh slot per turn. Reset here rather than at the end of the
         # inner turn so a crash between assignment and completion cannot
         # leak this turn's number into the next one, which would hand two
@@ -1649,6 +1655,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         finally:
             self._current_turn = None
             self._current_turn_hops = 0
+            self._current_turn_xid = ''
             self._affect.set_mode('idle')
 
     def _process_user_turn_inner(self, source: str, text: str, close: bool,
@@ -1836,7 +1843,8 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             # above still happens, so the human sees both sides.
             if source in self._peers and reply != '(no reply)':
                 self._route_reply_to_peer(source, reply,
-                                          self._current_turn_hops)
+                                          self._current_turn_hops,
+                                          self._current_turn_xid)
         self._last_reply_at = datetime.now(timezone.utc).isoformat()
         logger.info(f"[{self.character_name}] -> {source} ({act_type}): {reply!r}")
 
@@ -2362,13 +2370,14 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                 image_url = msg.get('image_url')
                 modality = msg.get('modality')
                 hops = int(msg.get('hops') or 0)
+                xid = str(msg.get('xid') or '')
                 img_tag = ' [+image]' if image_url else ''
                 logger.info(f"[{self.character_name}] <- {source}: {text!r} (close={close}){img_tag}")
 
                 try:
                     self._process_user_turn(source, text, close,
                                             image_url=image_url, modality=modality,
-                                            hops=hops)
+                                            hops=hops, xid=xid)
                 except Exception as e:
                     logger.error(f"[{self.character_name}] turn handling crashed: {e}")
                     import traceback

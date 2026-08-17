@@ -10,6 +10,8 @@ import json
 import logging
 import os
 import sys
+import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -36,6 +38,11 @@ logger = logging.getLogger('chat_loop')
 # improv scene ran a clean alternation and died at hop 7 with both parties
 # still mid-topic, which reads as a stall and is only a spent budget.
 AGENT_HOP_BUDGET = 6
+
+# How long an exchange stays joinable after its last leg — long enough to
+# cover a leg plus the concern fire behind it, short enough that a later
+# activity starts its own budget.
+_EXCHANGE_TTL_S = 600.0
 
 
 class ZenohMixin:
@@ -143,6 +150,7 @@ class ZenohMixin:
         image_url: Optional[str] = None
         modality: Optional[str] = None
         hops_val: Any = 0
+        xid_val: Any = ''
         if isinstance(content, str):
             try:
                 inner = json.loads(content)
@@ -151,6 +159,7 @@ class ZenohMixin:
                 close = bool(inner.get('close', False))
                 modality = inner.get('modality')
                 hops_val = inner.get('hops', 0)
+                xid_val = inner.get('xid', '')
                 img = inner.get('image')
                 if isinstance(img, dict):
                     url = img.get('url')
@@ -164,6 +173,7 @@ class ZenohMixin:
             close = bool(content.get('close', False))
             modality = content.get('modality')
             hops_val = content.get('hops', 0)
+            xid_val = content.get('xid', '')
             img = content.get('image')
             if isinstance(img, dict):
                 url = img.get('url')
@@ -194,9 +204,33 @@ class ZenohMixin:
             msg['image_url'] = image_url
         if modality:
             msg['modality'] = modality
-        # Agent-exchange hop count (0 = not an agent-to-agent message).
-        msg['hops'] = int(hops_val) if isinstance(hops_val, (int, float)) else 0
+        # Hop count (0 = not agent-to-agent) and the exchange it belongs to.
+        # A peer on an older build sends no xid; mint one, or the count
+        # aliases onto whatever arrives next.
+        hops = int(hops_val) if isinstance(hops_val, (int, float)) else 0
+        xid = str(xid_val or '')
+        if hops > 0 and not xid:
+            xid = uuid.uuid4().hex[:8]
+        msg['hops'] = hops
+        msg['xid'] = xid
+        # Record the leg so a concern firing before our reply sees it live.
+        if hops > 0 and source:
+            self._peer_exchanges[source] = {
+                'xid': xid, 'hops': hops, 'at': time.monotonic()}
         self._inbox.put(msg)
+
+    def _live_exchange(self, peer: str) -> Optional[Dict[str, Any]]:
+        """The exchange with `peer` a new message should join, or None to
+        start one. A spent exchange is not live — that is what lets the
+        hop-budget carrier resume on a fresh id and count."""
+        ex = self._peer_exchanges.get(peer)
+        if not ex:
+            return None
+        if time.monotonic() - float(ex.get('at') or 0.0) > _EXCHANGE_TTL_S:
+            return None
+        if int(ex.get('hops') or 0) >= self.hop_budget:
+            return None
+        return ex
 
     def _publish_say(self, text: str, *, speak: bool = False,
                      turn_seq: Optional[int] = None) -> None:
@@ -227,11 +261,12 @@ class ZenohMixin:
         if speak:
             self._speak_async(text)
 
-    def _publish_agent_message(self, peer: str, text: str, hops: int) -> None:
+    def _publish_agent_message(self, peer: str, text: str, hops: int,
+                               xid: str) -> None:
         """Publish a message into a co-resident agent's sense_data inbox.
         Envelope matches the CLI's shape (inner-content JSON) so the
         receiving _on_sense_data needs no special case; `hops` counts the
-        agent→agent legs of this exchange. Raises on publish failure —
+        agent→agent legs of exchange `xid`. Raises on publish failure —
         callers decide how to report it."""
         if self._zenoh_session is None:
             raise RuntimeError("zenoh session not open")
@@ -241,16 +276,18 @@ class ZenohMixin:
                 f"cognitive/{peer}/sense_data")
             self._peer_pubs[peer] = pub
         inner = json.dumps({'source': self.character_name, 'text': text,
-                            'hops': hops})
+                            'hops': hops, 'xid': xid})
         pub.put(json.dumps({'mode': 'text', 'content': inner}).encode('utf-8'))
+        self._peer_exchanges[peer] = {
+            'xid': xid, 'hops': hops, 'at': time.monotonic()}
 
     def _route_reply_to_peer(self, peer: str, reply: str,
-                             incoming_hops: int) -> None:
+                             incoming_hops: int, incoming_xid: str) -> None:
         """Deliver this turn's reply back to the agent that sourced it —
         the receiving half of an agent exchange (the sender's `respond`
-        reaches its peer through here, not through agent-say). Enforces
-        the hop budget: a suppressed leg still appeared on our own
-        /action topic, so the human sees the exchange end."""
+        reaches its peer through here, not through agent-say). Stays on the
+        incoming exchange. Enforces the hop budget: a suppressed leg still
+        appeared on our own /action topic, so the human sees it end."""
         next_hops = incoming_hops + 1
         if next_hops > self.hop_budget:
             logger.info(
@@ -268,9 +305,10 @@ class ZenohMixin:
                     f"failed for {peer}: {e}")
             return
         try:
-            self._publish_agent_message(peer, reply, next_hops)
+            self._publish_agent_message(peer, reply, next_hops, incoming_xid)
             logger.info(f"[{self.character_name}] reply routed to agent "
-                        f"{peer} (hop {next_hops}/{self.hop_budget})")
+                        f"{peer} (hop {next_hops}/{self.hop_budget}, "
+                        f"xid={incoming_xid})")
         except Exception as e:
             logger.warning(
                 f"[{self.character_name}] reply routing to {peer} failed: {e}")
@@ -278,8 +316,10 @@ class ZenohMixin:
     def _run_agent_say(self, to: str, text: str) -> str:
         """ReAct `agent-say` backend: message a co-resident agent by name.
         Hop accounting: addressing the agent that sourced the CURRENT turn
-        continues that exchange (inherits its hop count — no budget reset
-        mid-chain); addressing anyone else starts a fresh exchange."""
+        continues that exchange; addressing anyone else joins the live
+        exchange with that peer, and starts a fresh one only if there is
+        none — two concerns each opening a chain is what left Jack and Jill
+        holding two interleaved conversations on 2026-08-17."""
         peers = getattr(self, '_peers', None) or []
         want = (to or '').strip().lower()
         target = next((p for p in peers if p.lower() == want), None)
@@ -292,21 +332,29 @@ class ZenohMixin:
         turn_source = (getattr(self, '_current_turn', None) or {}).get('source')
         if target == turn_source:
             hops = getattr(self, '_current_turn_hops', 0) + 1
+            xid = getattr(self, '_current_turn_xid', '') or uuid.uuid4().hex[:8]
         else:
-            hops = 1
+            live = self._live_exchange(target)
+            if live:
+                hops = int(live['hops']) + 1
+                xid = str(live['xid'])
+            else:
+                hops = 1
+                xid = uuid.uuid4().hex[:8]
         if hops > self.hop_budget:
             return (f"EMPTY: the hop budget ({self.hop_budget}) for this "
                     f"exchange with {target} is exhausted — the message "
                     f"would not be delivered. Let the exchange rest; if "
                     f"something important remains, tell the user instead.")
         try:
-            self._publish_agent_message(target, body, hops)
+            self._publish_agent_message(target, body, hops, xid)
         except Exception as e:
             logger.warning(
                 f"[{self.character_name}] agent-say to {target} failed: {e}")
             return f"ERROR: send to {target} failed: {e}"
         logger.info(f"[{self.character_name}] agent-say -> {target} "
-                    f"(hop {hops}/{self.hop_budget}, {len(body)} chars)")
+                    f"(hop {hops}/{self.hop_budget}, xid={xid}, "
+                    f"{len(body)} chars)")
         return (f"OK: sent to {target}. Any reply arrives later as a NEW "
                 f"turn from source '{target}' — do not wait for it in this "
                 f"loop; finish this turn normally.")
