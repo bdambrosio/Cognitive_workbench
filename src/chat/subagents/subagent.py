@@ -75,12 +75,43 @@ class Subagent:
     # applies it on local engines only and skips it on cloud paths.
     response_schema: Optional[Dict[str, Any]] = REACT_ACTION_SCHEMA
 
+    # Ceiling on the reasoning effort a subagent inherits from its
+    # character. A character baseline reaches EVERY emission, and almost
+    # none of a subagent's are the thinking: it picks a primitive, picks a
+    # path, emits JSON, and only the final `respond` is synthesis. Measured
+    # 2026-08-16 on a cloud reasoning model — one turn made 19 inspect
+    # calls of ~5 iterations each, so ~100 of ~130 emissions that turn were
+    # a subagent deciding which file to read, all at effort=high. Cloud
+    # reasoning tokens are billed and not returned, so the whole cost
+    # surfaced as latency with nothing in the logs to account for it.
+    #
+    # A ceiling, not an override: a character already at or below this
+    # keeps its own value, and None (nothing sent) stays None. A subclass
+    # whose work really is reasoning can raise its own.
+    max_reasoning_effort: Optional[str] = 'low'
+
+    _EFFORT_RANK = {'low': 1, 'medium': 2, 'high': 3}
+
+    @classmethod
+    def _clamp_effort(cls, effort: Optional[str]) -> Optional[str]:
+        ceiling = cls.max_reasoning_effort
+        if effort is None or ceiling is None:
+            return effort
+        rank = cls._EFFORT_RANK
+        if rank.get(effort, 0) <= rank.get(ceiling, 0):
+            return effort
+        return ceiling
+
     def __init__(self, llm_backend, trace_dir: Path, *,
                  reasoning_effort: Optional[str] = None,
                  deadline: Optional[float] = None):
         self.llm_backend = llm_backend
         self.trace_dir = Path(trace_dir)
-        self.reasoning_effort = reasoning_effort
+        self.reasoning_effort = self._clamp_effort(reasoning_effort)
+        if self.reasoning_effort != reasoning_effort:
+            logger.info(
+                f"{self.label}: reasoning_effort {reasoning_effort!r} -> "
+                f"{self.reasoning_effort!r} (subagent ceiling)")
         self.deadline = deadline
 
     # -- subclass surface ------------------------------------------------

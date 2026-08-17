@@ -311,3 +311,47 @@ def test_react_max_iters_is_published_for_prompt_text():
     import chat.tools as tools
     assert 'REACT_MAX_ITERS' in Path(reflection.__file__).read_text()
     assert 'REACT_MAX_ITERS' in Path(tools.__file__).read_text()
+
+
+# --------------------------------------------------------------------
+# Subagent reasoning-effort ceiling.
+#
+# A character's reasoning_effort baseline reaches every emission, and
+# almost none of a subagent's are the thinking — it picks a primitive,
+# picks a path, emits JSON. Measured 2026-08-16 on a cloud reasoning
+# model: one turn made 19 inspect calls of ~5 iterations each, so ~100 of
+# ~130 emissions were a subagent choosing which file to read, all at
+# effort=high, billed and not returned.
+# --------------------------------------------------------------------
+
+def test_subagent_clamps_an_expensive_baseline():
+    assert Subagent._clamp_effort('high') == 'low'
+    assert Subagent._clamp_effort('medium') == 'low'
+
+
+def test_clamp_is_a_ceiling_not_an_override():
+    """A character already at or below the ceiling keeps its own value,
+    and 'unset' stays unset so nothing is sent."""
+    assert Subagent._clamp_effort('low') == 'low'
+    assert Subagent._clamp_effort(None) is None
+
+
+def test_a_subclass_may_raise_its_own_ceiling():
+    class Thinky(Subagent):
+        max_reasoning_effort = 'high'
+    assert Thinky._clamp_effort('high') == 'high'
+
+    class Unbounded(Subagent):
+        max_reasoning_effort = None
+    assert Unbounded._clamp_effort('high') == 'high'
+
+
+@pytest.mark.parametrize('run,mod,label', RUNNERS)
+def test_every_subagent_applies_the_ceiling(run, mod, label, tmp_path):
+    """All three subagents construct through Subagent.__init__, so the
+    clamp is one choke point rather than three hand-offs."""
+    backend = FakeBackend([_respond('done')])
+    run(backend, tmp_path, reasoning_effort='high')
+    assert backend.calls, 'expected at least one call'
+    assert all(c.get('reasoning_effort') == 'low' for c in backend.calls), \
+        [c.get('reasoning_effort') for c in backend.calls]

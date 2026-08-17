@@ -113,7 +113,15 @@ characters:
       # and does not apply here. backend.py sets this field BEFORE the
       # is_cloud guard, so it does reach cloud calls. Allowlist is
       # low|medium|high; xhigh/max/none would need backend.py:68,148 widened.
-      reasoning_effort: high
+      #
+      # LOWERED from high 2026-08-16. A character baseline reaches EVERY
+      # emission, and the bulk of them are not the thinking: one turn made
+      # 19 inspect calls of ~5 iterations each, so ~100 of ~130 emissions
+      # were a subagent choosing which file to read or what to grep for.
+      # Cloud reasoning tokens are billed and not returned, so that cost
+      # shows up only as latency — two turns at 275s and 195s with nothing
+      # in the logs to account for it.
+      reasoning_effort: low
       is_reasoning_model: true
 
     character: |
@@ -253,7 +261,15 @@ characters:
       # and does not apply here. backend.py sets this field BEFORE the
       # is_cloud guard, so it does reach cloud calls. Allowlist is
       # low|medium|high; xhigh/max/none would need backend.py:68,148 widened.
-      reasoning_effort: high
+      #
+      # LOWERED from high 2026-08-16. A character baseline reaches EVERY
+      # emission, and the bulk of them are not the thinking: one turn made
+      # 19 inspect calls of ~5 iterations each, so ~100 of ~130 emissions
+      # were a subagent choosing which file to read or what to grep for.
+      # Cloud reasoning tokens are billed and not returned, so that cost
+      # shows up only as latency — two turns at 275s and 195s with nothing
+      # in the logs to account for it.
+      reasoning_effort: low
       is_reasoning_model: true
 
     character: |
