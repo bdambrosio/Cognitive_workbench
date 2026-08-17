@@ -1853,6 +1853,14 @@ class ConcernsMixin:
         position = self._world_position_line()
         if position:
             lines.append(f"Where I am, measured now: {position}")
+        # Same argument, for the concern whose subject is the user rather
+        # than the world. Gated on user_model_reviewer so the PV monitor
+        # and the factory repair are not judged against Bruce's mood;
+        # this is evidence for a concern about him, not ambient context.
+        if props.get('user_model_reviewer'):
+            user_state = self._user_state_line()
+            if user_state:
+                lines.append(user_state)
         user_msg = "\n".join(lines)
 
         verdict, reason = 'fire', ''

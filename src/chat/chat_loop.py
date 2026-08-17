@@ -615,6 +615,138 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             logger.debug(f"world position unavailable: {e}")
             return ''
 
+    # ------------------------------------------------------------------
+    # The other party's state — the companion-model twin of the position
+    # line above. Both answer "what is true right now that I did not
+    # write myself", for the two things that move while the agent stands
+    # still: where its body is, and how the person it works with is
+    # doing. Read by prompt assembly (prompts.py) and by fire-time triage
+    # (concerns.py).
+    # ------------------------------------------------------------------
+
+    # Headings the companion template emits, in template order
+    # (see the OUTPUT FORMAT block in src/discourse.py). Parsing them back
+    # out is reading our own output format — the generator writes these
+    # strings verbatim — not classifying content by keyword.
+    _COMPANION_HEADINGS = (
+        'CURRENT CHAPTER', 'STATE OF MIND', 'WHAT MATTERS TO THEM',
+        'HOW THEY THINK & WORK', 'ON THEIR MIND',
+        'HOW TO BE USEFUL RIGHT NOW', 'OBSERVED DEFAULTS')
+    # The fast-moving half. discourse.py's CADENCE rule marks these as
+    # refreshed every conversation, so they are the part worth quoting
+    # somewhere that has to judge whether anything has changed.
+    _COMPANION_VOLATILE = ('STATE OF MIND', 'ON THEIR MIND')
+
+    def _companion_for_turn(self, source: str) -> Tuple[str, str]:
+        """The companion model to read on this turn, as (entity, text).
+
+        Autonomous fires dispatch with source=self.character_name, and
+        there is no companion model of herself — so the block silently
+        vanished from exactly the turns that reason about the user with
+        no user present to key it. A fire told to consider what the user
+        needs was reading the user_concerns list with no model of the
+        person behind it. Fall back to the human counterpart on those
+        turns; every other source keeps its own model, and an entity we
+        have never built one for still gets nothing.
+        """
+        text = self._companion_state.get(source, '').strip()
+        if text:
+            return source, text
+        if source == self.character_name:
+            return (HUMAN_COUNTERPART,
+                    self._companion_state.get(HUMAN_COUNTERPART, '').strip())
+        return source, ''
+
+    def _companion_sections(self, text: str, wanted: Tuple[str, ...]) -> str:
+        """Extract named sections from a companion model, in the order
+        `wanted` gives them. Returns '' if none of them are present."""
+        if not text:
+            return ''
+        sections: Dict[str, List[str]] = {}
+        current: Optional[str] = None
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.endswith(':'):
+                head = stripped[:-1].strip()
+                if head in self._COMPANION_HEADINGS:
+                    current = head
+                    sections[current] = []
+                    continue
+            if current:
+                sections[current].append(line)
+        out: List[str] = []
+        for name in wanted:
+            chunk = '\n'.join(sections.get(name, [])).strip()
+            if not chunk:
+                continue
+            sep = '\n' if '\n' in chunk else ' '
+            out.append(f"{name}:{sep}{chunk}")
+        return '\n\n'.join(out)
+
+    def _time_since_last_inbound(self, entity: str) -> str:
+        """Human-readable gap since `entity` last said something to me.
+        '' when they never have, or the record is unreadable."""
+        try:
+            turns = self.store.get_recent_turns(entity, limit=50, scope='all')
+        except Exception as e:
+            logger.debug(f"last-inbound lookup failed for {entity}: {e}")
+            return ''
+        for turn in reversed(turns or []):
+            if turn.get('direction') != 'in':
+                continue
+            raw = turn.get('timestamp')
+            try:
+                when = datetime.fromisoformat(str(raw))
+            except (TypeError, ValueError) as e:
+                logger.debug(f"unparseable turn timestamp {raw!r}: {e}")
+                return ''
+            # conversation_store stamps naive local time (datetime.now());
+            # compare in that frame rather than mixing in a UTC now().
+            if when.tzinfo is not None:
+                when = when.astimezone().replace(tzinfo=None)
+            minutes = (datetime.now() - when).total_seconds() / 60.0
+            if minutes < 0:
+                return ''
+            if minutes < 90:
+                return f"{minutes:.0f} minutes ago"
+            hours = minutes / 60.0
+            if hours < 36:
+                return f"{hours:.0f} hours ago"
+            return f"{hours / 24:.0f} days ago"
+        return ''
+
+    def _user_state_line(self) -> str:
+        """How the human counterpart is doing, measured now.
+
+        Fire-time triage sees the concern, its work-in-progress, and its
+        own prior defer reason — all self-authored, all snapshots. Asked
+        "is there anything new?" about a concern whose subject is the
+        user, it has nothing to answer with but no, and every defer
+        reasons from the defer before it: the user-model reviewer triaged
+        395 times and fired 4 times in the seventy days after it was
+        seeded. The companion model is rewritten after every real turn,
+        so its volatile sections plus the gap since the user last spoke
+        are the one input here that actually moves.
+
+        Empty when no companion model exists yet, which leaves the triage
+        prompt exactly as it was.
+        """
+        companion = self._companion_state.get(HUMAN_COUNTERPART, '').strip()
+        volatile = self._companion_sections(companion, self._COMPANION_VOLATILE)
+        gap = self._time_since_last_inbound(HUMAN_COUNTERPART)
+        if not volatile and not gap:
+            return ''
+        lines = [
+            f"How {HUMAN_COUNTERPART} is doing, measured now — the volatile "
+            f"half of the companion model, rewritten after every real turn "
+            f"with them, plus when they last spoke:"
+        ]
+        if gap:
+            lines.append(f"Last said something to me: {gap}.")
+        if volatile:
+            lines.append(volatile)
+        return "\n".join(lines)
+
     def _compute_substrate_line(self, repo_root: Optional[Path] = None) -> str:
         """One-line harness provenance for the system prompt: current
         commit, uncommitted-file count, commit subjects since the last

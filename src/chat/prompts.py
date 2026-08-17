@@ -123,7 +123,7 @@ class PromptsMixin:
                     continue
                 slug = ctext[:60].replace('\n', ' ').strip()
                 char_concerns.append({'id': slug, 'description': ctext})
-            companion = self._companion_state.get(source, '').strip()
+            companion = self._companion_for_turn(source)[1]
             assessment = evaluate(
                 event=event,
                 character_concerns=char_concerns,
@@ -291,10 +291,13 @@ class PromptsMixin:
                 f"an external codebase as documentation, not introspection.")
         if self.setting:
             parts.append("## Setting (from character config)\n" + self.setting)
-        companion = self._companion_state.get(source, '').strip()
+        # Not keyed on `source` directly: an autonomous fire's source is
+        # the character's own name, and looking that up returned nothing
+        # — see chat_loop._companion_for_turn for what that cost.
+        companion_entity, companion = self._companion_for_turn(source)
         if companion:
             parts.append(
-                f"## Companion model of {source} (rolling LLM reflection; fair-witness texture, not a brief to flatter)\n"
+                f"## Companion model of {companion_entity} (rolling LLM reflection; fair-witness texture, not a brief to flatter)\n"
                 f"{companion}"
             )
         # User concerns sit adjacent to companion — they're a structured
