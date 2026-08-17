@@ -56,6 +56,126 @@ class MemoriesMixin:
         except Exception as e:
             logger.warning(f"[{self.character_name}] _init_memories failed: {e}")
 
+    # ------------------------------------------------------------------
+    # Supersession at write time.
+    #
+    # Reflection is told not to re-emit a memory we already hold, but the
+    # "## Existing memories" list it checks against is that turn's recall
+    # top-k — so it is structurally blind to a near-duplicate that did not
+    # happen to be recalled. Measured 2026-08-17 over 223 memories: 13% of
+    # the store is redundant text, and 39% of recalling turns spend one of
+    # their three slots on a near-duplicate ("User's name is Bruce" x4).
+    #
+    # The gate is at write because there is no removal path afterwards.
+    # delete_resource only marks the note-level indexer; search_collection
+    # reads the per-collection chunk store, which nothing removes from and
+    # which add_to_collection only appends to. A deleted memory is still
+    # recallable. Hence the soft-delete below: _recall already dereferences
+    # the source note for category/created_at, so a `superseded_by`
+    # property there is honoured immediately with no index surgery.
+    # Reclaiming the chunks needs an offline rebuild.
+    _MEMORY_SIMILAR_THRESHOLD = 0.80    # matches _CONCERN_RECURRENCE_THRESHOLD
+    # ------------------------------------------------------------------
+
+    def _find_similar_memory(self, text: str,
+                             entity: str = "") -> Optional[Tuple[str, str]]:
+        """Top existing memory similar enough to `text` to be the same
+        fact, as (note_id, its current text). None on miss. Skips notes
+        already superseded — a chain should point at the live one.
+
+        Same-entity only, and that is load-bearing rather than tidiness.
+        "The user's name is Bruce" (learned with Sentinel) and "The user's
+        name is Jack" (learned with Jack) are one edit apart in text and
+        score as the same fact, but they are two facts about two people —
+        and the judge, asked which supersedes which, will pick the newer.
+        A cleanup pass did exactly that on 2026-08-17 and left the agent
+        believing the user had been renamed. Sameness of subject is
+        structural here; it does not need a probe and must not depend on
+        one."""
+        if not self._memories_collection_id or not text:
+            return None
+        try:
+            with self._faiss_lock:
+                ok, results, _ = self.resource_manager.search_collection(
+                    self.character_name, self._memories_collection_id, text,
+                    mode='semantic', limit=1,
+                    threshold=self._MEMORY_SIMILAR_THRESHOLD)
+            if not ok or not results or not isinstance(results[0], dict):
+                return None
+            note_id = (results[0].get('metadata') or {}).get('source_note_id')
+            if not note_id:
+                return None
+            note = self.resource_manager.get_resource(note_id)
+            if not note:
+                return None
+            props = note.get('properties') or {}
+            if props.get('superseded_by') or props.get('retired'):
+                return None
+            if (props.get('entity') or '') != (entity or ''):
+                return None
+            existing = str(props.get('content', '') or '').strip()
+            return (note_id, existing) if existing else None
+        except Exception as e:
+            logger.warning(
+                f"[{self.character_name}] similar-memory lookup failed: {e}")
+            return None
+
+    def _memory_relation(self, new_text: str, existing_text: str) -> str:
+        """How a new memory relates to the near-identical one already held:
+        'restatement', 'revision', or 'distinct'.
+
+        Similarity cannot decide this — "User is 79 years old" and "User is
+        80 years old" score nearly identically to a pair of verbatim
+        duplicates, and the right handling is opposite in each case. So it
+        is a meaning question, asked as one. Fails open to 'distinct',
+        which is today's behaviour: write it and keep both.
+        """
+        sys_msg = ("You compare two statements a system has recorded about "
+                   "the same subject. Answer with exactly one word.")
+        user_msg = (
+            "HELD is a fact already stored. NEW is about to be stored.\n\n"
+            f"HELD:\n{existing_text}\n\nNEW:\n{new_text}\n\n"
+            "Answer with one word:\n"
+            "restatement — NEW says the same thing as HELD and adds "
+            "nothing; storing it would only duplicate.\n"
+            "revision — NEW is the same fact with a changed or corrected "
+            "value, so HELD is now out of date (an age that went up, a "
+            "setting that changed, a plan replaced).\n"
+            "distinct — NEW carries something HELD does not; both are "
+            "worth keeping.\n\n"
+            "Two statements about DIFFERENT subjects are always distinct, "
+            "however alike they read. A fact about one person is never a "
+            "revision of the same fact about another person.")
+        try:
+            raw = self.backend.chat(
+                [{'role': 'system', 'content': sys_msg},
+                 {'role': 'user', 'content': user_msg}],
+                max_tokens=8, temperature=0.0, cot_profile='none')
+        except Exception as e:
+            logger.warning(
+                f"[{self.character_name}] memory-relation probe failed: {e}; "
+                f"keeping both")
+            return 'distinct'
+        verdict = (raw or '').strip().strip('.`"\'').lower()
+        for known in ('restatement', 'revision', 'distinct'):
+            if verdict.startswith(known):
+                return known
+        logger.warning(
+            f"[{self.character_name}] memory-relation probe returned "
+            f"{verdict[:40]!r}, no verdict; keeping both")
+        return 'distinct'
+
+    def _mark_superseded(self, note_id: str, by_note_id: str) -> None:
+        """Soft-delete: point a stale memory at the one that replaced it.
+        _recall skips these, so the effect is immediate; the chunks stay in
+        the collection store until an offline rebuild reclaims them."""
+        note = self.resource_manager.get_resource(note_id)
+        if not note:
+            return
+        props = note.setdefault('properties', {})
+        props['superseded_by'] = by_note_id
+        props['superseded_at'] = datetime.now(timezone.utc).isoformat()
+
     def _remember(self, text: str, entity: str = "",
                   category: str = 'fact',
                   polarity: str = 'positive') -> Optional[str]:
@@ -80,6 +200,31 @@ class MemoriesMixin:
             category = 'fact'
         if polarity not in ('positive', 'negative'):
             polarity = 'positive'
+        # Supersession gate. Only consulted when something close enough to
+        # be the same fact already exists, so the common path (a genuinely
+        # new memory) costs one vector search and no LLM call.
+        prior = self._find_similar_memory(text, entity)
+        prior_id: Optional[str] = None
+        if prior:
+            prior_id, prior_text = prior
+            relation = self._memory_relation(text, prior_text)
+            if relation == 'restatement':
+                logger.info(
+                    f"[{self.character_name}] memory restates {prior_id}, "
+                    f"not stored: {text[:80]!r}")
+                self._write_memory_event({
+                    'event': 'restatement_skipped',
+                    'note_id': prior_id,
+                    'text': text,
+                    'category': category,
+                    'polarity': polarity,
+                    'entity': entity,
+                    'source_turn_seq': getattr(self, '_turn_seq', None),
+                    'trigger': 'reflection',
+                })
+                return prior_id
+            if relation != 'revision':
+                prior_id = None
         try:
             with self._faiss_lock:
                 success, note_id, err, _ = self.resource_manager.create_note(
@@ -111,7 +256,14 @@ class MemoriesMixin:
                 # 'reflection' since that's currently the sole writer; if
                 # other writers appear (manual /recall, autonomous), pass
                 # trigger as a parameter instead.
-                self._write_memory_event({
+                # Retire the fact this one revises, now that its
+                # replacement exists and has an id to point at.
+                if prior_id:
+                    self._mark_superseded(prior_id, note_id)
+                    logger.info(
+                        f"[{self.character_name}] memory {note_id} "
+                        f"supersedes {prior_id}")
+                event = {
                     'event': 'write',
                     'note_id': note_id,
                     'text': text,
@@ -120,7 +272,10 @@ class MemoriesMixin:
                     'entity': entity,
                     'source_turn_seq': getattr(self, '_turn_seq', None),
                     'trigger': 'reflection',
-                })
+                }
+                if prior_id:
+                    event['supersedes'] = prior_id
+                self._write_memory_event(event)
                 return note_id
         except Exception as e:
             logger.warning(f"[{self.character_name}] _remember failed: {e}")
@@ -197,6 +352,15 @@ class MemoriesMixin:
                     note = self.resource_manager.get_resource(note_id)
                     if note:
                         props = note.get('properties') or {}
+                        # Withdrawn: either replaced by a later revision of
+                        # the same fact (superseded_by), or retired outright
+                        # as false with nothing to replace it (retired). The
+                        # chunk is still in the collection store — nothing
+                        # removes from it, see the supersession note above —
+                        # so this dereference is the only place a retirement
+                        # can take effect.
+                        if props.get('superseded_by') or props.get('retired'):
+                            continue
                         raw = props.get('category')
                         if isinstance(raw, str) and raw in _MEMORY_CATEGORIES:
                             cat = raw
