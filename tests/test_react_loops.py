@@ -355,3 +355,67 @@ def test_every_subagent_applies_the_ceiling(run, mod, label, tmp_path):
     assert backend.calls, 'expected at least one call'
     assert all(c.get('reasoning_effort') == 'low' for c in backend.calls), \
         [c.get('reasoning_effort') for c in backend.calls]
+
+
+# --------------------------------------------------------------------
+# Parsed, but not an action.
+#
+# A cloud model with no schema constraint emitted its ANSWER as JSON —
+# {"text": ...}, {"creation_occurrences": ...} — and, once it decided the
+# tools were broken, {"error": ...}. The old reply was "unknown tool
+# None", which names nothing actionable and reads as a tool failure. 160
+# of 217 observations in one run were that error, and the model concluded
+# its file reads were returning nothing. They never were, not once: there
+# were zero EMPTY observations in the entire run.
+# --------------------------------------------------------------------
+
+TOOLLESS_SHAPES = [
+    pytest.param('{"text": "the whole answer"}', id='bare-text'),
+    pytest.param('{"creation_occurrences": [1, 2]}', id='invented-schema'),
+    pytest.param('{"error": "tool returned no output"}', id='refusal'),
+]
+
+
+@pytest.mark.parametrize('raw', TOOLLESS_SHAPES)
+@pytest.mark.parametrize('run,mod,label', RUNNERS)
+def test_toolless_emission_is_named_as_a_format_problem(run, mod, label,
+                                                        raw, tmp_path):
+    backend = FakeBackend([raw, _respond('recovered')])
+    out = run(backend, tmp_path)
+    assert 'recovered' in out, 'the loop must continue, not abort'
+    feedback = backend.calls  # kwargs only; check the prompt instead
+    assert backend.n_calls == 2
+
+
+@pytest.mark.parametrize('raw', TOOLLESS_SHAPES)
+def test_the_feedback_says_what_to_do_instead(raw, tmp_path):
+    """Naming the missing field is the point — a model that cannot tell a
+    format slip from a broken tool starts refusing."""
+
+    class Recording(FakeBackend):
+        prompts: list = []
+
+        def chat(self, messages, **kwargs):
+            self.prompts.append(messages[-1]['content'])
+            return super().chat(messages, **kwargs)
+
+    backend = Recording([raw, _respond('ok')])
+    backend.prompts = []
+    _run_inspect(backend, tmp_path)
+
+    note = backend.prompts[1]
+    assert 'no `tool` field' in note
+    assert 'not a tool failure' in note        # the belief to head off
+    assert '"tool": "respond"' in note         # the shape to emit
+    assert 'unknown tool None' not in note     # the unhelpful old wording
+
+
+def test_a_toolless_emission_does_not_count_as_unparseable(tmp_path):
+    """It parsed. Counting it toward the unparseable cap would bail on a
+    model that is merely mis-shaping its actions and can be corrected."""
+    backend = FakeBackend(['{"text": "a"}', '{"text": "b"}',
+                           '{"text": "c"}', '{"text": "d"}',
+                           _respond('recovered')])
+    out = _run_inspect(backend, tmp_path)
+    assert 'recovered' in out
+    assert backend.n_calls == 5

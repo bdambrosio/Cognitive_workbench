@@ -79,11 +79,23 @@ def test_local_route_sends_json_schema(captured):
     assert rf['json_schema']['schema'] == REACT_ACTION_SCHEMA
 
 
-def test_cloud_route_sends_json_object_not_the_schema(captured):
-    """The schema would strip tool arguments; json_object only guarantees
-    the emission parses, which is the actual failure being fixed."""
+def test_cloud_route_sends_the_schema_too(captured):
+    """required:[thought,tool] is the constraint that stops a model
+    emitting its ANSWER as JSON instead of an action. json_object was
+    tried first and is not enough: it guarantees the emission parses and
+    nothing about its fields, and dropped `tool` 1/3 when probed against
+    the real subagent prompt."""
     rf = _send(captured, _cloud(), response_schema=REACT_ACTION_SCHEMA)
-    assert rf == {'type': 'json_object'}
+    assert rf['type'] == 'json_schema'
+    assert rf['json_schema']['schema'] == REACT_ACTION_SCHEMA
+
+
+def test_cloud_does_not_ask_for_strict_mode(captured):
+    """strict=true 400s on this schema — it demands
+    additionalProperties=false, and the extras are deliberate so each
+    tool's own args pass through."""
+    rf = _send(captured, _cloud(), response_schema=REACT_ACTION_SCHEMA)
+    assert 'strict' not in rf['json_schema']
 
 
 def test_cloud_route_is_constrained_at_all():

@@ -436,32 +436,31 @@ class _ChatBackend:
                 body['chat_template_kwargs'] = {'enable_thinking': False}
 
         elif response_schema is not None:
-            # Cloud: force valid JSON, but do NOT send the schema.
+            # Cloud gets the same schema, minus strict mode.
             #
             # Grammar and chat_template_kwargs are genuinely local-only —
             # cloud rejects them. response_format is not, and bundling all
-            # three behind one guard left the cloud route as the only path
-            # with no structured-output constraint at all. Measured
-            # 2026-08-16 on gpt-5.6-luna at reasoning_effort=low: 77
-            # unparseable emissions in one run, 76 of them finish=stop —
-            # complete outputs that simply were not JSON.
+            # three behind one guard left cloud as the only route with no
+            # structured-output constraint at all. What that produced on
+            # gpt-5.6-luna, measured 2026-08-16 across two runs: 160
+            # `ERROR: unknown tool None` against 57 OK observations — the
+            # model emitting its ANSWER as JSON (`{"text": ...}`,
+            # `{"creation_occurrences": ...}`) rather than an action.
+            # required:[thought,tool] is exactly the constraint against
+            # that, and local, which has always had it, produced zero such
+            # emissions in 51 calls.
             #
-            # json_object rather than json_schema, verified against the
-            # live API rather than assumed:
-            #   strict=true            → 400, "'additionalProperties' is
-            #     required to be supplied and to be false" — and setting it
-            #     false would forbid every tool's own args (text, query, to).
-            #   json_schema non-strict → 200, but the model treats
-            #     required:[thought,tool] as the fields to emit and DROPS
-            #     the args, 3/3 trials. A `respond` with no text.
-            #   json_object            → 200, all fields intact, 3/3.
-            # So the schema is worse than useless here; what is needed is
-            # only the guarantee that the emission parses.
-            #
-            # NOTE the OpenAI contract requires the word "JSON" somewhere in
-            # the messages for this mode. The ReAct system prompt says "ONE
-            # JSON action object", so every caller of this path satisfies it.
-            body['response_format'] = {'type': 'json_object'}
+            # strict=true is not available: it demands
+            # additionalProperties=false, and this schema allows extras
+            # precisely so each tool's own args (text, query, x, radius)
+            # pass through. Non-strict is best-effort rather than
+            # guaranteed — 3/3 compliant when probed against the real
+            # subagent prompt, where json_object dropped `tool` 1/3.
+            body['response_format'] = {
+                'type': 'json_schema',
+                'json_schema': {'name': 'react_action',
+                                'schema': response_schema},
+            }
 
         headers: Dict[str, str] = {'Content-Type': 'application/json'}
         if self._api_key_value:

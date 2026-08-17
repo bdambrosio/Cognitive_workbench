@@ -204,6 +204,36 @@ class Subagent:
             consecutive_unparseable = 0
 
             tool = action.get('tool')
+            if tool is None:
+                # Parsed, but not an action. Observed 2026-08-16 on a cloud
+                # model with no schema constraint: it emitted its ANSWER as
+                # JSON — {"text": ...}, {"creation_occurrences": ...} — and
+                # once it decided the tools were broken, {"error": ...}.
+                #
+                # The old reply was "unknown tool None", which names nothing
+                # the model can act on and reads as a tool failure rather
+                # than a format slip. That mattered: 160 of 217 observations
+                # in one run were this error, and the model concluded from
+                # the density that its file reads were returning nothing —
+                # they never were, not once. Say what is wrong and how to
+                # deliver an answer, so a format slip cannot compound into a
+                # belief that the primitives are dead.
+                keys = ', '.join(sorted(action)[:6]) or '(none)'
+                obs = (f"ERROR: that was valid JSON but not an action — it "
+                       f"has no `tool` field (keys: {keys}). Every emission "
+                       f"must name one of: {available}. Your primitives are "
+                       f"working; this is a formatting problem, not a tool "
+                       f"failure. To deliver a finished answer, put it in "
+                       f"the `text` field of a respond action: "
+                       f'{{"thought": "<terse>", "tool": "respond", '
+                       f'"text": "<your answer>"}}')
+                iter_rec['observation'] = obs
+                log_lines.append(f"ACTION {i+1}: {json.dumps(action)}")
+                log_lines.append(f"$step{i+1}:")
+                log_lines.append(obs)
+                log_lines.append('')
+                continue
+
             if tool == 'respond':
                 answer = (str(action.get('text', '') or '').strip()
                           or '(no answer)')
