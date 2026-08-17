@@ -80,6 +80,10 @@ _REACT_TOOLS = ('process_text', 'recall', 'inspect', 'inspect_external', 'securi
 # only — does not leak into conversation history or the next turn's loop.
 _REACT_BINDING_RE = re.compile(r'^\$step\d+$')
 
+# Above this length a `source` is material by weight; below it the
+# reference probe decides. Keeps the probe off the common path.
+_REFERENCE_PROBE_MAX_CHARS = 200
+
 
 class ReactMixin:
     """Mixin for ChatLoop — moved verbatim from chat_loop.py."""
@@ -134,7 +138,8 @@ class ReactMixin:
                                     ) -> Optional[str]:
         """Return a diagnostic reason string when process_text args look
         malformed — section-name placeholder as `source`, unresolved
-        `$stepN` binding, or empty fields. Returns None when args are
+        `$stepN` binding, empty fields, or a `source` that references
+        material instead of carrying it. Returns None when args are
         usable. Caller (the ReAct dispatch) wraps the returned reason
         with the ERROR: prefix, so emit naked sentences here. Each
         diagnostic names the failure AND points at the recovery path —
@@ -167,7 +172,62 @@ class ReactMixin:
                     "the heading as `source`. Section names do not "
                     "resolve to their bodies; `source` accepts only "
                     "literal inline text or a `$stepN` binding.")
+        # Prose pointer ("Recent reasoning traces #2728 through #2733"):
+        # nothing resolves it, so the call transforms the pointer and writes
+        # the rest from the instruction alone — a synthesis of material it
+        # never saw. The tell is meaning, not shape, hence a probe. A
+        # resolved $stepN came from a tool and is material by construction.
+        is_binding = isinstance(raw_src, str) and _REACT_BINDING_RE.match(raw_src.strip())
+        if not is_binding and len(resolved_src) <= _REFERENCE_PROBE_MAX_CHARS:
+            if self._source_is_reference(resolved_src, instruction):
+                return ("`source` names where material lives rather than "
+                        "carrying it, so there is nothing to transform — "
+                        "turn numbers, note ids and descriptions of prior "
+                        "conversation do not resolve to their contents. "
+                        "Fetch it first (recall, inspect, or read it in an "
+                        "earlier step this turn) and pass that step's "
+                        "`$stepN`, or paste the text inline.")
         return None
+
+    def _source_is_reference(self, source_text: str, instruction: str) -> bool:
+        """True when `source` points at material instead of being material.
+        Fails open: a probe that errors or answers off-format must not make
+        process_text unavailable."""
+        sys_msg = ("You classify one field of a tool call. Answer with "
+                   "exactly one word and nothing else.")
+        user_msg = (
+            "A tool transforms a SOURCE text according to an INSTRUCTION. "
+            "The SOURCE is supposed to BE the material. It is a mistake for "
+            "it to be a reference — a phrase naming where material can be "
+            "found (a range of turns, a note or step id, a section heading, "
+            "an earlier conversation, a file) without containing it.\n\n"
+            "Short material is fine and common: a sentence to translate, a "
+            "list to reformat, a figure to explain. Length does not decide "
+            "this — only whether the text IS the thing or POINTS AT it.\n\n"
+            f"INSTRUCTION:\n{instruction}\n\nSOURCE:\n{source_text}\n\n"
+            "Answer with one word: material or reference.")
+        try:
+            result = self.backend.chat(
+                [{'role': 'system', 'content': sys_msg},
+                 {'role': 'user', 'content': user_msg}],
+                max_tokens=8, temperature=0.0, cot_profile='none',
+            )
+        except Exception as e:
+            logger.warning(
+                f"[{self.character_name}] process_text source probe failed: "
+                f"{e}; allowing the call through")
+            return False
+        verdict = (result or '').strip().strip('.`"\'').lower()
+        if verdict.startswith('reference'):
+            logger.info(
+                f"[{self.character_name}] process_text source probe: "
+                f"reference — {source_text[:120]!r}")
+            return True
+        if not verdict.startswith('material'):
+            logger.warning(
+                f"[{self.character_name}] process_text source probe returned "
+                f"{verdict[:60]!r}, neither verdict; allowing the call through")
+        return False
 
     def _run_process_text(self, source_text: str, instruction: str,
                           cited_sources: Optional[List[Dict[str, Any]]] = None

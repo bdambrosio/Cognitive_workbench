@@ -419,3 +419,82 @@ def test_a_toolless_emission_does_not_count_as_unparseable(tmp_path):
     out = _run_inspect(backend, tmp_path)
     assert 'recovered' in out
     assert backend.n_calls == 5
+
+
+# --------------------------------------------------------------------
+# process_text `source` validation. `source` must BE material, not name
+# where material lives — a pointer transforms into a synthesis of text the
+# model never saw (observed 2026-08-17). Shape can't separate a short
+# pointer from short material, so the guard asks; these script the probe.
+# --------------------------------------------------------------------
+
+class _Diagnosing(ReactMixin):
+    """ReactMixin's arg validation with a scripted probe backend."""
+
+    character_name = 'Jill'
+    persona = ''
+
+    def __init__(self, probe_verdict='material'):
+        self.backend = FakeBackend([probe_verdict])
+
+    def diagnose(self, raw_src, resolved_src=None, instruction='Rewrite it.'):
+        return self._diagnose_process_text_args(
+            raw_src, resolved_src if resolved_src is not None else raw_src,
+            instruction, [('$step1', 'earlier output')])
+
+
+def test_source_naming_material_is_rejected():
+    h = _Diagnosing('reference')
+    diag = h.diagnose('Recent reasoning traces #2728 through #2733',
+                      instruction='Draft the proposal itself.')
+    assert diag is not None
+    assert 'names where material lives' in diag
+    assert '$stepN' in diag                     # the recovery path
+
+
+def test_short_literal_material_is_allowed():
+    h = _Diagnosing('material')
+    assert h.diagnose('eggs, milk, flour',
+                      instruction='Reformat as a checklist.') is None
+
+
+def test_long_source_skips_the_probe_entirely():
+    """Nobody writes 200 characters of pointer. Staying off the common
+    path is the reason the probe is affordable at all."""
+    h = _Diagnosing('reference')
+    assert h.diagnose('word ' * 100) is None
+    assert h.backend.n_calls == 0
+
+
+def test_a_resolved_binding_skips_the_probe():
+    """$stepN content came from a real tool — material by construction,
+    however short it reads."""
+    h = _Diagnosing('reference')
+    assert h.diagnose('$step1', resolved_src='ok short output') is None
+    assert h.backend.n_calls == 0
+
+
+def test_the_probe_fails_open():
+    """A guard against one silent failure mode must not make process_text
+    unavailable whenever the backend hiccups."""
+    class Broken(FakeBackend):
+        def chat(self, messages, **kwargs):
+            raise RuntimeError('backend down')
+
+    h = _Diagnosing()
+    h.backend = Broken([])
+    assert h.diagnose('the dialogue with Jack') is None
+
+
+def test_an_off_format_verdict_fails_open():
+    h = _Diagnosing('I think this is probably a reference, but...')
+    assert h.diagnose('the dialogue with Jack') is None
+
+
+def test_cheaper_checks_run_before_the_probe():
+    """An unresolved binding is diagnosable from shape alone; spending an
+    LLM call to say so would be waste."""
+    h = _Diagnosing('reference')
+    diag = h.diagnose('$step9', resolved_src='')
+    assert diag is not None and 'unresolved binding' in diag
+    assert h.backend.n_calls == 0
