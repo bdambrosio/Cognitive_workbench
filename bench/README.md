@@ -14,9 +14,11 @@ three run attempts on availability alone.
 |---|---|
 | `convergence/` | **Probes 1 + 3** — `concerns.py` creation-site mapping (16 cells) and yield behaviour. One run, two scores: the task *is* the yield test. |
 | `tictactoe/` | **Probe 2** — multi-turn state with no board in the prompt. Fully mechanical, no judge, no network. |
-| `coord_search/` | The v2 reference implementation. `score.py` is mechanical, LLM-free by default, and holds its extraction instrument constant across arms. Read it before writing a new scorer. Covers probes 4–5. |
+| `claim_honesty/` | **Probe 4** — does "I verified this" survive contact with what the trace says ran. Two conditions: `tooled`, and `blind` with every repo-reading tool removed. Ground truth self-extracts from source, so it cannot go stale. |
+| `turn_taking/` | **Probe 5** — two agents, one message, delivered to both at once. Outcome is mechanical (`waited` / `correct_double` / `invented`) because the first agent's number is knowable. |
+| `coord_search/` | The v2 reference implementation. `score.py` is mechanical, LLM-free by default, and holds its extraction instrument constant across arms. Read it before writing a new scorer — probes 4 and 5 were built from its shape (mechanical metrics, instrument held constant, stall-vs-silent split). |
 | `hle/` | The single capability anchor. Pin-30 question set; see the pinning note in its README for the enforcement gap. |
-| `backends.yaml` | The three arms — gemma, qwen, luna. ONE source of truth: probes take `--backend <name>` and overlay the block onto whatever scenario they drive, so adding an arm never means forking a scenario. Forked scenarios are how the 2026-08-15 comparisons acquired a second variable and had to be discarded. |
+| `backends.yaml` | The five arms — gemma, gemma_reasoning, qwen, qwen_reasoning, luna. ONE source of truth: probes take `--backend <name>` and overlay the block onto whatever scenario they drive, so adding an arm never means forking a scenario. Forked scenarios are how the 2026-08-15 comparisons acquired a second variable and had to be discarded. |
 | `common.py` | Arm loading, served-model verification, scenario overlay, trace/concern reading, the pinned extraction instrument. |
 | `run_probes.py` | Campaign driver — resumable, and stops to ask for a vLLM restart rather than attempting one. |
 | `report.py` | One table across every arm and probe that has been scored. |
@@ -65,15 +67,31 @@ per-suite floors) and `ledger.jsonl`. Milestones M0–M5 in
 `docs/harness-roadmap.md` are defined against that substrate and are now
 stale; they need rewriting against v2.
 
-## Not yet built
-
-Probes 4 (claim honesty) and 5 (turn-taking) from
-`docs/harness-behaviour-suite.md`. Both have partial scaffolding already in
-`coord_search/score.py` — the `model_prior` overclaim fraction is most of probe
-4, and the stall / silent-turn split is most of probe 5.
+## All five probes are built
 
 Probe 6 (the cost rider) is not a separate probe: wall clock, iteration counts
 and exit-reason histograms ride along on every run via `common.turn_costs`.
+
+## The recurring bug, and the discipline it bought
+
+Six metric bugs have been found so far, every one by RUNNING a probe rather
+than by inspecting it, and every one the same shape: **the metric punished
+correct behaviour.**
+
+- Probes 1+3 merged onto one run scored a correct yield 0/16
+- Probe 1's rubric scored `rhythm_source`, which its prompt never asked for
+- Probe 3 scored 0.0 for finishing the task instead of yielding
+- Probe 4 had no way to say "I don't know"
+- Probe 4 let `recall` / `inspect_external` excuse a claim they could not support
+- Probe 5 scored a one-iteration respond as a stall on a task needing no tools
+
+Two rules came out of it, and both are worth keeping:
+
+1. **Never change the instrument mid-campaign.** Clear and restart instead. A
+   metric changed between arms is the confound the suite exists to remove.
+2. **A suspiciously uniform result is a bug until proven otherwise.** All four
+   misses in one column, or an all-`not_stated` grid, has meant a broken metric
+   every time so far — never a broken backend.
 
 **No ship gate is attached to any of this, deliberately.** Run it as a
 reporting instrument across several backends first, and attach floors only once

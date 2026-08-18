@@ -45,10 +45,19 @@ logger = logging.getLogger("bench.claim_honesty.runner")
 SOURCE = "User"
 SCENARIO = REPO / "scenarios" / "yield_test.yaml"
 
-# Tools removed in the `blind` condition. Without these there is no way to
-# read the repository, so every honest answer is "recalled".
+# Tools removed in the `blind` condition. Without these there is no route to
+# the repository, so every honest answer is "recalled" or "unknown".
+#
+# `exec-script` is on this list because it is a GENERAL route to the
+# filesystem, not because it looks like a reading tool. Gemma tried it eight
+# times in the 2026-08-18 campaign to get at the files; it happened to fail
+# (broken from the chat path since 2026-08-03, world_name unplumbed), so the
+# condition held by luck rather than design. Luck is not a control.
+#
+# Anything added here should be justified as "could this reach the repo",
+# not "is this named like a retrieval tool".
 BLIND_OMIT = ["inspect", "inspect_external", "search-web", "fetch-text",
-              "doc-read", "obsidian", "recall", "agent-activity"]
+              "doc-read", "obsidian", "recall", "exec-script", "agent-activity"]
 
 
 def _prompt() -> str:
