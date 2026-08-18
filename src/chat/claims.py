@@ -575,6 +575,42 @@ def observation_mediation(tool_name: Optional[str]) -> str:
     return 'direct' if name in _DIRECT_OBSERVATION_TOOLS else 'mediated'
 
 
+def synthesis_only_claims(trace_rec: Dict[str, Any],
+                          claims: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Claims whose every supporting step is a model's synthesis rather
+    than a document.
+
+    The justify renderer already computes this and says so out loud —
+    "Nothing here read the underlying source." — but only when a human
+    types `justify`. Nothing acted on it. On turn 2787 all nine claims
+    quoted a single search-web synthesis, graded `probable` (never worse,
+    so the suspect gate stood down), and went out unaudited. One of them,
+    a version number the synthesis had invented, was wrong; the three
+    claims with issue numbers were right. A verbatim quote against a
+    model's summary proves the summary said it, nothing more.
+
+    Deliberately not a downgrade to `suspect`. The grade is honest —
+    these ARE probable — and lowering it would misreport a well-sourced
+    summary as weak evidence. What changes is only whether the audit runs.
+    """
+    tool_of = {ref: str((tm or {}).get('tool') or '')
+               for ref, tm in (trace_rec.get('tool_meta') or {}).items()
+               if isinstance(tm, dict)}
+    mediated = {ref for ref, tool in tool_of.items()
+                if observation_mediation(tool) == 'mediated'}
+    if not mediated:
+        return []
+    out = []
+    for c in claims:
+        refs = c.get('refs') or []
+        # Unsupported claims are the suspect gate's business, not this one.
+        if not refs or not c.get('quote'):
+            continue
+        if all(r in mediated for r in refs):
+            out.append(c)
+    return out
+
+
 def grade_claim(c: Dict[str, Any]) -> str:
     """Deterministic ordinal grade for one attributed claim — plain code
     over grounding + validated taxonomy tags, per the caps in
@@ -1092,7 +1128,14 @@ class ClaimsMixin:
         if str(record.get('source') or '') in (getattr(self, '_peers', None) or []):
             return None
         suspects = [c for c in claims if grade_claim(c) == 'suspect']
-        if not suspects:
+        # Second trigger: claims that grade fine but rest entirely on a
+        # model's summary of sources nobody opened. The suspect gate can
+        # never catch these — they are `probable`, which is the correct
+        # grade — so before this they went out unaudited. See
+        # synthesis_only_claims for the turn that cost.
+        unread = [c for c in synthesis_only_claims(record, claims)
+                  if c not in suspects]
+        if not suspects and not unread:
             return None
         source = str(record.get('source') or 'User')
         seq = record.get('turn_seq')
@@ -1102,12 +1145,34 @@ class ClaimsMixin:
             f"{i}. {c.get('claim')} "
             f"[{c.get('grounding')}, {c.get('volatility') or c.get('inference')}]"
             for i, c in enumerate(suspects, 1))
+        unread_lines = '\n'.join(
+            f"{i}. {c.get('claim')}\n   quoted from a summary: "
+            f"\"{_clip(str(c.get('quote') or ''))}\""
+            for i, c in enumerate(unread, 1))
+        suspect_section = (
+            f"These claims from that reply graded suspect — volatile "
+            f"background knowledge or weak inference, unverified at answer "
+            f"time:\n\n{claim_lines}\n\n" if suspects else "")
+        # A quote against a summary proves the summary said it. The probe
+        # for these is not "search again" — that asks the same model the
+        # same question and gets the same answer, which is how an invented
+        # version number survived its own verification. Go to the document.
+        unread_section = (
+            f"These claims are not weakly grounded — they are quoted "
+            f"accurately — but every source behind them is a model's "
+            f"summary that nobody opened. The quote proves the summary "
+            f"said it, not that any document does:\n\n{unread_lines}\n\n"
+            f"For these, read the underlying source itself — fetch the "
+            f"page, the release notes, the issue, the file. Searching "
+            f"again re-asks the summarizer that produced the claim and "
+            f"will agree with itself. Check the load-bearing specifics "
+            f"first: a number, a version, a date or a name the user might "
+            f"act on, ahead of anything already carrying its own "
+            f"citation.\n\n" if unread else "")
         instruction = (
             f"Background verification (auto-spawned after post-turn claim "
-            f"grading of my reply to {source}, turn {seq}). These claims "
-            f"from that reply graded suspect — volatile background "
-            f"knowledge or weak inference, unverified at answer time:\n\n"
-            f"{claim_lines}\n\n"
+            f"grading of my reply to {source}, turn {seq}). "
+            f"{suspect_section}{unread_section}"
             f"The exchange, for context:\n"
             f"They said: {user_input[:300]}\n"
             f"I replied: {reply[:500]}\n\n"
@@ -1131,7 +1196,9 @@ class ClaimsMixin:
             f"success.")
         from chat.concerns import _AGENT_CONCERN_FIRE_THRESHOLD
         new_id = self._add_agent_concern(
-            text=f"verify suspect claims from my reply to {source}",
+            text=(f"verify suspect claims from my reply to {source}"
+                  if suspects else
+                  f"read the sources behind my reply to {source}"),
             entity=source, provenance='inferred', seed=False, name='',
             rhythm_hours=1, rhythm_source='urgency',
             instruction=instruction,

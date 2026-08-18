@@ -2084,7 +2084,8 @@ class ConcernsMixin:
             return None
         if verdict != 'remainder' or not next_slice:
             return None
-        return self._create_successor_concern(parent_id, next_slice)
+        return self._create_successor_concern(parent_id, next_slice,
+                                              truncated=True)
 
     def _synthesize_remainder(self, instruction: str,
                               log: List[Tuple[str, str]],
@@ -2110,7 +2111,21 @@ class ConcernsMixin:
             "work substantively complete (just missing the wrap-up), or "
             "is real work left? If left, what is the narrow next slice "
             "(one ReAct loop's worth, ~12 tool calls) that should run "
-            "next?\n\nRespond ONLY with JSON, no prose, no markdown."
+            "next?\n\n"
+            "Write the slice as what is UNFINISHED, naming the specific "
+            "items still outstanding. Do not describe it as writing up, "
+            "synthesizing or finalizing what was already done: the "
+            "successor sees only your text, so a slice phrased as a "
+            "wrap-up of completed work produces a turn that reports "
+            "completion the parent never reached. Observed 2026-08-17 — a "
+            "provenance audit that had read 3 of 9 sources handed on "
+            "\"synthesize the verified bug reports and provide the final "
+            "justification\", and the successor answered \"everything is "
+            "now grounded in primary source documentation\". If the parent "
+            "checked, verified or covered only part of a set, the slice "
+            "must say which part remains and must instruct the successor "
+            "to state plainly what it could not confirm.\n\n"
+            "Respond ONLY with JSON, no prose, no markdown."
         )
         wip_section = (
             f"Accumulated work-in-progress from earlier fires:\n{wip}\n\n"
@@ -2286,16 +2301,39 @@ class ConcernsMixin:
             f"user-turn yield: {next_slice[:120]!r}")
         return new_id
 
-    def _create_successor_concern(self, parent_id: str,
-                                  next_slice: str) -> Optional[str]:
+    # Prepended by code, not by the synthesizer, when the parent was cut
+    # off rather than choosing to stop. The synthesizer is asked to phrase
+    # the remainder as unfinished work and mostly will, but it writes the
+    # slice as prose and prose is exactly what gets smoothed into "and
+    # then finalize". A successor whose parent ran out of iterations
+    # cannot know how much of the set was covered, and must not imply it
+    # does: on 2026-08-17 one read 3 of 9 sources, handed on "provide the
+    # final justification", and reported "everything is now grounded in
+    # primary source documentation".
+    _TRUNCATED_PARENT_PREAMBLE = (
+        "NOTE — the turn before this one hit its iteration cap and was cut "
+        "off mid-work; it did not choose to stop. Whatever set it was "
+        "working through, assume it is PARTLY done and that neither it nor "
+        "you know how much. Do not describe the work as complete, "
+        "finished, fully verified or fully grounded, and do not let a "
+        "summary of what was covered stand in for the whole. If you cannot "
+        "establish that every item was covered, say plainly which ones you "
+        "confirmed and that the rest are unconfirmed.\n\n")
+
+    def _create_successor_concern(self, parent_id: str, next_slice: str,
+                                  truncated: bool = False) -> Optional[str]:
         """Create the successor agent_concern carrying next_slice as its
         instruction. Shared tail of the reactive (max_iters + synthesizer)
         and intentional (yield) continuation paths. Enforces the depth cap
-        — successor chains can't run away regardless of route. Returns the
-        new concern id, or None (missing parent, cap, empty slice)."""
+        — successor chains can't run away regardless of route. `truncated`
+        marks the reactive route, where the parent was cut off rather than
+        choosing a boundary. Returns the new concern id, or None (missing
+        parent, cap, empty slice)."""
         next_slice = (next_slice or '').strip()
         if not next_slice:
             return None
+        if truncated:
+            next_slice = self._TRUNCATED_PARENT_PREAMBLE + next_slice
         parent = self.resource_manager.get_resource(parent_id)
         if not parent:
             return None
