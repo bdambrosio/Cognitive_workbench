@@ -168,7 +168,10 @@ def main() -> int:
 
     conv = score_convergence(raw.get("reply") or "", truth)
 
+    from bench.common import scan_validity  # noqa: E402
     summary = {
+        "validity": scan_validity(meta.get("captured_at"),
+                                  meta.get("wall_clock_s")),
         "backend_arm": meta.get("backend_arm"),
         "backend_label": meta.get("backend_label"),
         "served_model_check": meta.get("served_model_check"),

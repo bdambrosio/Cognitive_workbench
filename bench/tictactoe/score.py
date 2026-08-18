@@ -18,6 +18,7 @@ from typing import Any, Dict
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 sys.path.insert(0, str(REPO))
+sys.path.insert(0, str(REPO / "src"))
 
 from bench.tictactoe import game  # noqa: E402
 
@@ -89,7 +90,10 @@ def main() -> int:
     meta = json.loads((args.run_dir / "run_meta.json").read_text(encoding="utf-8"))
     s = score(raw)
 
+    from bench.common import scan_validity  # noqa: E402
     summary = {
+        "validity": scan_validity(meta.get("captured_at"),
+                                  meta.get("wall_clock_s")),
         "backend_arm": meta.get("backend_arm"),
         "backend_label": meta.get("backend_label"),
         "served_model_check": meta.get("served_model_check"),

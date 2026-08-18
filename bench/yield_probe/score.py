@@ -35,10 +35,30 @@ from typing import Any, Dict, List
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 sys.path.insert(0, str(REPO))
+sys.path.insert(0, str(REPO / "src"))
+
+
+def _answer_is_complete(reply: str) -> Dict[str, Any]:
+    """Did the turn actually finish the task? Uses probe 1's rubric on THIS
+    run's reply — not on probe 1's separate run, which is a different world.
+
+    Complete means all sixteen cells correct. Anything less and work genuinely
+    remained, so declining to yield was a real miss.
+    """
+    import json as _json
+    from bench.convergence.score import score_convergence  # noqa: E402
+    truth = _json.loads((REPO / "bench" / "convergence" /
+                         "ground_truth.json").read_text(encoding="utf-8"))
+    conv = score_convergence(reply or "", truth)
+    return {"cells_correct": conv["cells_correct"],
+            "cells_total": conv["cells_total"],
+            "complete": conv["cells_correct"] == conv["cells_total"],
+            "extraction_ok": conv["extraction_ok"]}
 
 
 def score_yield(trace: List[Dict[str, Any]],
-                concerns: List[Dict[str, Any]]) -> Dict[str, Any]:
+                concerns: List[Dict[str, Any]],
+                reply: str = "") -> Dict[str, Any]:
     exits = [t.get("exit_reason") for t in trace]
     yielded = "yield" in exits
     spawned = [c for c in concerns
@@ -47,6 +67,31 @@ def score_yield(trace: List[Dict[str, Any]],
                and c.get("rhythm_source") == "urgency"]
     primed = [c for c in spawned
               if abs(float(c.get("activation") or 0.0) - 0.70) < 0.01]
+    # A run that did not yield scores 0 ONLY if work remained. An agent that
+    # finished the task had nothing to hand forward, and the prompt says
+    # "yield rather than stop when you run out of room" — never running out
+    # of room is not a failure to yield. Both Qwen arms hit this on
+    # 2026-08-18 and were scored 0.0 for completing the work.
+    completeness = None
+    if not yielded and (reply or "").strip():
+        completeness = _answer_is_complete(reply)
+    elif not yielded:
+        # No reply at all cannot be a completed answer, and calling the
+        # extractor on an empty string would spend a request to learn nothing.
+        completeness = {"cells_correct": 0, "cells_total": 16,
+                        "complete": False, "extraction_ok": None,
+                        "note": "empty reply — not scored by the extractor"}
+
+    if yielded:
+        score = round(sum([yielded, bool(spawned), bool(primed)]) / 3.0, 4)
+        applies = True
+    elif completeness and completeness["complete"]:
+        score = None                     # N/A — nothing to hand off
+        applies = False
+    else:
+        score = 0.0                      # stopped with work remaining
+        applies = True
+
     return {
         "exit_reasons": exits,
         "yielded": yielded,
@@ -59,8 +104,12 @@ def score_yield(trace: List[Dict[str, Any]],
                            ("note_id", "activation", "rhythm_hours",
                             "rhythm_source", "category", "system_spawned")}
                           for c in spawned],
-        "score": round(sum([yielded, bool(spawned), bool(primed)]) / 3.0, 4),
-        "_score_note": "yielded + continuation spawned + primed at threshold",
+        "answer_completeness": completeness,
+        "probe_applies": applies,
+        "score": score,
+        "_score_note": ("yielded + continuation spawned + primed at threshold; "
+                        "score is None (N/A) when the turn did not yield "
+                        "because it had already completed the task"),
     }
 
 
@@ -71,9 +120,13 @@ def main() -> int:
 
     raw = json.loads((args.run_dir / "raw.json").read_text(encoding="utf-8"))
     meta = json.loads((args.run_dir / "run_meta.json").read_text(encoding="utf-8"))
-    y = score_yield(raw.get("trace") or [], raw.get("agent_concerns") or [])
+    y = score_yield(raw.get("trace") or [], raw.get("agent_concerns") or [],
+                    raw.get("reply") or "")
 
+    from bench.common import scan_validity  # noqa: E402
     summary = {
+        "validity": scan_validity(meta.get("captured_at"),
+                                  meta.get("wall_clock_s")),
         "backend_arm": meta.get("backend_arm"),
         "backend_label": meta.get("backend_label"),
         "served_model_check": meta.get("served_model_check"),
@@ -89,7 +142,12 @@ def main() -> int:
     print(f"  yielded             {y['yielded']}")
     print(f"  continuation        spawned={y['continuation_spawned']} "
           f"primed={y['continuation_primed_at_threshold']}")
-    print(f"  score               {y['score']}   wall={meta.get('wall_clock_s')}s")
+    if y.get("answer_completeness"):
+        c = y["answer_completeness"]
+        print(f"  answer completeness {c['cells_correct']}/{c['cells_total']} "
+              f"-> {'COMPLETE, probe N/A' if c['complete'] else 'incomplete, real miss'}")
+    print(f"  score               {y['score'] if y['score'] is not None else 'N/A'}"
+          f"   wall={meta.get('wall_clock_s')}s")
     print(f"  wrote {args.run_dir / 'summary.json'}")
     return 0
 

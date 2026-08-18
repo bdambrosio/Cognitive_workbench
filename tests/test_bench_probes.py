@@ -187,3 +187,27 @@ def test_absent_situation_is_omitted_not_zeroed():
                    "claimed_result": "draw"})
     assert s["forced_block_rate"] is None
     assert s["score"] == 1.0
+
+
+# --------------------------------------------------------------------------
+# Yield N/A — the distinction added 2026-08-18
+# --------------------------------------------------------------------------
+
+def test_no_reply_is_not_a_completed_answer():
+    """An empty reply cannot be 'nothing left to hand off'. It also must not
+    reach the extractor — that would spend a live request to learn nothing,
+    and would make this suite require a backend."""
+    s = score_yield([{"exit_reason": "respond", "iters": 3}], [], "")
+    assert s["score"] == 0.0
+    assert s["probe_applies"] is True
+    assert s["answer_completeness"]["complete"] is False
+    assert s["answer_completeness"]["extraction_ok"] is None
+
+
+def test_yielding_run_never_calls_the_extractor():
+    """A run that yielded is scored on the handoff alone; completeness is
+    irrelevant and must not cost a request."""
+    s = score_yield([{"exit_reason": "yield", "iters": 10}], [GOOD_CONTINUATION],
+                    "some long reply that would otherwise be extracted")
+    assert s["answer_completeness"] is None
+    assert s["score"] == 1.0

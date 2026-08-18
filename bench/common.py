@@ -241,3 +241,76 @@ def extract_json(backend, system: str, body: str,
     if parsed is None:
         logger.warning("extraction returned no usable JSON")
     return parsed
+
+
+# ---------------------------------------------------------------------------
+# Run validity
+# ---------------------------------------------------------------------------
+
+# A run can fail in a way that makes its NUMBER describe the harness rather
+# than the backend. Those must not be ranked alongside real scores — this
+# session produced two such numbers (Gemma 0/16, then 12/16) that read as
+# backend results and were not. `validity` is the third outcome beside
+# "scored" and "crashed": measurement invalid, do not compare.
+#
+# Detected by scanning the launcher log over the run's own window, the way
+# coord_search/score.py already scopes its metrics. The per-turn trace carries
+# no finish_reason, so the log is the only record.
+
+_LAUNCHER_LOG = REPO / "logs" / "character_launcher.log"
+
+
+def _local_window(captured_at_utc: str, wall_s: float, slack_s: float = 90.0):
+    """The launcher log stamps LOCAL time; run_meta records UTC. Convert, and
+    pad the end — post-turn work outlives the measured wall clock."""
+    import datetime as _dt
+    t0 = _dt.datetime.strptime(captured_at_utc, "%Y-%m-%dT%H-%M-%SZ").replace(
+        tzinfo=_dt.timezone.utc).astimezone()
+    t1 = t0 + _dt.timedelta(seconds=float(wall_s or 0) + slack_s)
+    return t0.strftime("%Y-%m-%d %H:%M:%S"), t1.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def scan_validity(captured_at_utc: str, wall_s: float) -> Dict[str, Any]:
+    """Look for signals that this run's score is not about the backend.
+
+    truncated        - any finish=length. The model was cut off mid-emission,
+                       so the reply is not what it would have written.
+    empty_content    - the parser-on truncation signature: with a reasoning
+                       parser active a mid-thought cut returns empty content
+                       rather than partial text, which is silent.
+    connection_error - the backend went away mid-run; reads as a mechanism
+                       failure in the trace and is not one.
+    """
+    out: Dict[str, Any] = {"checked": False, "valid": True, "reasons": []}
+    if not _LAUNCHER_LOG.is_file():
+        out["reasons"].append("launcher log missing — could not check")
+        out["valid"] = None
+        return out
+    try:
+        lo, hi = _local_window(captured_at_utc, wall_s)
+    except (ValueError, TypeError) as e:
+        logger.warning("cannot build log window: %s", e)
+        out["reasons"].append(f"unparseable timestamps: {e}")
+        out["valid"] = None
+        return out
+
+    counts = {"finish=length": 0, "empty_content": 0, "connection_error": 0}
+    for line in _LAUNCHER_LOG.read_text(errors="replace").splitlines():
+        ts = line[:19]
+        if len(line) < 19 or ts < lo or ts > hi:
+            continue
+        if "finish=length" in line:
+            counts["finish=length"] += 1
+        if '"content": ""' in line:
+            counts["empty_content"] += 1
+        if "ConnectionError" in line or "connection refused" in line.lower():
+            counts["connection_error"] += 1
+
+    out["checked"] = True
+    out["window_local"] = [lo, hi]
+    out["counts"] = counts
+    for k, v in counts.items():
+        if v:
+            out["reasons"].append(f"{k} x{v}")
+    out["valid"] = not any(counts.values())
+    return out

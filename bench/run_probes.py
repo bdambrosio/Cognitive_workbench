@@ -145,7 +145,12 @@ def main() -> int:
             print(f"Expected a model matching {arm['expects_served_model']!r}; "
                   f"server has {_served_model() or '<down>'}.")
             print(f"\nPlease restart the vLLM server:\n")
-            print(RESTART_HINT.get(arm_name, "  (see backends.yaml notes)"))
+            # A *_reasoning arm serves the SAME model as its base arm — the
+            # dial is a request field, not a deployment. Without this strip,
+            # gemma_reasoning printed "(see backends.yaml notes)" instead of a
+            # command, which is a worse thing to hand someone mid-campaign.
+            hint_key = arm_name.replace("_reasoning", "")
+            print(RESTART_HINT.get(hint_key, "  (see backends.yaml notes)"))
             print(f"\nThen re-run this exact command; finished work is skipped:")
             print(f"  python3 bench/run_probes.py --arms {args.arms} "
                   f"--probes {args.probes}")
