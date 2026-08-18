@@ -445,7 +445,16 @@ class _ChatBackend:
             # tells the chat template NOT to open the thinking block, so the
             # model goes straight to the answer. Soft `/think` `/nothink`
             # directives don't work on Qwen3.6 — only this template kwarg does.
-            if enable_thinking is False:
+            # reasoning_effort='none' means the call declined a baseline,
+            # so say so positively rather than by omission. Omitting only
+            # falls back to the server default, which happens to be off on
+            # both engines here — a pin that depends on how someone
+            # launched vllm is not a pin. Measured 2026-08-17 against
+            # Qwen3.8-27B served with enable_thinking=false: nothing sent →
+            # 0 reasoning chars, reasoning_effort=low alone → 256, so the
+            # request kwarg does beat --default-chat-template-kwargs in
+            # both directions.
+            if enable_thinking is False or reasoning_effort == 'none':
                 body['chat_template_kwargs'] = {'enable_thinking': False}
 
         elif response_schema is not None:

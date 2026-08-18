@@ -174,3 +174,15 @@ def test_fire_triage_sends_nothing_when_reasoning_is_off(loop):
     loop._triage_fire_candidate(nid, 'c', 'do the thing')
 
     assert loop.backend.kwargs['reasoning_effort'] is None
+
+
+def test_declining_asserts_thinking_off_rather_than_omitting():
+    """A pin that works only because of how someone launched vllm is not a
+    pin. Verified live 2026-08-17 against Qwen3.8-27B served with
+    --default-chat-template-kwargs '{"enable_thinking": false}': nothing
+    sent gave 0 reasoning chars, reasoning_effort=low alone gave 256 — the
+    request kwarg beats the server default in both directions, so the
+    decline has to be positive."""
+    import inspect
+    src = inspect.getsource(_ChatBackend.chat)
+    assert "enable_thinking is False or reasoning_effort == 'none'" in src
