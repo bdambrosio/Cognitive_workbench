@@ -90,3 +90,30 @@ counting unparseable as incorrect.
 reflection inline. `discourse` and `orientation` are off — same
 rationale as MMLU. Tools are NOT omitted; HLE expects retrieval where
 useful.
+
+## Question pinning — DATA KEPT, ENFORCEMENT LOST (2026-08-18)
+
+`hle_pinned_questions.json` moved here from `bench/composite/` when the
+composite suite was retired for benchmarks v2. It holds the 30 question
+ids pinned 2026-07-24, and it is the reason HLE's noise band fell from
+0.167 to 0.050 — a re-baseline that cost a full campaign to earn.
+
+**The drift check did not come with it.** The comparison lived in
+`composite/run.py:210-228`, not in this suite, and went with the deletion.
+`runner.py` selects questions positionally
+(`valid[start:][:max_questions]`), so if the upstream HF dataset ever
+reorders, this bench silently measures a different question set and every
+comparison against a prior row is quietly invalid.
+
+Re-add when v2 wires the anchor. The logic was:
+
+```python
+ids = [r["question_id"] for r in raw_rows]
+pinned = json.loads(PIN_FILE.read_text())
+if pinned["question_ids"] != ids:
+    raise SuiteError("HLE question set drifted from hle_pinned_questions.json "
+                     "(HF dataset order changed?) — comparability is broken.")
+```
+
+Recover the original from git history if wanted:
+`git show HEAD:bench/composite/run.py`.
