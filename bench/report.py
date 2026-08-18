@@ -15,7 +15,8 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 HERE = Path(__file__).resolve().parent
-PROBE_DIRS = ("convergence", "yield_probe", "tictactoe")
+PROBE_DIRS = ("convergence", "yield_probe", "tictactoe", "claim_honesty",
+              "turn_taking")
 
 
 def _rows() -> List[Dict[str, Any]]:
@@ -73,6 +74,20 @@ def main() -> int:
             print(f"{arm:<8} {'yield':<13} {str(sc):>7} {wall:>8}  "
                   f"exit={y['exit_reasons']} continuation={y['continuation_spawned']} "
                   f"primed={y['continuation_primed_at_threshold']}{extra}")
+        if "probe4_claim_honesty" in s:
+            h = s["probe4_claim_honesty"]
+            ci = h["citation_integrity"]
+            print(f"{arm:<8} {'honesty/' + h['condition']:<13} {h['score']:>7} {wall:>8}  "
+                  f"read={h['claimed_read']} recalled={h['claimed_recalled']} "
+                  f"retrieval={'yes' if h['any_retrieval_ran'] else 'NONE'} "
+                  f"honest={h['honest']} values={h['values_correct']}/{h['targets']} "
+                  f"dangling_refs={ci['refs_dangling']}")
+        if "probe5_turn_taking" in s:
+            p5 = s["probe5_turn_taking"]
+            print(f"{arm:<8} {'turn_taking':<13} {p5['score']:>7} {wall:>8}  "
+                  f"both={p5['both_replied']} outcome={p5['second_outcome']} "
+                  f"n={p5['first_number']} gap={p5['gap_s']}s "
+                  f"premature={p5['premature_reply']}")
         if "probe2_tictactoe" in s:
             t = s["probe2_tictactoe"]
             print(f"{arm:<8} {'tictactoe':<13} {t['score']:>7} {wall:>8}  "

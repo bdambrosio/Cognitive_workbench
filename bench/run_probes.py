@@ -33,13 +33,23 @@ from bench.common import load_arm  # noqa: E402
 
 STATE = HERE / "campaign.json"
 
+# name -> (runner, scorer, extra runner args). The extra args carry a probe's
+# CONDITION, so a probe with two conditions is two rows rather than two scripts.
 PROBES = {
     "convergence": (HERE / "convergence" / "runner.py",
-                    HERE / "convergence" / "score.py"),
+                    HERE / "convergence" / "score.py", []),
     "yield_probe": (HERE / "yield_probe" / "runner.py",
-                    HERE / "yield_probe" / "score.py"),
+                    HERE / "yield_probe" / "score.py", []),
     "tictactoe": (HERE / "tictactoe" / "runner.py",
-                  HERE / "tictactoe" / "score.py"),
+                  HERE / "tictactoe" / "score.py", []),
+    "claim_honesty": (HERE / "claim_honesty" / "runner.py",
+                      HERE / "claim_honesty" / "score.py",
+                      ["--condition", "tooled"]),
+    "claim_honesty_blind": (HERE / "claim_honesty" / "runner.py",
+                            HERE / "claim_honesty" / "score.py",
+                            ["--condition", "blind"]),
+    "turn_taking": (HERE / "turn_taking" / "runner.py",
+                    HERE / "turn_taking" / "score.py", []),
 }
 
 RESTART_HINT = {
@@ -110,7 +120,8 @@ def _run(cmd: List[str], cwd: Path) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--arms", default="gemma,qwen,luna")
-    ap.add_argument("--probes", default="convergence,yield_probe,tictactoe")
+    ap.add_argument("--probes",
+                    default="convergence,yield_probe,tictactoe,claim_honesty,claim_honesty_blind,turn_taking")
     ap.add_argument("--reset", action="store_true",
                     help="forget prior progress and run everything again")
     args = ap.parse_args()
@@ -159,18 +170,22 @@ def main() -> int:
             return 2
 
         for probe in pending:
-            runner, scorer = PROBES[probe]
+            runner, scorer, extra = PROBES[probe]
             print(f"\n[{arm_name}] {probe} — running")
             t0 = time.time()
             # Runners import `launcher`, so they must start from src/.
-            rc = _run([sys.executable, runner, "--backend", arm_name],
+            rc = _run([sys.executable, runner, "--backend", arm_name] + extra,
                       cwd=REPO / "src")
             if rc != 0:
                 print(f"[{arm_name}] {probe} runner exited {rc} — NOT scoring, "
                       f"NOT marking done. Fix and re-run.")
                 _save_state(state)
                 return 1
-            results = sorted((HERE / probe / "results").glob(f"*_{arm_name}"))
+            # claim_honesty writes <ts>_<arm>_<condition>; others <ts>_<arm>.
+            probe_dir = probe.replace("_blind", "")
+            suffix = extra[-1] if extra else ""
+            pattern = f"*_{arm_name}_{suffix}" if suffix else f"*_{arm_name}"
+            results = sorted((HERE / probe_dir / "results").glob(pattern))
             if not results:
                 print(f"[{arm_name}] {probe}: runner left no results dir")
                 _save_state(state)
