@@ -596,8 +596,24 @@ def synthesis_only_claims(trace_rec: Dict[str, Any],
     tool_of = {ref: str((tm or {}).get('tool') or '')
                for ref, tm in (trace_rec.get('tool_meta') or {}).items()
                if isinstance(tm, dict)}
+    # Mediated AND listed, which is the distinction the renderer already
+    # draws and this first shipped without. "Mediated" alone is every tool
+    # that isn't a raw read, including `display`, whose observation is a
+    # receipt — "OK: rendered to canvas (158 bytes)". There is no document
+    # behind a receipt to go and read, so flagging it produced an audit
+    # that told the agent to fetch "the page, the release notes, the issue"
+    # to confirm her own canvas render: a 63-second fire, live on
+    # 2026-08-17, and the same mistake as auditing a peer exchange
+    # (06928964, "it web-searched an agent's own eyes").
+    #
+    # A bibliography is what makes the claim checkable elsewhere. search-web
+    # records a query and its sources; a receipt records nothing.
+    listed = {ref for ref, tm in (trace_rec.get('tool_meta') or {}).items()
+              if isinstance(tm, dict) and any(
+                  (e or {}).get('tool_metadata')
+                  for e in (tm.get('meta') or []) if isinstance(e, dict))}
     mediated = {ref for ref, tool in tool_of.items()
-                if observation_mediation(tool) == 'mediated'}
+                if observation_mediation(tool) == 'mediated'} & listed
     if not mediated:
         return []
     out = []

@@ -71,8 +71,13 @@ def rec(tool_meta):
     return {"tool_meta": tool_meta}
 
 
-SEARCH = {"$step1": {"tool": "search-web"}}
-FETCH = {"$step1": {"tool": "fetch-text"}}
+# A synthesizer records what it searched and what it found; a receipt
+# records nothing. Only the first has a document behind it to go read.
+SEARCH = {"$step1": {"tool": "search-web",
+                     "meta": [{"tool_metadata": {"query": "sglang",
+                                                 "sources": ["github.com"]}}]}}
+FETCH = {"$step1": {"tool": "fetch-text", "meta": []}}
+RECEIPT = {"$step1": {"tool": "display", "meta": []}}
 
 
 # ── the synthesis-only trigger ─────────────────────────────────────────
@@ -141,3 +146,22 @@ def test_a_chosen_yield_carries_no_caveat(loop):
     new_id = loop._spawn_successor_from_yield(parent, "Do the next part.")
 
     assert props(loop, new_id)["instruction"] == "Do the next part."
+
+
+def test_a_receipt_is_not_a_summary_to_go_and_read():
+    """Regression, live 2026-08-17. `display` is "mediated" only because it
+    is not a raw read; its observation is a receipt — "OK: rendered to
+    canvas (158 bytes)". There is no page behind it. Flagging it spawned a
+    63-second audit telling the agent to fetch "the page, the release
+    notes, the issue" to confirm her own canvas render — which is
+    06928964's "web-searched an agent's own eyes", reintroduced."""
+    c = {"claim": "The grid is displayed on the canvas.",
+         "grounding": "retrieved", "refs": ["$step1"],
+         "quote": "OK: rendered to canvas (158 bytes, format=markdown)"}
+    assert synthesis_only_claims(rec(RECEIPT), [c]) == []
+
+
+def test_a_summary_with_a_bibliography_still_flags():
+    c = {"claim": "SGLang is currently at v0.5.17.", "grounding": "retrieved",
+         "refs": ["$step1"], "quote": "the latest SGLang release is v0.5.17"}
+    assert synthesis_only_claims(rec(SEARCH), [c]) == [c]

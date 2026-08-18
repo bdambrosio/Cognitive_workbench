@@ -131,49 +131,28 @@ def test_the_memory_probe_declines_a_baseline():
     assert obj.backend.kwargs['max_tokens'] == 8
 
 
-def test_fire_triage_asks_for_low_when_the_session_has_reasoning(loop):
+def test_fire_triage_does_not_request_reasoning(loop):
+    """Tried on 2026-08-17 and reverted the same evening.
+
+    Fire triage is the busiest LLM call in the system (87 in a four-hour
+    window) and reasoning cost ~5x on it: median 0.9s -> 4.6s against
+    Qwen3.8-27B, with a 20.7s outlier. What it bought could not be shown.
+    The case it was added for — x-feed deferring on a 401 that had already
+    been fixed — returned `defer` identically with thinking on and off,
+    because there is no conflicting evidence there to weigh, only a stale
+    self-authored note and nothing measured to contradict it. More
+    deliberation over one bad input buys a better-argued wrong answer.
+
+    The real repair is a measured-now signal for tool health, the same
+    shape as _world_position_line. Until that exists, triage pays nothing.
+    """
     nid = make_concern(loop)
     loop._reasoning_effort = 'low'
     loop.backend = KwargRecorder('{"verdict": "fire"}')
 
     loop._triage_fire_candidate(nid, 'c', 'do the thing')
 
-    assert loop.backend.kwargs['reasoning_effort'] == 'low'
-
-
-def test_fire_triage_never_escalates_past_low(loop):
-    """A scenario declaring high means it for the work, not for a small
-    JSON verdict — 11c8bc5b is what that costs."""
-    nid = make_concern(loop)
-    loop._reasoning_effort = 'high'
-    loop.backend = KwargRecorder('{"verdict": "fire"}')
-
-    loop._triage_fire_candidate(nid, 'c', 'do the thing')
-
-    assert loop.backend.kwargs['reasoning_effort'] == 'low'
-
-
-def test_fire_triage_survives_a_loop_without_the_attribute(loop):
-    """Mixin attribute owned by ChatLoop.__init__; a partially built loop
-    (every test fixture, and any future caller) must not blow up here —
-    the except would swallow it into a fire-open."""
-    nid = make_concern(loop)
-    loop.backend = KwargRecorder('{"verdict": "defer", "reason": "x"}')
-
-    assert loop._triage_fire_candidate(nid, 'c', 'do it') == 'defer'
-    assert loop.backend.kwargs['reasoning_effort'] is None
-
-
-def test_fire_triage_sends_nothing_when_reasoning_is_off(loop):
-    """Gemma's template has no reasoning_effort variable, so any value at
-    all switches thinking ON from a default of off."""
-    nid = make_concern(loop)
-    loop._reasoning_effort = None
-    loop.backend = KwargRecorder('{"verdict": "fire"}')
-
-    loop._triage_fire_candidate(nid, 'c', 'do the thing')
-
-    assert loop.backend.kwargs['reasoning_effort'] is None
+    assert 'reasoning_effort' not in loop.backend.kwargs
 
 
 def test_declining_asserts_thinking_off_rather_than_omitting():
