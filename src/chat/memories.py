@@ -150,7 +150,12 @@ class MemoriesMixin:
             raw = self.backend.chat(
                 [{'role': 'system', 'content': sys_msg},
                  {'role': 'user', 'content': user_msg}],
-                max_tokens=8, temperature=0.0, cot_profile='none')
+                max_tokens=8, temperature=0.0, cot_profile='none',
+                # See the process_text probe: eight tokens cannot carry a
+                # thinking channel, and this one fails open by keeping both
+                # memories, so a baseline would quietly restore the
+                # duplication it exists to prevent.
+                reasoning_effort='none')
         except Exception as e:
             logger.warning(
                 f"[{self.character_name}] memory-relation probe failed: {e}; "

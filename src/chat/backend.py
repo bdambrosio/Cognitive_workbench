@@ -275,16 +275,24 @@ class _ChatBackend:
              enable_thinking: Optional[bool] = None,
              reasoning_effort: Optional[str] = None,
              response_schema: Optional[Dict[str, Any]] = None) -> str:
-        # Per-call reasoning_effort override. Only takes effect when the
-        # scenario already declared a baseline (self.reasoning_effort is
-        # not None) — the field is a reasoning-model concept; we don't
-        # send it to non-reasoning backends. Validation matches __init__.
+        # Per-call reasoning_effort override, plus the one value __init__
+        # does not take: 'none', meaning this call opts OUT of a baseline
+        # the scenario declared.
+        #
+        # Passing None cannot express that — None means "defer", and the
+        # resolution below then fills in the baseline. So until now no call
+        # site could decline one, which is not academic: the two one-word
+        # probes (process_text source, memory relation) budget 8 tokens for
+        # a verdict, and under coord_search_luna's `low` or the gpt-oss
+        # bench's `medium` they were being handed a thinking channel to
+        # spend it on. Both fail open — allow the call, keep both memories
+        # — so the guard would go quiet rather than loud.
         if reasoning_effort is not None:
             eff = str(reasoning_effort).strip().lower()
-            if eff not in ('low', 'medium', 'high'):
+            if eff not in ('low', 'medium', 'high', 'none'):
                 raise RuntimeError(
                     f"_ChatBackend.chat: reasoning_effort must be "
-                    f"low|medium|high, got {reasoning_effort!r}")
+                    f"low|medium|high|none, got {reasoning_effort!r}")
             reasoning_effort = eff
         stops = stops or []
         if self._cloud_llm is not None:
@@ -399,7 +407,12 @@ class _ChatBackend:
         # enable_thinking=false stay off everywhere except these calls.
         effective = (reasoning_effort if reasoning_effort is not None
                      else self.reasoning_effort)
-        if effective is not None:
+        # 'none' suppresses rather than being forwarded: the deployment
+        # pattern here is a server launched with enable_thinking=false that
+        # individual calls opt into, so omitting the field IS off. Sending
+        # the literal would also risk a 400 from engines whose schema only
+        # knows low|medium|high.
+        if effective is not None and effective != 'none':
             body['reasoning_effort'] = effective
 
         # Skip grammar / chat_template_kwargs when going to a cloud endpoint

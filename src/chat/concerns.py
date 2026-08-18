@@ -1901,7 +1901,29 @@ class ConcernsMixin:
             raw = self.backend.chat(
                 [{'role': 'system', 'content': sys_msg},
                  {'role': 'user', 'content': user_msg}],
-                max_tokens=4096, temperature=0.2, cot_profile='none')
+                max_tokens=4096, temperature=0.2, cot_profile='none',
+                # The one judgement call with evidence that it wants
+                # deliberation. The user-model reviewer triaged 395 times
+                # and fired 4 in seventy days; x-feed deferred for 17 days
+                # on a stale note it had written itself. Both had a prompt
+                # telling them to re-check against measured state, and both
+                # kept restating the previous defer. Weighing a snapshot
+                # against a measurement under conflict is the shape of task
+                # reasoning helps, unlike the synthesis passes it measurably
+                # hurt (dd366453).
+                #
+                # Note this is NOT the call site --reasoning already
+                # reaches: that flag's "triage" is the orientation
+                # evaluator's cot_profile, a different pass entirely.
+                #
+                # Low, never the baseline. A scenario declaring medium or
+                # high means it for the work, not for a small JSON verdict
+                # — 11c8bc5b is what that costs. And None when reasoning is
+                # off everywhere, which keeps Gemma untouched: its template
+                # has no reasoning_effort variable, so any value at all
+                # switches thinking ON from a default of off.
+                reasoning_effort=('low' if getattr(
+                    self, '_reasoning_effort', None) else None))
             data = repair_json_string(raw or '')
             if isinstance(data, dict) and data.get('verdict') in ('fire', 'defer', 'reset'):
                 verdict = data['verdict']

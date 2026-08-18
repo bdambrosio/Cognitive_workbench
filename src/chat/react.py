@@ -211,6 +211,11 @@ class ReactMixin:
                 [{'role': 'system', 'content': sys_msg},
                  {'role': 'user', 'content': user_msg}],
                 max_tokens=8, temperature=0.0, cot_profile='none',
+                # Opt out of any scenario baseline. Eight tokens is a
+                # verdict, not a deliberation; hand this a thinking channel
+                # and it returns empty, which fails open and silently
+                # un-guards every process_text call.
+                reasoning_effort='none',
             )
         except Exception as e:
             logger.warning(
