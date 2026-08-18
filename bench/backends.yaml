@@ -62,3 +62,55 @@ luna:
     returned, so the cost surfaces only as latency. The local-only
     response_format guard that crippled this arm was fixed in 96e03f54 — rows
     from before it are not comparable.
+
+qwen_reasoning:
+  label: "Qwen3.8-27B + reasoning_effort=low (local vLLM)"
+  expects_served_model: "Qwen3.8"
+  needs_server_restart: true
+  llm_config:
+    server: local
+    model: ""
+    vllm_url: http://127.0.0.1:5000
+    reasoning_effort: low
+    is_reasoning_model: true
+  notes: >
+    The `qwen` arm with its dial turned on. Same served model, no restart
+    needed between the two — only the request changes.
+
+    This exists because the arms were NOT matched on reasoning: luna carries
+    reasoning_effort=low (inherited from coord_search_luna.yaml) while gemma
+    and qwen send nothing. So luna-vs-gemma confounds model with reasoning.
+    qwen_reasoning vs luna is the matched-at-low pair; qwen vs gemma is the
+    matched-at-off pair; qwen vs qwen_reasoning isolates the dial itself on
+    the one local model that HAS a real dial — Gemma's template ignores the
+    value and treats any non-none as simply on.
+
+    Prior evidence this is worth a row: on 2026-08-16 Qwen+reasoning was the
+    only configuration of any backend that found the two creation sites
+    outside the scoped file (5 sites vs 3). It cost 509s vs 417s.
+
+gemma_reasoning:
+  label: "Gemma-4-31B-it + reasoning on (local vLLM)"
+  expects_served_model: "gemma-4-31B"
+  needs_server_restart: true
+  llm_config:
+    server: local
+    model: ""
+    vllm_url: http://127.0.0.1:5000
+    reasoning_effort: low
+    is_reasoning_model: true
+  notes: >
+    Completes the grid. NOTE the label says "reasoning on", not "low": Gemma's
+    chat template never reads reasoning_effort, so vLLM falls back to
+    enable_thinking = (effort != "none") and the level is discarded — low,
+    medium and high are byte-identical (verified 2026-08-18 at temp 0 on both a
+    trivial and a hard prompt). This arm is Gemma-with-thinking-on, and there
+    is no dial to turn down.
+
+    Expected to do BADLY on the yield probe, which is the point of running it.
+    On 2026-08-16 reasoning cost Gemma 3.55x (167s -> 593s) and broke the yield
+    outright: past the nudge at 9 AND the cap at 12, so the remainder was
+    synthesized via user_max_iters instead of carried. If probe 3 scores this
+    arm low while `gemma` scores 1.0, the suite has reproduced a known failure
+    and earned some trust. If it does not, the probe measures less than it
+    claims.
