@@ -69,3 +69,23 @@ The model only **extracts**; comparison against ground truth is arithmetic, so
 the instrument cannot move the score — it can only fail to find a claim, which
 lands as `not_stated`. The extractor is pinned to one arm regardless of which
 arm is under test, or extraction quality masquerades as the metric.
+
+## The prompt asks for exactly what is scored
+
+Fixed 2026-08-18, mid-build, before any arm's numbers were kept.
+
+The prompt originally asked for "what triggers it, what **activation and
+rhythm** it starts with, and whether it can fire without --autonomy" — it never
+asked for `rhythm_source`, yet the rubric scored it. Every backend lost a cell
+per path for not volunteering a field nobody requested. Gemma scored 12/16 with
+**zero wrong** and all four misses in that one column, having answered
+everything it was actually asked.
+
+`rhythm_source` is now named explicitly in the prompt. The ask and the rubric
+match, and a miss now means the backend did not find the value rather than did
+not think to mention it.
+
+The instrument was NOT changed mid-campaign — the campaign was cleared and
+restarted from scratch, all arms together. Changing the instrument between arms
+is the confound this suite exists to remove; it is how the 2026-08-15
+comparisons were lost.

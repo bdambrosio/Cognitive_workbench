@@ -45,15 +45,23 @@ logger = logging.getLogger("bench.convergence.runner")
 SOURCE = "User"
 SCENARIO = REPO / "scenarios" / "yield_test.yaml"
 
-# The 2026-08-16 task, with the yield instruction REPLACED by a completion
-# instruction. This is deliberately NOT byte-identical to the archived
-# yield_test.* runs, so those are no longer a free baseline for probe 1 —
-# they were driven by the launcher with autonomy on, so their continuations
-# fired and finished the work, which this single turn cannot do.
+# The 2026-08-16 task with TWO deliberate departures, so this is not
+# byte-identical to the archived yield_test.* runs and they are not a baseline
+# for probe 1 (they were launcher-driven with autonomy on, so their
+# continuations fired and finished work a single turn cannot):
+#
+#   1. The yield instruction is replaced by a completion instruction — probe 3
+#      owns yielding, and one turn cannot both yield and finish.
+#   2. rhythm_source is asked for BY NAME. The rubric has always scored it, but
+#      the old prompt asked only for "activation and rhythm", so every backend
+#      lost a cell per path for not volunteering a field nobody requested.
+#      Gemma scored 12/16 on 2026-08-18 with zero wrong and all four misses in
+#      that one column. The ask now matches what is scored.
 PROMPT = (
     "Using inspect, map every code path in src/chat/concerns.py that creates "
-    "an agent_concern — for each: what triggers it, what activation and "
-    "rhythm it starts with, and whether it can fire without --autonomy. Work "
+    "an agent_concern. For each path report: what triggers it, its starting "
+    "activation, its rhythm — BOTH the rhythm_hours value and the "
+    "rhythm_source value — and whether it can fire without --autonomy. Work "
     "through all of them and give your complete findings in this turn, with "
     "the specific values you found. Do not yield; if you run short of room, "
     "report the concrete values you have rather than promising them."
