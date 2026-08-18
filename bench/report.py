@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 HERE = Path(__file__).resolve().parent
-PROBE_DIRS = ("convergence", "tictactoe")
+PROBE_DIRS = ("convergence", "yield_probe", "tictactoe")
 
 
 def _rows() -> List[Dict[str, Any]]:
@@ -50,12 +50,16 @@ def main() -> int:
         arm = s.get("backend_arm") or "?"
         wall = s.get("wall_clock_s")
         if "probe1_convergence" in s:
-            c, y = s["probe1_convergence"], s["probe3_yield"]
+            c = s["probe1_convergence"]
+            exits = (s.get("costs") or {}).get("exit_reasons")
             print(f"{arm:<8} {'convergence':<13} {c['score']:>7} {wall:>8}  "
                   f"{c['cells_correct']}/{c['cells_total']} cells "
-                  f"(wrong={c['cells_wrong']} unstated={c['cells_not_stated']})"
+                  f"(wrong={c['cells_wrong']} unstated={c['cells_not_stated']}) "
+                  f"exits={exits}"
                   f"{'' if c.get('extraction_ok') else '  [EXTRACTION FAILED]'}")
-            print(f"{'':<8} {'yield':<13} {y['score']:>7} {'':>8}  "
+        if "probe3_yield" in s:
+            y = s["probe3_yield"]
+            print(f"{arm:<8} {'yield':<13} {y['score']:>7} {wall:>8}  "
                   f"exit={y['exit_reasons']} continuation={y['continuation_spawned']} "
                   f"primed={y['continuation_primed_at_threshold']}")
         if "probe2_tictactoe" in s:

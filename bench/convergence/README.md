@@ -1,9 +1,18 @@
-# convergence + yield — probes 1 and 3
+# convergence — probe 1
 
-One run, two scores. They share it because the task **is** the yield test: the
-prompt is deliberately bigger than one turn and says so, which is what makes
-the exit reason meaningful. Measuring them separately would spend the turn
-twice to look at the same turn.
+Can the backend produce the sixteen facts at all? One turn, no yielding.
+
+**Probe 3 moved to `bench/yield_probe/` on 2026-08-18.** The two shared a run
+at first, to save a turn, and it scored Gemma 0/16 — which was a harness
+artifact, not a result. Gemma found all four paths and yielded exactly as
+instructed, leaving a 243-char handoff where the answer should have been,
+because the continuation only fires with autonomy on. Probe 3 *rewards*
+yielding; probe 1 needs the completed answer. One turn cannot satisfy both.
+
+Consequence: **probe 1's prompt is no longer byte-identical to the 2026-08-16
+one**, so the archived `yield_test.*` runs are no longer a free baseline for
+it. They were launcher-driven with autonomy on, so their continuations fired
+and finished the work — something a single bench turn cannot reproduce.
 
 ## Run
 
@@ -14,9 +23,9 @@ cd ..
 python bench/convergence/score.py --run-dir bench/convergence/results/<ts>_<arm>
 ```
 
-Or let the campaign driver do both: `python3 bench/run_probes.py`.
+Or let the campaign driver do everything: `python3 bench/run_probes.py`.
 
-## Probe 1 — convergence (16 cells)
+## The 16 cells
 
 Four creation paths in `src/chat/concerns.py` × four facts each: activation,
 `rhythm_hours`, `rhythm_source`, and whether the path can fire with
@@ -51,24 +60,6 @@ Every line number in `ground_truth.json` moved between 2026-08-16 and
 what to check and does **not** rewrite the JSON: values change far more rarely
 than lines, and a human reconciling a moved line is cheaper than a script
 silently rewriting the wrong cell.
-
-## Probe 3 — yield
-
-Entirely mechanical, no instrument involved. Three components:
-
-- `yielded` — did the turn exit with `yield` rather than `respond` or `max_iters`
-- `continuation_spawned` — did a one-shot `urgency` concern get created
-- `continuation_primed_at_threshold` — at activation 0.70, not 0.0
-
-The third is the one that bites. `Note_19` was created at activation 0.000
-against a 1h rhythm and never fired — a conversational beat scheduled on the
-same clock as a daily security patrol. A yield that spawns an unprimed
-continuation has lost the work just as surely as one that spawns nothing.
-
-Creation is asserted, not firing. Creation happens in-turn and needs no
-autonomy; firing is gated at `chat_loop.py:2211` unconditionally. The bench
-therefore runs with `autonomy_enabled=False`, which is also the safe default —
-it must never mutate live resource-manager state.
 
 ## Why the extractor is a model and not a regex
 

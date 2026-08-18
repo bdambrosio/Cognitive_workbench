@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Score probes 1 (convergence) and 3 (yield) off one run dir.
+"""Score probe 1 — convergence.
 
     python bench/convergence/score.py --run-dir bench/convergence/results/<ts>_<arm>
 
@@ -157,39 +157,6 @@ def score_convergence(reply: str, truth: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def score_yield(trace: List[Dict[str, Any]],
-                concerns: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Probe 3. Entirely mechanical — no instrument involved.
-
-    `continuation_spawned` asserts on CREATION, which happens in-turn and needs
-    no --autonomy; firing is gated separately. A yield that spawns nothing has
-    lost the work, which is the failure Note_19 recorded.
-    """
-    exits = [t.get("exit_reason") for t in trace]
-    yielded = "yield" in exits
-    spawned = [c for c in concerns
-               if c.get("category") == "one_shot"
-               and not c.get("seed")
-               and c.get("rhythm_source") == "urgency"]
-    primed = [c for c in spawned
-              if abs(float(c.get("activation") or 0.0) - 0.70) < 0.01]
-    return {
-        "exit_reasons": exits,
-        "yielded": yielded,
-        "iters_at_exit": [t.get("iters") for t in trace],
-        "hit_max_iters": "max_iters" in exits,
-        "continuation_spawned": bool(spawned),
-        "continuation_primed_at_threshold": bool(primed),
-        "continuation_count": len(spawned),
-        "continuations": [{k: c.get(k) for k in
-                           ("note_id", "activation", "rhythm_hours",
-                            "rhythm_source", "category", "system_spawned")}
-                          for c in spawned],
-        "score": round(sum([yielded, bool(spawned), bool(primed)]) / 3.0, 4),
-        "_score_note": "yielded + continuation spawned + primed at threshold",
-    }
-
-
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--run-dir", type=Path, required=True)
@@ -200,7 +167,6 @@ def main() -> int:
     truth = json.loads(GROUND_TRUTH.read_text(encoding="utf-8"))
 
     conv = score_convergence(raw.get("reply") or "", truth)
-    yld = score_yield(raw.get("trace") or [], raw.get("agent_concerns") or [])
 
     summary = {
         "backend_arm": meta.get("backend_arm"),
@@ -210,7 +176,6 @@ def main() -> int:
         "wall_clock_s": meta.get("wall_clock_s"),
         "costs": meta.get("costs"),
         "probe1_convergence": conv,
-        "probe3_yield": yld,
     }
     (args.run_dir / "summary.json").write_text(
         json.dumps(summary, indent=2, default=str) + "\n", encoding="utf-8")
@@ -222,9 +187,9 @@ def main() -> int:
     for pk, cells in conv["grid"].items():
         bad = {c: v for c, v in cells.items() if v != "correct"}
         print(f"    {pk:<20} {'ALL CORRECT' if not bad else bad}")
-    print(f"  probe3 yield        score={yld['score']} yielded={yld['yielded']} "
-          f"continuation={yld['continuation_spawned']} "
-          f"primed={yld['continuation_primed_at_threshold']}")
+    costs = meta.get("costs") or {}
+    print(f"  exits               {costs.get('exit_reasons')} "
+          f"(iters_total={costs.get('iters_total')})")
     print(f"  wrote {args.run_dir / 'summary.json'}")
     return 0
 

@@ -1,22 +1,20 @@
 #!/usr/bin/env python3
-"""Probe 1 — convergence.
+"""Probe 3 — yield.
 
-Can the backend produce the sixteen facts at all? One turn, no yielding.
+Does a turn that runs out of room hand its work forward intact?
 
-SPLIT FROM PROBE 3 on 2026-08-18 after the merged version scored Gemma 0/16.
-It had not failed: it found all four paths and yielded as instructed, leaving
-a 243-char handoff where the answer should have been, because the continuation
-only fires with autonomy on. Probe 3 REWARDS yielding and probe 1 needs the
-completed answer — one turn cannot satisfy both, and the merged run measured
-the contradiction rather than the backend. See bench/yield_probe/ for probe 3.
+The prompt is the 2026-08-16 one, verbatim: deliberately bigger than one turn
+and saying so, which is what makes the exit reason meaningful. Nothing here
+grades the CONTENT of the reply — that is probe 1's job, and asking one turn
+to both yield and finish is what made the merged version incoherent.
 
     cd src
-    python ../bench/convergence/runner.py --backend gemma
+    python ../bench/yield_probe/runner.py --backend gemma
 
-Writes bench/convergence/results/<ts>_<backend>/ with raw.json + run_meta.json,
+Writes bench/yield_probe/results/<ts>_<backend>/ with raw.json + run_meta.json,
 then score with:
 
-    python bench/convergence/score.py --run-dir <that dir>
+    python bench/yield_probe/score.py --run-dir <that dir>
 """
 
 from __future__ import annotations
@@ -40,23 +38,20 @@ from bench.common import (build_loop_config, load_arm,  # noqa: E402
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-logger = logging.getLogger("bench.convergence.runner")
+logger = logging.getLogger("bench.yield_probe.runner")
 
 SOURCE = "User"
 SCENARIO = REPO / "scenarios" / "yield_test.yaml"
 
-# The 2026-08-16 task, with the yield instruction REPLACED by a completion
-# instruction. This is deliberately NOT byte-identical to the archived
-# yield_test.* runs, so those are no longer a free baseline for probe 1 —
-# they were driven by the launcher with autonomy on, so their continuations
-# fired and finished the work, which this single turn cannot do.
+# Verbatim the prompt used across the 2026-08-16 comparisons. Do not reword:
+# the archived yield_test.* runs are only a free baseline for this probe while
+# the prompt is byte-identical to what produced them.
 PROMPT = (
     "Using inspect, map every code path in src/chat/concerns.py that creates "
     "an agent_concern — for each: what triggers it, what activation and "
     "rhythm it starts with, and whether it can fire without --autonomy. Work "
-    "through all of them and give your complete findings in this turn, with "
-    "the specific values you found. Do not yield; if you run short of room, "
-    "report the concrete values you have rather than promising them."
+    "through all of them. This is bigger than one turn; yield rather than "
+    "stop when you run out of room."
 )
 
 
@@ -84,7 +79,7 @@ def main() -> int:
     logger.info("arm=%s served=%s", arm["name"], served.get("served"))
 
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
-    world = args.world_name or f"bench-conv-{ts}-{args.backend}"
+    world = args.world_name or f"bench-yield-{ts}-{args.backend}"
     out = args.output_dir or (HERE / "results" / f"{ts}_{args.backend}")
     out.mkdir(parents=True, exist_ok=True)
 
@@ -125,7 +120,7 @@ def main() -> int:
     }, indent=2, default=str) + "\n", encoding="utf-8")
 
     (out / "run_meta.json").write_text(json.dumps({
-        "probe": "convergence (probe 1)",
+        "probe": "yield (probe 3)",
         "backend_arm": arm["name"],
         "backend_label": arm.get("label"),
         "served_model_check": served,

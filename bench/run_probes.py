@@ -36,6 +36,8 @@ STATE = HERE / "campaign.json"
 PROBES = {
     "convergence": (HERE / "convergence" / "runner.py",
                     HERE / "convergence" / "score.py"),
+    "yield_probe": (HERE / "yield_probe" / "runner.py",
+                    HERE / "yield_probe" / "score.py"),
     "tictactoe": (HERE / "tictactoe" / "runner.py",
                   HERE / "tictactoe" / "score.py"),
 }
@@ -108,7 +110,7 @@ def _run(cmd: List[str], cwd: Path) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--arms", default="gemma,qwen,luna")
-    ap.add_argument("--probes", default="convergence,tictactoe")
+    ap.add_argument("--probes", default="convergence,yield_probe,tictactoe")
     ap.add_argument("--reset", action="store_true",
                     help="forget prior progress and run everything again")
     args = ap.parse_args()
