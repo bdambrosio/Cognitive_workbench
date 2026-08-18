@@ -124,3 +124,7 @@ docs/*.png
 # Local secrets for run.sh (API keys) — do not commit
 .env
 .venv/
+
+# benchmarks v2 — run outputs and campaign progress
+bench/*/results/
+bench/campaign.json

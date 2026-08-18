@@ -12,8 +12,35 @@ three run attempts on availability alone.
 
 | dir | role |
 |---|---|
+| `convergence/` | **Probes 1 + 3** — `concerns.py` creation-site mapping (16 cells) and yield behaviour. One run, two scores: the task *is* the yield test. |
+| `tictactoe/` | **Probe 2** — multi-turn state with no board in the prompt. Fully mechanical, no judge, no network. |
 | `coord_search/` | The v2 reference implementation. `score.py` is mechanical, LLM-free by default, and holds its extraction instrument constant across arms. Read it before writing a new scorer. Covers probes 4–5. |
 | `hle/` | The single capability anchor. Pin-30 question set; see the pinning note in its README for the enforcement gap. |
+| `backends.yaml` | The three arms — gemma, qwen, luna. ONE source of truth: probes take `--backend <name>` and overlay the block onto whatever scenario they drive, so adding an arm never means forking a scenario. Forked scenarios are how the 2026-08-15 comparisons acquired a second variable and had to be discarded. |
+| `common.py` | Arm loading, served-model verification, scenario overlay, trace/concern reading, the pinned extraction instrument. |
+| `run_probes.py` | Campaign driver — resumable, and stops to ask for a vLLM restart rather than attempting one. |
+| `report.py` | One table across every arm and probe that has been scored. |
+
+## Running a campaign
+
+```bash
+python3 bench/run_probes.py --arms gemma,qwen,luna
+```
+
+It runs everything it can unattended. The one thing it will not do is restart
+the vLLM server: when it reaches a local arm whose model is not the one being
+served, it stops, prints the exact command, and exits 2. Re-run the same
+command afterwards — completed (arm, probe) pairs live in `campaign.json` and
+are skipped.
+
+Arm order is computed, not given: whichever local model is already loaded runs
+first, cloud runs whenever, and the arm needing a restart is left for last, so
+one restart covers the campaign instead of two.
+
+**Every run records what the server said it was serving.** A row that cannot
+name its own backend is not evidence — on 2026-08-15 one run's backend identity
+rested on recollection, and the arm mismatch is now a hard refusal rather than a
+footnote.
 
 ## What was retired, and why
 
@@ -40,8 +67,24 @@ stale; they need rewriting against v2.
 
 ## Not yet built
 
-Probes 1–3 and 6 from `docs/harness-behaviour-suite.md`: convergence
-(`concerns.py` mapping), state-across-turns (tic-tac-toe), yield, and the
-cost rider. No ship gate is attached to any of it yet — deliberately.
-Run it as a reporting instrument across several backends first, and attach
-floors only once the numbers demonstrably separate.
+Probes 4 (claim honesty) and 5 (turn-taking) from
+`docs/harness-behaviour-suite.md`. Both have partial scaffolding already in
+`coord_search/score.py` — the `model_prior` overclaim fraction is most of probe
+4, and the stall / silent-turn split is most of probe 5.
+
+Probe 6 (the cost rider) is not a separate probe: wall clock, iteration counts
+and exit-reason histograms ride along on every run via `common.turn_costs`.
+
+**No ship gate is attached to any of this, deliberately.** Run it as a
+reporting instrument across several backends first, and attach floors only once
+the numbers demonstrably separate. Inventing a gate before seeing the spread is
+how the mean−1.5×band formula once produced a 0.660 threshold that would have
+waved through real regressions.
+
+## Reading a result honestly
+
+`report.py` prints n=1 per cell and says so. Gemma's three no-reasoning runs on
+2026-08-16 disagreed with each other more than the backends disagreed on most
+measures — one run got priming right with a broken inspect tool, another
+invented a creation path. A single run is anecdote. Two conclusions have
+already had to be retracted for treating one as a result.

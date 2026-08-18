@@ -1,0 +1,64 @@
+# The three arms under test. ONE source of truth — probes take `--backend
+# <name>` and overlay the block below onto whatever scenario they drive, so
+# adding an arm never means forking a scenario file. Forked scenarios are how
+# the 2026-08-15 comparisons acquired a second variable and had to be thrown
+# away.
+#
+# `expects_served_model` is a SUBSTRING checked against the server's
+# /v1/models response before a run starts. The 2026-08-15 session recorded no
+# served-model name anywhere, so one run's backend identity rested on
+# recollection. A run that cannot name its own backend is not evidence.
+# Cloud arms skip the check (nothing to interrogate).
+
+gemma:
+  label: "Gemma-4-31B-it (local vLLM)"
+  expects_served_model: "gemma-4-31B"
+  needs_server_restart: true
+  llm_config:
+    server: local
+    model: ""
+    vllm_url: http://127.0.0.1:5000
+    is_reasoning_model: false
+  notes: >
+    Run WITHOUT --reasoning. Measured 167s vs 593s (3.55x) on the same task,
+    and reasoning broke the yield outright — past the nudge at 9 and the cap
+    at 12. Server must carry --reasoning-parser gemma4 or deliberation lands
+    in content (1201 dropped discourse lines -> 0).
+
+qwen:
+  label: "Qwen3.8-27B (local vLLM, FP8 + MTP)"
+  expects_served_model: "Qwen3.8"
+  needs_server_restart: true
+  llm_config:
+    server: local
+    model: ""
+    vllm_url: http://127.0.0.1:5000
+    is_reasoning_model: false
+  notes: >
+    Occupies the SAME port as gemma, so the two local arms cannot run in one
+    session — the server has to be restarted between them. Serve with
+    --reasoning-parser qwen3: without it the pre-opened <think> arrives
+    in-band in content, and a mid-thought truncation returns reasoning AS the
+    visible reply. Unlike Gemma, this template honours reasoning_effort as a
+    real dial; left unset here so the arm matches gemma's no-reasoning
+    posture.
+
+luna:
+  label: "gpt-5.6-luna (OpenAI cloud)"
+  expects_served_model: null
+  needs_server_restart: false
+  llm_config:
+    server: openai
+    model: "gpt-5.6-luna"
+    vllm_url: https://api.openai.com/v1
+    # NAME of the env var holding the bearer token, not the token.
+    api_key: OPENAI_API_KEY
+    reasoning_effort: low
+    is_reasoning_model: true
+  notes: >
+    Needs OPENAI_API_KEY exported. reasoning_effort stays at low: a character
+    baseline reaches EVERY emission, and most emissions are a subagent picking
+    a file to read, not thinking. Cloud reasoning tokens are billed and not
+    returned, so the cost surfaces only as latency. The local-only
+    response_format guard that crippled this arm was fixed in 96e03f54 — rows
+    from before it are not comparable.

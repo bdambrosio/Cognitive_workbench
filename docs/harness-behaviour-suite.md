@@ -67,15 +67,28 @@ In priority order. These are the parts to argue with, before the probes.
 
 | # | probe | measures | mechanical score | status |
 |---|---|---|---|---|
-| 1 | **Convergence** — `concerns.py` creation-site mapping | tool-loop convergence, search completeness | 16-cell rubric (4 facts × 4 paths) · `max_iters` rate · wall clock | ground truth exists; 4 archived runs give a free baseline |
-| 2 | **State across turns** — tic-tac-toe vs scripted opponent | multi-turn state with no prompt scaffolding | legal-move rate · forced-block rate · board-render accuracy · terminal agreement | new; seeded by the verified 2026-08-18 game |
-| 3 | **Yield** — `scenarios/yield_test.yaml` | turn-boundary handoff | `exit_reason == yield` · iters at exit · continuation correctness | scenario exists |
+| 1 | **Convergence** — `concerns.py` creation-site mapping | tool-loop convergence, search completeness | 16-cell rubric (4 facts × 4 paths) · `max_iters` rate · wall clock | **BUILT** `bench/convergence/` |
+| 2 | **State across turns** — tic-tac-toe vs scripted opponent | multi-turn state with no prompt scaffolding | legal-move rate · forced-block rate · win-take rate · terminal agreement | **BUILT** `bench/tictactoe/` |
+| 3 | **Yield** — `scenarios/yield_test.yaml` | turn-boundary handoff | `exit_reason == yield` · continuation spawned · continuation primed at 0.70 | **BUILT** — shares probe 1's run |
 | 4 | **Claim honesty** — task needing N verifications, tools instrumented | the Steam-titles failure | claimed-verified vs actually-fetched, from the trace | partly exists as `model_prior` fraction in `coord_search/score.py` |
 | 5 | **Turn-taking** — two agents, explicit ordering | multi-agent coordination | did B wait for A · did either author the other's line · stalls vs silent turns | `coord_search` scaffolding + scorer exist |
-| 6 | **Cost rider** — attached to 1–5, not standalone | the thing that keeps being a surprise | wall clock · LLM call count · post-turn queue depth | instrument once, free thereafter |
+| 6 | **Cost rider** — attached to 1–5, not standalone | the thing that keeps being a surprise | wall clock · iteration counts · exit-reason histogram | **BUILT** — rides along via `common.turn_costs` |
 
-Probes 1, 3, 5 reuse existing scaffolding. Only 2 and 4 are genuinely new,
-and both stay small because they are mechanically scored.
+Probes 1 and 3 share one run: the task **is** the yield test, so measuring them
+separately would spend the turn twice to look at the same turn.
+
+### Two changes made during the build
+
+- **Board-render accuracy dropped from probe 2.** The agent only renders a
+  board if it chooses to — the 2026-08-18 live game used the `display` tool on
+  every move, but nothing requires it. Scoring an optional behaviour would
+  penalise an arm for a choice the prompt never asked for.
+- **Wall clock here is NOT comparable to the archived 167s/417s/509s figures.**
+  The runners block on `_post_turn_executor.shutdown(wait=True)`, so the number
+  includes the full post-turn tail — which was independently measured at up to
+  six minutes for three turns. That is arguably the more honest cost of a turn,
+  but it is a different quantity, and comparing it to the 2026-08-16 numbers
+  would repeat exactly the incomparable-rows mistake this suite exists to stop.
 
 ### Probe 1 — ground truth
 
