@@ -35,6 +35,16 @@ qwen:
     vllm_url: http://127.0.0.1:5000
     is_reasoning_model: false
   notes: >
+    PLATFORM CHANGED 2026-08-18 evening: Bruce moved this arm from vLLM to
+    SGLang with DFLASH speculative decoding
+    (--speculative-algorithm DFLASH --speculative-draft-model-path
+    incoai/Qwen3.8-27B-DFlash2 --speculative-num-draft-tokens 8), server
+    default --default-chat-template-kwargs {"enable_thinking": false}, and
+    max_model_len 262144 rather than 65336. Rows from before and after that
+    change are NOT comparable on wall clock, and only loosely on anything else
+    — the engine, the decoding strategy and the context ceiling all moved at
+    once. Accepted knowingly.
+
     Occupies the SAME port as gemma, so the two local arms cannot run in one
     session — the server has to be restarted between them. Serve with
     --reasoning-parser qwen3: without it the pre-opened <think> arrives
@@ -74,6 +84,16 @@ qwen_reasoning:
     reasoning_effort: low
     is_reasoning_model: true
   notes: >
+    BROKEN ON THE CURRENT SERVER, 2026-08-18 evening. The SGLang launch has no
+    --reasoning-parser qwen3, so with reasoning_effort set the thinking lands
+    IN-BAND in `content` with a bare closing </think> tag and the `reasoning`
+    field stays empty. Verified by direct probe: content came back as
+    "The user is asking a simple arithmetic question... </think>\n\n9".
+    That corrupts every probe's format parsing, and a mid-thought truncation
+    returns reasoning as the visible reply. DO NOT RUN this arm until the
+    launch adds --reasoning-parser qwen3. Plain `qwen` is unaffected because
+    the server defaults enable_thinking to false.
+
     The `qwen` arm with its dial turned on. Same served model, no restart
     needed between the two — only the request changes.
 
