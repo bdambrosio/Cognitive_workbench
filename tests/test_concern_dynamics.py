@@ -19,6 +19,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+from chat.concerns import _TRIAGE_MAX_CONSECUTIVE_DEFERS
 from chat.chat_loop import (
     ChatLoop,
     _AGENT_CONCERN_BUMP_AMOUNT,
@@ -170,6 +171,46 @@ def test_triage_fails_open_to_fire(loop):
     nid = make_concern(loop)
     loop.backend = StubBackend(["not json at all"])
     assert loop._triage_fire_candidate(nid, "concern text", "instr") == "fire"
+
+
+def test_defers_are_counted_and_a_run_fires_anyway(loop):
+    """The cooldown re-asks the question; it does not make the answer
+    falsifiable. A concern whose precondition is "does this tool work"
+    has no measured state to check it against — the only probe is the
+    call being deferred — so the reason outlives the fault. Note_3980
+    deferred the X feed 60 hours running on a 401 that had been fixed
+    days earlier. Past the cap, triage fires without asking."""
+    nid = make_concern(loop, activation=0.9)
+    loop.backend = StubBackend(['{"verdict": "defer", "reason": "tool broken"}']
+                               * (_TRIAGE_MAX_CONSECUTIVE_DEFERS + 1))
+    props = loop.resource_manager.get_resource(nid)["properties"]
+
+    for n in range(1, _TRIAGE_MAX_CONSECUTIVE_DEFERS + 1):
+        props.pop("triage_at", None)          # cooldown elapsed each time
+        assert loop._triage_fire_candidate(nid, "c", "i") == "defer"
+        assert props["triage_defers"] == n
+
+    props.pop("triage_at", None)
+    assert loop._triage_fire_candidate(nid, "c", "i") == "fire"
+    # The reason goes with the count: handed to the next triage as "my own
+    # reason for deferring last time", it is what anchors the run.
+    for f in ("triage_defers", "triage_reason", "triage_verdict"):
+        assert f not in props
+
+
+def test_a_fire_verdict_clears_the_defer_run(loop):
+    nid = make_concern(loop, activation=0.9, extra={"triage_defers": 3})
+    loop.backend = StubBackend(['{"verdict": "fire"}'])
+    assert loop._triage_fire_candidate(nid, "c", "i") == "fire"
+    assert "triage_defers" not in loop.resource_manager.get_resource(nid)["properties"]
+
+
+def test_an_evidence_bump_clears_the_defer_run(loop):
+    nid = make_concern(loop, activation=0.4, extra={"triage_defers": 4})
+    loop.resource_manager.search_collection = (
+        lambda *a, **k: (True, [{"metadata": {"source_note_id": nid}}], None))
+    loop._bump_agent_concerns_on_input("new evidence in the concern domain")
+    assert "triage_defers" not in loop.resource_manager.get_resource(nid)["properties"]
 
 
 def test_triage_events_logged(loop, tmp_path):

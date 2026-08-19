@@ -227,6 +227,19 @@ def _triage_defer_cooldown_hours(rhythm_hours: float) -> float:
     _bump_agent_concerns_on_input)."""
     return min(24.0, max(1.0, float(rhythm_hours) / 8.0))
 
+# Consecutive defers before triage fires anyway, ignoring its own verdict.
+# The cooldown re-asks the question; it does not make the answer
+# falsifiable. A concern waiting on ambient state (am I there yet) is
+# decided from the measured lines in the triage prompt, but one waiting on
+# whether a tool works has no measured state at all — the only way to find
+# out is to call it, which is the action being deferred. So the reason
+# outlives the fault: Note_3980 deferred the X feed 60 hours running on
+# "401 Unauthorized" that had been fixed days earlier, and 280 hours
+# before that on a 503. Six is a retest interval, not a judgement: at the
+# 1h cooldown floor it costs one extra loop every six hours, and it scales
+# with rhythm because the cooldown does.
+_TRIAGE_MAX_CONSECUTIVE_DEFERS = 6
+
 def _snap_rhythm_hours(value) -> int:
     """Snap a rhythm_hours value to the nearest allowed bucket. Returns
     the default when value is None / unparseable / out of range."""
@@ -1296,7 +1309,8 @@ class ConcernsMixin:
         a = float(props.get('activation', 0.0) or 0.0)
         props['activation'] = min(1.0, a + _AGENT_CONCERN_BUMP_AMOUNT)
         props['last_bumped_at'] = now_iso
-        for stale in ('triage_verdict', 'triage_at', 'triage_reason'):
+        for stale in ('triage_verdict', 'triage_at', 'triage_reason',
+                      'triage_defers'):
             props.pop(stale, None)
 
     def _bump_agent_concerns_on_input(self, text: str) -> None:
@@ -1822,6 +1836,18 @@ class ConcernsMixin:
             logger.debug(
                 f"[{self.character_name}] triage cache hit (defer) for {nid}")
             return 'defer'
+        if int(props.get('triage_defers', 0) or 0) >= _TRIAGE_MAX_CONSECUTIVE_DEFERS:
+            # Clear the reason as well as the count: it is the anchor. Left
+            # in place it is handed to the next triage as "my own reason for
+            # deferring last time", which is how the run reached 60.
+            logger.info(
+                f"[{self.character_name}] triage firing {nid} after "
+                f"{props['triage_defers']} consecutive defers "
+                f"({props.get('triage_reason') or 'no reason recorded'})")
+            for stale in ('triage_verdict', 'triage_at', 'triage_reason',
+                          'triage_defers'):
+                props.pop(stale, None)
+            return 'fire'
 
         root = self.resource_manager.get_resource(self._root_concern_id(nid))
         wip = str(((root or {}).get('properties') or {}).get('wip', '') or '').strip()
@@ -1920,8 +1946,10 @@ class ConcernsMixin:
             props['triage_verdict'] = 'defer'
             props['triage_at'] = now_iso
             props['triage_reason'] = reason
+            props['triage_defers'] = int(props.get('triage_defers', 0) or 0) + 1
         else:
-            for stale in ('triage_verdict', 'triage_at', 'triage_reason'):
+            for stale in ('triage_verdict', 'triage_at', 'triage_reason',
+                          'triage_defers'):
                 props.pop(stale, None)
             if verdict == 'reset':
                 a = float(props.get('activation', 0.0) or 0.0)
