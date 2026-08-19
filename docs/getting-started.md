@@ -54,6 +54,7 @@ scenario YAML (see [configuration.md](configuration.md)):
 | `GMAIL_APP_PASSWORD` | check-email, send-email | 16-character app password (requires 2FA; generate at [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)) |
 | `GOOGLE_API_KEY` | search-web | Google Custom Search API key |
 | `GOOGLE_CX` | search-web | Google Custom Search Engine ID |
+| `TAVILY_API_KEY` | tavily | From [tavily.com](https://www.tavily.com/); every call is an `advanced` search (2 credits) because page extraction is unreliable on `basic` |
 | `ALPHA_VANTAGE_API_KEY` | stock-price, get-financial-statements | From [alphavantage.co](https://www.alphavantage.co/) |
 | `BLUESKY_ACCOUNT_HANDLE` | post-bluesky | Bluesky handle (e.g., `alice.bsky.social`) |
 | `BLUESKY_APP_PASSWORD` | post-bluesky | App password from Bluesky Settings > App Passwords |

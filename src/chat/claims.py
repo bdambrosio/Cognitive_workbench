@@ -558,7 +558,13 @@ _INFERENCE_CAPS = {
 # synthesis proves the synthesis said it, not that the source did.
 # Unknown tools default to 'mediated': the cap is the safe direction.
 _DIRECT_OBSERVATION_TOOLS = frozenset({
-    'fetch-text', 'obsidian', 'semantic-scholar', 'check-x-feed',
+    # `tavily` sits here and `search-web` does not, which is the whole
+    # difference between them: tavily's observation is the pages' own
+    # text and verbatim snippets, search-web's is a model's synthesis
+    # about those pages. The tool pins include_answer off and
+    # include_raw_content on so the distinction holds for every call and
+    # can be decided by name, as this set requires.
+    'fetch-text', 'tavily', 'obsidian', 'semantic-scholar', 'check-x-feed',
     'check-email', 'stock-price', 'get-financial-statements',
     'calculate', 'text-find', 'justify',
     'fac-status', 'fac-observe', 'fac-inventory', 'fac-nearest',
