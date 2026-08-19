@@ -117,6 +117,11 @@ class _ChatBackend:
         # stop_reason='max_tokens') apart from genuinely malformed output
         # when an emission fails to parse. Set on every chat() return path.
         self.last_finish_reason: Optional[str] = None
+        # Chars on the reasoning channel of the most recent emission, or None
+        # if the engine reported none. Field name differs by engine: vLLM
+        # returns `reasoning`, SGLang returns `reasoning_content` — checking
+        # only one gives a false "thinking is off" on the other.
+        self.last_reasoning_chars: Optional[int] = None
         # Server context window, fetched lazily from /v1/models on the
         # first local call. Sentinel None = not yet asked; 0 = asked and
         # the server did not say, so stop asking.
@@ -514,6 +519,9 @@ class _ChatBackend:
         # client-side <think> stripping or grammar-related contortions.
         choice = choices[0]
         self.last_finish_reason = choice.get('finish_reason')
+        _m = choice.get('message') or {}
+        _r = _m.get('reasoning_content') or _m.get('reasoning')
+        self.last_reasoning_chars = len(_r) if isinstance(_r, str) and _r else None
         try:
             logger.info(
                 "<llm-raw> profile=%s grammar=%s finish=%s message=%s",

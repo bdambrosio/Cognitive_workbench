@@ -841,6 +841,36 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                 f"[{self.character_name}] substrate marker write failed: {e}")
         return "; ".join(parts)
 
+    def _record_empty_response(self, cot_profile: Optional[str],
+                               max_tokens: int) -> None:
+        """Tally a call that returned no content, with the cause attached.
+
+        An empty response is NOT presumed to be a failure — an empty respond on
+        a peer turn is the deliberate don't-acknowledge idiom. This only counts
+        the generic `_llm_generate` path, where the caller wanted text and got
+        none, and it changes no control flow: it makes visible something that
+        was happening silently (a discourse crud call returned 5,018 chars of
+        reasoning and no content on 2026-08-18, and the only trace was a
+        "returning prior state unchanged" warning).
+
+        Two causes, deliberately kept apart, because they need different fixes:
+          budget  - finish=length. The token budget was spent, on reasoning or
+                    otherwise. Raise the floor for this profile.
+          stopped - finish=stop. The model ended cleanly having emitted
+                    nothing. More tokens will not help.
+        """
+        fr = getattr(self.backend, 'last_finish_reason', None)
+        rc = getattr(self.backend, 'last_reasoning_chars', None)
+        cause = 'budget' if fr == 'length' else 'stopped'
+        key = f"{cot_profile or '(none)'}/{cause}"
+        if not hasattr(self, '_empty_response_counts'):
+            self._empty_response_counts = {}
+        self._empty_response_counts[key] = self._empty_response_counts.get(key, 0) + 1
+        logger.warning(
+            f"[{self.character_name}] EMPTY RESPONSE profile={cot_profile or '(none)'} "
+            f"cause={cause} finish={fr} reasoning_chars={rc} max_tokens={max_tokens} "
+            f"(count {self._empty_response_counts[key]}) — caller wanted text, got none")
+
     def _llm_generate(self, messages, bindings=None, max_tokens=400,
                       temperature=0.7, stops=None, is_json=False,
                       cot_profile: Optional[str] = None,
@@ -881,6 +911,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                 reasoning_effort=reasoning_effort,
             )
             if not text:
+                self._record_empty_response(cot_profile, max_tokens)
                 return SimpleNamespace(success=False, text='', error='empty response')
             if is_json and isinstance(text, str):
                 parsed = repair_json_string(text)
