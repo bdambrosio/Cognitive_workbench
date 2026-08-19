@@ -453,6 +453,25 @@ def react_invoke(args, *, character_name=None, backend=None, logger=None):
             src_lines.append(f"- {domain}: {title}")
         elif title:
             src_lines.append(f"- {title} (no public URL)")
+        else:
+            continue
+        # The per-source excerpt, on a continuation line. It used to stay
+        # in `meta` — captured, stored in the trace, never read by the
+        # agent that had to act on it. The synthesis is the summarizer's
+        # conclusion; the excerpt is the closest thing in-band to
+        # per-source evidence, and it routinely carries what the
+        # conclusion left out. Measured over a 25% sample of this world's
+        # search calls (32 of 126, 172 sources): 34% of excerpts assert a
+        # fact absent from the synthesis, and 72% of calls lose at least
+        # one. Live case: turn 2837, where a recommendation turned on
+        # "no full-mouth-reconstruction marketing on this practice's
+        # site" while the dropped excerpt for that same site's services
+        # page listed full-mouth rehabilitation. Costs ~25% on the
+        # observation; no clip, the excerpts are 1-3 sentences by
+        # contract and p90 is 324 chars.
+        excerpt = ' '.join(str(s.get("excerpt") or "").split())
+        if excerpt:
+            src_lines.append(f"  {excerpt}")
     text = synthesis
     if src_lines:
         text = f"{synthesis}\n\nSources:\n" + "\n".join(src_lines)
