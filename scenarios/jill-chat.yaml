@@ -476,6 +476,11 @@ characters:
     # factorio-telemetry is the factory event ingress (game chat, joins,
     # flow stops, new alerts); quiet when the bridge or server is down.
     chat:
+      # Raised from the 8192 default for reasoning=medium. Worst observed
+      # pair (4876 tok reasoning + 1290 tok content) fits in 8192 with only
+      # ~2000 spare, and medium grew content 38-63%. max_tokens is a cap,
+      # not an allocation, so the headroom is free.
+      react_max_tokens: 12288
       omitted_tools:
         - agent-activity
 
@@ -765,6 +770,11 @@ characters:
     # (world_name unplumbed) — advertising it would just waste patrol
     # iterations on a guaranteed error.
     chat:
+      # Raised from the 8192 default for reasoning=medium. Worst observed
+      # pair (4876 tok reasoning + 1290 tok content) fits in 8192 with only
+      # ~2000 spare, and medium grew content 38-63%. max_tokens is a cap,
+      # not an allocation, so the headroom is free.
+      react_max_tokens: 12288
       omitted_tools:
         - fac-connect
         - fac-craft
@@ -917,6 +927,11 @@ characters:
         schedule: "30s"
 
     chat:
+      # Raised from the 8192 default for reasoning=medium. Worst observed
+      # pair (4876 tok reasoning + 1290 tok content) fits in 8192 with only
+      # ~2000 spare, and medium grew content 38-63%. max_tokens is a cap,
+      # not an allocation, so the headroom is free.
+      react_max_tokens: 12288
       omitted_tools:
         - fac-connect
         - fac-craft

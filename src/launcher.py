@@ -766,7 +766,12 @@ def main():
         cfg['is_infospace'] = True
         cfg['map_name'] = world_name
         cfg['autonomy_enabled'] = bool(args.autonomy)
-        cfg['reasoning_effort'] = 'low' if args.reasoning else None
+        # medium, not low: measured 2026-08-18 on Qwen3.8/SGLang, the two
+        # levels are indistinguishable on REASONING volume (median ratio
+        # 1.02x over four prompts, two of which went down at medium).
+        # What medium actually buys is longer CONTENT (+38-63%). Subagents
+        # stay clamped at 'low' by SubAgent.max_reasoning_effort.
+        cfg['reasoning_effort'] = 'medium' if args.reasoning else None
         cfg['head_aliveness_enabled'] = bool(args.head_aliveness)
         cfg['voice_enabled'] = bool(args.voice)
         cfg['voice_wake_word'] = args.wake
