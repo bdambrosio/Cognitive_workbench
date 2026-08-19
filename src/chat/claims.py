@@ -65,12 +65,26 @@ def _worst(*grades: str) -> str:
 
 # Prompt-size caps for the attribution call: per-line and total caps on
 # the working log. Observations in the stored trace are capped at
-# _REASONING_HISTORY_OBS_CAP (added 2026-08-08 to bound trace growth);
-# _restore_observations puts the elided text back before these caps
-# apply, so the total below has to accommodate a restored observation
-# rather than the 1000-char stub.
-_LINE_CAP = 800
-_LOG_CAP = 24_000
+# _REASONING_HISTORY_OBS_CAP; _restore_observations puts the elided text
+# back before these caps apply, so the total has to accommodate a
+# restored observation rather than the 1000-char stub.
+#
+# Policy, not a context limit — one turn's log cannot exceed
+# _ATTRIBUTION_OBS_CAP x REACT_MAX_ITERS (96k chars) however these are
+# set. Sized from the corpus: over 2848 turns the restored log runs 1k at
+# the median and 52,910 at its worst; lines run 38 and 9,215. The old
+# 800/24,000 cut 1.95% of lines and 0.53% of turns, and the turn cut is
+# the expensive one — it lands mid-way through the tool calls, so whole
+# observations never reach the attributor and facts the model read
+# verbatim grade model_prior (turn 2847, steps 4-6 invisible, a
+# verification fire spawned against evidence already in hand).
+#
+# Raising them is the fix; redistributing them is not. Clipping each
+# observation to an equal share of the same budget was measured and is
+# worse: the cuts land mid-span on quoted text and verbatim-quote
+# failures went 6 -> 15 across the affected turns.
+_LINE_CAP = 4_000
+_LOG_CAP = 60_000
 
 _STEP_LABEL_RE = re.compile(r'^\$step\d+', re.MULTILINE)
 _NOTE_ID_RE = re.compile(r'\[(Note_\d+)')
