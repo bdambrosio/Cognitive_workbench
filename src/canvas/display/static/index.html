@@ -65,6 +65,7 @@
   <span id="pager-prev" class="pager-btn">‹</span>
   <span id="pager-info"></span>
   <span id="pager-next" class="pager-btn">›</span>
+  <span id="pager-save" class="pager-btn" title="Save this page (s)">⤓</span>
   <span id="pager-live" hidden>LIVE</span>
 </div>
 <script>
@@ -79,6 +80,7 @@ const pagerPrevEl = document.getElementById('pager-prev');
 const pagerInfoEl = document.getElementById('pager-info');
 const pagerNextEl = document.getElementById('pager-next');
 const pagerLiveEl = document.getElementById('pager-live');
+const pagerSaveEl = document.getElementById('pager-save');
 
 // Scrollback: one entry per ReAct turn (the bridge replays recent ones on
 // connect). Same-turn publishes are drafts — they replace the tail entry,
@@ -144,13 +146,34 @@ function show(idx) {
 function updatePager() {
   if (!entries.length) { pagerEl.hidden = true; return; }
   pagerEl.hidden = false;
-  const t = new Date(entries[viewIdx].ts * 1000);
+  const en = entries[viewIdx];
+  const t = new Date(en.ts * 1000);
   const hhmm = `${String(t.getHours()).padStart(2, '0')}:${
     String(t.getMinutes()).padStart(2, '0')}`;
-  pagerInfoEl.textContent = `${viewIdx + 1}/${entries.length} · ${hhmm}`;
+  pagerInfoEl.textContent = `${viewIdx + 1}/${entries.length} · ${hhmm}`
+    + (en.turn ? ` · turn ${en.turn}` : '');
   pagerPrevEl.classList.toggle('disabled', viewIdx === 0);
   pagerNextEl.classList.toggle('disabled', viewIdx === entries.length - 1);
   pagerLiveEl.hidden = viewIdx === entries.length - 1;
+}
+
+function saveCurrent() {
+  if (!entries.length) return;
+  const en = entries[viewIdx];
+  const isHtml = en.format === 'html';
+  const d = new Date(en.ts * 1000);
+  const p2 = (n) => String(n).padStart(2, '0');
+  const stamp = `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`
+              + `-${p2(d.getHours())}${p2(d.getMinutes())}`;
+  const name = `canvas-turn${en.turn || en.seq}-${stamp}.${isHtml ? 'html' : 'md'}`;
+  const url = URL.createObjectURL(new Blob([en.content],
+    { type: (isHtml ? 'text/html' : 'text/markdown') + ';charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  statusEl.textContent = `saved ${name}`;
+  setTimeout(() => { statusEl.textContent = ''; }, 4000);
 }
 
 function nav(delta) {
@@ -161,10 +184,12 @@ function nav(delta) {
 document.addEventListener('keydown', (ev) => {
   if (ev.key === 'ArrowLeft') nav(-1);
   else if (ev.key === 'ArrowRight') nav(1);
+  else if (ev.key === 's' || ev.key === 'S') saveCurrent();
 });
 pagerPrevEl.onclick = () => nav(-1);
 pagerNextEl.onclick = () => nav(1);
 pagerLiveEl.onclick = () => show(entries.length - 1);
+pagerSaveEl.onclick = saveCurrent;
 
 function escapeHtml(s) {
   return s.replace(/[&<>"']/g, c => ({
