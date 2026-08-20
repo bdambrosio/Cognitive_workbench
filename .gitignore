@@ -128,3 +128,12 @@ docs/*.png
 # benchmarks v2 — run outputs and campaign progress
 bench/*/results/
 bench/campaign.json
+
+# exec-script sandbox: the interpreter venv (rebuild with
+# `uv venv sandbox_venv --python /usr/bin/python3`) and whatever the
+# agents write in their sandboxed scratch dirs. `git add -f` anything
+# worth keeping.
+sandbox_venv/
+sandbox_python/
+sandbox_models/
+scratch/

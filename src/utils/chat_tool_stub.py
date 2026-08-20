@@ -34,8 +34,11 @@ class StubExecutor:
     Also exposes `executive_node.benchmark_mode = True` because some
     OODA tools (exec-script in particular) check that flag before
     triggering an interactive permission prompt. The chat ReAct loop
-    can't be interactive, so we always present as benchmark-mode —
-    matches the agreed "trusted by default" policy.
+    can't be interactive, so we always present as benchmark-mode. That
+    is a statement about the channel, not a trust grant: a tool whose
+    safety depends on being asked must not rely on this flag —
+    exec-script's own bubblewrap sandbox is what makes skipping the
+    prompt acceptable there.
     """
 
     def __init__(self, world_name: Optional[str] = None):

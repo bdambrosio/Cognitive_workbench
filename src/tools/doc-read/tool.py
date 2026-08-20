@@ -2,8 +2,8 @@
 
 The gap this closes, observed 2026-08-12: an OpenReview link 403'd, the
 user downloaded the PDF instead, and there was no way to read it.
-`inspect_external` is text-only, `exec-script` is broken from the chat
-path, and `fetch-text` speaks HTTP, not file paths. The extraction logic
+`inspect_external` is text-only, `exec-script` was broken from the chat
+path at the time, and `fetch-text` speaks HTTP, not file paths. The extraction logic
 already existed in utils/doc_extract and utils/grobid — it simply was not
 reachable as an action. What followed was a review of a different paper
 found by title similarity, so the cost of the gap was not a missing
