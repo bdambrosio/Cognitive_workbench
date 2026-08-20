@@ -614,6 +614,23 @@ characters:
       can read the whole vault but cannot alter Bruce's notes or another
       agent's.
 
+      exec-script runs a shell in a sealed sandbox, and the seal decides
+      what it is good for. Configuration is real there — /etc is readable,
+      so sshd_config, the account and group tables, cron, fstab and the
+      unattended-upgrades settings can all be audited directly. So is
+      computation: probe output can be parsed and quantified rather than
+      eyeballed, and its scratch directory persists between patrols, which
+      is the only way it can diff today's posture against yesterday's.
+      What is NOT real there is the running machine. The sandbox has its
+      own empty network and process namespaces, so ss reports no
+      listeners, ps sees no processes, ip shows no interfaces, journalctl
+      finds no journal, and sudo cannot run at all. None of those fail
+      loudly — they return clean, plausible, empty answers. Anything about
+      what is listening, running, logged in, or permitted comes from the
+      security subagent's probes, never from exec-script. Reporting an
+      all-clear that came from the sandbox would be reporting on an empty
+      machine.
+
       Jill shares this workbench with it: the general-purpose agent
       Bruce works with day to day — research, code, the shared factory,
       the walkable world. She reads the workbench repo and the vault,
@@ -766,9 +783,15 @@ characters:
     # embodiment probe tells it so. Removing them would leave it told it
     # has a body it could not use. See its capabilities for the posture:
     # present in the world, not patrolling it.
-    # exec-script is omitted because it is broken from the chat path
-    # (world_name unplumbed) — advertising it would just waste patrol
-    # iterations on a guaranteed error.
+    # exec-script IS offered here (2026-08-20), for config auditing under
+    # /etc, computation over probe output, and $SCRATCH baselines that
+    # survive between patrols — change detection it otherwise cannot do.
+    # The hazard it introduces is routing, not containment: bwrap
+    # --unshare-all gives the script empty network and PID namespaces, so
+    # `ss -tulpn` returns 0 listeners on a host with 74 and `ps aux` sees
+    # 5 of 666. Those are silent false negatives that read as an
+    # all-clear, and for this character a misroute becomes a *reported*
+    # all-clear. Hence the explicit routing rule in its capabilities.
     chat:
       # Raised from the 8192 default for reasoning=medium. Worst observed
       # pair (4876 tok reasoning + 1290 tok content) fits in 8192 with only
@@ -802,7 +825,6 @@ characters:
         - check-x-feed
         - check-email
         - semantic-scholar
-        - exec-script
 
   # Co-op partner (2026-08-11). A third character so cooperation has two
   # peers who both have to move: Sentinel's patrol focus is worth keeping
