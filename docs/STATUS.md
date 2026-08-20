@@ -5,7 +5,9 @@ Classification of every doc against the live codebase. Full review
 **2026-07-19** (four entrypoint docs rewritten, drifted docs given
 status banners, second superseded set deleted — list below); third pass
 **2026-08-08** (essay/draft cleanup, third superseded set deleted, index
-reconciled against the tree).
+reconciled against the tree); partial pass **2026-08-20** (exec-script
+rows reconciled — three docs described it as broken or as running in a
+directory that never existed).
 
 Context: the OODA executive, incremental planner (Stage 0–3, envisioning,
 vision eval), GoalScheduler, and task-execution machinery were deleted
@@ -14,6 +16,19 @@ vision eval), GoalScheduler, and task-execution machinery were deleted
 fire-time triage and per-concern WIP as of 2026-06), infospace
 Notes/Collections, SKILL.md tools and sensors, resource browser / affect /
 canvas displays.
+
+As of **2026-08-20** `exec-script` is live again for Jill and Sentinel
+after four and a half months broken, rewritten as a bubblewrap sandbox:
+repo read-only, no network, no `$HOME`, empty environment, writes
+confined to a persistent per-character `$SCRATCH` and a per-call tmpfs
+`/tmp`, fail-closed if bwrap is absent. It carries a `sandbox_venv`
+(gitignored, rebuilt not cloned) provisioned to full parity with the
+host test suite — 588/588 in-sandbox — so a patch can be applied to a
+copy of the tree and tested there. Note the sandbox's empty network and
+PID namespaces make host observation from inside it silently wrong
+(`ss` reports no listeners, `ps` no processes); that is documented in
+the tool's Skill.md and in Sentinel's capabilities, and it is why the
+security subagent's probes remain the only route to live host state.
 
 ## What this system is, as a coordinate
 
@@ -74,14 +89,14 @@ point of recording this here:
 | [m1-collection-inputs.md](m1-collection-inputs.md) | Exemplar user inputs for M1 fire-outcome collection: reaction forms per outcome, latency spread, anti-patterns, cadence |
 | [justification-taxonomy.md](justification-taxonomy.md) | Closed claim taxonomy (volatility, inference type) + deterministic reduction to ordinal grades; the read path is the `justify` built-in |
 | [self-awareness-benchmarks.md](self-awareness-benchmarks.md) | Four-tier self-awareness bench (`bench/introspective_fidelity/`); verified 2026-07-19 |
-| [sentinel-setup.md](sentinel-setup.md) | Sentinel desktop-security character: Tier 0 unprivileged probes, Tier 2 argument-exact sudoers fence, `adm`-group prerequisite; sudoers installed + verified live 2026-08-08. Ubuntu/systemd-specific (ufw + AppArmor) |
+| [sentinel-setup.md](sentinel-setup.md) | Sentinel desktop-security character: Tier 0 unprivileged probes, Tier 2 argument-exact sudoers fence, `adm`-group prerequisite; sudoers installed + verified live 2026-08-08. Ubuntu/systemd-specific (ufw + AppArmor). Privilege-boundary note rewritten 2026-08-20: Sentinel now also has sandboxed `exec-script` (for `/etc` config audit, computing over probe output, cross-patrol `$SCRATCH` baselines), and the docker-group escalation it warned about is closed inside the sandbox — socket unbound, supplementary groups mapped to `nogroup`, both measured |
 | [sensor_spec.md](sensor_spec.md) | Sensor system (`src/sensors/`, `sensor_runner.py`, SKILL.md metadata); banner 2026-07-19 — machinery live, OODA framing + launcher-integration section stale |
 | [sensor_spec_change_order_1.md](sensor_spec_change_order_1.md) | Sensor disposition field; banner 2026-07-19 — data contract live, `trigger`/`alert` semantics inert (only `inform` meaningful) |
 | [shared-world.md](shared-world.md) | Shared walkable 3D world behind `--world` (`src/world/`): terrain, authoritative server + ports, `world-*` tools, world-presence sensor, and the creature avatars (crow / kitten / owl) with their preview harness. Written 2026-08-10 against the code |
 | [substack_awareness_evaluation.md](substack_awareness_evaluation.md) | Self-awareness bench writeup (implemented suite) |
 | [substack_sensors_vs_tools.md](substack_sensors_vs_tools.md) | Tools-pull vs sensors-push essay; matches live architecture |
 | [trace_grounded_introspectionv3.md](trace_grounded_introspectionv3.md) | Trace-as-input introspection; reasoning_history injection verified live 2026-07-19 |
-| [ui-guide.md](ui-guide.md) | The live UI surfaces (CLI, resource browser, affect, canvas, telegram) — REWRITTEN 2026-07-19 (previous version described the deleted OODA UI + nonexistent port-3002 manager) |
+| [ui-guide.md](ui-guide.md) | The live UI surfaces (CLI, resource browser, affect, canvas, telegram) — REWRITTEN 2026-07-19 (previous version described the deleted OODA UI + nonexistent port-3002 manager); canvas section predates the 2026-08-20 pager additions (⤓ / `s` saves the displayed keyframe's raw payload, and the readout carries the turn number) |
 
 ## ASPIRATIONAL
 
@@ -92,7 +107,7 @@ point of recording this here:
 | [fire-outcome-capture.md](fire-outcome-capture.md) | Signed per-ledger outcome capture for autonomous fires — Phase 1 (capture, reflection stage 6) implemented 2026-07 (commit 8a2bacf7); Phase 2 (outcome-modulated dynamics) gated on data |
 | [harness-roadmap.md](harness-roadmap.md) | Measurement-gated improvement loop (M0 frozen composite bench → fire-outcome data → weakness-mining cycles → re-grounded self-extension) — adopted 2026-07-08; M0 complete, M1 running (see harness-m0-m1-status.md); M2–M5 unbuilt |
 | [jill-integration.md](jill-integration.md) | Jill↔ChatterBot head binding design; voice sensor + say path + head/camera tools live, rest design |
-| [jill-self-extension.md](jill-self-extension.md) | Recursive tool construction; Phase 2a (judgment/propose-only) SHIPPED 2026-06 — capability-gap capture → self-extension concern; Phase 1/2b (generative author-test-restart path) unbuilt |
+| [jill-self-extension.md](jill-self-extension.md) | Recursive tool construction; Phase 2a (judgment/propose-only) SHIPPED 2026-06 — capability-gap capture → self-extension concern; Phase 1/2b (generative author-test-restart path) unbuilt. `exec-script` rows corrected 2026-08-20 (bubblewrap, not `scenarios/<world>/fs/`); its author→test→propose→human-gate pipeline is also the nearest existing design for the L3 propose-patch step |
 | [knowledge-base-system.md](knowledge-base-system.md) | Obsidian-backed three-tier knowledge base; obsidian tool (read/search/write→Notes) exists, decomposition/curation system doesn't |
 | [learned-disposition-design.md](learned-disposition-design.md) | Tiny-LM state→value learning over fire decisions (RL on imagined trajectories, real judged outcomes as anchor); G1 offline anchor passed 2026-07-24 (`bench/disposition/`), build-order step 1 — state capture + render — SHIPPED 2026-07-25 (`src/chat/disposition.py`, shadow-log only); scorer, imagination gate, and triage coupling unbuilt. Descends from substack-gut-feeling-draft.md |
 | [provenance-verifiability.md](provenance-verifiability.md) | Staged verifiability toward "justify your response" (claim-graph, no invented numerics); Levels 1–2 LIVE-VALIDATED; epistemic grader v1 SHIPPED 2026-08-04 (`f30d3f05`/`ad9bbda5`: verbatim-quote checks, [justification-taxonomy.md](justification-taxonomy.md) tags, ordinal grades + weakest-link + audit notes in `justify`) — refute/confirm/quiet branches all live-validated (SpaceX turns 2231/2236, Canberra 2239); Stage 5 background verification of suspect replies SHIPPED `8c1396e0` and LIVE-VALIDATED 2026-08-06 (confirm/silent turn 2247; unprompted correction turn 2295 — epistemic downgrade posted ~12 min post-reply); autonomous-turn claims + probe bench next; Levels 3–4 unbuilt |

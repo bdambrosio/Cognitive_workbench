@@ -32,7 +32,7 @@ Self-extension is mostly *assembling parts that already exist*:
 | Need | Already exists | Where |
 |---|---|---|
 | Read her own code to locate a limitation | `inspect` subagent — read-only, geofenced to `src/`, list/read/grep | `src/chat/tools.py` (`inspect` catalog entry) |
-| Run code in isolation with a timeout + human gate | `exec-script` — `subprocess.run` in `scenarios/<world>/fs/`, 120s cap, optional ASK step | `src/tools/exec-script/tool.py` |
+| Run code in isolation with a timeout + human gate | `exec-script` — bubblewrapped `bash -c`, repo read-only, no network, no `$HOME`, writable `$SCRATCH` + tmpfs `/tmp`, 120s cap (rewritten 2026-08-20; the pre-2026-08 `scenarios/<world>/fs/` cwd never existed) | `src/tools/exec-script/tool.py` |
 | Pattern for a constrained, persona-less subagent with typed primitives | `recall.py` is the canonical template (see README) — ReAct loop, geofenced inputs, per-call trace; `security.py` is the same shape with typed system probes and a wall-clock budget | `src/chat/subagents/recall.py` |
 | Iterate-on-failure | ReAct loop + max-iters → successor concern | `src/chat/react.py`, `src/chat/concerns.py` |
 | Per-event audit log | `autonomy.jsonl` (one record per fire/defer/successor) | concerns layer |
@@ -62,8 +62,10 @@ Four proportionate layers, no Docker:
 2. **Subprocess test, never in-process import.** Testing a fresh `tool.py`
    means running its `react_invoke` — but importing it would execute
    module-level code inside Jill's interpreter. So the test runs in a
-   **subprocess with a timeout** (reusing the `exec-script` `subprocess.run`
-   pattern). Untrusted code stays out of the live process even during testing.
+   **subprocess with a timeout** (reusing the `exec-script` sandbox, which
+   as of 2026-08-20 also supplies the isolation: no network, read-only repo,
+   writes confined to `$SCRATCH`). Untrusted code stays out of the live
+   process even during testing.
 3. **Git working tree = blast-radius limit + undo.** Everything authored is
    uncommitted working-tree change under `src/tools_staging/`. It shows in
    `git status`/`git diff`; reverting is `git checkout`. The repo's own VCS is

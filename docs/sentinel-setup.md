@@ -174,8 +174,19 @@ than not running them.
 ## Note on the privilege boundary
 
 "No LLM holds sudo" is the design intent, but on this host it is not
-OS-enforced: the `bruce` account is in the `docker` group, so anything
-running as that user can `docker run -v /:/host` and become root. The
-effective boundary is the **tool inventory** — no docker tool exists
-and `exec-script` is broken from the chat path. Keep that deliberate;
-it is doing more work than the absence of a sudoers file.
+OS-enforced *for code running as `bruce`*: that account is in the
+`docker` group, so anything running as the user can `docker run -v
+/:/host` and become root. The effective boundary used to be the tool
+inventory — no docker tool exists, and `exec-script` was broken.
+
+As of 2026-08-20 `exec-script` works and Sentinel has it, but it is
+bubblewrapped and the escalation route is closed twice over. Measured
+from inside the sandbox: `/var/run/docker.sock` is not bound, so it does
+not exist in that mount namespace and `docker run -v /:/host` fails to
+reach the daemon at all; and the user namespace maps every supplementary
+group to `nogroup`, so `id` reports no `docker` membership even though
+the host account has it. Either alone would be sufficient.
+
+The boundary is therefore no longer "the tool inventory happens to be
+thin". It is the sandbox, and it must stay that way: binding the docker
+socket, or restoring group membership, would hand back root.
