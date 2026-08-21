@@ -974,12 +974,27 @@ characters:
         - head-move
         - look-at-target
         - generate-image
-        - stock-price
-        # NB: this tool's SKILL.md name uses underscores, unlike its dir.
-        - get_financial_statements
+        # stock-price and get_financial_statements are NOT omitted
+        # (2026-08-21), for the same reason as exec-script below: the
+        # work these two actually collaborate on is financial — the
+        # engagement that ran away on 2026-08-20 turned on revenue
+        # reconciliation and MRR concentration — and Jill could pull
+        # statements while Jack could only reason about numbers she
+        # sent him. Neither tool has a hardware or privacy reason to be
+        # one-sided, unlike the vault and the mail accounts above.
         - ramana-saying
         - check-x-feed
         - check-email
         - obsidian
-        - exec-script
+        # exec-script is NOT omitted (2026-08-21). Jack exists as a
+        # near-clone of Jill so that coordination is the only variable
+        # under observation, and a tool asymmetry is a much larger one
+        # than a personality difference — a coordination run where one
+        # peer can compute and the other cannot measures the catalog,
+        # not the cooperation. Its scratch is per-character
+        # (scratch/Jack), so nothing here touches Jill's. He needs no
+        # capability prose for it: the routing hazard that earned
+        # Sentinel a paragraph is specific to a patrol reporting an
+        # all-clear from an empty namespace. For Jack, as for Jill, a
+        # misroute costs one iteration.
         - agent-activity
