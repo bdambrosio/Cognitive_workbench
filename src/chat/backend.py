@@ -22,6 +22,16 @@ from cot_profiles import is_reasoning_model, resolve_profile  # noqa: E402
 
 logger = logging.getLogger('chat_loop')
 
+# Client read timeout for a completion call. It bounds QUEUE WAIT plus
+# generation, not generation alone: a turn fans out into reflection, claim
+# grading and concern triage against the same server, and a call sitting
+# behind four others spends that time on the socket. Measured 2026-08-21 on
+# the local arm — 9k prompt tokens returned in 9.2s idle, while a 19-token
+# prompt took 20.6s mid-turn. At 120s the queued call died and the turn came
+# back as a degraded reply, twice in two runs.
+_HTTP_TIMEOUT_S = 300
+
+
 # ─── LLM backend ────────────────────────────────────────────────────────────
 
 class _ChatBackend:
@@ -234,7 +244,8 @@ class _ChatBackend:
 
     def _post_adapting(self, url: str, headers: Dict[str, str],
                        body: Dict[str, Any]):
-        resp = requests.post(url, headers=headers, json=body, timeout=120)
+        resp = requests.post(url, headers=headers, json=body,
+                             timeout=_HTTP_TIMEOUT_S)
         for _ in range(self._PARAM_ADAPT_MAX):
             if resp.ok or resp.status_code != 400:
                 return resp
@@ -267,7 +278,7 @@ class _ChatBackend:
                 logger.info(
                     "_ChatBackend: %s rejects %r; dropping it for this session",
                     self.model or self.base_url, param)
-            resp = requests.post(url, headers=headers, json=body, timeout=120)
+            resp = requests.post(url, headers=headers, json=body, timeout=_HTTP_TIMEOUT_S)
         return resp
 
     def chat(self, messages: List[Dict[str, Any]],
@@ -357,7 +368,7 @@ class _ChatBackend:
             }
             resp = requests.post(
                 f'{self.base_url}/v1/messages',
-                headers=headers, json=body, timeout=120,
+                headers=headers, json=body, timeout=_HTTP_TIMEOUT_S,
             )
             resp.raise_for_status()
             data = resp.json()
