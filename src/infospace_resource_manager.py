@@ -1046,15 +1046,6 @@ class InfospaceResourceManager:
                           # these in the allowlist they're silently dropped
                           # at create_note time and threads load with
                           # empty centroid / summary / counts.
-                          # Obligation concerns: a request from a principal
-                          # that stays open until it is reported on and
-                          # released. `awaiting` is the side of the debt
-                          # ('me' = I owe a report, 'them' = I reported and
-                          # they owe a decision); overdue_since is stamped by
-                          # the sweep instead of the silent satisfy that
-                          # ordinary stale concerns get.
-                          'owed_to', 'owed_turn', 'owed_at', 'awaiting',
-                          'reported_at', 'overdue_since', 'report_by',
                           'summary', 'centroid_embedding',
                           'constituent_turn_count', 'creation_provenance',
                           'last_activated_at', 'last_centroid_update_at',

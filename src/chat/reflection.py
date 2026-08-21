@@ -103,8 +103,7 @@ class ReflectionMixin:
         "agreements between you carry their literal weight\n"
         "If the frame is anything other than `none`, return all lists "
         "empty (memories, user_concerns, user_concerns_closed, "
-        "agent_concerns, agent_concerns_closed, obligations_update). "
-        "When in doubt, prefer "
+        "agent_concerns, agent_concerns_closed). When in doubt, prefer "
         "the more conservative classification.\n\n"
         "STAGE 2 — Memories. If frame is `none`, extract stable specifics "
         "that should survive into FUTURE conversations.\n"
@@ -254,71 +253,7 @@ class ReflectionMixin:
         "fire. `durable` = a standing concern that recurs on its rhythm "
         "(monitoring, tracking, recurring check-ins). Default `durable` "
         "when unsure.\n"
-        "- `owed_to` (string|null): the person who asked for this and is "
-        "waiting on it — usually {entity}, occasionally a named agent. "
-        "Set it ONLY for a specific request made by a specific someone "
-        "that this exchange did not close. Setting it makes the concern "
-        "an OBLIGATION: it will not be retired by any of the ordinary "
-        "housekeeping paths, it goes overdue instead of quietly "
-        "disappearing, and it stays visible until it is settled. null "
-        "for everything else — monitoring, standing interests, work "
-        "{character} took on herself. Getting this wrong in the "
-        "permissive direction is expensive: an obligation nobody owes "
-        "cannot be discharged and will nag indefinitely.\n"
-        "- `report_by_hours` (number|null): when the REQUEST said it was "
-        "needed, in hours from now. Only meaningful alongside `owed_to`. "
-        "Two symmetrical errors here, and both matter:\n"
-        "    DROPPING a horizon that was stated. If the request named "
-        "when — even loosely — you MUST convert it and fill this in. "
-        "'should be this week' → 84. 'by Friday' → hours until Friday. "
-        "'before you head out' → 3. 'end of day' → 6. 'in five minutes' "
-        "→ 0.08. 'when you get a chance today' → 8. A stated horizon that "
-        "comes back null is a deadline {entity} set and {character} threw "
-        "away.\n"
-        "    INVENTING one that was not. If the request named no time at "
-        "all, return null and mean it. An obligation with no deadline "
-        "stays visible and stays open, and {character} can ask when it "
-        "needs to be done — that ask is the designed path, not a "
-        "shortcoming. A number you inferred rather than heard becomes an "
-        "alarm on a schedule nobody agreed to.\n"
-        "  Null is common and correct. It is not, however, the safe "
-        "default: read the request for a time before you settle on it.\n"
-        "  The case that matters most, and the easy one to miss: the "
-        "exchange where {character} DID the work and the request is "
-        "still open, because she ended by handing a decision back. "
-        "'Here are four options, tell me which one' is not a completed "
-        "task; it is a request awaiting an answer, and if nothing records "
-        "that, the fact that no answer ever came becomes invisible. The "
-        "FULFILLED exclusion above does not apply to these — the work "
-        "being done is not the same as the matter being settled.\n"
         "{narrowness_rule}\n"
-        "UPDATE obligations: for each entry tagged [obligation ...] in "
-        "your input, ask whether THIS exchange moved it. Emit one entry "
-        "in `obligations_update` per obligation that moved, using its "
-        "EXACT text:\n"
-        "  - SETTLED — the person gave the decision they were asked for, "
-        "said it was handled, or withdrew the request. Emit the exact "
-        "text as a bare string, or {{\"text\": \"...\", \"state\": "
-        "\"settled\"}}. Judge the matter, not the activity: more work "
-        "done on the topic is not settlement, and neither is the person "
-        "talking about something else. An obligation marked 'awaiting "
-        "their reply' is settled only by THEM responding to it; "
-        "{character} cannot settle it by doing more.\n"
-        "  - REPORTED — {character} delivered what was asked THIS "
-        "exchange, but the matter is not closed (she handed back a "
-        "choice, or gave a partial answer). Emit {{\"text\": \"...\", "
-        "\"state\": \"reported\"}}. This stops it pressing for action "
-        "and starts it waiting on them. Only for a reply that was "
-        "actually ABOUT this obligation — an unrelated exchange with the "
-        "same person is not a report.\n"
-        "  - TIMELINE AGREED — the person named when they need it (often "
-        "because {character} asked). Emit {{\"text\": \"...\", "
-        "\"report_by_hours\": <number>}}. Use this rather than writing a "
-        "new agent_concern: the obligation already exists and a second "
-        "one would double the debt.\n"
-        "  `state` and `report_by_hours` may appear in the same entry. "
-        "Absence of mention is never settlement — leave it open and it "
-        "will surface again, which is the point.\n"
         "CLOSE agent_concerns: when the exchange shows an EXISTING "
         "agent_concern (from the list in your input) should be dropped — "
         "{entity} agreed to stop tracking it, asked {character} to drop "
@@ -349,12 +284,9 @@ class ReflectionMixin:
         "     \"text\": \"...\",\n"
         "     \"instruction\": \"<imperative>|null\",\n"
         "     \"rhythm_hours\": <int|null>,\n"
-        "     \"category\": \"one_shot|durable\",\n"
-        "     \"owed_to\": \"<who asked and is waiting>\"|null,\n"
-        "     \"report_by_hours\": <number|null>\n"
+        "     \"category\": \"one_shot|durable\"\n"
         "   }}, ...],\n"
         "   \"agent_concerns_closed\": [\"<exact text of an existing agent_concern>\", ...],\n"
-        "   \"obligations_update\": [\"<exact text — settled>\", {{\"text\": \"<exact text>\", \"state\": \"reported|settled\", \"report_by_hours\": <number>}}, ...],\n"
         "   \"capability_gap\": \"<one sentence>\"|null}}\n\n"
         "WORKED EXAMPLE 1. {entity}: \"Please keep an eye on S&P 500 "
         "closes — I want to hear about them every day.\"\n"
@@ -449,37 +381,6 @@ class ReflectionMixin:
         "  \"user_concerns_closed\": [],\n"
         "  \"agent_concerns\": [],\n"
         "  \"agent_concerns_closed\": [\"Track S&P 500 closing price daily.\"]}}\n\n"
-        "WORKED EXAMPLE 7 (obligation). {entity}: \"I need this to start "
-        "paying for itself — work out how.\" {character} researched it and "
-        "replied with four costed options, ending \"tell me which of these "
-        "pulls\". The work IS done; the request is NOT closed, because "
-        "{entity} has to pick. Without the obligation, nothing records that "
-        "no pick ever came.\n"
-        "Output:\n"
-        "{{\"frame\": \"none\", \"memories\": [],\n"
-        "  \"user_concerns\": [{{\"text\": \"making the work pay for itself\",\n"
-        "    \"context\": \"{entity} asked directly for a route to revenue this "
-        "exchange. Four costed options were put to him; he has not chosen "
-        "one yet.\"}}],\n"
-        "  \"user_concerns_updated\": [],\n"
-        "  \"user_concerns_closed\": [],\n"
-        "  \"agent_concerns\": [{{\n"
-        "    \"text\": \"{entity} owes a pick among the four revenue options I put to him.\",\n"
-        "    \"instruction\": null,\n"
-        "    \"rhythm_hours\": null,\n"
-        "    \"category\": \"one_shot\",\n"
-        "    \"owed_to\": \"{entity}\",\n"
-        "    \"report_by_hours\": null\n"
-        "  }}],\n"
-        "  \"agent_concerns_closed\": [], \"obligations_update\": []}}\n"
-        "Note two things. The null instruction: {character} has nothing "
-        "left to DO on this one, and an instruction here would have her "
-        "act on a direction that was never chosen — the obligation's job "
-        "is to stay visible until {entity} answers. And the null "
-        "report_by_hours: he named no deadline, so there is none. If he "
-        "later says \"I'll decide by Monday\", THAT exchange emits "
-        "{{\"text\": \"...\", \"report_by_hours\": 72}} in "
-        "obligations_update — not a new agent_concern.\n\n"
         "If frame≠none or nothing qualifies: return the envelope with all "
         "lists empty and capability_gap null."
     )
@@ -565,18 +466,6 @@ class ReflectionMixin:
                     p = p or {}
                     if p.get('seed'):
                         return " [seed]"
-                    if p.get('category') == 'obligation':
-                        # Candidates for obligations_update, not for
-                        # agent_concerns_closed — the two ends differ.
-                        who = str(p.get('owed_to', '') or 'someone')
-                        side = ('awaiting their reply'
-                                if p.get('awaiting') == 'them'
-                                else 'I still owe the report')
-                        turn = p.get('owed_turn')
-                        at = f", asked at turn {turn}" if turn else ""
-                        when = ("" if p.get('report_by')
-                                else ", no agreed timeline")
-                        return f" [obligation to {who}{at}: {side}{when}]"
                     return " [system]" if p.get('system_spawned') else ""
                 lines = [
                     f"- {text}{_tag(p)}"
@@ -603,8 +492,7 @@ class ReflectionMixin:
             # was shown — byte-identical otherwise (KV-cache stability).
             return_keys = ("frame, memories, user_concerns, "
                            "user_concerns_updated, user_concerns_closed, "
-                           "agent_concerns, agent_concerns_closed, "
-                           "obligations_update")
+                           "agent_concerns, agent_concerns_closed")
             if pending_fires:
                 return_keys += ", fire_outcomes"
             user_parts.append(
@@ -714,17 +602,9 @@ class ReflectionMixin:
             # carry it. Resolved against the same top-K list the LLM was
             # shown; seeds never close.
             agent_cons_closed: List[str] = []
-            obligations_updated: List[str] = []
             if isinstance(payload, dict):
                 agent_cons_closed = self._apply_agent_concern_closures(
                     payload.get('agent_concerns_closed'), existing_agent)
-                # Separate channel from the retire path above: an
-                # obligation update says the request moved on — reported,
-                # settled, or given a timeline — while a closure says the
-                # user dropped it. Only 'settled' is a legal end for an
-                # obligation (_satisfy_agent_concern refuses the rest).
-                obligations_updated = self._apply_obligation_updates(
-                    payload.get('obligations_update'), existing_agent)
 
             agent_cons_written: List[str] = []
             for c in raw_agent_concerns:
@@ -746,14 +626,12 @@ class ReflectionMixin:
                         rhythm_hours=c.get('rhythm_hours'),
                         rhythm_source=c.get('rhythm_source') or 'default',
                         instruction=c.get('instruction'),
-                        category=c.get('category') or 'durable',
-                        owed_to=c.get('owed_to'),
-                        report_by_hours=c.get('report_by_hours')):
+                        category=c.get('category') or 'durable'):
                     agent_cons_written.append(text)
 
             if (mems_written or user_cons_written or user_cons_updated
                     or user_cons_closed or agent_cons_written
-                    or agent_cons_closed or obligations_updated):
+                    or agent_cons_closed):
                 logger.info(
                     f"[{self.character_name}] reflection wrote "
                     f"{len(mems_written)} memory(s), "
@@ -761,9 +639,7 @@ class ReflectionMixin:
                     f"(+{len(user_cons_updated)} updated, "
                     f"+{len(user_cons_closed)} closed), "
                     f"{len(agent_cons_written)} agent_concern(s) "
-                    f"(+{len(agent_cons_closed)} closed, "
-                    f"+{len(obligations_updated)} obligation update(s)) "
-                    f"from {source}")
+                    f"(+{len(agent_cons_closed)} closed) from {source}")
             return (mems_written, user_cons_written, agent_cons_written)
         except Exception as e:
             logger.warning(f"[{self.character_name}] _reflect_and_remember failed: {e}")
@@ -860,8 +736,7 @@ class ReflectionMixin:
                 if isinstance(item, str) and item.strip():
                     out.append({'text': item.strip(), 'instruction': None,
                                 'rhythm_hours': None, 'rhythm_source': 'default',
-                                'category': 'durable', 'owed_to': None,
-                                'report_by_hours': None})
+                                'category': 'durable'})
                 elif isinstance(item, dict):
                     t = str(item.get('text', '') or '').strip()
                     if not t:
@@ -881,19 +756,12 @@ class ReflectionMixin:
                     cat = str(item.get('category', '') or '').strip().lower()
                     if cat not in ('one_shot', 'durable'):
                         cat = 'durable'
-                    # An owed_to promotes the concern to an obligation in
-                    # _add_agent_concern; the category the model wrote is
-                    # then irrelevant. Carried through raw so the naming
-                    # of the principal stays the model's judgement.
-                    owed_to = str(item.get('owed_to', '') or '').strip()
                     out.append({
                         'text': t,
                         'instruction': str(instr).strip() if instr else None,
                         'rhythm_hours': rhythm_h,
                         'rhythm_source': src,
                         'category': cat,
-                        'owed_to': owed_to or None,
-                        'report_by_hours': item.get('report_by_hours'),
                     })
             return out
 

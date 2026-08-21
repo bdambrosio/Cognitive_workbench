@@ -137,6 +137,3 @@ sandbox_venv/
 sandbox_python/
 sandbox_models/
 scratch/
-
-# obligation replay: per-run output, regenerated every invocation
-tests/obligation_replay_results.json
