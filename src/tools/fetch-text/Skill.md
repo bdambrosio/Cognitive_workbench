@@ -4,6 +4,7 @@ description: Fetch the text content of a web page or PDF from a URL. Handles HTM
 args:
   url: required string — the URL or base64-encoded PDF to fetch
   section: optional string — for a research PDF, return just this section's text. Use a name exactly as it appeared in the section index from the first call.
+  render_js: optional boolean — render the page in a headless browser before extracting text. Use for a JS-gated page that returns a shell of navigation and "Loading…" rather than content. The automatic browser fallback only fires when static extraction yields under 100 characters, so a few hundred characters of boilerplate never trips it. Slower than a plain fetch, so reach for it when a normal call came back with chrome and no substance, or for a portal already known to be gated. It errors rather than falling back silently when the browser is unavailable or renders nothing.
 ---
 
 # fetch-text

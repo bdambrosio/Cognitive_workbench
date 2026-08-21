@@ -81,9 +81,19 @@ def react_invoke(args, *, character_name=None, backend=None, logger=None):
     if not isinstance(url, str) or not url.strip():
         return {"status": "error", "text": "fetch-text requires non-empty `url`"}
 
+    render_js = bool(args.get("render_js"))
+    # Checked here rather than at extraction time: the answer is knowable
+    # before the fetch, and failing after it burns a network round-trip to
+    # discover something we already knew.
+    if render_js and not HAS_PLAYWRIGHT:
+        return {"status": "error",
+                "text": "fetch-text: render_js requested but Playwright is "
+                        "not installed"}
+
     mgr = CapturingResourceManager()
     result = tool(url, **build_tool_kwargs(
         character_name=character_name, backend=backend, manager=mgr,
+        render_js=render_js,
     ))
 
     # fetch-text stashes the extracted text in extra.text.
@@ -290,7 +300,8 @@ def tool(url_or_content: str, runtime=None, **kwargs) -> str:
     if file_format == "pdf":
         result = _extract_pdf_text(content, final_url, grobid_url=grobid_url, pdf_parser=pdf_parser)
     elif file_format == "html":
-        result = _extract_html_text(content, final_url)
+        result = _extract_html_text(
+            content, final_url, render_js=kwargs.get('render_js', False))
     elif file_format == "docx":
         result = _extract_docx_text(content, final_url)
     elif file_format == "markdown":
@@ -707,7 +718,8 @@ def _extract_docx_text(content: bytes, url: str) -> str:
         return json.dumps({"error": f"DOCX extraction failed: {str(e)}"})
 
 
-def _extract_html_text(content: bytes, url: str) -> str:
+def _extract_html_text(content: bytes, url: str,
+                       render_js: bool = False) -> str:
     """Extract text from HTML content."""
     html_str = content.decode('utf-8', errors='ignore')
     extraction_method = "static_html"
@@ -731,8 +743,27 @@ def _extract_html_text(content: bytes, url: str) -> str:
         parser.feed(html_str)
         full_text = "\n".join(parser.text)
     
-    # If we got very little text, try playwright fallback (for SPAs)
-    if len(full_text) < 100 and HAS_PLAYWRIGHT:
+    # Forced rendering, or the automatic fallback for SPAs.
+    #
+    # The automatic path only fires under 100 characters, which misses the
+    # case it most needs to catch: a JS-gated page that returns a shell of
+    # navigation, a cookie notice and "Loading…" — several hundred
+    # characters of nothing. `render_js` is how a caller that already knows
+    # the page is gated says so, rather than the tool trying to infer it.
+    if render_js:
+        logger.info(f"Forcing playwright rendering for {url}")
+        playwright_text = _try_playwright_extraction(url)
+        if not playwright_text:
+            # Loud: a forced render that quietly returned the static text
+            # would be read as "the page really is this thin".
+            return json.dumps({"error": f"forced JS rendering returned no "
+                                        f"content for {url}"}, indent=2)
+        # Unconditional, unlike the fallback below. Real content behind a
+        # gate is often SHORTER than the boilerplate shell it replaces, so
+        # a longer-wins rule would discard exactly what was asked for.
+        full_text = playwright_text
+        extraction_method = "playwright_forced"
+    elif len(full_text) < 100 and HAS_PLAYWRIGHT:
         logger.info(f"Low text content ({len(full_text)} chars) from {url}, trying playwright fallback")
         playwright_text = _try_playwright_extraction(url)
         if playwright_text and len(playwright_text) > len(full_text):
