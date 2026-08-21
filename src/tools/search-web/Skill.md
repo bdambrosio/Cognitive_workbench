@@ -1,6 +1,6 @@
 ---
 name: search-web
-description: Search the web for information on a topic. Returns a synthesized summary with citations. Use when you need current information or facts not in training data.
+description: Ask a question of a frontier model that has web search. Returns its synthesized answer, with sources when it searched — it may answer from its own knowledge and cite nothing, which is a valid result. Use for current information, or for general questions outside your own knowledge. What comes back is another model's account, not the source text; quote it as such.
 args:
   query: required string — what you want to know (a question, not a search-engine query string)
 ---
