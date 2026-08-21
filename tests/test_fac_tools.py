@@ -1,4 +1,10 @@
 """Step-4 checks for the fac-* Factorio chat tools (build order:
+
+SHELVED 2026-08-21: the tools moved to src/tools_out/ when the Factorio
+project was parked. These tests moved with them rather than being deleted —
+the code still has to work on the day it is moved back. Paths below point at
+the shelf; that is the only change.
+
 "discovery scan check, mocked-bridge smoke tests").
 
 - discovery: every fac-* tool is picked up by the standard tool loader
@@ -30,11 +36,11 @@ FAC_TOOLS = [
 
 
 def load_tool_module(name: str):
-    """Import src/tools/<name>/tool.py under a collision-free module name."""
+    """Import src/tools_out/<name>/tool.py under a collision-free module name."""
     mod_name = name.replace("-", "_") + "_tool"
     if mod_name in sys.modules:
         return sys.modules[mod_name]
-    spec = importlib.util.spec_from_file_location(mod_name, SRC / "tools" / name / "tool.py")
+    spec = importlib.util.spec_from_file_location(mod_name, SRC / "tools_out" / name / "tool.py")
     module = importlib.util.module_from_spec(spec)
     sys.modules[mod_name] = module
     spec.loader.exec_module(module)
@@ -44,7 +50,7 @@ def load_tool_module(name: str):
 # ------------------------------------------------------------- discovery
 
 def test_discovery_scan():
-    tools = load_tools(str(SRC / "tools"))
+    tools = load_tools(str(SRC / "tools_out"))
     for name in FAC_TOOLS:
         assert name in tools, f"{name} not discovered by tool_loader"
         meta = tools[name]

@@ -360,24 +360,30 @@ def test_tool_family_lookup_uses_declared_names():
     fac = _tool_names_with_prefix("fac-")
     world = _tool_names_with_prefix("world-")
     assert set(world) == {"world-look", "world-move", "world-mark"}
-    assert len(fac) > 10
+    # The fac-* family was shelved to src/tools_out/ on 2026-08-21, so the
+    # live catalog no longer advertises it. This asserts the lookup reads the
+    # catalog rather than a hardcoded list — if the project is reactivated by
+    # moving the directories back, this flips without any code change.
+    assert fac == []
     # get-financial-statements declares an underscored name; the family
     # lookup must key on the declaration, not the directory.
     assert not (set(fac) & set(world))
 
 
-@pytest.mark.parametrize("world,factorio,dropped,kept", [
-    (True, False, "fac-", "world-"),
-    (False, True, "world-", "fac-"),
-])
-def test_embodiment_selection_drops_the_other_family(world, factorio,
-                                                     dropped, kept):
+def test_embodiment_selection_drops_the_other_family():
+    """--factorio drops the world family.
+
+    The mirror case (--world dropping fac-*) cannot be asserted while the
+    fac-* family is shelved in src/tools_out/: there is nothing to drop, and
+    apply_embodiment_selection returns early rather than writing an empty
+    omission list. Restore the parametrised pair when the tools come back.
+    """
     from launcher import apply_embodiment_selection
     chars = [("Jill", {})]
-    apply_embodiment_selection(chars, world, factorio)
+    apply_embodiment_selection(chars, world=False, factorio=True)
     omitted = chars[0][1]["chat"]["omitted_tools"]
-    assert any(t.startswith(dropped) for t in omitted)
-    assert not any(t.startswith(kept) for t in omitted)
+    assert any(t.startswith("world-") for t in omitted)
+    assert not any(t.startswith("fac-") for t in omitted)
 
 
 def test_embodiment_selection_preserves_existing_omissions():
