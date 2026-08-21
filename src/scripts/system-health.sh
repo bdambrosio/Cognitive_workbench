@@ -189,15 +189,22 @@ EOJSON
 collect_disk() {
     echo '['
     local first=true
-    df -hP 2>/dev/null | awk 'NR>1 && $1 ~ /^\/dev\// {print $6, $5}' | sed 's/%//' | while read -r mount pct; do
+    # Size and available, not just the percentage. A reader given "92%,
+    # warning" and nothing else cannot tell 141 GB free on a 1.8 TB volume
+    # from 4 GB free on a 50 GB one, and will fill the gap with a guess —
+    # which is exactly what happened on 2026-08-21, where a roomy disk was
+    # written up as a hard blocker on a project plan.
+    df -PBG 2>/dev/null | awk 'NR>1 && $1 ~ /^\/dev\// {print $6, $5, $2, $4}' \
+        | sed 's/%//; s/G//g' | while read -r mount pct size_gb avail_gb; do
         local status; status=$(classify "$pct" "$DISK_WARN_PCT" "$DISK_CRIT_PCT")
         if [[ "$first" == "true" ]]; then
             first=false
         else
             echo ','
         fi
-        printf '  {"mount": %s, "used_pct": %s, "status": %s}' \
-            "$(json_str "$mount")" "$(json_num "$pct")" "$(json_str "$status")"
+        printf '  {"mount": %s, "used_pct": %s, "size_gb": %s, "available_gb": %s, "status": %s}' \
+            "$(json_str "$mount")" "$(json_num "$pct")" "$(json_num "$size_gb")" \
+            "$(json_num "$avail_gb")" "$(json_str "$status")"
     done
     echo ''
     echo ']'
