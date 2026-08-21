@@ -321,7 +321,7 @@ def test_reflection_prompt_stable_with_empty_registry(loop):
         "## Latest exchange\nUser: thanks, that was useful\n\n"
         "Return the JSON object now (keys: frame, memories, user_concerns, "
         "user_concerns_updated, user_concerns_closed, agent_concerns, "
-        "agent_concerns_closed). All "
+        "agent_concerns_closed, obligations_update). All "
         "lists empty if frame≠none or nothing qualifies.")
 
 
@@ -349,7 +349,8 @@ def test_reflection_stage6_section_and_judgment(loop, tmp_path):
     assert ("- [fid-1] concern: concern text — Tester did/said: "
             "PV voltage nominal at 54.2V (1 user turns ago)") in captured["user"]
     # Key list gains fire_outcomes.
-    assert "agent_concerns_closed, fire_outcomes)" in captured["user"]
+    assert ("agent_concerns_closed, obligations_update, "
+            "fire_outcomes)") in captured["user"]
     # Judged record left the registry and landed in autonomy.jsonl.
     assert read_pending(loop) == []
     events = read_events(tmp_path)

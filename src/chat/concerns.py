@@ -182,13 +182,57 @@ _FIRE_OUTCOME_JUDGED = ('helped', 'neutral', 'hindered', 'ignored')
 # clean exit, never revives (spawned by yield/max_iters continuations and
 # by reflection when the exchange asks for a one-time action).
 # durable = standing concern: recurs on its rhythm until closed or stale.
-_CONCERN_CATEGORIES = ('one_shot', 'durable')
+# obligation = a request from a principal that stays open until it is
+# reported on and released. Structurally an agent_concern like the other
+# two, but its satisfaction condition is "I have reported to X", not "I
+# have thought about this" — so the machinery that quietly retires a
+# finished-looking concern must not touch it (see _satisfy_agent_concern).
+_CONCERN_CATEGORIES = ('one_shot', 'durable', 'obligation')
 
 _CONCERN_CADENCE_HOURS_ALLOWED = _AGENT_CONCERN_RHYTHM_HOURS_ALLOWED
 
-_CONCERN_DEFAULT_CADENCE_HOURS = {'one_shot': 1, 'durable': 24}
+_CONCERN_DEFAULT_CADENCE_HOURS = {'one_shot': 1, 'durable': 24,
+                                  'obligation': 1}
 
-_CONCERN_DEFAULT_LIFETIME_DAYS = {'one_shot': 0.5, 'durable': 120.0}
+_CONCERN_DEFAULT_LIFETIME_DAYS = {'one_shot': 0.5, 'durable': 120.0,
+                                  'obligation': 120.0}
+
+# ----- obligations -----
+# The two sides of an open request. 'me': the principal asked and is
+# waiting on me — this is ordinary work-in-progress with an addressee.
+# 'them': I reported and the ball is in their court — the state that had
+# no representation at all before, and the one that matters. On
+# 2026-08-20 Jill answered a revenue directive with four costed options,
+# ended "tell me which of these pulls", and then had nowhere to keep the
+# fact that no pick had come back; the directive survived as 56 topic
+# memories and she executed a branch unasked. An obligation awaiting
+# 'them' never fires — it stands, ages, and goes overdue in the prompt.
+_OBLIGATION_AWAITING = ('me', 'them')
+
+# When an obligation comes due. There is deliberately NO default: the
+# horizon belongs to the request, not to the machinery. "Before you head
+# out" and "sometime next week" are the same object an hour apart, and a
+# constant that fits one nags on the other. Reflection reads the horizon
+# out of the ask as `report_by_hours` and the runtime resolves it once to
+# an absolute `report_by`; when the ask named none, `report_by` is None
+# and the obligation NEVER goes overdue — it stays visible, aging, and
+# flagged as lacking an agreed timeline, which is a thing to ask about
+# rather than a deadline to invent.
+#
+# Wall-clock, not exchanges: everything else in the sweep is wall-clock,
+# and "report back in 4 exchanges" has no counter to hang on (the only
+# enforced one is hop_budget, which counts hops and resets itself).
+# Overdue is a display state and a triage input — it never retires the
+# obligation.
+#
+# Free float rather than _AGENT_CONCERN_RHYTHM_HOURS_ALLOWED, whose floor
+# is 1h: a five-minute errand has to be expressible. Note the asymmetry
+# that leaves — such an obligation is RECORDED and comes due on time (the
+# sweep runs per tick), but cannot self-fire faster than the rhythm
+# floor. Sub-hour work is what the ReAct `yield` action is for.
+_OBLIGATION_REPORT_BY_MIN_HOURS = 0.01      # ~36s
+
+_OBLIGATION_REPORT_BY_MAX_HOURS = 8760.0    # a year
 
 _CONCERN_SATISFIED_THRESHOLD = 0.1
 
@@ -610,16 +654,63 @@ class ConcernsMixin:
         return (props.get('successor_of') is not None
                 or props.get('rhythm_source') == 'urgency')
 
+    def _resolve_report_by(self, hours: Optional[float]) -> Optional[str]:
+        """Turn a horizon stated in the request into an absolute deadline.
+        Reflection emits a duration because that is what the ask contains
+        ('by the end of the day'), and resolving it once here keeps the
+        stored value unambiguous no matter when it is next read. None in,
+        None out — an unstated horizon is not a horizon."""
+        if hours is None:
+            return None
+        try:
+            h = float(hours)
+        except (TypeError, ValueError) as e:
+            logger.warning(
+                f"[{self.character_name}] unusable report_by_hours "
+                f"{hours!r}: {e}")
+            return None
+        if h <= 0:
+            return None
+        h = max(_OBLIGATION_REPORT_BY_MIN_HOURS,
+                min(_OBLIGATION_REPORT_BY_MAX_HOURS, h))
+        return (datetime.now(timezone.utc) + timedelta(hours=h)).isoformat()
+
+    @staticmethod
+    def _is_obligation(props: Dict[str, Any]) -> bool:
+        """Is this agent_concern an open request from a principal? The
+        category is the authority; `owed_to` alone is not enough, because
+        an ordinary concern may name an entity it happens to be about."""
+        return props.get('category') == 'obligation'
+
+    # The only `via` that may retire an obligation. Every other route
+    # ('completed', 'superseded', 'synth_complete', 'depth_cap',
+    # 'stale_sweep') means some piece of machinery decided the WORK looks
+    # finished — none of them mean the principal was told. Letting any of
+    # them through is how a debt turns back into an absence.
+    _OBLIGATION_DISCHARGE_VIA = 'discharged'
+
     def _satisfy_agent_concern(self, nid: str, via: str) -> bool:
         """Transition an agent_concern to 'satisfied' (never a seed, never
         a delete) and record the autonomy event. 'satisfied' — unlike
         'abandoned' — stays recallable and can revive through recurrence
-        if the theme genuinely returns."""
+        if the theme genuinely returns.
+
+        Obligations are exempt from every route but discharge: they end
+        when the principal has been reported to and has released them,
+        and until then they must be able to become overdue rather than
+        quietly disappear."""
         note = self.resource_manager.get_resource(nid)
         if not note:
             return False
         props = note.get('properties') or {}
         if props.get('seed') or props.get('status') != 'active':
+            return False
+        if (self._is_obligation(props)
+                and via != self._OBLIGATION_DISCHARGE_VIA):
+            logger.info(
+                f"[{self.character_name}] obligation {nid} NOT satisfied "
+                f"via {via} — an obligation is discharged only by "
+                f"reporting to {props.get('owed_to') or 'its principal'}")
             return False
         ok, err = self._set_concern_status(nid, 'satisfied')
         if not ok:
@@ -694,6 +785,92 @@ class ConcernsMixin:
                     f"[{self.character_name}] agent-concern close failed "
                     f"for {nid}: {err}")
         return closed
+
+    def _apply_obligation_updates(
+            self, raw: Any,
+            shown: List[Tuple[str, str, float, Dict[str, Any]]]
+    ) -> List[str]:
+        """Apply reflection's edits to existing obligations: the report
+        was made, the request was settled, or a timeline was agreed.
+
+        One channel rather than three, because all three are edits to the
+        same object and obligations skip recurrence merge — without an
+        update path, asking "when do you need this?" and being answered
+        would mint a SECOND debt beside the first rather than filling in
+        the first one's deadline.
+
+        Entry forms (bare string == settled, so the simplest case stays
+        one word):
+            "exact text"
+            {"text": ..., "state": "reported"|"settled"}
+            {"text": ..., "report_by_hours": <number>}
+        `state` and `report_by_hours` may appear together.
+
+        Settling is a judgement rather than a mechanism on purpose: no
+        counter can tell "here are four options, pick one" from "option
+        two, go". Discharge here is the ONE route to `satisfied` for an
+        obligation (see _satisfy_agent_concern). Non-obligations are
+        refused rather than quietly closed — reflection already has a path
+        for those (`agent_concerns_closed`), and the two mean different
+        things: a drop blocks revival, a debt paid does not.
+        """
+        if not isinstance(raw, list):
+            return []
+        touched: List[str] = []
+        for item in raw:
+            if isinstance(item, str):
+                text, state, hours = item.strip(), 'settled', None
+            elif isinstance(item, dict):
+                text = str(item.get('text', '') or '').strip()
+                state = str(item.get('state', '') or '').strip().lower()
+                hours = item.get('report_by_hours')
+                if state not in ('reported', 'settled'):
+                    # A bare deadline is a legal update on its own; a
+                    # bare entry with neither is the settled shorthand.
+                    state = '' if hours is not None else 'settled'
+            else:
+                continue
+            if not text:
+                continue
+            nid = self._resolve_concern_by_text(
+                text, shown, self._agent_concerns_collection_id)
+            if not nid:
+                logger.info(
+                    f"[{self.character_name}] obligation update skipped — "
+                    f"no match for {text[:80]!r}")
+                continue
+            note = self.resource_manager.get_resource(nid) or {}
+            props = note.get('properties') or {}
+            if not self._is_obligation(props):
+                logger.info(
+                    f"[{self.character_name}] obligation update refused — "
+                    f"{nid} is not an obligation")
+                continue
+            changed = False
+            if hours is not None:
+                deadline = self._resolve_report_by(hours)
+                if deadline:
+                    props['report_by'] = deadline
+                    props['overdue_since'] = None
+                    changed = True
+                    logger.info(
+                        f"[{self.character_name}] obligation {nid} due "
+                        f"{deadline} (owed to {props.get('owed_to')})")
+            if state == 'reported':
+                changed = self._set_obligation_reported(nid, props) or changed
+            elif state == 'settled':
+                awaiting = str(props.get('awaiting', '') or '')
+                if self._satisfy_agent_concern(
+                        nid, via=self._OBLIGATION_DISCHARGE_VIA):
+                    changed = True
+                    logger.info(
+                        f"[{self.character_name}] obligation {nid} "
+                        f"discharged (owed to {props.get('owed_to')}, was "
+                        f"awaiting {awaiting}, asked at turn "
+                        f"{props.get('owed_turn')})")
+            if changed:
+                touched.append(text)
+        return touched
 
     def _bump_existing_user_concern(self, note_id: str,
                                     context: Optional[str] = None) -> str:
@@ -815,6 +992,8 @@ class ConcernsMixin:
                            instruction: Optional[str] = None,
                            skip_recurrence: bool = False,
                            category: str = 'durable',
+                           owed_to: Optional[str] = None,
+                           report_by_hours: Optional[float] = None,
                            extra_properties: Optional[Dict[str, Any]] = None
                            ) -> Optional[str]:
         """Create an agent_concern. Activation starts at 0; per-tick
@@ -825,7 +1004,18 @@ class ConcernsMixin:
 
         skip_recurrence bypasses similarity merge — used by successor
         concerns. extra_properties merges into the note's properties
-        (e.g. successor_of, successor_depth)."""
+        (e.g. successor_of, successor_depth).
+
+        `owed_to` names the principal whose request this is, and makes it
+        an obligation: the note gets the originating turn number, the
+        side of the debt, and exemption from recurrence merge. The merge
+        exemption is the point — two requests from the same person about
+        the same topic are two debts, and folding them into one silently
+        forgives the older.
+
+        `report_by_hours` is the horizon the REQUEST named, resolved here
+        to an absolute `report_by`. None means the ask named none, and the
+        obligation never goes overdue."""
         if not self._agent_concerns_collection_id:
             return None
         text = (text or "").strip()
@@ -837,6 +1027,20 @@ class ConcernsMixin:
             rhythm_source = 'default'
         if category not in _CONCERN_CATEGORIES:
             category = 'durable'
+        owed_to = (str(owed_to).strip() if owed_to else '') or None
+        if owed_to:
+            category = 'obligation'
+        elif category == 'obligation':
+            # A category with no principal cannot be reported to, so it
+            # could never be discharged — demote rather than mint a debt
+            # that only the graveyard can end.
+            logger.warning(
+                f"[{self.character_name}] obligation without owed_to; "
+                f"filing as one_shot: {text[:80]!r}")
+            category = 'one_shot'
+        if category == 'obligation':
+            seed = False
+            skip_recurrence = True
         if provenance not in ('asserted', 'inferred'):
             provenance = 'asserted'
         if not seed and not skip_recurrence:
@@ -859,6 +1063,20 @@ class ConcernsMixin:
             "last_activation_update_at": now_iso,
             "last_fired_at": None,
         }
+        if owed_to:
+            properties.update({
+                "owed_to": owed_to,
+                "owed_at": now_iso,
+                # The originating turn, kept because the request itself
+                # scrolls out of the 20-turn conversation window long
+                # before the debt does — the 2026-08-20 directive was
+                # ~60 turns back when the pile-up started.
+                "owed_turn": int(getattr(self, '_turn_seq', 0) or 0),
+                "awaiting": "me",
+                "reported_at": None,
+                "overdue_since": None,
+                "report_by": self._resolve_report_by(report_by_hours),
+            })
         if extra_properties:
             properties.update(extra_properties)
         return self._create_concern_note(
@@ -970,12 +1188,22 @@ class ConcernsMixin:
         note_ids = list((coll.get('properties') or {}).get('content', []) or [])
         now = datetime.now(timezone.utc)
         swept = 0
+        overdue = 0
         for nid in note_ids:
             note = self.resource_manager.get_resource(nid)
             if not note:
                 continue
             props = note.get('properties') or {}
             if props.get('status') != 'active' or props.get('seed'):
+                continue
+            if self._is_obligation(props):
+                # An obligation is never swept. Age is what makes it
+                # matter, not what retires it: the sweep stamps it
+                # overdue and moves on, so "they never came back" becomes
+                # a state the prompt can show rather than an absence
+                # nobody can notice.
+                if self._mark_obligation_overdue(nid, props, now):
+                    overdue += 1
                 continue
             category = props.get('category') or (
                 'one_shot' if self._is_one_shot_concern(props) else 'durable')
@@ -998,7 +1226,41 @@ class ConcernsMixin:
             logger.info(
                 f"[{self.character_name}] stale sweep satisfied {swept} "
                 f"agent concern(s)")
+        if overdue:
+            logger.info(
+                f"[{self.character_name}] stale sweep marked {overdue} "
+                f"obligation(s) overdue")
         self._delete_dead_agent_concerns()
+
+    def _mark_obligation_overdue(self, nid: str, props: Dict[str, Any],
+                                 now: datetime) -> bool:
+        """Stamp overdue_since on an obligation past the deadline its
+        REQUEST named. No deadline, no overdue — an obligation whose ask
+        set no horizon stays visible and aging forever rather than coming
+        due on a schedule nobody agreed to. Idempotent: an already-stamped
+        obligation is left alone, so the rendered age is how long it has
+        been overdue rather than how long since the last sweep. Returns
+        True only on the transition."""
+        if props.get('overdue_since'):
+            return False
+        deadline = self._latest_props_timestamp(nid, props, 'report_by')
+        if deadline is None or now < deadline:
+            return False
+        props['overdue_since'] = now.isoformat()
+        self._write_autonomy_event({
+            'event': 'obligation_overdue',
+            'concern_id': nid,
+            'concern_text': str(props.get('content', '') or '')[:140],
+            'owed_to': str(props.get('owed_to', '') or ''),
+            'awaiting': str(props.get('awaiting', '') or ''),
+            'owed_turn': props.get('owed_turn'),
+            'report_by': props.get('report_by'),
+        })
+        logger.info(
+            f"[{self.character_name}] obligation {nid} OVERDUE — owed to "
+            f"{props.get('owed_to')}, awaiting {props.get('awaiting')}, "
+            f"asked at turn {props.get('owed_turn')}")
+        return True
 
     def _latest_props_timestamp(self, nid: str, props: Dict[str, Any],
                                 *keys: str) -> Optional[datetime]:
@@ -1037,6 +1299,11 @@ class ConcernsMixin:
             return 'abandoned'
         if status == 'satisfied' and self._is_one_shot_concern(props):
             return 'completed_one_shot'
+        if status == 'satisfied' and self._is_obligation(props):
+            # A discharged obligation is a closed transaction, not a
+            # theme that might return. Keeping it in the revival pool
+            # would let recurrence resurrect a debt already settled.
+            return 'discharged_obligation'
         return None
 
     def _delete_dead_agent_concerns(self, dry_run: bool = False
@@ -1674,11 +1941,22 @@ class ConcernsMixin:
     def _top_active_agent_concerns(self, n: int = _AGENT_CONCERN_PROMPT_BUDGET
                                    ) -> List[Tuple[str, str, float, Dict[str, Any]]]:
         """Top-n agent_concerns by activation, descending. Tuple:
-        (note_id, text, activation, props)."""
+        (note_id, text, activation, props).
+
+        Obligations are exempt from the budget and sort first. An open
+        request has no pressure of its own once it has been reported on —
+        activation stops growing the moment it stops firing — so ranking
+        it by activation is ranking it by how little it is being worked,
+        and the five loudest concerns would push it off the prompt
+        exactly when it has been ignored longest."""
         active = self._iter_active_agent_concerns()
         active.sort(key=lambda t: t[2], reverse=True)
+        owed = [t for t in active
+                if self._is_obligation(t[1].get('properties') or {})]
+        rest = [t for t in active
+                if not self._is_obligation(t[1].get('properties') or {})]
         out: List[Tuple[str, str, float, Dict[str, Any]]] = []
-        for nid, note, a in active[:max(0, n)]:
+        for nid, note, a in owed + rest[:max(0, n)]:
             props = note.get('properties') or {}
             text = str(props.get('content', '') or note.get('text', '') or '').strip()
             if not text:
@@ -1762,6 +2040,14 @@ class ConcernsMixin:
             props = note.get('properties') or {}
             instruction = props.get('instruction')
             if not instruction:
+                continue
+            if (self._is_obligation(props)
+                    and props.get('awaiting') == 'them'):
+                # I have reported; the principal owes the next move.
+                # Firing here would be acting on a request that has not
+                # been answered yet — which is exactly what produced 130
+                # unattended turns on an unapproved branch. It stays
+                # active and visible instead.
                 continue
             text = str(props.get('content', '') or note.get('text', '') or '').strip()
             fired.append((nid, text, str(instruction)))
@@ -2468,10 +2754,63 @@ class ConcernsMixin:
                 'text': text[:self._SURFACED_CHARS],
             })
             props['surfaced'] = entries[-self._SURFACED_KEEP:]
+            self._note_obligation_report(root_id, props, entity)
         except Exception as e:
             logger.warning(
                 f"[{self.character_name}] surfaced-record failed for "
                 f"{concern_id}: {e}")
+
+    def _note_obligation_report(self, nid: str, props: Dict[str, Any],
+                                entity: str) -> None:
+        """Fire path: an obligation awaiting me has just delivered
+        something to its principal.
+
+        Delivery is read off the same record that catches repeats — the
+        addressee of the entry, not a re-reading of the text. That is
+        sound HERE because an autonomous fire is the concern itself
+        acting, so whatever it said was about this. It is not sound on an
+        ordinary conversational turn, where the reply may be about
+        anything at all; that case is a judgement and reaches
+        _set_obligation_reported through reflection's update channel
+        instead."""
+        if not self._is_obligation(props):
+            return
+        owed_to = str(props.get('owed_to', '') or '').strip()
+        if not owed_to or (entity or '').strip().lower() != owed_to.lower():
+            return
+        self._set_obligation_reported(nid, props)
+
+    def _set_obligation_reported(self, nid: str, props: Dict[str, Any]
+                                 ) -> bool:
+        """Flip an obligation from awaiting 'me' to awaiting 'them'.
+
+        Clears the deadline along with the overdue stamp. The horizon the
+        request named was a horizon on the REPORT — "get me the analysis
+        by five" is met at five whether or not the reply comes back — and
+        keeping it would have a delivered obligation re-alarm on a clock
+        it already answered. The cost is the other reading, where the ask
+        set a deadline on the DECISION ("pick one by Friday"); those fall
+        back to visible-and-aging, which is the error worth making, and a
+        deadline the principal states later can be set through the update
+        channel. Whether the report SETTLED anything is a separate
+        judgement — a partial report should stop the nagging without
+        closing the debt."""
+        if props.get('awaiting') != 'me':
+            return False
+        props['awaiting'] = 'them'
+        props['reported_at'] = datetime.now(timezone.utc).isoformat()
+        props['overdue_since'] = None
+        props['report_by'] = None
+        self._write_autonomy_event({
+            'event': 'obligation_reported',
+            'concern_id': nid,
+            'concern_text': str(props.get('content', '') or '')[:140],
+            'owed_to': str(props.get('owed_to', '') or ''),
+        })
+        logger.info(
+            f"[{self.character_name}] obligation {nid} reported to "
+            f"{props.get('owed_to')}; now awaiting their response")
+        return True
 
     def _surfaced_block(self, concern_id: str) -> str:
         """Render the delivery log for the fire prompt. '' when empty."""

@@ -147,6 +147,71 @@ class PromptsMixin:
             return ''
 
     @staticmethod
+    def _render_obligation_line(props: Dict[str, Any]) -> str:
+        """One line describing an open request: which side owes the next
+        move, since when, when it is due, and the turn it was asked on.
+        '' for anything that is not an obligation.
+
+        The turn number is here because the ask itself is usually outside
+        the 20-turn conversation window by the time the debt matters — it
+        is the only handle back to what was actually said. The elapsed
+        hours are the part that does the work: an obligation nobody has
+        moved on for two days should read as two days old, not as one
+        more line in a list.
+
+        An obligation with no deadline says so, and says it as something
+        to ASK about. That is the whole of the no-invented-deadlines
+        stance: the alternative is a horizon nobody agreed to, which
+        alarms on a schedule the person never set.
+        """
+        if props.get('category') != 'obligation':
+            return ''
+
+        def _age(stamp: Any) -> Optional[float]:
+            """Hours since `stamp` (negative = still in the future)."""
+            if not stamp:
+                return None
+            try:
+                then = datetime.fromisoformat(str(stamp))
+            except (TypeError, ValueError) as e:
+                logger.warning(f"unparseable obligation timestamp {stamp!r}: {e}")
+                return None
+            if then.tzinfo is None:
+                then = then.replace(tzinfo=timezone.utc)
+            return (datetime.now(timezone.utc) - then).total_seconds() / 3600.0
+
+        def _span(hours: float) -> str:
+            hours = abs(hours)
+            if hours >= 48:
+                return f"{hours / 24:.0f} days"
+            if hours >= 1:
+                return f"{hours:.0f}h"
+            return f"{max(1, round(hours * 60))} min"
+
+        owed_to = str(props.get('owed_to', '') or '').strip() or 'them'
+        awaiting = str(props.get('awaiting', '') or 'me')
+        if awaiting == 'them':
+            bits = [f"I reported; {owed_to} has not come back on it"]
+            since = _age(props.get('reported_at') or props.get('owed_at'))
+        else:
+            bits = [f"I owe {owed_to} a report on this"]
+            since = _age(props.get('owed_at'))
+        if since is not None and since >= 1 / 60:
+            bits.append(_span(since))
+        turn = props.get('owed_turn')
+        if turn:
+            bits.append(f"asked at turn {turn}")
+
+        due = _age(props.get('report_by'))
+        if due is None:
+            bits.append("no agreed timeline — worth asking what they need")
+        elif due >= 0:
+            bits.append(f"OVERDUE by {_span(due)}")
+        else:
+            bits.append(f"due in {_span(due)}")
+        return "owed: " + " — ".join(bits)
+
+    @staticmethod
     def _render_user_concerns_block(
             source: str,
             user_concerns: List[Tuple[str, str, float, Dict[str, Any]]]) -> str:
@@ -314,16 +379,28 @@ class PromptsMixin:
         # crosses threshold.
         if agent_concerns:
             ac_lines: List[str] = []
+            has_obligation = False
             for _nid, text, activation, props in agent_concerns:
                 tags = []
                 if props.get('seed'):
                     tags.append('seed')
                 if props.get('successor_of'):
                     tags.append(f"successor d{props.get('successor_depth', 1)}")
+                if props.get('category') == 'obligation':
+                    has_obligation = True
+                    tags.append('OWED')
                 tag_str = f", {','.join(tags)}" if tags else ''
                 ac_lines.append(f"- [{activation:.2f}{tag_str}] {text}")
+                owed_line = self._render_obligation_line(props)
+                if owed_line:
+                    ac_lines.append(f"    {owed_line}")
                 instr = (props.get('instruction') or '').strip()
                 rhythm = props.get('rhythm_hours')
+                if props.get('category') == 'obligation':
+                    # An obligation's cadence is not the interesting fact
+                    # about it and its instruction is often the same words
+                    # as its text; the state line above carries the load.
+                    continue
                 if instr and rhythm:
                     ac_lines.append(
                         f"    fires every ~{rhythm}h when activation crosses "
@@ -347,12 +424,29 @@ class PromptsMixin:
                     "is shown here, but nothing fires by itself — these shape "
                     "what I attend to on turns I am given, and I say so "
                     "plainly if asked whether I will act on one unprompted.")
+            if has_obligation:
+                owed_line = (
+                    "Entries tagged OWED are open requests from a person, "
+                    "not themes: someone asked for something and the "
+                    "exchange is not closed. They are listed first and are "
+                    "not ranked by activation. 'awaiting them' means I "
+                    "already reported and the next move is theirs — I do "
+                    "not get to proceed as though they answered, and if it "
+                    "has been a while, saying so plainly is the right move. "
+                    "'awaiting me' means I still owe the report. Where one "
+                    "says there is no agreed timeline, asking when they "
+                    "need it is a small, useful thing to do next time it "
+                    "fits — I do not invent a deadline for them.\n"
+                )
+            else:
+                owed_line = ''
             parts.append(
                 f"## My active concerns (agent_concerns, ranked by activation)\n"
                 "Pressure-driven: activation grows over wall-clock time at "
                 "each concern's rhythm; firing decrements it. Concerns "
                 "without an instruction don't fire — they shape what I "
                 "attend to without driving action.\n"
+                f"{owed_line}"
                 f"{autonomy_line}\n\n"
                 + "\n".join(ac_lines)
             )
