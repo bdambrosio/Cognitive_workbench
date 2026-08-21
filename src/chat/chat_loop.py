@@ -205,6 +205,47 @@ SENSOR_SOURCE_PREFIX = 'sensor:'
 # on self-sourced turns.
 HUMAN_COUNTERPART = 'User'
 
+# Ceiling on a single entity's discourse state. It accumulates agreements
+# and never expires any, so it grows without bound: measured 2026-08-21 at
+# 96,787 characters for `User`, which was 86% of a ~28k-token prompt — and
+# it is carried by every call the turn makes, reflection, claim grading and
+# triage included, not just the visible reply. Bullets from May were still
+# being paid for on every request in August.
+_DISCOURSE_STATE_MAX_CHARS = 10000
+
+
+def cap_discourse_state(text: str,
+                        limit: int = _DISCOURSE_STATE_MAX_CHARS) -> str:
+    """Trim a discourse state to `limit` characters, oldest entries first.
+
+    Section headers and any preamble are kept; only the bullet lines are
+    dropped, from the top, because the file is written in append order and
+    the top is therefore the oldest. What was dropped is stated in the text
+    rather than silently removed — a state that has quietly lost half its
+    agreements should say so, or the next reader will treat what remains as
+    the whole record.
+    """
+    if not text or len(text) <= limit:
+        return text
+    lines = text.split("\n")
+    bullets = [i for i, ln in enumerate(lines) if ln.lstrip().startswith("- ")]
+    dropped = 0
+    keep = set(bullets)
+    for i in bullets:
+        rendered = "\n".join(
+            ln for j, ln in enumerate(lines) if j not in bullets or j in keep)
+        # +120 leaves room for the notice line appended below.
+        if len(rendered) + 120 <= limit:
+            break
+        keep.discard(i)
+        dropped += 1
+    out = [ln for j, ln in enumerate(lines) if j not in bullets or j in keep]
+    if dropped:
+        out.append(f"\n[{dropped} older entries pruned to keep this state "
+                   f"under {limit} characters; they are not lost from memory, "
+                   f"only from this summary.]")
+    return "\n".join(out)
+
 
 def is_sensor_source(source: str) -> bool:
     """True for a turn pushed by a sensor rather than said by someone.
@@ -1098,7 +1139,10 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                 if not isinstance(content, str) or not content:
                     continue
                 if kind == "discourse_state":
-                    self._discourse_state[entity] = content
+                    # Cap on the way in too: a state that grew past the
+                    # ceiling under an older build would otherwise be
+                    # carried at full size until its next rewrite.
+                    self._discourse_state[entity] = cap_discourse_state(content)
                 elif kind == "companion_state":
                     self._companion_state[entity] = content
                 elif kind == "external_repo":
@@ -1311,9 +1355,14 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                 narrator_self_model=self.self_model,
             )
             if new_disc:
-                self._discourse_state[entity] = str(new_disc)
-                self._save_state_note('discourse_state', entity, str(new_disc))
-                self._write_state_snapshot('discourse_state', entity, str(new_disc))
+                # Capped here rather than downstream so the stored note, the
+                # snapshot and the copy handed to the next segment as
+                # `previous_discourse_state` are the same text — otherwise
+                # the tracker is asked to extend a version nobody else has.
+                capped = cap_discourse_state(str(new_disc))
+                self._discourse_state[entity] = capped
+                self._save_state_note('discourse_state', entity, capped)
+                self._write_state_snapshot('discourse_state', entity, capped)
 
             # Companion model — fair-witness texture for the chat reply.
             # Runs per-turn here (rather than only at dialog close as in

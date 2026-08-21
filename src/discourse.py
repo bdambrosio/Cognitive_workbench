@@ -119,7 +119,36 @@ Example:
 
 INSTRUCTIONS:
 
-1. COMPLETENESS: Provide the full updated state, including items from previous state that remain active. Drop items that are completed, superseded, no longer relevant, or older than the ~30-turn pruning rule. If the previous state contains a legacy `ACTIVE COMMITMENTS:` section, omit it entirely from the new output — that section has been retired.
+0. BUDGET — THIS IS A HARD LIMIT, NOT AN ASPIRATION: the entire state must
+   fit in 10,000 characters, and no more than 40 bullets across both
+   sections. This state is not an archive. It is carried in full on every
+   single request the agent makes — the reply, and also its reflection,
+   claim grading and concern triage — so every bullet is paid for many
+   times per turn, forever. A state left to accumulate reached 435 bullets
+   and 96,787 characters, which was 86% of the agent's entire prompt.
+
+   If adding something would break the budget, you MUST drop something
+   else. Say which, by dropping it. Refusing to choose is not an option:
+   an over-budget state is truncated mechanically from the oldest end, and
+   then the choice is made for you, worse.
+
+   DROPPING IS NOT FORGETTING. Durable memory holds the record separately.
+   This state is the small set of things that must be in front of the
+   agent right now, not everything that was ever true.
+
+1. COMPLETENESS, WITHIN THE BUDGET: provide the full updated state — but
+   "full" means everything still LOAD-BEARING, not everything still true.
+   An agreement is load-bearing while someone would act differently if
+   they forgot it. Carry those. Drop items that are completed, superseded,
+   no longer relevant, or older than the ~30-turn pruning rule — and drop
+   agreements as readily as decisions: the pruning rule applies to BOTH
+   sections. An agreement that has become simply how things are done here
+   no longer needs saying; it has been absorbed and should go.
+
+   If the previous state contains a legacy `ACTIVE COMMITMENTS:` section,
+   omit it entirely from the new output — that section has been retired.
+   If it carries a `[N older entries pruned ...]` notice, do not reproduce
+   that notice and do not try to reconstruct what it refers to.
 
 2. FORMAT STABILITY: Use the section headers exactly as shown. Plain text only. Do not add `#` headers, `**bold**`, horizontal rules, or `(NEW)` markers — the segment range in the section header makes recency clear.
 
@@ -133,6 +162,11 @@ INSTRUCTIONS:
 5. CONSOLIDATION:
    - Combine closely related agreements into single entries.
    - Focus on distinct shared positions, not every utterance.
+   - Prefer one general bullet to three specific ones that share a
+     principle. Three bullets about how to phrase a particular report are
+     one bullet about how reports are phrased.
+   - A bullet that merely records that a task was done belongs in memory,
+     not here. This section is for what is AGREED, not what happened.
 
 ###EXAMPLE OUTPUT:
 
