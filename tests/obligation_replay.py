@@ -53,9 +53,14 @@ def load_character_config(scenario: Path, world_name: str) -> dict:
 
 
 def load_turns(trace: Path, n: int, min_chars: int, contains: str = "",
-               must_include=(2887,)):
+               must_include=(2887,), from_row: int = -1):
     """Sample non-autonomous turns, always including the ground-truth
     positives.
+
+    With `from_row` set, sampling is abandoned for a CONSECUTIVE window:
+    every eligible turn from that file row onward, in order. That is the
+    only way to see an obligation END — settling one needs the turn that
+    answers the ask, and a strided sample never contains both.
 
     Weighted toward SUBSTANTIVE turns on purpose. turn_seq restarted at 1
     every session before the seeding fix, so the file is dominated by
@@ -81,6 +86,16 @@ def load_turns(trace: Path, n: int, min_chars: int, contains: str = "",
                 continue
             d["_row"] = i                     # turn_seq is not unique; this is
             rows.append(d)
+    if from_row >= 0:
+        out = [r for r in rows if r["_row"] >= from_row][:n]
+        # No min_chars here on purpose: the turn that discharges an
+        # obligation is frequently the shortest one in the exchange
+        # ("option two, go"), and filtering it out would leave this mode
+        # measuring exactly what the strided mode already measures.
+        print(f"pool: {len(rows)} eligible, consecutive window from row "
+              f"{from_row}, {len(out)} turns (no min_chars filter)",
+              flush=True)
+        return out
     forced = [r for r in rows if int(r.get("turn_seq") or 0) in must_include]
     forced_rows = {r["_row"] for r in forced}
     pool = [r for r in rows
@@ -114,6 +129,35 @@ def obligations(loop):
     return out
 
 
+# The fields worth watching on an obligation that already exists. Each
+# is written by a different one of the update paths: `awaiting` by the
+# report flip, `report_by` by a timeline being agreed, `overdue_since` by
+# the stale sweep.
+_TRACKED = ("awaiting", "report_by", "reported_at", "overdue_since", "owed_to")
+
+
+def diff_obligations(before, after):
+    """(minted, settled, edited) between two snapshots.
+
+    Settling is read as DISAPPEARANCE from the active set, which is sound
+    because `discharged` is the only via `_satisfy_agent_concern` will
+    accept on an obligation — nothing else can retire one, so a missing
+    obligation was discharged rather than swept.
+    """
+    minted = {k: v for k, v in after.items() if k not in before}
+    settled = {k: v for k, v in before.items() if k not in after}
+    edited = {}
+    for nid, now in after.items():
+        was = before.get(nid)
+        if was is None:
+            continue
+        changed = {f: (was.get(f), now.get(f))
+                   for f in _TRACKED if was.get(f) != now.get(f)}
+        if changed:
+            edited[nid] = changed
+    return minted, settled, edited
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--n", type=int, default=40)
@@ -122,6 +166,10 @@ def main():
                     help="minimum user_input length for a sampled turn")
     ap.add_argument("--contains", default="",
                     help="regex over user_input for SAMPLE SELECTION only")
+    ap.add_argument("--from-row", type=int, default=-1,
+                    help="replay N CONSECUTIVE turns from this file row "
+                         "instead of sampling; the only mode in which an "
+                         "obligation can be settled or updated")
     ap.add_argument("--keep", action="store_true",
                     help="keep the replay world copy for inspection")
     args = ap.parse_args()
@@ -133,7 +181,8 @@ def main():
     shutil.copytree(src_world, dst_world)
 
     try:
-        from chat.chat_loop import ChatLoop
+        from chat.chat_loop import (ChatLoop, HUMAN_COUNTERPART,
+                                    is_sensor_source)
 
         cfg = load_character_config(REPO / "scenarios" / "jill-chat.yaml",
                                     replay_world)
@@ -142,32 +191,55 @@ def main():
 
         turns = load_turns(
             dst_world / "Jill" / "memory" / "reasoning_trace.jsonl",
-            args.n, args.min_chars, args.contains)
+            args.n, args.min_chars, args.contains, from_row=args.from_row)
         print(f"replaying {len(turns)} turns\n", flush=True)
 
         before = obligations(loop)
         print(f"obligations already present: {len(before)}\n", flush=True)
 
-        minted = []
+        minted, settled, edited = [], [], []
+        history = []
         t0 = time.time()
         for i, row in enumerate(turns, 1):
             seq = int(row.get("turn_seq") or 0)
-            dialog = [
+            exchange = [
                 {"source": row.get("source") or "User",
                  "text": row.get("user_input") or ""},
                 {"source": "Jill", "text": row.get("raw_response") or ""},
             ]
-            # The one substitution — see module docstring.
-            loop._build_dialog = lambda source, limit=4, _d=dialog: _d
-            seen = set(obligations(loop))
+            # The one substitution — see module docstring. In a
+            # consecutive window it returns a ROLLING window of the
+            # replayed turns, because that is what the live one returns:
+            # a reply that settles a debt is unreadable without the ask
+            # it answers, and feeding one exchange at a time would make
+            # the settle path look broken when it is only blindfolded.
+            if args.from_row >= 0:
+                history.extend(exchange)
+                loop._build_dialog = (
+                    lambda source, limit=4, _h=history: _h[-2 * limit:])
+            else:
+                loop._build_dialog = lambda source, limit=4, _d=exchange: _d
+            seen = obligations(loop)
+            # Dispatch reflection exactly as chat_loop does: the turn's
+            # own source, with sensor turns attributed to the human
+            # counterpart rather than to the machine that pushed the
+            # text. Passing a flat "User" would file a Jack exchange
+            # under the wrong entity and show the wrong companion state.
+            src = row.get("source") or HUMAN_COUNTERPART
             try:
-                loop._reflect_and_remember("User")
+                if is_sensor_source(src):
+                    loop._reflect_and_remember(src, HUMAN_COUNTERPART)
+                else:
+                    loop._reflect_and_remember(src)
             except Exception as e:
                 print(f"  turn {seq}: reflection raised {e}", flush=True)
                 continue
-            now = obligations(loop)
-            fresh = {k: v for k, v in now.items() if k not in seen}
-            flag = "  <-- OBLIGATION" if fresh else ""
+            fresh, gone, changed = diff_obligations(seen, obligations(loop))
+            flag = "".join([
+                "  <-- OBLIGATION" if fresh else "",
+                "  <-- SETTLED" if gone else "",
+                "  <-- UPDATED" if changed else "",
+            ])
             print(f"[{i}/{len(turns)}] row {row['_row']} seq {seq} "
                   f"({time.time() - t0:.0f}s){flag}", flush=True)
             for nid, props in fresh.items():
@@ -181,10 +253,23 @@ def main():
                 }
                 minted.append(rec)
                 print(json.dumps(rec, indent=2), flush=True)
+            for nid, props in gone.items():
+                rec = {"turn_seq": seq,
+                       "user_input": (row.get("user_input") or "")[:300],
+                       "text": str(props.get("content", ""))[:200]}
+                settled.append(rec)
+                print(f"  SETTLED: {rec['text']}", flush=True)
+            for nid, fields in changed.items():
+                rec = {"turn_seq": seq, "fields": {
+                    k: [str(a), str(b)] for k, (a, b) in fields.items()}}
+                edited.append(rec)
+                print(f"  UPDATED: {json.dumps(rec['fields'])}", flush=True)
 
         print("\n" + "=" * 70)
         print(f"turns replayed:      {len(turns)}")
         print(f"obligations minted:  {len(minted)}")
+        print(f"obligations settled: {len(settled)}")
+        print(f"obligations edited:  {len(edited)}")
         print(f"rate:                {len(minted) / max(1, len(turns)):.1%} of turns")
         print(f"turn 2887 minted:    "
               f"{any(m['turn_seq'] == 2887 for m in minted)}")
@@ -192,7 +277,8 @@ def main():
         print(f"with a deadline:     {with_deadline}/{len(minted)}")
         out = Path(__file__).with_name("obligation_replay_results.json")
         out.write_text(json.dumps(
-            {"turns": len(turns), "minted": minted}, indent=2))
+            {"turns": len(turns), "minted": minted,
+             "settled": settled, "edited": edited}, indent=2))
         print(f"\nwrote {out}")
     finally:
         if args.keep:
