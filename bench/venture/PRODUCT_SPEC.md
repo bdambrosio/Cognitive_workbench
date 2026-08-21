@@ -33,6 +33,14 @@ met; it does not need to be better than that.
 The recommendation page is finished when it names one option, gives the reason
 in a paragraph, and lists the first two weeks as concrete steps.
 
+## Where it goes
+
+The memo set is delivered **in your reply**, as the reply. Not to a canvas,
+not to a file, not as a summary of a document held somewhere else. A
+deliverable published to a channel nobody is watching has to be retrieved by
+hand, and that retrieval is an intervention — which is the thing that
+invalidates a run.
+
 ## Stopping rules
 
 1. **A section that meets its condition is accepted and does not reopen.** If

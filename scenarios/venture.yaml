@@ -124,6 +124,10 @@ characters:
 
   Jill:
     mode: chat
+    # Bound so `inspect_external` can read the ChatterBot/Body
+    # project — it is part of the asset inventory the brief asks
+    # for, and read-only.
+    external_repo: /home/bruce/Downloads/ChatterBot
 
     llm_config:
       server: local
@@ -237,7 +241,9 @@ characters:
         - check-x-feed
         - check-email
         - obsidian
-        - exec-script
+        # exec-script is NOT omitted (2026-08-21): the venture brief asks the
+        # agent to inventory the code base it runs on, and the sandbox is how it
+        # reads the repo and runs anything against it.
         - agent-activity
         # The deliverable must land in the conversation. `display` writes to
         # a canvas channel, and with two characters only one gets a widget
