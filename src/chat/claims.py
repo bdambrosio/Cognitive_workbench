@@ -581,6 +581,9 @@ _DIRECT_OBSERVATION_TOOLS = frozenset({
     'fetch-text', 'tavily', 'obsidian', 'semantic-scholar', 'check-x-feed',
     'check-email', 'stock-price', 'get-financial-statements',
     'calculate', 'text-find', 'justify',
+    # Reads the machine directly (nvidia-smi, /proc, the health
+    # script) rather than a model's account of it.
+    'system-info',
     'fac-status', 'fac-observe', 'fac-inventory', 'fac-nearest',
     'world-look',
 })
