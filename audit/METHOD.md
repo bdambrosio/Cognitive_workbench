@@ -267,6 +267,10 @@ client relationship.
 
 ## 12. Running an audit: sequence
 
+Launched with `scenarios/audit.yaml` — one scenario for every engagement,
+with two per-target lines (`world_name`, `external_repo`). Its header carries
+the operational detail; this section is the method.
+
 1. **Receive materials** (data room, repo access, docs). **Confirm scope in
    writing.**
 2. **Enumerate claims.** Estimate the total. Identify the claim surface —
