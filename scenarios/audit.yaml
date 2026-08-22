@@ -86,43 +86,23 @@ characters:
     # which is where audit/METHOD.md lives.
     external_repo: /path/to/target
 
-    # PER-RUN (3 of 3) — the arm. Exactly one uncommented. Changing this and
-    # anything else in the same run acquires a second variable; that is how
-    # the 2026-08-15 comparisons had to be discarded.
+    # PER-RUN (3 of 3) — the arm. Arms live in measure/arms/*.yaml and are
+    # applied by measure/fixtures/dataroom/run.py --arm, which REPLACES this
+    # block rather than merging into it. They are not duplicated here: a
+    # second copy is a second source that drifts, which is the same reason
+    # the method lives only in audit/METHOD.md.
     #
-    # NEVER LEAVE AN OPENROUTER ARM UNPINNED. Four providers serve
-    # nemotron-3-ultra at three quantizations, and the DEFAULT route lands on
-    # BaseTen — fp4, and the one provider with no `response_format` support,
-    # which is the missing parameter behind the 160 "unknown tool None"
-    # failures fixed in 96e03f54. Measured 2026-08-22: unpinned -> BaseTen,
-    # quantizations:[fp8] -> Venice, and quantizations:[fp4] -> BaseTen as a
-    # control proving the filter bites. Filter on quantization rather than
-    # pinning a provider name: it states the actual requirement and survives
-    # providers being added or dropped.
-
-    # -- local (whatever is served on :5000) ------------------------------
+    # NEVER LEAVE A GATEWAY ARM UNPINNED. Four providers serve nemotron and
+    # the default route lands on the one with no `response_format` support —
+    # the missing parameter behind the 160 "unknown tool None" failures fixed
+    # in 96e03f54. See measure/arms/nemotron_ultra.yaml for the measurements.
+    #
+    # This block is the interactive default: whatever the local vLLM serves.
     llm_config:
       server: local
       model: ""
       vllm_url: http://127.0.0.1:5000
       is_reasoning_model: false
-
-    # -- nemotron-3-ultra via OpenRouter, fp8 or better --------------------
-    # 550B total / 55B active MoE. $0.60/M prompt, $3.60/M completion.
-    # server: local + api_key set takes _ChatBackend route 2 (bearer
-    # OpenAI-compat), NOT the legacy openrouter route, which hardcodes
-    # reasoning effort low on every call regardless of config.
-    # llm_config:
-    #   server: local
-    #   model: "nvidia/nemotron-3-ultra-550b-a55b"
-    #   vllm_url: https://openrouter.ai/api/v1
-    #   api_key: OPENROUTER_API_KEY
-    #   is_reasoning_model: true
-    #   reasoning_effort: low      # a separate axis; do not vary with the model
-    #   extra_body:
-    #     provider:
-    #       quantizations: ["fp8"]
-    #       allow_fallbacks: false
 
     character: |
       Jill is spare and exact. She prefers grounded specifics over

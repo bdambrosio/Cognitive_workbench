@@ -1,0 +1,32 @@
+# nemotron-3-ultra — 550B total / 55B active, hybrid Transformer-Mamba MoE.
+# $0.600/M in, $3.600/M out. 512k context on Together.
+#
+# PROVIDER PINNED, and the pin is not optional. Four providers serve this
+# model; the DEFAULT route lands on BaseTen, the one with no
+# `response_format` support — the missing parameter behind the 160
+# "unknown tool None" failures fixed in 96e03f54.
+#
+# Together first, DeepInfra as the single permitted fallback so an outage
+# does not kill a campaign mid-run. BaseTen excluded by name for the reason
+# above. Measured 2026-08-22, identical request, only the provider varied:
+#
+#   Venice     fp8       1,787 prefill tok/s    61.9 decode tok/s
+#   Together   unknown  16,056                 243.9
+#   DeepInfra  fp4      20,675                 264.2
+#   BaseTen    fp4      17,042                 222.7
+#
+# NOT pinned to fp8. Nemotron 3 is trained at FP4 (Bruce, 2026-08-22), so
+# fp4 serving is the native precision rather than a lossy quantization, and
+# fp8 would be an upcast — slower for no quality gain. Venice's 10x prefill
+# penalty was the cost of a pin that bought nothing.
+llm_config:
+  server: local
+  model: "nvidia/nemotron-3-ultra-550b-a55b"
+  vllm_url: https://openrouter.ai/api/v1
+  api_key: OPENROUTER_API_KEY
+  is_reasoning_model: true
+  reasoning_effort: low
+  extra_body:
+    provider:
+      order: ["Together", "DeepInfra"]
+      allow_fallbacks: false
