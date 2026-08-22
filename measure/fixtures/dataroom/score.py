@@ -196,11 +196,17 @@ def main() -> int:
          "content": _MATCH_SYS.format(findings=FINDINGS_BRIEF)},
         {"role": "user", "content": memo},
     ])
+    # repair_json_string already returns the parsed dict, not a string —
+    # json.loads on its result raises TypeError. Guard shape the way the
+    # retired bench/common.py did, for the same reason.
     from utils.json_utils import repair_json_string
-    try:
-        got = json.loads(repair_json_string(raw))["findings"]
-    except Exception as e:                                     # noqa: BLE001
-        print(f"  match pass failed to parse: {type(e).__name__}: {e}")
+    parsed = repair_json_string(raw) if isinstance(raw, str) else raw
+    if not isinstance(parsed, dict) or "findings" not in parsed:
+        print(f"  match pass returned no usable JSON: {str(raw)[:200]}")
+        return 1
+    got = parsed["findings"]
+    if not isinstance(got, list):
+        print(f"  match pass 'findings' was {type(got).__name__}, not a list")
         return 1
 
     order = [f.get("id") for f in got]
