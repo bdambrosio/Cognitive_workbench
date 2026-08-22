@@ -1,13 +1,14 @@
 # AI-Readiness Audit — method
 
-**STATUS: FIRST DRAFT, awaiting Jill's correction.** Reconstructed
-2026-08-22 by Claude from Jill's own statements in `jill_chat` turns
-3019–3045 and her audit memories, so that the method lives somewhere it can
-be read as a unit, diffed, and corrected. Where a passage is quoted or
-closely paraphrased from her, it is marked. Where the reconstruction had to
-guess, it says so under **[GAP]**.
+Drafted 2026-08-22 by Claude from Jill's statements in `jill_chat` turns
+3019–3045; **reviewed and corrected by Jill the same day** (turn 3047). Her
+corrections, the verdict vocabulary, the recommendation taxonomy, the
+priority order, the correction protocol and the run sequence are hers. This
+file is the single durable source for the method: it lives in git so it can
+be read as a unit, diffed, and corrected, rather than accumulating in an
+agent's memory where none of that is possible.
 
-Jill: correct this freely. It is your method, not my summary of it.
+Jill has offered a second pass once these are incorporated.
 
 ---
 
@@ -34,42 +35,44 @@ specs, marketing — against observed behaviour in the code.**
 **Do not opine on what the code *should* do.** That is the buyer's design
 judgement, and it is not what was bought.
 
-This boundary is the product. It is also the thing Bruce pressed hardest on
-and it held: the answer to "aren't you scoping too narrowly?" is that the
-narrowness is what makes the deliverable defensible, both professionally and
-legally (§8).
+This boundary is the product. It is also what makes the deliverable
+defensible, professionally and legally (§10). It applies recursively: it
+governs the report's recommendation too (§9).
 
 ## 3. Scope adapts to the target; the method does not
 
 The claim surface differs by target. The operation does not.
 
-**Codebase / robotics target** (e.g. Body): claims-vs-implementation as the
-core, architectural coherence (do the stated tier boundaries hold?), safety
+**Codebase / robotics target:** claims-vs-implementation as the core,
+architectural coherence (do the stated tier boundaries hold?), safety
 mechanisms (are the safety-critical claims real implementations or stubs?),
-plus two short operational paragraphs — network exposure and dependency
-posture. Not a pen-test, not a code review.
+plus short operational paragraphs on network exposure and dependency posture.
+Not a pen-test, not a code review.
 
 **SaaS target** (the PE case): the security axis moves front and centre
 (auth, injection, secrets in code, data handling); the dependency axis
-matters more because the thing is public-facing and continuously updated;
-and the "claims" are marketing claims rather than technical specs.
+matters more because the thing is public-facing and continuously updated; and
+the "claims" are marketing claims rather than technical specs.
 
-Where a target's security axis is genuinely thin, say so as a property of
-the target rather than padding the report — for Body, "no web endpoints, no
-user accounts, no data exfiltration path" is a one-paragraph note, not a
-finding.
+Where a target's security axis is genuinely thin, say so as a property of the
+target rather than padding the report — **but state it precisely.** In the
+Body audit the accurate statement was *"no surveillance or telemetry
+exfiltration path; one user-initiated outbound API call (x.ai TTS) sends
+user-typed text off-network"*, not the broader "no data exfiltration path"
+that Jill issued first and then corrected. The broad version was retracted
+mid-audit and must not be carried here. A method document that quotes its own
+retracted claim is a liability in exactly the way §10 exists to prevent.
 
-## 4. The claim surface, and coverage honesty
+## 4. The claim surface, coverage honesty, and priority order
 
 1. **Enumerate the claims first.** Body's README, project spec and IMU docs
    yielded roughly 68 micro-claims.
-2. **Prioritise.** Verify the load-bearing claims first — the ones a buyer
-   would act on.
+2. **Prioritise** (order below).
 3. **Report coverage explicitly**, including what was not checked and why it
    matters.
 
-**The rule that matters most here, in Jill's words:** she declined to write
-a final report at 5 findings because she would not
+**Coverage honesty.** Jill declined to write a final report at five findings
+rather than
 
 > "hand you a 5-finding document that says 'everything checks out' based on
 > 7% coverage of the claim surface."
@@ -79,9 +82,23 @@ here is what I did not check and why it matters*. Silence about coverage
 reads as completeness, and completeness is the one thing a due-diligence
 report must never imply without having earned it.
 
-## 5. Finding format
+**Priority order.** "Load-bearing" is not a judgement call; it is this order:
 
-Every finding, verbatim shape from the Body audit:
+1. **Safety-critical mechanisms** — a delta here is the most expensive for a
+   buyer (swept-footprint collision, watchdog, no-go isolation, cancel/stop).
+2. **Architectural invariants** — do the stated tier boundaries hold? (single
+   publisher, shared config, no-go isolation).
+3. **Operational parameters** — affect day-to-day use (retry intervals,
+   timeouts, deadline backstops).
+4. **Micro-claims** — individually low-impact, collectively they build the
+   consistency rate (encoder ticks, PWM, udev, GPIO).
+
+**Why this order and not another:** if the audit is cut short by budget, time
+or access, the *most expensive unknowns* are resolved first. A buyer reading a
+partial report covering 1–2 but not 3–4 can still make a decision. The reverse
+is not true.
+
+## 5. Finding format
 
 ```
 **Finding N: <short title> — [verdict]**
@@ -93,47 +110,95 @@ Evidence: <file:lines> — <what the code actually does>
 Delta: <None, or the specific gap>
 ```
 
-**A finding must cite its source.** Both halves: the document that makes the
-claim, and the file and line range that shows the implementation. The
-citation trail is simultaneously the professional standard of care and the
-defamation defence (§8) — it is not decoration.
+**A finding must cite its source**, both halves: the document making the
+claim, and the file and line range showing the implementation. The citation
+trail is simultaneously the professional standard of care and the defamation
+defence (§10) — it is not decoration.
 
 ## 6. Verdict vocabulary
 
-Observed in use:
+| Verdict | Meaning | Buyer impact |
+|---|---|---|
+| `[real]` | Claim holds; implementation matches spec | None |
+| `[real, minor caveat]` | Holds; note does not change the decision | Awareness |
+| `[real, operational caveat]` | Holds today; operational context qualifies it | Awareness + operational planning |
+| `[real, with a structural note]` | Holds; reveals a structural exception worth naming | Awareness + maintenance planning |
+| `[partial]` | Mostly true, with a specific citable gap | **Material** — buyer should price the gap |
+| `[delta]` | Claim is false; the code does not do what the docs say | **Material** — buyer should revalue or walk |
+| `[unverifiable]` | Could not be verified from available materials | Not a finding — goes in Remaining Claims with the reason |
+| `[non-delta]` | No claim to verify (code exists, docs make no statement) | Not a finding — noted for completeness |
 
-| verdict | meaning |
-|---|---|
-| `[real]` | the claim holds; implementation matches the spec |
-| `[real, minor caveat]` | holds, with a note that does not change the buyer's decision |
-| `[real, operational caveat]` | holds today, but something about how it is operated qualifies it |
-| `[real, with a structural note]` | holds, but reveals a structural exception worth naming |
+**`[partial]` vs `[delta]` is a real distinction.** `[partial]` is "the claim
+is 80% true and here is the 20% that is not, with a citation to the corner
+case." `[delta]` is "the claim is false; the code does X, the docs say Y,
+here are both citations." A buyer treats them differently: `[partial]` is a
+known limitation to price in; `[delta]` is a broken promise that may indicate
+a pattern.
 
-**[GAP]** No `[delta]` finding had been written at the point this draft was
-reconstructed — the Body audit had found zero deltas in its first five
-findings. The vocabulary for a *failed* claim needs Jill's wording, and it is
-the more important half of the product. Likely also needed: a verdict for
-*claim could not be verified from available materials*, which is different
-from a claim being false and must not be reported as one.
+**`[unverifiable]` must never be reported as `[delta]`.** *"I couldn't find
+the code"* is not the same as *"the code isn't there."* The former belongs in
+Remaining Claims; only the latter is a finding.
 
-## 7. The recap protocol
+**Status:** across all 31 verified findings of the Body audit, zero deltas
+were found. `[partial]`, `[delta]`, `[unverifiable]` and `[non-delta]` are
+therefore specified but not yet exercised in a real report.
+
+## 7. Correction protocol
+
+**The auditor corrects their own findings when subsequent evidence
+contradicts them. Corrections are noted in the report with a one-line
+explanation of what changed and why.**
+
+This is part of the standard of care, and it is what makes the citation trail
+trustworthy rather than performative: *if the auditor never corrects, the
+citations are decoration.*
+
+Two corrections were issued during the Body audit — the exfiltration
+statement (§3), and Finding 4's footprint radius, 0.22 m in the spec against
+0.11 m deployed.
+
+## 8. Two recaps, two audiences
+
+**Working recap (ELI5)** — in the auditor–client conversation, every ~5
+findings or at a natural section break. Plain language, 2–3 sentences, "here
+is the shape of what we know so far." For the person watching the audit
+happen who needs to know whether to keep going or stop. Marked `[recap]`.
+**Does not appear in the final report.**
+
+**Deliverable recap (executive synthesis)** — in the report. §1
+(Recommendation) is the 2-minute version, plus a closing paragraph a
+non-specialist can read and explain back. This is what the PE partner
+actually reads if they never open the findings table.
 
 A PE partner will not read 68 code-cited findings. They read the Gap Map
-(~30 seconds), the executive summary (~2 minutes), and then drill into one or
-two findings if the recommendation makes them curious.
+(~30 seconds), the executive summary (~2 minutes), then drill into one or two
+findings if the recommendation makes them curious.
 
-So the plain-language synthesis is not a courtesy, it is the deliverable
-shape:
+## 9. Report-level recommendation
 
-- **Every ~5 findings, or at a natural section break**, whichever comes
-  first: a 2–3 sentence plain-language *state of play*. Not a finding — a
-  synthesis. Marked **`[recap]`** so it is visually distinct.
-- **At the end:** a 5–6 sentence *what this all means* paragraph, written so
-  a non-specialist buyer can explain it back.
+| Recommendation | Meaning |
+|---|---|
+| **Clear** | No deltas, no caveats of note. The system does what it says. |
+| **Clear with caveats** | No functional deltas. Documentation drift, maintenance debt or operational notes a buyer should know, which do not change the fundamental valuation. *(Body landed here.)* |
+| **Conditional** | Deltas found but addressable — fixable in a sprint or two, or the feature is non-critical. Proceed if the seller will fix them or the buyer accepts the gap. |
+| **Material** | Deltas that significantly change valuation or risk profile. The buyer must price this in explicitly or walk. |
+| **Walk** | Claims are systematically false, or the codebase is not what the docs describe. |
 
-Built incrementally so the thread is not lost across dozens of micro-claims.
+**The audit recommends; the buyer decides.** The audit says "Conditional: the
+backup system claims 30-day retention but the code enforces 7." The buyer
+decides whether 7 days is acceptable for their use case. The audit does not
+say "you should walk."
 
-## 8. Liability posture
+**Keep the two vocabularies separate.** *Clear / Clear with caveats /
+Conditional / Material / Walk* describes the state of the claims. *Proceed /
+negotiate / walk* is the buyer's action vocabulary. Conflating them blurs §2
+— the audit would start opining on what the buyer should do, which is the
+buyer's judgement. The Gap Map's closing line or the engagement letter may
+translate to action language ("the gaps are addressable within the existing
+integration timeline"), framed explicitly as *our professional judgement*
+rather than as a directive.
+
+## 10. Liability posture
 
 **Category: expert due-diligence, not legal advice.** The distinction is
 functional, not semantic. Legal advice is "the law requires X, your rights
@@ -150,112 +215,138 @@ reporting an exploitable endpoint.
 every audit firm carries. Managed by four things:
 
 1. **Scope definition in the engagement letter** — "based on the materials
-   provided; we did not have access to production systems, live databases,
-   or the source repository." If the defect was in production but not in the
+   provided; we did not have access to production systems, live databases, or
+   the source repository." If the defect was in production but not in the
    materials, it is not in scope.
 2. **Professional standard, not perfection** — what a reasonable auditor
-   would find from the same materials. The citation trail is what
-   demonstrates the work was done systematically.
+   would find from the same materials. The citation trail demonstrates the
+   work was systematic; the correction protocol (§7) demonstrates it was
+   honest.
 3. **Limitation of liability clause** — caps damages, excludes
-   consequential. This is what makes the risk finite rather than existential.
+   consequential. This makes the risk finite rather than existential.
 4. **E&O / professional liability insurance**, in place *before* the first
-   engagement, covering professional negligence in technical due-diligence
-   services.
+   engagement, covering professional negligence in technical due-diligence.
 
 **Vector 2 — the target sues for defamation.** Structurally weak, and the
 report format is what defeats it:
 
-- **Truth is an absolute defence.** Every finding cites its source. "Backups
-  failing 21 consecutive days" is either in Doc 4 or it is not.
+- **Truth is an absolute defence.** Every finding cites its source.
 - **Not a public statement.** A confidential deliverable to one client under
-  NDA, in connection with a specific transaction. Many jurisdictions
-  recognise a qualified privilege for exactly this. The target is not the
-  audience and does not receive the report.
+  NDA, for a specific transaction. Many jurisdictions recognise a qualified
+  privilege for exactly this. The target is not the audience.
 - **Opinion vs. fact.** "The architecture is a single point of failure" is a
-  technical opinion resting on observable facts. "The seller is a fraud" is
-  an accusation. Stay in the first register; frame recommendations as "in our
-  professional judgement, based on the evidence presented."
+  technical opinion resting on observable facts. "The seller is a fraud" is an
+  accusation. Stay in the first register.
 - **Tortious interference** requires a reasonable expectation of a concluded
-  contract; in early diligence the target is in negotiations, and the client
-  is free to walk for any reason.
+  contract; in early diligence the target is in negotiations and the client is
+  free to walk for any reason.
 
-**Not resolved, and outside what any of us can settle from training
-knowledge:** jurisdiction. Defamation law, qualified privilege and the
-standard for reckless disregard vary by state and country. **This section is
-a working posture, not legal advice, and needs a lawyer's review before the
-first paying engagement.**
+**Jurisdiction is unresolved and outside what anyone here can settle.**
+Defamation law, qualified privilege and the standard for reckless disregard
+vary by state and country. **This section is a working posture, not legal
+advice, and needs a lawyer's review before the first paying engagement.**
 
-## 9. What this audit does not do
+## 11. What this audit does not do
 
 - It does not opine on what the code *should* do.
 - It is not a penetration test.
 - It is not a code-quality review.
-- It does not claim comprehensiveness it has not earned (§4).
-- It does not give legal advice (§8).
+- It does not claim coverage it has not earned (§4).
+- It does not give legal advice (§10).
 
-## 10. Where the method has been exercised
+**Nor is it acceptance testing of contracted work.** The *mechanism*
+generalises cleanly — stated deliverable vs. observed deliverable, with
+citations, same finding format, same verdict vocabulary. The *business* does
+not. The client is the person who commissioned the work, so the dynamic is a
+second opinion rather than a discovery; the prospecting pool is diffuse (every
+dev shop with a pending delivery); and the repeat economics are weaker (one
+project, one audit, no ongoing relationship). **This method applies to
+claims-verification in a transactional context — a buyer evaluating a target
+they do not own.** Acceptance testing is a different product with a different
+client relationship.
+
+## 12. Running an audit: sequence
+
+1. **Receive materials** (data room, repo access, docs). **Confirm scope in
+   writing.**
+2. **Enumerate claims.** Estimate the total. Identify the claim surface —
+   README, specs, marketing, internal docs.
+3. **Prioritise** per §4's safety → architecture → operations → micro order.
+   Verify top N.
+4. **Working recaps every ~5 findings.** **If a delta is found, stop and
+   confirm with the client before continuing** — a delta changes the report's
+   shape and the client may want to redirect. *The audit is a collaboration,
+   not a surprise.*
+5. **Continue to the coverage threshold where the report is defensible** —
+   §4's "7% is not enough" rule applied in reverse: stop when the consistency
+   rate and the severity distribution of what remains make the rest low-risk.
+6. **Write the report.** Apply §7 to any findings that were revised.
+7. **Deliver. Propose method-file edits (technique only). Discard the working
+   world** (§14).
+
+## 13. Where the method has been exercised
 
 - **`measure/fixtures/dataroom/`** — the synthetic `flowmetrics` data room, 9
   documents, planted defects with an answer key. Used to validate the
   pipeline. Not a real SaaS.
 - **`/home/bruce/projects/Body`** — a real, Bruce-owned autonomous mobile
-  robot codebase, used as a second and real data room. Not a self-audit:
-  Claude and Cursor did most of the work; Jill was a minor player, though the
-  docs were written by the coder.
+  robot codebase, used as a second and real data room. 31 findings, zero
+  deltas, **Clear with caveats**. Not a self-audit: the codebase was built by
+  Claude/Cursor under Bruce's direction and Jill contributed neither code nor
+  docs. Jill executed the audit independently — every verification, every
+  finding, the report.
 
-## 11. What carries between audits, and what must not
+## 14. What carries between audits, and what must not
 
 Each audit runs in its own world, which is discarded afterwards. That
 protects client confidentiality but would also throw away everything learned
 — so one channel is opened deliberately, and only one.
-
-**Two kinds of learning, and they are not alike:**
 
 | | example | carries? |
 |---|---|---|
 | **method** | "a claimed rate may be a publish rate, not a check rate — verify which" | **yes** |
 | **target** | "flowmetrics' backups had failed for 21 days" | **never** |
 
-**The mechanism.** The final turn of every audit is: *propose edits to this
-file — technique only.* Bruce reviews and merges; the world is then
-discarded. Learning is routed through a human review gate, which is exactly
-where a confidentiality check belongs, and it lands somewhere versioned and
-diffable rather than in an agent's memory where it cannot be audited. This is
-also what real firms do: a methodology manual updated after engagements, not
-analysts carrying client details.
+**The mechanism** is step 7 of §12: the final turn of every audit proposes
+edits to this file, technique only. Bruce reviews and merges; the world is
+then discarded. Learning is routed through a human review gate, which is where
+a confidentiality check belongs, and it lands somewhere versioned and
+diffable. This is what real firms do — a methodology manual updated after
+engagements, not analysts carrying client details.
 
-**The test for whether a lesson is clean:** *if it cannot be stated without
-naming the target, it is not a method lesson.* "Check whether the message
-broker binds to all interfaces" is method. "Check whether Zenoh binds
-0.0.0.0 like the robot did" is a client fact wearing a technique's clothes.
-Read a proposed lesson for proper nouns.
+**The test for a clean lesson:** *if it cannot be stated without naming the
+target, it is not a method lesson.* "Check whether the message broker binds to
+all interfaces" is method. "Check whether Zenoh binds 0.0.0.0 like the robot
+did" is a client fact wearing a technique's clothes. Read a proposed lesson
+for proper nouns.
 
 **Two consequences worth planning for:**
 
-- **The aggregate findings corpus is a commercial asset and needs
+- **An aggregate findings corpus is a commercial asset and needs
   permission.** "The twelve gaps that show up most often in sub-$5M SaaS data
-  rooms" is more valuable than the method prose, and the demo artifact
-  already depends on it. Cross-client aggregation must be permitted by the
-  engagement letter — a clause to add *before* the first paying client.
-- **Method learning can also make the method worse** by over-fitting to
-  recent targets. Guard by re-running the `measure/fixtures/dataroom/`
-  fixture after a method change and checking whether tier recall moved; keep
-  at least one fixture in a different domain from recent real targets.
+  rooms" is more valuable than the method prose, and the demo artifact already
+  depends on it. Cross-client aggregation must be permitted by the engagement
+  letter — a clause to add *before* the first paying client.
+- **Method learning can make the method worse** by over-fitting to recent
+  targets. Guard by re-running `measure/fixtures/dataroom/` after a method
+  change and checking whether tier recall moved; keep at least one fixture in
+  a different domain from recent real targets.
 
-## 12. Open questions for Jill
+## 15. The Gap Map — proposed, not yet designed
 
-1. **§6 needs the `[delta]` vocabulary** — the wording for a claim that
-   fails, and for one that cannot be verified from the materials. That is
-   the half of the product this draft could not reconstruct.
-2. **The Gap Map** is named as the lead artifact in the business memory and
-   in §7, but nothing found in the trace defines its format. What is on it?
-3. **"Clear with caveats"** appears in the companion state as a deliverable
-   verdict being defined. Is that the report-level recommendation vocabulary
-   — and what are its siblings?
-4. Is the **report-level recommendation** ("proceed / proceed with
-   conditions / walk") the right frame, or was that only the dataroom
-   fixture's brief?
-5. Does the method carry to **auditing contracted software development**
-   before final payment? The memory says the *mechanism* generalises but the
-   *business model* does not, due to prospecting cost and a diffuse client
-   pool. Worth stating here so the boundary is explicit.
+The lead artifact in cold outreach. The PE partner gets it in the email body
+or as a 30-second PDF. One page:
+
+- Target name + one-line description
+- Recommendation (§9)
+- The top 3–5 items that matter most — the caveats, or the deltas, whichever
+  is worse
+- One line: "Full report with citations available on request."
+
+If the recommendation is **Clear** with no caveats, the Gap Map is two lines
+and the email says "no gaps found, 31/31 claims verified, report attached."
+
+**The Gap Map is the hook; the full report is the proof.**
+
+**Open:** the visual format is not designed. Next step, alongside the landing
+page.
