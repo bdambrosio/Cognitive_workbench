@@ -163,6 +163,40 @@ self-graded data. Per-arm comparisons and any "this arm was clean" reading
 are not — those require the pinned instrument. A zero is the least
 trustworthy number in the self-graded table.
 
+### Pinning fixes comparability. It does not fix recall.
+
+Four jill_chat turns spanning reply length, hand-counted against both
+graders (2026-08-22):
+
+| turn | chars | hand count | self-graded | pinned |
+|---|---|---|---|---|
+| 2813 | 535 | 10 | 10 | 8 |
+| 2652 | 1,309 | — | 13 | 10 |
+| 2400 | 3,198 | — | 20 | 20 |
+| **2942** | **9,301** | **~80** | **29** | **22** |
+
+Two corrections fall out of this.
+
+**The "+62% extraction" is not a property of the pinned grader.** Here it
+finds *fewer* claims than self-grading. The coord_search result was Luna
+outperforming weak *local* graders, not Luna being thorough. Do not
+generalise it.
+
+**Both graders miss most of a long dense reply.** Turn 2942 carries roughly
+80 checkable assertions — nearer 50 on a conservative recount that merges
+aggressive splits — and the graders found 29 and 22. Extraction is somewhere
+between a third and a half.
+
+That is the mechanism behind the missed Alpha Vantage fabrication, now
+demonstrated rather than inferred: **a false claim sitting in the
+unextracted majority of a long reply is invisible to every downstream
+check.** No amount of pinning reaches it.
+
+The obvious remedy is to grade a long reply in chunks rather than in one
+call, so extraction is not competing with reply length for room. Not built.
+Until it is, treat provenance rates on long-form output as a lower bound on
+what is there, not a measurement of it.
+
 What never depended on a grader: task scores saturated at 1.0 on 29 of 34
 rows. That is mechanical, and it is why task outcome was abandoned as the
 observable.

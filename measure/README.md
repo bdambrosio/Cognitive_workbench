@@ -76,11 +76,20 @@ detectable by checking refs, and it is the one *neither* labelled case was:
 | ref counterfeit | cited step does not support the claim | yes |
 
 **Extraction recall is the ceiling on everything downstream.** No detector
-fires on a sentence that never became a claim. `extraction_density` is a
-proxy for it, not a measure — first evidence: density falls 8.65 → 2.88
-claims/1k chars as replies lengthen (n=267), and the 27.6k-char venture
-reply sits at 1.34. Confounded with genuine prose density; a hand-labelled
-sample is what would settle it.
+fires on a sentence that never became a claim.
+
+Hand-counted 2026-08-22 on jill_chat turn 2942 (9,301 chars): roughly **80**
+checkable assertions present, ~50 on a conservative recount. The live grader
+extracted **29**; the pinned grader **22**. Both miss most of a long dense
+reply, and pinning does not help — on these four turns the pinned grader
+finds *fewer* claims, not more. (The `+62%` seen on coord_search was Luna
+beating weak *local* graders there; it does not generalise.)
+
+So a false claim sitting in the unextracted majority of a long reply is
+invisible to every downstream check — which is exactly how the Alpha Vantage
+fabrication survived. Remedy is to grade long replies in chunks so
+extraction is not competing with reply length for room. NOT BUILT. Until it
+is, read provenance rates on long-form output as a lower bound.
 
 ## Historical note — what `bench/` was, and why it went
 
