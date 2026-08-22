@@ -282,6 +282,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             is_reasoning=llm_cfg.get('is_reasoning_model'),
             api_key=llm_cfg.get('api_key'),
             reasoning_effort=llm_cfg.get('reasoning_effort'),
+            extra_body=llm_cfg.get('extra_body'),
         )
 
         # ---- Persona ----

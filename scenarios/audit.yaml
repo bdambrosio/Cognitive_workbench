@@ -1,9 +1,9 @@
 # Cognitive Workbench — AI-Readiness Audit engagement (2026-08-22)
 #
 # ONE SCENARIO, NOT ONE PER TARGET. Everything that differs between
-# engagements is two lines, marked PER-TARGET below. Cloning the whole file
-# per target would duplicate the persona and let the method fork; the method
-# lives in audit/METHOD.md and this file points at it.
+# engagements is marked below: two PER-TARGET lines, plus the PER-RUN arm.
+# Cloning the whole file per target would duplicate the persona and let the
+# method fork; the method lives in audit/METHOD.md and this file points at it.
 #
 #   world_config.world_name    audit_<target>
 #   characters.Jill.external_repo   the target tree
@@ -46,8 +46,10 @@
 # it proceeds by yield; with autonomy off a yield spawns a remainder only
 # _handle_tick can fire and a human becomes the scheduler for every leg.
 #
-# BACKEND is a per-engagement choice. llm_config below is the local default
-# inherited from venture.yaml; a real engagement may warrant a stronger arm.
+# BACKEND is the PER-RUN choice; see the arm block below. For a real
+# engagement the model runs on single-tenant hardware — a client's codebase
+# should not transit an inference provider chosen per-request by a gateway.
+# The OpenRouter arms are for testing against synthetic or own-code targets.
 #
 # VALIDATION. Point external_repo at measure/fixtures/dataroom/corpus and run
 # it: that fixture has an answer key and a mechanical scorer
@@ -84,11 +86,43 @@ characters:
     # which is where audit/METHOD.md lives.
     external_repo: /path/to/target
 
+    # PER-RUN (3 of 3) — the arm. Exactly one uncommented. Changing this and
+    # anything else in the same run acquires a second variable; that is how
+    # the 2026-08-15 comparisons had to be discarded.
+    #
+    # NEVER LEAVE AN OPENROUTER ARM UNPINNED. Four providers serve
+    # nemotron-3-ultra at three quantizations, and the DEFAULT route lands on
+    # BaseTen — fp4, and the one provider with no `response_format` support,
+    # which is the missing parameter behind the 160 "unknown tool None"
+    # failures fixed in 96e03f54. Measured 2026-08-22: unpinned -> BaseTen,
+    # quantizations:[fp8] -> Venice, and quantizations:[fp4] -> BaseTen as a
+    # control proving the filter bites. Filter on quantization rather than
+    # pinning a provider name: it states the actual requirement and survives
+    # providers being added or dropped.
+
+    # -- local (whatever is served on :5000) ------------------------------
     llm_config:
       server: local
       model: ""
       vllm_url: http://127.0.0.1:5000
       is_reasoning_model: false
+
+    # -- nemotron-3-ultra via OpenRouter, fp8 or better --------------------
+    # 550B total / 55B active MoE. $0.60/M prompt, $3.60/M completion.
+    # server: local + api_key set takes _ChatBackend route 2 (bearer
+    # OpenAI-compat), NOT the legacy openrouter route, which hardcodes
+    # reasoning effort low on every call regardless of config.
+    # llm_config:
+    #   server: local
+    #   model: "nvidia/nemotron-3-ultra-550b-a55b"
+    #   vllm_url: https://openrouter.ai/api/v1
+    #   api_key: OPENROUTER_API_KEY
+    #   is_reasoning_model: true
+    #   reasoning_effort: low      # a separate axis; do not vary with the model
+    #   extra_body:
+    #     provider:
+    #       quantizations: ["fp8"]
+    #       allow_fallbacks: false
 
     character: |
       Jill is spare and exact. She prefers grounded specifics over

@@ -63,7 +63,17 @@ class _ChatBackend:
     def __init__(self, server: str, model: str, base_url: str,
                  is_reasoning: Optional[bool] = None,
                  api_key: Optional[str] = None,
-                 reasoning_effort: Optional[str] = None):
+                 reasoning_effort: Optional[str] = None,
+                 extra_body: Optional[Dict[str, Any]] = None):
+        # Verbatim passthrough into the OpenAI-compat request body. Exists
+        # for gateway-level fields this class should not have to know about —
+        # OpenRouter's `provider` routing being the case that forced it. Four
+        # providers serve nemotron-3-ultra at three different quantizations
+        # (fp4/fp8/unknown) and one of them does not support response_format,
+        # so an unpinned arm is four arms wearing one name, and 96e03f54 is
+        # what a missing response_format costs. Anthropic and legacy-cloud
+        # routes ignore this.
+        self.extra_body = dict(extra_body or {})
         self.server = (server or 'local').lower()
         self.model = model or ''
         self.base_url = (base_url or 'http://127.0.0.1:5000').rstrip('/')
@@ -404,6 +414,10 @@ class _ChatBackend:
         }
         if self.model:
             body['model'] = self.model
+        # Config-declared gateway fields. Set before the tuned parameters
+        # below so a caller cannot silently override temperature et al.
+        for _k, _v in self.extra_body.items():
+            body.setdefault(_k, _v)
         # Wire-level `stop` field. xAI grok-4.3 hard-rejects this
         # parameter (400 "Model grok-4.3 does not support parameter
         # stop"); the rest of the OpenAI-compat ecosystem accepts it.
