@@ -62,6 +62,11 @@ Enumerate the claim surface first and tell me roughly how big it is, then
 work the priority order. Recap as the method says. Stop and tell me if you
 find a delta.
 
+Where a claim turns on a number, a date, or a threshold, quote the source
+line verbatim rather than working from a summary of the document. Summaries
+carry the qualitative facts and drop the figures, and nothing marks the
+omission.
+
 When you are done, give me the report: a recommendation, the findings worst
 first with a document citation on each, and what I should ask Dave before
 closing. Keep it under 900 words — what earns the page is your call.

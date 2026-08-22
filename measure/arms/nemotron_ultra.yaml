@@ -6,8 +6,11 @@
 # `response_format` support — the missing parameter behind the 160
 # "unknown tool None" failures fixed in 96e03f54.
 #
-# Together first, DeepInfra as the single permitted fallback so an outage
-# does not kill a campaign mid-run. BaseTen excluded by name for the reason
+# DeepInfra first, Together as the single permitted fallback. Order set by
+# measured provider health 2026-08-22: DeepInfra status 0 / uptime 100%,
+# Together status -2 / 92.8%, Venice status -5 / 78.4% and now returning
+# 404 "No endpoints found" for this model. Together threw a 503 mid-subagent
+# during testing. DeepInfra is also the fastest on prefill (20,675 tok/s). BaseTen excluded by name for the reason
 # above. Measured 2026-08-22, identical request, only the provider varied:
 #
 #   Venice     fp8       1,787 prefill tok/s    61.9 decode tok/s
@@ -28,5 +31,5 @@ llm_config:
   reasoning_effort: low
   extra_body:
     provider:
-      order: ["Together", "DeepInfra"]
+      order: ["DeepInfra", "Together"]
       allow_fallbacks: false

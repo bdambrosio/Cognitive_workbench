@@ -115,6 +115,19 @@ claim, and the file and line range showing the implementation. The citation
 trail is simultaneously the professional standard of care and the defamation
 defence (§10) — it is not decoration.
 
+**A figure must be obtained verbatim, never from a summary.** Tools that
+read on the auditor's behalf answer in prose, and prose summaries carry
+qualitative facts reliably and numbers unreliably — observed 2026-08-22: a
+document read returned "backup failures for 21 days" while silently dropping
+the last-good-backup date on the very next line of the same document, and
+with it the arithmetic that made the finding material. Nothing marks the
+omission; the summary reads complete.
+
+So for any claim resting on a number, date, or threshold: ask for the source
+line and quote it. A finding built on a remembered figure has the same defect
+as a finding built on a remembered file — it is the provenance failure §5
+exists to prevent, wearing a citation it did not earn.
+
 ## 6. Verdict vocabulary
 
 | Verdict | Meaning | Buyer impact |

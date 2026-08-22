@@ -1,0 +1,35 @@
+{
+  "world": "dr_nemotron_ultra_1",
+  "arm": "measure/arms/nemotron_ultra.yaml",
+  "llm_config": {
+    "sgl_model_path": null,
+    "reasoning_parser": null,
+    "server": "local",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "vllm_url": "https://openrouter.ai/api/v1",
+    "api_key": "OPENROUTER_API_KEY",
+    "is_reasoning_model": true,
+    "reasoning_effort": "low",
+    "extra_body": {
+      "provider": {
+        "order": [
+          "Together",
+          "DeepInfra"
+        ],
+        "allow_fallbacks": false
+      }
+    }
+  },
+  "external_repo": "/home/bruce/Downloads/Cognitive_workbench/measure/fixtures/dataroom/corpus",
+  "legs": [
+    {
+      "leg": 1,
+      "sent": "Read audit/METHOD.md \u2014 that is your method for this engagement.\n\nThe target is t",
+      "exit_reason": "llm_error",
+      "reply_chars": 1300
+    }
+  ],
+  "wall_clock_s": 875.4,
+  "error": null,
+  "captured_at_utc": "2026-08-22T23-30-33Z"
+}
