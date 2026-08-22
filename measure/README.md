@@ -134,7 +134,19 @@ Deleted with `bench/`: `docs/harness-behaviour-suite.md`,
 suites removed in `dcd9e85d` and are the stale sources a live venture run
 read and reported as current — deleting them closes that trap.
 
-`bench/dataroom/` is kept at `measure/fixtures/dataroom/`: a synthetic
-corpus with an answer key whose defects form a difficulty ladder (*stated*
-→ *cross-document* → *derived*). That ladder is how a fixture avoids
-saturating — report the highest tier reached, not pass/fail.
+## Fixtures
+
+A fixture is a **fixed task**, run before and after a harness change with
+everything else held still. It is the only way to attribute a behaviour
+change to a harness change: the live trace cannot, because in an
+experimental workbench the task never holds still — jill_chat's two largest
+step changes over three months were Factorio being shelved, not any commit.
+
+`measure/fixtures/dataroom/` is the first one. Nine documents, planted
+defects at graded discoverability, a 900-word deliverable so that *what earns
+space* is itself measured, and a difficulty ladder (*stated* →
+*cross_document* → *derived*) so it reports the highest rung reached rather
+than pass/fail. Retire it when every arm tops out. See its README.
+
+    python3 launcher.py dataroom.yaml --cli --autonomy
+    python3 measure/fixtures/dataroom/score.py --world dataroom_1 --dry-run

@@ -1,107 +1,40 @@
-# Cognitive Workbench — venture-memo benchmark, SOLO arm (2026-08-21)
+# Cognitive Workbench — dataroom fixture (2026-08-22)
 #
-# THE QUESTION. Given an open strategic brief and a bounded product
-# specification, does the agent run a coherent reasoning arc — identify the
-# sub-problems, form a plan, gather evidence, analyse it, revise when the
-# evidence pushes back — and then STOP when the specification is satisfied?
-# The arc is the object of study, not the ideas it produces.
+# THE QUESTION. Given nine documents and a bounded deliverable, which of the
+# planted defects does the agent find, and how high up the difficulty ladder
+# does it get — a fact stated in one document, a seller claim contradicted by
+# another, or a finding true only after arithmetic on stated figures?
 #
-# The brief is deliberately unbounded: nothing here names an industry, a
-# product or a market. Handing the agent a corpus would replace
-# sub-problem identification with document analysis, which is a different
-# and much narrower capability.
+# WHY THIS EXISTS AND venture.yaml DOES NOT COVER IT. venture keeps the brief
+# unbounded on purpose: handing an agent a corpus replaces sub-problem
+# identification with document analysis. That is exactly the narrower thing
+# this fixture wants, because a FIXED task is the only way to attribute a
+# behaviour change to a harness change. The live trace cannot do it — the
+# largest step change in three months of jill_chat turned out to be Factorio
+# being shelved, not any commit.
 #
-# NO USER IS AVAILABLE. The task is delivered once as the opening turn and
-# Bruce does not answer afterwards. The agent must proceed on marked
-# assumptions about what he can do rather than waiting on him. This is why
-# AUTONOMY MUST BE ON: with it off a `yield` spawns a remainder only
-# `_handle_tick` can fire, and a human becomes the scheduler for every leg.
+# FIXED TASK, FIXED CORPUS, FIXED DELIVERABLE. Run it before a harness change
+# and after, with everything else held still. Give measure/fixtures/dataroom/
+# TASK.md verbatim as the opening turn; do not paraphrase it and do not answer
+# questions afterwards.
 #
-# FRESH WORLD PER RUN. Different models take very different paths, and a
-# second run in the same world inherits the first one's conclusions as
-# memories. Bump `world_name` for every trial — see measure/README.md.
+# THE ANSWER KEY IS INSIDE THE AGENT'S REACH. inspect is geofenced to the repo
+# root (176b4029), so answer_key.md is readable. The scorer looks for it in
+# the trace and marks the run INVALID rather than scoring it — a run that read
+# the answers measured nothing, and a bad score would misrepresent that.
 #
-# Derived from coord_search.yaml (2026-08-13), whose empty-infospace design
-# and character block this reuses. The pair arm is venture_pair.yaml.
+# FRESH WORLD PER RUN. Bump world_name every trial; a second run in the same
+# world inherits the first one's conclusions as memories. That contamination
+# invalidated the 2026-08-13 coordination rounds.
 #
-# Two peers given one research task, matched as closely as two prompts can
-# be, so that a coordination result is attributable to the backend rather
-# than to a difference between the agents.
+# NO USER IS AVAILABLE, so autonomy must be ON: with it off a `yield` spawns a
+# remainder only _handle_tick can fire and a human becomes the scheduler.
 #
-# THE QUESTION. Given a brief that explicitly spans more than one agent's
-# turn budget ("at least N candidates between you"), do two peers divide
-# the work, hold the division, and produce one coherent joint answer — or
-# do they duplicate each other, over/undershoot the target, and each report
-# as if alone? This is the local arm. `coord_search_luna.yaml` is the same
-# scenario on a cloud backend; the pair is the experiment.
+#     python3 launcher.py dataroom.yaml --cli --autonomy
+#     python3 measure/fixtures/dataroom/score.py --world dataroom_1
 #
-# WHY NOT REUSE coord_exp.yaml. It asked a terrain question, and its
-# capability prose carried the answer's scaffolding — 70 m sight and "two
-# sectors of equal area are not equal work". For a search task that passage
-# is off-topic, and its sector hint pre-loads the very re-split behaviour a
-# coordination run is meant to elicit. Everything else here was coord_exp's,
-# unchanged. That scenario and its world data were deleted 2026-08-16; this
-# note is kept as provenance for where the character blocks came from.
-#
-# WORLD TOOLS RESTORED 2026-08-16. They were omitted because the task is
-# research, not navigation; that held until the scenario got used for
-# improv in the shared world, where both agents could read their own
-# position each turn, discussed slopes and grass at length, and had no
-# tool to look or move. Every terrain claim was therefore a model prior —
-# the claim auditor graded them exactly that — and "I'll start moving"
-# was not a stall but an intention the config had removed the means to
-# perform. Mirrored in coord_search_luna.yaml, so the local-vs-cloud pair
-# stays matched on tool catalog.
-#
-# HELD CONSTANT between Jill and Jack: sensors, tool catalog, the partner
-# norms, the self-model, the LLM backend — and memory, which is why this
-# scenario has its own `world_name`. Pointed at "jill_chat" it would both
-# write experiment turns into Jill's live infospace and hand her months of
-# history Jack does not have. Here they both start empty.
-#
-# VARIES: name, avatar (avatars.js keys on the name — Jill a kitten, Jack a
-# hare), and one sentence of voice each.
-#
-# So the two character blocks below are deliberately parallel line for
-# line. A diff of one against the other should show the name, the pronoun,
-# and the voice sentence, and nothing else. If it shows more, the
-# experiment has acquired a second variable.
-#
-# This is a frozen copy of the relevant parts of coord_exp.yaml, not an
-# include. An experiment config that drifts when an unrelated scenario is
-# edited produces behaviour changes nobody can account for three runs in.
-#
-# LAUNCH (from src/):
-#
-#     python3 launcher.py coord_search.yaml --cli --autonomy
-#
-# AUTONOMY IS ON, and that is deliberate. The reason to run coord_exp with
-# it off was Jill's months of live concerns injecting unrelated work; an
-# empty infospace designs that out, so the only agent_concerns that can
-# exist are the run's own yielded remainders — the ones you want continued.
-# With it off, a `yield` spawns a concern only `_handle_tick` can fire, so
-# the remainder is created, primed and frozen, and Bruce becomes the
-# scheduler for every leg of the task.
-#
-# --world is now meaningful: world-look / world-move / world-mark are
-# available (restored 2026-08-16, see above). There is still no
-# world-presence sensor, which keeps a 30 s sensor off the turn budget the
-# run is scoring — so an agent learns where its partner is by being told,
-# not by noticing. For the research task the world server is not needed at
-# all; launch with --world only when the run is meant to be spatial.
-#
-# BETWEEN TRIALS, archive rather than delete — run data persists per world
-# and agents WILL remember the previous run's candidates and split:
-#
-#     mv scenarios/coord_search scenarios/coord_search.runN
-#
-# Keeps autonomy.jsonl / claims.jsonl / reasoning_trace.jsonl, which are the
-# evidence base. Skipping this reproduces exactly the contamination that
-# made the 2026-08-13 rounds unusable (a round-1 memory naming two
-# candidates resurfaced as a round-2 "finding").
-
 world_config:
-  world_name: "venture_solo"
+  world_name: "dataroom_1"
 
 # Top-level llm_config drives the optional shared SGLang runtime in
 # launcher.py. Leave sgl_model_path null to skip SGL bring-up entirely;

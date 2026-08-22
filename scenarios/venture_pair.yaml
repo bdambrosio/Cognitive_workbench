@@ -19,7 +19,7 @@
 #
 # FRESH WORLD PER RUN. Different models take very different paths, and a
 # second run in the same world inherits the first one's conclusions as
-# memories. Bump `world_name` for every trial — see bench/venture/README.md.
+# memories. Bump `world_name` for every trial — see measure/README.md.
 #
 # Derived from coord_search.yaml (2026-08-13), whose empty-infospace design
 # and character block this reuses. The solo arm is venture.yaml; the pair is the counterfactual the 2026-08-20 runaway never had.
