@@ -330,8 +330,13 @@ def attribute_claims(record: Dict[str, Any],
     # model_prior/volatile → suspect, then spawned a background job to go
     # web-verify a fact recorded in this repo's git log.
     state_lines = [str(c) for c in (record.get('active_concerns') or [])]
-    for key, label in (('substrate', 'harness provenance'),
-                       ('embodiment', 'body')):
+    # Keys are `substrate_line` / `embodiment_line`: chat_loop writes them as
+    # `record[key.strip('_')]` from `_substrate_line` / `_embodiment_line`.
+    # This read asked for 'substrate' / 'embodiment' and so never matched —
+    # 0 of 3,010 jill_chat rows carry those names, 561 carry the _line ones.
+    # The block below was added to close turn 2447 and had been inert since.
+    for key, label in (('substrate_line', 'harness provenance'),
+                       ('embodiment_line', 'body')):
         val = str(record.get(key) or '').strip()
         if val:
             state_lines.append(f"[{label}] {val}")

@@ -99,17 +99,39 @@ Stale-source is detectable only for *self-referential* claims, by re-checking
 the cited source against current state. Not generally detectable for external
 claims; say so rather than implying coverage.
 
-## Known defect, not yet fixed
+## The grader is a large part of the measurement
 
 The live grader calls `self.backend.chat` (`src/chat/claims.py`), so the
-backend under test grades its own output. Grounding numbers are therefore
-**not comparable across arms** until measurement re-grades offline with a
-pinned model. `attribute_claims()` is pure and offline-runnable, so this is
-a separate re-grade pass, not a change to the live path — production
-grading stays as it is, since it feeds the agent's own verification concern
-and works.
+backend under test grades its own output. `measure/regrade.py` fixes this
+for measurement by re-grading offline against a pinned instrument
+(`gpt-5.6-luna`, `reasoning_effort=low`, matching the cloud arm). Production
+grading stays as it is — it feeds the agent's own verification concern and
+works.
 
-Until that lands, cross-arm provenance comparisons are suggestive only.
+**How much this matters, measured 2026-08-22.** The same venture_solo reply,
+graded by the run's own backend and then by the pinned grader:
+
+| grounding | self-graded | pinned luna |
+|---|---|---|
+| retrieved | 19 (51%) | 16 (64%) |
+| **model_prior** | **12 (32%)** | **0 (0%)** |
+| inferred | 3 (8%) | 5 (20%) |
+| user_asserted | 3 (8%) | 3 (12%) |
+| context | 0 | 1 (4%) |
+| **total extracted** | **37** | **25** |
+
+Both extraction count *and* attribution move. n=1 turn, so the size is not
+established — but the direction is unambiguous and the effect is not small.
+
+**This partly undercuts the evidence that motivated this rebuild.** The
+4% → 97% `model_prior` spread across archived `coord_search` arms was
+measured with each arm grading itself, so an unknown share of it is the
+grader rather than the agent. Re-grading those nine runs against the pinned
+instrument is the first real experiment, not a refinement.
+
+What does *not* depend on the grader: task scores saturated at 1.0 on 29 of
+34 rows. That is mechanical, it needs no grader, and it is why task outcome
+was abandoned as the observable.
 
 ## Verification before trust
 

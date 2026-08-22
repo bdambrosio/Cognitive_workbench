@@ -32,6 +32,7 @@ Read-only with respect to agent state. Needs no GPU, no server, no network.
 | `provenance.py` | grounding mix, extraction density, quote gate, ref validity |
 | `harness_rev.py` | joins a turn to the harness commit live when it ran |
 | `report.py` | prints the vector |
+| `regrade.py` | offline re-grade against the PINNED grader (costs money) |
 
 `provenance.py` reuses `src/chat/claims.py` (`valid_refs_for`,
 `_restore_observations`) rather than reimplementing it. The live grader is
@@ -92,6 +93,13 @@ between-arm signal, measurable within-arm noise; only wall clock separated.
 Meanwhile the provenance instrument had been running in production the whole
 time and spans **4% → 97% `model_prior` across the archived coord_search
 arms** on the same task. It discriminates; the task scorers did not.
+
+**Caveat on that spread, added the same day it was cited.** Each arm graded
+itself, so an unknown share of the range is the grader. On one venture_solo
+reply, re-grading with the pinned instrument moved `model_prior` from 32% to
+0% and the extracted-claim count from 37 to 25. Re-grading the nine archived
+arms through `regrade.py` is the first experiment, not a tidy-up. What does
+not depend on a grader: 29 of 34 task rows scored exactly 1.0.
 
 Worth keeping from the retired work, and carried forward here:
 

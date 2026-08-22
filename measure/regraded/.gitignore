@@ -1,0 +1,3 @@
+# Re-graded output is derived data and can be large; regenerate with
+# measure/regrade.py. The pinned grader makes it reproducible.
+*.jsonl
