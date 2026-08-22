@@ -120,18 +120,52 @@ graded by the run's own backend and then by the pinned grader:
 | context | 0 | 1 (4%) |
 | **total extracted** | **37** | **25** |
 
-Both extraction count *and* attribution move. n=1 turn, so the size is not
-established — but the direction is unambiguous and the effect is not small.
+Both extraction count *and* attribution move on that one turn.
 
-**This partly undercuts the evidence that motivated this rebuild.** The
-4% → 97% `model_prior` spread across archived `coord_search` arms was
-measured with each arm grading itself, so an unknown share of it is the
-grader rather than the agent. Re-grading those nine runs against the pinned
-instrument is the first real experiment, not a refinement.
+### The full experiment — all 15 coord_search arms re-graded
 
-What does *not* depend on the grader: task scores saturated at 1.0 on 29 of
-34 rows. That is mechanical, it needs no grader, and it is why task outcome
-was abandoned as the observable.
+Run 2026-08-22, 67 cloud calls, `measure/grader_delta.py`. It corrects the
+n=1 worry above rather than confirming it.
+
+**The aggregate rate is robust.** Across 15 arms, `model_prior` is **25.9%
+self-graded and 25.9% pinned** — identical. The headline spread survives
+intact: 0.0% → 97.3% both ways.
+
+**The extreme is real.** `Gemma4_1/Jack` reproduces exactly — 37 claims both
+ways, 97.3% `model_prior` both ways, 0% retrieved both ways. Two independent
+instruments agree that arm fabricated rather than searched.
+
+**But per-arm readings from self-grading are not trustworthy, and the reason
+is extraction, not attribution.** The pinned grader extracts **+62% more
+claims** (355 → 576). Seven of 15 arms extracted at most half what one
+consistent instrument found:
+
+    coord_search_luna.run1/Jack     0 ->  44 claims   (self-grading produced nothing)
+    coord_search_luna.run1/Jill     1 ->  34
+    coord_search.luna2/Jill         2 ->  28
+    coord_search.Gemma4_1/Jill      6 ->  41
+    coord_search.luna3/Jill         3 ->  16
+
+Under-extraction reads as innocence. Three arms that scored a clean **0.0%
+`model_prior`** carry substantial background-knowledge claims once a
+consistent instrument looks:
+
+    coord_search.Gemma4_1/Jill    0.0% -> 48.8%   (6 -> 41 claims)
+    coord_search.gemma3/Jill      0.0% -> 30.6%   (36 -> 36 claims — same count!)
+    coord_search.gemma1/Jill      0.0% -> 25.0%
+
+`gemma3/Jill` is the sharp case: identical claim count, and attribution
+still moves 0.0 → 30.6. So both mechanisms are live; extraction is merely
+the larger one.
+
+**What this settles.** Aggregate provenance rates are safe to quote from
+self-graded data. Per-arm comparisons and any "this arm was clean" reading
+are not — those require the pinned instrument. A zero is the least
+trustworthy number in the self-graded table.
+
+What never depended on a grader: task scores saturated at 1.0 on 29 of 34
+rows. That is mechanical, and it is why task outcome was abandoned as the
+observable.
 
 ## Verification before trust
 

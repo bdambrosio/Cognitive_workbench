@@ -33,6 +33,7 @@ Read-only with respect to agent state. Needs no GPU, no server, no network.
 | `harness_rev.py` | joins a turn to the harness commit live when it ran |
 | `report.py` | prints the vector |
 | `regrade.py` | offline re-grade against the PINNED grader (costs money) |
+| `grader_delta.py` | self-graded vs pinned, per arm — the instrument's own effect |
 
 `provenance.py` reuses `src/chat/claims.py` (`valid_refs_for`,
 `_restore_observations`) rather than reimplementing it. The live grader is
@@ -94,12 +95,18 @@ Meanwhile the provenance instrument had been running in production the whole
 time and spans **4% → 97% `model_prior` across the archived coord_search
 arms** on the same task. It discriminates; the task scorers did not.
 
-**Caveat on that spread, added the same day it was cited.** Each arm graded
-itself, so an unknown share of the range is the grader. On one venture_solo
-reply, re-grading with the pinned instrument moved `model_prior` from 32% to
-0% and the extracted-claim count from 37 to 25. Re-grading the nine archived
-arms through `regrade.py` is the first experiment, not a tidy-up. What does
-not depend on a grader: 29 of 34 task rows scored exactly 1.0.
+**All 15 arms have since been re-graded against the pinned instrument**
+(2026-08-22, 67 cloud calls). The spread is real: 0.0% -> 97.3% both ways,
+and aggregate `model_prior` is 25.9% self-graded and 25.9% pinned. The
+extreme reproduces exactly — `Gemma4_1/Jack`, 37 claims and 97.3% both ways.
+
+What is NOT trustworthy from self-graded data is any per-arm reading,
+because the pinned grader extracts **+62% more claims** (355 -> 576) and
+under-extraction reads as innocence. Three arms scoring a clean 0.0%
+`model_prior` carry 25-49% once one instrument looks at all of them; one arm
+self-graded 0 claims where the pinned grader found 44. Quote aggregates from
+`claims.jsonl`; use `regrade.py` before comparing arms. See
+`docs/measurement-v3.md` for the table.
 
 Worth keeping from the retired work, and carried forward here:
 
