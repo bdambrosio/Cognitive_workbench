@@ -444,7 +444,7 @@ src/
                          avatars (see docs/shared-world.md)
   cli.py · resource_browser.py · telegram_bridge.py · launcher.py
 scenarios/               YAML configs
-bench/                   eval harnesses (each with its own README)
+measure/                 trace-level measurement (see measure/README.md)
 factorio/                Factorio game-embodiment subproject: headless
                          server + fle-bridge mod + HTTP bridge behind
                          the fac-* tools (see factorio/README.md)
@@ -485,20 +485,25 @@ templates auto-open `<think>` (pass `--reasoning-format none`);
 reasoning-model detection is name-substring-based — override with
 `is_reasoning_model:` in the scenario.
 
-## Benchmarks
+## Measurement
 
-`bench/` holds the eval harnesses, each with its own README: introspective
-fidelity (four-tier operational self-awareness), discourse reflection,
-memory recall, recall-subagent prompt A/B, counterfactual self-prediction
-(cspred), HLE. Runs land in `bench/runs/` (gitignored).
+`measure/` scores **traces, not task outcomes**. Task success is binary and
+saturates; trace properties — where a claim came from, whether evidence
+preceded authoring, whether an agent waited for its partner — are the same
+measurements on every task, so a coding task and a venture memo become
+comparable. Tasks are fixtures that elicit behaviour; they are not scored.
+
+    python3 measure/report.py --world venture_solo
+
+Read-only, no GPU, no server. It reports a vector and never a single score.
+See `measure/README.md`, and `docs/measurement-v3.md` for the design.
 
 ## Limitations and non-goals
 
 - Single-author research code; breaking changes without notice.
 - Memory and reflection quality is LLM-dependent: frontier models extract
   and update reliably; small local models lose recall on subtler
-  write-side moves (`bench/discourse_reflect/`,
-  `docs/design_note_agreements_rag.md`).
+  write-side moves (`docs/design_note_agreements_rag.md`).
 - **No autonomy bench yet** — whether autonomous fires are useful and
   well-timed is currently judged anecdotally from `autonomy.jsonl`, not
   measured. It's the next evaluation gap.
@@ -531,8 +536,8 @@ Key entrypoints, by need:
 - [docs/concerns-architecture.md](docs/concerns-architecture.md) — the
   live mechanics: two-layer strength/activation model, triage, WIP,
   yield, fire-outcome capture.
-- [docs/harness-roadmap.md](docs/harness-roadmap.md) — the
-  measurement-gated improvement loop (M0 done, M1 running).
+- [docs/measurement-v3.md](docs/measurement-v3.md) — measuring the
+  workbench: score traces, not tasks.
 
 **The Factorio experiment**
 
@@ -554,8 +559,7 @@ Key entrypoints, by need:
   tamper-evident.
 - [docs/STATUS.md](docs/STATUS.md) — every design doc classified against
   the live code (LIVE / ASPIRATIONAL / SUPERSEDED / REFERENCE).
-- [docs/substack_sensors_vs_tools.md](docs/substack_sensors_vs_tools.md),
-  [docs/self-awareness-benchmarks.md](docs/self-awareness-benchmarks.md).
+- [docs/substack_sensors_vs_tools.md](docs/substack_sensors_vs_tools.md).
 
 ## License
 

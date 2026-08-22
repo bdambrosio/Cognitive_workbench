@@ -121,7 +121,7 @@ A fire (or a user turn) that can't finish in one ReAct loop can
 **yield**: the remainder is captured into a successor agent concern that
 carries the work forward on its own pressure. Auditability comes from
 yield points, not plan artifacts (see
-[harness-roadmap.md](harness-roadmap.md) §2).
+the retired harness roadmap, §2).
 
 ## Fire-outcome capture
 

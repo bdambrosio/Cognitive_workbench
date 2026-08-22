@@ -91,12 +91,10 @@ For the project itself — what it is, why, and a quick start — see the
 
 | Doc | |
 |---|---|
-| [harness-roadmap.md](harness-roadmap.md) | The measurement-gated improvement loop, M0–M5 |
-| [harness-m0-m1-status.md](harness-m0-m1-status.md) | Where that loop currently stands |
-| [m1-collection-inputs.md](m1-collection-inputs.md) | Exemplar inputs for M1 collection |
-| [self-awareness-benchmarks.md](self-awareness-benchmarks.md) | The four-tier self-awareness bench |
-| [introspective_fidelity_benchmark_v01.md](introspective_fidelity_benchmark_v01.md) | Its methodology |
-| [substack_awareness_evaluation.md](substack_awareness_evaluation.md) | Write-up of the implemented suite |
+| [measurement-v3.md](measurement-v3.md) | Score traces, not tasks — the current approach |
+| [../measure/README.md](../measure/README.md) | How to run it, the join traps, and what `bench/` was |
+| [m1-collection-inputs.md](m1-collection-inputs.md) | Exemplar inputs for M1 collection — stale, M0–M5 retired |
+| [substack_awareness_evaluation.md](substack_awareness_evaluation.md) | Write-up of a suite deleted 2026-08-18 |
 
 ## Security
 

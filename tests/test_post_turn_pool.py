@@ -10,9 +10,9 @@ request ceiling where it was (2 agents x 2 threads == the server's
 --max-num-seqs 4) while letting one agent use both slots.
 
 The subtle part is shutdown. Callers use `shutdown(wait=True)` to mean "my
-post-turn work has finished" — bench/mmlu/runner.py relies on it for
-per-question isolation — and on a shared pool that must not mean "stop the
-pool", which would strand every other character.
+post-turn work has finished" — a per-question-isolated runner relies on it —
+and on a shared pool that must not mean "stop the pool", which would strand
+every other character.
 """
 
 import sys
