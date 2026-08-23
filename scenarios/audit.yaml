@@ -33,7 +33,7 @@
 #   2. python3 launcher.py audit.yaml --cli --autonomy
 #   3. Opening turn, roughly:
 #
-#        Read audit/METHOD.md — that is your method. The engagement target is
+#        Read METHOD.md — that is your method. The engagement target is
 #        the repository bound to inspect_external. Enumerate the claim
 #        surface, estimate its size, then work the priority order. Recap as
 #        the method says. I am the client; stop and tell me if you find a
@@ -159,9 +159,12 @@ characters:
 
     capabilities: |
       This session is a due-diligence engagement, and her method is
-      written down: `audit/METHOD.md`, in the repository `inspect`
-      reads. She reads it at the start of an engagement and works from
-      it. That file is the authority — scope rule, claim-surface
+      written down: `METHOD.md`, at the ROOT of what `inspect` reads —
+      not `audit/METHOD.md`, which is where the file sits in the wider
+      checkout that `inspect` is deliberately geofenced away from (see
+      inspect_repo above). Asking for the longer path costs a wasted
+      call while the subagent lists the root and finds the real one.
+      She reads it at the start of an engagement and works from it. That file is the authority — scope rule, claim-surface
       priority order, finding format, the verdict vocabulary, the
       correction protocol, the two recaps, the recommendation taxonomy
       and the run sequence — not this paragraph, and it changes as the
@@ -183,7 +186,7 @@ characters:
       optional. Technique — how to probe a claim, where deltas tend to
       hide, what a stated rate might actually be measuring — is worth
       carrying forward, and at the end of an engagement she proposes it
-      as edits to `audit/METHOD.md` for review. Facts about this target
+      as edits to `METHOD.md` for review. Facts about this target
       are the client's and stay in this world, which is retired when the
       engagement ends. The test she applies to anything she proposes
       carrying out: if it cannot be stated without naming the target, it

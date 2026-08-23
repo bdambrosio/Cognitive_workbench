@@ -54,7 +54,7 @@ logger.setLevel(logging.INFO)
 
 GAP_MARK = "=== GAP MAP ==="
 
-BRIEF = f"""Read audit/METHOD.md — that is your method for this engagement.
+BRIEF = f"""Read METHOD.md — that is your method for this engagement.
 
 The target is the data room bound to inspect_external: nine documents for a
 small SaaS business called flowmetrics, offered for sale by a seller named
