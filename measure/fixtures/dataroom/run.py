@@ -156,7 +156,8 @@ def verify_served_model(arm: Dict[str, Any], timeout: float = 10.0
             "expected": expect}
 
 
-def build_config(world: str, arm_path: Optional[Path]
+def build_config(world: str, arm_path: Optional[Path],
+                 workflow_mode: Optional[bool] = None
                  ) -> Tuple[str, Dict[str, Any]]:
     from launcher import parse_characters                      # noqa: E402
 
@@ -188,6 +189,15 @@ def build_config(world: str, arm_path: Optional[Path]
     # The two per-target values, set here rather than by editing the committed
     # scenario, so a run leaves no diff behind.
     cfg["external_repo"] = str(CORPUS)
+    # WHY A FLAG AND NOT A SECOND SCENARIO. Comparing workflow_mode on
+    # against off needs both, and audit.yaml's own header says why a copy is
+    # the wrong way to get one: "a second copy is a second source that
+    # drifts". One scenario, one override, and run_meta records which side of
+    # the comparison a row is on — a row that cannot name its own
+    # configuration is not evidence, the same rule the served-model check
+    # exists to enforce.
+    if workflow_mode is not None:
+        cfg["workflow_mode"] = workflow_mode
     return name, cfg
 
 
@@ -231,6 +241,9 @@ def main() -> int:
                     help="YAML with an llm_config block; replaces the scenario's")
     ap.add_argument("--max-turns", type=int, default=25,
                     help="hard cap on legs (default 25)")
+    ap.add_argument("--workflow-mode", choices=("on", "off"), default=None,
+                    help="override the scenario's workflow_mode; omit to use "
+                         "whatever audit.yaml declares")
     args = ap.parse_args()
 
     if (REPO / "scenarios" / args.world).exists():
@@ -248,7 +261,9 @@ def main() -> int:
     if served_check.get("checked"):
         logger.info("served-model check OK: %s", served_check["served"])
 
-    name, cfg = build_config(args.world, args.arm)
+    wf_mode = (None if args.workflow_mode is None
+               else args.workflow_mode == "on")
+    name, cfg = build_config(args.world, args.arm, wf_mode)
     logger.info("world=%s arm=%s model=%s", args.world, args.arm,
                 (cfg.get("llm_config") or {}).get("model") or "(scenario default)")
 
@@ -329,6 +344,7 @@ def main() -> int:
     (out / "run_meta.json").write_text(json.dumps({
         "world": args.world,
         "arm": str(args.arm) if args.arm else "(scenario default)",
+        "workflow_mode": bool(cfg.get("workflow_mode")),
         "llm_config": cfg.get("llm_config"),
         "served_model_check": served_check,
         "external_repo": cfg.get("external_repo"),
