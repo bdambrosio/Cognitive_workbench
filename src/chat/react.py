@@ -41,9 +41,19 @@ logger = logging.getLogger('chat_loop')
 # for hypothetical multi-tool sequences and more ambitious autonomous
 # concerns without introducing room for runaway loops to wander.
 #
-# 12 also matches inspect's inner cap, removing the asymmetry where
-# the outer loop had fewer iters than each subagent it could invoke.
-REACT_MAX_ITERS = 12
+# 12→16 on 2026-08-23. The dataroom fixture is the first task that reaches
+# the cap as a matter of course rather than by wandering: an arm read the
+# method, listed a 9-document corpus and read the documents one per call,
+# and hit 12 at the exact iteration ingestion finished — sound work, no
+# repeats, no budget left to do the job it had just prepared for. Arms that
+# batch reads (3 docs per call) finish comfortably, so the cap was
+# selecting for batching rather than for reasoning.
+#
+# This DELIBERATELY breaks the old parity with inspect's inner cap (still
+# 12, code_subagent._MAX_ITERS). The asymmetry that mattered was the outer
+# loop having FEWER iterations than a subagent it invokes; outer > inner is
+# the harmless direction.
+REACT_MAX_ITERS = 16
 
 # Per-iteration budget for re-emitting a malformed/truncated action. A
 # parse failure (commonly a `thought` that ran long and got cut off by the

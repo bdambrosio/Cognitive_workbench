@@ -70,7 +70,7 @@ def _worst(*grades: str) -> str:
 # restored observation rather than the 1000-char stub.
 #
 # Policy, not a context limit — one turn's log cannot exceed
-# _ATTRIBUTION_OBS_CAP x REACT_MAX_ITERS (96k chars) however these are
+# _ATTRIBUTION_OBS_CAP x REACT_MAX_ITERS (128k chars at 8k x 16) however these are
 # set. Sized from the corpus: over 2848 turns the restored log runs 1k at
 # the median and 52,910 at its worst; lines run 38 and 9,215. The old
 # 800/24,000 cut 1.95% of lines and 0.53% of turns, and the turn cut is

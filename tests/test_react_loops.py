@@ -240,7 +240,12 @@ def test_reasoning_effort_defaults_to_none(run, mod, label, tmp_path):
 # --------------------------------------------------------------------
 
 def test_iteration_caps_currently_differ():
-    assert REACT_MAX_ITERS == 12
+    assert REACT_MAX_ITERS == 16, (
+        'raised 12→16 on 2026-08-23: the dataroom fixture reaches the cap '
+        'doing sound work (9 documents read one per call left nothing to '
+        'audit with). Outer > inner is deliberate — the asymmetry that '
+        'mattered was the outer loop having FEWER iters than a subagent it '
+        'invokes.')
     assert sec._MAX_ITERS == 12
     assert cs._MAX_ITERS == 12
     assert rem._MAX_ITERS == 10, 'recall runs a tighter budget than the rest'
