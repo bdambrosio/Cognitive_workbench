@@ -366,6 +366,11 @@ the operational detail; this section is the method.
    §4's "7% is not enough" rule applied in reverse: stop when the consistency
    rate and the severity distribution of what remains make the rest low-risk.
 6. **Write the report.** Apply §7 to any findings that were revised.
+6b. **Verify the report against its own citations.** Every claim resolves to
+   a line in the materials, or it does not ship — §5 applied to the finished
+   deliverable rather than trusted to the author. It catches a claim citing
+   nothing, not one citing the wrong line convincingly: a floor, not a
+   guarantee.
 7. **Deliver. Propose method-file edits (technique only). Discard the working
    world** (§14).
 

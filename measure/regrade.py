@@ -54,7 +54,13 @@ GRADER = {
     "model": "gpt-5.6-luna",
     "base_url": "https://api.openai.com/v1",
     "api_key": "OPENAI_API_KEY",   # NAME of the env var, not the key
-    "reasoning_effort": "low",
+    # high, not low. The grader's whole difficulty is one judgement — can
+    # this sentence produce its source — and on `low` it was undecided:
+    # four passes over one run at temperature 0.1 returned unsupported =
+    # 0, 1, 0, 1 while every other number was byte-identical. That is not a
+    # flaky instrument, it is a close call made on a short thinking budget.
+    # One call per scored run; the cost is nothing against an 8-minute run.
+    "reasoning_effort": "high",
 }
 
 # Same floor the live path uses. A literal 1600 cut the JSON mid-object on
@@ -80,28 +86,25 @@ def make_grader():
         # pass beats a partial.
         _attempt[0] += 1
         cap = _TOKEN_BUDGET * 2 if _attempt[0] > 1 else _TOKEN_BUDGET
-        # 0.0, NOT 0.2. An instrument that returns a different reading on
-        # the same input is not an instrument. Observed 2026-08-23: one run
-        # scored Tier 3 = 2 on four consecutive passes and Tier 3 = 3 on a
-        # fifth, and failed the unsupported check on a sixth. Small compared
-        # with the variance of the thing being measured — four runs of one
-        # arm produced four different tool strategies — but it is noise in
-        # the ruler rather than in the object, and it compounds every
-        # comparison built on it.
+        # 0.1. Was 0.2; briefly 0.0, which was wrong twice over.
         #
-        # IT IS NOT SUFFICIENT. At 0.0 the same run still scored unsupported
-        # = 0 twice and 1 twice across four consecutive passes. A cloud model
-        # at temperature zero is not deterministic — no seed is sent, and
-        # batching and reasoning-mode sampling both survive it. So this
-        # narrows the grader's noise without removing it, and any threshold
-        # that gates on a count this grader produces needs more than one
-        # pass to mean anything.
+        # WHY NOT 0.2. Observed 2026-08-23: one run scored Tier 3 = 2 on four
+        # consecutive passes, 3 on a fifth, and failed the unsupported check
+        # on a sixth. An instrument that returns a different reading on the
+        # same input is noise in the ruler rather than in the object, and it
+        # compounds every comparison built on it.
         #
-        # This changes the pinned instrument, and the header above says what
-        # that costs. It is still worth it: the numbers it invalidates were
-        # not reproducible either, which is a stronger objection than the one
-        # the pinning rule exists to raise.
-        return backend.chat(messages, max_tokens=cap, temperature=0.0,
+        # WHY NOT 0.0. It did not work — at zero the same run still scored
+        # unsupported = 0 twice and 1 twice in four consecutive passes,
+        # because a cloud model at temperature zero is not deterministic: no
+        # seed is sent, and batching and reasoning-mode sampling both survive
+        # it. So zero bought none of the determinism it was chosen for, while
+        # taking on greedy decoding's own well-documented pathologies. Paying
+        # a known cost for a benefit that did not arrive is the worst of the
+        # available trades.
+        #
+        # The real fix for grader noise is a better grader, not a colder one.
+        return backend.chat(messages, max_tokens=cap, temperature=0.1,
                             cot_profile='none')
 
     return backend, llm_chat
