@@ -51,7 +51,7 @@ OUT_DIR = REPO / "measure" / "regraded"
 # Matches the cloud arm in scenarios/coord_search_luna.yaml.
 GRADER = {
     "server": "local",          # _ChatBackend route 2: api_key set -> bearer
-    "model": "gpt-5.6-luna",
+    "model": "gpt-5.6-terra",
     "base_url": "https://api.openai.com/v1",
     "api_key": "OPENAI_API_KEY",   # NAME of the env var, not the key
     # high, not low. The grader's whole difficulty is one judgement — can
@@ -65,7 +65,15 @@ GRADER = {
 
 # Same floor the live path uses. A literal 1600 cut the JSON mid-object on
 # replies with many quoted claims and dropped the whole pass.
-_TOKEN_BUDGET = 8000
+#
+# 8000 -> 32000 when the grader moved to reasoning_effort=high. Reasoning
+# tokens are billed against the SAME completion budget as the answer, so a
+# thinking pass long enough to make the judgement well can leave nothing to
+# say it with. Observed 2026-08-23: three of eleven runs returned "match pass
+# returned no usable JSON" with an empty body — the grader thought and then
+# had no room to answer. Not correlated with report length, which is what
+# made it look like something else.
+_TOKEN_BUDGET = 32000
 
 
 def make_grader():

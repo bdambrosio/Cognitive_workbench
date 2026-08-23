@@ -5,77 +5,59 @@ discarded, deliberately — see "Why every earlier run was discarded".
 
 ## Scored runs
 
-| run | arm | rung | T1 | T2 | T3 | stated | cross | unsup | report | legs / wall |
-|---|---|---|---|---|---|---|---|---|---|---|
-| wm1 | Qwen3.8-27B | derived | 3/3 | 1/2 | 3 | 1/3 | 5/6 | 2 | 1,519w | 2 / 858s* |
-| wm2 | Qwen3.8-27B | derived | 3/3 | 1/2 | 6 | 3/3 | 6/6 | **7** | 2,214w† | 2 / 433s |
-| wm3 | Qwen3.8-27B | derived | 3/3 | 1/2 | 2 | 0/3 | 5/6 | 0 | 1,510w | 2 / 387s |
-| wm4 | Qwen3.8-27B | derived | 3/3 | 1/2 | 5 | 2/3 | 6/6 | 2 | 1,637w | 2 / 512s |
-| wm1 | gpt-5.6-luna | derived | 3/3 | 2/2 | 5 | 3/3 | 5/6 | 0 | 1,206w | 4 / 729s |
-| wm2 | gpt-5.6-luna | cross_doc | **2/3** | **0/2** | 2 | 0/3 | 4/6 | 0 | 1,244w | 9 / 813s |
+| run | arm | temp | rung | T1 | T2 | T3 | uns | words | wall | §9 | THRESH |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| wm1 | Qwen3.8-27B | 0.7 | derived | 3/3 | 1/2 | 3 | 0 | 1,519 | 858s* | Material | **PASS** |
+| wm2 | Qwen3.8-27B | 0.7 | derived | 3/3 | 1/2 | 4 | 0 | 2,214 | 433s | Material | FAIL |
+| wm3 | Qwen3.8-27B | 0.7 | derived | 3/3 | 1/2 | 2 | 0 | 1,510 | 387s | Conditional | **PASS** |
+| wm4 | Qwen3.8-27B | 0.7 | derived | 3/3 | 1/2 | 5 | 1 | 1,637 | 512s | — | FAIL |
+| r1 | Qwen3.8-27B **+reasoning** | 0.7 | derived | 3/3 | 1/2 | 4 | 0 | 1,275 | 1,015s | Material | **PASS** |
+| r2 | Qwen3.8-27B **+reasoning** | 0.7 | derived | 3/3 | 1/2 | 3 | 0 | 1,965 | 812s | Material | **PASS** |
+| wm1 | gpt-5.6-luna | 0.7 | derived | 3/3 | **2/2** | 4 | 0 | 1,206 | 729s | Material | **PASS** |
+| wm2 | gpt-5.6-luna | 0.7 | cross_doc | 2/3 | 0/2 | 2 | 0 | 1,244 | 813s | Conditional | FAIL |
+| t025_1 | gpt-5.6-luna | 0.25 | derived | 3/3 | 1/2 | 2 | 0 | 1,227 | 548s | Material | **PASS** |
+| t025_2 | gpt-5.6-luna | 0.25 | derived | 3/3 | 1/2 | 2 | 0 | 1,176 | 570s | Material | **PASS** |
+| t025_3 | gpt-5.6-luna | 0.25 | derived | 2/3 | 0/2 | 5 | 0 | 1,302 | 650s | Material | FAIL |
 
-\* contended — the live agent shared the GPU. † over the 2,000-word guide.
+\* contended — the live agent shared the GPU.
 
-**Every run is workflow_mode. There is no other configuration — the
-machinery-off comparison was run twice, told us nothing either arm's own
-spread did not already cover, and has been deleted.**
+**7 of 11 clear the threshold.** Every run is workflow_mode. Graded by
+`gpt-5.6-terra`, effort high, temp 0.1, 32k budget.
 
-**n=4 Qwen, n=2 Luna. Read the spread, not the rows.**
+## The threshold, and why it is the number that matters
 
-## What replication actually showed
+Tier counts are a score; a business case needs a floor. `score.py` reports
+PASS/FAIL against six criteria a delivered report would be judged on: all
+three must-find items, a Gap Map, a §9 recommendation, leading with a top-3
+finding, no unsupported claims, and the word ceiling. What separates the four
+failures is not depth — it is a missing must-find item (luna wm2, t025_3), a
+recommendation in the wrong vocabulary (qwen wm4), and a report over length
+(qwen wm2).
 
-Two things are stable across all six runs, both arms:
+## The grader was validated, and swapped
 
-- **Placement.** P2 first, every run. The key ranks it #1 of 12.
-- **Coverage.** 9 of 9 documents opened, every run.
+`gpt-5.6-luna` over-credited. Checked by hand against the key on three
+judgements:
 
-Everything else moves, and the two arms move in different places:
+- **B7** credited from a line in the memo's *questions for the seller*
+  section — which the match prompt already forbids in as many words.
+- **B6** credited on a finding that quoted the right claim and concluded
+  "Delta: None", missing the co-located database that is the whole finding.
+- **F1** credited on a report that states the substance ($24k of revenue
+  outside the payment processor, flagged for verification) without computing
+  the percentage.
 
-**Qwen is deterministic at the top of the ladder and noisy at the bottom.**
-Four for four on Tier 1, four for four on Tier 2 (always F2, never F1). Then
-the stated rung spans its entire possible range 0/3 to 3/3 across four runs
-of one config, Tier 3 spans 2 to 6, and unsupported claims span **0 to 7**.
+`gpt-5.6-terra`, same prompt and settings, drops B6 and B7 and keeps F1 —
+a finer distinction than the rule proposed at the time, which would have
+thrown away all three. Two of those three calls were the grader being wrong;
+the third was the reviewer being wrong.
 
-**Luna is noisy at the top.** Between two runs of the identical config it
-dropped a must-find item (3/3 to 2/3) and both derived findings (2/2 to 0/2),
-while doing more work — 9 legs and 64 iterations against 4 and 39.
-
-That split is worth more than any single score. The method's §4 priority
-order — safety, architecture, operations, micro — is doing real work on the
-arm that follows it: the ranked top is deterministic and the unranked bottom
-is noise, which is exactly what §4 argues for on the grounds that a report
-cut short must still be decidable.
-
-## What this retires
-
-**Tier 3 and the stated rung are not measurements at n<3.** A 2-to-6 spread
-on four identical runs means any between-arm comparison on those axes was
-reading noise. Several were made in this session and were wrong.
-
-**No claim about `workflow_mode`, in either direction.** Two conclusions were
-drawn today — "Qwen degraded under it", "Luna improved under it" — and
-replication killed both. Each arm's own spread on one config covers the
-entire difference that had been attributed to the change. What IS verified is
-that the lean config carries less: 0 chars of discourse, companion and
-orientation state per turn against 1,252 / 2,791 / 460, and two fewer LLM
-calls per turn. Whether that is free in quality terms is not answerable from
-this data.
-
-**Unsupported claims are the least stable thing scored** — 0 to 7 on one
-config — and also the one with the worst product consequence. An unsupported
-claim in a delivered report is precisely the §5 provenance failure the method
-exists to prevent. That instability deserves attention before any of these
-numbers are quoted.
-
-## One finding that survived replication
-
-**F1 never lands. F2 always does.** Across four Qwen runs, the backup-expiry
-derivation (30-day retention against a 2026-07-30 last-good backup) appears
-every time; the revenue derivation ($16k Stripe against $24k wired, 60% of
-revenue unverifiable from the payment processor) appears never. Two derived
-findings of the same shape, one reliably reachable and one not. That is
-consistent enough across runs to be a property rather than variance, and it
-is the most concrete open question the fixture has produced.
+**Accuracy improved; precision did not.** Three passes over one run on Terra:
+Tier 3 = 5, 4, 5 and unsupported = 1, 1, 2. Tier 1, Tier 2 and the threshold
+verdict held, but that run fails on §9 regardless — a run sitting at
+unsupported 0 or 1 would flip PASS/FAIL on grader noise alone. **Any
+threshold result within one unsupported claim of the boundary needs more than
+one grading pass.**
 
 ## What the workflow harness changed
 
