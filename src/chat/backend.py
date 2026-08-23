@@ -338,7 +338,18 @@ class _ChatBackend:
     def chat(self, messages: List[Dict[str, Any]],
              max_tokens: int = 600,
              temperature: float = 0.7,
-             top_p: float = 1.0,
+             # 0.95, not 1.0. A mild nucleus cut is what the publishers of
+             # the models this talks to actually specify — Qwen, DeepSeek
+             # and NVIDIA all say 0.95 for agentic work, and nothing in
+             # this codebase was passing any value, so every call went out
+             # at 1.0 by omission rather than by choice. Route 1
+             # (Anthropic) omits top_p entirely and is unaffected.
+             #
+             # Callers that need a fixed value should PASS it rather than
+             # inherit this. measure/regrade.py does, deliberately: an
+             # instrument that moves when an unrelated default changes is
+             # not pinned, whatever its header says.
+             top_p: float = 0.95,
              stops: Optional[List[str]] = None,
              is_json: bool = False,
              cot_profile: Optional[str] = None,

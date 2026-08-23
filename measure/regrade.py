@@ -112,8 +112,13 @@ def make_grader():
         # available trades.
         #
         # The real fix for grader noise is a better grader, not a colder one.
+        # top_p PINNED AT 1.0, not inherited. The codebase default moved to
+        # 0.95 on 2026-08-23; this grader was validated against the answer key
+        # at 1.0, by hand, on three specific judgements. An instrument that
+        # shifts because an unrelated default shifted is not pinned. Change it
+        # only by re-validating, never by editing a default elsewhere.
         return backend.chat(messages, max_tokens=cap, temperature=0.1,
-                            cot_profile='none')
+                            top_p=1.0, cot_profile='none')
 
     return backend, llm_chat
 
