@@ -118,6 +118,24 @@ characters:
     # are stripped by the loader; they are for whoever runs the practice.
     workflow: audit/METHOD.md
 
+    # An auditor executing an engagement is not maintaining a relationship.
+    # Suppresses discourse state, the per-turn companion-model update, and
+    # the orientation block — measured at ~4.5k chars and two extra LLM calls
+    # per turn on a run that has no relationship to model yet.
+    #
+    # Today this resolves to two switches that already existed; it is a named
+    # bundle so that a subsystem added later has somewhere to be listed, and
+    # so the intent is in the scenario rather than inferred from three
+    # booleans. What it actually suppressed is logged each launch.
+    #
+    # NOT suppressed: concerns. Concern creation is how a `yield` carries its
+    # remainder into the next leg, and an audit runs on yields.
+    #
+    # The consultation phase — the client asking the auditor questions after
+    # delivery — wants all of this back on. That is a different mode of the
+    # same engagement, and is not built.
+    workflow_mode: true
+
     # PER-RUN (3 of 3) — the arm. Arms live in measure/arms/*.yaml and are
     # applied by measure/fixtures/dataroom/run.py --arm, which REPLACES this
     # block rather than merging into it. They are not duplicated here: a

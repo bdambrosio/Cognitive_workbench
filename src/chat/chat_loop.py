@@ -298,6 +298,15 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # ---- Feature flags (on by default per project decision) ----
         self.discourse_enabled = bool((character_config.get('discourse') or {}).get('enabled', True))
         self.orientation_enabled = bool((character_config.get('orientation') or {}).get('enabled', True))
+        # WORKFLOW MODE. An agent executing a procedure is not maintaining a
+        # relationship, and the machinery for the second is pure weight on
+        # the first. Bundled rather than set one flag at a time because they
+        # always move together; explicit scenario settings still win.
+        from chat.workflow import apply_workflow_mode          # noqa: E402
+        _wf_off = apply_workflow_mode(self, character_config)
+        if _wf_off:
+            logger.info("[%s] workflow_mode: suppressed %s",
+                        character_name, "; ".join(_wf_off))
         # Conversation turns rendered into the prompt. A behavioural
         # choice — how much context a character carries — so it stays a
         # scenario knob, but the DEFAULT lives here and no scenario needs

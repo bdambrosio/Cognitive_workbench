@@ -74,3 +74,52 @@ def load_workflow(path: Path) -> str:
         "workflow loaded: %s — %d chars, %d of %d sections (%d practice-only "
         "dropped)", path, len(text), len(kept), len(sections), dropped)
     return text
+
+
+# ---------------------------------------------------------------------------
+# Workflow mode
+# ---------------------------------------------------------------------------
+
+# Subsystems an agent executing a procedure does not need. Each entry is
+# (ChatLoop attribute, scenario key that overrides it, what it costs).
+#
+# MEASURED on an audit run, 2026-08-23, by leg 2: 1,252 chars of discourse
+# state and 2,791 of companion state per turn — relationship modelling for an
+# engagement with no relationship yet — plus two extra LLM calls per turn for
+# the updates.
+#
+# NOT IN THIS LIST, deliberately: concerns. `autonomy_enabled=False` already
+# gates concern FIRING; concern CREATION is how a `yield` carries its
+# remainder to the next leg, and an audit runs on yields. Suppressing them
+# would not produce a leaner audit, it would produce one that cannot continue
+# itself.
+#
+# The membership of this list is a judgement, and judgements rot quietly — a
+# subsystem added later is silently not covered. That is why applying it
+# returns what it touched, for the caller to log.
+_SUPPRESSED = [
+    ('discourse_enabled',   'discourse',
+     'discourse state + the per-turn companion model update'),
+    ('orientation_enabled', 'orientation',
+     'the per-turn orientation block'),
+]
+
+
+def apply_workflow_mode(loop, character_config: dict) -> List[str]:
+    """Switch off relationship machinery for an agent executing a procedure.
+
+    Returns the human-readable descriptions of what was suppressed, or []
+    when workflow_mode is off. An explicit scenario setting always wins: a
+    config that says `discourse: {enabled: true}` keeps discourse, so the
+    comparison "same workflow, machinery on" stays available.
+    """
+    if not bool(character_config.get('workflow_mode')):
+        return []
+    suppressed: List[str] = []
+    for attr, key, what in _SUPPRESSED:
+        block = character_config.get(key)
+        if isinstance(block, dict) and 'enabled' in block:
+            continue                      # explicit scenario setting wins
+        setattr(loop, attr, False)
+        suppressed.append(what)
+    return suppressed

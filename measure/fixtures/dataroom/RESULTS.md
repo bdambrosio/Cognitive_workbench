@@ -127,6 +127,28 @@ git history if a specific claim ever needs checking.
    trace and no post-hoc analysis can say whether an agent was warned before
    it ran out of iterations.
 
+## Open: the auditor cannot talk to the client
+
+§12 step 4 requires it — *"if a delta is found, stop and confirm with the
+client before continuing; the audit is a collaboration, not a surprise"* —
+and §8 defines the working recap as living "in the auditor-client
+conversation". Neither is reachable. The runner sends `continue` and nothing
+else; there is no channel back.
+
+The deliverable has "what I should ask Dave before closing", but Dave is the
+seller and that advice is post-audit. The missing thing is different:
+**questions for the client, raised during the audit, whose answers would
+materially change it.** Scope questions ("is the source repo available?"),
+direction questions ("should the eight pilot accounts count as revenue?"),
+and the §12-step-4 delta confirmations.
+
+Candidate shape: a third output alongside the report and the Gap Map — open
+questions, each with what it would change. Cheap, needs no new channel, and
+turns an unanswerable requirement into a deliverable. Whether it belongs in
+§12, §16, or as its own section is a method decision and is not made.
+
+Noted 2026-08-23. Not built, deliberately.
+
 ## Environment note that will bite again
 
 `~/.bashrc` returns early for non-interactive shells (the standard
