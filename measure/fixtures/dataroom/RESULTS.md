@@ -5,18 +5,22 @@ discarded, deliberately — see "Why every earlier run was discarded".
 
 ## Scored runs
 
-| run | arm | wf_mode | rung | T1 | T2 | T3 | stated | cross | unsup | report | legs / wall |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| wm1 | Qwen3.8-27B | on | derived | 3/3 | 1/2 | 3 | 1/3 | 5/6 | 2 | 1,519w | 2 / 858s* |
-| wm2 | Qwen3.8-27B | on | derived | 3/3 | 1/2 | 6 | 3/3 | 6/6 | **7** | 2,214w† | 2 / 433s |
-| wm3 | Qwen3.8-27B | on | derived | 3/3 | 1/2 | 2 | 0/3 | 5/6 | 0 | 1,510w | 2 / 387s |
-| wm4 | Qwen3.8-27B | on | derived | 3/3 | 1/2 | 5 | 2/3 | 6/6 | 2 | 1,637w | 2 / 512s |
-| wm1 | gpt-5.6-luna | on | derived | 3/3 | 2/2 | 5 | 3/3 | 5/6 | 0 | 1,206w | 4 / 729s |
-| wm2 | gpt-5.6-luna | on | cross_doc | **2/3** | **0/2** | 2 | 0/3 | 4/6 | 0 | 1,244w | 9 / 813s |
+| run | arm | rung | T1 | T2 | T3 | stated | cross | unsup | report | legs / wall |
+|---|---|---|---|---|---|---|---|---|---|---|
+| wm1 | Qwen3.8-27B | derived | 3/3 | 1/2 | 3 | 1/3 | 5/6 | 2 | 1,519w | 2 / 858s* |
+| wm2 | Qwen3.8-27B | derived | 3/3 | 1/2 | 6 | 3/3 | 6/6 | **7** | 2,214w† | 2 / 433s |
+| wm3 | Qwen3.8-27B | derived | 3/3 | 1/2 | 2 | 0/3 | 5/6 | 0 | 1,510w | 2 / 387s |
+| wm4 | Qwen3.8-27B | derived | 3/3 | 1/2 | 5 | 2/3 | 6/6 | 2 | 1,637w | 2 / 512s |
+| wm1 | gpt-5.6-luna | derived | 3/3 | 2/2 | 5 | 3/3 | 5/6 | 0 | 1,206w | 4 / 729s |
+| wm2 | gpt-5.6-luna | cross_doc | **2/3** | **0/2** | 2 | 0/3 | 4/6 | 0 | 1,244w | 9 / 813s |
 
 \* contended — the live agent shared the GPU. † over the 2,000-word guide.
 
-**n=4 Qwen, n=2 Luna, one configuration. Read the spread, not the rows.**
+**Every run is workflow_mode. There is no other configuration — the
+machinery-off comparison was run twice, told us nothing either arm's own
+spread did not already cover, and has been deleted.**
+
+**n=4 Qwen, n=2 Luna. Read the spread, not the rows.**
 
 ## What replication actually showed
 

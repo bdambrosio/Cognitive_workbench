@@ -1,6 +1,8 @@
 {
-  "world": "dr_qwen_d1",
+  "world": "dr_qwen_t0_1",
   "arm": "measure/arms/qwen_local.yaml",
+  "workflow_mode": true,
+  "react_temperature": 0.0,
   "llm_config": {
     "sgl_model_path": null,
     "reasoning_parser": null,
@@ -22,17 +24,17 @@
     {
       "leg": 1,
       "sent": "The target is the data room bound to inspect_external: nine\ndocuments for a smal",
-      "exit_reason": "yield",
-      "reply_chars": 2189
+      "exit_reason": "respond",
+      "reply_chars": 2848
     },
     {
       "leg": 2,
-      "sent": "continue\n\n[engagement state, recorded by the client's process \u2014 leg 2 of 25, 2 m",
+      "sent": "continue\n\n[engagement state, recorded by the client's process \u2014 leg 2 of 25, 6 m",
       "exit_reason": "respond",
-      "reply_chars": 14689
+      "reply_chars": 19794
     }
   ],
-  "wall_clock_s": 333.0,
+  "wall_clock_s": 691.7,
   "error": null,
-  "captured_at_utc": "2026-08-23T17-55-25Z"
+  "captured_at_utc": "2026-08-23T20-49-50Z"
 }
