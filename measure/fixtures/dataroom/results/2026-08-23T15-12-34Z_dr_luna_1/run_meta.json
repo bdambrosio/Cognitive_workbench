@@ -1,0 +1,43 @@
+{
+  "world": "dr_luna_1",
+  "arm": "measure/arms/luna_openai.yaml",
+  "llm_config": {
+    "sgl_model_path": null,
+    "reasoning_parser": null,
+    "server": "local",
+    "model": "gpt-5.6-luna",
+    "vllm_url": "https://api.openai.com/v1",
+    "api_key": "OPENAI_API_KEY",
+    "is_reasoning_model": true,
+    "reasoning_effort": "low"
+  },
+  "served_model_check": {
+    "checked": false,
+    "reason": "cloud arm \u2014 nothing to interrogate",
+    "served": "gpt-5.6-luna"
+  },
+  "external_repo": "/home/bruce/Downloads/Cognitive_workbench/measure/fixtures/dataroom/corpus",
+  "legs": [
+    {
+      "leg": 1,
+      "sent": "Read audit/METHOD.md \u2014 that is your method for this engagement.\n\nThe target is t",
+      "exit_reason": "yield",
+      "reply_chars": 245
+    },
+    {
+      "leg": 2,
+      "sent": "continue",
+      "exit_reason": "yield",
+      "reply_chars": 186
+    },
+    {
+      "leg": 3,
+      "sent": "continue",
+      "exit_reason": "max_iters",
+      "reply_chars": 1917
+    }
+  ],
+  "wall_clock_s": 490.2,
+  "error": "turn 3 hit max_iters without answering \u2014 run is not valid",
+  "captured_at_utc": "2026-08-23T15-12-34Z"
+}
