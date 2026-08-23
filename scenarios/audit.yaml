@@ -104,6 +104,20 @@ characters:
     # else is in the tree first.
     inspect_repo: audit
 
+    # THE WORKFLOW — the procedure, loaded verbatim into the static system
+    # prompt at launch. Path is relative to the repo root; the file stays in
+    # git as the single reviewable source and is read from there each launch.
+    #
+    # It used to be read with `inspect` at the start of an engagement, and it
+    # did not survive: tool observations cap at 1000 chars in the stored
+    # trace and drop out of the history window entirely, so by the leg that
+    # wrote the report the method had decayed to §1 and half of §2. Measured
+    # 2026-08-23 — across four runs "Conditional", "Material" and "Walk"
+    # appear zero times in any working log. Sections marked
+    # `<!-- audience: practice -->` (liability posture, engagement history)
+    # are stripped by the loader; they are for whoever runs the practice.
+    workflow: audit/METHOD.md
+
     # PER-RUN (3 of 3) — the arm. Arms live in measure/arms/*.yaml and are
     # applied by measure/fixtures/dataroom/run.py --arm, which REPLACES this
     # block rather than merging into it. They are not duplicated here: a

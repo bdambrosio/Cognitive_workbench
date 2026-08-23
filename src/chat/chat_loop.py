@@ -461,6 +461,25 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                     f"(resolved {cand}). Fix the scenario rather than "
                     f"running with the geofence silently wide open.")
 
+        # THE WORKFLOW. The procedure this agent executes — its phases, the
+        # vocabulary its output must use, what a finished deliverable is.
+        # Loaded into the STATIC system prompt because procedure must not
+        # decay the way tool observations are designed to; see
+        # chat.workflow's module docstring for the measurement that forced
+        # this. Path is relative to the repo root.
+        #
+        # One source: the document stays in git and is read from there each
+        # launch. Nothing is copied into the scenario, so there is no second
+        # copy to drift.
+        self.workflow_text: str = ''
+        yaml_workflow = (character_config.get('workflow') or '').strip()
+        if yaml_workflow:
+            from chat.workflow import load_workflow          # noqa: E402
+            wf = Path(yaml_workflow)
+            if not wf.is_absolute():
+                wf = Path(__file__).resolve().parents[2] / wf
+            self.workflow_text = load_workflow(wf)
+
         # ---- Concurrency primitives (must precede anything FAISS-touching) ----
         # _faiss_lock serializes the one cross-thread FAISS race: main
         # thread `_recall` reading the memories collection vs background

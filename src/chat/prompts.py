@@ -235,6 +235,19 @@ class PromptsMixin:
             parts.append("## Self-model (from character config; what I am, not who)\n" + self.self_model)
         if self.capabilities:
             parts.append("## Capabilities (from character config; chat-only mode)\n" + self.capabilities)
+        # The workflow document, verbatim. Placed after capabilities and
+        # before the varying blocks (recall, concerns, setting) so it sits in
+        # the stable prefix the KV cache hits on — see react.py's
+        # store-and-append note. Verbatim and NOT summarised: summarising the
+        # procedure is exactly the failure this replaced.
+        if getattr(self, 'workflow_text', ''):
+            parts.append(
+                "## Workflow — the method for this engagement\n"
+                "This is the authority for how the work is done and what the "
+                "deliverable is. It is here in full; you do not need to read "
+                "it with a tool, and a summary of it is not a substitute for "
+                "it. Where it names a vocabulary, use that vocabulary and no "
+                "other.\n\n" + self.workflow_text)
         # Substrate provenance: computed once at session start
         # (chat_loop._compute_substrate_line). Absent when git is
         # unavailable.

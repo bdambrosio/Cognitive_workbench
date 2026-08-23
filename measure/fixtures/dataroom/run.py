@@ -54,39 +54,68 @@ logger.setLevel(logging.INFO)
 
 GAP_MARK = "=== GAP MAP ==="
 
-BRIEF = f"""Read METHOD.md — that is your method for this engagement.
-
-The target is the data room bound to inspect_external: nine documents for a
-small SaaS business called flowmetrics, offered for sale by a seller named
-Dave. I am the buyer's side. Audit it.
+# THE BRIEF IS THE ENGAGEMENT, NOT THE METHOD. It used to open "Read
+# METHOD.md" and then restate the deliverable contract in full, because the
+# method was something the agent fetched with a tool and the contract had
+# nowhere else to live. Both are now in the workflow document, loaded verbatim
+# into the static system prompt (scenarios/audit.yaml `workflow:`), so what is
+# left here is only what a client would actually say: who the target is, what
+# is wanted, and the protocol for driving legs.
+#
+# Dropped with the contract: the paragraph telling the agent to quote figures
+# verbatim. That is §5, and §5 is now guaranteed present on every turn — which
+# is precisely what it was not when that paragraph was added.
+BRIEF = """The target is the data room bound to inspect_external: nine
+documents for a small SaaS business called flowmetrics, offered for sale by a
+seller named Dave. I am the buyer's side. Audit it.
 
 Enumerate the claim surface first and tell me roughly how big it is, then
 work the priority order. Recap as the method says. Stop and tell me if you
 find a delta.
 
-Where a claim turns on a number, a date, or a threshold, quote the source
-line verbatim rather than working from a summary of the document. Summaries
-carry the qualitative facts and drop the figures, and nothing marks the
-omission.
-
 Work in as many legs as you need — end a leg with `yield` and I will say
-continue. When the engagement is finished, produce BOTH deliverables in one
-final reply, in this order:
-
-**1. The full report.** Recommendation from the method's taxonomy; findings
-worst first, each with its verdict, the seller claim it tests, the document
-that makes the claim and the document that settles it; a coverage statement
-saying what you did not check and why it matters; and what I should ask Dave
-before closing. Aim for 2,000 words or under.
-
-**2. The Gap Map**, after a line reading exactly {GAP_MARK!r} — the one-page
-lead artifact from METHOD.md §15. Target name and a one-line description,
-the recommendation, the three to five items that matter most, and the
-coverage line. No citations; those live in the report. This is the thing a
-buyer reads in thirty seconds.
+continue. Produce both deliverables together in your final reply, as the
+method specifies.
 """
 
 CONTINUE = "continue"
+
+
+def engagement_state(world: str, agent: str, leg: int, max_legs: int,
+                     elapsed_s: float) -> str:
+    """A ledger of what has happened, appended to each `continue`.
+
+    WHY THE RUNNER CARRIES THIS. The agent's own record of its work decays by
+    design — observations cap at 1000 chars once stored, and whole legs drop
+    out of the history window. The runner's does not. So the one thing an
+    agent structurally cannot hold across a long engagement is exactly the
+    thing the process driving it already knows for free.
+
+    STATE, NOT GAPS — the line worth holding. Everything here is something
+    that happened: legs taken, documents opened, minutes spent. Nothing here
+    says what remains. The runner uses the Gap Map marker as its stopping
+    rule, and handing the agent the stopping rule would be feeding the metric
+    to the thing being measured. "9 of 9 documents opened" is a ledger entry;
+    "you still owe me a Gap Map" is the answer sheet.
+
+    Nothing here is interpreted. Filenames are matched against the corpus
+    listing — a directory comparison, not a judgement about what the agent
+    meant or intended.
+    """
+    docs = sorted(f.name for f in CORPUS.glob("*.md"))
+    traces = REPO / "scenarios" / world / agent / "inspect_traces"
+    seen = set()
+    if traces.is_dir():
+        for t in traces.glob("inspect_external_*.txt"):
+            try:
+                body = t.read_text(errors="replace")
+            except OSError as e:
+                logger.warning("ledger: unreadable trace %s (%s)", t, e)
+                continue
+            seen.update(d for d in docs if d in body)
+    return (f"\n\n[engagement state, recorded by the client's process — "
+            f"leg {leg} of {max_legs}, {elapsed_s / 60:.0f} min elapsed. "
+            f"Data room: {len(seen)} of {len(docs)} documents opened so far.]")
 
 
 def verify_served_model(arm: Dict[str, Any], timeout: float = 10.0
@@ -264,7 +293,8 @@ def main() -> int:
                 if exit_reason != "yield":
                     logger.info("leg %d ended %s with no %s — continuing",
                                 i + 1, exit_reason, GAP_MARK)
-                text = CONTINUE
+                text = CONTINUE + engagement_state(
+                    args.world, name, i + 2, args.max_turns, time.time() - t0)
                 continue
             break
     except Exception as e:                                     # noqa: BLE001

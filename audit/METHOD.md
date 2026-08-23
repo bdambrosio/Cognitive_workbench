@@ -213,6 +213,8 @@ rather than as a directive.
 
 ## 10. Liability posture
 
+<!-- audience: practice -->
+
 **Category: expert due-diligence, not legal advice.** The distinction is
 functional, not semantic. Legal advice is "the law requires X, your rights
 are Y, you should do Z." Expert due-diligence is "here is what I observed,
@@ -302,6 +304,8 @@ the operational detail; this section is the method.
    world** (§14).
 
 ## 13. Where the method has been exercised
+
+<!-- audience: practice -->
 
 - **`measure/fixtures/dataroom/`** — the synthetic `flowmetrics` data room, 9
   documents, planted defects with an answer key. Used to validate the
@@ -413,3 +417,34 @@ brochure and forfeits the register the disclaimer just established.
 **Open:** whether the colour coding survives email-thumbnail scale, PDF
 export, and the landing page it shares a visual system with. None of these
 block sending one.
+
+## 16. The deliverable
+
+Two documents, produced together in the final turn, in this order.
+
+**1. The report.** Aim for 2,000 words or under.
+
+- The recommendation, from §9's taxonomy and no other vocabulary.
+- Findings worst first, each in §5's format, carrying its §6 verdict, the
+  claim it tests, the document making that claim, and the document that
+  settles it.
+- A coverage statement: what was not checked, and why that matters (§4).
+- What the client should ask the seller before closing.
+
+**2. The Gap Map** (§15), after a line reading exactly:
+
+```
+=== GAP MAP ===
+```
+
+The marker is load-bearing and must appear on its own line. It is how a
+reader — and any harness driving the engagement — separates the two
+documents, and its absence is the signal that the work is unfinished. An
+engagement that ends without it has not delivered, whatever the closing
+paragraph says.
+
+**Why both, and why together.** The Gap Map is read in thirty seconds and
+the report is read only if the Gap Map earns it (§8). Producing the Gap Map
+alone forfeits the proof; producing the report alone forfeits the reader.
+Neither is a summary of the other: the report carries citations and the Gap
+Map carries none.
