@@ -39,9 +39,10 @@ logger = logging.getLogger('chat_loop')
 # synthesis. Empirically (263 chat turns audited 2026-05-03) p95 is 2
 # iters and the cap had never been hit — raised 8→12 to add headroom
 # for hypothetical multi-tool sequences and more ambitious autonomous
-# concerns without introducing room for runaway loops to wander. 12
-# also matches inspect's inner cap, removing the asymmetry where the
-# outer loop had fewer iters than each subagent it could invoke.
+# concerns without introducing room for runaway loops to wander.
+#
+# 12 also matches inspect's inner cap, removing the asymmetry where
+# the outer loop had fewer iters than each subagent it could invoke.
 REACT_MAX_ITERS = 12
 
 # Per-iteration budget for re-emitting a malformed/truncated action. A
@@ -854,7 +855,9 @@ class ReactMixin:
             from chat.subagents.code_subagent import inspect as _inspect
             answer = _inspect(
                 query=str(query),
-                repo_root=Path(_REPO_ROOT),
+                # Scenario may narrow this; see chat_loop's inspect_repo.
+                repo_root=Path(getattr(self, '_inspect_root', None)
+                               or _REPO_ROOT),
                 llm_backend=self.backend,
                 trace_dir=self._inspect_traces_dir(),
                 reasoning_effort=self._reasoning_effort,

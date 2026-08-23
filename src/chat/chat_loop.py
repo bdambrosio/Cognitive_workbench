@@ -430,6 +430,37 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             if yaml_repo:
                 self._set_external_repo(yaml_repo, persist=True)
 
+        # Optional narrowing of the `inspect` geofence, default the whole
+        # checkout. DELIBERATELY not persisted and not settable in-session,
+        # unlike external_repo above: it is a property of the scenario, and
+        # a binding that outlived its scenario would silently blind an agent
+        # to her own repository.
+        #
+        # WHY IT EXISTS. `inspect` reads this checkout, and this checkout
+        # contains measure/fixtures/dataroom/ — the audit fixture's
+        # answer_key.md ("Do not place this file where an agent under test
+        # can read it", its own line 3), plus every prior arm's committed
+        # report.md. An audit run could grep its way to the answers. Observed
+        # 2026-08-23: a run's grep for "Gap Map"/"claim surface" returned a
+        # previous arm's full_reply.md among its hits.
+        self._inspect_root: Optional[Path] = None
+        yaml_inspect = (character_config.get('inspect_repo') or '').strip()
+        if yaml_inspect:
+            cand = Path(yaml_inspect)
+            if not cand.is_absolute():
+                cand = Path(__file__).resolve().parents[2] / cand
+            if cand.is_dir():
+                self._inspect_root = cand.resolve()
+                logger.info(f"[{self.character_name}] inspect geofence "
+                            f"narrowed to {self._inspect_root}")
+            else:
+                # Loud, and NOT a silent fall-back to the whole checkout:
+                # that is the failure this setting exists to prevent.
+                raise SystemExit(
+                    f"inspect_repo {yaml_inspect!r} is not a directory "
+                    f"(resolved {cand}). Fix the scenario rather than "
+                    f"running with the geofence silently wide open.")
+
         # ---- Concurrency primitives (must precede anything FAISS-touching) ----
         # _faiss_lock serializes the one cross-thread FAISS race: main
         # thread `_recall` reading the memories collection vs background

@@ -82,9 +82,27 @@ characters:
     mode: chat
 
     # PER-TARGET (2 of 2) — the tree under audit. inspect_external is bound
-    # to it and cannot see anything else; `inspect` reads this repository,
-    # which is where audit/METHOD.md lives.
+    # to it and cannot see anything else; `inspect` reads the tree named by
+    # inspect_repo below, which is where audit/METHOD.md lives.
     external_repo: /path/to/target
+
+    # THE `inspect` GEOFENCE. Relative to the repo root; `audit/` holds
+    # METHOD.md and nothing else, which is the entirety of what an audit
+    # legitimately reads from this side.
+    #
+    # It used to be the whole checkout, and the whole checkout contains
+    # measure/fixtures/dataroom/answer_key.md — whose own third line reads
+    # "Do not place this file where an agent under test can read it" — plus
+    # every previously committed arm's report.md. On 2026-08-23 a run's grep
+    # for "Gap Map" and "claim surface" returned a prior arm's full_reply.md
+    # among its hits. No arm is known to have used any of it; the point is
+    # that a benchmark whose answers are inside the geofence is not
+    # measuring what it claims to, and the exposure grows with every run
+    # committed.
+    #
+    # A real (non-fixture) engagement can widen this, but should ask what
+    # else is in the tree first.
+    inspect_repo: audit
 
     # PER-RUN (3 of 3) — the arm. Arms live in measure/arms/*.yaml and are
     # applied by measure/fixtures/dataroom/run.py --arm, which REPLACES this
