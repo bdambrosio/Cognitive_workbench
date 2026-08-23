@@ -212,6 +212,21 @@ def main() -> int:
             logger.warning("final persist failed: %s", e)
 
     wall = round(time.time() - t0, 1)
+
+    # Write the deliverables as files. run_meta.json carries the metadata;
+    # without this the report exists only inside the trace's raw_response,
+    # which is not somewhere a human reads a report from.
+    final = latest_reply(loop, SOURCE)
+    if final:
+        (out / "full_reply.md").write_text(final, encoding="utf-8")
+        if GAP_MARK in final:
+            rep, _, gap = final.partition(GAP_MARK)
+            (out / "report.md").write_text(rep.rstrip() + "\n", encoding="utf-8")
+            (out / "gap_map.md").write_text(gap.strip() + "\n", encoding="utf-8")
+        else:
+            (out / "report.md").write_text(final, encoding="utf-8")
+            logger.warning("no %s marker — Gap Map not produced", GAP_MARK)
+
     (out / "run_meta.json").write_text(json.dumps({
         "world": args.world,
         "arm": str(args.arm) if args.arm else "(scenario default)",
@@ -224,6 +239,7 @@ def main() -> int:
     }, indent=2, default=str) + "\n", encoding="utf-8")
 
     print(f"\n{len(legs)} legs, {wall}s, error={error}")
+    print(f"deliverables: {out}/report.md, gap_map.md")
     print(f"meta: {out / 'run_meta.json'}")
     print(f"score with:  python3 measure/fixtures/dataroom/score.py "
           f"--world {args.world}")
