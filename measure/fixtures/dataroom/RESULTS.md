@@ -5,34 +5,73 @@ discarded, deliberately — see "Why every earlier run was discarded".
 
 ## Scored runs
 
-| arm | rung | Tier 1 | Tier 2 | T3 | unsup | §9 verdict | report | Gap Map | legs / iters / wall |
-|---|---|---|---|---|---|---|---|---|---|
-| **Qwen3.8-27B** (local) | cross_document | **3/3** | 0/2 | 5 | 1 | Material | 1,923w | 153w | 2 / 15 / 472s |
-| **gpt-5.6-luna** (OpenAI) | cross_document | **3/3** | 0/2 | 3 | **0** | Conditional | 1,284w | 158w | 6 / 34 / 412s |
-| **Nemotron-3-Ultra** (DeepInfra) | cross_document | **3/3** | 0/2 | 4 | 1 | Material | 1,738w | 169w | 5 / 16 / 477s |
+| run | arm | wf_mode | rung | T1 | T2 | T3 | stated | cross | unsup | report | legs / wall |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| wm1 | Qwen3.8-27B | on | derived | 3/3 | 1/2 | 3 | 1/3 | 5/6 | 2 | 1,519w | 2 / 858s* |
+| wm2 | Qwen3.8-27B | on | derived | 3/3 | 1/2 | 6 | 3/3 | 6/6 | **7** | 2,214w† | 2 / 433s |
+| wm3 | Qwen3.8-27B | on | derived | 3/3 | 1/2 | 2 | 0/3 | 5/6 | 0 | 1,510w | 2 / 387s |
+| wm4 | Qwen3.8-27B | on | derived | 3/3 | 1/2 | 5 | 2/3 | 6/6 | 2 | 1,637w | 2 / 512s |
+| wm1 | gpt-5.6-luna | on | derived | 3/3 | 2/2 | 5 | 3/3 | 5/6 | 0 | 1,206w | 4 / 729s |
+| wm2 | gpt-5.6-luna | on | cross_doc | **2/3** | **0/2** | 2 | 0/3 | 4/6 | 0 | 1,244w | 9 / 813s |
 
-Deliverables live beside each run:
-`results/<ts>_<world>/{report.md,gap_map.md,full_reply.md,run_meta.json}`
+\* contended — the live agent shared the GPU. † over the 2,000-word guide.
 
-**Every arm found all three must-find items, used §9's vocabulary, opened all
-nine documents, and led with P2 — which the key ranks #1 of 12. No arm
-reached a derived finding.**
+**n=4 Qwen, n=2 Luna, one configuration. Read the spread, not the rows.**
 
-Three arms agreeing on everything the fixture makes easy, and failing
-identically on the one thing it makes hard, is a statement about the fixture
-rather than about the models. See "The Tier 2 collapse" below.
+## What replication actually showed
 
-Ultra's run is its first valid one in six attempts — the previous five died
-on 429, 429, 404, and twice on `max_iters` after spending eleven of twelve
-iterations reading documents in order to read the method. It no longer has to
-read the method.
+Two things are stable across all six runs, both arms:
 
-Luna is the outlier in shape rather than score: the most legs and iterations
-for the shortest report, the only arm with zero unsupported claims, and the
-only one to land on Conditional rather than Material. Whether that is better
-calibration or under-reading is not answerable at n=1.
+- **Placement.** P2 first, every run. The key ranks it #1 of 12.
+- **Coverage.** 9 of 9 documents opened, every run.
 
-**n=1 per arm. Nothing here is a result yet.**
+Everything else moves, and the two arms move in different places:
+
+**Qwen is deterministic at the top of the ladder and noisy at the bottom.**
+Four for four on Tier 1, four for four on Tier 2 (always F2, never F1). Then
+the stated rung spans its entire possible range 0/3 to 3/3 across four runs
+of one config, Tier 3 spans 2 to 6, and unsupported claims span **0 to 7**.
+
+**Luna is noisy at the top.** Between two runs of the identical config it
+dropped a must-find item (3/3 to 2/3) and both derived findings (2/2 to 0/2),
+while doing more work — 9 legs and 64 iterations against 4 and 39.
+
+That split is worth more than any single score. The method's §4 priority
+order — safety, architecture, operations, micro — is doing real work on the
+arm that follows it: the ranked top is deterministic and the unranked bottom
+is noise, which is exactly what §4 argues for on the grounds that a report
+cut short must still be decidable.
+
+## What this retires
+
+**Tier 3 and the stated rung are not measurements at n<3.** A 2-to-6 spread
+on four identical runs means any between-arm comparison on those axes was
+reading noise. Several were made in this session and were wrong.
+
+**No claim about `workflow_mode`, in either direction.** Two conclusions were
+drawn today — "Qwen degraded under it", "Luna improved under it" — and
+replication killed both. Each arm's own spread on one config covers the
+entire difference that had been attributed to the change. What IS verified is
+that the lean config carries less: 0 chars of discourse, companion and
+orientation state per turn against 1,252 / 2,791 / 460, and two fewer LLM
+calls per turn. Whether that is free in quality terms is not answerable from
+this data.
+
+**Unsupported claims are the least stable thing scored** — 0 to 7 on one
+config — and also the one with the worst product consequence. An unsupported
+claim in a delivered report is precisely the §5 provenance failure the method
+exists to prevent. That instability deserves attention before any of these
+numbers are quoted.
+
+## One finding that survived replication
+
+**F1 never lands. F2 always does.** Across four Qwen runs, the backup-expiry
+derivation (30-day retention against a 2026-07-30 last-good backup) appears
+every time; the revenue derivation ($16k Stripe against $24k wired, 60% of
+revenue unverifiable from the payment processor) appears never. Two derived
+findings of the same shape, one reliably reachable and one not. That is
+consistent enough across runs to be a property rather than variance, and it
+is the most concrete open question the fixture has produced.
 
 ## What the workflow harness changed
 
