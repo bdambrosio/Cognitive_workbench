@@ -52,6 +52,8 @@ logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger("dataroom.run")
 logger.setLevel(logging.INFO)
 
+GAP_MARK = "=== GAP MAP ==="
+
 BRIEF = f"""Read audit/METHOD.md — that is your method for this engagement.
 
 The target is the data room bound to inspect_external: nine documents for a
@@ -67,9 +69,21 @@ line verbatim rather than working from a summary of the document. Summaries
 carry the qualitative facts and drop the figures, and nothing marks the
 omission.
 
-When you are done, give me the report: a recommendation, the findings worst
-first with a document citation on each, and what I should ask Dave before
-closing. Keep it under 900 words — what earns the page is your call.
+Work in as many legs as you need — end a leg with `yield` and I will say
+continue. When the engagement is finished, produce BOTH deliverables in one
+final reply, in this order:
+
+**1. The full report.** Recommendation from the method's taxonomy; findings
+worst first, each with its verdict, the seller claim it tests, the document
+that makes the claim and the document that settles it; a coverage statement
+saying what you did not check and why it matters; and what I should ask Dave
+before closing. Aim for 2,000 words or under.
+
+**2. The Gap Map**, after a line reading exactly {GAP_MARK!r} — the one-page
+lead artifact from METHOD.md §15. Target name and a one-line description,
+the recommendation, the three to five items that matter most, and the
+coverage line. No citations; those live in the report. This is the thing a
+buyer reads in thirty seconds.
 """
 
 CONTINUE = "continue"

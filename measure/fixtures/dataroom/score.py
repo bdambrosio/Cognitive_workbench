@@ -131,10 +131,27 @@ A finding may match only one id. Do not invent ids.
 Output ONLY: {{"findings": [{{"id": "...", "quote": "..."}}]}}"""
 
 
+GAP_MARK = "=== GAP MAP ==="
+
+
 def read_memo(world: str, agent: str) -> Optional[str]:
-    """The memo is the last substantial reply in the run."""
+    """The report is the last substantial reply, with the Gap Map removed.
+
+    The Gap Map repeats the top findings by design, so matching over both
+    would count them twice and inflate recall. It is reported separately —
+    presence and length — rather than scored."""
     turns = [t for t in load_turns(world, agent) if t.produced_chars > 400]
-    return str(turns[-1].raw.get("raw_response") or "") if turns else None
+    if not turns:
+        return None
+    return str(turns[-1].raw.get("raw_response") or "")
+
+
+def split_deliverables(reply: str) -> tuple:
+    """(report, gap_map_or_None). Split on the marker the brief specifies."""
+    if GAP_MARK in reply:
+        head, _, tail = reply.partition(GAP_MARK)
+        return head.rstrip(), tail.strip()
+    return reply, None
 
 
 def trace_facts(world: str, agent: str) -> Dict[str, Any]:
@@ -178,12 +195,18 @@ def main() -> int:
         print("  no memo found (no reply over 400 chars)")
         return 1
 
-    wc = word_count(memo)
+    report, gap_map = split_deliverables(memo)
+    memo = report          # findings are matched over the report only
+    wc = word_count(report)
     print(f"  turns {facts['turns']}   iterations {facts['iterations']}")
+    if gap_map is None:
+        print("  Gap Map            ABSENT — the brief asked for one")
+    else:
+        print(f"  Gap Map            present, {word_count(gap_map)} words")
     print(f"  corpus docs opened  {len(facts['docs_opened'])}/{CORPUS_DOCS}  "
           f"{facts['docs_opened']}")
-    print(f"  memo length         {wc} words  "
-          f"({'within' if wc <= 900 else 'OVER'} the 900 ceiling)")
+    print(f"  report length       {wc} words  "
+          f"({'within' if wc <= 2000 else 'OVER'} the 2,000 guide)")
 
     if args.dry_run:
         print("  dry run — no finding match attempted.")
