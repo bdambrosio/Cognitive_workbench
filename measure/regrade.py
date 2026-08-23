@@ -80,7 +80,28 @@ def make_grader():
         # pass beats a partial.
         _attempt[0] += 1
         cap = _TOKEN_BUDGET * 2 if _attempt[0] > 1 else _TOKEN_BUDGET
-        return backend.chat(messages, max_tokens=cap, temperature=0.2,
+        # 0.0, NOT 0.2. An instrument that returns a different reading on
+        # the same input is not an instrument. Observed 2026-08-23: one run
+        # scored Tier 3 = 2 on four consecutive passes and Tier 3 = 3 on a
+        # fifth, and failed the unsupported check on a sixth. Small compared
+        # with the variance of the thing being measured — four runs of one
+        # arm produced four different tool strategies — but it is noise in
+        # the ruler rather than in the object, and it compounds every
+        # comparison built on it.
+        #
+        # IT IS NOT SUFFICIENT. At 0.0 the same run still scored unsupported
+        # = 0 twice and 1 twice across four consecutive passes. A cloud model
+        # at temperature zero is not deterministic — no seed is sent, and
+        # batching and reasoning-mode sampling both survive it. So this
+        # narrows the grader's noise without removing it, and any threshold
+        # that gates on a count this grader produces needs more than one
+        # pass to mean anything.
+        #
+        # This changes the pinned instrument, and the header above says what
+        # that costs. It is still worth it: the numbers it invalidates were
+        # not reproducible either, which is a stronger objection than the one
+        # the pinning rule exists to raise.
+        return backend.chat(messages, max_tokens=cap, temperature=0.0,
                             cot_profile='none')
 
     return backend, llm_chat

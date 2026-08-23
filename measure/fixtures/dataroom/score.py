@@ -169,6 +169,28 @@ def trace_facts(world: str, agent: str) -> Dict[str, Any]:
     }
 
 
+# The five values §9 permits, longest first so "Clear with caveats" is not
+# matched as "Clear". This is a CONFORMANCE check on a closed vocabulary the
+# method defines — not classification of free text, which is what the
+# no-keyword-matching rule exists to prevent.
+_REC_VOCAB = ["Clear with caveats", "Conditional", "Material", "Walk", "Clear"]
+
+
+def recommendation_of(report: str) -> Optional[str]:
+    """Return the §9 recommendation the report states, or None if it used
+    some other vocabulary. A report that recommends in the buyer's action
+    language ("pause", "do not proceed") violates §2 and fails here."""
+    head = report[:4000]
+    for term in _REC_VOCAB:
+        for marker in (f"Recommendation: {term}",
+                       f"Recommendation:** {term}",
+                       f"Recommendation**: {term}",
+                       f"recommendation is **{term}**"):
+            if marker.lower() in head.lower():
+                return term
+    return None
+
+
 def word_count(memo: str) -> int:
     return len(re.findall(r"\S+", memo))
 
@@ -262,6 +284,34 @@ def main() -> int:
         ideal = [x for x in SEVERITY if x in found]
         print(f"  placement           memo order {ranked[:6]}")
         print(f"                      key order  {ideal[:6]}")
+    # ---- THE THRESHOLD ----------------------------------------------
+    # Tier counts are a SCORE. A business case needs a FLOOR: did this run
+    # clear the bar, yes or no. The distinction matters because the tail is
+    # noisy and the bar is not — across nine runs on one configuration the
+    # Tier 3 count spanned 2 to 6 while every run found all three must-find
+    # items. Averaging the tail hides that; a pass rate does not.
+    #
+    # Each criterion is something a delivered report would be judged on, not
+    # something the fixture happens to be able to count. `unsupported` is the
+    # one with teeth: a claim in a delivered report that cannot produce its
+    # source is the §5 provenance failure the whole method exists to prevent,
+    # and it is a liability rather than a lost point.
+    rec = recommendation_of(report)
+    checks = [
+        ("all three must-find items", len(t1) == 3),
+        ("Gap Map produced",          gap_map is not None),
+        ("§9 recommendation used",    rec is not None),
+        ("leads with a top-3 finding",
+         bool(ranked) and ranked[0] in SEVERITY[:3]),
+        ("no unsupported claims",     unsupported == 0),
+        ("report within 2,000 words", wc <= 2000),
+    ]
+    passed = all(ok for _, ok in checks)
+    print(f"\n  THRESHOLD           {'PASS' if passed else 'FAIL'}"
+          f"{'' if rec is None else '   (recommendation: ' + rec + ')'}")
+    for label, ok in checks:
+        print(f"      {'ok  ' if ok else 'FAIL'}  {label}")
+
     print("\n  n=1 is anecdote. Run the fixture at least three times per arm.")
     return 0
 
