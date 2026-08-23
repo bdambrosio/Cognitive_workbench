@@ -5,18 +5,34 @@ discarded, deliberately — see "Why every earlier run was discarded".
 
 ## Scored runs
 
-| arm | rung | Tier 1 | Tier 2 | T3 | unsup | §9 verdict | report | Gap Map | legs / wall |
+| arm | rung | Tier 1 | Tier 2 | T3 | unsup | §9 verdict | report | Gap Map | legs / iters / wall |
 |---|---|---|---|---|---|---|---|---|---|
-| **Qwen3.8-27B** (local) | cross_document | **3/3** | 0/2 | 5 | 1 | **Material** | 1,923w | 153w | 2 / 472s |
+| **Qwen3.8-27B** (local) | cross_document | **3/3** | 0/2 | 5 | 1 | Material | 1,923w | 153w | 2 / 15 / 472s |
+| **gpt-5.6-luna** (OpenAI) | cross_document | **3/3** | 0/2 | 3 | **0** | Conditional | 1,284w | 158w | 6 / 34 / 412s |
+| **Nemotron-3-Ultra** (DeepInfra) | cross_document | **3/3** | 0/2 | 4 | 1 | Material | 1,738w | 169w | 5 / 16 / 477s |
 
 Deliverables live beside each run:
 `results/<ts>_<world>/{report.md,gap_map.md,full_reply.md,run_meta.json}`
 
-Qwen took every cross-document item — 6/6, the first clean sweep of that
-rung — and reached no derived finding. It led with P2, which the key ranks
-#1 of 12.
+**Every arm found all three must-find items, used §9's vocabulary, opened all
+nine documents, and led with P2 — which the key ranks #1 of 12. No arm
+reached a derived finding.**
 
-**n=1. Nothing here is a result yet.**
+Three arms agreeing on everything the fixture makes easy, and failing
+identically on the one thing it makes hard, is a statement about the fixture
+rather than about the models. See "The Tier 2 collapse" below.
+
+Ultra's run is its first valid one in six attempts — the previous five died
+on 429, 429, 404, and twice on `max_iters` after spending eleven of twelve
+iterations reading documents in order to read the method. It no longer has to
+read the method.
+
+Luna is the outlier in shape rather than score: the most legs and iterations
+for the shortest report, the only arm with zero unsupported claims, and the
+only one to land on Conditional rather than Material. Whether that is better
+calibration or under-reading is not answerable at n=1.
+
+**n=1 per arm. Nothing here is a result yet.**
 
 ## What the workflow harness changed
 
@@ -33,6 +49,51 @@ fetched with `inspect`. Three things reached an output for the first time:
   available on request", and the scope disclaimer verbatim.
 - **§16's deliverable contract**, which until today existed only inside this
   runner's brief.
+
+## The Tier 2 collapse — the method has no slot for a derived finding
+
+All three arms scored 0/2 on Tier 2, and all three found the underlying
+evidence. They stopped one step short, in the same place.
+
+The answer key's F2 is *"30-day retention against 21 days of failures puts the
+last recoverable backup at total loss around 2026-08-29"* — described there as
+**the strongest single finding available**. Qwen got to the doorstep: *"The
+last successful backup is 24 days old. The 30-day retention window is being
+consumed by 21 consecutive days of failure."* Every fact needed is on the
+page. It never computes the date. Luna declined explicitly — *"the supplied
+lines do not establish 30-day usable retention"* — and Ultra filed it as
+`(duplicate)` of the backup finding.
+
+**§5's finding format has nowhere to put it.** The format is:
+
+    Claim (<source>): <the stated claim>
+    Evidence: <file:lines> — <what the code actually does>
+    Delta: <None, or the specific gap>
+
+and "a finding must cite its source, both halves: the document making the
+claim, and the file and line range showing the implementation."
+
+A derived finding tests no stated claim. Nobody claimed a backup expiry date;
+it is a consequence of two facts in two documents. Under §5 it has only one
+home — the finding for the claim it escalates — which is exactly where all
+three arms put it. Ultra's `(duplicate)` label is the method working as
+written.
+
+Searching the whole document for a slot: no occurrence of *derived*,
+*arithmetic as a finding type*, *projection*, *forecast*, or *implication*.
+The one place arithmetic appears is §5's warning that a prose summary drops
+"the arithmetic that made the finding material" — the method knows the
+arithmetic is what makes a finding material, and gives it no structure.
+
+**So the fixture rewards what the method's format excludes.** That conflict
+was invisible while the method was not reaching the agent. It appeared the
+moment the workflow harness delivered §5 intact and the arms started obeying
+it.
+
+This is documentary inference, not a controlled test. The test is to give §5
+a derived-finding shape — a claim slot that names the two facts rather than a
+stated claim — and re-run. Until then, Tier 2 is measuring whether an arm
+will break the format it was given.
 
 ## Why every earlier run was discarded
 
