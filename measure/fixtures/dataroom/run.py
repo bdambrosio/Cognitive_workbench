@@ -252,9 +252,21 @@ def main() -> int:
                 error = (f"turn {i + 1} hit max_iters without answering — "
                          f"run is not valid")
                 break
-            if exit_reason != "yield":
-                break
-            text = CONTINUE
+            # DONE IS A DELIVERABLE, NOT AN EXIT REASON. Continuing only on
+            # `yield` treats any `respond` as a finished audit — and on
+            # 2026-08-22 an arm enumerated the claim surface, wrote "I will
+            # now begin working the priority order", and ended the turn with
+            # that plan unexecuted. exit=respond, 241 words, zero findings,
+            # scored as a completed run. The brief specifies a Gap Map after a
+            # literal marker, so its absence is the mechanical signal that the
+            # work is not finished, whatever the exit reason says.
+            if exit_reason == "yield" or GAP_MARK not in reply:
+                if exit_reason != "yield":
+                    logger.info("leg %d ended %s with no %s — continuing",
+                                i + 1, exit_reason, GAP_MARK)
+                text = CONTINUE
+                continue
+            break
     except Exception as e:                                     # noqa: BLE001
         error = f"{type(e).__name__}: {e}"
         logger.exception("run failed")
