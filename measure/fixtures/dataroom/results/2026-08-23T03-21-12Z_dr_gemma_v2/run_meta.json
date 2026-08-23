@@ -1,0 +1,50 @@
+{
+  "world": "dr_gemma_v2",
+  "arm": "measure/arms/gemma_local.yaml",
+  "llm_config": {
+    "sgl_model_path": null,
+    "reasoning_parser": null,
+    "server": "local",
+    "model": "",
+    "vllm_url": "http://127.0.0.1:5000",
+    "is_reasoning_model": false
+  },
+  "served_model_check": {
+    "checked": true,
+    "endpoint": "http://127.0.0.1:5000/v1/models",
+    "served": [
+      "google/gemma-4-31B-it"
+    ],
+    "expected": "gemma-4-31B"
+  },
+  "external_repo": "/home/bruce/Downloads/Cognitive_workbench/measure/fixtures/dataroom/corpus",
+  "legs": [
+    {
+      "leg": 1,
+      "sent": "Read audit/METHOD.md \u2014 that is your method for this engagement.\n\nThe target is t",
+      "exit_reason": "respond",
+      "reply_chars": 2404
+    },
+    {
+      "leg": 2,
+      "sent": "continue",
+      "exit_reason": "respond",
+      "reply_chars": 2525
+    },
+    {
+      "leg": 3,
+      "sent": "continue",
+      "exit_reason": "respond",
+      "reply_chars": 2344
+    },
+    {
+      "leg": 4,
+      "sent": "continue",
+      "exit_reason": "respond",
+      "reply_chars": 4491
+    }
+  ],
+  "wall_clock_s": 220.4,
+  "error": null,
+  "captured_at_utc": "2026-08-23T03-21-12Z"
+}
