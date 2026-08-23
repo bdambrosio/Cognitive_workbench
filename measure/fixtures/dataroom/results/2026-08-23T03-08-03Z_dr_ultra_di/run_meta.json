@@ -1,0 +1,26 @@
+{
+  "world": "dr_ultra_di",
+  "arm": "measure/arms/nemotron_ultra_di.yaml",
+  "llm_config": {
+    "sgl_model_path": null,
+    "reasoning_parser": null,
+    "server": "local",
+    "model": "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B",
+    "vllm_url": "https://api.deepinfra.com/v1/openai",
+    "api_key": "DEEPINFRA",
+    "is_reasoning_model": true,
+    "reasoning_effort": "low"
+  },
+  "external_repo": "/home/bruce/Downloads/Cognitive_workbench/measure/fixtures/dataroom/corpus",
+  "legs": [
+    {
+      "leg": 1,
+      "sent": "Read audit/METHOD.md \u2014 that is your method for this engagement.\n\nThe target is t",
+      "exit_reason": "llm_error",
+      "reply_chars": 134
+    }
+  ],
+  "wall_clock_s": 1.2,
+  "error": "turn 1 ended llm_error \u2014 run is not valid",
+  "captured_at_utc": "2026-08-23T03-08-03Z"
+}

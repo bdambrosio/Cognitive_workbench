@@ -1,0 +1,27 @@
+# nemotron-3-ultra — DIRECT to DeepInfra, not through OpenRouter.
+#
+# 550B total / 55B active hybrid Transformer-Mamba MoE, served FP4 (native
+# training precision, so this is not a lossy quantization).
+#
+# WHY DIRECT. Three runs died on OpenRouter with 429s whose own metadata said
+# limit_source: upstream_provider_shared_pool, is_byok: false — we were
+# queueing behind every other OpenRouter user's Nemotron traffic. DeepInfra's
+# own limit is 200 CONCURRENT requests per model per account
+# (docs.deepinfra.com/account/rate-limits); an audit runs at concurrency 1-2,
+# so with our own account it is not a constraint. Verified 2026-08-22: 12
+# rapid sequential calls, 12/12 ok, zero 429s.
+#
+# No provider block: there is one provider now, so nothing to pin.
+#
+# Measured on this endpoint, same day:
+#   decode  ~290 tok/s, consistent
+#   prefill HIGHLY VARIABLE — 1.4s to 14.1s for the same ~15k-token prompt
+#           (~1,000-10,500 tok/s). Our own account removes the rate limit,
+#           not the queueing; capacity is still shared.
+llm_config:
+  server: local
+  model: "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B"
+  vllm_url: https://api.deepinfra.com/v1/openai
+  api_key: DEEPINFRA
+  is_reasoning_model: true
+  reasoning_effort: low

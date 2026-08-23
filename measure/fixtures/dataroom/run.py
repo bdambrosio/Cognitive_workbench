@@ -89,6 +89,44 @@ buyer reads in thirty seconds.
 CONTINUE = "continue"
 
 
+def verify_served_model(arm: Dict[str, Any], timeout: float = 10.0
+                        ) -> Dict[str, Any]:
+    """Ask the server what it is serving, and refuse to run if it is not the
+    arm we think we are measuring.
+
+    Recovered from the retired bench/common.py on 2026-08-22, the day it was
+    needed: both local arms declare model:"" (whatever is served), so when the
+    box switched from Qwen to Gemma the qwen arm would have produced a Gemma
+    run labelled Qwen. A comparison whose backend identity rests on
+    recollection is not a comparison. The result is recorded verbatim into
+    run_meta.json so a row can always name its own backend.
+    """
+    import urllib.request, urllib.error
+    expect = arm.get("expects_served_model")
+    if not expect:
+        return {"checked": False, "reason": "cloud arm — nothing to interrogate",
+                "served": (arm.get("llm_config") or {}).get("model")}
+    base = ((arm.get("llm_config") or {}).get("vllm_url") or "").rstrip("/")
+    if base.endswith("/v1"):
+        base = base[:-3]
+    url = f"{base}/v1/models"
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as fh:
+            payload = json.loads(fh.read().decode("utf-8"))
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        raise SystemExit(
+            f"cannot reach {url} to verify the served model ({e}). The local "
+            f"backend must be up before a run — a connection refused mid-run "
+            f"reads as a mechanism failure in the trace and is not one.")
+    served = [m.get("id", "") for m in (payload.get("data") or [])]
+    if not any(expect.lower() in s.lower() for s in served):
+        raise SystemExit(
+            f"arm expects a model matching {expect!r} but {url} is serving "
+            f"{served}. Restart on the right model, or this row is mislabelled.")
+    return {"checked": True, "endpoint": url, "served": served,
+            "expected": expect}
+
+
 def build_config(world: str, arm_path: Optional[Path]
                  ) -> Tuple[str, Dict[str, Any]]:
     from launcher import parse_characters                      # noqa: E402
@@ -175,6 +213,12 @@ def main() -> int:
     out = HERE / "results" / f"{ts}_{args.world}"
     out.mkdir(parents=True, exist_ok=True)
 
+    arm_doc = (yaml.safe_load(Path(args.arm).read_text(encoding="utf-8"))
+               if args.arm else {})
+    served_check = verify_served_model(arm_doc)
+    if served_check.get("checked"):
+        logger.info("served-model check OK: %s", served_check["served"])
+
     name, cfg = build_config(args.world, args.arm)
     logger.info("world=%s arm=%s model=%s", args.world, args.arm,
                 (cfg.get("llm_config") or {}).get("model") or "(scenario default)")
@@ -244,6 +288,7 @@ def main() -> int:
         "world": args.world,
         "arm": str(args.arm) if args.arm else "(scenario default)",
         "llm_config": cfg.get("llm_config"),
+        "served_model_check": served_check,
         "external_repo": cfg.get("external_repo"),
         "legs": legs,
         "wall_clock_s": wall,
