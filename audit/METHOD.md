@@ -128,6 +128,65 @@ line and quote it. A finding built on a remembered figure has the same defect
 as a finding built on a remembered file — it is the provenance failure §5
 exists to prevent, wearing a citation it did not earn.
 
+### The second shape: a derived finding
+
+The format above tests a stated claim. Some of the most material things in a
+data room are stated by nobody — they follow by arithmetic from two figures
+the seller supplied separately, in documents that never meet. A retention
+window and a last-good-backup date sit in different sections of the same
+file; each is innocuous, and together they carry a date after which the
+business cannot be restored.
+
+That finding has no claim to cite, so the format above has no room for it. It
+gets its own:
+
+```
+**Finding N: <short title> — [derived]**
+
+Basis: <file:lines> — <the first stated figure, verbatim>
+       <file:lines> — <the second, verbatim>
+
+Derivation: <the arithmetic, written out so a reader can check it>
+
+Consequence: <what follows, and why a buyer cares>
+
+Escalates: <Finding N, or None>
+```
+
+**Four rules, and they are what keep this inside §2.**
+
+1. **Only the target's own figures.** Every input is a number, date or
+   threshold the seller stated, quoted verbatim per the rule above. Deriving
+   an expiry date from the seller's own retention terms is still auditing
+   what they told you. Deriving that the market will turn against them is
+   not, and is not a finding.
+
+2. **The derivation is written out, not asserted.** "30-day retention from a
+   2026-07-30 last-good backup exhausts on 2026-08-29" is checkable in one
+   line. A consequence whose arithmetic is left implicit is an opinion
+   wearing a citation, and §5 exists to prevent exactly that.
+
+3. **No recommendation inside the finding.** State the consequence and stop.
+   What the buyer should do about it is the buyer's judgement (§2), and the
+   report's own recommendation is §9's job.
+
+4. **Name what it escalates.** A derived finding frequently sharpens an
+   ordinary one — the same backup failure, now with a date on it. Say which,
+   so the report reads as one finding intensified rather than two findings
+   counted. Where it escalates nothing, say None.
+
+**Priority.** A derived finding inherits the §4 priority of the facts it
+rests on, and rises above them when the consequence is more severe than
+either input. The backup case is the pattern: two operational facts, one
+consequence a buyer would treat as material.
+
+**Why this was missing.** Measured 2026-08-23: three independent arms found
+every figure needed for a derived finding, and all three declined to state
+it. One wrote out the setup and stopped before the arithmetic; one said the
+lines "do not establish" the conclusion; one filed it as `(duplicate)` of the
+claim it escalated. That is not three models failing. That is three models
+obeying a format with one shape in it.
+
 ## 6. Verdict vocabulary
 
 | Verdict | Meaning | Buyer impact |
@@ -140,6 +199,7 @@ exists to prevent, wearing a citation it did not earn.
 | `[delta]` | Claim is false; the code does not do what the docs say | **Material** — buyer should revalue or walk |
 | `[unverifiable]` | Could not be verified from available materials | Not a finding — goes in Remaining Claims with the reason |
 | `[non-delta]` | No claim to verify (code exists, docs make no statement) | Not a finding — noted for completeness |
+| `[derived]` | Not a claim test — a consequence computed from two or more stated figures (§5's second shape) | **As severe as the consequence.** Frequently material |
 
 **`[partial]` vs `[delta]` is a real distinction.** `[partial]` is "the claim
 is 80% true and here is the 20% that is not, with a citation to the corner
@@ -147,6 +207,12 @@ case." `[delta]` is "the claim is false; the code does X, the docs say Y,
 here are both citations." A buyer treats them differently: `[partial]` is a
 known limitation to price in; `[delta]` is a broken promise that may indicate
 a pattern.
+
+**`[derived]` is not a verdict on a claim, and that is the point.** The other
+eight say how a stated claim stood up. `[derived]` says the seller's own
+figures, taken together, entail something neither document states. It carries
+no claim source because there is no claim — which is why it needs §5's second
+shape rather than a row in the format above.
 
 **`[unverifiable]` must never be reported as `[delta]`.** *"I couldn't find
 the code"* is not the same as *"the code isn't there."* The former belongs in
