@@ -21,7 +21,11 @@
 llm_config:
   server: local
   model: "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B"
-  vllm_url: https://api.deepinfra.com/v1/openai
+  # NOT .../v1/openai — _ChatBackend appends "/v1/chat/completions" and only
+  # strips a TRAILING "/v1", so that base composed
+  # ".../v1/openai/v1/chat/completions" and 404'd. Bare host works:
+  # api.deepinfra.com/v1/chat/completions is a live endpoint (verified 200).
+  vllm_url: https://api.deepinfra.com
   api_key: DEEPINFRA
   is_reasoning_model: true
   reasoning_effort: low
