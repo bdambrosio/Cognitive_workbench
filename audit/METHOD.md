@@ -349,21 +349,67 @@ for proper nouns.
   change and checking whether tier recall moved; keep at least one fixture in
   a different domain from recent real targets.
 
-## 15. The Gap Map — proposed, not yet designed
+## 15. The Gap Map
 
 The lead artifact in cold outreach. The PE partner gets it in the email body
 or as a 30-second PDF. One page:
 
 - Target name + one-line description
 - Recommendation (§9)
-- The top 3–5 items that matter most — the caveats, or the deltas, whichever
-  is worse
+- The top 3–5 items that matter most
+- Coverage line
 - One line: "Full report with citations available on request."
 
 If the recommendation is **Clear** with no caveats, the Gap Map is two lines
-and the email says "no gaps found, 31/31 claims verified, report attached."
+and the email says "no gaps found, N/N claims verified, report attached."
 
 **The Gap Map is the hook; the full report is the proof.**
 
-**Open:** the visual format is not designed. Next step, alongside the landing
-page.
+### The format
+
+Designed 2026-08-22. Reference implementation:
+`docs/audit-gap-map-mockup.html` — populated with a real audit as example
+data, which is why it lives outside `audit/` (§14: target facts do not carry
+between engagements).
+
+**One card, ~680 px wide.** Scan order top to bottom is deliberate: target
+identity → verdict band → key items → coverage → full-report link. A partner
+glancing at it in an email gets the verdict in about three seconds, then
+enough substance to decide whether to open the report.
+
+**Verdict band.** The §9 recommendation, colour-coded, immediately under the
+header. All five levels have a treatment — the band is the first thing that
+registers, and it is the only place the recommendation appears. Green through
+red across Clear → Walk.
+
+**Key items — three to five, and MIX THEM.** Each item is an icon, a
+one-line claim, and a two-line note. No `file:line` citations; those live in
+the report.
+
+The non-obvious rule: **when the recommendation is Clear or Clear with
+caveats, include the positive confirmations, not only the caveats.** The
+buyer needs to see *what* is clear, not merely that it is — "the
+safety-critical mechanisms are real implementations, not stubs" is the
+finding they are paying for, and a list of only caveats misrepresents an
+audit that mostly passed. Where the recommendation is Material or Walk the
+balance inverts on its own.
+
+**Coverage line.** How many claims were individually verified out of how many
+identified, and why the remainder is or is not low-risk. This is §4's
+coverage honesty at artifact scale: the Gap Map is the document most likely
+to be read *instead of* the report, so silence about coverage does its damage
+here first.
+
+**Footer.** The report link, and the scope disclaimer in small type —
+"technical claims verification · not a pen-test, not legal advice". That is
+§2's boundary and §10's liability posture enforced at the artifact level,
+where a recipient who reads nothing else will still see it.
+
+**Deliberately absent: no logo, no pricing, no "book a call".** A lead
+artifact's job is to make the recipient want the full report. The link is the
+call to action; anything more converts a professional document into a
+brochure and forfeits the register the disclaimer just established.
+
+**Open:** whether the colour coding survives email-thumbnail scale, PDF
+export, and the landing page it shares a visual system with. None of these
+block sending one.

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html><head><style>
+  body { margin: 0; padding: 40px; background: #f5f5f0; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; }
+  .card { max-width: 680px; margin: 0 auto; background: #fff; border-radius: 4px; box-shadow: 0 2px 16px rgba(0,0,0,0.08); overflow: hidden; }
+  .header { padding: 28px 32px 16px; border-bottom: 1px solid #e8e8e4; }
+  .target-name { font-size: 22px; font-weight: 700; color: #1a1a1a; margin: 0 0 4px; }
+  .target-desc { font-size: 13px; color: #555; margin: 0 0 8px; }
+  .audit-date { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; }
+  .rec-band { padding: 18px 32px; margin: 0; }
+  .rec-band .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #666; margin-bottom: 4px; }
+  .rec-band .verdict { font-size: 20px; font-weight: 700; }
+  .rec-clear { background: #e8f5e9; border-left: 4px solid #43a047; }
+  .rec-clear .verdict { color: #2e7d32; }
+  .rec-caveats { background: #fff8e1; border-left: 4px solid #f9a825; }
+  .rec-caveats .verdict { color: #e65100; }
+  .rec-conditional { background: #fff3e0; border-left: 4px solid #ef6c00; }
+  .rec-conditional .verdict { color: #e65100; }
+  .rec-material { background: #fbe9e7; border-left: 4px solid #d84315; }
+  .rec-material .verdict { color: #b71c1c; }
+  .rec-walk { background: #fce4ec; border-left: 4px solid #c62828; }
+  .rec-walk .verdict { color: #b71c1c; }
+  .items { padding: 20px 32px; }
+  .items-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 14px; }
+  .item { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f0f0ec; }
+  .item:last-child { border-bottom: none; }
+  .item-icon { flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; margin-top: 1px; }
+  .icon-ok { background: #e8f5e9; color: #43a047; }
+  .icon-warn { background: #fff8e1; color: #f9a825; }
+  .icon-fail { background: #fbe9e7; color: #d84315; }
+  .item-body { flex: 1; }
+  .item-claim { font-size: 13px; font-weight: 600; color: #222; margin: 0 0 2px; }
+  .item-note { font-size: 12px; color: #666; margin: 0; line-height: 1.4; }
+  .coverage { padding: 12px 32px; background: #fafafa; border-top: 1px solid #eee; font-size: 11px; color: #777; }
+  .footer { padding: 16px 32px 24px; border-top: 1px solid #e8e8e4; }
+  .footer-line { font-size: 13px; color: #333; margin: 0 0 4px; }
+  .footer-line a { color: #1565c0; text-decoration: none; }
+  .footer-brand { font-size: 10px; color: #aaa; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 10px; }
+</style></head><body>
+<div class="card">
+  <div class="header">
+    <p class="target-name">Body — Autonomous Mobile Robot</p>
+    <p class="target-desc">Pi + desktop two-sided home/office security robot. Two-sided Python stack, hierarchical drive, particle-filter localization.</p>
+    <p class="audit-date">AI-Readiness Audit · 2026-08-22</p>
+  </div>
+
+  <div class="rec-band rec-caveats">
+    <div class="label">Recommendation</div>
+    <div class="verdict">Clear with caveats</div>
+  </div>
+
+  <div class="items">
+    <div class="items-title">Key items</div>
+
+    <div class="item">
+      <div class="item-icon icon-ok">✓</div>
+      <div class="item-body">
+        <p class="item-claim">Safety-critical mechanisms are real</p>
+        <p class="item-note">Swept-footprint collision, dual watchdog kill, no-go isolation from localization — all implemented correctly. No stubs.</p>
+      </div>
+    </div>
+
+    <div class="item">
+      <div class="item-icon icon-warn">!</div>
+      <div class="item-body">
+        <p class="item-claim">Phase 8 localization cutover pending</p>
+        <p class="item-note">~200 LOC legacy pose code still in tree alongside new PF. Cutover documented but not executed. One week of cleanup.</p>
+      </div>
+    </div>
+
+    <div class="item">
+      <div class="item-icon icon-warn">!</div>
+      <div class="item-body">
+        <p class="item-claim">Documentation drift (2 items)</p>
+        <p class="item-note">AprilTag section in redesign doc not updated after 2026-06-01 removal; motor timeout values live in Python defaults, not config.json.</p>
+      </div>
+    </div>
+
+    <div class="item">
+      <div class="item-icon icon-ok">✓</div>
+      <div class="item-body">
+        <p class="item-claim">Network posture: by-design, not a finding</p>
+        <p class="item-note">Zenoh on LAN (no auth) is the control plane — expected for a local robot. One user-initiated outbound call (x.ai TTS). No telemetry or surveillance exfiltration.</p>
+      </div>
+    </div>
+
+    <div class="item">
+      <div class="item-icon icon-ok">✓</div>
+      <div class="item-body">
+        <p class="item-claim">Claim consistency: 31/31 verified, 0 deltas</p>
+        <p class="item-note">Every individually traced claim matches its implementation. 100% consistency rate across safety, architecture, operational, and micro-claims.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="coverage">Coverage: 31 of ~68 identifiable claims individually verified. Remaining ~54 are micro-claims assessed low-risk given 100% consistency. Full list in report §6.</div>
+
+  <div class="footer">
+    <p class="footer-line">Full report with file:line citations: <a href="#">[link]</a></p>
+    <p class="footer-brand">AI-Readiness Audit · Technical claims verification · Not a pen-test, not legal advice</p>
+  </div>
+</div>
+</body></html>
