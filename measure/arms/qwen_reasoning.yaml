@@ -1,0 +1,43 @@
+# Qwen3.8-27B on the local SGLang, THINKING ON. One variable against
+# qwen_local.yaml, which is otherwise byte-identical below the comments.
+#
+# THE HYPOTHESIS. F1 has never landed. Across four runs of qwen_local the
+# backup-expiry derivation (F2) appears every time and the revenue derivation
+# (F1) appears never. F1 needs two figures from two documents held at once —
+# $16,000 of Stripe MRR in doc 5, $24,000 of wired enterprise revenue in
+# doc 7 — plus the observation that they are in different payment systems,
+# plus the arithmetic that 60% of claimed revenue is unverifiable from the
+# processor. That is the shape thinking is supposed to help with. If it is
+# what unlocks F1, F1 should appear.
+#
+# THE COUNTER-HYPOTHESIS, held as a caution rather than a prediction. Earlier
+# work in this project found reasoning helps state-judgement and HARMS
+# retrieval. An audit is retrieval-heavy — find every claim across nine
+# documents — so Tier 1 could fall while Tier 2 rises. That finding did not
+# replicate on a later campaign, which is why it is a caution. It is also
+# exactly the axis this fixture measures, so the run will say.
+#
+# TEMPERATURE IS DELIBERATELY LEFT AT THE 0.7 DEFAULT. There are four scored
+# runs of qwen_local at 0.7 to compare against; changing temperature here
+# would change two variables and leave the comparison with no baseline. The
+# temp-0 probe is a separate experiment about variance, not the baseline for
+# this one. Greedy decoding is also the worst pairing for thinking mode in
+# this model family — it invites repetition in exactly the long generations
+# thinking produces.
+#
+# NO SERVER RESTART NEEDED. The server runs with
+# `--default-chat-template-kwargs {"enable_thinking": false}` but also with
+# `--reasoning-parser qwen3` loaded, so a request that asks for thinking is
+# parsed correctly. reasoning_effort is what flips it per request.
+#
+# The effort LEVEL may be inert. On at least one other local model in this
+# project low/medium/high proved binary — thinking on or off, no dial. If
+# that holds here, `medium` reads as `on`.
+expects_served_model: "Qwen3.8"
+
+llm_config:
+  server: local
+  model: ""
+  vllm_url: http://127.0.0.1:5000
+  is_reasoning_model: true
+  reasoning_effort: medium
