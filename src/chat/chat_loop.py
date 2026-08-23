@@ -330,6 +330,24 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # lowers it to 4096 so a runaway tool arg truncates before the HTTP
         # read timeout, letting the parse-retry recover.
         self.react_max_tokens = int((character_config.get('chat') or {}).get('react_max_tokens', 8192))
+        # ACTION-EMISSION TEMPERATURE. 0.7 is right for a companion, where
+        # sampling diversity is the personality. It is not obviously right
+        # for an agent executing a procedure, which wants the most likely
+        # action rather than a sampled one.
+        #
+        # Measured 2026-08-23: four runs of one arm on one config produced
+        # four different strategies — 11 document reads and no arithmetic in
+        # one, a calculator and a script in another, 10 tool calls against
+        # 16. At 0.7 across 10-16 sequential choices, each sampled action
+        # changes the state the next is sampled from, so divergence
+        # compounds. The scorer was ruled out first: three passes over one
+        # run returned byte-identical results.
+        #
+        # Deliberately NOT part of workflow_mode. Bundling it would change
+        # what that flag means and invalidate the runs already scored under
+        # it; one variable at a time is the whole point of the arm mechanism.
+        self.react_temperature = float(
+            (character_config.get('chat') or {}).get('react_temperature', 0.7))
         # Benchmark mode: run post-turn reflection inline (rather than on the
         # background executor) so probe-time state snapshots see fully-resolved
         # state. Off by default; opt-in via scenario YAML for harnesses like

@@ -465,7 +465,9 @@ class ReactMixin:
                 self._affect.set_waiting_for_llm(True)
                 try:
                     raw = self.backend.chat(prompt, max_tokens=self.react_max_tokens,
-                                            temperature=0.7, cot_profile='none',
+                                            temperature=getattr(
+                                                self, 'react_temperature', 0.7),
+                                            cot_profile='none',
                                             reasoning_effort=self._reasoning_effort,
                                             response_schema=REACT_ACTION_SCHEMA)
                 except Exception as e:
