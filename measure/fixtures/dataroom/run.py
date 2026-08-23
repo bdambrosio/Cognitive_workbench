@@ -195,6 +195,19 @@ def main() -> int:
                          "reply_chars": len(reply)})
             logger.info("leg %d: exit=%s chars=%d", i + 1, exit_reason,
                         len(reply))
+            # A turn that died is not a turn that finished. llm_error and
+            # max_iters both end the loop, and treating them as ordinary
+            # completion reported error=None on a run whose only output was
+            # "[degraded reply — a model call failed mid-loop]". Silence
+            # reading as success is the failure mode this whole suite exists
+            # to catch; it should not be in the runner.
+            if exit_reason in ("llm_error", "crashed"):
+                error = f"turn {i + 1} ended {exit_reason} — run is not valid"
+                break
+            if exit_reason == "max_iters":
+                error = (f"turn {i + 1} hit max_iters without answering — "
+                         f"run is not valid")
+                break
             if exit_reason != "yield":
                 break
             text = CONTINUE
