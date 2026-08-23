@@ -235,8 +235,18 @@ class Subagent:
                 continue
 
             if tool == 'respond':
-                answer = (str(action.get('text', '') or '').strip()
-                          or '(no answer)')
+                # EMPTY MUST STAY EMPTY. This was `or '(no answer)'`, and
+                # that sentinel is a NON-EMPTY string, so the caller's guard
+                # (`if not text: return 'EMPTY: ...'`, react.py) could never
+                # fire — the parent was handed a cheerful `OK: (no answer)`.
+                # Observed 2026-08-23: a subagent read METHOD.md in full
+                # across four `read` calls, emitted a respond carrying no
+                # `text`, and its parent was told the read had SUCCEEDED and
+                # returned nothing. 14 of 29 inspect calls that run; the
+                # parent spent two legs re-asking a tool reporting OK, then
+                # yielded blocked. A subagent that answers nothing has to say
+                # so in the one place that checks, which is emptiness.
+                answer = str(action.get('text', '') or '').strip()
                 exit_reason = 'respond'
                 iter_rec['observation'] = '(respond)'
                 break
