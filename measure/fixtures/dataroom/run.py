@@ -158,7 +158,8 @@ def verify_served_model(arm: Dict[str, Any], timeout: float = 10.0
 
 def build_config(world: str, arm_path: Optional[Path],
                  workflow_mode: Optional[bool] = None,
-                 temperature: Optional[float] = None
+                 temperature: Optional[float] = None,
+                 max_tokens: Optional[int] = None
                  ) -> Tuple[str, Dict[str, Any]]:
     from launcher import parse_characters                      # noqa: E402
 
@@ -201,6 +202,12 @@ def build_config(world: str, arm_path: Optional[Path],
         cfg["workflow_mode"] = workflow_mode
     if temperature is not None:
         cfg.setdefault("chat", {})["react_temperature"] = temperature
+    # Reasoning tokens bill against the SAME budget as the action. At 8192 a
+    # thinking model can deliberate until there is no room left to emit the
+    # JSON, and the emission comes back truncated or empty — observed on the
+    # grader 2026-08-23, silently, three times in eleven.
+    if max_tokens is not None:
+        cfg.setdefault("chat", {})["react_max_tokens"] = max_tokens
     return name, cfg
 
 
@@ -244,6 +251,9 @@ def main() -> int:
                     help="YAML with an llm_config block; replaces the scenario's")
     ap.add_argument("--max-turns", type=int, default=25,
                     help="hard cap on legs (default 25)")
+    ap.add_argument("--max-tokens", type=int, default=None,
+                    help="override chat.react_max_tokens (scenario default "
+                         "8192). Reasoning tokens bill against this budget")
     ap.add_argument("--temperature", type=float, default=None,
                     help="override the action-emission temperature "
                          "(scenario default 0.7)")
@@ -270,7 +280,7 @@ def main() -> int:
     wf_mode = (None if args.workflow_mode is None
                else args.workflow_mode == "on")
     name, cfg = build_config(args.world, args.arm, wf_mode,
-                             args.temperature)
+                             args.temperature, args.max_tokens)
     logger.info("world=%s arm=%s model=%s", args.world, args.arm,
                 (cfg.get("llm_config") or {}).get("model") or "(scenario default)")
 
@@ -354,6 +364,8 @@ def main() -> int:
         "workflow_mode": bool(cfg.get("workflow_mode")),
         "react_temperature": (cfg.get("chat") or {}).get(
             "react_temperature", 0.7),
+        "react_max_tokens": (cfg.get("chat") or {}).get(
+            "react_max_tokens", 8192),
         "llm_config": cfg.get("llm_config"),
         "served_model_check": served_check,
         "external_repo": cfg.get("external_repo"),
