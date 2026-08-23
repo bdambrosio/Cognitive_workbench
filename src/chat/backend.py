@@ -252,10 +252,54 @@ class _ChatBackend:
             "window %d)", max_tokens, room, est_prompt, window)
         return room
 
-    def _post_adapting(self, url: str, headers: Dict[str, str],
-                       body: Dict[str, Any]):
+    # Transient upstream refusals. A gateway serving a popular model from a
+    # shared rate pool returns these under load, and they clear in seconds —
+    # but an audit turn is call-dense (subagent loop + ReAct loop + post-turn
+    # reflection), so one 429 killed two whole runs on 2026-08-22 with
+    # "engine_overloaded, limit_source: upstream_provider_shared_pool".
+    # Retrying is right here and clamping is not: nothing is wrong with the
+    # request.
+    _TRANSIENT_STATUS = (429, 500, 502, 503, 504)
+    _TRANSIENT_MAX_RETRIES = 4
+    _TRANSIENT_BASE_SLEEP_S = 2.0
+
+    def _post_transient_retrying(self, url: str, headers: Dict[str, str],
+                                 body: Dict[str, Any]):
+        """POST, retrying transient upstream errors with backoff.
+
+        Honours the gateway's own `retry_after_seconds` when it sends one,
+        since it knows more than a fixed schedule does; otherwise doubles
+        from a 2s base. Returns the final response either way — the caller
+        still decides what a persistent failure means.
+        """
+        import time as _time
+        delay = self._TRANSIENT_BASE_SLEEP_S
         resp = requests.post(url, headers=headers, json=body,
                              timeout=_HTTP_TIMEOUT_S)
+        for attempt in range(self._TRANSIENT_MAX_RETRIES):
+            if resp.ok or resp.status_code not in self._TRANSIENT_STATUS:
+                return resp
+            wait = delay
+            try:
+                meta = ((resp.json() or {}).get('error') or {}).get('metadata') or {}
+                hinted = meta.get('retry_after_seconds')
+                if isinstance(hinted, (int, float)) and hinted > 0:
+                    wait = float(hinted)
+            except ValueError:
+                pass
+            logger.warning(
+                "_ChatBackend: %s returned %s; retry %d/%d in %.1fs",
+                self.model or self.base_url, resp.status_code,
+                attempt + 1, self._TRANSIENT_MAX_RETRIES, wait)
+            _time.sleep(wait)
+            delay *= 2
+            resp = requests.post(url, headers=headers, json=body,
+                                 timeout=_HTTP_TIMEOUT_S)
+        return resp
+
+    def _post_adapting(self, url: str, headers: Dict[str, str],
+                       body: Dict[str, Any]):
+        resp = self._post_transient_retrying(url, headers, body)
         for _ in range(self._PARAM_ADAPT_MAX):
             if resp.ok or resp.status_code != 400:
                 return resp
@@ -288,7 +332,7 @@ class _ChatBackend:
                 logger.info(
                     "_ChatBackend: %s rejects %r; dropping it for this session",
                     self.model or self.base_url, param)
-            resp = requests.post(url, headers=headers, json=body, timeout=_HTTP_TIMEOUT_S)
+            resp = self._post_transient_retrying(url, headers, body)
         return resp
 
     def chat(self, messages: List[Dict[str, Any]],
@@ -376,10 +420,10 @@ class _ChatBackend:
                 'x-api-key': self._api_key_value,
                 'anthropic-version': '2023-06-01',
             }
-            resp = requests.post(
-                f'{self.base_url}/v1/messages',
-                headers=headers, json=body, timeout=_HTTP_TIMEOUT_S,
-            )
+            # Same transient-retry treatment as the OpenAI-compat route;
+            # rate limits are not a property of the wire format.
+            resp = self._post_transient_retrying(
+                f'{self.base_url}/v1/messages', headers, body)
             resp.raise_for_status()
             data = resp.json()
             self.last_finish_reason = data.get('stop_reason')

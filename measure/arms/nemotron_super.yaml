@@ -6,7 +6,10 @@
 # `response_format` support — the missing parameter behind the 160
 # "unknown tool None" failures fixed in 96e03f54.
 #
-# DeepInfra first, Together as the single permitted fallback. Order set by
+# DeepInfra first, DigitalOcean as the fallback. Together does NOT serve
+# Super — pinning it there left one valid provider, so a DeepInfra 429
+# became an immediate 404 'No endpoints found'. DeepInfra serves Super at
+# bf16, higher precision than Ultra's fp4. Order set by
 # measured provider health 2026-08-22: DeepInfra status 0 / uptime 100%,
 # Together status -2 / 92.8%, Venice status -5 / 78.4% and now returning
 # 404 "No endpoints found" for this model. Together threw a 503 mid-subagent
@@ -31,7 +34,7 @@ llm_config:
   reasoning_effort: low
   extra_body:
     provider:
-      order: ["DeepInfra", "Together"]
+      order: ["DeepInfra", "DigitalOcean"]
       allow_fallbacks: false
 # THE DEPLOYABILITY ARM. At FP4 this is ~60GB of weights — one H100 or H200,
 # so single-tenant rental is a couple of dollars an hour. Ultra at FP4 is
