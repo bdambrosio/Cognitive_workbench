@@ -124,23 +124,28 @@ with it the arithmetic that made the finding material. Nothing marks the
 omission; the summary reads complete.
 
 **AN ABSENCE NEEDS THE SEARCH, NOT THE CONCLUSION.** "This is not
-implemented" cannot cite a file and line, because the point is that there
-isn't one. Its evidence is the SEARCH — what was looked for, and why that
-search would have found the thing if it existed. State both.
+implemented" cannot cite a file and line — the point is that there isn't one.
+Its evidence is the search. Show two, because each fails where the other
+holds:
 
-Observed 2026-08-23, on the first real engagement. One finding reported that
-a documented feature had no implementation, and supported it: grepped the
-term, showed all ten matches meant something else, and separately ruled out
-the event path that could have carried it. Correct, and it held up when
-checked. Another finding in the same report asserted that no sentiment
-scorer existed. One existed — 136 lines, wired into every customer message —
-and a single grep for the obvious word would have found it. The difference
-between the two findings was not care or model or luck. One showed its
-search and one asserted a conclusion.
+- **Lexical, in the claim's own words.** The claim supplies the terms, and
+  the implementer probably used them too. A claim about detecting frustration
+  is searched as `frustrat`, not as whatever you would have named the module.
+- **Structural.** List the directory the thing would live in. A listing
+  cannot be defeated by a synonym; a grep can.
 
-A negative finding is the most valuable thing an audit produces and the
-easiest to get wrong, because nothing contradicts it until the seller does.
-Support it the way you would have to defend it.
+Observed 2026-08-23. A finding that a documented feature was unimplemented
+grepped the term, showed all ten matches meant something else, and ruled out
+the event path that could have carried it — correct, and it held up. A second
+finding asserted no sentiment scorer existed. One did: 136 lines, wired into
+every customer message. It had been searched for as a module *driving the
+escalation*, found nothing, and generalised. Different claims; the first true,
+the second false.
+
+An absence is the most valuable thing an audit reports and the easiest to get
+wrong, because nothing contradicts it until the seller does. And a documented
+search proves diligence, not absence — a well-recorded search for the wrong
+word is worse than none, because it reads as rigour.
 
 So for any claim resting on a number, date, or threshold: ask for the source
 line and quote it. A finding built on a remembered figure has the same defect
