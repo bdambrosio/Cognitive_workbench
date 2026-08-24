@@ -24,6 +24,18 @@ technical due diligence, which commonly runs $10K–$30K and covers
 architecture, scalability, security, team, technical debt and IP. This covers
 one thing and refuses the rest.
 
+**Scope is priced in claims, not in repository size.** Up to N prioritised
+claims verified, with explicit coverage reporting on the rest. That bounds the
+engagement whatever the target's size — a large codebase costs more searching
+per claim, not more claims — and it is the discipline a fixed fee lives or
+dies by.
+
+**The deliverable is my professional judgement, produced with tooling.** The
+machine reads, searches and drafts; I confirm each finding, correct what is
+wrong, and sign a report that says so. That is what a client is buying at this
+price, and it is what makes §10's expert-due-diligence posture coherent rather
+than decorative.
+
 ## Why the problem exists now
 
 The cost of producing plausible software — **and plausible claims about
@@ -94,29 +106,60 @@ report one that cannot produce its source line. Confidentiality is
 architectural rather than promised: each engagement runs in an isolated world
 with no path to any other client's materials.
 
-## What exists today, honestly
+## What exists today
 
-- **A written method** — 16 sections covering scope, priority order, finding
-  format, verdict vocabulary, correction protocol, recommendation taxonomy,
-  the run sequence and the deliverable contract. Versioned and reviewable.
-- **A measurement suite** — a synthetic data room with a published answer
-  key, and a scored pass/fail threshold covering the six things a delivered
-  report is actually judged on. Eleven runs across two model backends; seven
-  clear the bar.
-- **A designed deliverable** — the one-page summary, with all five
-  recommendation levels and the scope disclaimer built in.
-- **One real engagement** — a full audit of a robotics codebase: 31 claims
-  verified, **zero deltas**.
+- **A written method** — 16 sections covering scope, priority order, two
+  finding formats, verdict vocabulary, correction protocol, recommendation
+  taxonomy, the run sequence and the deliverable contract. Versioned,
+  reviewable, and corrected six times in a day by what running it revealed.
+- **A measurement suite** — a synthetic data room with a published answer key
+  and a pass/fail threshold covering the six things a delivered report is
+  judged on. Thirteen scored runs across five model backends.
+- **A first real engagement.** ChatterMate, an open-source AI support platform
+  — 255,000 lines, 1,114 files, a 75-claim surface. Nine clean legs, 45
+  minutes, on a 27B model running locally at zero marginal cost. It found a
+  delta, and I verified the delta independently.
+- **A designed deliverable** — the one-page Gap Map, all five recommendation
+  levels, coverage line and scope disclaimer built in.
+- **Confidentiality by construction** — each engagement in its own isolated
+  world, with no path to any other client's materials. Not policy; a boundary
+  the system cannot cross.
+
+## What the first real engagement actually showed
+
+Both halves are worth stating, because the second is the one a buyer would
+test.
+
+**It found a real gap.** The README advertises outbound ticket webhooks "to
+drive your own automations". The codebase has an enum value with no
+dispatcher and an inbound alert webhook pointing the other way. Decision-
+relevant for a buyer whose workflow depends on it, and it survived independent
+checking.
+
+**It also got one finding wrong**, and the way it was wrong is the useful
+part. It reported that no sentiment scorer existed. One did — 136 lines, wired
+into every customer message. It had searched for a module *driving the
+escalation*, found none, and generalised to absence. A directed post-pass
+caught it, corrected it, and proved what the original had only asserted.
+
+Three things follow, and all three are now in the method: a negative finding
+must show its search, lexically and structurally; corrections are recorded in
+the report rather than applied silently; and the report is confirmed by a
+human before it ships. **The audit is not the product. The audit plus the
+review is the product** — which is also why it is worth $5,000 rather than an
+API call.
 
 ## The claim I cannot yet make
 
 The economic proposition is that **the audit finds decision-relevant things a
-reasonably diligent buyer would otherwise miss.** Nothing above establishes
-it. The one real-target engagement found nothing wrong — which demonstrates
-rigour and not value — and the findings I can point to are on a fixture whose
-defects I planted myself.
+reasonably diligent buyer would otherwise miss.** ChatterMate is the first
+evidence for it and it is one data point, on a target I chose, with a finding
+that is real but not deal-changing — an advertised integration that does not
+exist. Nobody has yet paid for one, and nobody outside this machine has read
+one.
 
-That is the gap, and it is the first thing three months would have to close.
+So the proposition is now supported rather than unevidenced, and it is a long
+way from established.
 
 ## What three months would buy, and what would decide it
 
@@ -125,12 +168,14 @@ who will pay $5,000 for this?*
 
 Sequenced:
 
-1. **A sample audit that finds something consequential**, on a real target
-   with checkable claims. Without it there is nothing to sell.
+1. ~~A sample audit on a real target with checkable claims.~~ **Done** —
+   ChatterMate, with one verified delta and a corrected error that made the
+   method better.
 2. **The fifteen-minute test.** Hand that report to someone who buys this kind
    of work and time whether they can explain back what it found and why it
    matters. If they cannot, the format is wrong and no amount of rigour fixes
-   it.
+   it. **This is now the next thing, and it needs a person rather than a
+   run.**
 3. **Ten conversations** with small-M&A buyers — search funds, micro-PE,
    individual acquirers — about whether this is a purchase or a nice idea.
 4. **Three paid engagements**, or a clear reason nobody will pay.
@@ -138,8 +183,8 @@ Sequenced:
 **Continue if** three strangers pay, and the audits find things the buyers
 say changed their decision.
 
-**Stop if** the sample audit cannot find anything consequential on a real
-target, or ten qualified conversations produce no purchase intent. Those are
+**Stop if** ten qualified conversations produce no purchase intent, or the
+next two real-target audits find nothing consequential. Those are
 different failures — the first says the product does not work, the second
 says the market does not want it — and both are cheap to reach.
 
@@ -148,6 +193,8 @@ realistic against everything else, since the $5K economics turn on it. Ten is
 $50K; twenty is $100K.]`
 
 The honest summary: the underlying failure mode is real and recognized, the
-price point is plausible, the machinery mostly exists, and **the single thing
-that would make this a business has not been demonstrated.** Three months is
-roughly what it costs to find out.
+price point is plausible, the machinery works at real scale on free hardware,
+and it has now found one real gap in one real product. **What has not been
+demonstrated is that anyone will pay for that.** Three months is roughly what
+it costs to find out, and the first two weeks of it require no engineering at
+all.
