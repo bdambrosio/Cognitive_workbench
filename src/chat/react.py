@@ -273,6 +273,29 @@ class ReactMixin:
         ]
         if self.persona:
             sys_parts.append("## Persona (governs voice and stance)\n" + self.persona)
+        # THE METHOD CROSSES THE TOOL BOUNDARY. Without this, a sub-call's
+        # entire context is the framing line, the persona and the citation
+        # rule — so an instruction reading "use the §5 finding format, the §6
+        # verdict vocabulary and the §9 taxonomy" is four dangling pointers,
+        # and the sub-model invents plausible formats instead. Observed
+        # 2026-08-24: one arm wrote exactly that instruction; another
+        # compensated by inlining ~3,000 characters of contract into every
+        # call, which is the correct workaround and an expensive one.
+        #
+        # workflow_text, not the file: load_workflow has already stripped the
+        # practice-only sections, so what crosses is what an executing agent
+        # is meant to read.
+        #
+        # PLACED BEFORE THE CONDITIONAL BLOCK ON PURPOSE. Everything above
+        # this point is byte-stable across calls, so the provider can cache
+        # the prefix; the citation block below varies with the binding.
+        wf = getattr(self, 'workflow_text', '')
+        if wf:
+            sys_parts.append(
+                "## Method (the procedure this work follows)\n"
+                "The instruction may cite this by section. Follow it as "
+                "written; where it fixes a format or a vocabulary, that "
+                "format is mandatory and not a suggestion.\n\n" + wf)
         if has_sources:
             sys_parts.append(
                 "## Citation requirement\n"
@@ -411,7 +434,23 @@ class ReactMixin:
             agent_concerns=agent_concerns, user_concerns=user_concerns)
         user_prefix_str = self._build_react_user_prefix(source, user_text)
         log_appendage_str = ""
-        trailer = "\nEmit next action:"
+        # THE WORKING LOG IS NOW EXPLICITLY CLOSED. The prefix opens it with
+        # "## Working log" and nothing closed it, so the last observation's
+        # content ran straight into this trailer separated by one newline.
+        # Harmless for a short observation; not harmless for a long one.
+        #
+        # Observed 2026-08-24: an arm processing an 8,000-character report
+        # read "Emit next action:" as the document's final line and spent ten
+        # of sixteen iterations instructing process_text to delete it. The
+        # string appears zero times in the delivered report and ten times in
+        # the trace — every one inside an instruction asking for its removal.
+        # process_text correctly returned the text unchanged each time, which
+        # the arm read as the edit failing.
+        #
+        # A closing header, mirroring the opening one, is the whole fix. It
+        # preserves the store-and-append discipline above (appended once, at
+        # the end, so the cached prefix is untouched).
+        trailer = "\n## End of working log\n\nEmit next action:"
 
         def _append_log(label: str, content: str) -> None:
             """Lockstep append: list and string grow together. The string

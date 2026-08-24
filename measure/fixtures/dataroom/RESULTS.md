@@ -244,6 +244,57 @@ done, because a run made before it is a run that will be discarded.
    trace and no post-hoc analysis can say whether an agent was warned before
    it ran out of iterations.
 
+## What the 2026-08-24 harness fixes were supposed to change
+
+The runs behind this are deleted; the observations are kept because they are
+what the fixes were aimed at, and a fix nobody stated a prediction for cannot
+be shown to have worked. **Predictions, written before the re-run.**
+
+Pre-change behaviour, one run per arm, all at the corrected per-model
+temperatures:
+
+| | legs | iters | `process_text` | `inspect_external` | words |
+|---|---|---|---|---|---|
+| grok-4.6 | 2 | 9 | **0** | 5 | 1,262 |
+| Qwen3.8-27B | 2 | 24 | 3 | 16 | 1,706 |
+| gpt-5.6-luna | 3 | **40** | **13** | 24 | 1,019 |
+
+Three behaviours, and what each fix should do to them:
+
+**1. The phantom trailing line (fix: the working log is now closed).** Luna
+spent ten of leg 3's sixteen iterations instructing `process_text` to delete a
+line reading `Emit next action:` — the ReAct prompt's own trailer, which the
+unclosed working log left sitting one newline below an 8,000-character
+document. The string appears **zero** times in the delivered report and ten
+times in the trace, every one inside an instruction asking for its removal.
+
+> **Predicted:** no instruction referencing `Emit next action:`; Luna's leg-3
+> iteration count well below the cap of 16. **Falsified if** the phantom
+> recurs, which would mean the boundary was not the cause.
+
+**2. Dangling section references (fix: the method crosses into
+`process_text`).** Qwen instructed a sub-call to "use the §5 finding format,
+the §6 verdict vocabulary, the §9 taxonomy, a coverage statement per §4"
+against a system prompt containing only a framing line, the persona and a
+citation rule. Four pointers to a document the sub-call had never seen.
+
+> **Predicted:** Qwen's §-references now resolve, so its report conforms to
+> §5/§6 without the parent reformatting. **Falsified if** conformance is
+> unchanged — which would mean the sub-model was already guessing the format
+> correctly and the references never mattered.
+
+**3. Contract inlining (same fix, opposite arm).** Luna compensated correctly
+for the same gap by pasting ~3,000 characters of taxonomy and finding
+structure into every composition instruction.
+
+> **Predicted:** Luna's `process_text` instructions get materially shorter,
+> because the contract is now in the sub-call's context. **This is the cheap
+> falsifiable one** — instruction length is mechanical to measure.
+
+**A caution against reading these as model comparisons.** n=1 per arm, and
+the three arms differ in temperature by design. What is being tested is
+whether two harness defects stopped happening, not which model is better.
+
 ## Outstanding work — needs careful, extensive testing before shipping
 
 **A diff view for `process_text`.** The observation would carry a
