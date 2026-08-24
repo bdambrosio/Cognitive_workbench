@@ -276,9 +276,14 @@ class Subagent:
             log_lines.append(obs)
             log_lines.append('')
 
+    # Per-observation and total caps on salvaged evidence. Sized so grep hits
+    # survive whole — they are short, one file:line per row, and they are what
+    # a caller most needs — while a long file read is trimmed. The caller can
+    # always read a file again; it cannot re-run a search it never saw.
         if exit_reason == 'max_iters' and not answer:
             answer = (f"({self.label}: hit max iterations without responding; "
-                      f"consider narrowing the query)")
+                      f"consider narrowing the query)"
+                      + self._salvage(iters))
         elif exit_reason == 'format_failed' and not answer:
             cause = ("the answer was too large to emit — ask for a summary or "
                      "a narrower line range rather than raw content"
@@ -286,8 +291,56 @@ class Subagent:
                      else "it could not emit valid JSON")
             answer = (f"({self.label}: gave up after "
                       f"{self.max_consecutive_unparseable} consecutive "
-                      f"unparseable emissions; {cause}.)")
+                      f"unparseable emissions; {cause}.)"
+                      + self._salvage(iters))
 
         write_subagent_trace(self.trace_dir, self.label, query, iters, answer,
                              exit_reason)
         return answer
+
+    _SALVAGE_PER_OBS = 600
+    _SALVAGE_TOTAL = 5000
+
+    def _salvage(self, iters: List[Dict[str, Any]]) -> str:
+        """Return what the loop actually found, for the paths that end without
+        an answer.
+
+        WHY THIS EXISTS. A subagent that runs out of iterations used to return
+        only a diagnostic and discard its working log. Observed 2026-08-23 on
+        the first real engagement: an `inspect_external` call searching for a
+        sentiment module hit the grep result
+
+            repositories/chat.py:36: from app.services.sentiment import ...
+
+        at iteration 3 of 12, kept working, exhausted its budget, and reported
+        "hit max iterations without responding". The parent — hearing nothing
+        from that call and nothing contradicting it from the others — published
+        a finding that no sentiment scorer existed. One did.
+
+        The search was not the failure. The failure was that a loop which
+        found the answer threw it away on the way out, which is the same shape
+        as procedure dying in a capped observation and a report dying in an
+        unsaved canvas render.
+
+        Chronological, not most-recent-first: the useful hit was iteration 3 of
+        12, so recency is the wrong heuristic for which evidence mattered.
+        """
+        rows: List[str] = []
+        used = 0
+        for n, it in enumerate(iters, 1):
+            obs = str(it.get('observation') or '').strip()
+            if not obs or obs.startswith('ERROR:'):
+                continue
+            if len(obs) > self._SALVAGE_PER_OBS:
+                obs = obs[:self._SALVAGE_PER_OBS].rstrip() + ' …[trimmed]'
+            if used + len(obs) > self._SALVAGE_TOTAL:
+                rows.append(f"…[{len(iters) - n + 1} further observations "
+                            f"omitted for length]")
+                break
+            rows.append(f"  step {n}: {obs}")
+            used += len(obs)
+        if not rows:
+            return ''
+        return ("\n\nPARTIAL — what this call did find before it ran out, "
+                "unsummarised:\n" + "\n".join(rows))
+
