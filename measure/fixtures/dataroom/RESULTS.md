@@ -18,10 +18,27 @@ discarded, deliberately — see "Why every earlier run was discarded".
 | t025_1 | gpt-5.6-luna | 0.25 | derived | 3/3 | 1/2 | 2 | 0 | 1,227 | 548s | Material | **PASS** |
 | t025_2 | gpt-5.6-luna | 0.25 | derived | 3/3 | 1/2 | 2 | 0 | 1,176 | 570s | Material | **PASS** |
 | t025_3 | gpt-5.6-luna | 0.25 | derived | 2/3 | 0/2 | 5 | 0 | 1,302 | 650s | Material | FAIL |
+| di_1 | DeepSeek-V4-Flash | 1.0 | derived | 3/3 | **2/2** | 3 | 0-2 | 1,111 | 1,136s | Material | indet. |
+| di_1 | Nemotron-3-Ultra | 1.0 | derived | 3/3 | 1/2 | 4 | 6 | 1,576 | 1,681s | — | FAIL |
 
 \* contended — the live agent shared the GPU.
 
-**7 of 11 clear the threshold.** Every run is workflow_mode. Graded by
+**7 of 13 clear the threshold.** DeepSeek's verdict is indeterminate — three
+grading passes over the identical report returned unsupported = 1, 0, 2,
+flipping PASS/FAIL on grader noise. It is the only arm besides one Luna run to
+reach Tier 2 = 2/2, in the shortest report anyone wrote.
+
+Nemotron completes and cannot assemble a report: six unsupported claims, no §9
+recommendation, and a placement line reading `['B2','P1','B2','B2','P1','P1']`
+— it states the same findings three times. Two valid runs in seven attempts.
+
+Qwen3.8-2.4T-A95B is excluded, not failed. Measured directly: 2,902 completion
+tokens to answer a one-line question against a 6k-character prompt, where
+DeepSeek used 18. At ~21 tok/s that is 140 seconds per call, and this
+architecture makes 35-187 calls per audit. Not throttling and not cache — both
+were tested. The binding constraint is output tokens per call, and a model
+that cannot answer briefly cannot be used in a call-heavy agent whatever its
+parameter count. Every run is workflow_mode. Graded by
 `gpt-5.6-terra`, effort high, temp 0.1, 32k budget.
 
 ## The threshold, and why it is the number that matters
