@@ -176,18 +176,72 @@ def trace_facts(world: str, agent: str) -> Dict[str, Any]:
 _REC_VOCAB = ["Clear with caveats", "Conditional", "Material", "Walk", "Clear"]
 
 
+# A term counts only where it stands as a verdict — the clause ENDS on it.
+# "Recommendation: **Material**", "Verdict: Material." and "Material — the
+# backups have failed" all match. "Recommendation: Clear the backup failures"
+# and "we should walk away from this deal" do not, and that is the whole
+# point of the trailing guard: `Clear` and `Walk` are ordinary English verbs,
+# and a substring test reads both as verdicts. Both false positives were
+# caught by testing the fix rather than reading it.
+#
+# A CONSEQUENCE WORTH NAMING: "Recommendation: Walk away from this deal"
+# returns None. That is not a miss. §2 forbids recommending in the buyer's
+# action language, and "walk away from this deal" is exactly that; the
+# conforming spelling is the bare term. A report that means the taxonomy
+# writes the taxonomy.
+_REC_TERM_RE = {
+    term: re.compile(
+        r"(?<![A-Za-z])\*{0,2}" + re.escape(term) + r"\*{0,2}(?![A-Za-z])"
+        # HORIZONTAL space only, then a terminator or END OF LINE. `\s*` here
+        # instead of `[^\S\n]*` swallows the newline so `$` can never reach
+        # it, and re.M is what makes `$` mean end-of-line rather than end of
+        # the whole report. Getting either wrong turned 13 correct rows into
+        # false negatives — caught by re-scoring all 19, not by reading it.
+        r"(?=[^\S\n]*(?:[.,;:)\]|—–-]|$))", re.I | re.M)
+    for term in _REC_VOCAB
+}
+
+
 def recommendation_of(report: str) -> Optional[str]:
     """Return the §9 recommendation the report states, or None if it used
     some other vocabulary. A report that recommends in the buyer's action
-    language ("pause", "do not proceed") violates §2 and fails here."""
+    language ("pause", "do not proceed") violates §2 and fails here.
+
+    WHAT WAS WRONG, AND WHAT WAS NOT. This matched four hardcoded spellings
+    of the surrounding label — "Recommendation: X", "Recommendation:** X",
+    "Recommendation**: X", "recommendation is **X**" — and returned None for
+    anything else. Measured across the 19-row campaign 2026-08-24: FOUR false
+    negatives, every `—` in the §9 column. wm4 wrote "**Section 1:
+    RECOMMENDATION**" then "**Verdict: Material.**"; hd1 put the term on the
+    next line; hd3 wrote "Recommendation: **Material**", where the emphasis
+    markers fall between the colon and the term. All four state Material. The
+    column had never once discriminated between arms — it only ever reported
+    label formatting.
+
+    The CLOSED VOCABULARY is not the bug and is kept: §9 defines five literal
+    values and the method requires one of them verbatim, so testing for them
+    is conformance, not classification of free text. That distinction is why
+    this stays mechanical rather than becoming an LLM call. The stronger
+    reason is noise: this gates a PASS/FAIL, and the campaign has already
+    watched grader noise flip `unsupported` 0/1 over identical text. A
+    threshold criterion that is itself sampled would put that noise on a
+    second gate.
+
+    What changed is only the LOCATOR: find each mention of "recommendation",
+    then look for a vocabulary term standing as a verdict in the 120
+    characters that follow. Earliest match wins, longest term breaking a tie
+    so "Clear with caveats" is never read as "Clear".
+    """
     head = report[:4000]
-    for term in _REC_VOCAB:
-        for marker in (f"Recommendation: {term}",
-                       f"Recommendation:** {term}",
-                       f"Recommendation**: {term}",
-                       f"recommendation is **{term}**"):
-            if marker.lower() in head.lower():
-                return term
+    for m in re.finditer(r"recommendation\b", head, re.I):
+        window = head[m.end():m.end() + 120]
+        hits = []
+        for term in _REC_VOCAB:
+            tm = _REC_TERM_RE[term].search(window)
+            if tm:
+                hits.append((tm.start(), -len(term), term))
+        if hits:
+            return min(hits)[2]
     return None
 
 

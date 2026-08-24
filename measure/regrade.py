@@ -112,13 +112,18 @@ def make_grader():
         # available trades.
         #
         # The real fix for grader noise is a better grader, not a colder one.
-        # top_p PINNED AT 1.0, not inherited. The codebase default moved to
-        # 0.95 on 2026-08-23; this grader was validated against the answer key
-        # at 1.0, by hand, on three specific judgements. An instrument that
-        # shifts because an unrelated default shifted is not pinned. Change it
-        # only by re-validating, never by editing a default elsewhere.
-        return backend.chat(messages, max_tokens=cap, temperature=0.1,
-                            top_p=1.0, cot_profile='none')
+        # NO LONGER PINS top_p, AND NO LONGER PASSES temperature. It held
+        # top_p at 1.0 on the argument that a pinned instrument must not move
+        # when an unrelated default moves — sound in general, overruled on
+        # 2026-08-24: top_p 0.95 is a house setting for every model at every
+        # call site and the grader is not exempt. Temperature now resolves
+        # from model_params (gpt-5.6-terra -> 0.1, the same value this used
+        # to hardcode) so there is one place it can be changed.
+        #
+        # CONSEQUENCE, NOT YET DISCHARGED: the hand-validation against the
+        # answer key was done at top_p 1.0. The grader wants re-validating
+        # before its numbers are trusted again.
+        return backend.chat(messages, max_tokens=cap, cot_profile='none')
 
     return backend, llm_chat
 

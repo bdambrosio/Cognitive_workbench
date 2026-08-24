@@ -346,8 +346,12 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # Deliberately NOT part of workflow_mode. Bundling it would change
         # what that flag means and invalidate the runs already scored under
         # it; one variable at a time is the whole point of the arm mechanism.
-        self.react_temperature = float(
-            (character_config.get('chat') or {}).get('react_temperature', 0.7))
+        # None means "resolve from the model" (src/chat/model_params.py). It
+        # was 0.7, and because no scenario or arm ever set react_temperature,
+        # that literal WAS the temperature of every run this project has made.
+        # A default nobody chose is not a default; it is a silent variable.
+        _rt = (character_config.get('chat') or {}).get('react_temperature')
+        self.react_temperature = None if _rt is None else float(_rt)
         # Benchmark mode: run post-turn reflection inline (rather than on the
         # background executor) so probe-time state snapshots see fully-resolved
         # state. Off by default; opt-in via scenario YAML for harnesses like

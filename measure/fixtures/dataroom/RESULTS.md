@@ -5,53 +5,156 @@ discarded, deliberately — see "Why every earlier run was discarded".
 
 ## Scored runs
 
-| run | arm | temp | rung | T1 | T2 | T3 | uns | words | wall | §9 | THRESH |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| wm1 | Qwen3.8-27B | 0.7 | derived | 3/3 | 1/2 | 3 | 0 | 1,519 | 858s* | Material | **PASS** |
-| wm2 | Qwen3.8-27B | 0.7 | derived | 3/3 | 1/2 | 4 | 0 | 2,214 | 433s | Material | FAIL |
-| wm3 | Qwen3.8-27B | 0.7 | derived | 3/3 | 1/2 | 2 | 0 | 1,510 | 387s | Conditional | **PASS** |
-| wm4 | Qwen3.8-27B | 0.7 | derived | 3/3 | 1/2 | 5 | 1 | 1,637 | 512s | — | FAIL |
-| r1 | Qwen3.8-27B **+reasoning** | 0.7 | derived | 3/3 | 1/2 | 4 | 0 | 1,275 | 1,015s | Material | **PASS** |
-| r2 | Qwen3.8-27B **+reasoning** | 0.7 | derived | 3/3 | 1/2 | 3 | 0 | 1,965 | 812s | Material | **PASS** |
-| wm1 | gpt-5.6-luna | 0.7 | derived | 3/3 | **2/2** | 4 | 0 | 1,206 | 729s | Material | **PASS** |
-| wm2 | gpt-5.6-luna | 0.7 | cross_doc | 2/3 | 0/2 | 2 | 0 | 1,244 | 813s | Conditional | FAIL |
-| t025_1 | gpt-5.6-luna | 0.25 | derived | 3/3 | 1/2 | 2 | 0 | 1,227 | 548s | Material | **PASS** |
-| t025_2 | gpt-5.6-luna | 0.25 | derived | 3/3 | 1/2 | 2 | 0 | 1,176 | 570s | Material | **PASS** |
-| t025_3 | gpt-5.6-luna | 0.25 | derived | 2/3 | 0/2 | 5 | 0 | 1,302 | 650s | Material | FAIL |
-| di_1 | DeepSeek-V4-Flash | 1.0 | derived | 3/3 | **2/2** | 3 | 0-2 | 1,111 | 1,136s | Material | indet. |
-| di_1 | Nemotron-3-Ultra | 1.0 | derived | 3/3 | 1/2 | 4 | 6 | 1,576 | 1,681s | — | FAIL |
+**All rows wiped 2026-08-24.** Every run in the campaign was made at
+temperature 0.7 — the code default in `chat_loop.py`, inherited by every
+scenario and every arm because none of them set one. That was never the
+intended house setting, and nothing in the config, the arm files or the
+runner would have revealed it: `run.py --help` reports the scenario default
+as if it were a decision. Temperature is now a per-model setting (see
+`docs/model-settings.md`), and no result predating that is trusted.
 
-\* contended — the live agent shared the GPU.
+The three DeepInfra arms are the sharpest illustration. Their yaml carries a
+comment stating temperature 1.0 as the publisher's number, explains that it
+is passed by the runner rather than set in the file, and warns in as many
+words about "the silent second variable this exists to avoid" — and then the
+runner was invoked without it. Documenting a setting in a file the runner
+does not read is not setting it.
 
-**7 of 13 clear the threshold.** DeepSeek's verdict is indeterminate — three
-grading passes over the identical report returned unsupported = 1, 0, 2,
-flipping PASS/FAIL on grader noise. It is the only arm besides one Luna run to
-reach Tier 2 = 2/2, in the shortest report anyone wrote.
+*(No table. The next campaign starts from zero, on one frozen instrument,
+temperature and top_p resolved per model and recorded in every `run_meta`.)*
 
-Nemotron completes and cannot assemble a report: six unsupported claims, no §9
-recommendation, and a placement line reading `['B2','P1','B2','B2','P1','P1']`
-— it states the same findings three times. Two valid runs in seven attempts.
+## Instrument drift — the check that has to run before every campaign
 
-Qwen3.8-2.4T-A95B is excluded, not failed. Measured directly: 2,902 completion
-tokens to answer a one-line question against a 6k-character prompt, where
-DeepSeek used 18. At ~21 tok/s that is 140 seconds per call, and this
-architecture makes 35-187 calls per audit. Not throttling and not cache — both
-were tested. The binding constraint is output tokens per call, and a model
-that cannot answer briefly cannot be used in a call-heavy agent whatever its
-parameter count. Every run is workflow_mode. Graded by
-`gpt-5.6-terra`, effort high, temp 0.1, 32k budget.
+The check, kept. What it concluded about specific runs is gone with them.
+
+**Join run timestamps to commit timestamps before comparing anything.**
+Established 2026-08-24, when a table being read as one experiment turned out
+to span three instruments. Four commits landed *between* runs inside 30
+hours, each changing agent behaviour:
+
+| UTC | commit | change |
+|---|---|---|
+| 08-23 21:48 | `544858ce` | METHOD.md §12 **6b** — verify every claim against its citations before shipping |
+| 08-23 23:20 | `aae2f5e7` | `top_p` default **1.0 -> 0.95** on every non-Anthropic call |
+| 08-24 01:25-01:38 | `ef2e4fa8` `1240b460` `42dc3fe5` | METHOD.md +24 lines: an absence needs the search, not the conclusion |
+| 08-24 02:14 | `a6c5c466` | subagent no longer discards a found answer — `inspect_external` IS a subagent |
+
+Two traps found doing it, both worth keeping:
+
+- **Timezone.** `git log --date=format-local` renders in local time; the
+  result directories are UTC. Comparing them directly inverted the ordering
+  and made a post-run commit look like a pre-run one. Use `TZ=UTC`.
+- **A commit is not the edit.** `luna_t025_3` started before `544858ce` and
+  finished after it. Commits follow edits, so the file may change under a
+  run and the boundary is unrecoverable after the fact. Prefer a clean tree
+  and a recorded `git rev-parse HEAD` per run over reconstructing it later.
+
+**Comparisons within one instrument are clean; across instruments they are
+not.** That rule discarded the pre-workflow campaign, then the campaign that
+replaced it. The next one runs on a frozen instrument or it will discard too.
+
+## The §9 column was broken — fixed 2026-08-24
+
+`recommendation_of()` matched four hardcoded spellings of the label and
+returned None for anything else. Hand-checked against all 19 reports in the
+campaign: **every one stated a valid §9 term**, and the check missed four —
+every `—` that was ever in the column. It had never once discriminated
+between arms; it only ever reported label formatting.
+
+Those reports are deleted. The fix is not evidence about models, it is a
+repair to the instrument, and it is covered by unit tests that do not depend
+on them. The four spellings below are kept because they are the lesson.
+
+| run | wrote | why the old matcher missed it |
+|---|---|---|
+| run A | `**Section 1: RECOMMENDATION**` / `**Verdict: Material.**` | caps, and `Verdict:` not `Recommendation:` |
+| run B | `### Recommendation: **Material**` | `**` between the colon and the term |
+| run C | `## 1. Recommendation` then `**Material.**` | term on the next line |
+| run D | `## 1. Recommendation: **Material**` | `**` between the colon and the term |
+
+**The closed vocabulary was never the bug, and is kept.** §9 defines five
+literal values and the method requires one verbatim, so testing for them is
+conformance, not classification of free text — the distinction the existing
+comment already drew, and it was right. Replacing it with an LLM call was
+considered and rejected for a stronger reason than that: this gates a
+PASS/FAIL, and the campaign has already watched grader noise flip
+`unsupported` between 0 and 1 over identical text. Putting a sampled model
+behind a second gate would add noise to the threshold, not remove it.
+
+Only the LOCATOR changed: find each mention of "recommendation", then look
+for a vocabulary term standing as a verdict in the 120 characters after it —
+earliest match wins, longest term breaks the tie so "Clear with caveats" is
+never read as "Clear".
+
+**Two bugs in the fix itself, both found by running it, not reading it.**
+The first guard accepted `Recommendation: Clear the backup failures` as a
+verdict of `Clear` — `Clear` and `Walk` are ordinary English verbs. The
+second, tightened to require the clause to END on the term, used `\s*` and
+no `re.M`, so the newline was swallowed before `$` could match end-of-line:
+that turned **13 correct rows into false negatives**. The working form is
+horizontal whitespace only, plus `re.M`. Re-scoring all 19 after each attempt
+is what caught both; neither was visible in the diff.
+
+**No verdicts flipped** when the fix was applied: all four corrected runs
+failed another criterion anyway, so the bug had never changed a verdict — only
+made the §9 column look informative when it was not. Those runs are now
+deleted; the four spellings survive as the shape of the bug.
+
+**The 19 rows were not re-graded.** §9 is mechanical and was recomputed
+offline for free; the tier counts come from a sampled grader, and re-running
+it over historical rows would have shifted them by grader noise while
+correcting nothing. The record keeps the numbers it was scored with.
+
+## The preamble boundary — decided 2026-08-24
+
+**The deliverable is the whole final turn.** Prose before the report counts
+as report: against the word budget, and against the ordering.
+
+Decided this way because the fixture already worked this way in the half
+nobody questioned — `run.py` writes everything before `=== GAP MAP ===` into
+`report.md`, so a leg-opening preamble was already inside the word count.
+Scoring placement on a narrower span than word count would have made one
+deliverable two different documents depending on which criterion was asking.
+
+The alternative was a `=== REPORT ===` marker mirroring the Gap Map's. It was
+rejected as machinery bought to spare the agent one explicit act of
+restraint: a new marker is a new compliance surface and a new way to fail,
+where a sentence in §16 costs nothing and says what was always meant.
+
+§16 now carries that sentence, which changes the instrument — every run from
+here is on the post-2026-08-24 method.
+
+## Pick arms by output tokens per call, not parameter count
+
+Kept as a selection rule; the model that produced it is dropped.
+
+Qwen3.8-2.4T-A95B spent 2,902 completion tokens answering a one-line question
+against a 6k-character prompt, where DeepSeek used 18. At ~21 tok/s that is
+140 seconds per call, and this architecture makes 35-187 calls per audit.
+Neither throttling nor cache — both were tested. **A model that cannot answer
+briefly cannot be used in a call-heavy agent, whatever its parameter count.**
+Measure tokens-per-call on a trivial prompt before committing an arm to a
+campaign; it costs one call and it is the cheapest disqualifier available.
 
 ## The threshold, and why it is the number that matters
 
 Tier counts are a score; a business case needs a floor. `score.py` reports
 PASS/FAIL against six criteria a delivered report would be judged on: all
 three must-find items, a Gap Map, a §9 recommendation, leading with a top-3
-finding, no unsupported claims, and the word ceiling. What separates the four
-failures is not depth — it is a missing must-find item (luna wm2, t025_3), a
-recommendation in the wrong vocabulary (qwen wm4), and a report over length
-(qwen wm2).
+finding, no unsupported claims, and the word ceiling.
+
+**The arithmetic that makes this hard to read.** Six criteria ANDed: even at
+90% reliability each, the conjunction passes 53% of the time. A ~50% pass
+rate is therefore roughly what six good-but-imperfect gates produce
+*regardless of the model*, so pass rate alone is close to uninformative at
+small n. Report the per-criterion failures, not just the verdict.
 
 ## The grader was validated, and swapped
+
+> The three hand-checked judgements below were made against the answer
+> key, which still exists, but the reports they were made on are deleted.
+> The conclusion — terra, not luna — stands and is configured. The noise
+> figures are indicative only and would need re-measuring.
 
 `gpt-5.6-luna` over-credited. Checked by hand against the key on three
 judgements:
@@ -78,6 +181,11 @@ one grading pass.**
 
 ## What the workflow harness changed
 
+> Architecture stands — the method does load verbatim into the static
+> system prompt. The claim that three contract elements reached an output
+> "for the first time" rested on runs now deleted, and is unverified
+> until the next campaign reproduces it.
+
 The method now loads verbatim into the static system prompt
 (`scenarios/audit.yaml` -> `workflow: audit/METHOD.md`) instead of being
 fetched with `inspect`. Three things reached an output for the first time:
@@ -91,51 +199,6 @@ fetched with `inspect`. Three things reached an output for the first time:
   available on request", and the scope disclaimer verbatim.
 - **§16's deliverable contract**, which until today existed only inside this
   runner's brief.
-
-## The Tier 2 collapse — the method has no slot for a derived finding
-
-All three arms scored 0/2 on Tier 2, and all three found the underlying
-evidence. They stopped one step short, in the same place.
-
-The answer key's F2 is *"30-day retention against 21 days of failures puts the
-last recoverable backup at total loss around 2026-08-29"* — described there as
-**the strongest single finding available**. Qwen got to the doorstep: *"The
-last successful backup is 24 days old. The 30-day retention window is being
-consumed by 21 consecutive days of failure."* Every fact needed is on the
-page. It never computes the date. Luna declined explicitly — *"the supplied
-lines do not establish 30-day usable retention"* — and Ultra filed it as
-`(duplicate)` of the backup finding.
-
-**§5's finding format has nowhere to put it.** The format is:
-
-    Claim (<source>): <the stated claim>
-    Evidence: <file:lines> — <what the code actually does>
-    Delta: <None, or the specific gap>
-
-and "a finding must cite its source, both halves: the document making the
-claim, and the file and line range showing the implementation."
-
-A derived finding tests no stated claim. Nobody claimed a backup expiry date;
-it is a consequence of two facts in two documents. Under §5 it has only one
-home — the finding for the claim it escalates — which is exactly where all
-three arms put it. Ultra's `(duplicate)` label is the method working as
-written.
-
-Searching the whole document for a slot: no occurrence of *derived*,
-*arithmetic as a finding type*, *projection*, *forecast*, or *implication*.
-The one place arithmetic appears is §5's warning that a prose summary drops
-"the arithmetic that made the finding material" — the method knows the
-arithmetic is what makes a finding material, and gives it no structure.
-
-**So the fixture rewards what the method's format excludes.** That conflict
-was invisible while the method was not reaching the agent. It appeared the
-moment the workflow harness delivered §5 intact and the arms started obeying
-it.
-
-This is documentary inference, not a controlled test. The test is to give §5
-a derived-finding shape — a claim slot that names the two facts rather than a
-stated claim — and re-run. Until then, Tier 2 is measuring whether an arm
-will break the format it was given.
 
 ## Why every earlier run was discarded
 
@@ -158,16 +221,50 @@ git history if a specific claim ever needs checking.
 
 ## Pick up here
 
-1. **Luna and Ultra**, one run each, then read all three together.
-2. **Replicate to n>=3 per arm.** Two conclusions in this project have
-   already been retracted for treating n=1 as a result.
-3. **Add the §9 taxonomy check to `score.py`.** Qwen now conforms, but the
-   scorer still cannot tell — it would have passed the non-conforming runs
-   too.
-4. **Persist NOTE lines in the stored working log.** `chat_loop.py:1667`
+Everything below the line is instrument work. No campaign runs until it is
+done, because a run made before it is a run that will be discarded.
+
+1. **Land the model-settings layer.** `src/chat/model_params.py` as the single
+   source of truth (per-model temperature, global `top_p` 0.95), resolved and
+   enforced in `_ChatBackend`, with the `0.7` literals deleted so an unknown
+   model raises instead of inheriting. Plus `docs/model-settings.md` for
+   provenance, a `CLAUDE.md` rule, and a test that walks every arm and
+   scenario asserting each resolves. See "Scored runs" above.
+2. **Remove the `top_p=1.0` pin in `measure/regrade.py`.** The grader is not
+   exempt from the global setting.
+3. **Freeze the instrument, then run.** Clean tree, recorded `git rev-parse
+   HEAD` per run, no method edits mid-campaign. Two campaigns have now been
+   discarded for drifting under their own runs.
+4. **n=5 per arm, all on one frozen instrument.** Arms: grok-4.6,
+   Qwen3.8-27B local, gpt-5.6-luna.
+   Nemotron excluded (two valid runs in seven attempts, cannot assemble a
+   report). DeepSeek is the obvious fourth, held back only for run time.
+5. **Persist NOTE lines in the stored working log.** `chat_loop.py:1667`
    keeps only `$step*` labels, so the budget nudge is stripped from every
    trace and no post-hoc analysis can say whether an agent was warned before
    it ran out of iterations.
+
+## Outstanding work — needs careful, extensive testing before shipping
+
+**A diff view for `process_text`.** The observation would carry a
+`difflib.unified_diff` of source-vs-result instead of the whole rewritten
+document, while the `$stepN` binding keeps the full text. The split is known
+to work: on 2026-08-24 a `respond text="$step15"` delivered all 8,114
+characters while the stored observation held 8,000, so a binding already
+resolves to more than the observation shows.
+
+**Why it is not shipped.** It changes what the agent sees on every
+`process_text` call — a workhorse tool — and a diff is only the right view
+for edit-shaped instructions. For a summarisation the result IS the answer
+and a diff against the source is noise. Choosing between them means
+classifying the instruction, which the house rule forbids doing by keyword;
+the alternative is a similarity heuristic, which is a new failure mode on a
+hot path. Needs deliberate design and a test matrix across edit / summarise /
+translate / extract shapes before it goes anywhere near a campaign.
+
+The cheap half of the benefit shipped instead: `process_text` now reports
+`EMPTY: … returned the source UNCHANGED` on a no-op, which is what actually
+ends the observed loop.
 
 ## Open: the auditor cannot talk to the client
 
@@ -201,7 +298,16 @@ Extract them explicitly:
     eval "$(grep -m1 '^export DEEPINFRA=' ~/.bashrc)"; export DEEPINFRA
     eval "$(grep -m1 '^export OPENAI_API_KEY=' ~/.bashrc)"; export OPENAI_API_KEY
 
+Same for `XAI_API_KEY`. Note that `~/.bashrc` also exports `GROK_API_KEY`, a
+**different** key value that is equally valid against api.x.ai — both return
+200. `grok_4p6.yaml` names `XAI_API_KEY`; if a quota or billing question ever
+comes up, that duplication is the first place to look.
+
 ## Yield-adherence, carried forward
+
+> Survived one discard already, and survives this one on the same
+> reasoning: these are observations about harness behaviour, not scores.
+> The runs are deleted; the two behaviours still want a probe of their own.
 
 Two observations outlive the discard because they are about behaviour rather
 than scores. Both deserve a probe of their own rather than being folded into

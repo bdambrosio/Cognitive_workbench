@@ -19,6 +19,7 @@ if _SRC_DIR not in sys.path:
     sys.path.insert(0, _SRC_DIR)
 
 from cot_profiles import is_reasoning_model, resolve_profile  # noqa: E402
+from chat.model_params import (TOP_P, resolve_temperature)  # noqa: E402
 
 logger = logging.getLogger('chat_loop')
 
@@ -146,6 +147,15 @@ class _ChatBackend:
         # first local call. Sentinel None = not yet asked; 0 = asked and
         # the server did not say, so stop asking.
         self._server_max_model_len: Optional[int] = None
+        # Resolved model identity and its temperature, both lazy. For a
+        # cloud arm the identity IS self.model; for a local one declaring
+        # model:"" it is whatever /v1/models reports, so it cannot be known
+        # until the server is reachable. Resolved on the first chat() call
+        # and cached — late enough not to make construction depend on a
+        # running server, early enough that an unconfigured model kills the
+        # run before it does any work.
+        self._resolved_model: Optional[str] = None
+        self._resolved_temperature: Optional[float] = None
 
     @property
     def supports_image_input(self) -> bool:
@@ -211,6 +221,50 @@ class _ChatBackend:
         except Exception as e:
             logger.warning(f"_ChatBackend: could not read /v1/models: {e}")
         return self._server_max_model_len
+
+    def resolved_model(self) -> str:
+        """The model actually answering, not the one the config wrote down.
+
+        A local arm declares model:"" and takes whatever is served, so its
+        identity has to be read off /v1/models. Recording the config value
+        instead is how a Qwen row gets labelled Gemma.
+        """
+        if self._resolved_model:
+            return self._resolved_model
+        if self.model:
+            self._resolved_model = self.model
+            return self._resolved_model
+        served = []
+        try:
+            resp = requests.get(f'{self.base_url}/v1/models', timeout=10)
+            if resp.ok:
+                served = [m.get('id', '') for m in
+                          (resp.json() or {}).get('data') or []]
+        except Exception as e:
+            raise RuntimeError(
+                f"_ChatBackend: this config declares model:\"\" and "
+                f"{self.base_url}/v1/models is unreachable ({e}), so the model "
+                f"answering cannot be identified and no temperature can be "
+                f"chosen for it.")
+        if len(served) != 1:
+            raise RuntimeError(
+                f"_ChatBackend: model:\"\" needs exactly one served model to "
+                f"resolve against; {self.base_url} reports {served}.")
+        self._resolved_model = served[0]
+        logger.info("_ChatBackend: resolved served model %r",
+                    self._resolved_model)
+        return self._resolved_model
+
+    def temperature_for_model(self) -> float:
+        """Configured temperature for the model actually answering.
+
+        Raises for a model with no entry. There is no fallback ON PURPOSE —
+        see src/chat/model_params.py for the twelve runs that bought this.
+        """
+        if self._resolved_temperature is None:
+            self._resolved_temperature = resolve_temperature(
+                self.resolved_model())
+        return self._resolved_temperature
 
     def _clamp_max_tokens(self, messages: List[Dict[str, Any]],
                           max_tokens: int) -> int:
@@ -337,7 +391,13 @@ class _ChatBackend:
 
     def chat(self, messages: List[Dict[str, Any]],
              max_tokens: int = 600,
-             temperature: float = 0.7,
+             # None means "the model's configured temperature", which is the
+             # only correct default. The old literal 0.7 here was inherited
+             # by every scenario and every arm, silently, and cost a whole
+             # campaign. An explicit value is still honoured — run.py's
+             # --temperature is a real experimental knob — but it is now a
+             # decision someone made rather than one nobody made.
+             temperature: Optional[float] = None,
              # 0.95, not 1.0. A mild nucleus cut is what the publishers of
              # the models this talks to actually specify — Qwen, DeepSeek
              # and NVIDIA all say 0.95 for agentic work, and nothing in
@@ -345,17 +405,23 @@ class _ChatBackend:
              # at 1.0 by omission rather than by choice. Route 1
              # (Anthropic) omits top_p entirely and is unaffected.
              #
-             # Callers that need a fixed value should PASS it rather than
-             # inherit this. measure/regrade.py does, deliberately: an
-             # instrument that moves when an unrelated default changes is
-             # not pinned, whatever its header says.
-             top_p: float = 0.95,
+             # GLOBAL as of 2026-08-24: every model, every call site,
+             # including the grader, which used to pin 1.0 and no longer
+             # does. The value lives in model_params.TOP_P so there is one
+             # place to change it.
+             top_p: float = TOP_P,
              stops: Optional[List[str]] = None,
              is_json: bool = False,
              cot_profile: Optional[str] = None,
              enable_thinking: Optional[bool] = None,
              reasoning_effort: Optional[str] = None,
              response_schema: Optional[Dict[str, Any]] = None) -> str:
+        # THE DEFAULT COMES FROM THE MODEL, NOT FROM THIS SIGNATURE. Raises
+        # for a model with no configured temperature, which is the point:
+        # a run that cannot name its own sampling settings must not start.
+        if temperature is None:
+            temperature = self.temperature_for_model()
+
         # Per-call reasoning_effort override, plus the one value __init__
         # does not take: 'none', meaning this call opts OUT of a baseline
         # the scenario declared.

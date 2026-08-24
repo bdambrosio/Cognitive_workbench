@@ -308,7 +308,18 @@ def main() -> int:
                 (cfg.get("llm_config") or {}).get("model") or "(scenario default)")
 
     from chat.chat_loop import ChatLoop                        # noqa: E402
+    from chat.model_params import TOP_P                        # noqa: E402
     loop = ChatLoop(character_name=name, character_config=cfg)
+
+    # PRE-FLIGHT: resolve the model and its temperature before any work. An
+    # unconfigured model raises here, in one second, instead of producing a
+    # full run that has to be thrown away.
+    resolved_model = loop.backend.resolved_model()
+    resolved_temperature = (cfg.get("chat") or {}).get("react_temperature")
+    if resolved_temperature is None:
+        resolved_temperature = loop.backend.temperature_for_model()
+    logger.info("resolved model=%s temperature=%s top_p=%s",
+                resolved_model, resolved_temperature, TOP_P)
 
     t0 = time.time()
     legs, error = [], None
@@ -391,6 +402,13 @@ def main() -> int:
             "react_temperature", 0.7),
         "react_max_tokens": (cfg.get("chat") or {}).get(
             "react_max_tokens", 8192),
+        # THE SETTINGS THAT ACTUALLY APPLIED, resolved from the model rather
+        # than copied from config. A row that cannot name its own sampling
+        # settings is not evidence — the rule that already governs the served
+        # -model check, extended to the thing that cost a campaign.
+        "resolved_model": resolved_model,
+        "resolved_temperature": resolved_temperature,
+        "top_p": TOP_P,
         "llm_config": cfg.get("llm_config"),
         "served_model_check": served_check,
         "external_repo": cfg.get("external_repo"),

@@ -517,6 +517,13 @@ block sending one.
 
 Two documents, produced together in the final turn, in this order.
 
+**The final turn carries these two documents and nothing else.** No covering
+note, no "here is what I did this leg", no continuation prose ahead of the
+report. Anything written before the report *is* the report: it counts against
+the word budget and it sets the ordering, because it is what the client reads
+first. A leg that opens by narrating the previous leg has buried its own lede
+before the first finding.
+
 **1. The report.** Aim for 2,000 words or under.
 
 - The recommendation, from §9's taxonomy and no other vocabulary.

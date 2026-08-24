@@ -49,7 +49,10 @@ class Subagent:
     label: str = 'subagent'
     max_iters: int = 12
     max_tokens: int = 4096
-    temperature: float = 0.2
+    # None -> the model's configured temperature. inspect_external is a
+    # subagent, so this sits on the audit path; a literal here is the
+    # same silent variable as the one in the ReAct loop.
+    temperature: Optional[float] = None
 
     # Consecutive unparseable emissions tolerated before the loop gives up
     # and reports from the working log. The schema below removes the

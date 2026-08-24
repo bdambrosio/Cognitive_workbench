@@ -25,6 +25,22 @@ natural-language description, embedding similarity, or another
 meaning-based method. Keyword lists always miss edge cases. Only with
 explicit permission.
 
+## Sampling settings are code, not convention
+
+`top_p` is 0.95 globally; temperature is per-model. Both live in
+`src/chat/model_params.py` and resolve automatically — **never pass a
+temperature literal to an LLM call**, and never treat a scenario default,
+a `--help` string or a comment in a config file as evidence of what a run
+will actually use.
+
+Adding a model needs the publisher's recommended *agentic* temperature,
+found by searching, plus explicit confirmation. If no recommendation
+exists, say so and ask — don't pick. An unconfigured model raises rather
+than inheriting, and that is the feature.
+
+Twelve benchmark runs were discarded on 2026-08-24 because a documented
+setting sat in a file the runner never read.
+
 ## Reuse over re-implementation
 
 Before writing logic for a common task (fence stripping, JSON repair,

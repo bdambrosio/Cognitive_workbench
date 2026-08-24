@@ -55,6 +55,11 @@ logger = logging.getLogger('chat_loop')
 # the harmless direction.
 REACT_MAX_ITERS = 16
 
+# Output ceiling for one process_text pass. Reasoning tokens bill
+# against this same budget on a thinking model, so raising it is not
+# free and lowering it truncates rewrites — see _run_process_text.
+_PROCESS_TEXT_MAX_TOKENS = 4096
+
 # Per-iteration budget for re-emitting a malformed/truncated action. A
 # parse failure (commonly a `thought` that ran long and got cut off by the
 # token limit before the JSON closed) is retried WITHOUT consuming an
@@ -285,18 +290,57 @@ class ReactMixin:
             )
         sys_msg = "\n\n".join(sys_parts)
         user_msg = f"INSTRUCTION:\n{instruction}\n\nSOURCE:\n{source_text}"
+
+        # A REWRITE CANNOT ROUND-TRIP A SOURCE LARGER THAN ITS OWN CEILING.
+        # Arithmetic only — no guess at what the instruction wants. A summary
+        # legitimately outputs far less than it reads, so this cannot be an
+        # error; a whole-document edit legitimately outputs about what it
+        # reads, and that is the case that silently loses its tail.
+        est_in = int(len(source_text) / getattr(
+            self.backend, '_CHARS_PER_TOKEN', 3.0))
+        if est_in > _PROCESS_TEXT_MAX_TOKENS:
+            logger.warning(
+                "[%s] process_text: source ~%d tokens against a %d-token "
+                "ceiling. An edit-shaped instruction cannot return this "
+                "document whole.",
+                self.character_name, est_in, _PROCESS_TEXT_MAX_TOKENS)
         try:
             result = self.backend.chat(
                 [{'role': 'system', 'content': sys_msg},
                  {'role': 'user', 'content': user_msg}],
-                max_tokens=4096, temperature=0.4, cot_profile='none',
+                max_tokens=_PROCESS_TEXT_MAX_TOKENS, cot_profile='none',
             )
         except Exception as e:
             logger.warning(f"[{self.character_name}] process_text failed: {e}")
             return f"ERROR: process_text raised: {e}"
+
+        # TRUNCATION IS THE DANGEROUS OUTCOME, NOT THE EMPTY ONE. A rewrite cut
+        # off at the ceiling looks exactly like a successful edit that removed
+        # trailing content — the caller cannot tell "I deleted the footer" from
+        # "the footer fell off the end". Reported as ERROR so it is never bound
+        # and forwarded as a finished document.
+        if self.backend.last_finish_reason in ('length', 'max_tokens'):
+            return ('ERROR: process_text output hit the token ceiling and is '
+                    'TRUNCATED — the tail is missing, not removed. Do not use '
+                    'this result. Process the document in sections, or ask for '
+                    'a shorter transformation.')
+
         text = (result or '').strip()
         if not text:
             return 'EMPTY: process_text produced no output'
+
+        # NO-OP DETECTION. Observed 2026-08-24: an arm issued the same removal
+        # instruction ten times against a document process_text kept handing
+        # back byte-identical, burning ten of sixteen iterations and finishing
+        # one short of the cap. Every call answered `OK:` followed by the whole
+        # document, so the only way to learn nothing had changed was to diff
+        # 8,000 characters by eye, per iteration. Saying so costs one
+        # comparison and ends the loop on the first repeat.
+        if text == source_text.strip():
+            return ('EMPTY: process_text returned the source UNCHANGED — the '
+                    'instruction produced no edit. Reissuing it verbatim will '
+                    'return this same text; change the instruction, or work '
+                    'with the document as it stands.\n' + text)
         return 'OK: ' + text
 
     def _emit_status(self, msg: str) -> None:
@@ -465,8 +509,13 @@ class ReactMixin:
                 self._affect.set_waiting_for_llm(True)
                 try:
                     raw = self.backend.chat(prompt, max_tokens=self.react_max_tokens,
+                                            # None -> the model's configured
+                                            # temperature. NOT a literal: this
+                                            # is the main action-emission call
+                                            # and the one that decided every
+                                            # discarded run.
                                             temperature=getattr(
-                                                self, 'react_temperature', 0.7),
+                                                self, 'react_temperature', None),
                                             cot_profile='none',
                                             reasoning_effort=self._reasoning_effort,
                                             response_schema=REACT_ACTION_SCHEMA)
