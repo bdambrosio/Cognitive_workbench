@@ -82,7 +82,7 @@ CONTINUE = "continue"
 
 
 def engagement_state(world: str, agent: str, leg: int, max_legs: int,
-                     elapsed_s: float) -> str:
+                     elapsed_s: float, fixture: bool = True) -> str:
     """A ledger of what has happened, appended to each `continue`.
 
     WHY THE RUNNER CARRIES THIS. The agent's own record of its work decays by
@@ -102,7 +102,10 @@ def engagement_state(world: str, agent: str, leg: int, max_legs: int,
     listing — a directory comparison, not a judgement about what the agent
     meant or intended.
     """
-    docs = sorted(f.name for f in CORPUS.glob("*.md"))
+    # Fixture-only. A real target has a claim surface, not a document list,
+    # and counting *.md in a 1,100-file repository would report progress
+    # against a denominator that means nothing.
+    docs = sorted(f.name for f in CORPUS.glob("*.md")) if CORPUS.is_dir() else []
     traces = REPO / "scenarios" / world / agent / "inspect_traces"
     seen = set()
     if traces.is_dir():
@@ -113,9 +116,12 @@ def engagement_state(world: str, agent: str, leg: int, max_legs: int,
                 logger.warning("ledger: unreadable trace %s (%s)", t, e)
                 continue
             seen.update(d for d in docs if d in body)
-    return (f"\n\n[engagement state, recorded by the client's process — "
-            f"leg {leg} of {max_legs}, {elapsed_s / 60:.0f} min elapsed. "
-            f"Data room: {len(seen)} of {len(docs)} documents opened so far.]")
+    head = (f"\n\n[engagement state, recorded by the client's process — "
+            f"leg {leg} of {max_legs}, {elapsed_s / 60:.0f} min elapsed")
+    if fixture:
+        return head + (f". Data room: {len(seen)} of {len(docs)} documents "
+                       f"opened so far.]")
+    return head + ".]"
 
 
 def verify_served_model(arm: Dict[str, Any], timeout: float = 10.0
@@ -159,7 +165,8 @@ def verify_served_model(arm: Dict[str, Any], timeout: float = 10.0
 def build_config(world: str, arm_path: Optional[Path],
                  workflow_mode: Optional[bool] = None,
                  temperature: Optional[float] = None,
-                 max_tokens: Optional[int] = None
+                 max_tokens: Optional[int] = None,
+                 external_repo: Optional[Path] = None
                  ) -> Tuple[str, Dict[str, Any]]:
     from launcher import parse_characters                      # noqa: E402
 
@@ -190,7 +197,7 @@ def build_config(world: str, arm_path: Optional[Path],
     cfg["autonomy_enabled"] = False
     # The two per-target values, set here rather than by editing the committed
     # scenario, so a run leaves no diff behind.
-    cfg["external_repo"] = str(CORPUS)
+    cfg["external_repo"] = str(external_repo or CORPUS)
     # WHY A FLAG AND NOT A SECOND SCENARIO. Comparing workflow_mode on
     # against off needs both, and audit.yaml's own header says why a copy is
     # the wrong way to get one: "a second copy is a second source that
@@ -251,6 +258,14 @@ def main() -> int:
                     help="YAML with an llm_config block; replaces the scenario's")
     ap.add_argument("--max-turns", type=int, default=25,
                     help="hard cap on legs (default 25)")
+    ap.add_argument("--external-repo", type=Path, default=None,
+                    help="audit a real target instead of the fixture corpus. "
+                         "Scoring against the answer key is meaningless for "
+                         "one — score.py is for the fixture")
+    ap.add_argument("--brief-file", type=Path, default=None,
+                    help="engagement brief for a real target; required with "
+                         "--external-repo, since the built-in brief names "
+                         "flowmetrics")
     ap.add_argument("--max-tokens", type=int, default=None,
                     help="override chat.react_max_tokens (scenario default "
                          "8192). Reasoning tokens bill against this budget")
@@ -279,8 +294,16 @@ def main() -> int:
 
     wf_mode = (None if args.workflow_mode is None
                else args.workflow_mode == "on")
+    if args.external_repo and not args.brief_file:
+        raise SystemExit(
+            "--external-repo needs --brief-file: the built-in brief "
+            "names flowmetrics and its nine documents, and handing "
+            "that to an agent pointed at a different target is the "
+            "kind of mismatch that produces a confident report about "
+            "the wrong thing.")
     name, cfg = build_config(args.world, args.arm, wf_mode,
-                             args.temperature, args.max_tokens)
+                             args.temperature, args.max_tokens,
+                             args.external_repo)
     logger.info("world=%s arm=%s model=%s", args.world, args.arm,
                 (cfg.get("llm_config") or {}).get("model") or "(scenario default)")
 
@@ -290,7 +313,8 @@ def main() -> int:
     t0 = time.time()
     legs, error = [], None
     try:
-        text = BRIEF
+        text = (args.brief_file.read_text(encoding='utf-8')
+                if args.brief_file else BRIEF)
         for i in range(args.max_turns):
             loop._process_user_turn(source=SOURCE, text=text, close=False)
             reply = latest_reply(loop, SOURCE)
@@ -326,7 +350,8 @@ def main() -> int:
                     logger.info("leg %d ended %s with no %s — continuing",
                                 i + 1, exit_reason, GAP_MARK)
                 text = CONTINUE + engagement_state(
-                    args.world, name, i + 2, args.max_turns, time.time() - t0)
+                    args.world, name, i + 2, args.max_turns,
+                    time.time() - t0, fixture=args.external_repo is None)
                 continue
             break
     except Exception as e:                                     # noqa: BLE001
