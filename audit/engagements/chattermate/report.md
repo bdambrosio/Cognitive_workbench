@@ -30,9 +30,11 @@ Delta: The README's deployment instructions specify 4 workers; the production ar
 
 Claim (README.md): The AI "detects" customer frustration and escalates to a human agent.
 
-Evidence: `backend/app/agents/chat_agent.py` — system-prompt instruction directs the LLM to set a transfer flag when the customer is expressing frustration or requesting a human. No separate classifier, sentiment scorer, or NLP detection module exists. The transfer pipeline (flag → handover → agent assignment) is fully implemented and functional.
+Evidence: `backend/app/agents/chat_agent.py:596` — system-prompt instruction directs the LLM to set a transfer flag when "the customer is expressing frustration with your responses". `backend/app/models/schemas/chat.py:47,216` — FRUSTRATED is one of eleven values in the TransferReasonType enum the LLM selects from. A sentiment scorer does exist: `backend/app/services/sentiment.py` (136 lines) combines TextBlob polarity with literal POSITIVE_KEYWORDS / NEGATIVE_KEYWORDS sets, the latter containing 'frustrated', 'annoyed' and 'disappointed'. It is wired in at `backend/app/repositories/chat.py:124-129`, which scores every customer message and stores sentiment_label and sentiment_score. No learned classifier or trained sentiment model is present. The transfer pipeline (flag → handover → agent assignment) is fully implemented and functional.
 
-Delta: The mechanism is prompt-guided LLM judgment, not a detection system. The word "detects" slightly overstates the implementation. Functionally, the escalation works; the buyer should know it is the LLM's inference, not a dedicated model.
+Delta: Two mechanisms, neither of them what "detects" implies. Escalation is decided by prompt-guided LLM judgment, not by the sentiment scorer — the scorer records a label per message and does not gate the transfer. And the scorer itself is keyword matching plus a polarity library, not a trained model. Functionally the escalation works; a buyer should know that the recorded sentiment is a word-list score and that the escalation decision is the LLM's inference.
+
+**Correction (§7):** an earlier draft of this finding stated that no separate classifier or sentiment scorer existed. That was wrong — `services/sentiment.py` exists and runs on every customer message. The error was an assertion of absence made without a search that would have located it. The conclusion about the escalation mechanism is unchanged; the account of what else is present has been corrected.
 
 ---
 
@@ -82,11 +84,11 @@ These go in Remaining Claims. They are not findings — I could not verify them,
 
 ## Coverage Statement
 
-**74 claims identified** across README.md (625 lines), llms.txt (49 lines), and HELP_CENTER_INFRA.md.
+**75 claims identified** across README.md (625 lines), llms.txt (49 lines), and HELP_CENTER_INFRA.md.
 
-**68 individually verified (92%).** 1 delta, 1 partial, 4 minor caveats, 62 real (including [real] and [real, minor caveat]).
+**68 individually verified (91%).** 1 delta, 1 partial, 4 minor caveats, 62 real (including [real] and [real, minor caveat]).
 
-**4 unverifiable** — external packages/modules not in this repo (Shopify App Store, pip CLI, npm CLI, MCP server). The FREE plan enum is a fifth item in the same category.
+**5 unverifiable** — external packages/modules not in this repo: Shopify App Store listing, pip CLI, npm CLI, MCP server, and the FREE plan enum.
 
 **2 non-delta** — AI ticketing sub-claims (auto-categorization, priority, SLA, auto-resolution) are sub-claims of the ticket system already verified as [real] in legs 2-3.
 

@@ -18,7 +18,7 @@
 
 ---
 
-**Coverage:** 68/74 claims individually verified (92%). 5 unverifiable (external packages: PyPI CLI, npm CLI, MCP server, Shopify App Store, enterprise plan enum). 2 non-delta (sub-claims of verified systems). No claims were skipped within the available source.
+**Coverage:** 68/75 claims individually verified (91%). 5 unverifiable (external packages: PyPI CLI, npm CLI, MCP server, Shopify App Store, enterprise plan enum). 2 non-delta (sub-claims of verified systems). No claims were skipped within the available source.
 
 *Full report with citations available on request.*
 
