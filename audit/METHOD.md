@@ -123,6 +123,25 @@ the last-good-backup date on the very next line of the same document, and
 with it the arithmetic that made the finding material. Nothing marks the
 omission; the summary reads complete.
 
+**AN ABSENCE NEEDS THE SEARCH, NOT THE CONCLUSION.** "This is not
+implemented" cannot cite a file and line, because the point is that there
+isn't one. Its evidence is the SEARCH — what was looked for, and why that
+search would have found the thing if it existed. State both.
+
+Observed 2026-08-23, on the first real engagement. One finding reported that
+a documented feature had no implementation, and supported it: grepped the
+term, showed all ten matches meant something else, and separately ruled out
+the event path that could have carried it. Correct, and it held up when
+checked. Another finding in the same report asserted that no sentiment
+scorer existed. One existed — 136 lines, wired into every customer message —
+and a single grep for the obvious word would have found it. The difference
+between the two findings was not care or model or luck. One showed its
+search and one asserted a conclusion.
+
+A negative finding is the most valuable thing an audit produces and the
+easiest to get wrong, because nothing contradicts it until the seller does.
+Support it the way you would have to defend it.
+
 So for any claim resting on a number, date, or threshold: ask for the source
 line and quote it. A finding built on a remembered figure has the same defect
 as a finding built on a remembered file — it is the provenance failure §5
