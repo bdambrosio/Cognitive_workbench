@@ -74,8 +74,8 @@ carry.
 those are strings a human could go look up. In the process they are live
 references into a corpus, with the retrieved spans attached.
 
-**The rejected hypotheses.** That run put the claim surface at roughly fifty
-seller-facing micro-claims and reported about a dozen findings. The rest came
+**The rejected hypotheses.** That run closed the claim surface at 33 seller
+claims and reported thirteen findings. The rest came
 back clean and are not in the report — correctly, because a report that lists
 everything it checked is unreadable. But *"did you look at the SSL
 configuration?"* has an answer (it did; SSL is Heroku-managed and auto-renews;
@@ -150,7 +150,7 @@ cannot name its own configuration is not evidence. That rule turns out to
 apply to deliverables as well as to experiments, and for the same reason.
 
 Provenance is what makes carrying the reasoning forward trustworthy rather
-than merely impressive. It is load-bearing, not a feature.
+than merely impressive. Without it there is no product, only a demonstration.
 
 ## An engineering constraint I do not want to paper over
 
@@ -165,7 +165,21 @@ agent structurally cannot hold across a long engagement is the shape of the
 engagement itself.
 
 Which means the producing intelligence is *already* partly outside the agent.
-It lives in the runner's state, in the trace, in the claims file. A
+It lives in the runner's state, in the trace, in the claims file — and, I
+found later, in the engagement setup itself.
+
+The audit method now requires the engagement to name which documents contain
+the seller's assertions; everything else supplied is evidence. I added that to
+stop three models enumerating three different claim populations, not for any
+reason to do with this essay. But it is the same move. The list of claim
+sources is part of the reasoning that produced the report, it is not in the
+report, and a continuation that could not name it could not answer *"why is
+the CRM export not in your denominator?"* — a question a buyer will ask,
+because the denominator is what every coverage figure divides by.
+
+Externalized state is not only a workaround for context decay. Some of it is
+the engagement's own configuration, and it has to be carried forward for the
+same reason the derivations do. A
 continuation product cannot be a long-lived process; it has to be a
 reconstructible one, assembled from externalized state. The design work is in
 deciding what to externalize, and that is not free — it is most of the work.
@@ -223,8 +237,8 @@ model. That is worth doing deliberately.
 
 **Provenance stops being hygiene and becomes the product.** Citations exist in
 my method so a reader can check a claim. In a continuation they are the
-mechanism by which the deliverable can answer a question it was not asked.
-Same machinery, load-bearing in a way it was not before.
+mechanism by which the deliverable answers a question it was not asked. Same
+machinery, now carrying weight it was not designed to carry.
 
 **"Done" changes meaning.** A workflow that ends by emitting text is done when
 the text is written. A workflow that ends by handing over a continuation is

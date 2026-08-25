@@ -9,8 +9,9 @@ arrows, a start and an end. Fetch the documents, extract the claims, compare
 against the code, write the report. The arrows are the workflow. The agent is
 the thing that walks the arrows.
 
-The workflow document I run in production is 552 lines long and contains no
-arrows, deliberately. It never says what to do next.
+The workflow document I run in production reaches the agent as about twenty
+thousand characters across fourteen sections, and contains no arrows,
+deliberately. It never says what to do next.
 
 The distinction I want to make is this:
 
@@ -27,25 +28,26 @@ The method is for a technical due-diligence audit. One operation, stated in
 §1: *stated claims vs. observed implementation, with citations.* Sold to
 buyers doing sub-$5M software acquisitions.
 
-Sorting its 552 lines by *kind of information* rather than by section number,
-almost nothing is procedural:
+Sorting it by *kind of information* rather than by section number, almost
+nothing is procedural:
 
-**A scope boundary, expressed as negative space.** §2: audit what the codebase
-*claims* to do against what it observably does — and *do not opine on what the
-code should do*, because that is the buyer's design judgement and is not what
-was bought. Most of the force here is in the prohibition. The document spends
+**A scope boundary, expressed as negative space.** §2: audit what the seller
+asserts about the target against what the materials show — and *do not opine
+on what the target should do*, because that is the buyer's judgement and is not
+what was bought. Most of the force here is in the prohibition. The document spends
 more effort on what the auditor must not say than on what it must.
 
-**A priority order, with its rationale attached.** §4 ranks work:
-safety-critical mechanisms, architectural invariants, operational parameters,
-micro-claims. Then it says why: *if the audit is cut short by budget, time or
-access, the most expensive unknowns are resolved first.* This is not a
+**A priority order, with its rationale attached.** §4 ranks work: claims whose
+failure ends the business, architectural invariants, operational parameters,
+low-impact claims. Then it says why: the order exists *so that an audit cut
+short by budget, time or access has resolved the most expensive unknowns
+first.* This is not a
 sequence. It is a sort key, plus the reason the key is that way, so an
 executor facing an unanticipated ordering question can derive an answer rather
 than look one up.
 
 **An output schema.** §5 gives findings a shape — the claim, the evidence with
-file and line, the delta — and then a second shape for a finding that tests no
+document and line, the gap — and then a second shape for a finding that tests no
 stated claim but follows by arithmetic from two figures the seller supplied
 separately. Basis, Derivation, Consequence, Escalates.
 
@@ -55,17 +57,18 @@ not close pending verification" has violated §2 by recommending a buyer
 action, and the closed vocabulary is what makes that violation visible instead
 of arguable.
 
-**Acceptance conditions.** §4's coverage honesty: a report must be able to say
-*here is what holds, here is what does not, here is what I did not check and
-why it matters* — because "silence about coverage reads as completeness, and
-completeness is the one thing a due-diligence report must never imply without
-having earned it." §16 specifies the deliverable. These describe a finished
+**Acceptance conditions.** §1a's two rules: state the coverage wherever you
+state the recommendation, and *never write a sentence that implies you examined
+more than you did* — "the system does what it says" is a claim about
+everything; "of the 43 claims examined, 39 hold" is a claim about the work
+done. §16 specifies the deliverable. These describe a finished
 state, not a route to it.
 
 **An audience model, which changed the shape of the deliverable.** §8 is a
-claim about a reader: *"A PE partner will not read 68 code-cited findings.
-They read the Gap Map (~30 seconds), the executive summary (~2 minutes), then
-drill into one or two findings if the recommendation makes them curious."*
+claim about a reader: they read the Gap Map in about thirty seconds and open
+the report only if it earns the time; *they will not read forty cited findings
+— they read the recommendation, then drill into one or two if it makes them
+curious.*
 
 That is not a formatting preference, and you can see what it cost. The
 deliverable is **two documents, not one** (§16) — a Gap Map and a report,
@@ -89,9 +92,9 @@ what to do about it.
 That posture is abstract until §9 makes it operational, in the sharpest
 sentence in the document:
 
-> The audit says "Conditional: the backup system claims 30-day retention but
-> the code enforces 7." The buyer decides whether 7 days is acceptable for
-> their use case. The audit does not say "you should walk."
+> The audit says "Conditional: the seller claims 30-day retention, the
+> materials show 7." Whether 7 days is acceptable is the buyer's call. The
+> audit does not say "you should walk."
 
 Two vocabularies, held apart on purpose. *Clear / Clear with caveats /
 Conditional / Material / Walk* describes the state of the claims. *Proceed /
@@ -102,6 +105,15 @@ enumerated type makes visible instead of arguable. The liability posture is
 not commentary sitting beside the rules. It is why the rules have the shape
 they have.
 
+And it is withheld from the executor on purpose. §10 is marked for the human
+running the practice, and the loader strips it before the method reaches the
+model — not to save tokens, but because "here is how you would be sued" in an
+auditor's prompt invites defensive hedging in a document whose value is plain
+statement. The posture shapes the rules; the rules are what get delivered. A
+method can be written by one audience and addressed to another, and being
+deliberate about which sections cross that line turns out to matter as much as
+what the sections say.
+
 **A learning channel.** §14, which I will come back to.
 
 None of that is control flow. All of it constrains the output.
@@ -111,9 +123,9 @@ None of that is control flow. All of it constrains the output.
 §12 is titled "Running an audit: sequence," and it is numbered 1 through 7.
 Fair enough. But look at what the numbered items actually say.
 
-Step 5 is: *"Continue to the coverage threshold where the report is
-defensible — stop when the consistency rate and the severity distribution of
-what remains make the rest low-risk."*
+Step 5 is: *"Stop when what remains is low-risk — when the claims still
+unchecked are low-priority ones, and those checked so far have held
+consistently. Say in the coverage statement where you stopped and why."*
 
 There is no number in that. It does not say read nine documents, or verify
 forty claims, or spend two hours. It describes a **condition to be
@@ -123,9 +135,8 @@ cannot contain that step. A script would have to replace it with a counter,
 and the counter would be wrong for every target that isn't the one it was
 tuned on.
 
-The same is true of step 4's working recaps "every ~5 findings" — a rhythm,
-not a trigger — and step 3's "verify top N," where N is left to judgement
-under §4's ordering.
+The same is true of step 3, which says only *prioritise in §4's order* and
+leaves how far to go to the same judgement step 5 describes.
 
 So §12's steps are not instructions to execute. They are **states to reach**,
 in an order, each with a satisfaction condition. What sits between them is
@@ -166,12 +177,73 @@ method is a script with extra words: it commits to a route without knowing the
 terrain, and when the terrain differs the executor has no basis to deviate. §3
 makes this explicit — *"scope adapts to the target; the method does not."*
 
-There is a failure mode here I have hit. §12 step 4 requires that on finding a
-delta the auditor **stop and confirm with the client before continuing** — *the
-audit is a collaboration, not a surprise.* It is good practice and it is
-unreachable: my harness has no channel back to the client. The method
-specified something the executor cannot do. A method can over-reach into
-capability it does not have, and nothing in the document itself will tell you.
+There is a failure mode here I hit, and it is worth reporting with its ending.
+§12 once required that on finding a delta the auditor **stop and confirm with
+the client before continuing** — *the audit is a collaboration, not a
+surprise.* Good practice, and unreachable: the harness has no channel back to
+the client mid-engagement. So every run silently failed a requirement nobody
+could meet, and nothing in the document or the logs said so.
+
+It survived because an unperformable procedure produces no error. It reads as
+rigour and does nothing. It came out only when I read the method against the
+assurance standards and asked, of each clause, whether an executor could
+actually perform it — a review pass that also removed a verdict term nothing
+had ever used. **A method can over-reach into capability the executor does not
+have, and the document will not tell you; only trying to perform every clause
+will.**
+
+## Where specification runs out
+
+The strongest test of the "specify acceptance, not transitions" claim is a
+place where I tried to specify acceptance and could not.
+
+Every coverage figure in the report divides by one number: the size of the
+claim surface. Three models, given the same nine documents and the same
+method, enumerated **62, 67 and 273 claims**. The reports were internally
+consistent and mutually incomparable.
+
+So I did what the thesis recommends: tightened the acceptance condition. *One
+claim is one assertion that can take exactly one verdict.* It reads as precise.
+It made the spread worse — 44, 21 and 321 — because "one assertion" has no
+fixed size. "The infrastructure is redundant" is one assertion, and so are
+"there is one dyno", "the database is co-located" and "there are no replicas".
+Two models read the sentence at different scales and neither of them misread
+it.
+
+The second attempt was procedural: count one claim per statement in the
+materials, don't merge, don't split, report a per-document breakdown. Better
+prose, and it produced 66 and 108 — and left the third model unable to close
+the surface at all, because the rule was longer and that model relayed the
+instruction text into a tool query instead of executing it. Making a
+specification more explicit made one executor worse.
+
+What worked was not a better definition. It was moving the fact out of the
+method entirely. A claim is now *an assertion the seller makes to the buyer* —
+which makes source code, comments, and a data room's evidence documents into
+evidence rather than claims — and **the engagement names which documents carry
+those assertions.** For the fixture: three of the nine. The auditor is told,
+not asked to infer.
+
+The result: the three models enumerated 33, 70 and 88 — still a spread — but
+all three read only the three named documents, and two of them cited an
+*identical* set of twenty-one document lines. They agree about where the claims
+are and differ about how finely to slice them. The first is a question about
+criteria and had to be fixed. The second is a matter of grain, and it is
+harmless as long as each report is internally consistent and says what its
+denominator was.
+
+This is a third kind of information, and I did not have a name for it when I
+started. Not a transition, not an acceptance condition, but **a parameter the
+engagement supplies and the method must not invent.** The assurance standards
+have known this for a long time: criteria are agreed in advance, not derived by
+the practitioner mid-engagement. My two failed attempts were both efforts to
+have the document decide something the document is not in a position to know.
+
+The general lesson is unwelcome and I think correct. **A method's reach ends
+where its author's knowledge of the specific engagement ends.** Past that
+point, more specification does not converge behaviour; it produces confident
+divergence, which is worse than visible divergence because every executor
+believes it complied.
 
 ## A method learns; a prompt does not
 
@@ -185,9 +257,9 @@ destroyed.
 
 The test for whether a lesson may pass: *if it cannot be stated without naming
 the target, it is not a method lesson.* "Check whether the message broker binds
-to all interfaces" carries. "Check whether Zenoh binds 0.0.0.0 like the robot
-did" is a client fact wearing a technique's clothes. Read a proposed lesson for
-proper nouns.
+to all interfaces" carries. The same sentence with the product's name and the
+port number in it does not. Read a proposed edit for proper nouns before
+including it.
 
 This is what professional firms actually do — a methodology manual updated
 after engagements, not analysts carrying client details in their heads. It
@@ -219,10 +291,16 @@ finding a home was necessary and nowhere near sufficient, and anyone selling
 you "we improved the prompt and the model got smarter" is describing something
 that did not happen.
 
-*(Those runs have since been discarded for an unrelated configuration fault —
-see the third essay, which is about how much harder it is to measure this than
-to build it. The observation stands as an observation and is pending
-replication. I would rather say that than quote a number I no longer trust.)*
+*(Those runs were discarded for an unrelated configuration fault — see the
+third essay, which is about how much harder it is to measure this than to
+build it.)*
+
+It has since replicated on a rebuilt instrument. Across the three arms I now
+run, the shape is used every time and the content still varies: on one set of
+runs the two planted derived findings were recovered 1 of 2, 2 of 2 and 1 of 2.
+Same document, same format, same slots, three different degrees of actually
+doing the arithmetic. Whatever produces that difference, it is not the
+specification, because the specification was identical.
 
 What it does buy is more modest and more durable: an output that can be
 **checked by someone who was not there.** A closed recommendation vocabulary
