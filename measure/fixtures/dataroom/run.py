@@ -32,6 +32,7 @@ import argparse
 import datetime
 import json
 import logging
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -399,6 +400,40 @@ def main() -> int:
         else:
             (out / "report.md").write_text(final, encoding="utf-8")
             logger.warning("no %s marker — Gap Map not produced", GAP_MARK)
+
+    # THE WORKING RECORD, COPIED OUT (§14). The world is discarded after an
+    # engagement; these two are the evidence that the work was systematic, and
+    # they are the only evidence of the claims examined that produced no
+    # finding. Copied here, beside the deliverables, so they survive the
+    # world's deletion.
+    #
+    # BY THE HARNESS, NOT THE AUDITOR. §12 step 7 deliberately does not ask
+    # the agent to produce this: an auditor's own account of its diligence is
+    # the weakest evidence of that diligence. The value is that this is a
+    # byproduct of doing the work rather than a claim about having done it.
+    #
+    # HOLDS CLIENT MATERIAL. Verbatim lines from the target's documents are in
+    # these traces. Harmless for the synthetic fixture; a retention obligation
+    # for a real engagement, which belongs in the engagement letter.
+    world_dir = REPO / "scenarios" / args.world / name
+    record = out / "working_record"
+    for src in (world_dir / "memory" / "reasoning_trace.jsonl",
+                world_dir / "inspect_traces"):
+        if not src.exists():
+            logger.warning("working record: %s absent", src.name)
+            continue
+        try:
+            dst = record / src.name
+            record.mkdir(parents=True, exist_ok=True)
+            if src.is_dir():
+                shutil.copytree(src, dst, dirs_exist_ok=True)
+            else:
+                shutil.copy2(src, dst)
+        except OSError as e:
+            logger.warning("working record: could not copy %s (%s)", src, e)
+    if record.exists():
+        kb = sum(f.stat().st_size for f in record.rglob("*") if f.is_file()) // 1024
+        logger.info("working record: %d KB copied to %s", kb, record)
 
     (out / "run_meta.json").write_text(json.dumps({
         "world": args.world,

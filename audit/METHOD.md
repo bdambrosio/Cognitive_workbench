@@ -481,8 +481,9 @@ the operational detail; this section is the method.
    deliverable rather than trusted to the author. It catches a claim citing
    nothing, not one citing the wrong line convincingly: a floor, not a
    guarantee.
-7. **Extract the engagement file** (§14), **deliver, propose method-file edits
-   (technique only), then discard the working world.**
+7. **Deliver. Propose method-file edits (technique only).** The working record
+   is then copied out and the world destroyed (§14) — both by the practice,
+   not by you.
 
 **There is no independent review, and that is a decision rather than an
 oversight.** Step 6b is self-review — the author checking its own citations —
@@ -517,20 +518,39 @@ protects client confidentiality but would also throw away everything learned
 | **method** | "a claimed rate may be a publish rate, not a check rate — verify which" | **yes** |
 | **target** | "flowmetrics' backups had failed for 21 days" | **never** |
 
-**Before the world is discarded, extract the engagement file.** §10's defence
-against a negligence claim is that *"the citation trail demonstrates the work
-was systematic"* — and the citation trail in the report covers only what was
-reported. The claims examined and found sound, the searches that returned
-nothing, the hypotheses dropped, the corrections made in flight: all of that
-lives in the world, and discarding it destroys the evidence the liability
-posture depends on. The report proves twelve findings; it cannot prove the
-thirty-eight checks that produced no finding.
+**The working record is kept. The world is still discarded.**
 
-So the engagement file — procedure log, the frozen claim surface and its
-coverage record, correction history, and the as-of date — is **retained under
-the engagement letter**, target facts included. It is not method, it does not
-carry to the next engagement, and it is not what §14 is about. It is the
-working paper, and it is kept for the same reason every firm keeps one.
+§10's defence against a negligence claim is that *"the citation trail
+demonstrates the work was systematic"* — and the citation trail in the report
+covers only what was reported. On a fifty-claim surface producing a dozen
+findings, the other thirty-eight were examined, held, and left no trace. A
+negligence claim asks about those. Discarding the world destroyed the only
+evidence they happened.
+
+**Nothing is authored to fix this.** The record already exists as a byproduct
+of the work:
+
+- `memory/reasoning_trace.jsonl` — every action, with the `thought` that
+  motivated it, every observation returned, iterations and exit reason per leg.
+- `inspect_traces/*.txt` — one file per evidence request: the query, every
+  read and search inside it, what each returned, and the answer given back.
+
+Together, for a single engagement, on the order of a hundred kilobytes. That is
+a working paper in the professional sense — what was asked of the materials,
+what came back, and why the next question followed. Its evidential value comes
+precisely from being a byproduct: an auditor's own summary of its diligence is
+the weakest evidence of that diligence, and this is not a summary.
+
+**Copied out of the world before the world is destroyed, and retained under
+the engagement letter.** The copy is made by the harness, not by the auditor —
+§12 step 7 is the auditor's last step and it does not include this.
+
+**This holds client material, and that is a real obligation.** Verbatim lines
+from the data room are in those traces. §14's discard exists to avoid holding
+client data; retaining the record reverses that deliberately, in exchange for
+being able to evidence the work. It brings a retention period, a destruction
+date, and a security obligation, and those belong in the engagement letter
+before the next paying engagement — not here.
 
 **The mechanism** for method learning is step 7 of §12: the final turn of every
 audit proposes edits to this file, technique only. Bruce reviews and merges; the world is
