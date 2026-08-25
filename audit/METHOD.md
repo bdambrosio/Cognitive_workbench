@@ -218,7 +218,6 @@ obeying a format with one shape in it.
 | `[real]` | Claim holds; implementation matches spec | None |
 | `[real, minor caveat]` | Holds; note does not change the decision | Awareness |
 | `[real, operational caveat]` | Holds today; operational context qualifies it | Awareness + operational planning |
-| `[real, with a structural note]` | Holds; reveals a structural exception worth naming | Awareness + maintenance planning |
 | `[partial]` | Mostly true, with a specific citable gap | **Material** — buyer should price the gap |
 | `[delta]` | Claim is false; the code does not do what the docs say | **Material** — buyer should revalue or walk |
 | `[unverifiable]` | Could not be verified from available materials | Not a finding — goes in Remaining Claims with the reason |
@@ -242,9 +241,16 @@ shape rather than a row in the format above.
 the code"* is not the same as *"the code isn't there."* The former belongs in
 Remaining Claims; only the latter is a finding.
 
-**Status:** across all 31 verified findings of the Body audit, zero deltas
-were found. `[partial]`, `[delta]`, `[unverifiable]` and `[non-delta]` are
-therefore specified but not yet exercised in a real report.
+**Status, measured across three engagements** (Body, ChatterMate,
+flowmetrics): every verdict above is exercised — `[delta]` 35, `[real]` 29,
+`[partial]` 20, `[derived]` 11, `[real, minor caveat]` 11, `[unverifiable]` 8,
+`[non-delta]` 5, `[real, operational caveat]` 4.
+
+`[real, with a structural note]` was **removed 2026-08-24**: zero uses in
+three engagements, and near-indistinguishable from `[real, minor caveat]` in
+practice. A vocabulary entry that nothing has ever needed is not a
+distinction, and an option list is easier to apply consistently when every
+option earns its place.
 
 ## 7. Correction protocol
 
@@ -262,11 +268,15 @@ statement (§3), and Finding 4's footprint radius, 0.22 m in the spec against
 
 ## 8. Two recaps, two audiences
 
-**Working recap (ELI5)** — in the auditor–client conversation, every ~5
-findings or at a natural section break. Plain language, 2–3 sentences, "here
-is the shape of what we know so far." For the person watching the audit
-happen who needs to know whether to keep going or stop. Marked `[recap]`.
-**Does not appear in the final report.**
+**There is no working recap, and there was no channel for one.** This section
+specified one — plain language, every ~5 findings, for the person watching the
+audit happen. It was never performable: the audit runs as one engagement with
+no channel back to the client mid-flight, so every run silently failed a
+requirement nobody could meet. An unperformable procedure is worse than an
+absent one; it reads as rigour and produces nothing. Removed 2026-08-24.
+
+If a mid-engagement channel is ever built, this comes back — with §12's
+delta-confirmation step, which was removed for the same reason.
 
 **Deliverable recap (executive synthesis)** — in the report. §1
 (Recommendation) is the 2-minute version, plus a closing paragraph a
@@ -276,6 +286,11 @@ actually reads if they never open the findings table.
 A PE partner will not read 68 code-cited findings. They read the Gap Map
 (~30 seconds), the executive summary (~2 minutes), then drill into one or two
 findings if the recommendation makes them curious.
+
+**One audience, then. The reader of the finished document.** That is not a
+weakening: the standards' communication requirement is that the report be
+understandable to its intended users, and this section's remaining content —
+the reader model, and the tiering built on it — is how that is met.
 
 ## 9. Report-level recommendation
 
@@ -382,10 +397,13 @@ the operational detail; this section is the method.
    README, specs, marketing, internal docs.
 3. **Prioritise** per §4's safety → architecture → operations → micro order.
    Verify top N.
-4. **Working recaps every ~5 findings.** **If a delta is found, stop and
-   confirm with the client before continuing** — a delta changes the report's
-   shape and the client may want to redirect. *The audit is a collaboration,
-   not a surprise.*
+4. **Work the priority order without pausing for confirmation.** This step
+   used to require stopping to confirm a delta with the client. There is no
+   channel to the client mid-engagement, so the requirement was unperformable
+   and every run failed it silently. Removed 2026-08-24 with §8's working
+   recap. Deltas are reported in the deliverable, where the client can act on
+   them; a delta discovered late does not change the report's shape enough to
+   justify a procedure that cannot be carried out.
 5. **Continue to the coverage threshold where the report is defensible** —
    §4's "7% is not enough" rule applied in reverse: stop when the consistency
    rate and the severity distribution of what remains make the rest low-risk.
@@ -450,8 +468,8 @@ for proper nouns.
 
 ## 15. The Gap Map
 
-The lead artifact in cold outreach. The PE partner gets it in the email body
-or as a 30-second PDF. One page:
+**A one-page summary for the decision-maker**, who reads it in about thirty
+seconds and opens the report only if it earns the time (§8). One page:
 
 - Target name + one-line description
 - Recommendation (§9)
@@ -461,8 +479,6 @@ or as a 30-second PDF. One page:
 
 If the recommendation is **Clear** with no caveats, the Gap Map is two lines
 and the email says "no gaps found, N/N claims verified, report attached."
-
-**The Gap Map is the hook; the full report is the proof.**
 
 ### The format
 
@@ -550,3 +566,30 @@ the report is read only if the Gap Map earns it (§8). Producing the Gap Map
 alone forfeits the proof; producing the report alone forfeits the reader.
 Neither is a summary of the other: the report carries citations and the Gap
 Map carries none.
+
+## 17. Positioning and outreach
+
+<!-- audience: practice -->
+
+**Where the Gap Map came from, and why this is not in §15.** The Gap Map is
+the lead artifact in cold outreach: the partner gets it in the email body or
+as a 30-second PDF. The Gap Map is the hook; the full report is the proof.
+
+That is true, and an agent executing an engagement should not read it. A
+document written to be a hook is not the same document as one written to
+inform, and §15 should carry only the second brief. This lived inside §15
+until 2026-08-24, unmarked, which meant every executing agent was told it was
+writing a hook.
+
+**A note on why it is in this file at all.** A gap analysis against ISAE 3000
+or AT-C 205 will not find business development in those standards, and that is
+scope rather than disapproval — they govern the engagement, not the firm.
+Silence in an external reference is not evidence that a requirement is
+spurious. What the standards DO cover is communication of results to intended
+users, and §15's format rules are exactly that: a reader model, and a tiering
+built on it.
+
+The distinction worth keeping: a false-positive requirement is one that
+constrains the audit work with no professional basis — the 2,000-word ceiling
+was one, and it failed real runs for three days. A section the standards
+simply do not reach is not the same thing.
