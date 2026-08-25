@@ -219,6 +219,27 @@ self-authored criteria cannot provide: **the fixture cannot fail an arm for a
 thing the method never asked for.** Every gap above is a way an audit could be
 professionally deficient while scoring a clean PASS.
 
+## Status — all eight closed 2026-08-24
+
+| # | gap | where it now lives |
+|---|---|---|
+| 1 | assurance level unstated | **§1a** — limited assurance over a disclosed subset; recommendation and coverage travel together |
+| 2 | working papers destroyed | **§14** — engagement file extracted and retained before the world is discarded |
+| 3 | no materiality basis | **§4** — a gap is material if it would change price, structure, or the decision to close |
+| 4 | criteria not frozen | **§12.2** — the claim surface closes at enumeration; late claims go in an addendum |
+| 5 | responsible party not consulted, undisclosed | **§16** — inherent-limitations statement, three lines, always present |
+| 6 | no expiry on dated conclusions | **§5** — a dated derived finding carries its own expiry; the report carries an as-of date |
+| 7 | independence unaddressed | **§10** — the incentive runs toward over-reporting; four existing safeguards named |
+| 8 | no independent review | **§12.7** — named as a deliberate, price-point decision, with the trigger to revisit |
+
+Plus the reverse-pass finding that was an addition rather than a removal:
+**§4's priority order was a robotics artifact** whose top tier was empty for
+every SaaS target. Restated against all three engagements, with tiers defined
+by consequence to the buyer rather than by subsystem.
+
+Executing text 3,963 -> 4,926 words. It grew, and should have: eight of these
+were things the method did not say.
+
 ## What I would do
 
 1. **Gaps 1 and 3 first** — assurance level and materiality. They are cheap to

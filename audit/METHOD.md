@@ -27,6 +27,29 @@ wants a full code-quality review hires a QA team. This is the **claims
 verification** step — *is what they told you true?* — and that is what makes
 it a distinct product rather than a re-skin of a code review.
 
+## 1a. Level of assurance
+
+**This is limited assurance over a disclosed subset of the claim surface, and
+the conclusion is expressed positively over that subset only.**
+
+The distinction matters because it fixes what the report means. An engagement
+offering *reasonable* assurance examines enough to reduce risk to acceptably
+low and concludes positively over the whole subject matter. This engagement
+does not: §4 prioritises, §12 stops at a coverage threshold, and §11 lists
+what is out of scope. So the conclusion in §9 says something narrower than it
+appears to — *of the claims examined, here is how they stood up* — and the
+coverage statement is not a footnote to it but part of it.
+
+**Two consequences that bind.**
+
+1. **A §9 recommendation may not be stated without the coverage it rests on.**
+   The recommendation and the coverage line travel together, in the report and
+   in the Gap Map. A verdict without a denominator is not a conclusion.
+2. **Never write a sentence that implies the unexamined was examined.** "The
+   system does what it says" claims the whole surface. "Of the 43 claims
+   verified, 39 hold" claims what was done. §4's coverage honesty is this rule
+   applied to prose.
+
 ## 2. The scope rule
 
 **Audit what the codebase *claims* to do — stated behaviour in docs, README,
@@ -82,16 +105,46 @@ here is what I did not check and why it matters*. Silence about coverage
 reads as completeness, and completeness is the one thing a due-diligence
 report must never imply without having earned it.
 
-**Priority order.** "Load-bearing" is not a judgement call; it is this order:
+**Materiality — what makes a gap worth reporting at all.**
 
-1. **Safety-critical mechanisms** — a delta here is the most expensive for a
-   buyer (swept-footprint collision, watchdog, no-go isolation, cancel/stop).
-2. **Architectural invariants** — do the stated tier boundaries hold? (single
-   publisher, shared config, no-go isolation).
-3. **Operational parameters** — affect day-to-day use (retry intervals,
-   timeouts, deadline backstops).
-4. **Micro-claims** — individually low-impact, collectively they build the
-   consistency rate (encoder ticks, PWM, udev, GPIO).
+A gap is material if a reasonable buyer, knowing it, **would change the price,
+the structure of the deal, or the decision to close.** That is the threshold,
+and it is transaction-relative rather than absolute: the same defect is
+material in a $400k acquisition and noise in a $40m one.
+
+Three things follow. **Report every material gap regardless of which way it
+pushes the price** — §10's independence rule. **A gap below the threshold is
+not a finding**; it belongs in the consistency rate, not the findings table.
+And **materiality is judged against the buyer's decision, not the auditor's
+taste** — "this code is poorly organised" is not material unless it bears on
+what was claimed.
+
+Without this, "load-bearing" is whatever the reporter thinks it is. Measured
+2026-08-24: three arms on one fixture reported 6, 3 and 2 unplanted findings.
+Part of that spread is three reporters placing an undefined threshold in three
+different places.
+
+**Priority order.** Within what is material, verify in this order:
+
+1. **Claims whose failure ends the business** — data that cannot be recovered,
+   money that cannot be collected, a dependency that can withdraw. In a
+   physical product this tier is safety-critical mechanism; in a SaaS target
+   it is recoverability, payment integrity and single points of control.
+2. **Architectural invariants** — do the stated boundaries hold? Isolation,
+   redundancy, failover, tier separation, shared state.
+3. **Operational parameters** — retry intervals, timeouts, monitoring,
+   retention windows, thresholds affecting day-to-day operation.
+4. **Micro-claims** — individually low-impact; collectively they establish the
+   consistency rate, which is the strongest available signal about the claims
+   nobody had time to check.
+
+**The tiers are defined by consequence to the buyer, not by subsystem.** They
+were first written from a robotics engagement and read as robotics — swept
+footprints, watchdogs, encoder ticks, PWM — which left tier 1 empty for every
+SaaS target the product is actually sold to (§1). Restated 2026-08-24 against
+three engagements: a robot, a chat product, and a SaaS data room. If a tier is
+empty for a target, say so in the coverage statement rather than silently
+running a three-tier order.
 
 **Why this order and not another:** if the audit is cut short by budget, time
 or access, the *most expensive unknowns* are resolved first. A buyer reading a
@@ -198,6 +251,14 @@ Escalates: <Finding N, or None>
    ordinary one — the same backup failure, now with a date on it. Say which,
    so the report reads as one finding intensified rather than two findings
    counted. Where it escalates nothing, say None.
+
+**A derived finding that resolves to a date carries that date as its own
+expiry.** The backup case is the pattern: *"the last recoverable backup ages
+out on 2026-08-29"* is true when written, catastrophic five days later, and
+meaningless a month after that. State the date, and state what happens on it.
+The report as a whole carries an **as-of date for the materials**, because a
+data room is a snapshot and every conclusion in the report is a conclusion
+about that snapshot.
 
 **Priority.** A derived finding inherits the §4 priority of the facts it
 rests on, and rises above them when the consequence is more severe than
@@ -323,6 +384,20 @@ Same category as a financial auditor reporting material misstatements, a
 structural engineer certifying an undersized wall, or a pen-test firm
 reporting an exploitable endpoint.
 
+**Independence, and which way the incentive runs.** The buyer engages the
+auditor, and the buyer benefits from findings: every delta is leverage on
+price. That is a self-interest threat in the direction of **over-reporting**,
+and naming it is the first safeguard. The others are already load-bearing
+elsewhere: §5's citation requirement, which an invented delta cannot satisfy;
+§6's rule that `[unverifiable]` is never reported as `[delta]`; §4's
+materiality threshold, applied **regardless of which way a gap pushes the
+price**; and §12 step 6b, which verifies the finished report against its own
+citations.
+
+A finding that survives all four is not advocacy. A finding that would not
+have been written for a seller-side client should not be written for a
+buyer-side one.
+
 **Vector 1 — client sues for sloppy work.** The real risk, and the same one
 every audit firm carries. Managed by four things:
 
@@ -385,8 +460,13 @@ the operational detail; this section is the method.
 
 1. **Receive materials** (data room, repo access, docs). **Confirm scope in
    writing.**
-2. **Enumerate claims.** Estimate the total. Identify the claim surface —
-   README, specs, marketing, internal docs.
+2. **Enumerate claims, then CLOSE the surface.** Estimate the total and
+   identify the claim surface — README, specs, marketing, internal docs. When
+   enumeration ends the surface is **frozen**: it is the denominator every
+   coverage figure in the report is measured against, and a denominator that
+   moves makes every percentage before it mean something else. A claim met
+   later that was missed here goes in an **addendum** with its own count, not
+   into the original population.
 3. **Prioritise** per §4's safety → architecture → operations → micro order.
    Verify top N.
 4. **Work the priority order straight through.** Do not pause for
@@ -401,8 +481,16 @@ the operational detail; this section is the method.
    deliverable rather than trusted to the author. It catches a claim citing
    nothing, not one citing the wrong line convincingly: a floor, not a
    guarantee.
-7. **Deliver. Propose method-file edits (technique only). Discard the working
-   world** (§14).
+7. **Extract the engagement file** (§14), **deliver, propose method-file edits
+   (technique only), then discard the working world.**
+
+**There is no independent review, and that is a decision rather than an
+oversight.** Step 6b is self-review — the author checking its own citations —
+and the method says plainly it is a floor, not a guarantee. A second reviewer
+who took no part in the work is what the assurance profession requires for
+engagements of consequence, and it is not proportionate at this price point.
+Revisit it before the first engagement where a finding moves real money; a
+self-reviewed report is the weakest link in §10's defence.
 
 ## 13. Where the method has been exercised
 
@@ -429,8 +517,23 @@ protects client confidentiality but would also throw away everything learned
 | **method** | "a claimed rate may be a publish rate, not a check rate — verify which" | **yes** |
 | **target** | "flowmetrics' backups had failed for 21 days" | **never** |
 
-**The mechanism** is step 7 of §12: the final turn of every audit proposes
-edits to this file, technique only. Bruce reviews and merges; the world is
+**Before the world is discarded, extract the engagement file.** §10's defence
+against a negligence claim is that *"the citation trail demonstrates the work
+was systematic"* — and the citation trail in the report covers only what was
+reported. The claims examined and found sound, the searches that returned
+nothing, the hypotheses dropped, the corrections made in flight: all of that
+lives in the world, and discarding it destroys the evidence the liability
+posture depends on. The report proves twelve findings; it cannot prove the
+thirty-eight checks that produced no finding.
+
+So the engagement file — procedure log, the frozen claim surface and its
+coverage record, correction history, and the as-of date — is **retained under
+the engagement letter**, target facts included. It is not method, it does not
+carry to the next engagement, and it is not what §14 is about. It is the
+working paper, and it is kept for the same reason every firm keeps one.
+
+**The mechanism** for method learning is step 7 of §12: the final turn of every
+audit proposes edits to this file, technique only. Bruce reviews and merges; the world is
 then discarded. Learning is routed through a human review gate, which is where
 a confidentiality check belongs, and it lands somewhere versioned and
 diffable. This is what real firms do — a methodology manual updated after
@@ -536,6 +639,14 @@ before the first finding.
   settles it.
 - A coverage statement: what was not checked, and why that matters (§4).
 - What the client should ask the seller before closing.
+
+- **The inherent-limitations statement.** Three lines, always present:
+  the materials examined and their as-of date; that the seller was **not
+  consulted and has not confirmed the auditor's reading of their own claims**;
+  and the assurance level (§1a) with the coverage it rests on. The second is
+  the one most easily forgotten and the most load-bearing — every finding
+  interprets a claim without its author present to say what was meant, and a
+  reader who does not know that will over-read the report.
 
 **2. The Gap Map** (§15), after a line reading exactly:
 
