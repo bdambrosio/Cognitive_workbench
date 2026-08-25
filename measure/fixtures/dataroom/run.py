@@ -73,9 +73,21 @@ GAP_MARK = "=== GAP MAP ==="
 # the opposite. A client brief instructing behaviour the method forbids is a
 # contradiction the agent has to resolve at runtime, and it was doing so
 # silently. The brief must not outlive the method it refers to.
+#
+# Added 2026-08-25: the claim sources. §2 defines a claim as something the
+# SELLER asserts to the buyer, which makes doc3-doc8 evidence rather than
+# claims — but deciding that per run is a judgement, and three arms made it
+# three ways. Measured: counts of 62, 67 and 273 on identical materials, then
+# 44, 21 and 321 under one definition and 66, 108 and none under another. The
+# engagement names the sources instead; §12 step 1 says so. This is the client
+# speaking, not the method, which is why it lives in the brief.
 BRIEF = """The target is the data room bound to inspect_external: nine
 documents for a small SaaS business called flowmetrics, offered for sale by a
 seller named Dave. I am the buyer's side. Audit it.
+
+The claim sources are doc1 (the listing), doc2 (the tech stack description)
+and doc9 (the technical claims). Those are the documents Dave asserts things
+in. The other six are evidence.
 
 Enumerate the claim surface first and close it as the method says, then work
 the priority order straight through.

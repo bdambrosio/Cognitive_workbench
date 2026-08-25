@@ -122,9 +122,16 @@ Here is the key:
 
 Read the memo. For EACH distinct finding the memo reports, in the order the \
 memo presents them, output one entry:
-- "id": the key id it matches (P1 P2 P3 F1 F2 B1..B7), or "unsupported" if \
-the memo asserts something the data room does not establish, or "other" if \
-it is a real observation that matches no key entry.
+- "id": the key id it matches (P1 P2 P3 F1 F2 B1..B7), or "unsupported", or \
+"other". See the test below for which.
+
+Use "unsupported" ONLY when the memo states a fact that contradicts the data \
+room, or a fact that appears nowhere in it. Use "other" when the underlying \
+facts are in the documents and the memo has drawn its own conclusion from \
+them, even if you disagree with the conclusion, and when the finding is a \
+real observation matching no key entry. If you are unsure which applies, use \
+"other": "unsupported" is a claim about the memo inventing a fact, not about \
+the memo reasoning differently from you.
 - "quote": a short verbatim span from the memo identifying that finding.
 
 Match on SUBSTANCE, not wording. A memo saying "the database shares a dyno \

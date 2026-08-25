@@ -1,67 +1,74 @@
-# Cognitive Workbench — AI-Readiness Audit engagement (2026-08-22)
+# Cognitive Workbench — technical claims audit engagement (2026-08-22)
 #
-# ONE SCENARIO, NOT ONE PER TARGET. Everything that differs between
-# engagements is marked below: two PER-TARGET lines, plus the PER-RUN arm.
-# Cloning the whole file per target would duplicate the persona and let the
-# method fork; the method lives in audit/METHOD.md and this file points at it.
+# ONE SCENARIO FOR EVERY ENGAGEMENT. Three things change per target; nothing
+# else should. Cloning this file per target duplicates the persona and lets
+# the method fork.
 #
-#   world_config.world_name    audit_<target>
+#   world_config.world_name         audit_<target>
 #   characters.Jill.external_repo   the target tree
-#
-# WHY A SEPARATE WORLD PER TARGET. Audit target A then target B in one world
-# and B's audit recalls A's findings. While the targets are Bruce's own that
-# is untidy; at the first paying client it is a confidentiality breach. This
-# project has already been burned by the mechanism — the 2026-08-13
-# coordination rounds were invalidated by a world inheriting the previous
-# run's conclusions. A fresh world_name is the whole fix, and it is permanent
-# rather than depending on remembering to archive.
-#
-# WHAT CARRIES OUT OF AN ENGAGEMENT: method only, as proposed edits to
-# audit/METHOD.md, reviewed by a human before merge. Never a target fact. The
-# test is in METHOD.md §14 — if a lesson cannot be stated without naming the
-# target, it is not a method lesson.
+#   the claim sources               named in the opening turn (below)
 #
 # THE METHOD IS NOT IN THIS FILE. audit/METHOD.md is the authority: scope
-# rule, claim-surface priority, finding format, the eight verdicts, the
-# correction protocol, the two recaps, the recommendation taxonomy, the
-# liability posture, and the run sequence. Duplicating any of it here would
-# create a second source that drifts.
+# rule, priority order, finding format, verdicts, correction protocol,
+# recommendation taxonomy, liability posture, run sequence. A copy here would
+# be a second source that drifts.
+#
+# A FRESH WORLD PER TARGET. Audit target A then target B in one world and B's
+# audit recalls A's findings. On Bruce's own targets that is untidy; at the
+# first paying client it is a confidentiality breach. The 2026-08-13
+# coordination runs were invalidated by exactly this. A new world_name is the
+# whole fix.
+#
+# WHAT LEAVES AN ENGAGEMENT: method only, as proposed edits to audit/METHOD.md,
+# reviewed by a human before merge. Never a target fact. The test is in §12
+# step 7 — if a lesson cannot be stated without naming the target, it is not a
+# method lesson.
 #
 # RUNNING
 #
-#   1. Set the two PER-TARGET lines.
+#   1. Set world_name and external_repo. Decide the claim sources.
 #   2. python3 launcher.py audit.yaml --cli --autonomy
 #   3. Opening turn, roughly:
 #
-#        Read METHOD.md — that is your method. The engagement target is
-#        the repository bound to inspect_external. Enumerate the claim
-#        surface, estimate its size, then work the priority order. Recap as
-#        the method says. I am the client; stop and tell me if you find a
-#        delta.
+#        Read METHOD.md — that is your method. The engagement target is the
+#        repository bound to inspect_external. The claim sources are <name
+#        them>; every other document provided is evidence. I am the buyer's
+#        side. Enumerate the claim surface, close it as the method says, then
+#        work the priority order straight through.
 #
-#   4. On completion: propose METHOD.md edits (technique only), then the
-#      world is retired. Do not reuse it for the next target.
+#   4. On completion the agent proposes METHOD.md edits (technique only). The
+#      world is then retired, never reused.
 #
-# AUTONOMY MUST BE ON. An audit runs longer than one turn's action budget, so
-# it proceeds by yield; with autonomy off a yield spawns a remainder only
-# _handle_tick can fire and a human becomes the scheduler for every leg.
+#   NAME THE CLAIM SOURCES. §2 defines a claim as something the seller asserts
+#   to the buyer, which makes the rest of a data room evidence. Which
+#   documents those are is an engagement fact, not something to infer: given
+#   the same nine documents, three backends enumerated 62, 67 and 273 claims
+#   (2026-08-25). §12 step 1 has the fallback if they are not named.
 #
-# BACKEND is the PER-RUN choice; see the arm block below. For a real
-# engagement the model runs on single-tenant hardware — a client's codebase
-# should not transit an inference provider chosen per-request by a gateway.
-# The OpenRouter arms are for testing against synthetic or own-code targets.
+#   DO NOT ADD INSTRUCTIONS HERE THAT THE METHOD FORBIDS. This block once told
+#   the agent to recap every five findings and stop on a delta. §8 and §12
+#   step 4 had already removed both, and the agent was left resolving the
+#   contradiction at runtime.
+#
+# AUTONOMY MUST BE ON. An audit runs longer than one turn's action budget and
+# proceeds by yield. With autonomy off, a yield spawns a remainder only
+# _handle_tick can fire, and a human becomes the scheduler for every leg.
+#
+# BACKEND is per-run; see the arm block below. A real engagement runs on
+# single-tenant hardware: a client's materials should not transit an inference
+# provider chosen per-request by a gateway. The OpenRouter arms are for
+# synthetic or own-code targets.
 #
 # VALIDATION. Point external_repo at measure/fixtures/dataroom/corpus and run
-# it: that fixture has an answer key and a mechanical scorer
-# (measure/fixtures/dataroom/score.py) which reports tier recall and the
-# difficulty rung reached. It is how you check the method still works after
-# changing it.
+# it. That fixture has an answer key and a mechanical scorer
+# (measure/fixtures/dataroom/score.py) reporting tier recall and difficulty
+# rung. It is how you check the method still works after changing it.
 #
-# Derived from venture.yaml, whose empty-infospace design and character block
-# this reuses. The partner-facing material is dropped — an audit is solo.
+# Derived from venture.yaml, reusing its empty-infospace design and character
+# block. The partner-facing material is dropped: an audit is solo.
 
 world_config:
-  # PER-TARGET (1 of 2) — a fresh name per engagement, never reused.
+  # PER-TARGET — a fresh name per engagement, never reused.
   world_name: "audit_TARGET"
 
 llm_config:
@@ -81,66 +88,53 @@ characters:
   Jill:
     mode: chat
 
-    # PER-TARGET (2 of 2) — the tree under audit. inspect_external is bound
-    # to it and cannot see anything else; `inspect` reads the tree named by
-    # inspect_repo below, which is where audit/METHOD.md lives.
+    # PER-TARGET — the tree under audit. inspect_external is bound to it and
+    # can see nothing else. `inspect` reads inspect_repo below, where
+    # audit/METHOD.md lives.
     external_repo: /path/to/target
 
-    # THE `inspect` GEOFENCE. Relative to the repo root; `audit/` holds
-    # METHOD.md and nothing else, which is the entirety of what an audit
-    # legitimately reads from this side.
+    # THE `inspect` GEOFENCE, relative to the repo root. `audit/` holds
+    # METHOD.md and nothing else, which is all an audit needs from this side.
     #
-    # It used to be the whole checkout, and the whole checkout contains
-    # measure/fixtures/dataroom/answer_key.md — whose own third line reads
-    # "Do not place this file where an agent under test can read it" — plus
-    # every previously committed arm's report.md. On 2026-08-23 a run's grep
-    # for "Gap Map" and "claim surface" returned a prior arm's full_reply.md
-    # among its hits. No arm is known to have used any of it; the point is
-    # that a benchmark whose answers are inside the geofence is not
-    # measuring what it claims to, and the exposure grows with every run
-    # committed.
+    # It was the whole checkout, which contains the fixture's answer key and
+    # every committed arm's report. On 2026-08-23 a run's grep for "Gap Map"
+    # returned a prior arm's full_reply.md. No arm is known to have used it,
+    # but a benchmark whose answers sit inside the geofence measures nothing,
+    # and the exposure grows with every committed run.
     #
-    # A real (non-fixture) engagement can widen this, but should ask what
-    # else is in the tree first.
+    # A real engagement can widen this. Check what else is in the tree first.
     inspect_repo: audit
 
     # THE WORKFLOW — the procedure, loaded verbatim into the static system
     # prompt at launch. Path is relative to the repo root; the file stays in
     # git as the single reviewable source and is read from there each launch.
     #
-    # It used to be read with `inspect` at the start of an engagement, and it
-    # did not survive: tool observations cap at 1000 chars in the stored
-    # trace and drop out of the history window entirely, so by the leg that
-    # wrote the report the method had decayed to §1 and half of §2. Measured
-    # 2026-08-23 — across four runs "Conditional", "Material" and "Walk"
-    # appear zero times in any working log. Sections marked
-    # `<!-- audience: practice -->` (liability posture, engagement history)
-    # are stripped by the loader; they are for whoever runs the practice.
+    # Do not go back to reading it with `inspect`. Tool observations cap at
+    # 1000 chars in the stored trace and leave the history window, so by the
+    # leg that wrote the report the method had decayed to §1 and half of §2:
+    # across four runs (2026-08-23) "Conditional", "Material" and "Walk"
+    # appear zero times in any working log.
+    #
+    # Sections marked `<!-- audience: practice -->` are stripped by the
+    # loader. They are for whoever runs the practice, not the auditor.
     workflow: audit/METHOD.md
 
-    # An auditor executing an engagement is not maintaining a relationship.
-    # Suppresses discourse state, the per-turn companion-model update, and
-    # the orientation block — measured at ~4.5k chars and two extra LLM calls
-    # per turn on a run that has no relationship to model yet.
+    # An auditor running an engagement is not maintaining a relationship.
+    # Suppresses discourse state, the per-turn companion-model update and the
+    # orientation block: ~4.5k chars and two extra LLM calls per turn, spent
+    # modelling a relationship that does not exist. What was suppressed is
+    # logged each launch.
     #
-    # Today this resolves to two switches that already existed; it is a named
-    # bundle so that a subsystem added later has somewhere to be listed, and
-    # so the intent is in the scenario rather than inferred from three
-    # booleans. What it actually suppressed is logged each launch.
+    # NOT suppressed: concerns. A `yield` carries its remainder into the next
+    # leg as a concern, and an audit runs on yields.
     #
-    # NOT suppressed: concerns. Concern creation is how a `yield` carries its
-    # remainder into the next leg, and an audit runs on yields.
-    #
-    # The consultation phase — the client asking the auditor questions after
-    # delivery — wants all of this back on. That is a different mode of the
-    # same engagement, and is not built.
+    # The consultation phase — the client asking questions after delivery —
+    # would want all of this back on. Not built.
     workflow_mode: true
 
-    # PER-RUN (3 of 3) — the arm. Arms live in measure/arms/*.yaml and are
-    # applied by measure/fixtures/dataroom/run.py --arm, which REPLACES this
-    # block rather than merging into it. They are not duplicated here: a
-    # second copy is a second source that drifts, which is the same reason
-    # the method lives only in audit/METHOD.md.
+    # PER-RUN — the arm. Arms live in measure/arms/*.yaml and are applied by
+    # measure/fixtures/dataroom/run.py --arm, which REPLACES this block rather
+    # than merging into it. Not duplicated here: a second copy drifts.
     #
     # NEVER LEAVE A GATEWAY ARM UNPINNED. Four providers serve nemotron and
     # the default route lands on the one with no `response_format` support —
