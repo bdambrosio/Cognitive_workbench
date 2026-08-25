@@ -65,29 +65,32 @@ the auditor were still there.
 
 Four specific things:
 
-These fall into three kinds — **executable** state, **epistemic** state, and
-**provenance** state — and they are not interchangeable.
-
-**The derivations** (executable). As above. Every derived finding is an expression over
+**The derivations.** As above. Every derived finding is an expression over
 stated figures, and the expression is thrown away.
 
-**The coverage reasoning** (epistemic). The method requires a Gap Map: what was not
+**The coverage reasoning.** The method requires a Gap Map: what was not
 checked and why that matters. The delivered Gap Map is a summary of that
 reasoning, roughly 150 words standing in for an entire pass over the claim
 surface. The buyer who asks *"why didn't you check the git history?"* is
 asking a question the auditor answered internally and the artifact did not
 contain.
 
-**The evidence chain** (provenance). Every finding cites `file:lines`. In the artifact
+**The evidence chain.** Every finding cites `file:lines`. In the artifact
 those are strings a human could go look up. In the process they are live
 references into a corpus, with the retrieved spans attached.
 
-**The rejected hypotheses** (epistemic). That run closed the claim surface at 33 seller
+**The rejected hypotheses.** That run closed the claim surface at 33 seller
 claims and reported thirteen findings. The rest came
 back clean and are not in the report — correctly, because a report that lists
 everything it checked is unreadable. But *"did you look at the SSL
 configuration?"* has an answer (it did; SSL is Heroku-managed and auto-renews;
 it was one of the claims that held), and the artifact does not carry it.
+
+Two of those are the same kind of thing. The coverage reasoning and the
+rejected hypotheses are both decisions about what *not* to pursue, and a
+decision not to pursue something leaves no trace in the output by definition.
+They are the hardest to reconstruct afterwards and the most likely to be asked
+about.
 
 The report is a lossy projection. That is not a flaw in the report; a report
 that carried all of this would be unreadable. The
@@ -167,8 +170,8 @@ continuation answers a question two weeks after delivery, it is not speaking as
 the auditor who signed the report. **A continuation must never silently inherit
 the authority of the signed artifact.** The signed findings were reviewed; a
 counterfactual computed on request was not, and it has to say so — which is a
-commercial distinction as much as an epistemic one, because the signature is
-what the client paid for.
+commercial distinction as much as a technical one: the signature is what the
+client paid for.
 
 This is the discipline I already apply to measurement: every benchmark row
 records the model, the harness commit and the grader, because a row that cannot
