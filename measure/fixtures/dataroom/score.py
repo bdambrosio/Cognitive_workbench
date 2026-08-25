@@ -319,7 +319,18 @@ _REC_TERM_RE = {
         # it, and re.M is what makes `$` mean end-of-line rather than end of
         # the whole report. Getting either wrong turned 13 correct rows into
         # false negatives — caught by re-scoring all 19, not by reading it.
-        r"(?=[^\S\n]*(?:[.,;:)\]|—–-]|$))", re.I | re.M)
+        #
+        # `(` IS A TERMINATOR, and its absence was the THIRD bug in this
+        # function — 2026-08-25, same discovery method as the first two. An
+        # arm wrote "**Recommendation: Material** (coverage: 28 of 62 claims
+        # individually verified)." and scored FAIL on §9. The closing paren
+        # was already here; the opening one was not, so a verdict followed by
+        # a parenthetical qualifier failed the guard. Semantically an opening
+        # paren is the same event as `—` or `.`: the clause ended on the term
+        # and a qualifier follows. The guard's real target — `Clear` and
+        # `Walk` used as ordinary verbs — is untouched, because "Clear the
+        # backup failures" puts a LETTER after the term, not a bracket.
+        r"(?=[^\S\n]*(?:[.,;:()\]|—–-]|$))", re.I | re.M)
     for term in _REC_VOCAB
 }
 
@@ -469,10 +480,16 @@ def main() -> int:
     cs = facts["claim_surface"]
     if cs["declared"]:
         early = cs["leg"] <= max(1, cs["total_legs"] // 2)
+        if not cs["count"]:
+            note = ("   <-- n=0 is not a closure; every coverage figure "
+                    "divides by it")
+        elif early:
+            note = ""
+        else:
+            note = ("   <-- closed late; verification ran before the "
+                    "denominator was fixed")
         print(f"  claim surface        closed leg {cs['leg']} of "
-              f"{cs['total_legs']}, n={cs['count']}"
-              + ("" if early else "   <-- closed late; verification "
-                                 "ran before the denominator was fixed"))
+              f"{cs['total_legs']}, n={cs['count']}" + note)
     else:
         print("  claim surface        NOT CLOSED — §12.2 requires "
               "=== CLAIM SURFACE ===")
@@ -566,7 +583,15 @@ def main() -> int:
         ("no unsupported claims",     unsupported == 0),
         ("§6 verdicts only",           not vc["off_vocabulary"]),
         ("limitations statement",      LIMITS_MARK in report),
-        ("claim surface closed",       facts["claim_surface"]["declared"]),
+        # A DECLARED ZERO IS NOT A CLOSURE. 2026-08-25: an arm's first
+        # external listing returned no entries, so it emitted the marker with
+        # `0 claims`, recovered, and re-froze at 273 — which its report then
+        # used throughout. This criterion tested `declared` alone and passed
+        # it, recording a denominator of 0 for a report that never used one.
+        # Zero fails the thing the marker exists to fix: it is the number
+        # every coverage figure divides by.
+        ("claim surface closed",       facts["claim_surface"]["declared"]
+                                       and bool(facts["claim_surface"]["count"])),
     ]
     passed = all(ok for _, ok in checks)
     print(f"\n  THRESHOLD           {'PASS' if passed else 'FAIL'}"
