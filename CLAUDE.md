@@ -25,6 +25,31 @@ natural-language description, embedding similarity, or another
 meaning-based method. Keyword lists always miss edge cases. Only with
 explicit permission.
 
+## Write for the reader, not for yourself
+
+Scratch files and working notes can use any shorthand. Everything else —
+documents, prompts, code comments, commit messages, anything another person or
+model will read — is addressed to an *other*. Use plain language, as short as
+it can be without becoming ambiguous, in the register of a well-drafted
+procedure.
+
+**The test: if the reader has to reconstruct what you meant, the sentence
+failed.** Three ways that happens, all found in this repo:
+
+- **A metaphor standing in for a rule.** "Load-bearing" meant *mandatory*; say
+  mandatory.
+- **A term defined precisely, then reused loosely.** `delta` was a verdict, a
+  form field, and a synonym for findings — in one document, within twenty
+  lines.
+- **Compression that reads as precision.** "One assertion" sounds exact and has
+  no fixed size. Two models read it at different scales and neither misread it.
+
+This is not a style preference. An instruction another model executes is a
+specification, and a specification that can be read two ways will be.
+
+Going forward, not backward: applies to new and edited text. Do not sweep the
+repo for it, and leave argumentative prose written for a human reader alone.
+
 ## Sampling settings are code, not convention
 
 `top_p` is 0.95 globally; temperature is per-model. Both live in
