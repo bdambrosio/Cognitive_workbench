@@ -160,8 +160,13 @@ Claim (<source>, e.g. README line 201-202): <the stated claim>
 
 Evidence: <file:lines> — <what the code actually does>
 
-Delta: <None, or the specific gap>
+Gap: <None, or the specific gap>
 ```
+
+**The field is `Gap`, not `Delta`, because it is filled on every finding
+regardless of verdict.** `[delta]` is one of §6's nine verdicts; the gap line
+is required on all of them, and a `[partial]`'s gap written under a heading
+named after the `[delta]` verdict reads as the stronger finding it is not.
 
 **A finding must cite its source**, both halves: the document making the
 claim, and the file and line range showing the implementation. The citation
@@ -279,8 +284,8 @@ obeying a format with one shape in it.
 | `[real]` | Claim holds; implementation matches spec | None |
 | `[real, minor caveat]` | Holds; note does not change the decision | Awareness |
 | `[real, operational caveat]` | Holds today; operational context qualifies it | Awareness + operational planning |
-| `[partial]` | Mostly true, with a specific citable gap | **Material** — buyer should price the gap |
-| `[delta]` | Claim is false; the code does not do what the docs say | **Material** — buyer should revalue or walk |
+| `[partial]` | Mostly true, with a specific citable gap | **Material** — a gap to price |
+| `[delta]` | Claim is false; the code does not do what the docs say | **Material** — a broken promise, and possibly a pattern |
 | `[unverifiable]` | Could not be verified from available materials | Not a finding — goes in Remaining Claims with the reason |
 | `[non-delta]` | No claim to verify (code exists, docs make no statement) | Not a finding — noted for completeness |
 | `[derived]` | Not a claim test — a consequence computed from two or more stated figures (§5's second shape) | **As severe as the consequence.** Frequently material |
@@ -349,10 +354,10 @@ deliverable to that reader.
 
 | Recommendation | Meaning |
 |---|---|
-| **Clear** | No deltas, no caveats of note. The system does what it says. |
-| **Clear with caveats** | No functional deltas. Documentation drift, maintenance debt or operational notes a buyer should know, which do not change the fundamental valuation. *(Body landed here.)* |
-| **Conditional** | Deltas found but addressable — fixable in a sprint or two, or the feature is non-critical. Proceed if the seller will fix them or the buyer accepts the gap. |
-| **Material** | Deltas that significantly change valuation or risk profile. The buyer must price this in explicitly or walk. |
+| **Clear** | No `[delta]` and no `[partial]` findings, and no caveats of note. The system does what it says. |
+| **Clear with caveats** | No `[delta]` or `[partial]` findings. Documentation drift, maintenance debt or operational notes a buyer should know, which do not change the fundamental valuation. *(Body landed here.)* |
+| **Conditional** | Material findings, but addressable — fixable in a sprint or two, or the feature is non-critical. Proceed if the seller will fix them or the buyer accepts the gap. |
+| **Material** | Material findings that significantly change valuation or risk profile. The buyer must price this in explicitly. |
 | **Walk** | Claims are systematically false, or the codebase is not what the docs describe. |
 
 **The audit recommends; the buyer decides.** The audit says "Conditional: the
@@ -474,6 +479,23 @@ the operational detail; this section is the method.
    the client; the count comes first, on its own line, because it is the
    number every coverage figure in the report divides by.
 
+   **What counts as one claim.** One claim is one assertion that can take
+   exactly one §6 verdict. Two statements that would always take the same
+   verdict on the same evidence are one claim; a statement that could hold in
+   one part and fail in another is more than one. **Every claim on the surface
+   is counted, whatever its priority** — §4's tiers govern the order of
+   verification, not the denominator. Low-priority claims verified in
+   aggregate rather than individually stay in the count and are reported as
+   what they are.
+
+   Measured 2026-08-25: three arms on identical materials returned
+   denominators of 62, 67 and 273. ISAE 3000 (Revised) para 24(b)(ii) requires
+   criteria permitting "reasonably consistent measurement or evaluation ... when
+   used in similar circumstances by different practitioners" (A45(c)), and A46
+   excludes vague descriptions. A 4x spread fails that test by name. The
+   standard requires this rule and does not supply it, so the rule above is
+   the method's own.
+
    Measured 2026-08-24, first exposure, three arms, three readings of a
    looser wording: one stated the count, one enumerated the surface and never
    counted it, and one quoted the instruction back. All three were defensible
@@ -494,20 +516,25 @@ the operational detail; this section is the method.
 3. **Prioritise** per §4's safety → architecture → operations → micro order.
    Verify top N.
 4. **Work the priority order straight through.** Do not pause for
-   confirmation; there is no channel to the client mid-engagement. Deltas are
-   reported in the deliverable, where the client can act on them.
+   confirmation; there is no channel to the client mid-engagement. Findings
+   are reported in the deliverable, where the client can act on them.
 5. **Continue to the coverage threshold where the report is defensible** —
    §4's "7% is not enough" rule applied in reverse: stop when the consistency
    rate and the severity distribution of what remains make the rest low-risk.
 6. **Write the report.** Apply §7 to any findings that were revised.
-6b. **Verify the report against its own citations.** Every claim resolves to
-   a line in the materials, or it does not ship — §5 applied to the finished
+6b. **Verify the report against its own citations.** Every finding must carry
+   both halves — the document making the claim, and the file and line range
+   settling it — and every one of those references must resolve to a line
+   that is actually in the materials. A finding whose citation does not
+   resolve does not ship (see §5). This is applied to the finished
    deliverable rather than trusted to the author. It catches a claim citing
    nothing, not one citing the wrong line convincingly: a floor, not a
    guarantee.
-7. **Deliver. Propose method-file edits (technique only).** The working record
-   is then copied out and the world destroyed (§14) — both by the practice,
-   not by you.
+7. **Deliver. Propose method-file edits (technique only).** A proposed edit
+   states a technique, never a fact about this target: *if the lesson cannot
+   be stated without naming the target, it is not a method lesson.* Read every
+   proposed edit for proper nouns before including it. The working record is
+   then copied out and the world destroyed — both by the practice, not by you.
 
 **There is no independent review, and that is a decision rather than an
 oversight.** Step 6b is self-review — the author checking its own citations —
@@ -532,6 +559,14 @@ self-reviewed report is the weakest link in §10's defence.
   finding, the report.
 
 ## 14. What carries between audits, and what must not
+
+<!-- audience: practice -->
+
+Retention periods, destruction dates, engagement-letter clauses and who
+reviews a proposed edit are the practice's, not the auditor's. The one rule
+the auditor needs from this section — a proposed method edit states a
+technique and names no target — is inlined at §12 step 7, because a pointer
+into a section the auditor never receives is no rule at all.
 
 Each audit runs in its own world, which is discarded afterwards. That
 protects client confidentiality but would also throw away everything learned
