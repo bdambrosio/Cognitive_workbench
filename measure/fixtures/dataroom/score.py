@@ -151,19 +151,29 @@ def claim_surface(world: str, agent: str) -> Dict[str, Any]:
     and only the trace knows which leg each thing happened in. The report is a
     single artifact with no time in it.
 
-    Mechanical. The count is the first integer on or after the marker line;
-    prose around it ("roughly", "micro-claims") is ignored. A range like
-    "45-55" takes the first number, which is the conservative denominator.
+    Mechanical, and DELIBERATELY STRICT. §12.2 fixes the shape — the marker,
+    then a count and the word `claims` on the next line — so this matches that
+    and nothing else. The first version took "the first integer on or after
+    the marker", which on first exposure returned n=1 for an arm that listed
+    its surface ("1) Asking $480k...") and n=463 for an arm that quoted the
+    instruction back without ever closing anything. A confident wrong
+    denominator is worse than none: every coverage figure divides by it.
+
+    Not matched means NOT CLOSED, which is the honest reading — the method
+    asks for a specific artifact and it is absent.
     """
     turns = load_turns(world, agent)
     for i, t in enumerate(turns, 1):
         body = f"{t.working_log}\n{t.raw.get('raw_response') or ''}"
         if SURFACE_MARK not in body:
             continue
-        tail = body.split(SURFACE_MARK, 1)[1][:400]
-        m = re.search(r"\d[\d,]*", tail)
+        tail = body.split(SURFACE_MARK, 1)[1][:300]
+        # <N> claims — tolerating "micro-claims", "stated claims", bold marks.
+        m = re.search(r"(\d[\d,]*)\s+\S*claims\b", tail, re.I)
+        if not m:
+            continue        # marker present but no count: keep looking
         return {"declared": True, "leg": i, "total_legs": len(turns),
-                "count": int(m.group().replace(",", "")) if m else None}
+                "count": int(m.group(1).replace(",", ""))}
     return {"declared": False, "leg": None, "total_legs": len(turns),
             "count": None}
 

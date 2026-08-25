@@ -466,7 +466,19 @@ the operational detail; this section is the method.
 
    ```
    === CLAIM SURFACE ===
+   <N> claims
    ```
+
+   The line immediately after the marker carries the count and nothing else:
+   a number, then the word `claims`. List the surface afterwards if it helps
+   the client; the count comes first, on its own line, because it is the
+   number every coverage figure in the report divides by.
+
+   Measured 2026-08-24, first exposure, three arms, three readings of a
+   looser wording: one stated the count, one enumerated the surface and never
+   counted it, and one quoted the instruction back. All three were defensible
+   readings of "state the count after the marker", which is why the shape is
+   now fixed rather than described.
 
    From that point the surface is **frozen**. It is the denominator every
    coverage figure in the report is measured against, and a denominator that
