@@ -8,11 +8,23 @@ when you change an input the conclusions move. Hand someone a PDF export of
 that spreadsheet and they get the same numbers and none of the capability. The
 values survive; the machine that produced them does not.
 
-Every agent workflow I have seen ships the PDF.
+Most agent workflows still treat the final artifact as the product boundary.
+They ship the PDF.
 
-The claim of this essay is that the artifact is the wrong product boundary.
-The output of an intelligent workflow should be a continuation of the
-intelligence that produced it, not a transcript of its conclusions.
+The claim of this essay is that this is the wrong boundary. The output of a
+reasoning-intensive workflow should be a continuation of the intelligence that
+produced it, not a transcript of its conclusions.
+
+**A continuation is not a process left running.** It is a reconstruction: an
+immutable artifact plus enough versioned state to rebuild, challenge and
+conditionally recompute the reasoning behind it. Nothing here asks you to keep
+an agent alive, and the hard part is not liveness — it is deciding what state
+is worth keeping.
+
+One qualification up front, because an experienced reader will raise it within
+a paragraph: a spreadsheet's computation is formal and executable, and most
+agent reasoning is neither. That gap is real, it is the subject of a section
+below, and it bounds the claim rather than sinking it.
 
 ## A worked example, from a real run
 
@@ -53,21 +65,24 @@ the auditor were still there.
 
 Four specific things:
 
-**The derivations.** As above. Every derived finding is an expression over
+These fall into three kinds — **executable** state, **epistemic** state, and
+**provenance** state — and they are not interchangeable.
+
+**The derivations** (executable). As above. Every derived finding is an expression over
 stated figures, and the expression is thrown away.
 
-**The coverage reasoning.** The method requires a Gap Map: what was not
+**The coverage reasoning** (epistemic). The method requires a Gap Map: what was not
 checked and why that matters. The delivered Gap Map is a summary of that
 reasoning, roughly 150 words standing in for an entire pass over the claim
 surface. The buyer who asks *"why didn't you check the git history?"* is
 asking a question the auditor answered internally and the artifact did not
 contain.
 
-**The evidence chain.** Every finding cites `file:lines`. In the artifact
+**The evidence chain** (provenance). Every finding cites `file:lines`. In the artifact
 those are strings a human could go look up. In the process they are live
 references into a corpus, with the retrieved spans attached.
 
-**The rejected hypotheses.** That run closed the claim surface at 33 seller
+**The rejected hypotheses** (epistemic). That run closed the claim surface at 33 seller
 claims and reported thirteen findings. The rest came
 back clean and are not in the report — correctly, because a report that lists
 everything it checked is unreadable. But *"did you look at the SSL
@@ -84,8 +99,8 @@ The obvious objection is that this is retrieval over the report with extra
 steps. Attach the PDF to a chat window and you are done.
 
 You are not, and the difference is testable. A continuation can do four things
-a retrieval layer over the artifact provably cannot, because the artifact does
-not contain the information required:
+a retrieval layer cannot recover if the producing workflow never externalized
+them:
 
 1. **Recompute a derived finding under a changed assumption.** The derivation
    is present, not merely its result.
@@ -95,10 +110,13 @@ not contain the information required:
    not make the page.
 4. **Change its verdict.**
 
-The fourth is decisive. Retrieval over the report holds the *conclusion* and
-none of the evidence, so under challenge it can only restate. A continuation
-holds the evidence chain, and can therefore be argued out of a finding — or
-can refuse to be, and say exactly which line it is standing on.
+The fourth is decisive. A report carries citations, and good retrieval can
+attach the corpus and pull the cited passages back — so this is not a claim
+that the evidence is gone. What is gone is the **relationship** among the
+evidence, the alternatives, the assumptions and the conclusion, which was never
+written down anywhere. Under challenge, retrieval can only restate. A
+continuation holds that relationship, and can therefore be argued out of a
+finding — or refuse to be, and say exactly which line it is standing on.
 
 If your live deliverable cannot change its mind, you built a chatbot with a
 document in its context, and this essay is not about that.
@@ -136,24 +154,29 @@ exactly the hallucination surface the versioning was meant to contain. So the
 spreadsheet property is real for the arithmetic cases and aspirational for the
 rest, and a system that blurs the two is claiming trust it has not earned.
 
-And "stamped" is not enough. A version number tells the reader *that*
-something moved, which is the least useful part. What they need to see is
-**which assumption moved, and what the evidence did in response** — that
-retention went 30 → 14, that the expiry consequently precedes the closing
-date, that Finding 1 escalated from operational to material as a result. The
-signed finding and the counterfactual one have to be visibly different kinds
-of object, not two entries in a list. A continuation that can change its mind
-without showing its work is worse than the frozen report, because it is
-equally unauditable and now also moves.
+And "stamped" is not enough. A version number says *that* something moved,
+which is the least useful part. The reader needs **which assumption moved and
+what the evidence did in response** — retention 30 → 14, expiry now before the
+closing date, Finding 1 escalated from operational to material. The signed
+finding and the counterfactual have to be visibly different kinds of object. A
+continuation that changes its mind without showing its work is worse than the
+frozen report: equally unauditable, and now also moving.
 
-This is not a new discipline. It is the one I already apply to measurement in
-this project: every benchmark row records the model that produced it, the
-harness commit it ran on, and the grader that scored it, because a row that
-cannot name its own configuration is not evidence. That rule turns out to
-apply to deliverables as well as to experiments, and for the same reason.
+It also needs a boundary the versioning does not supply on its own. When the
+continuation answers a question two weeks after delivery, it is not speaking as
+the auditor who signed the report. **A continuation must never silently inherit
+the authority of the signed artifact.** The signed findings were reviewed; a
+counterfactual computed on request was not, and it has to say so — which is a
+commercial distinction as much as an epistemic one, because the signature is
+what the client paid for.
 
-Provenance is what makes carrying the reasoning forward trustworthy rather
-than merely impressive. Without it there is no product, only a demonstration.
+This is the discipline I already apply to measurement: every benchmark row
+records the model, the harness commit and the grader, because a row that cannot
+name its own configuration is not evidence. It applies to deliverables for the
+same reason.
+
+Provenance is what makes this trustworthy rather than merely impressive.
+Without it there is no product, only a demonstration.
 
 ## An engineering constraint I do not want to paper over
 
@@ -246,18 +269,25 @@ measurements of a process rather than of an artifact.
 Set the two claims side by side:
 
 - **Do not evaluate the artifact. Evaluate the process that made it.**
-- **Do not deliver the artifact. Deliver the process that made it.**
+- **Do not deliver only the artifact. Deliver the state that makes its
+  reasoning reconstructible.**
 
-The first is now uncontroversial in my own work; I rebuilt the benchmark
-around it. The second is the same sentence with one word changed, and I cannot
-find the argument for accepting one and rejecting the other.
+The second is deliberately weaker, and the weakness is the point. "Deliver the
+process" is a slogan that cannot be honoured: a process includes ephemeral
+model state, stochastic computation and tool behaviour that may not reproduce.
+What can be handed over is structured state — evidence, configuration,
+assumptions, derivations, and what was considered and rejected.
+
+Which raises the question I think is actually the hard one, and which I do not
+have a general answer to: **what is the minimal sufficient state from which a
+defensible continuation can be reconstructed?** Store too little and the
+continuation cannot answer the second question. Store everything and you have
+replaced a deliverable with an archive nobody can audit either.
 
 If the artifact is too lossy to *judge* the work by, it is a poor candidate for
-*being* the work. Not an identity — an evaluator can afford lossiness a
-customer cannot, because the evaluator has the trace and the customer has only
-what was sent. That asymmetry is the argument, not a weakening of it: the
-customer is the one who needed the reasoning and is the only one who did not
-get it.
+*being* the work — and the asymmetry cuts the way you would not want. The
+evaluator, who can afford the loss, has the trace. The customer, who cannot,
+has only what was sent.
 
 ## Where this does not apply
 
