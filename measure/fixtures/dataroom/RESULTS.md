@@ -219,7 +219,167 @@ Comparing across that line would be comparing two instruments. Those runs did
 their job — every fix above was found by running them — and they remain in
 git history if a specific claim ever needs checking.
 
-## Pick up here — 2026-08-24, end of session
+## Pick up here — 2026-08-25, end of session
+
+**Frozen at `bc4ae148`** (METHOD.md, run.py, audit.yaml). `score.py` moved once
+after that, at `3b1d6e07`, before any campaign run — see "The scorer read a
+tool's output as the auditor's closure" below. Zero campaign runs on the board.
+
+### Next: three runs per arm
+
+```bash
+R=~/Downloads/Cognitive_workbench
+eval "$(grep -m1 '^export XAI_API_KEY=' ~/.bashrc)";    export XAI_API_KEY
+eval "$(grep -m1 '^export OPENAI_API_KEY=' ~/.bashrc)"; export OPENAI_API_KEY
+for i in 1 2 3; do for a in grok:grok_4p6 qwen:qwen_local luna:luna_openai; do
+  n=${a%%:*}; f=${a##*:}
+  python3 $R/measure/fixtures/dataroom/run.py --world m1_${n}_$i \
+          --arm $R/measure/arms/${f}.yaml
+done; done
+```
+
+Interleave by round, not blocked by arm. Then `score.py --world <w>` per run;
+the grader costs one call each. About 20 minutes per round on today's timings
+(grok ~310s, qwen ~450s, luna ~465s).
+
+**Expect roughly one run in four to need a retry.** Six claim-enumeration runs
+today produced two failures: a 300-second read timeout on the local server
+mid-loop, and an arm whose five inspection attempts all returned nothing. Both
+succeeded on retry. Decide the retry policy before starting, not during.
+
+### The threshold no longer discriminates
+
+All three arms passed all eight criteria on 2026-08-25 (`s6_*`). Read the
+vector, not the threshold. What separated the arms:
+
+| | grok | qwen | luna |
+|---|---|---|---|
+| Tier 1 must-find | 3/3 | 3/3 | 3/3 |
+| Tier 2 derived | 1/2 | 2/2 | 1/2 |
+| Tier 3 credit | 5 | 5 | 4 |
+| findings · distinct verdicts | 15 · 7 | 28 · 5 | 7 · 2 |
+| claim surface | 33 | 32 | 86 |
+| subagent no-answer | 0/5 | 0/9 | 7/34 (21%) |
+| wall clock | 306s | 447s | 464s |
+
+All three led with P2, the key's top-ranked finding.
+
+## The claim surface: named by the engagement, not inferred
+
+**The problem.** Three arms given the same nine documents enumerated 62, 67 and
+273 claims. Every coverage figure in a report divides by that number.
+
+**Two attempts to fix it by defining a claim more precisely both failed.**
+"One claim is one assertion that can take exactly one §6 verdict" widened the
+spread to 44, 21 and 321 — "one assertion" has no fixed size, and two arms read
+it at different scales without either misreading it. A second, procedural
+version produced 66 and 108 and left the third arm unable to close the surface
+at all: it was longer, and the arm relayed the instruction text into a subagent
+query instead of executing it.
+
+**What worked.** §2 defines a claim as an assertion the seller makes to the
+buyer, which makes source code, comments and a data room's evidence documents
+evidence rather than claims. §12 step 1 has the engagement name which documents
+carry the assertions. For the fixture that is doc1, doc2 and doc9.
+
+**Measured after the change.** grok 33, qwen 70, luna 88 — but all three read
+only the three named documents, and grok and qwen cited an identical 21-line
+set (Jaccard 1.00; luna 0.75, differing only on where doc2's paragraph breaks).
+Scope is settled. The residual is grain, and it is immaterial: a denominator
+only has to be internally consistent and disclosed, and no client compares two
+auditors' denominators. §12a, practice-only, has a person confirm the surface
+before delivery.
+
+**The fixture was flattering us.** On ChatterMate — a 625-line README —
+grok enumerated 244 claims and qwen 58, agreeing on only 129 of 311 cited lines
+(Jaccard 0.41). The 1.00 is substantially a property of three short,
+claim-dense documents, not of the method. Do not report fixture agreement as a
+general result.
+
+### Claim sources, settled per target
+
+| target | claim sources | grok count |
+|---|---|---|
+| FlowMetrics (fixture) | doc1, doc2, doc9 | 33 |
+| ChatterMate | README.md, llms.txt, HELP_CENTER_INFRA.md | 244 |
+| Body | README.md, body_project_spec.md | 164 |
+
+`claims.py` enumerates and stops — one leg, no verification, about a fifth of a
+scored run. `overlap.py` compares two surfaces by what they cited, because two
+arms both reporting 28 claims may have enumerated two different sets of 28.
+
+## The scorer read a tool's output as the auditor's closure
+
+An arm reported 28 findings against a 14-claim surface. That is impossible, and
+the 14 was the scorer's number rather than the arm's. It came from a
+`process_text` call whose observation arrived truncated at the 1000-char trace
+cap, announcing 14 while listing 18. The arm said so in its next thought — "the
+output is unreliable... it says 14 claims but lists 18" — discarded it,
+re-enumerated, and closed at 32 in its own words. `claim_surface` took the
+first marker with a count and recorded the one the agent had rejected.
+
+**The 1000-char cap is not the fix.** `chat_loop.py:1719` states that the
+stored record is re-injected in full into the next few turns' prompts, so the
+cap bounds prompt text as well as trace size. Raising it changes what every
+model reads on every later turn.
+
+**Excluding tool output was tried first and was wrong.** An arm may close the
+surface through a tool — delegate the enumeration and adopt the result — and
+that is a real closure. Across the 15 runs on disk, excluding observations
+turned three legitimate tool-delegated closures into no count at all, which
+fails the threshold. Position does not separate the good case from the bad;
+adoption does, and that needs judgement.
+
+The rule is now: **read the agent's own `ACTION:` lines first, fall back to
+what it was handed.** Exactly one number moved across 15 runs.
+
+## `unsupported` gated a PASS/FAIL on an unstable definition
+
+The same memo scored 2 unsupported claims, then 0, on consecutive grader calls.
+The definition described the category rather than testing for it. It now reads:
+unsupported only where the memo states a fact that contradicts the data room or
+appears nowhere in it; where the facts are in the documents and the memo has
+drawn its own conclusion, that is "other". Ties break to "other", because the
+uncertain case belongs on the ungated side. Three consecutive calls afterwards:
+0, 0, 0.
+
+## METHOD rewritten for its reader — 2026-08-25
+
+Agent-visible text went from 32,333 to about 20,000 characters. Removed: a
+scope rule describing a codebase audit for engagements that have no codebase,
+and which excluded the financial claims that produce the most material
+findings; a §3 telling a SaaS auditor to put security "front and centre" while
+§11 says this is not a penetration test; a §8 titled "two recaps" that
+described one, and which used "§1" to mean the report's first section rather
+than this file's; every pointer into a practice-stripped section; and three
+target facts carried from a previous engagement, which §14 forbids.
+
+Four terms had been defined precisely and then reused loosely: `delta` named a
+verdict, a form field and a synonym for findings; `walk` sat in both the
+audit's vocabulary and the buyer's, two lines apart, inside the section
+forbidding the conflation; `micro-claim` meant both the whole surface and its
+lowest tier; `statement` meant a sentence in one rule and an assertion in the
+next, which made the two rules contradict. The general rule is now in
+`CLAUDE.md` — write for the reader, not for yourself.
+
+**Validated, not just read.** grok on the rewritten text: 8/8, Tier 1 3/3,
+Tier 2 2/2, 0 unsupported, top finding the key's #1, claim surface 33 — the
+same 33 an independent enumeration-only run produced.
+
+## Open
+
+- **One arm's enumeration varies run to run.** qwen has closed the same three
+  documents at 70 and at 32. grok gave 33 twice; luna 88 and 86. Not
+  understood.
+- **ChatterMate agreement is 0.41.** Whether that is the target's size, its
+  prose style, or the arms, is untested. Two more arms on ChatterMate would
+  say.
+- **`score.py` checks the §9 taxonomy was used, never that coverage supports
+  it.** An arm verifying 15 of 273 claims and returning "Material" scores the
+  same as one verifying 45. §1a forbids the conclusion without the coverage;
+  nothing enforces it.
+
+## Superseded: pick up here — 2026-08-24
 
 **The instrument is finished and frozen at `27353583`.** Tree clean, tests
 pass, zero runs on the board. Everything below is measurement, not more
