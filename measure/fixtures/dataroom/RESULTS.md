@@ -3,25 +3,82 @@
 Started 2026-08-23, on the workflow harness. Everything before it was
 discarded, deliberately — see "Why every earlier run was discarded".
 
-## Scored runs
+## Scored runs — campaign m1, 2026-08-25
 
-**All rows wiped 2026-08-24.** Every run in the campaign was made at
-temperature 0.7 — the code default in `chat_loop.py`, inherited by every
-scenario and every arm because none of them set one. That was never the
-intended house setting, and nothing in the config, the arm files or the
-runner would have revealed it: `run.py --help` reports the scenario default
-as if it were a decision. Temperature is now a per-model setting (see
-`docs/model-settings.md`), and no result predating that is trusted.
+Nine runs, three per arm, interleaved by round. Instrument frozen at
+`bc4ae148` (METHOD.md, run.py, audit.yaml); scorer at `3b1d6e07`. Every run
+completed with `error=None`. No retries were needed.
 
-The three DeepInfra arms are the sharpest illustration. Their yaml carries a
-comment stating temperature 1.0 as the publisher's number, explains that it
-is passed by the runner rather than set in the file, and warns in as many
-words about "the silent second variable this exists to avoid" — and then the
-runner was invoked without it. Documenting a setting in a file the runner
-does not read is not setting it.
+| run | T1 | T2 | T3 | unsup | findings | verdicts | surface | subagent no-ans | leads | threshold |
+|---|---|---|---|---|---|---|---|---|---|---|
+| grok 1 | 3/3 | 2/2 | 4 | 0 | 12 | 6 | 32 | 0% | F2 | PASS |
+| grok 2 | 3/3 | 2/2 | 5 | 0 | 16 | 7 | 31 | 0% | P2 | PASS |
+| grok 3 | 3/3 | 2/2 | 5 | 0 | 12 | 6 | 34 | 0% | P2 | PASS |
+| qwen 1 | 3/3 | 1/2 | 5 | 0 | 29 | 6 | 40 | 0% | P2 | PASS |
+| qwen 2 | 3/3 | 1/2 | 5 | 0 | 15 | 3 | not closed | 0% | P2 | **FAIL** |
+| qwen 3 | 3/3 | 1/2 | 4 | 1 | 16 | 6 | not closed | 0% | P2 | **FAIL** |
+| luna 1 | 3/3 | 1/2 | 3 | 0 | 8 | 3 | 62 | 19% | P2 | PASS |
+| luna 2 | 2/3 | 2/2 | 4 | 0 | 11 | 4 | not closed | 31% | P2 | **FAIL** |
+| luna 3 | 3/3 | 1/2 | 3 | 0 | 8 | 3 | 90 | 20% | P2 | PASS |
 
-*(No table. The next campaign starts from zero, on one frozen instrument,
-temperature and top_p resolved per model and recorded in every `run_meta`.)*
+**grok 3/3 PASS · qwen 1/3 · luna 2/3.**
+
+### The threshold does discriminate. Yesterday's saturation was an n=1 artifact
+
+On 2026-08-24 all three arms passed all eight criteria once each, and this file
+recorded that the threshold had stopped discriminating. At n=3 it separates the
+arms cleanly. One run per arm was not enough to see it, which is the reason the
+scorer prints "n=1 is anecdote" after every run.
+
+### Every failure is the claim surface, and the marker is simply absent
+
+All three FAILs are the same criterion, and no other criterion failed more than
+once across nine runs. In all three the marker appears **nowhere** in the trace
+— not truncated, not echoed from a tool, not present without a count. The arm
+did not enumerate.
+
+**Both of qwen's failures are single-leg runs**, and its one two-leg run closed
+the surface. An arm that compresses the whole engagement into one turn appears
+to skip enumeration and go straight to verification. Two observations is not a
+finding, and luna 2 is a counterexample at three legs, so leg count is not the
+whole mechanism.
+
+This is now the most interesting open question in the suite. It is also the
+criterion that took the most work to build, and it is the only one earning its
+place in the threshold.
+
+### What replicated
+
+- **luna's subagent no-answer rate: 19%, 31%, 20%.** Predicted 25-36%. Real,
+  arm-specific, and slightly below the band. Both other arms are 0% across all
+  six of their runs.
+- **grok's stability.** Tier 2 2/2 on all three runs, claim surface 31/32/34,
+  zero subagent failures, threshold PASS every time. No other arm is stable on
+  any of those axes.
+- **Report thickness tracks the arm.** luna 8, 11, 8 findings with 3-4 distinct
+  verdicts; grok 12-16 with 6-7; qwen 15-29 with 3-6.
+- **Placement is saturated.** Eight of nine runs lead with P2, the key's
+  top-ranked finding. This column no longer discriminates and should be
+  reported, not gated.
+
+### One genuine miss
+
+luna 2 is the only run in nine to drop a must-find item (2/3), and one of only
+two to register anything as `unsupported`.
+
+### Trust the mechanical columns
+
+Tier 2 and Tier 3 are grader-sampled, and Tier 2 was observed flipping on
+identical text earlier the same day. The claim-surface, subagent and
+verdict-conformance columns are read straight off the trace and are the ones to
+argue from.
+
+### The retry estimate was pessimistic
+
+This file predicted roughly one run in four would need a retry, from six
+enumeration runs that produced two failures. Nine scored runs needed none. The
+failures were in the claims-only harness and against repository-sized targets,
+not the fixture. Keep the warning for real targets; drop it for fixture runs.
 
 ## Instrument drift — the check that has to run before every campaign
 
@@ -221,48 +278,32 @@ git history if a specific claim ever needs checking.
 
 ## Pick up here — 2026-08-25, end of session
 
-**Frozen at `bc4ae148`** (METHOD.md, run.py, audit.yaml). `score.py` moved once
-after that, at `3b1d6e07`, before any campaign run — see "The scorer read a
-tool's output as the auditor's closure" below. Zero campaign runs on the board.
+**Campaign m1 is complete.** Nine runs, three per arm, on frozen instrument
+`bc4ae148` with scorer `3b1d6e07`. Results at the top of this file. grok 3/3
+PASS, qwen 1/3, luna 2/3; all three failures are the claim-surface criterion.
 
-### Next: three runs per arm
+### Next, in rough order of value
 
-```bash
-R=~/Downloads/Cognitive_workbench
-eval "$(grep -m1 '^export XAI_API_KEY=' ~/.bashrc)";    export XAI_API_KEY
-eval "$(grep -m1 '^export OPENAI_API_KEY=' ~/.bashrc)"; export OPENAI_API_KEY
-for i in 1 2 3; do for a in grok:grok_4p6 qwen:qwen_local luna:luna_openai; do
-  n=${a%%:*}; f=${a##*:}
-  python3 $R/measure/fixtures/dataroom/run.py --world m1_${n}_$i \
-          --arm $R/measure/arms/${f}.yaml
-done; done
-```
+1. **Why does an arm skip enumeration?** All three failures emitted no marker
+   anywhere in the trace. Both of qwen's were single-leg runs and its two-leg
+   run closed the surface; luna 2 failed at three legs, so leg count is not the
+   whole mechanism. Read the three traces before running anything.
+2. **Nothing enforces §1a.** The scorer checks the §9 taxonomy was used, never
+   that coverage supports it. Verifying 15 of 273 claims and returning
+   "Material" scores the same as 45 of 273.
+3. **ChatterMate and Body have claim sources and one enumeration each.** Two
+   more arms per target would say whether the fixture's agreement (Jaccard
+   1.00 grok/qwen) is a property of the method or of three short documents;
+   ChatterMate is already at 0.41.
+4. **qwen's enumeration varies run to run** — 40 on the run that closed, and
+   32 and 70 on earlier days' fixtures. grok is 31/32/34. Not understood.
 
-Interleave by round, not blocked by arm. Then `score.py --world <w>` per run;
-the grader costs one call each. About 20 minutes per round on today's timings
-(grok ~310s, qwen ~450s, luna ~465s).
+### Do not repeat
 
-**Expect roughly one run in four to need a retry.** Six claim-enumeration runs
-today produced two failures: a 300-second read timeout on the local server
-mid-loop, and an arm whose five inspection attempts all returned nothing. Both
-succeeded on retry. Decide the retry policy before starting, not during.
-
-### The threshold no longer discriminates
-
-All three arms passed all eight criteria on 2026-08-25 (`s6_*`). Read the
-vector, not the threshold. What separated the arms:
-
-| | grok | qwen | luna |
-|---|---|---|---|
-| Tier 1 must-find | 3/3 | 3/3 | 3/3 |
-| Tier 2 derived | 1/2 | 2/2 | 1/2 |
-| Tier 3 credit | 5 | 5 | 4 |
-| findings · distinct verdicts | 15 · 7 | 28 · 5 | 7 · 2 |
-| claim surface | 33 | 32 | 86 |
-| subagent no-answer | 0/5 | 0/9 | 7/34 (21%) |
-| wall clock | 306s | 447s | 464s |
-
-All three led with P2, the key's top-ranked finding.
+- Nine runs needed **no retries**. The earlier one-in-four estimate came from
+  the claims-only harness and repository-sized targets, not the fixture.
+- The threshold discriminates at n=3 and looked saturated at n=1. Do not draw
+  a conclusion about an arm from one run, including a smoke run.
 
 ## The claim surface: named by the engagement, not inferred
 
