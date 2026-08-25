@@ -177,73 +177,62 @@ method is a script with extra words: it commits to a route without knowing the
 terrain, and when the terrain differs the executor has no basis to deviate. §3
 makes this explicit — *"scope adapts to the target; the method does not."*
 
-There is a failure mode here I hit, and it is worth reporting with its ending.
-§12 once required that on finding a delta the auditor **stop and confirm with
-the client before continuing** — *the audit is a collaboration, not a
-surprise.* Good practice, and unreachable: the harness has no channel back to
-the client mid-engagement. So every run silently failed a requirement nobody
-could meet, and nothing in the document or the logs said so.
+A method can also require something the executor cannot do, and nothing will
+report it. §12 once required that on finding a delta the auditor **stop and
+confirm with the client before continuing** — *the audit is a collaboration,
+not a surprise.* Good practice, and unreachable: the harness has no channel to
+the client mid-engagement. Every run silently failed a requirement nobody could
+meet.
 
-It survived because an unperformable procedure produces no error. It reads as
-rigour and does nothing. It came out only when I read the method against the
-assurance standards and asked, of each clause, whether an executor could
-actually perform it — a review pass that also removed a verdict term nothing
-had ever used. **A method can over-reach into capability the executor does not
-have, and the document will not tell you; only trying to perform every clause
-will.**
+**An unperformable clause produces no error. It reads as rigour and does
+nothing.** The only thing that finds one is asking, of each clause, whether the
+executor can perform it — which is a different review from asking whether each
+clause is right, and it is the one nobody thinks to run.
 
 ## Where specification runs out
 
-The strongest test of the "specify acceptance, not transitions" claim is a
-place where I tried to specify acceptance and could not.
+A method can specify what makes an output acceptable. It cannot specify facts
+about the engagement it is applied to, and that boundary is sharper than it
+looks.
 
-Every coverage figure in the report divides by one number: the size of the
-claim surface. Three models, given the same nine documents and the same
-method, enumerated **62, 67 and 273 claims**. The reports were internally
-consistent and mutually incomparable.
+Every coverage figure in an audit report divides by one number: the size of the
+claim surface. That number is not a property of the method. It is a property of
+which documents in *this* data room carry the seller's assertions — and the
+method's author has not seen this data room.
 
-So I did what the thesis recommends: tightened the acceptance condition. *One
-claim is one assertion that can take exactly one verdict.* It reads as precise.
-It made the spread worse — 44, 21 and 321 — because "one assertion" has no
-fixed size. "The infrastructure is redundant" is one assertion, and so are
-"there is one dyno", "the database is co-located" and "there are no replicas".
-Two models read the sentence at different scales and neither of them misread
-it.
+Given the same nine documents and the same method, three models enumerated
+**62, 67 and 273 claims**. Tightening the definition does not converge them. *A
+claim is one assertion that can take exactly one verdict* reads as precise, has
+no fixed size, and widens the spread to 44, 21 and 321: "the infrastructure is
+redundant" is one assertion, and so are "there is one dyno", "the database is
+co-located" and "there are no replicas". Two models read that sentence at
+different scales and neither misread it. Making the rule longer and more
+procedural is worse again — one model relayed the extra instruction text into a
+tool query instead of executing it, and closed no surface at all.
 
-The second attempt was procedural: count one claim per statement in the
-materials, don't merge, don't split, report a per-document breakdown. Better
-prose, and it produced 66 and 108 — and left the third model unable to close
-the surface at all, because the rule was longer and that model relayed the
-instruction text into a tool query instead of executing it. Making a
-specification more explicit made one executor worse.
+The fix is not a better definition. It is a different kind of clause. A claim
+is *an assertion the seller makes to the buyer* — which makes source code,
+comments and a data room's evidence documents into evidence rather than claims
+— and **the engagement names which documents carry those assertions.** The
+auditor is told, not asked to infer.
 
-What worked was not a better definition. It was moving the fact out of the
-method entirely. A claim is now *an assertion the seller makes to the buyer* —
-which makes source code, comments, and a data room's evidence documents into
-evidence rather than claims — and **the engagement names which documents carry
-those assertions.** For the fixture: three of the nine. The auditor is told,
-not asked to infer.
+With three of the nine documents named, the same three models enumerate 33, 70
+and 88. Still a spread, and a harmless one: all three read only the named
+documents, and two cite an *identical* set of twenty-one document lines. They
+agree about where the claims are and differ about how finely to slice them. The
+first was a defect in the criteria. The second is grain, and it costs nothing
+as long as each report is internally consistent and states its own denominator.
 
-The result: the three models enumerated 33, 70 and 88 — still a spread — but
-all three read only the three named documents, and two of them cited an
-*identical* set of twenty-one document lines. They agree about where the claims
-are and differ about how finely to slice them. The first is a question about
-criteria and had to be fixed. The second is a matter of grain, and it is
-harmless as long as each report is internally consistent and says what its
-denominator was.
+So there is a third kind of information in a workflow document, alongside
+transitions and acceptance conditions: **a parameter the engagement supplies
+and the method must not invent.** Assurance practice has known this for a long
+time — criteria are agreed in advance, not derived by the practitioner
+mid-engagement.
 
-This is a third kind of information, and I did not have a name for it when I
-started. Not a transition, not an acceptance condition, but **a parameter the
-engagement supplies and the method must not invent.** The assurance standards
-have known this for a long time: criteria are agreed in advance, not derived by
-the practitioner mid-engagement. My two failed attempts were both efforts to
-have the document decide something the document is not in a position to know.
-
-The general lesson is unwelcome and I think correct. **A method's reach ends
-where its author's knowledge of the specific engagement ends.** Past that
-point, more specification does not converge behaviour; it produces confident
-divergence, which is worse than visible divergence because every executor
-believes it complied.
+The general form: **a method's reach ends where its author's knowledge of the
+specific engagement ends.** Past that boundary more specification does not
+converge behaviour. It produces confident divergence, which is worse than
+visible divergence, because every executor believes it complied.
 
 ## A method learns; a prompt does not
 
@@ -276,31 +265,22 @@ a domain unlike recent real work.
 The honest limit first, because it is the most interesting thing I have
 learned and it cuts against the case I am making.
 
-§5's derived-finding shape was added specifically because arms had been
-reaching the evidence for a derived finding and stopping short of stating it —
-the format had one shape, and a finding that tests no stated claim had nowhere
-to go. The fix landed twenty-one minutes before a benchmark campaign started.
+**A specification constrains form. It does not confer competence.**
 
-In that campaign, fifteen of sixteen runs used the new shape. And they still
-differed sharply in what they *put in it* — some computed the consequence,
-some filled the slot with the finding it escalated.
+§5 gives a derived finding its own shape because, without one, a finding that
+tests no stated claim has nowhere to go: models reach the evidence and stop
+short of stating the conclusion. Give it a home and they use it — the shape is
+now used in essentially every run.
 
-That is exactly what a specification addressed to a practitioner should
-produce. **It constrains form. It does not confer competence.** Giving the
-finding a home was necessary and nowhere near sufficient, and anyone selling
-you "we improved the prompt and the model got smarter" is describing something
-that did not happen.
+What they put in it still varies. Across the three arms I run, the two planted
+derived findings are recovered 1 of 2, 2 of 2 and 1 of 2. Same document, same
+format, same slots, three different degrees of actually doing the arithmetic.
+Whatever produces that difference is not the specification, because the
+specification was identical.
 
-*(Those runs were discarded for an unrelated configuration fault — see the
-third essay, which is about how much harder it is to measure this than to
-build it.)*
-
-It has since replicated on a rebuilt instrument. Across the three arms I now
-run, the shape is used every time and the content still varies: on one set of
-runs the two planted derived findings were recovered 1 of 2, 2 of 2 and 1 of 2.
-Same document, same format, same slots, three different degrees of actually
-doing the arithmetic. Whatever produces that difference, it is not the
-specification, because the specification was identical.
+So giving the finding a home was necessary and nowhere near sufficient. Anyone
+selling you "we improved the prompt and the model got smarter" is describing
+something that did not happen.
 
 What it does buy is more modest and more durable: an output that can be
 **checked by someone who was not there.** A closed recommendation vocabulary
