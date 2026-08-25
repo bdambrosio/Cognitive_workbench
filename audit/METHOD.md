@@ -660,13 +660,23 @@ before the first finding.
 - A coverage statement: what was not checked, and why that matters (§4).
 - What the client should ask the seller before closing.
 
-- **The inherent-limitations statement.** Three lines, always present:
-  the materials examined and their as-of date; that the seller was **not
-  consulted and has not confirmed the auditor's reading of their own claims**;
-  and the assurance level (§1a) with the coverage it rests on. The second is
-  the one most easily forgotten and the most load-bearing — every finding
-  interprets a claim without its author present to say what was meant, and a
-  reader who does not know that will over-read the report.
+- **The inherent-limitations statement**, after a line reading exactly:
+
+  ```
+  === LIMITATIONS ===
+  ```
+
+  Three lines, always present: the materials examined and their as-of date;
+  that the seller was **not consulted and has not confirmed the auditor's
+  reading of their own claims**; and the assurance level (§1a) with the
+  coverage it rests on. The second is the one most easily forgotten and the
+  most load-bearing — every finding interprets a claim without its author
+  present to say what was meant, and a reader who does not know that will
+  over-read the report.
+
+  The marker is load-bearing for the same reason `=== GAP MAP ===` is: a
+  required element with no handle is a requirement nothing can check, and an
+  unchecked requirement is one that quietly stops being met.
 
 **2. The Gap Map** (§15), after a line reading exactly:
 

@@ -139,6 +139,35 @@ Output ONLY: {{"findings": [{{"id": "...", "quote": "..."}}]}}"""
 
 
 GAP_MARK = "=== GAP MAP ==="
+LIMITS_MARK = "=== LIMITATIONS ==="
+
+# §6's closed set, after `[real, with a structural note]` was retired 2026-08-24
+# for zero uses across three engagements. A finding wearing a label outside this
+# set is not using the method's vocabulary — the same failure §9's check catches
+# at report level, one level down, where nothing was watching.
+_VERDICTS = {"real", "real, minor caveat", "real, operational caveat",
+             "partial", "delta", "unverifiable", "non-delta", "derived"}
+
+# §5's heading shape: **Finding N: <title> — [verdict]**. Tolerant of the dash
+# an arm chooses and of bold markers, because those vary and the verdict does
+# not.
+_FINDING_RE = re.compile(r"^\s*\**\s*Finding\s+\d+[^\n\[]*\[([^\]]+)\]",
+                         re.M | re.I)
+
+
+def verdict_conformance(report: str) -> Dict[str, Any]:
+    """Which §6 verdicts the findings used, and which are not §6 verdicts.
+
+    Mechanical, and a CONFORMANCE check on a closed vocabulary the method
+    defines — the same standing as recommendation_of, not classification of
+    free text. Added 2026-08-24 on noticing that removing a verdict from §6 had
+    no scorer consequence whatever: nothing checked per-finding labels, so an
+    arm could invent them freely and still score clean.
+    """
+    found = [v.strip().lower() for v in _FINDING_RE.findall(report)]
+    return {"findings": len(found),
+            "used": sorted(set(v for v in found if v in _VERDICTS)),
+            "off_vocabulary": sorted(set(v for v in found if v not in _VERDICTS))}
 
 
 def read_memo(world: str, agent: str) -> Optional[str]:
@@ -391,6 +420,19 @@ def main() -> int:
     print(f"  report length       {wc} words  "
           f"({_length_note(wc)})")
 
+    vc = verdict_conformance(report)
+    if vc["findings"]:
+        print(f"  finding verdicts     {vc['findings']} findings, "
+              f"{len(vc['used'])} distinct §6 verdicts"
+              + (f"   OFF-VOCABULARY: {vc['off_vocabulary']}"
+                 if vc["off_vocabulary"] else ""))
+    else:
+        print("  finding verdicts     none parsed — check the §5 heading shape")
+
+    print(f"  limitations stmt     "
+          + ("present" if LIMITS_MARK in report else
+             "ABSENT — §16 requires it after === LIMITATIONS ==="))
+
     sa = facts["subagent"]
     if sa["calls"]:
         pct = sa["empty"] / sa["calls"] * 100
@@ -474,6 +516,8 @@ def main() -> int:
         ("leads with a top-3 finding",
          bool(ranked) and ranked[0] in SEVERITY[:3]),
         ("no unsupported claims",     unsupported == 0),
+        ("§6 verdicts only",           not vc["off_vocabulary"]),
+        ("limitations statement",      LIMITS_MARK in report),
     ]
     passed = all(ok for _, ok in checks)
     print(f"\n  THRESHOLD           {'PASS' if passed else 'FAIL'}"
