@@ -93,21 +93,19 @@ def extract(world: str, agent: str) -> dict:
             "declared": True,
             "leg": i,
             "count": int(m.group(1).replace(",", "")),
-            "text": tail[:20000],
+            # NOT TRUNCATED AT 20k. That cap cut a 244-claim enumeration
+            # mid-listing, losing one of three documents entirely and
+            # under-reporting the per-document breakdown by 81 lines. The
+            # listing is the artifact this script exists to capture.
+            "text": tail[:400000],
         }
     return {"declared": False, "leg": None, "count": None, "text": ""}
 
 
-def per_document(text: str) -> dict:
-    """How many enumerated lines cite each document.
-
-    A rough count, and deliberately so: it exists to show WHERE a total came
-    from, which is what makes two totals comparable. An arm that enumerates 28
-    claims all from doc1 and an arm that enumerates 28 across three documents
-    have not done the same thing.
-    """
-    hits = re.findall(r"doc(\d)", text, re.I)
-    return {f"doc{n}": hits.count(n) for n in sorted(set(hits))}
+# Reused from overlap.py rather than kept as a second copy: this one matched
+# only the fixture's `docN` form and returned {} for every real target, whose
+# arms cite `README.md:9`. One parser, one set of fixes.
+from measure.fixtures.dataroom.overlap import per_document   # noqa: E402,F401
 
 
 def main() -> int:

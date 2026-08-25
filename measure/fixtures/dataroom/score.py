@@ -150,6 +150,34 @@ LIMITS_MARK = "=== LIMITATIONS ==="
 SURFACE_MARK = "=== CLAIM SURFACE ==="
 
 
+def agent_emissions(working_log: str) -> str:
+    """The agent's own lines, with tool observations removed.
+
+    A working log interleaves what the agent emitted (`ACTION: ...`) with what
+    its tools returned (`$stepN: ...`). A claim surface is CLOSED BY THE
+    AUDITOR. A marker inside a tool's output is the tool handing the
+    instruction back, not a closure, and reading the two as equivalent
+    recorded a denominator the agent had itself rejected: on 2026-08-25 an arm
+    got `=== CLAIM SURFACE === / 14 claims` from a process_text call, said in
+    its next thought that the output was unreliable because "it says 14 claims
+    but lists 18", re-enumerated, and closed at 32. The scorer recorded 14 and
+    reported 28 findings against it.
+
+    An observation runs from its `$stepN:` line until the next `ACTION:`,
+    `$stepN:` or `--- iter` line, because tool output may contain newlines.
+    """
+    keep, in_observation = [], False
+    for line in working_log.splitlines():
+        if line.startswith("$step"):
+            in_observation = True
+            continue
+        if line.startswith("ACTION:") or line.startswith("--- iter"):
+            in_observation = False
+        if not in_observation:
+            keep.append(line)
+    return "\n".join(keep)
+
+
 def claim_surface(world: str, agent: str) -> Dict[str, Any]:
     """When enumeration closed, and what denominator it committed to (§12.2).
 
@@ -169,18 +197,40 @@ def claim_surface(world: str, agent: str) -> Dict[str, Any]:
     Not matched means NOT CLOSED, which is the honest reading — the method
     asks for a specific artifact and it is absent.
     """
-    turns = load_turns(world, agent)
-    for i, t in enumerate(turns, 1):
-        body = f"{t.working_log}\n{t.raw.get('raw_response') or ''}"
+    def _count(body: str) -> Optional[int]:
         if SURFACE_MARK not in body:
-            continue
+            return None
         tail = body.split(SURFACE_MARK, 1)[1][:300]
         # <N> claims — tolerating "micro-claims", "stated claims", bold marks.
         m = re.search(r"(\d[\d,]*)\s+\S*claims\b", tail, re.I)
-        if not m:
-            continue        # marker present but no count: keep looking
+        # Marker present but no count is not a closure, same rule as before.
+        return int(m.group(1).replace(",", "")) if m else None
+
+    turns = load_turns(world, agent)
+    for i, t in enumerate(turns, 1):
+        raw = t.raw.get("raw_response") or ""
+        # THE AGENT'S OWN WORDS FIRST, then anything it was handed.
+        #
+        # An arm may close the surface THROUGH a tool — delegate enumeration to
+        # process_text and adopt the result — and that is a real closure. An arm
+        # may also be handed a marker it then rejects. 2026-08-25: one run got
+        # `14 claims` from process_text, said in its next thought that the
+        # output was unreliable because "it says 14 claims but lists 18",
+        # re-enumerated, and closed at 32 in its own words. The scorer recorded
+        # 14, and reported 28 findings against a 14-claim surface.
+        #
+        # Excluding tool observations outright was tried first and was worse:
+        # it turned three legitimate tool-delegated closures into no count at
+        # all, which fails the threshold. Preferring the agent's own statement
+        # and falling back to what it was handed gets both cases right without
+        # having to detect whether the agent adopted or rejected the output.
+        n = _count(f"{agent_emissions(t.working_log)}\n{raw}")
+        if n is None:
+            n = _count(f"{t.working_log}\n{raw}")
+        if n is None:
+            continue
         return {"declared": True, "leg": i, "total_legs": len(turns),
-                "count": int(m.group(1).replace(",", ""))}
+                "count": n}
     return {"declared": False, "leg": None, "total_legs": len(turns),
             "count": None}
 
