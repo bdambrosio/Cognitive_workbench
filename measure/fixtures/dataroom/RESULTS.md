@@ -219,30 +219,68 @@ Comparing across that line would be comparing two instruments. Those runs did
 their job — every fix above was found by running them — and they remain in
 git history if a specific claim ever needs checking.
 
-## Pick up here
+## Pick up here — 2026-08-24, end of session
 
-Everything below the line is instrument work. No campaign runs until it is
-done, because a run made before it is a run that will be discarded.
+**The instrument is finished and frozen at `27353583`.** Tree clean, tests
+pass, zero runs on the board. Everything below is measurement, not more
+instrument work.
 
-1. **Land the model-settings layer.** `src/chat/model_params.py` as the single
-   source of truth (per-model temperature, global `top_p` 0.95), resolved and
-   enforced in `_ChatBackend`, with the `0.7` literals deleted so an unknown
-   model raises instead of inheriting. Plus `docs/model-settings.md` for
-   provenance, a `CLAUDE.md` rule, and a test that walks every arm and
-   scenario asserting each resolves. See "Scored runs" above.
-2. **Remove the `top_p=1.0` pin in `measure/regrade.py`.** The grader is not
-   exempt from the global setting.
-3. **Freeze the instrument, then run.** Clean tree, recorded `git rev-parse
-   HEAD` per run, no method edits mid-campaign. Two campaigns have now been
-   discarded for drifting under their own runs.
-4. **n=5 per arm, all on one frozen instrument.** Arms: grok-4.6,
-   Qwen3.8-27B local, gpt-5.6-luna.
-   Nemotron excluded (two valid runs in seven attempts, cannot assemble a
-   report). DeepSeek is the obvious fourth, held back only for run time.
-5. **Persist NOTE lines in the stored working log.** `chat_loop.py:1667`
-   keeps only `$step*` labels, so the budget nudge is stripped from every
-   trace and no post-hoc analysis can say whether an agent was warned before
-   it ran out of iterations.
+### Tomorrow: three runs per arm
+
+```bash
+R=~/Downloads/Cognitive_workbench
+eval "$(grep -m1 '^export XAI_API_KEY=' ~/.bashrc)";    export XAI_API_KEY
+eval "$(grep -m1 '^export OPENAI_API_KEY=' ~/.bashrc)"; export OPENAI_API_KEY
+for i in 1 2 3; do for a in grok:grok_4p6 qwen:qwen_local luna:luna_openai; do
+  n=${a%%:*}; f=${a##*:}
+  python3 $R/measure/fixtures/dataroom/run.py --world m1_${n}_$i \
+          --arm $R/measure/arms/${f}.yaml
+done; done
+```
+
+Interleave by round, not blocked by arm, so a mid-campaign disturbance hits
+all three equally. Nine runs, roughly 90 minutes on last night's timings
+(grok ~440s, qwen ~650s, luna ~950s). Then
+`score.py --world <w>` per run; the grader costs one call each.
+
+**Do not edit METHOD.md, run.py or score.py once the first run starts.** Two
+campaigns were discarded for exactly that. If something needs fixing, finish
+the nine, then fix, then re-run.
+
+### The threshold is eight criteria
+
+three must-find items · Gap Map · §9 recommendation · leads with a top-3
+finding · no unsupported claims · §6 verdicts only · limitations statement ·
+claim surface closed
+
+Three of those are new and were exercised once each. Report length is in the
+vector and **not** gated.
+
+### What to expect, so a surprise is legible
+
+- **Luna's subagent no-answer rate.** 36% before the harness fixes, 25% after,
+  against 0% for both other arms. The only arm-specific effect that has
+  replicated across two instruments. If it vanishes, suspect the instrument.
+- **grok's derived-finding recall** was 2/2 in three consecutive runs on the
+  old instrument. Untested since.
+- **The claim-surface marker is newly mandated in shape.** On first exposure
+  only qwen produced a parseable count; grok listed without counting and luna
+  quoted the instruction. Watch whether the tightened §12.2 fixes both.
+
+### Known, deliberately not fixed
+
+- `difflib` view for `process_text` — needs a test matrix across
+  edit/summarise/translate shapes before it goes near a campaign.
+- Grader misses B6 three times in four; Tier 3 noise 6/5/5/5. **Trust the
+  threshold, not Tier 3.**
+- The fixture and `answer_key.md` still share a lineage. METHOD now has an
+  external reference (`audit/METHOD-gap-analysis.md`); the key does not.
+- Saturation: all arms cleared every criterion before the three new ones
+  landed. If all nine pass tomorrow, the threshold has stopped discriminating
+  and the vector is the only signal left.
+- DeepSeek, both Nemotrons and gemma-4-31B are in the settings table and have
+  never run under it.
+- `chat_loop.py:1667` still strips NOTE lines from the stored working log.
 
 ## What the 2026-08-24 harness fixes were supposed to change
 
