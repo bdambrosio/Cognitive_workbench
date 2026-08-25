@@ -1080,7 +1080,7 @@ class ClaimsMixin:
             attempts['n'] += 1
             cap = budget * 2 if attempts['n'] > 1 else budget
             return self.backend.chat(messages, max_tokens=cap,
-                                     temperature=0.2, cot_profile='none')
+                                     cot_profile='none')
 
         status: Dict[str, Any] = {}
         claims = attribute_claims(record, llm_chat,

@@ -226,7 +226,7 @@ class ReactMixin:
             result = self.backend.chat(
                 [{'role': 'system', 'content': sys_msg},
                  {'role': 'user', 'content': user_msg}],
-                max_tokens=8, temperature=0.0, cot_profile='none',
+                max_tokens=8, cot_profile='none',
                 # Opt out of any scenario baseline. Eight tokens is a
                 # verdict, not a deliberation; hand this a thinking channel
                 # and it returns empty, which fails open and silently
@@ -1068,7 +1068,7 @@ class ReactMixin:
         try:
             result = self.backend.chat(
                 [{'role': 'system', 'content': sys_msg}, {'role': 'user', 'content': user_msg}],
-                max_tokens=4096, temperature=0.7, cot_profile='none')
+                max_tokens=4096, cot_profile='none')
             text = (result or '').strip() or "(could not synthesize)"
         except Exception as e:
             text = f"(trouble formulating a response: {e})"

@@ -995,7 +995,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             f"(count {self._empty_response_counts[key]}) — caller wanted text, got none")
 
     def _llm_generate(self, messages, bindings=None, max_tokens=400,
-                      temperature=0.7, stops=None, is_json=False,
+                      temperature=None, stops=None, is_json=False,
                       cot_profile: Optional[str] = None,
                       enable_thinking: Optional[bool] = None,
                       reasoning_effort: Optional[str] = None) -> SimpleNamespace:
@@ -1101,7 +1101,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                        else self._PROFILE_TOKEN_FLOOR_LOCAL)
         floor = floor_table.get(cot_profile or '', 0)
 
-        def _gen(messages, bindings=None, max_tokens=400, temperature=0.7,
+        def _gen(messages, bindings=None, max_tokens=400, temperature=None,
                  stops=None, is_json=False):
             return self._llm_generate(messages, bindings=bindings,
                                       max_tokens=max(max_tokens, floor),

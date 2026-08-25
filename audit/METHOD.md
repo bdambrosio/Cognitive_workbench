@@ -460,13 +460,25 @@ the operational detail; this section is the method.
 
 1. **Receive materials** (data room, repo access, docs). **Confirm scope in
    writing.**
-2. **Enumerate claims, then CLOSE the surface.** Estimate the total and
-   identify the claim surface — README, specs, marketing, internal docs. When
-   enumeration ends the surface is **frozen**: it is the denominator every
+2. **Enumerate claims, then CLOSE the surface.** Identify the claim surface —
+   README, specs, marketing, internal docs — and end enumeration by stating
+   the count after a line reading exactly:
+
+   ```
+   === CLAIM SURFACE ===
+   ```
+
+   From that point the surface is **frozen**. It is the denominator every
    coverage figure in the report is measured against, and a denominator that
-   moves makes every percentage before it mean something else. A claim met
-   later that was missed here goes in an **addendum** with its own count, not
-   into the original population.
+   moves makes every percentage stated before it mean something else. A claim
+   met later that was missed here goes in an **addendum** with its own count,
+   never into the original population.
+
+   The marker does two things nothing else can. It fixes **when** enumeration
+   ended, so the record shows verification followed it rather than running
+   alongside it. And it fixes **what** the denominator was, so the coverage
+   statement in the report can be checked against the number the audit
+   actually committed to.
 3. **Prioritise** per §4's safety → architecture → operations → micro order.
    Verify top N.
 4. **Work the priority order straight through.** Do not pause for

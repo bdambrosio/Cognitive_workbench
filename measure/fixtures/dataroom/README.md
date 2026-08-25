@@ -28,9 +28,16 @@ python3 measure/fixtures/dataroom/score.py --world dataroom_1 --dry-run
 python3 measure/fixtures/dataroom/score.py --world dataroom_1
 ```
 
-Give `TASK.md` **verbatim** as the opening turn. Do not paraphrase it and do
-not answer questions afterwards — the brief says no user is available, and
-answering makes the run incomparable with every other run.
+`run.py` supplies the brief. Do not paraphrase it and do not answer questions
+afterwards — the brief says no user is available, and answering makes the run
+incomparable with every other run.
+
+`TASK.md` was deleted 2026-08-24. It was the pre-runner brief, from when the
+only way to run this was to paste a task into `--cli` by hand, and it had gone
+stale in a way that mattered: it asked for a recommendation of "proceed,
+proceed with conditions, or walk" — the buyer-action vocabulary §2 and §9
+exist to forbid. Anyone following the old instruction produced a run that
+violated the method by construction.
 
 `scenarios/dataroom.yaml` is `venture.yaml` with a different `world_name` and
 header, deliberately: matched line for line so the two fixtures differ in the
@@ -99,8 +106,8 @@ Placement carries the signal the cap was reaching for, and carries it better:
 it measures selection directly, without confounding it with how much the
 subject matter actually contains.
 
-The stopping rule and the no-reopen clause in `TASK.md` exist because of the
-2026-08-20 runaway: Jill and Jack *had* a document structure — three parts,
+The stopping rule and the no-reopen clause exist because of the 2026-08-20
+runaway: Jill and Jack *had* a document structure — three parts,
 nine sections, four deliverables — and still produced "Revised Part 2 is in
 hand. Different document from the one I reviewed last turn." A heading is not
 a finish line. Each section needs a satisfaction condition and a rule against

@@ -501,7 +501,7 @@ class ReflectionMixin:
             result = self._llm_generate(
                 [{'role': 'system', 'content': sys_msg},
                  {'role': 'user', 'content': "\n\n".join(user_parts)}],
-                max_tokens=8192, temperature=0.3, is_json=True,
+                max_tokens=8192, is_json=True,
                 cot_profile='none')
             if not result.success:
                 return ([], [], [])

@@ -1927,7 +1927,7 @@ class ConcernsMixin:
             raw = self.backend.chat(
                 [{'role': 'system', 'content': sys_msg},
                  {'role': 'user', 'content': user_msg}],
-                max_tokens=4096, temperature=0.2, cot_profile='none')
+                max_tokens=4096, cot_profile='none')
             data = repair_json_string(raw or '')
             if isinstance(data, dict) and data.get('verdict') in ('fire', 'defer', 'reset'):
                 verdict = data['verdict']
@@ -2171,7 +2171,7 @@ class ConcernsMixin:
             raw = self.backend.chat(
                 [{'role': 'system', 'content': sys_msg},
                  {'role': 'user', 'content': user_msg}],
-                max_tokens=4096, temperature=0.2, cot_profile='none')
+                max_tokens=4096, cot_profile='none')
         except Exception as e:
             logger.warning(f"[{self.character_name}] successor synth LLM failed: {e}")
             return ('error', None)
@@ -2549,7 +2549,7 @@ class ConcernsMixin:
             new_wip = self.backend.chat(
                 [{'role': 'system', 'content': sys_msg},
                  {'role': 'user', 'content': user_msg}],
-                max_tokens=1024, temperature=0.3, cot_profile='none')
+                max_tokens=1024, cot_profile='none')
             new_wip = (new_wip or '').strip()
             if not new_wip:
                 logger.warning(

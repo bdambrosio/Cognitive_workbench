@@ -140,6 +140,32 @@ Output ONLY: {{"findings": [{{"id": "...", "quote": "..."}}]}}"""
 
 GAP_MARK = "=== GAP MAP ==="
 LIMITS_MARK = "=== LIMITATIONS ==="
+SURFACE_MARK = "=== CLAIM SURFACE ==="
+
+
+def claim_surface(world: str, agent: str) -> Dict[str, Any]:
+    """When enumeration closed, and what denominator it committed to (§12.2).
+
+    WHY THE TRACE AND NOT THE REPORT. The marker's whole point is ORDERING —
+    that verification followed enumeration rather than running alongside it —
+    and only the trace knows which leg each thing happened in. The report is a
+    single artifact with no time in it.
+
+    Mechanical. The count is the first integer on or after the marker line;
+    prose around it ("roughly", "micro-claims") is ignored. A range like
+    "45-55" takes the first number, which is the conservative denominator.
+    """
+    turns = load_turns(world, agent)
+    for i, t in enumerate(turns, 1):
+        body = f"{t.working_log}\n{t.raw.get('raw_response') or ''}"
+        if SURFACE_MARK not in body:
+            continue
+        tail = body.split(SURFACE_MARK, 1)[1][:400]
+        m = re.search(r"\d[\d,]*", tail)
+        return {"declared": True, "leg": i, "total_legs": len(turns),
+                "count": int(m.group().replace(",", "")) if m else None}
+    return {"declared": False, "leg": None, "total_legs": len(turns),
+            "count": None}
 
 # §6's closed set, after `[real, with a structural note]` was retired 2026-08-24
 # for zero uses across three engagements. A finding wearing a label outside this
@@ -249,6 +275,7 @@ def trace_facts(world: str, agent: str) -> Dict[str, Any]:
         "docs_opened": sorted(int(d) for d in docs),
         "exit_reasons": {},
         "subagent": subagent_compliance(world, agent),
+        "claim_surface": claim_surface(world, agent),
         # The run is void if the answers were in reach and got read.
         "read_answer_key": "answer_key" in log,
     }
@@ -429,6 +456,17 @@ def main() -> int:
     else:
         print("  finding verdicts     none parsed — check the §5 heading shape")
 
+    cs = facts["claim_surface"]
+    if cs["declared"]:
+        early = cs["leg"] <= max(1, cs["total_legs"] // 2)
+        print(f"  claim surface        closed leg {cs['leg']} of "
+              f"{cs['total_legs']}, n={cs['count']}"
+              + ("" if early else "   <-- closed late; verification "
+                                 "ran before the denominator was fixed"))
+    else:
+        print("  claim surface        NOT CLOSED — §12.2 requires "
+              "=== CLAIM SURFACE ===")
+
     print(f"  limitations stmt     "
           + ("present" if LIMITS_MARK in report else
              "ABSENT — §16 requires it after === LIMITATIONS ==="))
@@ -518,6 +556,7 @@ def main() -> int:
         ("no unsupported claims",     unsupported == 0),
         ("§6 verdicts only",           not vc["off_vocabulary"]),
         ("limitations statement",      LIMITS_MARK in report),
+        ("claim surface closed",       facts["claim_surface"]["declared"]),
     ]
     passed = all(ok for _, ok in checks)
     print(f"\n  THRESHOLD           {'PASS' if passed else 'FAIL'}"
