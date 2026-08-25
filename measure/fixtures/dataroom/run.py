@@ -342,9 +342,11 @@ def main() -> int:
 
     t0 = time.time()
     legs, error = [], None
+    text_first_leg = ''
     try:
         text = (args.brief_file.read_text(encoding='utf-8')
                 if args.brief_file else BRIEF)
+        text_first_leg = text
         for i in range(args.max_turns):
             loop._process_user_turn(source=SOURCE, text=text, close=False)
             reply = latest_reply(loop, SOURCE)
@@ -429,6 +431,31 @@ def main() -> int:
     # for a real engagement, which belongs in the engagement letter.
     world_dir = REPO / "scenarios" / args.world / name
     record = out / "working_record"
+
+    # THE INSTRUMENT, COPIED OUT WITH IT. The record shows what the auditor
+    # did; these two show what it was told to do. Without them a reader — or a
+    # continuation answering questions about this run later — cannot tell
+    # which method produced the report, and a method that has moved since
+    # supplies the wrong verdict vocabulary silently.
+    #
+    # THE DELIVERED TEXT, NOT THE FILE. audit/METHOD.md is not what the agent
+    # read: the loader strips every section marked for the practice. A commit
+    # hash would name the file and still not answer what reached the model, and
+    # it needs the repository at that revision to resolve at all. A copy is
+    # self-contained and is the artifact itself.
+    record.mkdir(parents=True, exist_ok=True)
+    try:
+        from chat.workflow import load_workflow                # noqa: E402
+        wf = (cfg.get("workflow") or "").strip()
+        if wf:
+            (record / "method_as_delivered.md").write_text(
+                load_workflow(REPO / wf), encoding="utf-8")
+    except Exception as e:                                     # noqa: BLE001
+        logger.warning("working record: method not copied (%s)", e)
+    try:
+        (record / "brief.md").write_text(text_first_leg, encoding="utf-8")
+    except Exception as e:                                     # noqa: BLE001
+        logger.warning("working record: brief not copied (%s)", e)
     for src in (world_dir / "memory" / "reasoning_trace.jsonl",
                 world_dir / "inspect_traces"):
         if not src.exists():
