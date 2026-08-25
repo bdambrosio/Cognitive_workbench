@@ -340,6 +340,64 @@ Also worth its own note: the counter surfaced an `llm_error` subagent exit on
 grok that nobody had seen, on a run that scored the best of the three. Failures
 that get recovered from are still failures worth counting.
 
+## Grader revalidated at top_p 0.95 — 2026-08-24
+
+The un-pinning left the grader's hand-validation stale, because that had been
+done at top_p 1.0. Redone. **Precision improved; accuracy is uneven, and all
+of the unevenness sits in the tier that cannot change a verdict.**
+
+**Precision.** Four passes over one identical report:
+
+| | pass 1 | 2 | 3 | 4 |
+|---|---|---|---|---|
+| Tier 1 / Tier 2 / unsupported / THRESHOLD | identical across all four | | | |
+| Tier 3 | 6 | 5 | 5 | 5 |
+
+Against the documented baseline at top_p 1.0 — Tier 3 = 5, 4, 5 and
+**unsupported = 1, 1, 2** — this is a real improvement, and the mechanism is
+plain: top_p 0.95 with temperature 0.1 is near-greedy where 1.0 kept the tail.
+The failure that mattered — `unsupported` flapping 0/1/2 and turning PASS/FAIL
+on grader noise — did not recur on that report. It DID recur on another, so
+the improvement is not universal.
+
+**Accuracy, hand-checked against the answer key.** B6 is a genuine finding the
+report states correctly — claim cited, `doc4 lines 3-8` for the co-located
+database, delta stated — and **three of four passes missed it**. B7 is credited
+on partial support: the report nails the renewal-inside-notice-window half and
+never states the concentration half. Not the old error (crediting from a
+forbidden questions section) but the looser reading.
+
+**Verdict: trust it for the threshold, not for Tier 3.** All observed noise is
+in the credit-only tier, which is never penalised and cannot move a verdict.
+Report Tier 3 as an indicator, never as a score.
+
+## Runs deleted 2026-08-24, and what they showed
+
+Seven runs (three arms) deleted when METHOD.md changed — §8's working recap
+and §12's delta-confirmation removed as unperformable, `[real, with a
+structural note]` removed as unused, and `run.py`'s brief corrected where it
+still instructed both removed procedures. Everything they measured is
+downstream of that.
+
+Kept because they are the only observations of these behaviours:
+
+| arm | n | threshold | Tier 2 | subagent no-answer | words |
+|---|---|---|---|---|---|
+| grok-4.6 | 3 | **3/3 PASS** | **2/2 every run** | 0 of 22 | 928-1,194 |
+| Qwen3.8-27B | 3 | 1/3 PASS | 2/2 once, 1/2 twice | 0 of 24 | 1,804-2,851 |
+| gpt-5.6-luna | 1 | PASS | 1/2 | **12 of 33** | 1,156 |
+
+**A correction worth keeping.** Qwen's two failures were first reported here as
+length failures. They were not — removing the word gate flipped neither. They
+fail on placement, and one also on §9 and unsupported. The length reading came
+from seeing "OVER the 2,000 guide" and not reading the criteria list.
+
+**Predictions carried forward, still untested against the current method:**
+grok's derived-finding recall (2/2 in three consecutive runs) and Luna's
+subagent no-answer rate (~36%) are the two effects large enough to expect
+again. If either vanishes on the next campaign, suspect the instrument before
+the model.
+
 ## Outstanding work — needs careful, extensive testing before shipping
 
 **A diff view for `process_text`.** The observation would carry a
