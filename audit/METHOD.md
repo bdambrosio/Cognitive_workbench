@@ -241,16 +241,10 @@ shape rather than a row in the format above.
 the code"* is not the same as *"the code isn't there."* The former belongs in
 Remaining Claims; only the latter is a finding.
 
-**Status, measured across three engagements** (Body, ChatterMate,
-flowmetrics): every verdict above is exercised — `[delta]` 35, `[real]` 29,
-`[partial]` 20, `[derived]` 11, `[real, minor caveat]` 11, `[unverifiable]` 8,
-`[non-delta]` 5, `[real, operational caveat]` 4.
-
-`[real, with a structural note]` was **removed 2026-08-24**: zero uses in
-three engagements, and near-indistinguishable from `[real, minor caveat]` in
-practice. A vocabulary entry that nothing has ever needed is not a
-distinction, and an option list is easier to apply consistently when every
-option earns its place.
+**Every verdict above is exercised.** Measured across three engagements —
+`[delta]` 35, `[real]` 29, `[partial]` 20, `[derived]` 11, `[real, minor
+caveat]` 11, `[unverifiable]` 8, `[non-delta]` 5, `[real, operational
+caveat]` 4. Use the narrowest one that fits.
 
 ## 7. Correction protocol
 
@@ -287,10 +281,8 @@ A PE partner will not read 68 code-cited findings. They read the Gap Map
 (~30 seconds), the executive summary (~2 minutes), then drill into one or two
 findings if the recommendation makes them curious.
 
-**One audience, then. The reader of the finished document.** That is not a
-weakening: the standards' communication requirement is that the report be
-understandable to its intended users, and this section's remaining content —
-the reader model, and the tiering built on it — is how that is met.
+**One audience, then: the reader of the finished document.** Tier the
+deliverable to that reader.
 
 ## 9. Report-level recommendation
 
@@ -397,13 +389,9 @@ the operational detail; this section is the method.
    README, specs, marketing, internal docs.
 3. **Prioritise** per §4's safety → architecture → operations → micro order.
    Verify top N.
-4. **Work the priority order without pausing for confirmation.** This step
-   used to require stopping to confirm a delta with the client. There is no
-   channel to the client mid-engagement, so the requirement was unperformable
-   and every run failed it silently. Removed 2026-08-24 with §8's working
-   recap. Deltas are reported in the deliverable, where the client can act on
-   them; a delta discovered late does not change the report's shape enough to
-   justify a procedure that cannot be carried out.
+4. **Work the priority order straight through.** Do not pause for
+   confirmation; there is no channel to the client mid-engagement. Deltas are
+   reported in the deliverable, where the client can act on them.
 5. **Continue to the coverage threshold where the report is defensible** —
    §4's "7% is not enough" rule applied in reverse: stop when the consistency
    rate and the severity distribution of what remains make the rest low-risk.
@@ -571,25 +559,10 @@ Map carries none.
 
 <!-- audience: practice -->
 
-**Where the Gap Map came from, and why this is not in §15.** The Gap Map is
-the lead artifact in cold outreach: the partner gets it in the email body or
-as a 30-second PDF. The Gap Map is the hook; the full report is the proof.
+**The Gap Map is the lead artifact in cold outreach** — the partner gets it in
+the email body or as a 30-second PDF. The Gap Map is the hook; the full report
+is the proof.
 
-That is true, and an agent executing an engagement should not read it. A
-document written to be a hook is not the same document as one written to
-inform, and §15 should carry only the second brief. This lived inside §15
-until 2026-08-24, unmarked, which meant every executing agent was told it was
-writing a hook.
-
-**A note on why it is in this file at all.** A gap analysis against ISAE 3000
-or AT-C 205 will not find business development in those standards, and that is
-scope rather than disapproval — they govern the engagement, not the firm.
-Silence in an external reference is not evidence that a requirement is
-spurious. What the standards DO cover is communication of results to intended
-users, and §15's format rules are exactly that: a reader model, and a tiering
-built on it.
-
-The distinction worth keeping: a false-positive requirement is one that
-constrains the audit work with no professional basis — the 2,000-word ceiling
-was one, and it failed real runs for three days. A section the standards
-simply do not reach is not the same thing.
+Kept out of §15 deliberately: an agent writing a deliverable should not be told
+it is writing a hook. Removals, retractions and the reasoning behind this split
+live in `audit/METHOD-gap-analysis.md`, not here.

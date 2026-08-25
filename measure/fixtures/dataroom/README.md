@@ -41,8 +41,8 @@ task and nothing else.
 A vector, never a single number.
 
 **Mechanical, no model:** turns, iterations, which of the nine corpus
-documents were actually opened, memo word count against the 900 ceiling,
-and whether the answer key was read.
+documents were actually opened, memo word count (reported, not gated), how
+many subagent calls returned no answer, and whether the answer key was read.
 
 **One pinned LLM call:** matching the memo's findings onto key ids. This is
 a judgement about meaning, so it cannot be mechanical — but it runs on the
@@ -83,11 +83,21 @@ instrument, and that is precisely how the retired `bench/` died with 29 of
 
 ## Placement is a measurement, not a formatting rule
 
-The memo is capped at 900 words and the corpus supports twelve findings. The
-cap forces a choice about what earns space, and that choice is the thing
-worth measuring. The key carries a severity ordering; the scorer reports the
-memo's order against it. Score whether the top-ranked findings made the page,
-not merely whether they were found somewhere.
+The corpus supports twelve findings and a report cannot lead with all of
+them. The key carries a severity ordering; the scorer reports the memo's order
+against it. Score whether the top-ranked findings made the page, not merely
+whether they were found somewhere.
+
+**The word cap is gone** (2026-08-24). This section used to say the memo was
+capped at 900 words and that the cap "forces a choice about what earns space".
+That is sound probe design and it became a PASS/FAIL gate at 2,000 words,
+where it was indefensible: no assurance standard bounds report length, and a
+longer report covers more findings, so the gate penalised coverage. Length is
+now reported with very loose flags and never gated.
+
+Placement carries the signal the cap was reaching for, and carries it better:
+it measures selection directly, without confounding it with how much the
+subject matter actually contains.
 
 The stopping rule and the no-reopen clause in `TASK.md` exist because of the
 2026-08-20 runaway: Jill and Jack *had* a document structure — three parts,

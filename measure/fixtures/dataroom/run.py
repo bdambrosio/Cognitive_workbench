@@ -65,13 +65,19 @@ GAP_MARK = "=== GAP MAP ==="
 # Dropped with the contract: the paragraph telling the agent to quote figures
 # verbatim. That is §5, and §5 is now guaranteed present on every turn — which
 # is precisely what it was not when that paragraph was added.
+#
+# Dropped 2026-08-24: "Recap as the method says. Stop and tell me if you find a
+# delta." Both named procedures METHOD.md has since removed as unperformable —
+# there is no channel to the client mid-engagement — and §12 step 4 now says
+# the opposite. A client brief instructing behaviour the method forbids is a
+# contradiction the agent has to resolve at runtime, and it was doing so
+# silently. The brief must not outlive the method it refers to.
 BRIEF = """The target is the data room bound to inspect_external: nine
 documents for a small SaaS business called flowmetrics, offered for sale by a
 seller named Dave. I am the buyer's side. Audit it.
 
 Enumerate the claim surface first and tell me roughly how big it is, then
-work the priority order. Recap as the method says. Stop and tell me if you
-find a delta.
+work the priority order straight through.
 
 Work in as many legs as you need — end a leg with `yield` and I will say
 continue. Produce both deliverables together in your final reply, as the
