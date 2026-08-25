@@ -9,6 +9,10 @@ arrows, a start and an end. Fetch the documents, extract the claims, compare
 against the code, write the report. The arrows are the workflow. The agent is
 the thing that walks the arrows.
 
+That picture is why most agent workflows are still scripts with a language
+model dropped into each box — and why they break in ways their authors find
+baffling.
+
 The workflow document I run in production reaches the agent as about twenty
 thousand characters across fourteen sections, and contains no arrows,
 deliberately. It never says what to do next.
@@ -146,15 +150,28 @@ supplied by the executor.
 
 This is the underlying difference, and it is old.
 
-GAAP is not a script. A clinical protocol is not a script. An ISO procedure is
-not a script. They are all addressed to a competent practitioner who brings
-judgement, and their function is to constrain that judgement into a form the
-profession can defend — to make an output *reviewable by someone who was not
-there*.
+GAAP, a clinical protocol and an ISO procedure are all addressed to a competent
+practitioner who brings judgement, and all exist to constrain that judgement
+into a form the profession can defend — to make an output *reviewable by
+someone who was not there*.
 
 A script assumes the executor has no judgement and must be told everything. A
 method assumes the executor has judgement and tells it what the judgement is
 for.
+
+The obvious question is how much judgement, and of what kind. The honest answer
+is that it is **patchy, and unevenly so**. On the same fixture, every model I
+run finds all three planted claim-versus-evidence contradictions — that is
+local work, and they are reliable at it. The same models recover the two
+findings that require arithmetic over figures from different documents 1 of 2,
+2 of 2 and 1 of 2. One rejected a malformed tool result, said why, and redid
+the enumeration itself; another relayed an instruction into a tool query
+instead of executing it.
+
+So the method form is not a bet that the executor is uniformly competent. It is
+a bet that the executor has *enough* judgement that specifying acceptance beats
+specifying steps — which holds even when, especially when, the judgement is
+inconsistent. A script would not have caught the malformed tool result either.
 
 Which of those you write depends entirely on what you think you are handing
 the work to. For thirty years the answer was "a machine, so write the script."
@@ -191,9 +208,12 @@ clause is right, and it is the one nobody thinks to run.
 
 ## Where specification runs out
 
+That was a limit on the executor's *capability* — the method asked for
+something the runner could not do. There is a second limit, on the author's
+*knowledge*, and it binds harder.
+
 A method can specify what makes an output acceptable. It cannot specify facts
-about the engagement it is applied to, and that boundary is sharper than it
-looks.
+about the engagement it is applied to.
 
 Every coverage figure in an audit report divides by one number: the size of the
 claim surface. That number is not a property of the method. It is a property of
@@ -255,10 +275,20 @@ after engagements, not analysts carrying client details in their heads. It
 routes learning through a human review gate, which is where a confidentiality
 check belongs, and it lands somewhere versioned and diffable.
 
-It also has a failure mode the document names: method learning can make the
-method *worse*, by over-fitting to recent targets. The guard is a fixed
-benchmark re-run after any method change, plus keeping at least one fixture in
-a domain unlike recent real work.
+It also has the failure mode the document names, and it is worth stating
+starkly: **this is the only durable channel by which the method improves, and
+the only one by which it can silently degrade.** A lesson from one engagement
+generalises badly, and nothing in the merged diff looks wrong.
+
+Detection is two things, and only the second one works. The first is a fixed
+benchmark re-run after every method change, watching whether tier recall moves;
+that catches a change which makes the method worse everywhere. It does not
+catch over-fitting, because a method over-fitted to the fixture scores *better*
+on the fixture. The second is a target in a different domain, run
+occasionally — which is how I learned that two models agreeing perfectly about
+where the claims are on my nine-document fixture agree on only 41% of them in a
+625-line README. The fixture had been flattering the method, and only the
+out-of-domain check said so.
 
 ## What this buys, and the limit I can now state precisely
 
