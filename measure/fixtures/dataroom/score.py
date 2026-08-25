@@ -288,9 +288,20 @@ def recommendation_of(report: str) -> Optional[str]:
     characters that follow. Earliest match wins, longest term breaking a tie
     so "Clear with caveats" is never read as "Clear".
     """
-    head = report[:4000]
-    for m in re.finditer(r"recommendation\b", head, re.I):
-        window = head[m.end():m.end() + 120]
+    # WHOLE REPORT, NOT THE FIRST 4,000 CHARS. The head window was the second
+    # locator bug in this function, found 2026-08-24 the same way as the
+    # first — by re-scoring real runs. It was safe while reports ran ~7,000
+    # chars and led with the recommendation, as §16 requires. An arm that
+    # wrote 2,851 words and put "The recommendation is Material" at the END
+    # scored "§9 recommendation used: FAIL" — reporting that it never used the
+    # taxonomy when it had, at character ~16,000.
+    #
+    # Note what that mislabels: putting the recommendation last IS a §16
+    # violation, and worth catching. But it is an ORDERING failure, and this
+    # criterion answers "was the vocabulary used". Reporting one as the other
+    # hides both. Ordering wants its own check.
+    for m in re.finditer(r"recommendation\b", report, re.I):
+        window = report[m.end():m.end() + 120]
         hits = []
         for term in _REC_VOCAB:
             tm = _REC_TERM_RE[term].search(window)
@@ -299,6 +310,46 @@ def recommendation_of(report: str) -> Optional[str]:
         if hits:
             return min(hits)[2]
     return None
+
+
+# REPORTED, NOT GATED — removed from the threshold 2026-08-24.
+#
+# It was a gate, at 2,000 words, and it could not survive being asked where
+# the number came from. Three values existed in three places: the fixture
+# README says 900, METHOD.md §16 says "AIM FOR 2,000 or under", and this file
+# enforced a hard 2,000. The scorer was stricter than the method it scores.
+#
+# The README's rationale is a PROBE-DESIGN argument and a sound one — "the cap
+# forces a choice about what earns space, and that choice is the thing worth
+# measuring." That justifies scarcity as an instrument. It does not justify
+# the threshold's claim to test "what a delivered report would be judged on",
+# which is what it silently became.
+#
+# NO ASSURANCE STANDARD CAPS REPORT LENGTH. ISAE 3000 and AT-C 205 specify
+# report CONTENTS and are silent on length; SOC 2 reports run to 100+ pages.
+# Length is a consequence of the subject matter's complexity, and bounding it
+# would force omission of required content.
+#
+# And it was actively inverting a measurement: an arm failed two of three runs
+# on length alone while finding all three must-find items with zero
+# unsupported claims. A longer report covers more findings, so the gate
+# penalised coverage — the one thing §4 says must never be silently traded.
+#
+# The scarcity idea belongs where METHOD.md already justifies it: §15's Gap
+# Map, which has a stated reader model and a real one-page constraint.
+_LEN_THIN, _LEN_BLOATED = 500, 5000
+
+
+def _length_note(wc: int) -> str:
+    """A flag, never a gate. The bounds are deliberately very loose: below
+    _LEN_THIN a 50-claim surface cannot have been covered, above
+    _LEN_BLOATED the stated audience (§8: a partner reading for two minutes)
+    will not read it. Between them, length is the subject matter's business."""
+    if wc < _LEN_THIN:
+        return f"THIN — under {_LEN_THIN}, check coverage"
+    if wc > _LEN_BLOATED:
+        return f"LONG — over {_LEN_BLOATED}, check the §8 audience holds"
+    return "reported, not gated"
 
 
 def word_count(memo: str) -> int:
@@ -338,7 +389,7 @@ def main() -> int:
     print(f"  corpus docs opened  {len(facts['docs_opened'])}/{CORPUS_DOCS}  "
           f"{facts['docs_opened']}")
     print(f"  report length       {wc} words  "
-          f"({'within' if wc <= 2000 else 'OVER'} the 2,000 guide)")
+          f"({_length_note(wc)})")
 
     sa = facts["subagent"]
     if sa["calls"]:
@@ -423,7 +474,6 @@ def main() -> int:
         ("leads with a top-3 finding",
          bool(ranked) and ranked[0] in SEVERITY[:3]),
         ("no unsupported claims",     unsupported == 0),
-        ("report within 2,000 words", wc <= 2000),
     ]
     passed = all(ok for _, ok in checks)
     print(f"\n  THRESHOLD           {'PASS' if passed else 'FAIL'}"
