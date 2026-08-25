@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import re
 import sys
 from pathlib import Path
@@ -39,6 +40,12 @@ sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "src"))
 
 from measure.trace import load_turns                            # noqa: E402
+
+logger = logging.getLogger("dataroom.score")
+
+# Where a run's world lives. Same layout load_turns walks; named here so the
+# subagent trace files can be found without a second convention.
+SCEN = REPO / "scenarios"
 
 CORPUS_DOCS = 9
 
@@ -154,6 +161,54 @@ def split_deliverables(reply: str) -> tuple:
     return reply, None
 
 
+_TRACE_HDR = re.compile(r'^\[(?P<label>[\w-]+)\][^\n]*?exit=(?P<exit>\w+)\s+'
+                        r'iters=(?P<iters>\d+)', re.M)
+
+
+def subagent_compliance(world: str, agent: str) -> Dict[str, Any]:
+    """How often a subagent call came back with no answer at all.
+
+    WHY THIS IS COUNTED RATHER THAN REPAIRED. The subagent contract is one
+    line: end by emitting `respond` with your answer in `text`. A call that
+    returns nothing has failed that contract, and the parent sees only
+    `EMPTY:` — so it retries, narrower, and the cost lands in the iteration
+    count where nothing distinguishes it from thorough work. Measured
+    2026-08-24: one arm returned no answer on 12 of 33 `inspect_external`
+    calls while two others managed 0 of 9 and 0 of 7. That difference took
+    three passes of hand-reading traces to find, because no number reported
+    it.
+
+    NOT SALVAGED, DELIBERATELY. `subagent._salvage` reconstructs an answer
+    from the working log for the paths where the loop never GOT to answer —
+    `max_iters`, `format_failed`. These are different: the subagent chose to
+    respond and responded with nothing. Substituting salvaged observations
+    there would put words in its mouth, which in an audit is manufacturing
+    evidence to cover a contract violation. Count it; do not paper over it.
+
+    Mechanical: reads the trace files the subagents already write. No model,
+    no network, and no change to anything the agent sees.
+    """
+    d = (SCEN / world / agent / "inspect_traces")
+    calls, empty, by_exit = 0, 0, {}
+    if not d.is_dir():
+        return {"calls": 0, "empty": 0, "by_exit": {}}
+    for f in sorted(d.glob("*.txt")):
+        try:
+            body = f.read_text(errors="replace")
+        except OSError as e:
+            logger.warning("subagent trace unreadable: %s (%s)", f, e)
+            continue
+        m = _TRACE_HDR.search(body)
+        if not m:
+            continue
+        calls += 1
+        by_exit[m.group("exit")] = by_exit.get(m.group("exit"), 0) + 1
+        _, _, answer = body.partition("FINAL ANSWER:")
+        if not answer.strip():
+            empty += 1
+    return {"calls": calls, "empty": empty, "by_exit": by_exit}
+
+
 def trace_facts(world: str, agent: str) -> Dict[str, Any]:
     """Everything computable without a model."""
     turns = load_turns(world, agent)
@@ -164,6 +219,7 @@ def trace_facts(world: str, agent: str) -> Dict[str, Any]:
         "iterations": sum(t.iterations for t in turns),
         "docs_opened": sorted(int(d) for d in docs),
         "exit_reasons": {},
+        "subagent": subagent_compliance(world, agent),
         # The run is void if the answers were in reach and got read.
         "read_answer_key": "answer_key" in log,
     }
@@ -283,6 +339,15 @@ def main() -> int:
           f"{facts['docs_opened']}")
     print(f"  report length       {wc} words  "
           f"({'within' if wc <= 2000 else 'OVER'} the 2,000 guide)")
+
+    sa = facts["subagent"]
+    if sa["calls"]:
+        pct = sa["empty"] / sa["calls"] * 100
+        print(f"  subagent calls      {sa['calls']}  "
+              f"returned NO answer: {sa['empty']} ({pct:.0f}%)"
+              f"{'   <-- contract violations' if sa['empty'] else ''}")
+        if sa["by_exit"]:
+            print(f"                      exits {sa['by_exit']}")
 
     if args.dry_run:
         print("  dry run — no finding match attempted.")

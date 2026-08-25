@@ -295,6 +295,51 @@ structure into every composition instruction.
 the three arms differ in temperature by design. What is being tested is
 whether two harness defects stopped happening, not which model is better.
 
+## Subagent contract compliance — counted, not repaired
+
+Added to `score.py`'s mechanical block 2026-08-24. Free, no grader, no change
+to anything the agent sees.
+
+The subagent contract is one line: finish by emitting `respond` with your
+answer in `text`. A call that returns nothing has failed it. The parent sees
+only `EMPTY:`, retries narrower, and the cost lands in the iteration count
+where nothing distinguishes it from thorough work.
+
+First measurement, one run per arm:
+
+| arm | `inspect_external` calls | returned NO answer | exits |
+|---|---|---|---|
+| grok-4.6 | 9 | **0 (0%)** | respond 8, **llm_error 1** |
+| Qwen3.8-27B | 7 | **0 (0%)** | respond 7 |
+| gpt-5.6-luna | 33 | **12 (36%)** | respond 32, max_iters 1 |
+
+All twelve of Luna's are `exit=respond` — the subagent chose to finish and
+finished with an empty `text`. Hand-read, they split evenly:
+
+- **Six declare the tools broken without calling them**, several at
+  `iters=1`: *"Unable to inspect the repository because tool results were not
+  returned."*
+- **Six announce an answer and emit nothing**: *"doc7 has been read in full;
+  I'll provide its exact line-numbered contents…"* — then no text.
+
+**Why this is counted rather than fixed.** `subagent._salvage` reconstructs an
+answer for the paths where the loop never GOT to answer (`max_iters`,
+`format_failed`). These are not those paths: the subagent chose to respond and
+responded with nothing. Salvaging there would substitute reconstructed
+observations for an answer the model declined to give — manufacturing evidence
+to cover a contract violation, in a product whose entire value is provenance.
+
+**The line this draws.** Fix the harness where the harness is wrong; do not fix
+it where the model is wrong. The two changes shipped on 2026-08-24 were
+defects — the working log was unclosed, so the prompt's own trailer read as
+document content; and §-references reached a sub-call that had never been given
+the method. A model that reports tools failed without calling them is not a
+defect in either. It is a finding, and it now has a denominator.
+
+Also worth its own note: the counter surfaced an `llm_error` subagent exit on
+grok that nobody had seen, on a run that scored the best of the three. Failures
+that get recovered from are still failures worth counting.
+
 ## Outstanding work — needs careful, extensive testing before shipping
 
 **A diff view for `process_text`.** The observation would carry a
