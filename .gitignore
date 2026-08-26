@@ -13,6 +13,12 @@ bench/snapshots/
 # Benchmark per-run output (transcripts, raw/scored jsonl, summaries)
 bench/*/results/
 
+# Claims-audit run output. Derived from a model against an instrument state, not
+# source: a checkout does not need it and it only grows. engagements/*/runs/ is
+# already covered by the bare `runs/` rule below. Reports needed by tests are
+# copied into tests/fixtures/audit_review/ instead.
+measure/fixtures/dataroom/results/
+
 # Benchmark scoring artifacts (judge outputs, aggregate.json) — regenerable
 bench/*/scores*/
 
