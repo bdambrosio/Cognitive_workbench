@@ -26,7 +26,9 @@ sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "src"))
 
 from workflows.audit_review.runner import (resolve_citations, resolve_quotes,
-                                           unpointed_fields)
+                                           unpointed_fields,
+                                           judgement_exceptions,
+                                           _confirmation_note)
 
 CORPUS = REPO / "measure" / "fixtures" / "dataroom" / "corpus"
 
@@ -225,3 +227,41 @@ def test_line_reference_half_is_unchanged_against_the_golden():
     assert fresh["citations"] == golden["citations"]
     assert (fresh["total"], fresh["broken"]) == (golden["total"],
                                                  golden["broken"])
+
+
+def test_only_judgement_disputes_need_confirming():
+    """§9: `[unsupported]` and `[indeterminate]` rest on a reading of a line.
+
+    `[uncited]` and `[broken citation]` are settled by a file operation, and
+    `[overstated]` never fails a report, so none of the three should cost a
+    second opinion.
+    """
+    review = (
+        "**Exception 1: report Finding 9 — [unsupported]**\n"
+        "**Exception 2: report Finding 5 — [uncited]**\n"
+        "**Exception 3: report Finding 3 — [overstated]**\n"
+        "**Exception 4: report Finding 7 — [indeterminate]**\n"
+        "**Exception 5: report Finding 2 — [broken citation]**\n")
+    assert judgement_exceptions(review) == [
+        {"finding": "9", "verdict": "unsupported"},
+        {"finding": "7", "verdict": "indeterminate"}]
+    assert judgement_exceptions("") == []
+
+
+def test_the_summary_is_told_the_outcome_and_not_the_verdict():
+    """The runner reports what the second reviewer found. §9 carries the rule.
+
+    A confirmed dispute and an unconfirmed one must be distinguishable, and
+    an unconfirmed one must survive into the review rather than vanish.
+    """
+    note = _confirmation_note({"ran": True, "results": [
+        {"finding": "9", "verdict": "unsupported",
+         "second_opinion": "supported", "confirmed": False},
+        {"finding": "7", "verdict": "indeterminate",
+         "second_opinion": "indeterminate", "confirmed": True}]})
+    assert "Finding 9" in note and "NOT CONFIRMED" in note
+    assert "Finding 7" in note and "CONFIRMED" in note
+    assert "do not delete it" in note
+    # A pass that could not run must not read as a clearance.
+    failed = _confirmation_note({"ran": False, "error": "boom"})
+    assert "unconfirmed" in failed and "CONFIRMED" not in failed

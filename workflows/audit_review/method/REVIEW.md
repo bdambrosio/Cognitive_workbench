@@ -315,7 +315,38 @@ is listed.
 **PASS or FAIL.** FAIL if there is any `[unsupported]`, `[broken citation]`,
 `[indeterminate]` or `[uncited]`. All four mean a finding is not defensible
 from what it cites — whether the citation is wrong, unplaceable, or absent —
-which is the one thing this review exists to catch. `[overstated]` and
+which is the one thing this review exists to catch.
+
+**A judgement-based dispute must be confirmed before it fails a report.**
+`[unsupported]` and `[indeterminate]` rest on your reading of a line against
+a claim. Before either counts toward FAIL, a second reviewer — who is not
+told your verdict and does not see your review — checks the same finding and
+must independently reach the same verdict on it. The client's process
+arranges this and reports the outcome to you before you write §9.
+
+`[broken citation]` and `[uncited]` need no confirmation. A reference
+resolves or it does not, and a field carries a pointer or it does not. Both
+are settled by a file operation, and asking a second model to re-derive a
+fact is not a second opinion.
+
+**Report an unconfirmed dispute; do not delete it and do not upgrade it.**
+"One of two reviewers found Finding 9 unsupported; the second did not" is the
+honest line, and it belongs in the review. Silently dropping the exception
+hides a real disagreement, and restating it as agreement invents one.
+
+**Why the burden is one-sided.** A reviewer disputing an auditor's work is
+asserting a defect in finished work, and should carry the higher standard for
+it. The measurement agrees: §9 fails on a *single* exception, so one marginal
+judgement flips a whole verdict — a clean report reviewed five times on
+2026-08-26 came back PASS four times and FAIL once, on a finding the reviewer
+had rebutted by attacking a claim the audit never made. At a 2% per-finding
+error rate a 12-finding report flips about a fifth of the time and a
+23-finding report about a third, so without this rule the more thorough the
+audit, the likelier it is failed for nothing. The error runs one way only: a
+clean report can be failed by one stray judgement, while a bad one cannot be
+passed by the same mechanism, which would need every real exception missed at
+once. Confirmation is therefore required for disputes and never for
+clearances. `[overstated]` and
 `[understated]` are calibration: reported, never fatal, because a verdict one
 step off is a different problem from a finding with no support.
 

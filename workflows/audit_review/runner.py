@@ -468,6 +468,145 @@ after it.
 """
 
 
+# Exceptions in a finished review, as §6 writes them.
+_EXCEPTION = re.compile(
+    r"^\s*\**\s*Exception\s+\d+\s*:\s*report\s+Finding\s+(\d+)[^\n\[]*\[([^\]]+)\]",
+    re.M | re.I)
+
+# The two FAIL verdicts that rest on judgement. `[broken citation]` and
+# `[uncited]` are decided by a file operation — citations.json says a
+# reference resolves or it does not, conformance.json says a field carries a
+# pointer or it does not — so re-asking a model would spend money to
+# re-derive a fact it cannot change.
+_JUDGEMENT_VERDICTS = ("unsupported", "indeterminate")
+
+
+def judgement_exceptions(review_text: str) -> List[Dict[str, str]]:
+    """Findings a review disputed on judgement rather than on a file fact."""
+    out, seen = [], set()
+    for finding, verdict in _EXCEPTION.findall(review_text or ""):
+        v = verdict.strip().lower()
+        if v in _JUDGEMENT_VERDICTS and finding not in seen:
+            seen.add(finding)
+            out.append({"finding": finding, "verdict": v})
+    return out
+
+
+CONFIRM_BRIEF = """A colleague is reviewing the claims audit in this run directory and has
+asked for a second opinion on specific findings, before anything is
+reported.
+
+Check these findings, and only these: {findings}.
+
+For each one, read what the report claims and what its citations actually
+say — `review/citations.json` has every cited line already fetched — and give
+it a verdict from REVIEW.md §6. Judge each finding on the evidence in front
+of you. You have not been told what anyone else concluded, and you should not
+try to infer it: a second opinion that guesses at the first is not one.
+
+REVIEW.md §2 and §10 bind here as everywhere. The subject is the report, not
+the business. A claim the report never made is not an exception, and a
+statement about what the audit could NOT verify is a coverage statement
+rather than a claim about the target.
+
+Answer with one line per finding and nothing else:
+
+    Finding <N>: [verdict] — <one sentence, citing the line that settles it>
+"""
+
+
+def confirm_exceptions(run: Path, world: str, model_path: Optional[Path],
+                       target: Path, disputed: List[Dict[str, str]],
+                       ) -> Dict[str, Any]:
+    """A blind second opinion on the findings a review disputed.
+
+    WHY THIS IS ONE-SIDED. §9 fails a report on any single `[unsupported]`,
+    so one marginal judgement flips the whole verdict — measured 2026-08-26,
+    a clean report reviewed five times came back PASS four times and FAIL
+    once, on a finding the reviewer had rebutted by attacking a claim the
+    audit never made. The arithmetic is unkind and gets worse with length: at
+    a ~2% per-finding error rate a 12-finding report flips ~21% of the time
+    and a 23-finding one ~37%, so the more thorough the audit, the likelier
+    it is failed for nothing.
+
+    The error only runs one way. A clean report can be failed by one stray
+    judgement; a bad one cannot be passed by the same mechanism, which would
+    need every real exception missed at once. So confirmation is required for
+    disputes and not for clearances, and that asymmetry is a standard rather
+    than a patch: a reviewer disputing an auditor's work carries the higher
+    burden of proof.
+
+    BLIND. Launched before `review.md` is written to disk, so the confirming
+    reviewer cannot reach the first verdict through `inspect`, and its brief
+    does not carry it. It CONFIRMS, it does not override — a dispute the
+    second pass does not reach stands as recorded and unconfirmed, and the
+    disagreement is reported rather than resolved silently.
+    """
+    names = ", ".join(f"Finding {d['finding']}" for d in disputed)
+    name, cfg = build_config(run, world, model_path, target)
+    from chat.chat_loop import ChatLoop                        # noqa: E402
+    loop = ChatLoop(character_name=name, character_config=cfg)
+    t0 = time.time()
+    try:
+        loop._process_user_turn(source=SOURCE, close=False,
+                                text=CONFIRM_BRIEF.format(findings=names))
+        reply = latest_reply(loop, SOURCE)
+    except Exception as e:                                     # noqa: BLE001
+        logger.warning("confirmation pass failed: %s", e)
+        return {"ran": False, "error": f"{type(e).__name__}: {e}",
+                "disputed": disputed}
+    finally:
+        try:
+            loop._post_turn_executor.shutdown(wait=True)
+        except Exception as e:                                 # noqa: BLE001
+            logger.warning("confirm executor shutdown failed: %s", e)
+
+    second = {}
+    for m in re.finditer(r"Finding\s+(\d+)\s*:\s*\[([^\]]+)\]", reply or "",
+                         re.I):
+        second[m.group(1)] = m.group(2).strip().lower()
+
+    results = []
+    for d in disputed:
+        got = second.get(d["finding"])
+        results.append({**d, "second_opinion": got,
+                        "confirmed": got == d["verdict"]})
+    n_conf = sum(1 for r in results if r["confirmed"])
+    logger.info("confirmation: %d of %d disputes confirmed", n_conf, len(results))
+    return {"ran": True, "error": None, "world": world,
+            "resolved_model": loop.backend.resolved_model(),
+            "wall_clock_s": round(time.time() - t0, 1),
+            "reply": reply, "results": results,
+            "confirmed": n_conf, "disputed_count": len(results)}
+
+
+def _confirmation_note(c: Dict[str, Any]) -> str:
+    """What the summary turn is told about the second opinion.
+
+    States outcomes and does not instruct the verdict: REVIEW.md §9 carries
+    the rule, and a runner that also argued the conclusion would be writing
+    the review.
+    """
+    if not c.get("ran"):
+        return ("\n\n[The client's process could not obtain a second opinion on "
+                "your judgement-based exceptions. Report them as recorded and "
+                "unconfirmed, per §9.]")
+    lines = []
+    for r in c["results"]:
+        got = r.get("second_opinion") or "no verdict returned"
+        lines.append(f"  Finding {r['finding']}: you found [{r['verdict']}]; "
+                     f"the second reviewer found [{got}] — "
+                     f"{'CONFIRMED' if r['confirmed'] else 'NOT CONFIRMED'}")
+    return ("\n\n[Second opinion, obtained by the client's process from a "
+            "reviewer who was not told your verdicts and did not see your "
+            "review:\n" + "\n".join(lines) +
+            "\n\nApply §9: a judgement-based exception counts toward FAIL only "
+            "where the second reviewer independently reached the same verdict "
+            "on the same finding. Report an unconfirmed dispute as recorded "
+            "and unconfirmed — do not delete it, and do not restate it as "
+            "agreement.]")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=__doc__,
@@ -492,7 +631,18 @@ def main() -> int:
         raise SystemExit(
             f"{out} already exists. One review per run: a reviewer whose "
             f"`inspect` can see a previous review is not independent of it. "
-            f"Move or delete it to review again.")
+            f"Move it OUT of the run directory, or delete it, to review again.")
+    # RENAMING IS NOT MOVING. `inspect` reaches the whole run directory, so a
+    # previous review parked alongside as review.8192-era/ or
+    # review.pre-admissibility/ is exactly as visible as review/ was. The
+    # guard above was written for the name and missed the point of itself.
+    stale = sorted(d.name for d in run.glob("review*")
+                   if d.is_dir() and (d / "review.md").is_file())
+    if stale:
+        raise SystemExit(
+            f"{run} still holds a previous review: {', '.join(stale)}. "
+            f"`inspect` reaches the whole run directory, so renaming one does "
+            f"not hide it. Move it outside the run directory to review again.")
 
     meta = json.loads(meta_p.read_text(encoding="utf-8"))
     target = Path(meta.get("external_repo") or "").resolve()
@@ -526,6 +676,7 @@ def main() -> int:
 
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
     t0, legs, error, summary_sent, review_text = time.time(), [], None, False, ""
+    confirmation: Optional[Dict[str, Any]] = None
     try:
         text = BRIEF
         for i in range(args.max_turns):
@@ -545,7 +696,19 @@ def main() -> int:
                         f"process — leg {i + 2} of {args.max_turns}, "
                         f"{(time.time() - t0) / 60:.0f} min elapsed.]")
                 continue
-            review_text, text, summary_sent = reply, SUMMARY_REQUEST, True
+            review_text, summary_sent = reply, True
+            # Blind second opinion on judgement-based disputes, BEFORE
+            # review.md is written and before the summary is asked for, so
+            # the confirming reviewer cannot reach the first verdict and the
+            # summary can state the outcome. See confirm_exceptions.
+            disputed = judgement_exceptions(review_text)
+            if disputed:
+                logger.info("%d judgement dispute(s) — confirming", len(disputed))
+                confirmation = confirm_exceptions(
+                    run, f"{world}_confirm", args.model, target, disputed)
+                text = SUMMARY_REQUEST + _confirmation_note(confirmation)
+            else:
+                text = SUMMARY_REQUEST
     except Exception as e:                                     # noqa: BLE001
         error = f"{type(e).__name__}: {e}"
         logger.exception("review failed")
@@ -577,6 +740,7 @@ def main() -> int:
         "citations_broken": cites["broken"],
         "scheme": cites["scheme"],
         "findings_parsed": len(conf["findings"]),
+        "confirmation": confirmation,
         "legs": legs,
         "wall_clock_s": round(time.time() - t0, 1),
         "error": error,
