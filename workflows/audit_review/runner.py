@@ -553,6 +553,11 @@ def confirm_exceptions(run: Path, world: str, model_path: Optional[Path],
     """
     names = ", ".join(f"Finding {d['finding']}" for d in disputed)
     from chat.chat_loop import ChatLoop                        # noqa: E402
+    # Imported here as well as in main(): main()'s import is local to it, and
+    # a NameError raised inside the retest reads as "could not obtain the
+    # retest", which silently turns every failed finding into one that does
+    # not stand. Cost one review on 2026-08-26 before it was noticed.
+    from workflows.claims_audit.runner import latest_reply     # noqa: E402
     t0, opinions, replies, models = time.time(), [], [], []
 
     for n in range(1, CONFIRMING_REVIEWERS + 1):

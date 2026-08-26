@@ -291,3 +291,46 @@ def test_the_summary_is_told_what_the_retest_found():
     assert "could not obtain the retest" in failed
     assert "none of them stands" in failed
     assert "STANDS" not in failed.replace("none of them stands", "")
+
+
+def test_every_name_the_runner_uses_at_run_time_resolves():
+    """A NameError inside the retest reads as "could not obtain the retest".
+
+    `latest_reply` was imported inside main(), so the module-level
+    confirm_exceptions could not see it. The retest raised NameError, every
+    failed finding became one that did not stand, and a report with five
+    [unsupported] findings came back PASS. The failure path was correct; the
+    name was not there to begin with.
+
+    Static, because the alternative needs a live model: every global a
+    function reads must exist in the module or be imported in its own body.
+    """
+    import ast
+    import builtins
+    import inspect
+    from workflows.audit_review import runner as mod
+
+    src = ast.parse(inspect.getsource(mod))
+    problems = []
+    for fn in [n for n in src.body if isinstance(n, ast.FunctionDef)]:
+        local = set()
+        for node in ast.walk(fn):
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                local.update(a.asname or a.name.split(".")[0]
+                             for a in node.names)
+            elif isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+                local.add(node.id)
+            elif isinstance(node, ast.arg):
+                local.add(node.arg)
+            elif isinstance(node, ast.ExceptHandler) and node.name:
+                local.add(node.name)          # `except X as e` binds a str
+        for node in ast.walk(fn):
+            if not (isinstance(node, ast.Name)
+                    and isinstance(node.ctx, ast.Load)):
+                continue
+            n = node.id
+            if n in local or hasattr(mod, n) or hasattr(builtins, n):
+                continue
+            problems.append(f"{fn.name}: {n} (line {node.lineno})")
+    assert not problems, "names that will not resolve at run time: " + \
+        "; ".join(sorted(set(problems)))
