@@ -317,36 +317,36 @@ is listed.
 from what it cites — whether the citation is wrong, unplaceable, or absent —
 which is the one thing this review exists to catch.
 
-**A judgement-based dispute must be confirmed before it fails a report.**
-`[unsupported]` and `[indeterminate]` rest on your reading of a line against
-a claim. Before either counts toward FAIL, a second reviewer — who is not
-told your verdict and does not see your review — checks the same finding and
-must independently reach the same verdict on it. The client's process
-arranges this and reports the outcome to you before you write §9.
+**A finding you fail on judgement is accepted as failed only when three of
+three reviewers fail it.** `[unsupported]` and `[indeterminate]` rest on your
+reading of a line against a claim. The client's process obtains two more
+reviewers for every finding you gave one of those verdicts. Neither is told
+your verdict, neither sees your review, and neither sees the other. All three
+must reach the same verdict on the same finding. You are told what they found
+before you write §9.
 
-`[broken citation]` and `[uncited]` need no confirmation. A reference
-resolves or it does not, and a field carries a pointer or it does not. Both
-are settled by a file operation, and asking a second model to re-derive a
-fact is not a second opinion.
+A finding that is not accepted as failed does not count toward FAIL.
 
-**Report an unconfirmed dispute; do not delete it and do not upgrade it.**
-"One of two reviewers found Finding 9 unsupported; the second did not" is the
-honest line, and it belongs in the review. Silently dropping the exception
-hides a real disagreement, and restating it as agreement invents one.
+`[broken citation]` and `[uncited]` need no second and third reviewer. A
+reference resolves or it does not, and a field carries a pointer or it does
+not. Both are settled by a file operation, and asking another model to
+re-derive a fact is not another opinion.
 
-**Why the burden is one-sided.** A reviewer disputing an auditor's work is
-asserting a defect in finished work, and should carry the higher standard for
-it. The measurement agrees: §9 fails on a *single* exception, so one marginal
-judgement flips a whole verdict — a clean report reviewed five times on
-2026-08-26 came back PASS four times and FAIL once, on a finding the reviewer
-had rebutted by attacking a claim the audit never made. At a 2% per-finding
-error rate a 12-finding report flips about a fifth of the time and a
-23-finding report about a third, so without this rule the more thorough the
-audit, the likelier it is failed for nothing. The error runs one way only: a
-clean report can be failed by one stray judgement, while a bad one cannot be
-passed by the same mechanism, which would need every real exception missed at
-once. Confirmation is therefore required for disputes and never for
-clearances. `[overstated]` and
+**Report a finding that was not accepted, and give the tally.** "Two of three
+reviewers found Finding 9 unsupported" is the honest line and it belongs in
+the review. Dropping the finding hides a real disagreement; restating it as
+agreement invents one. A split result is worth stating plainly: where
+reviewers divide, the finding is genuinely borderline, and that is something
+the reader should know rather than something to round away.
+
+**Why only findings that fail.** A reviewer asserting a defect in finished
+work carries the higher standard. The measurement says the same: §9 fails a
+whole report on a *single* exception, so one wrong judgement condemns it. One
+clean report reviewed five times on 2026-08-26 came back supported 12 of 12
+four times and 11 of 12 once, and the one dissent had rebutted a finding by
+attacking a claim the audit never made. A wrong judgement the other way
+cannot do the same damage, because passing a bad report would need every real
+exception missed at once. `[overstated]` and
 `[understated]` are calibration: reported, never fatal, because a verdict one
 step off is a different problem from a finding with no support.
 

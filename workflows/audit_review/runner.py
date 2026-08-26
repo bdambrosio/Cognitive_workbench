@@ -515,96 +515,127 @@ Answer with one line per finding and nothing else:
 """
 
 
+# How many reviewers must agree before a finding the review failed is
+# accepted as failed. Three, and all three must say it fails: the reviewer
+# who wrote the review, plus CONFIRMING_REVIEWERS more obtained here.
+REVIEWERS_REQUIRED = 3
+CONFIRMING_REVIEWERS = REVIEWERS_REQUIRED - 1
+
+
 def confirm_exceptions(run: Path, world: str, model_path: Optional[Path],
                        target: Path, disputed: List[Dict[str, str]],
                        ) -> Dict[str, Any]:
-    """A blind second opinion on the findings a review disputed.
+    """Two more blind opinions on the findings the first reviewer failed.
 
-    WHY THIS IS ONE-SIDED. §9 fails a report on any single `[unsupported]`,
-    so one marginal judgement flips the whole verdict — measured 2026-08-26,
-    a clean report reviewed five times came back PASS four times and FAIL
-    once, on a finding the reviewer had rebutted by attacking a claim the
-    audit never made. The arithmetic is unkind and gets worse with length: at
-    a ~2% per-finding error rate a 12-finding report flips ~21% of the time
-    and a 23-finding one ~37%, so the more thorough the audit, the likelier
-    it is failed for nothing.
+    THE RULE. A finding the review says fails is accepted as failed only
+    when three of three reviewers say it fails. This function obtains the
+    other two. If any one of the three disagrees, the finding is not accepted
+    as failed, and the disagreement is reported.
 
-    The error only runs one way. A clean report can be failed by one stray
-    judgement; a bad one cannot be passed by the same mechanism, which would
-    need every real exception missed at once. So confirmation is required for
-    disputes and not for clearances, and that asymmetry is a standard rather
-    than a patch: a reviewer disputing an auditor's work carries the higher
-    burden of proof.
+    WHY IT APPLIES ONLY TO FINDINGS THAT FAIL. §9 fails a whole report on a
+    single exception, so one wrong judgement condemns the report. Measured on
+    2026-08-26: one clean report was reviewed five times and came back
+    supported 12 of 12 four times and 11 of 12 once, and the one dissent had
+    rebutted a finding by attacking a claim the audit never made. A wrong
+    judgement the other way cannot do the same damage, because passing a bad
+    report would need every real exception missed at once. A reviewer
+    asserting a defect in finished work carries the higher standard; a
+    reviewer finding no defect does not.
 
-    BLIND. Launched before `review.md` is written to disk, so the confirming
-    reviewer cannot reach the first verdict through `inspect`, and its brief
-    does not carry it. It CONFIRMS, it does not override — a dispute the
-    second pass does not reach stands as recorded and unconfirmed, and the
-    disagreement is reported rather than resolved silently.
+    A MIXED RESULT IS NOT NOISE. Two reviewers finding a fault and one not is
+    a genuinely borderline finding, and saying so is more use than rounding
+    it to yes or no. The tally is reported either way.
+
+    BLIND. These reviewers are launched before `review.md` is written to
+    disk, so none of them can reach the first verdict through `inspect`, none
+    is told it, and none sees the others. They confirm; they do not overrule.
+    A finding not accepted as failed stays in the review as recorded, with
+    its tally.
     """
     names = ", ".join(f"Finding {d['finding']}" for d in disputed)
-    name, cfg = build_config(run, world, model_path, target)
     from chat.chat_loop import ChatLoop                        # noqa: E402
-    loop = ChatLoop(character_name=name, character_config=cfg)
-    t0 = time.time()
-    try:
-        loop._process_user_turn(source=SOURCE, close=False,
-                                text=CONFIRM_BRIEF.format(findings=names))
-        reply = latest_reply(loop, SOURCE)
-    except Exception as e:                                     # noqa: BLE001
-        logger.warning("confirmation pass failed: %s", e)
-        return {"ran": False, "error": f"{type(e).__name__}: {e}",
-                "disputed": disputed}
-    finally:
-        try:
-            loop._post_turn_executor.shutdown(wait=True)
-        except Exception as e:                                 # noqa: BLE001
-            logger.warning("confirm executor shutdown failed: %s", e)
+    t0, opinions, replies, models = time.time(), [], [], []
 
-    second = {}
-    for m in re.finditer(r"Finding\s+(\d+)\s*:\s*\[([^\]]+)\]", reply or "",
-                         re.I):
-        second[m.group(1)] = m.group(2).strip().lower()
+    for n in range(1, CONFIRMING_REVIEWERS + 1):
+        # A world each: these reviewers must not see each other any more than
+        # they see the first one.
+        name, cfg = build_config(run, f"{world}_{n}", model_path, target)
+        loop = ChatLoop(character_name=name, character_config=cfg)
+        try:
+            loop._process_user_turn(source=SOURCE, close=False,
+                                    text=CONFIRM_BRIEF.format(findings=names))
+            reply = latest_reply(loop, SOURCE)
+            models.append(loop.backend.resolved_model())
+        except Exception as e:                                 # noqa: BLE001
+            logger.warning("confirming reviewer %d failed: %s", n, e)
+            return {"ran": False, "error": f"{type(e).__name__}: {e}",
+                    "reviewers_required": REVIEWERS_REQUIRED,
+                    "reviewers_obtained": len(opinions) + 1,
+                    "disputed": disputed}
+        finally:
+            try:
+                loop._post_turn_executor.shutdown(wait=True)
+            except Exception as e:                             # noqa: BLE001
+                logger.warning("confirm executor shutdown failed: %s", e)
+        replies.append(reply)
+        verdicts = {}
+        for m in re.finditer(r"Finding\s+(\d+)\s*:\s*\[([^\]]+)\]",
+                             reply or "", re.I):
+            verdicts[m.group(1)] = m.group(2).strip().lower()
+        opinions.append(verdicts)
 
     results = []
     for d in disputed:
-        got = second.get(d["finding"])
-        results.append({**d, "second_opinion": got,
-                        "confirmed": got == d["verdict"]})
-    n_conf = sum(1 for r in results if r["confirmed"])
-    logger.info("confirmation: %d of %d disputes confirmed", n_conf, len(results))
+        others = [o.get(d["finding"]) for o in opinions]
+        agreeing = 1 + sum(1 for v in others if v == d["verdict"])
+        results.append({**d, "other_verdicts": others,
+                        "agreeing": agreeing,
+                        "of": REVIEWERS_REQUIRED,
+                        # Three of three, and a reviewer that returned no
+                        # verdict for this finding has not agreed to fail it.
+                        "accepted_as_failed": agreeing == REVIEWERS_REQUIRED})
+    n_acc = sum(1 for r in results if r["accepted_as_failed"])
+    logger.info("confirmation: %d of %d failed findings accepted, %d of %d "
+                "reviewers required", n_acc, len(results), REVIEWERS_REQUIRED,
+                REVIEWERS_REQUIRED)
     return {"ran": True, "error": None, "world": world,
-            "resolved_model": loop.backend.resolved_model(),
+            "reviewers_required": REVIEWERS_REQUIRED,
+            "resolved_models": models,
             "wall_clock_s": round(time.time() - t0, 1),
-            "reply": reply, "results": results,
-            "confirmed": n_conf, "disputed_count": len(results)}
+            "replies": replies, "results": results,
+            "accepted_as_failed": n_acc, "failed_findings": len(results)}
 
 
 def _confirmation_note(c: Dict[str, Any]) -> str:
-    """What the summary turn is told about the second opinion.
+    """What the summary turn is told about the other two reviewers.
 
-    States outcomes and does not instruct the verdict: REVIEW.md §9 carries
-    the rule, and a runner that also argued the conclusion would be writing
-    the review.
+    States what each of them found and does not argue the verdict: REVIEW.md
+    §9 carries the rule, and a runner that also reasoned the conclusion would
+    be writing the review.
     """
     if not c.get("ran"):
-        return ("\n\n[The client's process could not obtain a second opinion on "
-                "your judgement-based exceptions. Report them as recorded and "
-                "unconfirmed, per §9.]")
+        return ("\n\n[The client's process could not obtain the other two "
+                "reviewers. Three of three are required to accept a finding "
+                "as failed, so no finding you failed can be accepted. Report "
+                "each one as found but not accepted, with the reason, "
+                "per §9.]")
     lines = []
     for r in c["results"]:
-        got = r.get("second_opinion") or "no verdict returned"
-        lines.append(f"  Finding {r['finding']}: you found [{r['verdict']}]; "
-                     f"the second reviewer found [{got}] — "
-                     f"{'CONFIRMED' if r['confirmed'] else 'NOT CONFIRMED'}")
-    return ("\n\n[Second opinion, obtained by the client's process from a "
-            "reviewer who was not told your verdicts and did not see your "
-            "review:\n" + "\n".join(lines) +
-            "\n\nApply §9: a judgement-based exception counts toward FAIL only "
-            "where the second reviewer independently reached the same verdict "
-            "on the same finding. Report an unconfirmed dispute as recorded "
-            "and unconfirmed — do not delete it, and do not restate it as "
-            "agreement.]")
+        others = ", ".join(f"[{v}]" if v else "[no verdict returned]"
+                           for v in r["other_verdicts"])
+        lines.append(
+            f"  Finding {r['finding']}: you found [{r['verdict']}]; the other "
+            f"two found {others} — {r['agreeing']} of {r['of']} — "
+            + ("ACCEPTED AS FAILED" if r["accepted_as_failed"]
+               else "NOT ACCEPTED"))
+    return ("\n\n[The other two reviewers, obtained by the client's process. "
+            "Neither was told your verdicts, neither saw your review, and "
+            "neither saw the other:\n" + "\n".join(lines) +
+            "\n\nApply §9. A finding you failed on judgement is accepted as "
+            "failed only where all three reviewers reached the same verdict "
+            "on it. Report a finding that was not accepted as found but not "
+            "accepted, and give the tally — do not delete it, and do not "
+            "restate it as agreement.]")
 
 
 def main() -> int:
@@ -703,7 +734,9 @@ def main() -> int:
             # summary can state the outcome. See confirm_exceptions.
             disputed = judgement_exceptions(review_text)
             if disputed:
-                logger.info("%d judgement dispute(s) — confirming", len(disputed))
+                logger.info("%d finding(s) failed on judgement — obtaining "
+                            "%d more reviewers", len(disputed),
+                            CONFIRMING_REVIEWERS)
                 confirmation = confirm_exceptions(
                     run, f"{world}_confirm", args.model, target, disputed)
                 text = SUMMARY_REQUEST + _confirmation_note(confirmation)

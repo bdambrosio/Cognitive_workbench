@@ -248,20 +248,46 @@ def test_only_judgement_disputes_need_confirming():
     assert judgement_exceptions("") == []
 
 
-def test_the_summary_is_told_the_outcome_and_not_the_verdict():
-    """The runner reports what the second reviewer found. §9 carries the rule.
+def test_a_finding_is_accepted_as_failed_only_on_three_of_three():
+    """All three reviewers must reach the same verdict on the same finding.
 
-    A confirmed dispute and an unconfirmed one must be distinguishable, and
-    an unconfirmed one must survive into the review rather than vanish.
+    A reviewer that returned no verdict for a finding has not agreed to fail
+    it, so a missing answer cannot make up the third voice.
+    """
+    from workflows.audit_review.runner import REVIEWERS_REQUIRED
+    assert REVIEWERS_REQUIRED == 3
+
+    def tally(mine, others):
+        agreeing = 1 + sum(1 for v in others if v == mine)
+        return agreeing, agreeing == REVIEWERS_REQUIRED
+
+    assert tally("unsupported", ["unsupported", "unsupported"]) == (3, True)
+    assert tally("unsupported", ["unsupported", "supported"]) == (2, False)
+    assert tally("unsupported", ["supported", "supported"]) == (1, False)
+    assert tally("unsupported", ["unsupported", None]) == (2, False)
+
+
+def test_the_summary_is_told_what_each_reviewer_found():
+    """The runner reports the tally. §9 carries the rule.
+
+    An accepted finding and one that was not accepted must be
+    distinguishable, and one that was not accepted must survive into the
+    review rather than vanish.
     """
     note = _confirmation_note({"ran": True, "results": [
         {"finding": "9", "verdict": "unsupported",
-         "second_opinion": "supported", "confirmed": False},
+         "other_verdicts": ["supported", "unsupported"],
+         "agreeing": 2, "of": 3, "accepted_as_failed": False},
         {"finding": "7", "verdict": "indeterminate",
-         "second_opinion": "indeterminate", "confirmed": True}]})
-    assert "Finding 9" in note and "NOT CONFIRMED" in note
-    assert "Finding 7" in note and "CONFIRMED" in note
+         "other_verdicts": ["indeterminate", "indeterminate"],
+         "agreeing": 3, "of": 3, "accepted_as_failed": True}]})
+    assert "Finding 9" in note and "2 of 3" in note and "NOT ACCEPTED" in note
+    assert "Finding 7" in note and "3 of 3" in note
+    assert "ACCEPTED AS FAILED" in note
     assert "do not delete it" in note
-    # A pass that could not run must not read as a clearance.
+
+    # If the other reviewers cannot be obtained, nothing is accepted as
+    # failed — and that must not read as a clearance either.
     failed = _confirmation_note({"ran": False, "error": "boom"})
-    assert "unconfirmed" in failed and "CONFIRMED" not in failed
+    assert "Three of three" in failed and "not accepted" in failed
+    assert "ACCEPTED AS FAILED" not in failed
