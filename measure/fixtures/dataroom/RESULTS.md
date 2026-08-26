@@ -380,6 +380,58 @@ REPORT. §15 puts target identity first, so that arm's recommendation sits on
 line 2 and the report-shaped locator could not see it. The measurement was
 worse than the thing it measured. A Gap Map check needs its own locator.
 
+### Queued, larger: `workflows` as a capability
+
+The decision taken 2026-08-25: this is worth preserving and generalising. The
+audit is one workflow; there will be others. The directory layout has not
+caught up, and the import direction shows it.
+
+**`measure/continuation.py` imports `latest_reply` from
+`measure.fixtures.dataroom.run`.** Product code reaching into a fixture for a
+general utility — dependencies pointing from the general thing into the
+specific one, which is the reliable smell.
+
+`run.py` was born as a benchmark harness for one fixture, which is why it lives
+where it does. Then `--external-repo` and `--brief-file` were added so it could
+audit ChatterMate and Body, and it became the engagement driver without moving.
+Its own help text records the split: *"audit a real target instead of the
+fixture corpus. Scoring against the answer key is meaningless for one."*
+
+About 25 lines of its 549 are fixture-specific — `BRIEF`, `CORPUS`, and
+`engagement_state`'s document counting, which already carries the comment
+"Fixture-only. A real target has a claim surface, not a document list."
+Everything else knows nothing about FlowMetrics.
+
+**Rough shape, to be planned properly rather than assumed:**
+
+- a driver package for the engagement machinery, with `continuation.py` in it —
+  that is product, not measurement
+- `claims-audit` as one workflow beneath it, holding METHOD.md, CONTINUATION.md
+  and the scenario, perhaps parallel to how `scenarios/` is organised
+- `measure/fixtures/dataroom/` keeps the fixture: corpus, answer key, results,
+  and `score.py`, which is genuinely fixture code because the answer key is
+  compiled into it. Its brief becomes a file beside the corpus instead of a
+  constant in the driver.
+- `claims.py` and `overlap.py` are study tools and stay in `measure/`
+
+**Two things that make it more than a file move:**
+
+- **Paths are computed from `HERE`.** `CORPUS = HERE / "corpus"` and
+  `out = HERE / "results" / ...`. Moving the file relocates where results are
+  written. These have to become parameters.
+- **Name collision.** `src/chat/workflow.py` already exists — the loader that
+  strips practice-audience sections. A `src/workflow/` package beside it will
+  confuse imports and conversation. Either pick another name or move the loader
+  in with it, since they are the same concern.
+
+**Open, and deliberately not decided:** whether one driver generalises cleanly
+across workflows and METHOD files at all. The leg protocol, the deliverable
+count and the working record are plausibly shared; the stopping rule and the
+brief shape may not be. That is a question for the refactor plan, not an
+assumption going into it.
+
+**Sequence.** Review and settle `run.py` first. The refactor plans after that.
+
 ### Also queued, smaller
 
 - **The claims-only harness measures something adjacent.** grok enumerated
