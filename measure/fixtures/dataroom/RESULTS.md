@@ -276,6 +276,66 @@ Comparing across that line would be comparing two instruments. Those runs did
 their job — every fix above was found by running them — and they remain in
 git history if a specific claim ever needs checking.
 
+## Pick up here — 2026-08-26, end of session
+
+**The campaign table is in question, and that is the headline.** An independent
+review of `m1_qwen_2` returned **supported 1 of 15 findings, FAIL**. That run
+passed every check the threshold has — valid §9 recommendation, closed §6
+vocabulary, limitations statement, complete Gap Map with every §15 element,
+Tier 1 3/3 against the answer key — and four of its findings cite lines that do
+not exist while ten cite lines that say something else. Verified by hand:
+`doc2` has 5 lines and the report cites `doc2:6, :11, :12, :13`; `doc9:10` is
+cited for "managed DNS" and is about backups.
+
+It found the right things and fabricated the evidence trail for nearly all of
+them. **If one run in nine does that while passing, the m1 table measures
+format compliance more than it measures work.** Nothing in it should be quoted
+until the other eight are reviewed.
+
+### Do this first
+
+**Review the other eight m1 runs.** `workflows/audit_review/runner.py --run
+<dir> --model measure/models/grok_4p6.yaml`, about five minutes each. The
+mechanical half alone — citations resolved against the corpus — costs nothing
+and may settle several of them before a model is involved.
+
+Then decide what the m1 table means. Options are: report supported-ratio
+alongside the existing vector, gate on it, or retire the campaign.
+
+### The rest, in rough order
+
+1. **§9's number is not extracted mechanically.** "Supported 14 of 15, PASS" is
+   prose in `summary.md`. A small parser makes it the dev benchmark that was
+   the point of §9. Now that two reviews exist, the shape is known rather than
+   guessed.
+2. **REVIEW.md §7 is too conservative.** The reviewer declined to flag "all 48
+   claims were examined" on a run that never closed a claim surface — "not
+   re-litigated here as a new finding about the business". Correct instinct
+   about §2, wrong result: a coverage statement the record does not support is
+   an exception, and §7 must say so more plainly.
+3. **Review a big report.** ChatterMate, 42 findings. Both reviews so far fit
+   every finding and citation into one context, so checking needed no tool
+   calls after the fetch — four `inspect` calls, all retrieval. That will stop
+   holding at some size, and where it stops is worth knowing.
+4. **`[incoherent]` is off the table** and still unresolved: cross-finding
+   contradiction is a property of the set, not a per-finding verdict.
+5. **33 worlds, 1.4 GB in `scenarios/`**, genuinely discardable since runs read
+   their own archives. Nothing deletes them because nothing ever did.
+6. **Runs live in two places** — 28 under `measure/fixtures/dataroom/results/`,
+   new ones under `engagements/*/runs/`. The old ones were left because their
+   paths are in the campaign table above.
+
+### Two properties established today, worth not breaking
+
+**A run directory is self-sufficient.** Delete its world and it still scores
+and still answers questions. Verified by deleting one.
+
+**The model is not the reviewer's problem.** Use the best available; diversity
+only helps between peers, and a weaker reviewer's disagreements are mostly its
+own errors. Review is currently about as expensive as the audit (309s vs 249s),
+which should improve with report size: audit cost tracks the claim surface,
+review cost tracks findings.
+
 ## Campaign m1 is closed. A new stage starts here — 2026-08-25
 
 **The base campaign is done.** Nine runs, three models, one frozen instrument.
