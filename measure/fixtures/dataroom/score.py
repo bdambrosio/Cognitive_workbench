@@ -290,16 +290,93 @@ def verdict_conformance(report: str) -> Dict[str, Any]:
             "off_vocabulary": sorted(set(v for v in found if v not in _VERDICTS))}
 
 
-def read_memo(world: str, agent: str) -> Optional[str]:
-    """The report is the last substantial reply, with the Gap Map removed.
+# The opening of run.py's Gap Map request, verbatim. Matching THIS is safe in a
+# way matching model output is not: the harness emitted it, so it is byte-exact
+# every time. If run.py's GAP_MAP_REQUEST changes, change this with it.
+GAP_MAP_REQUEST_MARK = "The report is received. Now the Gap Map"
 
-    The Gap Map repeats the top findings by design, so matching over both
-    would count them twice and inflate recall. It is reported separately —
-    presence and length — rather than scored."""
-    turns = [t for t in load_turns(world, agent) if t.produced_chars > 400]
+
+def read_memo(world: str, agent: str) -> Optional[str]:
+    """The report, which since §16 went to two turns is not the last reply.
+
+    THE LAST REPLY IS THE GAP MAP. A Gap Map runs ~150 words, comfortably over
+    the 400-char floor below, so taking the last substantial turn would hand
+    the grader a one-page summary to score against the answer key — silently,
+    and with recall that looks merely poor rather than wrong.
+
+    The runner ASKED for the Gap Map, so the record knows which turn it is: the
+    turn whose user_input carries the request. The report is the substantial
+    turn before it. Runs made before the two-turn change have no such turn and
+    fall through to the old rule.
+
+    The Gap Map repeats the top findings by design, so matching over both would
+    count them twice and inflate recall. It is reported separately — presence,
+    length and §15 elements — rather than scored.
+    """
+    all_turns = load_turns(world, agent)
+    gap_leg = next((i for i, t in enumerate(all_turns)
+                    if GAP_MAP_REQUEST_MARK in (t.raw.get("user_input") or "")),
+                   None)
+    if gap_leg is not None:
+        all_turns = all_turns[:gap_leg]
+    turns = [t for t in all_turns if t.produced_chars > 400]
     if not turns:
         return None
     return str(turns[-1].raw.get("raw_response") or "")
+
+
+def gap_map_elements(gap_map: str) -> Dict[str, bool]:
+    """Which of §15's required elements a Gap Map actually contains.
+
+    WHY THIS EXISTS. `=== GAP MAP ===` was taken as proof a Gap Map had been
+    produced, and it proves only that five characters appeared. The whole
+    validation was the marker plus a word count. Measured 2026-08-25 across 25
+    runs: two shipped a Gap Map missing a required element — one with no
+    report-link line, one with no scope disclaimer — and both passed the
+    threshold.
+
+    ITS OWN RECOMMENDATION LOCATOR, and this is the trap. A first version
+    reused recommendation_of and reported nine of twenty-five Gap Maps as
+    missing the recommendation. All nine were one arm, and all nine were wrong:
+    recommendation_of requires the term to open the document because §16 puts
+    the recommendation first in a REPORT. §15 puts target identity first, so
+    that arm's recommendation sits on line 2 and a report-shaped locator cannot
+    see it. Here the term may stand as a verdict anywhere in the first few
+    lines.
+
+    Not gated. Reported, because two runs is not enough to know whether a
+    missing disclaimer is an arm's habit or an accident.
+    """
+    head = "\n".join(gap_map.strip().splitlines()[:6])
+    rec = None
+    for term in _REC_VOCAB:
+        m = _REC_TERM_RE[term].search(head)
+        if m and (rec is None or m.start() < rec[0]):
+            rec = (m.start(), term)
+    low = gap_map.lower()
+    return {
+        "recommendation": rec is not None,
+        # §1a: the recommendation and the number it rests on travel together.
+        "coverage": bool(re.search(r"\bcoverage\b|\bof\s+\d+\s+claims"
+                                  r"|\d+\s*(?:of|/)\s*\d+", low)),
+        "report link": "full report" in low,
+        "disclaimer": "pen-test" in low or "pen test" in low,
+    }
+
+
+def read_gap_map(world: str, agent: str) -> Optional[str]:
+    """The Gap Map turn's reply, for runs delivered in two turns (§16).
+
+    Returns None for a one-turn run, where the Gap Map is inside the report's
+    reply behind the marker and split_deliverables recovers it.
+
+    Same principle as read_memo: the runner asked for this turn, so the record
+    identifies it without anything being parsed out of the model's prose.
+    """
+    for t in load_turns(world, agent):
+        if GAP_MAP_REQUEST_MARK in (t.raw.get("user_input") or ""):
+            return str(t.raw.get("raw_response") or "").strip() or None
+    return None
 
 
 def split_deliverables(reply: str) -> tuple:
@@ -564,14 +641,24 @@ def main() -> int:
         print("  no memo found (no reply over 400 chars)")
         return 1
 
-    report, gap_map = split_deliverables(memo)
+    # TWO TURNS OR ONE. A two-turn run (§16) has the Gap Map in its own reply;
+    # an older run has it inside the memo behind the marker. read_gap_map
+    # answers the first case from the record, split_deliverables the second.
+    gap_map = read_gap_map(args.world, args.agent)
+    report, embedded = split_deliverables(memo)
+    if gap_map is None:
+        gap_map = embedded
     memo = report          # findings are matched over the report only
     wc = word_count(report)
     print(f"  turns {facts['turns']}   iterations {facts['iterations']}")
     if gap_map is None:
         print("  Gap Map            ABSENT — the brief asked for one")
     else:
-        print(f"  Gap Map            present, {word_count(gap_map)} words")
+        el = gap_map_elements(gap_map)
+        missing = [k for k, ok in el.items() if not ok]
+        print(f"  Gap Map            present, {word_count(gap_map)} words"
+              + ("" if not missing
+                 else f"   <-- §15 missing: {', '.join(missing)}"))
     print(f"  corpus docs opened  {len(facts['docs_opened'])}/{CORPUS_DOCS}  "
           f"{facts['docs_opened']}")
     print(f"  report length       {wc} words  "

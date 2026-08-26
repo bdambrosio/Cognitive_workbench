@@ -577,14 +577,14 @@ action. Anything more turns a professional document into a brochure.
 
 ## 16. The deliverable
 
-Two documents, produced together in the final turn, in this order.
+Two documents, in two turns, in this order.
 
-**The final turn carries these two documents and nothing else.** No covering
-note, no account of what you did this leg, no prose ahead of the report.
-Anything written before the report *is* the report: it is what the client
-reads first, and it displaces the finding that should have been there.
+**A turn carries its document and nothing else.** No covering note, no account
+of what you did this leg, no prose ahead of the report. Anything written before
+the report *is* the report: it is what the client reads first, and it displaces
+the finding that should have been there.
 
-**1. The report.** Aim for 2,000 words or under.
+**Turn one: the report.** Aim for 2,000 words or under.
 
 - The recommendation, in §9's vocabulary and no other.
 - Findings worst first, each in §5's format, carrying its §6 verdict, the
@@ -610,21 +610,22 @@ reads first, and it displaces the finding that should have been there.
   Every finding interprets a claim without its author present to say what was
   meant, and a reader who does not know that will over-read the report.
 
-**2. The Gap Map** (§15), after a line reading exactly:
+End that turn with the report. You will be asked for the Gap Map next.
 
-```
-=== GAP MAP ===
-```
+**Turn two: the Gap Map** (§15). The whole turn is the Gap Map. Do not restate
+the report, do not introduce it, do not append a note about it.
 
-Both markers must appear on their own line. They are how a reader — and any
-system handling the engagement — tells the two documents apart, and a required
-element with no marker is one nothing can check. An engagement that ends
-without the Gap Map has not delivered, whatever its closing paragraph says.
+**Why two turns and not one.** They were produced together, separated by a
+marker, and the marker was doing work it is bad at: proving the engagement had
+finished, and standing in for a Gap Map nobody checked. A turn boundary
+separates them without either document having to announce itself. If you are
+asked for the Gap Map, the report is done; what you write is the Gap Map
+because that is what the turn is for.
 
-**Both, together.** The Gap Map is read in thirty seconds; the report is read
-only if the Gap Map earns it. The Gap Map alone forfeits the proof, the report
-alone forfeits the reader, and neither is a summary of the other: the report
-carries the citations and the Gap Map carries none.
+**Both, and in this order.** The Gap Map is read in thirty seconds; the report
+is read only if the Gap Map earns it. The Gap Map alone forfeits the proof, the
+report alone forfeits the reader, and neither is a summary of the other: the
+report carries the citations and the Gap Map carries none.
 
 ## 17. Positioning and outreach
 

@@ -32,6 +32,7 @@ import argparse
 import datetime
 import json
 import logging
+import re
 import shutil
 import sys
 import time
@@ -54,6 +55,9 @@ logger = logging.getLogger("dataroom.run")
 logger.setLevel(logging.INFO)
 
 GAP_MARK = "=== GAP MAP ==="
+# Whitespace-tolerant, for the same reason score.py's is: a marker split by a
+# line wrap is still a marker. Only used for the salvage path now.
+_GAP_RE = re.compile(r"\s+".join(re.escape(t) for t in GAP_MARK.split()))
 
 # THE BRIEF IS THE ENGAGEMENT, NOT THE METHOD. It used to open "Read
 # METHOD.md" and then restate the deliverable contract in full, because the
@@ -93,11 +97,21 @@ Enumerate the claim surface first and close it as the method says, then work
 the priority order straight through.
 
 Work in as many legs as you need — end a leg with `yield` and I will say
-continue. Produce both deliverables together in your final reply, as the
-method specifies.
+continue. End with the report; I will ask for the Gap Map after it.
 """
 
 CONTINUE = "continue"
+
+# THE SECOND DELIVERABLE IS ASKED FOR, NOT DETECTED. §16 puts the report in one
+# turn and the Gap Map in the next, so the runner knows which is which because
+# it drove them. Nothing has to be parsed out of prose.
+# The leading sentence is a STABLE SENTINEL score.py matches to find the Gap
+# Map leg. Matching it is safe in a way matching the model's output is not:
+# this is the harness's own text, emitted verbatim by the harness. Change it
+# and score.py's GAP_MAP_REQUEST_MARK must change with it.
+GAP_MAP_REQUEST = ("The report is received. Now the Gap Map, per §15. The whole "
+                   "reply is the Gap Map — no preamble, no restatement of the "
+                   "report.")
 
 
 def engagement_state(world: str, agent: str, leg: int, max_legs: int,
@@ -343,6 +357,8 @@ def main() -> int:
     t0 = time.time()
     legs, error = [], None
     text_first_leg = ''
+    gap_map_sent = False
+    report_text = ''
     try:
         text = (args.brief_file.read_text(encoding='utf-8')
                 if args.brief_file else BRIEF)
@@ -369,23 +385,33 @@ def main() -> int:
                 error = (f"turn {i + 1} hit max_iters without answering — "
                          f"run is not valid")
                 break
-            # DONE IS A DELIVERABLE, NOT AN EXIT REASON. Continuing only on
-            # `yield` treats any `respond` as a finished audit — and on
-            # 2026-08-22 an arm enumerated the claim surface, wrote "I will
-            # now begin working the priority order", and ended the turn with
-            # that plan unexecuted. exit=respond, 241 words, zero findings,
-            # scored as a completed run. The brief specifies a Gap Map after a
-            # literal marker, so its absence is the mechanical signal that the
-            # work is not finished, whatever the exit reason says.
-            if exit_reason == "yield" or GAP_MARK not in reply:
-                if exit_reason != "yield":
-                    logger.info("leg %d ended %s with no %s — continuing",
-                                i + 1, exit_reason, GAP_MARK)
+            # THE RUNNER DRIVES; THE SCORER JUDGES. This loop used to continue
+            # until `=== GAP MAP ===` appeared in a reply, because "done is a
+            # deliverable, not an exit reason": on 2026-08-22 an arm wrote "I
+            # will now begin working the priority order", ended the turn, and
+            # was scored as complete. But detecting completeness by matching a
+            # string in prose is what that check actually was, and score.py
+            # already has the criteria — a 241-word report with zero findings
+            # fails the finding parse, fails Tier 1, fails the threshold. So a
+            # premature `respond` now produces a legibly bad run instead of a
+            # silent pass, and this loop stops making the judgement.
+            if gap_map_sent:
+                break                       # that reply IS the Gap Map (§16)
+            if exit_reason == "yield":
                 text = CONTINUE + engagement_state(
                     args.world, name, i + 2, args.max_turns,
                     time.time() - t0, fixture=args.external_repo is None)
                 continue
-            break
+            # SALVAGE. An arm may emit both documents in one turn whatever the
+            # brief says. Splitting that is strictly better than spending a leg
+            # asking for a Gap Map it has already written.
+            if _GAP_RE.search(reply):
+                logger.info("leg %d carried both documents — no Gap Map leg needed",
+                            i + 1)
+                break
+            report_text = reply
+            text, gap_map_sent = GAP_MAP_REQUEST, True
+            continue
     except Exception as e:                                     # noqa: BLE001
         error = f"{type(e).__name__}: {e}"
         logger.exception("run failed")
@@ -404,16 +430,29 @@ def main() -> int:
     # Write the deliverables as files. run_meta.json carries the metadata;
     # without this the report exists only inside the trace's raw_response,
     # which is not somewhere a human reads a report from.
+    # TWO TURNS, TWO FILES (§16). The runner asked for each, so it knows which
+    # reply is which and nothing is parsed out of prose. The marker path
+    # survives only as salvage, for an arm that emitted both in one turn.
     final = latest_reply(loop, SOURCE)
     if final:
         (out / "full_reply.md").write_text(final, encoding="utf-8")
-        if GAP_MARK in final:
-            rep, _, gap = final.partition(GAP_MARK)
-            (out / "report.md").write_text(rep.rstrip() + "\n", encoding="utf-8")
-            (out / "gap_map.md").write_text(gap.strip() + "\n", encoding="utf-8")
+        hit = _GAP_RE.search(final)
+        if gap_map_sent:
+            # The last reply is the Gap Map; the one before it is the report.
+            (out / "report.md").write_text(
+                (report_text or "").rstrip() + "\n", encoding="utf-8")
+            (out / "gap_map.md").write_text(final.strip() + "\n", encoding="utf-8")
+            if not report_text:
+                logger.warning("Gap Map leg ran but no report leg was captured")
+        elif hit:
+            (out / "report.md").write_text(
+                final[:hit.start()].rstrip() + "\n", encoding="utf-8")
+            (out / "gap_map.md").write_text(
+                final[hit.end():].strip() + "\n", encoding="utf-8")
         else:
             (out / "report.md").write_text(final, encoding="utf-8")
-            logger.warning("no %s marker — Gap Map not produced", GAP_MARK)
+            logger.warning("run ended without a Gap Map leg or marker — "
+                           "Gap Map not produced")
 
     # THE WORKING RECORD, COPIED OUT (§14). The world is discarded after an
     # engagement; these two are the evidence that the work was systematic, and
