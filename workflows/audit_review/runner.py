@@ -77,11 +77,36 @@ _LOOKS_LIKE_A_FILE = re.compile(r"\.[A-Za-z][A-Za-z0-9]{0,4}$")
 _DOCN = re.compile(r"^doc(\d)", re.I)
 _FINDING = re.compile(r"^\s*\**\s*Finding\s+(\d+)[^\n\[]*\[([^\]]+)\]", re.M | re.I)
 
-# A quoted span in the report. Both quote characters, because a report that has
-# been through a model may carry either. The 12-character floor drops `"active"`
-# and other single-word quoting, which is not a citation of anything.
-_QUOTE = re.compile(r"[\"“]([^\"”\n]{12,})[\"”]")
+# A quote mark. Straight and curly, because a report that has been through a
+# model may carry either, and marks ALTERNATE open/close: they are paired in
+# document order, first with second, third with fourth. A regex that scans for
+# an opening mark followed by a closing one slides past a pair too short to
+# keep and matches from that pair's CLOSING mark to the next pair's opening
+# one, capturing the prose between two quoted words. `"Streamlined" is not a
+# fair description of "not present."` yielded ` is not a fair description of `
+# as a quote. Pairing in order cannot do that.
+_QUOTE_MARK = re.compile(r"[\"“”]")
+# The 12-character floor drops `"active"` and other single-word quoting, which
+# is not a citation of anything.
 _MIN_QUOTE_CHARS = 12
+
+# The fields of a §5 finding that carry evidence. Quotes are read from these
+# and from nowhere else. `Gap:`, `Derivation:` and `Consequence:` are the
+# auditor's own prose, where quoting a word back at the seller — `"Streamlined"
+# is not a fair description of "not present."` — is legitimate writing and not
+# a citation of anything. Scoping to the evidence fields removed every false
+# miss across the three reports on disk: five misses became three, and all
+# three survivors are real paraphrases. This is a structural parse of the
+# labels §5 mandates, in the same class as `=== LIMITATIONS ===`.
+#
+# A field runs to the next blank line, the next §5 label, or the next finding —
+# not to the end of its first line. `Basis:` is two lines by design, and a long
+# Evidence quote may wrap.
+_EVIDENCE_FIELD = re.compile(
+    r"^[ \t]*\**[ \t]*(?:Claim|Evidence|Basis)\b"
+    r".*?(?=\n[ \t]*\n|\n[ \t]*\**[ \t]*(?:Gap|Derivation|Consequence|"
+    r"Escalates|Claim|Evidence|Basis|Finding)\b|\Z)",
+    re.M | re.I | re.S)
 
 
 _NOT_TEXT = re.compile(r"[^a-z0-9 ]+")
@@ -101,8 +126,22 @@ def _flatten(s: str) -> str:
     return " ".join(_NOT_TEXT.sub(" ", s.lower()).split())
 
 
+def _quoted_spans(text: str) -> List[str]:
+    """Quoted spans in one field, pairing quote marks in document order.
+
+    Marks alternate open/close, so the first pairs with the second and the
+    third with the fourth. A pair too short to keep is CONSUMED rather than
+    skipped: the alternative is matching from its closing mark to the next
+    pair's opening one, which reports the prose between two quoted words as a
+    quotation of the materials.
+    """
+    marks = [m.start() for m in _QUOTE_MARK.finditer(text)]
+    return [" ".join(text[a + 1:b].split())
+            for a, b in zip(marks[::2], marks[1::2])]
+
+
 def resolve_quotes(report: str, target: Path) -> List[Dict[str, Any]]:
-    """Every quoted span in the report, looked for in the materials.
+    """Every quote in a finding's evidence fields, looked for in the materials.
 
     THE SECOND HALF OF THE CITATION SURFACE. `_CITE` sees `docN:NN` and nothing
     else, so a report citing its evidence by section name — "(doc4, Backups
@@ -116,17 +155,39 @@ def resolve_quotes(report: str, target: Path) -> List[Dict[str, Any]]:
     prose before the auditor ever sees it (code_subagent.py:407 numbers it;
     subagent.py:252 is the model's own answer, unnumbered).
 
-    SEGMENTS, NOT SPANS. Reports quote composites — four bullets of doc4's
-    Backups section joined into one sentence, sometimes reordered. Every fact in
-    such a quote can be verbatim while the span as typed appears nowhere. Whole-
-    span matching reports those as fabrication, so each quote is split and its
-    segments resolved separately. A quote resolves when all of them do.
+    SEGMENTS, NOT SPANS. Reports quote composites — several bullets of doc4's
+    Backups section joined into one sentence, sometimes reordered, sometimes
+    with `...` between them. Every fact in such a quote can be verbatim while
+    the span as typed appears nowhere, so each quote is split and its segments
+    resolved separately.
 
-    KNOWN NOISE. The extractor takes quoted spans, and a report that writes
-    `"Streamlined" is not a fair description of "not present."` yields the prose
-    between the two quoted words. Such a span resolves to nothing, correctly,
-    and still counts in the denominator. The ratio is a signal for §4.0, not a
-    verdict.
+    ONE QUOTE, ONE DOCUMENT. A quote resolves when SOME SINGLE DOCUMENT holds
+    every one of its segments — not when each segment is found somewhere. The
+    difference is a fabrication route: fragments drawn from two documents,
+    joined into one sentence that reads as continuous evidence, every fragment
+    verbatim and the sentence true of nothing. Measured across every quote in
+    the three reports on disk, the rule costs nothing — not one needed two
+    documents — and it settles attribution without reading the citation label,
+    so a mistyped document name cannot defeat it. A quote whose segments are
+    all found but never together is `split`, and it does not resolve.
+
+    A quote is exact or it does not resolve. There is no near-match tier: a
+    similarity threshold would put a judgement in the layer that exists to keep
+    judgement out, and would need calibrating against failures we do not have.
+    A paraphrase — "Integration with…" for "we integrate with…", or dropping
+    the "all" from "all critical paths" — does not resolve, and the second of
+    those is an auditor softening a claim while presenting it as verbatim.
+
+    WHAT THIS CHANNEL IS NOT. It is the second half of the citation surface,
+    not a replacement for the first. §5 requires `document:lines` on both
+    halves of every finding, and that requirement is what makes a finding
+    checkable at all: a quote is content, so a report can satisfy a
+    quote-shaped rule by writing prose and pointing nowhere. Measured on
+    2026-08-26, a report written to a quote-only contract left 10 of 33
+    evidence fields with nothing a reader could search for, against 1 of 45
+    under §5 as it stands. A citation that resolves to the wrong line is a
+    different problem, and it belongs to the reviewer's judgement — §12a and
+    REVIEW.md §6 — not to the citation format.
     """
     if not target.is_dir():
         return []
@@ -136,38 +197,36 @@ def resolve_quotes(report: str, target: Path) -> List[Dict[str, Any]]:
     body = _FINDING.sub("", report)     # titles quote the claim; they are headings
     out: List[Dict[str, Any]] = []
     seen = set()
-    for m in _QUOTE.finditer(body):
-        q = m.group(1).strip()
-        if len(q) < _MIN_QUOTE_CHARS or q in seen:
-            continue
-        seen.add(q)
-        segs = [s for s in (_flatten(x) for x in _SEGMENT.split(q))
-                if len(s) >= _MIN_SEGMENT_CHARS]
-        if not segs:
-            continue
-        whole = _flatten(q)
-        hits, missing, docs_hit = 0, [], []
-        for s in segs:
-            for name, text in flat.items():
-                if s in text:
-                    hits += 1
-                    if name not in docs_hit:
-                        docs_hit.append(name)
-                    break
-            else:
-                missing.append(s)
-        contiguous = any(whole in text for text in flat.values())
-        rec: Dict[str, Any] = {
-            "quote": q[:300], "resolved": hits == len(segs),
-            "how": "contiguous" if contiguous
-                   else "segments" if hits == len(segs)
-                   else "partial" if hits else "miss",
-            "segments": len(segs), "segments_found": hits,
-            "documents": docs_hit,
-        }
-        if missing:
-            rec["missing"] = [s[:160] for s in missing]
-        out.append(rec)
+    for field in _EVIDENCE_FIELD.finditer(body):
+        for q in _quoted_spans(field.group(0)):
+            if len(q) < _MIN_QUOTE_CHARS or q in seen:
+                continue
+            seen.add(q)
+            segs = [s for s in (_flatten(x) for x in _SEGMENT.split(q))
+                    if len(s) >= _MIN_SEGMENT_CHARS]
+            if not segs:
+                continue
+            whole = _flatten(q)
+            # Documents holding EVERY segment. One quote, one document.
+            docs_hit = [n for n, text in flat.items()
+                        if all(s in text for s in segs)]
+            missing = [s for s in segs
+                       if not any(s in text for text in flat.values())]
+            contiguous = any(whole in flat[n] for n in docs_hit)
+            rec: Dict[str, Any] = {
+                "quote": q[:300], "resolved": bool(docs_hit),
+                "how": "contiguous" if contiguous
+                       else "segments" if docs_hit
+                       else "split" if not missing
+                       else "partial" if len(missing) < len(segs)
+                       else "miss",
+                "segments": len(segs),
+                "segments_found": len(segs) - len(missing),
+                "documents": docs_hit,
+            }
+            if missing:
+                rec["missing"] = [s[:160] for s in missing]
+            out.append(rec)
     return out
 
 
@@ -277,6 +336,36 @@ def resolve_citations(report: str, target: Path) -> Dict[str, Any]:
             "quotes": quotes, "scheme": scheme(out, quotes)}
 
 
+def unpointed_fields(report: str) -> List[str]:
+    """Evidence fields carrying neither a line reference nor a quote.
+
+    THE DENOMINATOR THAT WAS MISSING. `resolve_citations` and `resolve_quotes`
+    score the pointers a report makes. Neither notices a field that makes none,
+    so a report can read `16 of 23 quotes resolving` while ten of its evidence
+    fields say `Evidence (doc4): Single standard-1x dyno, no read replicas` —
+    prose, naming a whole document, with nothing a reader can search for. That
+    is §5's requirement failing silently: "without both, a reader cannot check
+    the finding and the practice cannot defend it."
+
+    Measured 2026-08-26 across four reports: 1 of 29 and 1 of 45 under §5 as it
+    stands, and both of those assert that no evidence exists ("no source code
+    provided to verify exact version"), which is the one legitimate case. A
+    report written to a quote-only contract left 10 of 33.
+
+    Structure only, no corpus. Whether a pointer RESOLVES is the other two
+    functions' job; this one asks whether the auditor pointed at all.
+    """
+    body = _FINDING.sub("", report)     # titles quote the claim; they are headings
+    out: List[str] = []
+    for field in _EVIDENCE_FIELD.finditer(body):
+        text = field.group(0)
+        quoted = [q for q in _quoted_spans(text) if len(q) >= _MIN_QUOTE_CHARS]
+        if quoted or _CITE.search(text):
+            continue
+        out.append(" ".join(text.split())[:160])
+    return out
+
+
 def conformance(run: Path) -> Dict[str, Any]:
     """The method-conformance checks that need no answer key.
 
@@ -301,6 +390,8 @@ def conformance(run: Path) -> Dict[str, Any]:
         "limitations statement": bool(score._LIMITS_RE.search(report)),
         "gap map present": bool(gap.strip()),
         "§15 elements missing": [k for k, ok in el.items() if not ok],
+        "evidence fields": len(_EVIDENCE_FIELD.findall(report)),
+        "evidence fields pointing nowhere": unpointed_fields(report),
         "findings": [{"n": int(n), "verdict": v.strip()}
                      for n, v in _FINDING.findall(report)],
     }
@@ -345,9 +436,14 @@ record. The materials that audit examined are under `inspect_external`.
 
 Citations have been resolved for you as far as a file operation reaches.
 `review/citations.json` holds three things: every `docN:NN` reference with the
-text of the line it names; every quoted span in the report, looked for in the
-materials; and a `scheme` block saying whether those integers can be line
-numbers at all.
+text of the line it names; every quote in a Claim, Evidence or Basis field,
+looked for in the materials, with the document that holds all of it; and a
+`scheme` block saying whether those integers can be line numbers at all.
+
+A quote resolves only when one document holds every part of it. `split` means
+each part was found but never together in one document — fragments from two
+documents joined into a sentence that reads as continuous evidence. `miss`
+means the words are not in the materials as written.
 
 Do not re-fetch what it has already resolved, and do not assess support for a
 finding whose citation is broken. **It is not the whole of the materials.** A

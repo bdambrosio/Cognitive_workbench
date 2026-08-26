@@ -25,7 +25,8 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "src"))
 
-from workflows.audit_review.runner import resolve_citations, resolve_quotes
+from workflows.audit_review.runner import (resolve_citations, resolve_quotes,
+                                           unpointed_fields)
 
 CORPUS = REPO / "measure" / "fixtures" / "dataroom" / "corpus"
 
@@ -118,12 +119,99 @@ def test_composite_quote_resolves_by_segment():
     assert composite["how"] == "segments"       # found, but not contiguous
 
 
-def test_quotes_that_are_not_quotations_do_not_resolve():
-    """Report prose captured between two quoted words. Known noise, not a bug."""
+def test_report_prose_between_two_quoted_words_is_not_a_quote():
+    """`"Streamlined" is not a fair description of "not present."`
+
+    This yielded ` is not a fair description of ` as a quotation of the
+    materials, from two directions at once: the old extractor scanned for an
+    opening mark followed by a closing one, sliding past a pair too short to
+    keep and matching from ITS closing mark to the next pair's opening one;
+    and it read the whole report, including `Gap:`, where quoting a word back
+    at the seller is legitimate writing rather than a citation. Marks now pair
+    in document order, and quotes are read only from the evidence fields.
+    """
     quotes = resolve_quotes(ORDINALS.read_text(), CORPUS)
-    prose = next(q for q in quotes
-                 if q["quote"] == "is not a fair description of")
-    assert not prose["resolved"] and prose["how"] == "miss"
+    assert not [q for q in quotes if "fair description" in q["quote"]]
+    assert all(q["resolved"] for q in quotes), \
+        [q["quote"] for q in quotes if not q["resolved"]]
+
+
+def test_a_quote_needs_one_document_to_hold_all_of_it():
+    """Fragments from two documents, joined into one sentence, is fabrication.
+
+    Every fragment here is verbatim — `Dyno:` from doc4, the MRR from doc1 —
+    and the sentence is true of neither document. Resolving each segment
+    wherever it happens to appear reports this as evidence.
+    """
+    report = ('Evidence (doc4): "Dyno: `standard-1x` (1GB RAM, 0.5 CPU). '
+              'Blended MRR: $40,000."\n')
+    quote = resolve_quotes(report, CORPUS)[0]
+    assert not quote["resolved"]
+    assert quote["how"] == "split"          # both found, never together
+    assert quote["segments_found"] == quote["segments"]
+    assert quote["documents"] == []
+
+
+def test_separated_passages_of_one_document_joined_by_ellipsis_resolve():
+    """Separated passages of one document, joined, resolve segment by segment.
+
+    Not a licence to paraphrase: each passage is matched exactly. This is what
+    stops a legitimate multi-passage quote being reported as fabrication.
+    """
+    report = ('Evidence (doc1): "loyal customer base of 120 active accounts '
+              '... driven by a mix of high-value enterprise contracts"\n')
+    quote = resolve_quotes(report, CORPUS)[0]
+    assert quote["resolved"] and quote["how"] == "segments"
+    assert quote["documents"] == ["doc1_seller_listing_description.md"]
+
+
+def test_a_field_that_wraps_is_still_one_field():
+    """A long Evidence quote may wrap, and `Basis:` is two lines by design.
+
+    Reading only the label's own line truncates the quote and reports it as a
+    miss. A field runs to the next blank line or the next §5 label.
+    """
+    report = ('Evidence (doc1): "loyal customer base of 120 active accounts '
+              '...\ndriven by a mix of high-value enterprise contracts" — the '
+              'listing.\n\nGap: "active" is not "paying".\n')
+    quotes = resolve_quotes(report, CORPUS)
+    assert len(quotes) == 1                 # Gap: prose is not evidence
+    assert quotes[0]["resolved"] and quotes[0]["how"] == "segments"
+
+
+def test_a_paraphrase_is_not_a_quote():
+    """doc9 says "across ALL critical paths". The report dropped the word.
+
+    Verbatim is exact. The dropped qualifier is the auditor softening a
+    seller's claim while presenting it as quoted, which is the reason there is
+    no near-match tier.
+    """
+    quotes = resolve_quotes(LINE_NUMBERED.read_text(), CORPUS)
+    bad = [q for q in quotes if not q["resolved"]]
+    assert [q["quote"] for q in bad] == [
+        "well-documented with comprehensive test coverage across critical paths"]
+    assert bad[0]["how"] == "miss"
+
+
+def test_a_field_pointing_nowhere_is_counted():
+    """§5: "without both, a reader cannot check the finding."
+
+    `resolve_citations` and `resolve_quotes` score the pointers a report makes.
+    Neither notices a field that makes none, so nothing counted the gap this
+    test names. On a report written to a quote-only contract this reached 10 of
+    33 evidence fields while the quote ratio still read 16 of 23.
+    """
+    unpointed = unpointed_fields(LINE_NUMBERED.read_text())
+    # The one legitimate case: a field asserting that no evidence exists.
+    assert len(unpointed) == 1
+    assert "Cannot confirm" in unpointed[0]
+
+    # A field naming a document and then writing prose points nowhere.
+    assert unpointed_fields(
+        "Evidence (doc4): Single standard-1x dyno, no read replicas.\n")
+    # Either pointer alone is enough for a reader to go and look.
+    assert not unpointed_fields("Evidence: doc4:5 — a single dyno.\n")
+    assert not unpointed_fields('Evidence (doc4): "Dyno: `standard-1x`"\n')
 
 
 def test_line_reference_half_is_unchanged_against_the_golden():
