@@ -524,6 +524,67 @@ line-heavy and quote-light, so the quote channel is only reliable once METHOD
 §5 asks for it. Today it asks for line numbers, which is why some reports barely
 quote at all.
 
+### The gate is live, and it fires on the right one — 2026-08-26
+
+Three reviews under the amended REVIEW.md, all grok-4.6, all `error=None`.
+
+| report | instrument | scheme | verdict | wall |
+|---|---|---|---|---|
+| `m1_qwen_2` | METHOD `bc4ae148` | 4 of 7 doc2 refs past EOF | **INADMISSIBLE** | 94s |
+| `w1_grok_2` | current | 41 refs, 0 past EOF | ADMISSIBLE, 15/15, PASS | 304s |
+| `w1_qwen_1` | current | 58 refs, 0 past EOF | ADMISSIBLE, 19/23, **FAIL** | 931s |
+
+**The stop path works, and the reviewer reasoned its way there.** It was given
+the mechanical signal only — that four integers exceed their document — and
+found the corroboration itself: *"The same report states coverage as 'doc1: 25,
+doc2: 13, doc9: 10.' The clustering and the stated claim count match each other.
+They do not match line numbering."* It reported no ratio and enumerated nothing,
+and it stopped in 94 seconds where the review it replaces spent 309 producing a
+number. It also made an argument this file had not: the three doc2 integers that
+*do* fall inside the file cannot be read as lines while the other four are
+ordinals, because that is two schemes at once.
+
+**Admissibility and quality are orthogonal, and `w1_qwen_1` proves it.** It
+passes the gate on citation form and then fails the review on substance — one
+`[unsupported]`, three `[overstated]`, all of the shape "the cited line shows
+the add-on, not the use". A gate that only ever fired together with FAIL would
+be measuring nothing new.
+
+**The negative control holds.** `w1_grok_2` is admissible and clean. Two lines
+of its summary are direct evidence the other two fixes landed: *"F4's
+enterprise-contract figures were confirmed in doc7 **outside the line-index
+keys**"* — the reviewer going to the materials for evidence the index does not
+carry, which is exactly what Exception 5 refused to do — and a quoted span
+correctly noted as non-contiguous rather than treated as a failure.
+
+**One flap, recorded rather than explained.** `w1_grok_2` reviewed 14 of 15 with
+one `[understated]` before the change and 15 of 15 with none after, on identical
+text with the same model. `[understated]` is calibration and cannot move a
+threshold, and PASS held both times — but it is a one-finding move on identical
+input, which is the instability this file already documents for the grader. The
+precision check (three admissibility legs on one report) has **not** been run.
+
+**Qwen's ordinals look like the old METHOD, not the model.** The same
+Qwen3.8-27B that cited claim ordinals in `m1_qwen_2` cited 58 line references
+with zero overruns under the current METHOD. n=1, and worth one more run before
+it is believed.
+
+### Two things the runs exposed
+
+**The instrument could not run at all.** `scenario.yaml` pointed `inspect_repo`
+at `audit/`, a tree the workflow refactor moved, so `chat_loop` refused to
+launch. Every audit after `w1_grok_2` would have died at launch and none was
+attempted, so the refactor went unexercised for a day. Fixed at `1e39ba83`,
+pointing at `workflows/claims_audit/method` — METHOD.md stays at the root of
+what `inspect` reads, and `engagements/` stays outside a fence that now guards
+delivered client reports as well as the answer key.
+
+**Run output stopped being tracked.** `measure/fixtures/dataroom/results/` is
+gitignored and 27 stale-instrument runs were deleted; `m1_qwen_2` is kept as the
+only report on disk that trips §4.0, and reports the tests need are copied into
+`tests/fixtures/audit_review/`. The cost, named: the campaign table above cites
+paths that now resolve only on the machine that made them.
+
 ### Do this first — revised 2026-08-26
 
 **Do not review the other eight runs yet.** That was the instruction here, and
