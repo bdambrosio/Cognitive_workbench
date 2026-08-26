@@ -150,6 +150,32 @@ LIMITS_MARK = "=== LIMITATIONS ==="
 SURFACE_MARK = "=== CLAIM SURFACE ==="
 
 
+def marker_re(mark: str) -> "re.Pattern":
+    """A marker matcher tolerant of the whitespace between its tokens.
+
+    WHY NOT AN EXACT MATCH. 2026-08-25, on a real target: an arm emitted a
+    complete and correct limitations statement — all three required lines —
+    under `===\nLIMITATIONS ===`. A line wrap in the middle of the literal.
+    Exact matching reported the requirement as absent, which is the opposite
+    of what the record showed.
+
+    The repository already had this lesson. claims.py normalises whitespace
+    before its quote-verbatim check, with the comment: "so an honest copy
+    isn't invalidated by line wrapping in the observation." Same failure,
+    same fix, one subsystem later.
+
+    A pattern rather than normalising the whole text, because claim_surface
+    splits on the marker's POSITION and normalising would move every offset
+    after it.
+    """
+    return re.compile(r"\s+".join(re.escape(t) for t in mark.split()))
+
+
+_GAP_RE = marker_re(GAP_MARK)
+_LIMITS_RE = marker_re(LIMITS_MARK)
+_SURFACE_RE = marker_re(SURFACE_MARK)
+
+
 def agent_emissions(working_log: str) -> str:
     """The agent's own lines, with tool observations removed.
 
@@ -198,9 +224,10 @@ def claim_surface(world: str, agent: str) -> Dict[str, Any]:
     asks for a specific artifact and it is absent.
     """
     def _count(body: str) -> Optional[int]:
-        if SURFACE_MARK not in body:
+        hit = _SURFACE_RE.search(body)
+        if not hit:
             return None
-        tail = body.split(SURFACE_MARK, 1)[1][:300]
+        tail = body[hit.end():hit.end() + 300]
         # <N> claims — tolerating "micro-claims", "stated claims", bold marks.
         m = re.search(r"(\d[\d,]*)\s+\S*claims\b", tail, re.I)
         # Marker present but no count is not a closure, same rule as before.
@@ -277,9 +304,9 @@ def read_memo(world: str, agent: str) -> Optional[str]:
 
 def split_deliverables(reply: str) -> tuple:
     """(report, gap_map_or_None). Split on the marker the brief specifies."""
-    if GAP_MARK in reply:
-        head, _, tail = reply.partition(GAP_MARK)
-        return head.rstrip(), tail.strip()
+    hit = _GAP_RE.search(reply)
+    if hit:
+        return reply[:hit.start()].rstrip(), reply[hit.end():].strip()
     return reply, None
 
 
@@ -434,16 +461,41 @@ def recommendation_of(report: str) -> Optional[str]:
     # violation, and worth catching. But it is an ORDERING failure, and this
     # criterion answers "was the vocabulary used". Reporting one as the other
     # hides both. Ordering wants its own check.
-    for m in re.finditer(r"recommendation\b", report, re.I):
-        window = report[m.end():m.end() + 120]
+    def _in(window: str) -> Optional[str]:
         hits = []
         for term in _REC_VOCAB:
             tm = _REC_TERM_RE[term].search(window)
             if tm:
                 hits.append((tm.start(), -len(term), term))
-        if hits:
-            return min(hits)[2]
-    return None
+        return min(hits)[2] if hits else None
+
+    for m in re.finditer(r"recommendation\b", report, re.I):
+        found = _in(report[m.end():m.end() + 120])
+        if found:
+            return found
+
+    # NO LABEL IS NOT NO RECOMMENDATION. §16 requires "the recommendation, in
+    # §9's vocabulary and no other" and never requires the word
+    # "Recommendation" in front of it. 2026-08-25, on a real target: a report
+    # opened "**Conditional** (of 42 claims examined out of 118 identified)"
+    # and scored as having stated no recommendation. That was the fourth miss
+    # by this function and the first where the report was entirely conformant —
+    # the locator was enforcing a label the method does not ask for.
+    #
+    # THE FIRST LINE, AND THE TERM MUST OPEN IT. Without the label as an anchor
+    # the trailing guard is doing all the work, and `Clear` and `Walk` are
+    # ordinary English. Searching the opening 200 characters was tried and read
+    # "Findings worst first.\n\nThe team should walk." as a Walk
+    # recommendation — the guard accepts `walk.` because a period follows.
+    #
+    # §8 and §16 both put the recommendation first, so requiring the term to
+    # BEGIN the report costs nothing a conformant report needs and removes the
+    # whole class: a §9 term in a sentence is prose, a §9 term opening the
+    # document is the verdict.
+    head = next((ln for ln in report.splitlines() if ln.strip()), "")
+    head = head.lstrip("#*_> \t")
+    found = _in(head)
+    return found if found and head.lower().startswith(found.lower()) else None
 
 
 # REPORTED, NOT GATED — removed from the threshold 2026-08-24.
@@ -552,7 +604,7 @@ def main() -> int:
               "=== CLAIM SURFACE ===")
 
     print(f"  limitations stmt     "
-          + ("present" if LIMITS_MARK in report else
+          + ("present" if _LIMITS_RE.search(report) else
              "ABSENT — §16 requires it after === LIMITATIONS ==="))
 
     sa = facts["subagent"]
@@ -639,7 +691,7 @@ def main() -> int:
          bool(ranked) and ranked[0] in SEVERITY[:3]),
         ("no unsupported claims",     unsupported == 0),
         ("§6 verdicts only",           not vc["off_vocabulary"]),
-        ("limitations statement",      LIMITS_MARK in report),
+        ("limitations statement",      bool(_LIMITS_RE.search(report))),
         # A DECLARED ZERO IS NOT A CLOSURE. 2026-08-25: an arm's first
         # external listing returned no entries, so it emitted the marker with
         # `0 claims`, recovered, and re-froze at 273 — which its report then
