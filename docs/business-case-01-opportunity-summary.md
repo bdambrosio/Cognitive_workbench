@@ -16,8 +16,10 @@ One question, asked systematically, for a fixed fee:
 An independent audit of a target's stated technical claims against its actual
 implementation, with citations to both — the document making each claim and
 the file and line that settles it. The deliverable is a report of what holds,
-what does not, and explicitly what was not checked and why that matters, plus
-a one-page summary a non-technical buyer reads in thirty seconds.
+what does not, and explicitly what was not checked and why that matters; a
+short list of questions to put to the seller before closing, phrased as deal
+actions rather than observations; and a one-page summary a non-technical buyer
+reads in thirty seconds.
 
 **$5,000, fixed fee, roughly one week.** Deliberately the rung below full
 technical due diligence, which commonly runs $10K–$30K and covers
@@ -83,13 +85,27 @@ prospect immediately asks why their own CTO cannot do it.
 
 ## Why this person
 
-I have been on the other side of this transaction. I co-founded CleverSet in
+I have been on both sides of this transaction. I co-founded CleverSet in
 2001 to commercialize statistical relational learning, built it into an
 e-commerce personalization service deployed to 70+ online retailers, and sold
 it to Art Technology Group (NASDAQ: ARTG) in 2008, then served as VP and
 Chief Architect for OnDemand Personalization there. **I have written the
 technical claims that a buyer's diligence team examined**, which is a useful
 thing to have done before auditing someone else's.
+
+I have also been on the buying side: `[FILL — year, role]` on the acquisition
+of a French firm by a UK product-recommendation business. The same problem,
+across distance, language, and a seller who understands the system while the
+buyer does not — which is structurally what a codebase whose README is the
+only account of itself presents.
+
+The two sides teach different things, and the second is the one that shows up
+in the deliverable. **Sell side taught me how technical claims get written.
+Buy side taught me what a buyer does with a finding** — whether it moves the
+price, becomes a representation, becomes a condition of closing, or gets waved
+off. That is why the report ends in five questions to put to the seller rather
+than in a list of observations. A finding a buyer cannot act on is a finding
+that did not need to be written.
 
 Before and alongside that: PhD from Berkeley, Professor Emeritus of Computer
 Science at Oregon State, four decades in AI, foundational work on inference
@@ -148,6 +164,49 @@ the report rather than applied silently; and the report is confirmed by a
 human before it ships. **The audit is not the product. The audit plus the
 review is the product** — which is also why it is worth $5,000 rather than an
 API call.
+
+## "Why not just run an AI over it myself?"
+
+This will come up in every one of the ten conversations, and the answer has to
+be better than a claim of superior output — because a prospect can check that
+claim and it will not entirely hold.
+
+A buyer with a capable model and the repository will find some of this. The
+webhook gap is findable: one search contradicts one README line. Four things a
+cold run does not do, in rough order of what they cost:
+
+- **It answers a different question.** *Audit this codebase* produces a code
+  review — dependency versions, test coverage, refactoring suggestions.
+  Valuable to an engineer, unusable in a deal file, and unbounded. Knowing the
+  operation is *stated claims vs. observed implementation* is the shape of the
+  product, and it precedes any tooling.
+- **It has no denominator.** A cold run reports six findings and stops. Nothing
+  states that the claim surface was seventy-five, so the report reads as
+  complete. Silence about coverage reads as completeness, and completeness is
+  the one thing a diligence report must never imply without having earned it.
+- **It confuses "not present here" with "does not exist."** Five ChatterMate
+  claims — a pip CLI, an npm CLI, an MCP server, a Shopify listing, a plan
+  enum — are unverifiable from this repository rather than false. A cold run
+  writes *not implemented*. That is a false accusation against a seller, in a
+  document the buyer will hand them, and it is the failure most likely to end
+  an engagement badly.
+- **It stops at the first half of a conjunction.** The frustration-detection
+  finding is true only as a pair: a sentiment scorer exists *and* it never
+  reaches the escalation path. Either half on its own is wrong.
+
+Two of those four are observed rather than argued — the conjunction error is
+one this machine actually made and a directed pass caught, and the five
+unverifiable claims are in the delivered report. The other two are inference
+about how a cold run behaves; one blind run against the seventy-five-claim
+answer key would settle them, and has not been done.
+
+So the answer is not *my output is better*. It is: **the operation is bounded,
+the coverage is stated, absence is distinguished from ignorance, and someone
+independent signs the result.** The first three are method, and method is
+copyable by anyone who reads it. The fourth is what is actually being bought
+at the moment the money moves — a report the seller has to dispute with a
+person who has sat on both sides of an acquisition, rather than with a chat
+log.
 
 ## The claim I cannot yet make
 
