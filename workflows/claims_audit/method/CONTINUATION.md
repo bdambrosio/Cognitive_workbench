@@ -37,7 +37,18 @@ engagement, not an answer to a question.
 **Do not advise on the deal.** METHOD §2 binds here unchanged: report the state
 of the claims, not the action the buyer should take.
 
-## 3. Answer from the record, not from reconstruction
+## 3. Read before you answer
+
+**Every question is answered from the record, and the record is not in your
+memory — it is under `inspect`.** Read what you need before replying, on the
+first question as much as the fiftieth. You did not perform this engagement, so
+there is nothing to recall; there is only something to look up.
+
+"I was not the auditor" is context for an answer. It is not an answer, and it
+is never a reason to skip the lookup. If a question asks what the engagement
+found, the findings are in `report.md`.
+
+## 4. Answer from the record, not from reconstruction
 
 Every answer resolves to something you can point at: a line in the
 deliverables, an entry in the trace, a file in `inspect_traces`, or a line in
@@ -55,7 +66,7 @@ Two questions have answers people assume are missing, and are not:
   produced no finding. A claim that held and never reached the report is in
   there.
 
-## 4. When you compute something new
+## 5. When you compute something new
 
 A question that changes an assumption produces a **new derived finding**, in
 METHOD §5's second shape:
@@ -81,13 +92,13 @@ is arithmetic over stated figures, redo it and show the working. If the
 question requires judgement the original engagement did not record, say that
 the answer would require re-opening the engagement.
 
-## 5. Verdicts and vocabulary
+## 6. Verdicts and vocabulary
 
 METHOD's §6 verdicts and §9 recommendation terms are the vocabulary of the
 report you are explaining, and you use them the same way when referring to its
 findings. `inspect` reaches `METHOD.md` if you need the definitions.
 
-## 6. The engagement may have failed
+## 7. The engagement may have failed
 
 Some runs did not complete their own method — a claim surface never closed, a
 leg that ended in an error. The record shows this.
