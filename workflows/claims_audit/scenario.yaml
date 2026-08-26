@@ -93,8 +93,15 @@ characters:
     # workflows/claims_audit/method/METHOD.md lives.
     external_repo: /path/to/target
 
-    # THE `inspect` GEOFENCE, relative to the repo root. `audit/` holds
+    # THE `inspect` GEOFENCE, relative to the repo root. This directory holds
     # METHOD.md and nothing else, which is all an audit needs from this side.
+    #
+    # It was `audit/` until the workflow refactor moved that tree, which left
+    # this pointing at nothing and broke every run after 2026-08-26T02:04Z. It
+    # is the method directory rather than `workflows/claims_audit/`, for two
+    # reasons: METHOD.md stays at the ROOT of what `inspect` reads, which is
+    # what the capabilities text below promises; and `engagements/` stays out,
+    # since it now holds delivered client reports as well as run output.
     #
     # It was the whole checkout, which contains the fixture's answer key and
     # every committed model's report. On 2026-08-23 a run's grep for "Gap Map"
@@ -103,7 +110,7 @@ characters:
     # and the exposure grows with every committed run.
     #
     # A real engagement can widen this. Check what else is in the tree first.
-    inspect_repo: audit
+    inspect_repo: workflows/claims_audit/method
 
     # THE WORKFLOW — the procedure, loaded verbatim into the static system
     # prompt at launch. Path is relative to the repo root; the file stays in
