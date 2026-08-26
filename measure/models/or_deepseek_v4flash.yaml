@@ -1,0 +1,64 @@
+# DeepSeek-V4-Flash-0731 via OpenRouter, pinned to Baidu at fp8.
+#
+# WHY NOT DeepInfra (di_deepseek_v4flash.yaml). Same model, same snapshot, same
+# fp8 weights — DeepInfra just serves it slowly. Our DeepInfra run took 1,432s
+# over 43 calls, 33s a call, six times grok's wall clock, and generation is what
+# dominates: a ~42k-token prompt prefills in seconds while ~2,000 output tokens
+# at ~49 tok/s is the other thirty. Provider is the only variable between the
+# two runs — same snapshot, same fp8 weights.
+#
+# STRUCTURED OUTPUT NARROWS THE FIELD, and it narrows it to slow providers.
+# Measured 2026-08-26 with the real payload (json_schema + reasoning_effort),
+# every provider of this model at fp8:
+#
+#   baidu 69 tok/s · parasail 58 · siliconflow 50 · deepinfra 49 · akashml 46
+#   gmicloud, novita, streamlake, coreweave, baseten -> 404, no json_schema
+#
+# The two fastest endpoints on paper — coreweave ~166 tok/s and gmicloud ~117
+# (Artificial Analysis) — refuse `response_format` entirely, and those
+# benchmarks are run without it. So published throughput rankings do not
+# describe this workload. Baidu is the fastest that accepts our payload, and
+# it is only ~40% ahead of DeepInfra rather than the 2-4x the rankings imply.
+#
+# `supported_parameters` from the endpoints API is NOT reliable here: it lists
+# `response_format` for gmicloud, which then 404s on a json_schema request.
+# Probe with the real payload.
+#
+# PINNED, AND NO FALLBACK, because "the same model" is three different things
+# here. Asking OpenRouter for this model three ways on 2026-08-26 gave:
+#
+#   deepseek-v4-flash-0731, unpinned      -> OpenInference, fp4
+#   deepseek-v4-flash (base) + coreweave  -> CoreWeave, fp8, snapshot 20260423
+#   deepseek-v4-flash-0731 + gmicloud/fp8 -> GMICloud, fp8, snapshot 20260731
+#
+# Only the third is the artifact we measured on DeepInfra. An unpinned run
+# would have quietly used 4-bit weights, and the base id would have used an
+# April build. A failover mid-run could do either without the model id
+# changing, which is why fallbacks are off.
+#
+# THE TAG CARRIES THE QUANTIZATION. `gmicloud/fp8` pins precision as well as
+# provider; the plain provider name does not. Tags come from
+# openrouter.ai/api/v1/models/<model>/endpoints, which also gives per-provider
+# status and uptime. GMICloud at selection time: fp8, status ok, 97.8% over a
+# day, 99.7% over 30 minutes. Two of that model's endpoints were degraded at
+# the same moment and `baseten/fp8` returned a 429 on a one-line probe, so
+# re-check before a later run rather than assuming this holds.
+#
+# NOTE: CoreWeave is faster still (~166 tok/s) but serves only the April
+# snapshot under the base id, and does not serve 0731 at all — pinning it
+# against this model id returns 404.
+#
+# TEMPERATURE resolves through the substring key `DeepSeek-V4-Flash` in
+# src/chat/model_params.py to 1.0, the publisher's agentic recommendation, the
+# same value the DeepInfra route gets. Nothing new is decided here.
+llm_config:
+  server: local
+  model: "deepseek/deepseek-v4-flash-0731"
+  vllm_url: https://openrouter.ai/api/v1
+  api_key: OPENROUTER_API_KEY
+  is_reasoning_model: true
+  reasoning_effort: low
+  extra_body:
+    provider:
+      order: ["baidu/fp8"]
+      allow_fallbacks: false

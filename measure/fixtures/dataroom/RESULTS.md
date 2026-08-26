@@ -735,6 +735,123 @@ same defect behind prose.
 **For this workflow, Qwen3.8-27B is not usable.** Two of its three runs on the
 current method are inadmissible.
 
+### The review layer got two rules and a retest — 2026-08-26
+
+**REVIEW.md §4.0 asked one of the two questions it promised.** It opens "Two
+questions, and this one comes first" and then only ever asks whether the
+citations can be placed. The missing one is whether the report cites at all.
+A report with three of eighteen evidence fields pointing nowhere was reviewed
+**ADMISSIBLE, supported 10 of 10, PASS** — the reviewer wrote "cited lines say
+what the findings say they say", which was true: it checked the twelve
+references that existed while a sixth of the evidence carried none. A field
+that names a document and then writes prose makes no citation, so it is
+invisible in every citation count.
+
+`[uncited]` is now a sixth verdict and §9 fails on it. It is not a stretched
+`[broken citation]` — that has a reference which does not resolve — nor an
+`[indeterminate]`, which has one that resolves to text the reader cannot
+place. `[uncited]` has none at all. Re-reviewed under the rule, that report
+returned **7 of 10, FAIL**, with three `[uncited]`.
+
+**§9 fails a report on a single exception, which turns reviewer noise into
+verdict noise.** `r1_grok_1` reviewed five times: supported 12 of 12 PASS four
+times, 11 of 12 FAIL once. The dissent rebutted a finding by attacking a claim
+the audit never made — the report said Rails 7 was "not re-verified from a
+Gemfile", a statement about its own coverage, and the review read it as a
+claim about the target. At a 2% per-finding error rate a 12-finding report
+flips ~21% of the time and a 23-finding one ~37%: the more thorough the audit,
+the likelier it is failed for nothing.
+
+**So a claim-check fail is retested once.** `[unsupported]` and
+`[indeterminate]` rest on a reading of a line against a claim, and the fail
+stands only if a retest — not told the first verdict, unable to see the review
+— reaches the same verdict. A single disagreement means it does not stand.
+Where the two divide the finding is genuinely borderline, so the tally is
+reported either way and a fail that does not stand stays in the review as
+found but not upheld. `[broken citation]` and `[uncited]` are not retested: a
+reference resolves or it does not, and asking a model to re-derive a file fact
+is not another opinion.
+
+**Renaming is not moving.** The one-review-per-run guard tested for the
+literal name `review/`, so a previous review parked alongside as
+`review.8192-era/` was exactly as visible to `inspect` as `review/` had been.
+Four re-reviews ran under that hole and were discarded. The guard now refuses
+on any `review*` directory holding a `review.md`.
+
+**The supported ratio does not hold still, and that limits what the model
+search can grade on.** `w1_qwen_1` went 19 of 23 FAIL, then 21 of 23 FAIL,
+then 23 of 23 PASS across three reviews of identical text. Admissibility has
+been measured stable at 3 of 3; PASS/FAIL has now been measured unstable
+twice. A candidate reviewer should be graded on admissibility, with the ratio
+reported and not scored.
+
+### Ceilings were the model's problem, not the model — 2026-08-26
+
+Four emission ceilings sit on the audit path and only one is the 8192 anyone
+talks about. Two candidates were cut mid-emission from two different limits:
+`inspect_external` at the subagent's 4096, and the main loop at 8192. Raised
+to 8192 and 16384 respectively, with `_PROCESS_TEXT_MAX_TOKENS` and the stored
+observation cap (1000 -> 4096) alongside. The truncation marker now says where
+the elided text went: `observations_full` was already in the live trace and
+`recall` already reads `reasoning_trace.jsonl`, so the retrieval path existed
+and nothing pointed at it.
+
+**What that was worth, measured on one model.** DeepSeek-V4-Flash, same
+fixture:
+
+| | provider | ceiling | wall | calls | s/call | evidence fields | pointing nowhere |
+|---|---|---|---|---|---|---|---|
+| `r1_deepseek_1` | DeepInfra | 8192 | 1432s | 43 | 33.3 | 18 | **3** |
+| `b2_deepseek_or` | Baidu | 16384 | **226s** | 28 | **8.1** | 23 | **0** |
+
+**6.3x faster and now quicker per call than grok** (8.1s against 11.1s), with
+citations more than doubled — 12 line references became 29, 19 quotes became
+40. **The three pointerless fields were our ceiling, not its citation habit**,
+and they would have eliminated it under the screening bar. Two variables moved
+at once, so provider and ceiling cannot be separated from this.
+
+### Provider selection is not what the benchmarks measure — 2026-08-26
+
+**Structured output eliminates the fast endpoints.** Probing every fp8
+provider of DeepSeek-V4-Flash-0731 with the real payload (`json_schema` +
+`reasoning_effort`):
+
+    baidu 69 tok/s · parasail 58 · siliconflow 50 · deepinfra 49 · akashml 46
+    gmicloud, novita, streamlake, coreweave, baseten -> 404, no json_schema
+
+The two fastest on paper — coreweave ~166 tok/s, gmicloud ~117 — refuse
+`response_format` outright, and published throughput rankings are measured
+without it. Among providers that accept our payload the spread is 46-69 and
+DeepInfra sits mid-pack. `response_format` is load-bearing (it is what stopped
+luna emitting its answer as JSON instead of an action, 160 `unknown tool
+None`), so this is a real constraint rather than a setting to drop.
+
+**`supported_parameters` from the endpoints API is not reliable.** It lists
+`response_format` for gmicloud, which then 404s on a `json_schema` request.
+Probe with the real payload; the endpoints API is for shortlisting.
+
+**Three ways of asking for one model give three different artifacts.** On
+2026-08-26:
+
+    deepseek-v4-flash-0731, unpinned        -> OpenInference, fp4
+    deepseek-v4-flash (base) + coreweave    -> CoreWeave, fp8, snapshot 20260423
+    deepseek-v4-flash-0731 + gmicloud/fp8   -> GMICloud, fp8, snapshot 20260731
+
+An unpinned run would have used 4-bit weights; the base id an April build.
+Pin by TAG (`baidu/fp8`), which fixes precision as well as provider, and turn
+fallbacks off — a failover mid-run can change quantization without changing
+the model id.
+
+**Rate limits are per-model shared pools, not per-account.** Two runs launched
+together on one DeepInfra key: Nemotron-3-Super took eight 429s between
+12:36:54 and 12:52:23 while DeepSeek took none. A 429 recorded on 2026-08-22
+named it directly — `limit_source: upstream_provider_shared_pool`. OpenRouter
+does throttle on its own account, but only on `:free` variants (20 req/min,
+which a 20-43 call audit would trip); paid models pass upstream limits
+through. `error.metadata.provider_code` marks an upstream refusal and
+`X-RateLimit-*` headers a gateway one. None of this is captured in a run
+record today.
+
 ### Two things the runs exposed
 
 **The instrument could not run at all.** `scenario.yaml` pointed `inspect_repo`
