@@ -617,10 +617,12 @@ def _confirmation_note(c: Dict[str, Any]) -> str:
     the review.
     """
     if not c.get("ran"):
-        return ("\n\n[The client's process could not obtain the retest. A "
-                "finding you failed stands only if a retest agrees, so none "
-                "of them stands. Report each one as found but not retested, "
-                "with the reason, per §9.]")
+        return ("\n\n[The client's process could not obtain the retest. Per "
+                "§9 the result is INCONCLUSIVE: report ADMISSIBLE or "
+                "INADMISSIBLE as you found it, list every finding you failed "
+                "as found but not retested, and give neither PASS nor FAIL. "
+                "A retest that could not be run is not a finding that did "
+                "not hold.]")
     lines = []
     for r in c["results"]:
         others = ", ".join(f"[{v}]" if v else "[no verdict returned]"

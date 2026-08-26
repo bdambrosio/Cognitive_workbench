@@ -285,12 +285,14 @@ def test_the_summary_is_told_what_the_retest_found():
     assert "Finding 7" in note and "2 of 2" in note and "STANDS" in note
     assert "do not delete it" in note
 
-    # If the retest cannot be obtained, no fail stands — and that must not
-    # read as a clearance either.
+    # A retest that could not be run must produce neither PASS nor FAIL. It
+    # is not a finding that did not hold, and an infrastructure failure must
+    # not clear a report.
     failed = _confirmation_note({"ran": False, "error": "boom"})
     assert "could not obtain the retest" in failed
-    assert "none of them stands" in failed
-    assert "STANDS" not in failed.replace("none of them stands", "")
+    assert "INCONCLUSIVE" in failed
+    assert "neither PASS nor FAIL" in failed
+    assert "STANDS" not in failed
 
 
 def test_every_name_the_runner_uses_at_run_time_resolves():

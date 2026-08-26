@@ -265,7 +265,8 @@ still the summary.
 
 Otherwise:
 
-- The §9 result: ADMISSIBLE, supported N of M, exceptions by verdict, PASS or FAIL.
+- The §9 result: ADMISSIBLE, supported N of M, exceptions by verdict, and
+  PASS, FAIL, or INCONCLUSIVE where a retest could not be run.
 - Exceptions worst first, each in §6's format.
 - A coverage statement: findings checked out of findings enumerated, and what
   the record showed about the audit's own coverage (§7).
@@ -284,8 +285,8 @@ Otherwise:
 report ships:
 
 - The report reviewed, and the engagement it came from
-- The §9 result: admissibility, then supported N of M and PASS or FAIL if the
-  report was admissible
+- The §9 result: admissibility, then supported N of M and PASS, FAIL or
+  INCONCLUSIVE if the report was admissible
 - Exceptions that would change a reader's understanding, worst first
 - Findings checked out of findings enumerated
 - A footer in small type: "report review · checks findings against cited
@@ -326,6 +327,13 @@ not see your review. You are told what it found before you write §9.
 The fail stands only if the retest reached the same verdict. A single
 disagreement means the fail does not stand, and a fail that does not stand
 does not count toward FAIL.
+
+**If the retest could not be run at all, the result is INCONCLUSIVE** — report
+admissibility as you found it, list every finding you failed as found but not
+retested, and give neither PASS nor FAIL. A retest that did not happen is not
+a retest that disagreed. On 2026-08-26 a bug stopped the retest from launching
+and a report carrying five `[unsupported]` findings came back PASS, because
+nothing had stood. An infrastructure failure must not clear a report.
 
 `[broken citation]` and `[uncited]` are not retested. A reference resolves or
 it does not, and a field carries a pointer or it does not. Both are settled
