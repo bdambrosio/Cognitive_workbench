@@ -15,11 +15,15 @@ starts, because they have answers that do not depend on judgement:
 
   conformance   the method-conformance criteria that need no answer key —
                 markers, closed vocabularies, a claim surface that closed
-  citations     every cited line, fetched. Whether doc4:16-19 EXISTS is a file
-                operation, and it decides one of the two verdicts that fail a
-                report. Resolving it here means the reviewer cannot hallucinate
-                a line it never fetched, and spends its judgement on whether the
-                line SUPPORTS the claim.
+  citations     every cited line, fetched, and every quoted span, looked for.
+                Whether doc4:16-19 EXISTS is a file operation, and it decides
+                one of the two verdicts that fail a report. Resolving it here
+                means the reviewer cannot hallucinate a line it never fetched,
+                and spends its judgement on whether the line SUPPORTS the claim.
+  scheme        whether those integers can be line numbers at all. A reference
+                past the end of its document proves they are not — see §4.0.
+                This does not decide admissibility; it is what the reviewer
+                decides it on.
 
 An LLM asked whether `=== LIMITATIONS ===` appears is slower, dearer and less
 reliable than a substring test. The workflow's value is the checks with no
@@ -72,6 +76,147 @@ _CITE = re.compile(
 _LOOKS_LIKE_A_FILE = re.compile(r"\.[A-Za-z][A-Za-z0-9]{0,4}$")
 _DOCN = re.compile(r"^doc(\d)", re.I)
 _FINDING = re.compile(r"^\s*\**\s*Finding\s+(\d+)[^\n\[]*\[([^\]]+)\]", re.M | re.I)
+
+# A quoted span in the report. Both quote characters, because a report that has
+# been through a model may carry either. The 12-character floor drops `"active"`
+# and other single-word quoting, which is not a citation of anything.
+_QUOTE = re.compile(r"[\"“]([^\"”\n]{12,})[\"”]")
+_MIN_QUOTE_CHARS = 12
+
+
+_NOT_TEXT = re.compile(r"[^a-z0-9 ]+")
+_SEGMENT = re.compile(r"(?<=[.;:])\s+|\n+")
+_MIN_SEGMENT_CHARS = 8
+
+
+def _flatten(s: str) -> str:
+    """Lowercased alphanumerics and single spaces, and nothing else.
+
+    Everything discarded here is a difference that is not a citation failure:
+    markdown emphasis and bullet markers (`*   **Status:**` against `Status:`),
+    the newline where a quote spans two source lines, a re-typed apostrophe,
+    and the punctuation a model adds when it joins two bullets into one
+    sentence. What survives is the words, in order.
+    """
+    return " ".join(_NOT_TEXT.sub(" ", s.lower()).split())
+
+
+def resolve_quotes(report: str, target: Path) -> List[Dict[str, Any]]:
+    """Every quoted span in the report, looked for in the materials.
+
+    THE SECOND HALF OF THE CITATION SURFACE. `_CITE` sees `docN:NN` and nothing
+    else, so a report citing its evidence by section name — "(doc4, Backups
+    section)" — resolved to zero entries and the reviewer read that absence as
+    absence of evidence. On 2026-08-26 that produced "supported 1 of 15" on a
+    report whose evidence quotes were, every one, verbatim correct.
+
+    A quote resolves by file operation exactly as a line reference does, so it
+    decides `[broken citation]` without judgement. It also survives the boundary
+    a line number does not: the inspect subagent reformats numbered content into
+    prose before the auditor ever sees it (code_subagent.py:407 numbers it;
+    subagent.py:252 is the model's own answer, unnumbered).
+
+    SEGMENTS, NOT SPANS. Reports quote composites — four bullets of doc4's
+    Backups section joined into one sentence, sometimes reordered. Every fact in
+    such a quote can be verbatim while the span as typed appears nowhere. Whole-
+    span matching reports those as fabrication, so each quote is split and its
+    segments resolved separately. A quote resolves when all of them do.
+
+    KNOWN NOISE. The extractor takes quoted spans, and a report that writes
+    `"Streamlined" is not a fair description of "not present."` yields the prose
+    between the two quoted words. Such a span resolves to nothing, correctly,
+    and still counts in the denominator. The ratio is a signal for §4.0, not a
+    verdict.
+    """
+    if not target.is_dir():
+        return []
+    flat = {f.name: _flatten(f.read_text(errors="replace"))
+            for f in sorted(target.rglob("*")) if f.is_file()}
+
+    body = _FINDING.sub("", report)     # titles quote the claim; they are headings
+    out: List[Dict[str, Any]] = []
+    seen = set()
+    for m in _QUOTE.finditer(body):
+        q = m.group(1).strip()
+        if len(q) < _MIN_QUOTE_CHARS or q in seen:
+            continue
+        seen.add(q)
+        segs = [s for s in (_flatten(x) for x in _SEGMENT.split(q))
+                if len(s) >= _MIN_SEGMENT_CHARS]
+        if not segs:
+            continue
+        whole = _flatten(q)
+        hits, missing, docs_hit = 0, [], []
+        for s in segs:
+            for name, text in flat.items():
+                if s in text:
+                    hits += 1
+                    if name not in docs_hit:
+                        docs_hit.append(name)
+                    break
+            else:
+                missing.append(s)
+        contiguous = any(whole in text for text in flat.values())
+        rec: Dict[str, Any] = {
+            "quote": q[:300], "resolved": hits == len(segs),
+            "how": "contiguous" if contiguous
+                   else "segments" if hits == len(segs)
+                   else "partial" if hits else "miss",
+            "segments": len(segs), "segments_found": hits,
+            "documents": docs_hit,
+        }
+        if missing:
+            rec["missing"] = [s[:160] for s in missing]
+        out.append(rec)
+    return out
+
+
+def scheme(citations: List[Dict[str, Any]],
+           quotes: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Whether the report's `docN:NN` references are line numbers at all.
+
+    Decidable by file operation, and only in the negative: **an integer that
+    exceeds its document's line count proves the reference is not a line
+    number.** `doc2:13` against a five-line doc2 is not a broken line reference;
+    it is claim 13 of the 13 that report enumerated for doc2.
+
+    This does not say what the scheme IS. Nothing mechanical can. It says the
+    declared one does not hold, which is what REVIEW.md §4.0 needs in order to
+    stop rather than report a ratio computed over a misread.
+    """
+    over = [c for c in citations
+            if not c.get("resolved") and " lines" in str(c.get("why", ""))]
+    consistent: Optional[bool] = None
+    if citations:
+        consistent = not over
+
+    # PER DOCUMENT, because the rate is what distinguishes the two cases. One
+    # stray reference in forty is a typo. Four of the seven references to one
+    # five-line document are a different coordinate system, and only the second
+    # is grounds to stop. Measured across 29 reports on 2026-08-26: six carry at
+    # least one over-length reference, and they range from 1-in-42 to 4-in-7.
+    by_doc: Dict[str, Dict[str, Any]] = {}
+    for c in citations:
+        key = str(c.get("cited", "")).split(":")[0].strip().lower() or "?"
+        d = by_doc.setdefault(key, {"refs": 0, "exceeding": 0, "max_cited": 0})
+        d["refs"] += 1
+        d["max_cited"] = max(d["max_cited"], int(c.get("line") or 0))
+        if c in over:
+            d["exceeding"] += 1
+            d["file_lines"] = str(c.get("why", ""))
+
+    return {
+        "line_refs": len(citations),
+        "line_refs_resolving": sum(1 for c in citations if c.get("resolved")),
+        "line_refs_exceeding_file_length": len(over),
+        "by_document": {k: v for k, v in sorted(by_doc.items())
+                        if v["exceeding"]},
+        "quotes": len(quotes),
+        "quotes_resolving": sum(1 for q in quotes if q.get("resolved")),
+        "quotes_contiguous": sum(1 for q in quotes
+                                 if q.get("how") == "contiguous"),
+        "consistent_with_line_numbering": consistent,
+    }
 
 
 def resolve_citations(report: str, target: Path) -> Dict[str, Any]:
@@ -127,7 +272,9 @@ def resolve_citations(report: str, target: Path) -> Dict[str, Any]:
                     f"{n}: {lines[n-1]}" for n in range(lo, min(hi_i, len(lines)) + 1))
         out.append(rec)
     broken = [c for c in out if not c["resolved"]]
-    return {"citations": out, "total": len(out), "broken": len(broken)}
+    quotes = resolve_quotes(report, target)
+    return {"citations": out, "total": len(out), "broken": len(broken),
+            "quotes": quotes, "scheme": scheme(out, quotes)}
 
 
 def conformance(run: Path) -> Dict[str, Any]:
@@ -196,14 +343,26 @@ BRIEF = """You are reviewing the claims audit in this run directory, per REVIEW.
 The report and the Gap Map are under `inspect`, with the auditor's working
 record. The materials that audit examined are under `inspect_external`.
 
-Citations have already been resolved for you: `review/citations.json` holds
-every cited line with its text, and any that do not exist are marked. Do not
-re-fetch them, and do not assess support for a finding whose citation is broken.
+Citations have been resolved for you as far as a file operation reaches.
+`review/citations.json` holds three things: every `docN:NN` reference with the
+text of the line it names; every quoted span in the report, looked for in the
+materials; and a `scheme` block saying whether those integers can be line
+numbers at all.
 
-Enumerate the findings first and close the review surface as the method says,
-then check every one. Work in as many legs as you need — end a leg with `yield`
-and I will say continue. End with the review; I will ask for the summary after
-it.
+Do not re-fetch what it has already resolved, and do not assess support for a
+finding whose citation is broken. **It is not the whole of the materials.** A
+reference it does not cover — an evidence document named by section rather than
+by line — is absent from it because no regex could fetch it, not because the
+document says nothing. Read anything it does not cover under `inspect_external`.
+
+Settle admissibility first, per §4.0. If the report's citation scheme cannot be
+established, say so and stop: do not enumerate, do not check findings, do not
+report a supported ratio.
+
+Otherwise enumerate the findings and close the review surface as the method
+says, then check every one. Work in as many legs as you need — end a leg with
+`yield` and I will say continue. End with the review; I will ask for the summary
+after it.
 """
 
 
@@ -245,8 +404,10 @@ def main() -> int:
     (out / "citations.json").write_text(json.dumps(cites, indent=2), encoding="utf-8")
     conf = conformance(run)
     (out / "conformance.json").write_text(json.dumps(conf, indent=2), encoding="utf-8")
-    logger.info("resolved %d citations, %d broken; %d findings parsed",
-                cites["total"], cites["broken"], len(conf["findings"]))
+    logger.info("resolved %d citations, %d broken; %d quotes, %d resolving; "
+                "%d findings parsed", cites["total"], cites["broken"],
+                cites["scheme"]["quotes"], cites["scheme"]["quotes_resolving"],
+                len(conf["findings"]))
 
     world = args.world or f"review_{run.name.split('_', 1)[-1]}"
     if (REPO / "scenarios" / world).exists():
@@ -312,6 +473,7 @@ def main() -> int:
         "harness_rev": git_rev(REPO),
         "citations_total": cites["total"],
         "citations_broken": cites["broken"],
+        "scheme": cites["scheme"],
         "findings_parsed": len(conf["findings"]),
         "legs": legs,
         "wall_clock_s": round(time.time() - t0, 1),
@@ -320,7 +482,13 @@ def main() -> int:
     }, indent=2, default=str) + "\n", encoding="utf-8")
 
     print(f"\n{len(legs)} legs, {round(time.time() - t0, 1)}s, error={error}")
-    print(f"citations: {cites['total']} resolved, {cites['broken']} broken")
+    sch = cites["scheme"]
+    print(f"citations: {cites['total']} line refs, {cites['broken']} broken; "
+          f"{sch['quotes']} quotes, {sch['quotes_resolving']} resolving")
+    if sch["consistent_with_line_numbering"] is False:
+        print(f"scheme: NOT line numbers — "
+              f"{sch['line_refs_exceeding_file_length']} references exceed "
+              f"their document's line count. See REVIEW.md §4.0.")
     print(f"review: {out}/review.md, summary.md")
     return 1 if error else 0
 

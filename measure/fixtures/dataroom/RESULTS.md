@@ -278,6 +278,11 @@ git history if a specific claim ever needs checking.
 
 ## Pick up here — 2026-08-26, end of session
 
+> **Read the retraction below before this section.** Both paragraphs that
+> follow were written from the review's verdict and are wrong in their
+> central claim. They are kept because the correction is only legible
+> against them.
+
 **The campaign table is in question, and that is the headline.** An independent
 review of `m1_qwen_2` returned **supported 1 of 15 findings, FAIL**. That run
 passed every check the threshold has — valid §9 recommendation, closed §6
@@ -292,15 +297,252 @@ them. **If one run in nine does that while passing, the m1 table measures
 format compliance more than it measures work.** Nothing in it should be quoted
 until the other eight are reviewed.
 
-### Do this first
+### That headline is wrong. Retracted 2026-08-26
 
-**Review the other eight m1 runs.** `workflows/audit_review/runner.py --run
-<dir> --model measure/models/grok_4p6.yaml`, about five minutes each. The
-mechanical half alone — citations resolved against the corpus — costs nothing
-and may settle several of them before a model is involved.
+**The review's facts are all correct, its verdict is defensible, and its number
+is an artifact of the reviewer's harness.** Fourteen of the fifteen findings
+are defensible from the materials. What failed is the citation *pointers*, and
+the reviewer could see only the half of the citation surface that fails.
 
-Then decide what the m1 table means. Options are: report supported-ratio
-alongside the existing vector, gate on it, or retire the campaign.
+Checked by hand against the corpus, not taken from the review:
+
+| | result |
+|---|---|
+| claim-side pointers resolving correctly **as line numbers** | 5 of 23 |
+| evidence-side quotes reproduced verbatim from doc3–doc8 | **every one** |
+| findings defensible from the materials | 14 of 15 |
+
+Every evidence quote checks out exactly: "Failures recorded for the last 21
+days", "Last Successful Backup: 2026-07-30", "Uptime Monitor: None (No Pingdom,
+UptimeRobot, or custom checks)", "Unit Tests: 12 (all located in `test/utils/`)",
+"Payment-Path Tests: 0", "Managed personally by 'dave'. No secondary DNS
+provider". The audit did the work. It could not say where it got it.
+
+#### The auditor was citing claim ordinals, not line numbers
+
+`doc2` has five lines and the report cites `doc2:11, :12, :13`. Those are not
+broken line references. They are claim indices, and they are correct ones.
+
+The report declares the scheme in its own coverage statement — *"48 claims
+identified from three claim sources (doc1: 25, **doc2: 13**, **doc9: 10**)"* —
+and every reference fits it in document order:
+
+| cited | claim | position in doc2 |
+|---|---|---|
+| `doc2:2` | automatic scaling and failover at the platform level | para 1 |
+| `doc2:3` | remains available under varying load | para 1 |
+| `doc2:4` | no manual intervention for routine operations | para 1 end |
+| `doc2:6` | configured with daily scheduled backups | para 2 early |
+| `doc2:11` | the entire stack is managed through Heroku's dashboard | para 2 late |
+| `doc2:12` | deployments, scaling and monitoring are streamlined | para 2 late |
+| `doc2:13` | standard SaaS stack with platform-level redundancy | final phrase |
+
+Perfectly monotone, and it terminates at 13 — the count the report declared.
+doc9's ten claims land the same way, `:1` redundancy through `:10` managed DNS,
+with five of six distinct references correct under the scheme.
+
+**Inference, not verification.** `working_record/method_as_delivered.md` is
+absent from this run, so the auditor's intent cannot be confirmed. The fit is
+tight — two independently declared counts, both matching, both monotone in
+document order — but it is a reconstruction.
+
+**It inverts the flagship example.** "`doc9:10` is cited for managed DNS and is
+about backups" was recorded above as the clearest instance of a fabricated
+trail. Under claim indexing `doc9:10` **is** managed DNS, the tenth of the ten
+claims the report declares for that document. F15 is correct. The real error is
+F1 and F2 reusing `:10` for the backup claim, which is `:7`.
+
+**Why this was hard to see:** doc1 declares 25 claims and doc1 has exactly 25
+lines. Its references are ambiguous between the two schemes, and three of them
+happen to resolve correctly as lines. The coincidence made the report look like
+a document that was citing lines and getting them wrong.
+
+#### For most documents, line numbers were destroyed in transit
+
+`inspect`'s `read` returns numbered lines (`19|*   **Reliability:** …`). The
+subagent sees them. What reaches the auditor is the subagent's `respond`.
+Measured across this run's three traces:
+
+| trace | documents | numbered lines surviving into the answer |
+|---|---|---|
+| 1 | doc1 | **0** — reformatted as prose, closing "That is the entire file — 25 lines" |
+| 2 | doc2, doc9 | 16 — passed through intact |
+| 3 | doc3–doc8 (every evidence document) | **0** |
+
+So for doc1 and for all six evidence documents, METHOD §5's *"each with line
+numbers"* was not an instruction the auditor could follow — it held no line
+numbers. That is why the evidence half cites section names (`Evidence (doc4,
+Backups section)`): not sloppiness, the only locator it had.
+
+**This is the fourth instance of the shape.** Retrieval was reliable; transit
+was not. See `docs/RESUME-2026-08-24.md`, "evidence was retrieved and then lost
+in transit".
+
+Note what it does **not** explain. doc2 and doc9 arrived fully numbered and the
+auditor still used ordinals. Where the numbers were present it did not want
+them, because it was working in the claim surface §4 had made it build.
+
+#### The reviewer saw one of three citation dialects, and it was the worst one
+
+`runner.py:70`'s `_CITE` matches `docN:NN`. The report emits three forms:
+
+| dialect | where | count | in `citations.json` |
+|---|---|---|---|
+| claim ordinals, `docN:NN` | claim half | 23 | **all 23, resolved as line numbers** |
+| section names, `(doc4, Backups section)` | evidence half | 15 | none |
+| line numbers | nowhere | 0 | — |
+
+The brief then forbids re-fetching (`runner.py:199`: *"Citations have already
+been resolved for you… Do not re-fetch them"*), so `citations.json` became the
+reviewer's whole evidence base. Exception 5 states the consequence outright:
+F2 is ruled unsupported because *"last-success / doc4 is not in the resolved
+citation set"* — reasoning from absence in a partial index. `doc4:18` reads
+`**Last Successful Backup:** 2026-07-30`, the report quotes it exactly, and the
+derivation to 2026-08-29 is arithmetically right.
+
+**Two symmetric errors, from one regex.** It over-reported the claim half to 14
+false exceptions, and never saw that the evidence half violates §5 too —
+fifteen real violations, unreported.
+
+#### The failure mode, named
+
+**Not malformed syntax. Well-formed syntax over an undeclared referent.**
+
+All 23 citations parsed cleanly. There was no syntactic complaint available.
+The regex succeeded on every one and resolved them against the wrong axis,
+producing eighteen confident false readings with verbatim quoted text attached.
+A parse *failure* would have been the safer outcome: a parser can report a
+malformed citation, and nothing reports a correct-looking integer indexing a
+different coordinate system.
+
+The generalisation, which predicts the other queued items: **a syntactic
+contract holds when the required token is copyable from something in front of
+the model at generation time, and fails when it must be reconstructed from a
+rendering the model no longer holds.** `=== LIMITATIONS ===` and the
+`[delta]`/`[partial]` vocabulary held in this run because they sit in the
+prompt. Line numbers failed because they are a property of a display two hops
+upstream. Apply the same test to the leg-split completion signal now queued: it
+holds if the harness emits it, and fails if the model must synthesise it.
+
+#### What this does to the m1 table
+
+Less than the retracted headline claimed, and not nothing.
+
+- **The audit's work was sound.** 14 of 15 findings defensible, evidence quoted
+  verbatim. "Fabricated the evidence trail" is withdrawn: the quotes are real
+  and locatable, the pointers are unresolvable by a third party.
+- **The report is still not deliverable.** A citation trail no reader outside
+  the run can follow is not provenance, and §10's negligence defence rests on
+  exactly that trail. FAIL is the right verdict for the wrong reason.
+- **"The m1 table measures format compliance more than work" is withdrawn.**
+  It was drawn from this review. What the run shows is a citation-hygiene
+  failure, not a work failure. Whether that holds across the other eight is
+  open and untested.
+
+#### Admissibility is a real gate, and it is not decidable syntactically
+
+This run is the proof: **the syntactic check passed 23 of 23 and the document
+was still not reviewable.** Whether a report can be reviewed at all is a
+separate question from whether its findings hold, and it cannot be settled by
+code, because a citation can be well-formed, resolve to real text, and still
+not permit a reader to establish what the auditor meant.
+
+**Recommendation: a declared phase and a missing verdict, not a third process.**
+
+The reviewer already held everything it needed to say "I cannot tell what
+coordinate system this is." It did not say so because §6 gave it no way to.
+All five verdicts — `[supported]`, `[overstated]`, `[understated]`,
+`[unsupported]`, `[broken citation]` — presuppose the reviewer knows what the
+citation points at. Add the sixth:
+
+> `[indeterminate]` — the citation is well-formed and resolves to text, and the
+> referent it indexes cannot be established from the report.
+
+With that verdict this run reports 23 indeterminate citations and INADMISSIBLE,
+instead of 14 unsupported and FAIL. That is the correct reading, and it costs
+one table row.
+
+Then make admissibility **§4.0**, before any finding is checked, with the
+authority to end the run: state the citation scheme the report uses and whether
+it can be established; if it cannot, stop and say so. It sits naturally beside
+§4's existing "close the review surface" phase, needs no second scenario,
+runner or method document, and shares the read the reviewer must do anyway.
+
+**Why not a separate pre-screen process.** The independence it appears to buy
+is not independence, it is a fresh context — and a fresh context is precisely
+what loses the reading being judged. The cost is a new method document, a new
+output contract and a new failure surface, against a gate that is one phase and
+one verdict inside a process that already reads the report.
+
+**The cheap half belongs on the audit side.** The auditor *did* declare its
+scheme — in prose, in the coverage statement, at the end, far from the
+citations it governs. METHOD §5 should require the citation scheme to be stated
+where the citations are used, in one line. Admissibility is not only "can the
+information be extracted"; it is "is the coordinate system declared".
+
+#### Two confounds, both real
+
+**The method is missing.** REVIEW.md §3 makes
+`working_record/method_as_delivered.md` a mandated input, and it is absent from
+this run. So it cannot be determined whether the auditor violated §5 or
+followed a version that specified claim indices. **The reviewer noted the file
+was missing and returned a verdict anyway** — a review inadmissible under its
+own method, delivering a number. §4.0 would have caught its own case.
+
+**The models differ**, qwen audited and grok reviewed. That is the documented
+policy and it worked as intended. A same-model reviewer might have shared the
+claim-ordinal convention and read the citations as the auditor meant them —
+passing a report whose trail no third party can follow. Cross-model review is
+what exposed this, and this is evidence for the policy rather than against it.
+
+### The sweep answered it: six of 29, and quotes hold across legs — 2026-08-26
+
+The new resolver was run over every report on disk, 29 runs, no model calls.
+
+**Six runs carry at least one reference past the end of its document**, and
+they are not one model's problem: `s4_qwen_1`, `m1_grok_1`, `m1_grok_2`,
+`m1_qwen_2`, `cm_audit_grok`, `t3_grok_1`. Three of the nine m1 runs, including
+two grok runs that passed.
+
+**But the rate separates them, and the rate is the finding.** `m1_grok_1` has
+one bad reference in 42, `doc7:94` against a 45-line document — a typo.
+`m1_qwen_2` has four of its seven doc2 references past the end of a five-line
+file, topping out at 13, against a coverage statement declaring "doc2: 13
+claims". One is a slip; the other is a different coordinate system. §4.0 divides
+on the rate for this reason, and `by_document` in the `scheme` block is what it
+divides on.
+
+**Quote resolution across all 29 runs: 692 of 733, 94%.** This settles the open
+risk that would have blocked the citation-contract change: quote accuracy does
+**not** degrade across legs. `m1_qwen_2` was single-leg, so its verbatim
+evidence proved nothing about multi-leg runs; the multi-leg grok runs resolve at
+the same rate (`m1_grok_3` 33/33, `m1_grok_2` 56/58, `m1_qwen_1` 70/73).
+
+**One caveat that shapes the METHOD pass.** Quote density varies enormously —
+`m1_qwen_1` carries 73 quoted spans, `s1_grok_1` carries five. A report can be
+line-heavy and quote-light, so the quote channel is only reliable once METHOD
+§5 asks for it. Today it asks for line numbers, which is why some reports barely
+quote at all.
+
+### Do this first — revised 2026-08-26
+
+**Do not review the other eight runs yet.** That was the instruction here, and
+running it against the current reviewer would produce eight more numbers with
+the same defect. Fix the instrument first, in this order:
+
+1. **Add `[indeterminate]` to REVIEW.md §6, and admissibility as §4.0** with
+   the authority to end the run. See the retraction above.
+2. **Decide the citation contract in METHOD §5** — the one line stating which
+   coordinate system the report uses, and whether line numbers are asked for at
+   all given that the subagent boundary strips them from most documents.
+3. **Re-review `m1_qwen_2`.** Its `review/` directory must be moved or deleted
+   first; the runner refuses a second review in place, deliberately.
+4. **Then the other eight**, `workflows/audit_review/runner.py --run <dir>
+   --model measure/models/grok_4p6.yaml`, about five minutes each.
+
+Only then decide what the m1 table means. Options are unchanged: report
+supported-ratio alongside the existing vector, gate on it, or retire the
+campaign.
 
 ### The rest, in rough order
 
