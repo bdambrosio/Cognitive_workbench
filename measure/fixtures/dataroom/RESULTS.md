@@ -330,6 +330,15 @@ What it touches:
 - **The brief** says "Produce both deliverables together in your final reply."
 - **`score.py:split_deliverables`** becomes unnecessary for runs made after the
   change, and must keep working for the ones already on disk.
+- **The runner should stop judging completeness.** `GAP_MARK not in reply` is
+  there because "done is a deliverable, not an exit reason" — an arm once wrote
+  "I will now begin working the priority order", ended the turn, and scored as
+  complete. That check belongs in the scorer, which already has the criteria: a
+  241-word report with zero findings fails `_FINDING_RE`, fails Tier 1, fails
+  the threshold. The runner drives a fixed protocol and accepts what comes
+  back; the scorer judges. Truncation has a structural signal already —
+  `backend.last_finish_reason` — and needs no sentinel in the text, though note
+  `backend.py:456` leaves it None on the legacy cloud route.
 
 **Keep `=== GAP MAP ===` as a fallback rather than deleting it.** An arm will
 sometimes produce both documents in one leg regardless of instruction, and a
@@ -340,6 +349,36 @@ rather than a marker fix: `=== LIMITATIONS ===` is a section inside the report
 and `=== CLAIM SURFACE ===` lives in the working log mid-engagement. Neither is
 a boundary between deliverables, so leg-splitting does not reach them. Their
 whitespace fragility was fixed separately in `5a3945ce`.
+
+### And the half that makes the leg split worth doing: check §15's elements
+
+**A marker is not evidence that a Gap Map was produced.** `=== GAP MAP ===`
+currently does three jobs and is competent at one. It delimits two documents in
+one reply — fine. It stands in for "the engagement finished" — weak. And it is
+taken as proof a valid Gap Map followed, which it does not attempt: `score.py`
+checks that the marker appeared and counts the words after it. That is all.
+
+§15 requires six elements: target name and a one-line description, the §9
+recommendation, three to five key items, a coverage line, the report-link line,
+and the scope disclaimer. **None is checked.** A run emitting the marker
+followed by 150 words of anything scores "Gap Map produced".
+
+Measured 2026-08-25 across 25 runs: **two shipped a Gap Map missing a required
+element** — one with no report-link line, one with no scope disclaimer — and
+both passed the threshold.
+
+When the Gap Map is its own leg the reply IS the Gap Map, and the question
+stops being "is the marker there" and becomes "does this document have its six
+elements". That is checkable, and it is the same move as §12a's sign-off: stop
+detecting compliance with a string, test the thing itself.
+
+**Write the test against §15's shape, not §16's.** A first attempt at this
+check reported nine of twenty-five Gap Maps as missing the recommendation. All
+nine were one arm, and all nine were wrong: `recommendation_of` requires the
+term to open the document, because §16 puts the recommendation first in a
+REPORT. §15 puts target identity first, so that arm's recommendation sits on
+line 2 and the report-shaped locator could not see it. The measurement was
+worse than the thing it measured. A Gap Map check needs its own locator.
 
 ### Also queued, smaller
 
