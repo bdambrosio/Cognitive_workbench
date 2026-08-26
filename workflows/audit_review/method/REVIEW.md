@@ -82,6 +82,37 @@ resolvable, and end the review there. **Do not enumerate the findings, do not
 check them, and do not report a supported ratio.** The ratio is the thing that
 gets quoted, and a ratio computed over a misreading is worse than no ratio.
 
+**The second question: is there anything to check?** A citation you cannot
+place is one failure. A field that cites nothing at all is another, and on the
+page the two look alike — both read as evidence.
+
+**What you are given.** `review/conformance.json` carries `evidence fields` and
+`evidence fields pointing nowhere`: every Claim, Evidence or Basis field that
+carries neither a reference nor a quote. `Evidence (doc3, CI/CD & Testing): 12
+unit tests, all in test/utils/` names a document, names a section of it, and
+then writes prose. A reader has nothing to search for. The audit's METHOD §5 is
+explicit about why that is not a citation: "without both, a reader cannot check
+the finding and the practice cannot defend it."
+
+**One legitimate case, and only one.** A field stating that no evidence exists
+— "no source code provided to verify exact version" — has nothing to cite.
+Expect one or two in a report and do not count them against it.
+
+**Rate and clustering, as above.** These are different cases:
+
+- **A few fields among many.** The findings they belong to are `[uncited]`,
+  listed as exceptions, and the rest of the review proceeds normally.
+- **A material share of the report's evidence fields.** The report cannot be
+  checked, which is an admissibility failure exactly like the first question's.
+  Stop, and say how many findings that leaves unverifiable.
+
+**Where the second question came from.** On 2026-08-26 a report with three of
+its eighteen evidence fields pointing nowhere was reviewed **ADMISSIBLE,
+supported 10 of 10, PASS**. The reviewer wrote "cited lines say what the
+findings say they say", which was true: it checked the twelve references that
+existed while a sixth of the evidence carried none. Nothing in this document
+had told it to look.
+
 **Where this rule came from.** On 2026-08-26 a report citing claim ordinals was
 read as though it cited lines. Every citation parsed; there was no syntactic
 complaint available. The review reported supported 1 of 15 and FAIL on a report
@@ -180,9 +211,17 @@ serious one is the exception and the other is a note within it.
 | `[unsupported]` | The lines do not bear on the claim, or say something else |
 | `[broken citation]` | The reference does not resolve in the materials |
 | `[indeterminate]` | The citation is well-formed and resolves to text, and the referent it indexes cannot be established from the report |
+| `[uncited]` | The finding's evidence names no location — no reference and no quote — so there is nothing to check |
 
 `[supported]` is not an exception and needs no Exception block — it goes in the
 count and nothing else. Only the other five are written out.
+
+**`[uncited]`, `[broken citation]` and `[indeterminate]` are three different
+failures, and the difference is what the reader can do.** `[broken citation]`
+has a reference that does not resolve — the reader looks and finds nothing.
+`[indeterminate]` has one that resolves to text the reader cannot place.
+`[uncited]` has no reference at all: the field names a document, or a section
+of one, and then writes prose, so there is nowhere to look.
 
 **`[indeterminate]` is not a softer `[unsupported]`.** `[unsupported]` says you
 read the cited line and it does not bear on the claim. `[indeterminate]` says
@@ -271,11 +310,12 @@ findings that came back `[supported]`. Every other verdict is an exception and
 is listed.
 
 **Exceptions by verdict** — how many `[overstated]`, `[understated]`,
-`[unsupported]`, `[broken citation]`, `[indeterminate]`.
+`[unsupported]`, `[broken citation]`, `[indeterminate]`, `[uncited]`.
 
-**PASS or FAIL.** FAIL if there is any `[unsupported]`, any `[broken citation]`
-or any `[indeterminate]`. Those two mean a finding is not defensible from what it
-cites, which is the one thing this review exists to catch. `[overstated]` and
+**PASS or FAIL.** FAIL if there is any `[unsupported]`, `[broken citation]`,
+`[indeterminate]` or `[uncited]`. All four mean a finding is not defensible
+from what it cites — whether the citation is wrong, unplaceable, or absent —
+which is the one thing this review exists to catch. `[overstated]` and
 `[understated]` are calibration: reported, never fatal, because a verdict one
 step off is a different problem from a finding with no support.
 

@@ -445,6 +445,12 @@ each part was found but never together in one document — fragments from two
 documents joined into a sentence that reads as continuous evidence. `miss`
 means the words are not in the materials as written.
 
+`review/conformance.json` holds the checks that need no answer key, including
+`evidence fields` and `evidence fields pointing nowhere` — the fields carrying
+neither a reference nor a quote, which §4.0's second question turns on. A field
+that names a document and then writes prose gives a reader nothing to search
+for, and it is invisible in the citation counts because it makes no citation.
+
 Do not re-fetch what it has already resolved, and do not assess support for a
 finding whose citation is broken. **It is not the whole of the materials.** A
 reference it does not cover — an evidence document named by section rather than
