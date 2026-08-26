@@ -195,6 +195,54 @@ def verify_served_model(model: Dict[str, Any], timeout: float = 10.0
             "expected": expect}
 
 
+def git_rev(path: Path) -> Optional[str]:
+    """The commit a tree is at, or None if it is not a repository.
+
+    Used for both the target and this repo. A target that moves under a
+    delivered report makes every citation in it resolve against a tree the
+    report never saw, and nothing downstream can detect that from a path.
+    """
+    import subprocess
+    try:
+        r = subprocess.run(["git", "-C", str(path), "rev-parse", "HEAD"],
+                           capture_output=True, text=True, timeout=10)
+        return r.stdout.strip() or None if r.returncode == 0 else None
+    except Exception as e:                                     # noqa: BLE001
+        logger.warning("git rev for %s: %s", path, e)
+        return None
+
+
+def files_read(traces: Path, target: Path) -> Dict[str, str]:
+    """Content hashes for the target files this run actually opened.
+
+    A commit pin says the tree moved. This says whether it moved under a file
+    the report cites, which is the question a reader of the report has.
+
+    Derived rather than authored: every evidence request already records the
+    files it opened, so this reads the record the run produced instead of
+    asking the auditor to declare anything.
+    """
+    import hashlib
+    import re as _re
+    out: Dict[str, str] = {}
+    if not traces.is_dir() or not target.is_dir():
+        return out
+    names = set()
+    for t in sorted(traces.glob("*.txt")):
+        try:
+            names.update(_re.findall(r'"file":\s*"([^"]+)"', t.read_text(errors="replace")))
+        except OSError as e:
+            logger.warning("manifest: unreadable trace %s (%s)", t, e)
+    for n in sorted(names):
+        f = target / n
+        if f.is_file():
+            try:
+                out[n] = hashlib.sha256(f.read_bytes()).hexdigest()[:16]
+            except OSError as e:
+                logger.warning("manifest: unreadable target file %s (%s)", f, e)
+    return out
+
+
 def build_config(world: str, model_path: Optional[Path],
                  workflow_mode: Optional[bool] = None,
                  temperature: Optional[float] = None,
@@ -495,6 +543,16 @@ def main() -> int:
         (record / "brief.md").write_text(text_first_leg, encoding="utf-8")
     except Exception as e:                                     # noqa: BLE001
         logger.warning("working record: brief not copied (%s)", e)
+
+    # THE SCENARIO AS RESOLVED, not the file. The model config replaces a block
+    # at runtime, and what shaped the run is the result. omitted_tools, the
+    # geofence and workflow_mode all decide what the auditor could do, and
+    # "why did you not check X" may have the answer "that tool was not bound".
+    try:
+        (record / "scenario_as_used.json").write_text(
+            json.dumps(cfg, indent=2, default=str), encoding="utf-8")
+    except Exception as e:                                     # noqa: BLE001
+        logger.warning("working record: scenario not copied (%s)", e)
     for src in (world_dir / "memory" / "reasoning_trace.jsonl",
                 world_dir / "inspect_traces"):
         if not src.exists():
@@ -531,6 +589,14 @@ def main() -> int:
         "llm_config": cfg.get("llm_config"),
         "served_model_check": served_check,
         "external_repo": cfg.get("external_repo"),
+        # A PATH IS NOT A PIN. run_meta used to record where the target was and
+        # not what it contained, so a citation could later resolve against a
+        # tree the report never saw, silently. The commit says the tree moved;
+        # the manifest below says whether it moved under a file this run read.
+        "target_rev": git_rev(Path(cfg.get("external_repo") or ".")),
+        "harness_rev": git_rev(REPO),
+        "files_read": files_read(record / "inspect_traces",
+                                 Path(cfg.get("external_repo") or ".")),
         "legs": legs,
         "wall_clock_s": wall,
         "error": error,
