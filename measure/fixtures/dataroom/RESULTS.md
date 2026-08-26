@@ -562,12 +562,178 @@ one `[understated]` before the change and 15 of 15 with none after, on identical
 text with the same model. `[understated]` is calibration and cannot move a
 threshold, and PASS held both times — but it is a one-finding move on identical
 input, which is the instability this file already documents for the grader. The
-precision check (three admissibility legs on one report) has **not** been run.
+precision check has since been run; see the next section.
 
 **Qwen's ordinals look like the old METHOD, not the model.** The same
 Qwen3.8-27B that cited claim ordinals in `m1_qwen_2` cited 58 line references
 with zero overruns under the current METHOD. n=1, and worth one more run before
 it is believed.
+
+### The admissibility verdict reproduces — 2026-08-26
+
+Three independent reviews of the same report (`m1_qwen_2`), same reviewer
+model (grok-4.6), each from a clean copy of the run directory with `review/`
+and `review.pre-admissibility/` removed so no reviewer could see a predecessor
+through `inspect`. Archived under `results/precision_m1_qwen_2/`.
+
+| leg | verdict | findings enumerated | legs | wall |
+|---|---|---|---|---|
+| 1 (shipped) | **INADMISSIBLE** | 0 | 2 | 94s |
+| 2 | **INADMISSIBLE** | 0 | 2 | 247s |
+| 3 | **INADMISSIBLE** | 0 | 2 | 380s |
+
+**3 of 3, and the reasoning reproduces too, not just the verdict.** The runner
+hands the reviewer one mechanical signal — four integers exceed their document.
+All three legs went looking for corroboration and all three found the same
+thing without being pointed at it: the report's own coverage line says
+"doc2: 13", and 13 is the largest integer cited for a five-line file. Leg 1 and
+leg 3 each added the two-schemes-at-once argument — that the three doc2
+integers falling inside the file cannot be lines while the other four are
+ordinals. Each leg stopped in two turns, enumerated nothing, and reported no
+ratio.
+
+**The mechanical layer is byte-identical across legs.** `citations.json` and
+`conformance.json` hash the same in all three. That is expected — they are file
+operations — but it means the only thing varying across these rows is the
+judgement, which is what the check was for.
+
+**What this does not establish.** One report, one direction. A verdict that
+reproduces on a report where the signal is loud says nothing about a report
+where four of seven references overrun by one line instead of eight. The false
+*positive* — a gate firing on an admissible report — remains untested, and
+`w1_grok_2` (41 refs, 0 overruns) passing once is the only evidence against it.
+
+**Wall clock spread 4x on identical input**: 94s, 247s, 380s, same two-leg
+shape and same three `inspect` calls each. Cost per review is not predictable
+from the input; budget from the slow end.
+
+### METHOD §5 was rewritten and reverted the same day — 2026-08-26
+
+**What was changed.** §5's citation contract went from `document:lines` on both
+halves of every finding to document plus verbatim quote, on the argument that a
+line number is not copyable at generation time: the inspect subagent numbers
+the lines it reads, then answers in prose with the numbers gone, so writing one
+means reconstructing it. Quotes were measured to resolve 692/733 across 29
+reports where line references overran their document in 6 of 29 runs.
+
+**Why it was reverted.** Two audits under the new contract, one grok and one
+Qwen3.8-27B on the fixture, against the two runs it replaced:
+
+| report | evidence fields | resolving quote | quote that fails | line ref only | **nothing** |
+|---|---|---|---|---|---|
+| `q1_grok_1` new §5 | 37 | 33 | 0 | 1 | **3** |
+| `q1_qwen_1` new §5 | 33 | 16 | 7 | 0 | **10** |
+| `w1_grok_2` §5 as it stands | 29 | 14 | 0 | 14 | **1** |
+| `w1_qwen_1` §5 as it stands | 45 | 34 | 2 | 8 | **1** |
+
+The two `nothing` cells in the bottom rows are fields asserting that no
+evidence exists — "no source code provided to verify exact version" — which is
+the one legitimate case. The ten in `q1_qwen_1` are not: `Evidence (doc4):
+Single standard-1x dyno, no read replicas, no separate DB instance` had carried
+`doc4:5`. **Seventeen of its 33 evidence fields, 52%, gave a reader nothing to
+search for.**
+
+**The mechanism, and it is general.** `Evidence (doc4:17–19)` has a slot that
+looks wrong when empty. `Evidence (doc4)` looks complete while naming a whole
+document. A required token became an encouraged behaviour, because a quote is
+content and not a slot. Grok kept quoting; Qwen took the format at its word.
+
+**Three further findings from the excursion.**
+
+- **The claim-ordinal defect relocated rather than being fixed** — Qwen wrote
+  `Claim (doc9, claim 44)`, moving the ordinal into the document slot — and
+  §4.0 went blind to it, because that report emits zero `docN:NN` references
+  for the gate to test.
+- **The premise was false where it mattered.** Cross-checking the two channels
+  against each other on the runs that carry both, the quoted text sits inside
+  the lines the same field cites in **28 of 29** and **53 of 55** cases, and
+  every exception is a paraphrase rather than a misdirected reference. There
+  was no epidemic of wrong-but-resolving citations.
+- **"A quote is text you are looking at" is false across a leg boundary.**
+  Qwen's seven failing quotes are all reconstructions — `"database backed up
+  daily to Heroku managed storage"` against doc9's `"The database is backed up
+  daily to Heroku's managed storage"`. That is the same failure line numbers
+  have. Grok resolved 64 of 64. The channel's reliability is model-dependent,
+  so a quote-only contract measures transcription discipline as much as audit
+  work.
+
+**The rule this cost.** A citation that resolves to the wrong line is what the
+review layer exists to catch — REVIEW.md §6 decides whether a cited line
+SUPPORTS a claim, and §4.0 stopped `m1_qwen_2` for exactly this class three
+times out of three the same morning. **Do not weaken a base-instrument
+requirement to solve a review-layer problem.** The defect was already handled
+in the layer that owns it.
+
+**The methodological error, separately.** The new contract was validated by
+running the CHECKER over reports written under the OLD one. Every one of them
+carried line references, so the failure that appears when the pointer
+obligation is removed was structurally invisible to every measurement taken
+before the change shipped.
+
+**What was kept**, all in `workflows/audit_review/runner.py`, none of it
+touching what the auditor must produce:
+
+- **Quote marks pair in document order.** The old extractor scanned for an
+  opening mark followed by a closing one, slid past a pair too short to keep,
+  and matched from that pair's closing mark to the next pair's opening one.
+  `"Streamlined" is not a fair description of "not present."` was reported as a
+  quotation of the materials that resolved to nothing — the auditor's own prose
+  scored as fabricated evidence.
+- **Quotes are read from `Claim`, `Evidence` and `Basis` only.** `Gap:` is
+  where quoting a word back at the seller is legitimate writing. This removed
+  every false miss: five became three, and all three survivors are real
+  paraphrases.
+- **One quote, one document.** A quote resolves when some single document holds
+  every segment, not when each segment is found somewhere. Fragments from two
+  documents joined into one sentence read as continuous evidence and are true
+  of neither. It costs nothing — no quote in any report on disk needed two
+  documents — and it settles attribution without reading the citation label.
+- **`evidence fields pointing nowhere` in `conformance.json`.** The counter
+  that was missing: `resolve_citations` and `resolve_quotes` score the pointers
+  a report makes, and neither notices a field making none. `q1_qwen_1` read
+  "16 of 23 quotes resolving" beside ten fields with nothing. Nothing in
+  REVIEW.md reads this counter yet; wiring it in is a method decision and is
+  not made.
+
+### The restored instrument, verified — 2026-08-26
+
+One grok and one Qwen3.8-27B audit on the fixture after the revert, then a
+review of each. `err=None` on all four.
+
+| run | model | findings | evidence fields | line refs | broken | quotes | resolving | **pointing nowhere** |
+|---|---|---|---|---|---|---|---|---|
+| `r1_grok_1` | grok-4.6 | 12 | 46 | 47 | 1 | 53 | 53 | **0** |
+| `r1_qwen_1` | Qwen3.8-27B | 13 | 25 | 27 | 13 | 12 | 7 | **0** |
+| `w1_grok_2` | grok-4.6 | 15 | 29 | 41 | 0 | 29 | 28 | 1 |
+| `w1_qwen_1` | Qwen3.8-27B | 23 | 45 | 58 | 0 | 54 | 52 | 1 |
+
+**The verifiability requirement holds.** No evidence field on either new run
+points nowhere; the two `1`s are the legitimate case, a field stating that no
+evidence exists. The quote-only contract produced ten.
+
+**Qwen3.8-27B cannot reliably follow this METHOD, and that is the finding.**
+`r1_qwen_1` puts 13 of 27 references past the end of their document, across
+four documents at once — doc9 six of six, max cited 32 against an 11-line file;
+doc2 three of three, max 23 against five lines. The review returned
+**INADMISSIBLE** and reasoned its way there from the mechanical signal alone:
+*"doc9 topping out at 32 against the report's stated 32-claim surface. Claim
+and Evidence use the same form, so the citations cannot be read."*
+
+**This settles the open watch item, the other way.** The note carried forward
+was that Qwen cited 58 clean references on `w1_qwen_1` after citing claim
+ordinals on `m1_qwen_2`, and that if it held on a second run the original
+defect was never a model property. It did not hold. `w1_qwen_1` was the
+outlier. State it as what the evidence supports — this model does not reliably
+follow this method — rather than as a property of the model at large.
+
+**And it is the argument for the layer rule, run forward.** The defect that
+prompted rewriting §5 is real and recurs at a 48% rate on this model. The base
+instrument still requires the pointer; the review layer catches the bad
+pointer and stops the report. Removing the requirement would have hidden the
+same defect behind prose.
+
+**For this workflow, Qwen3.8-27B is not usable.** Two of its three runs on the
+current method are inadmissible.
 
 ### Two things the runs exposed
 
