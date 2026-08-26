@@ -39,13 +39,38 @@ REPO = HERE.parent.parent.parent
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "src"))
 
-from measure.trace import load_turns                            # noqa: E402
+from measure.trace import load_turns, load_trace                # noqa: E402
 
 logger = logging.getLogger("dataroom.score")
 
 # Where a run's world lives. Same layout load_turns walks; named here so the
 # subagent trace files can be found without a second convention.
 SCEN = REPO / "scenarios"
+
+# WHERE THIS RUN'S RECORD LIVES. Set once from the command line: a run
+# directory's working_record when --run is given, the live world otherwise.
+#
+# A run leaves an archive precisely so it survives the world's deletion (§14),
+# and until now nothing read it — score.py has always read `scenarios/<world>/`,
+# so a discarded world took its run's scorability with it. That is also the
+# property a scoring WORKFLOW would need: it would be handed the run directory
+# as its target, the way a data room is handed to an audit.
+_RECORD: Optional[Path] = None
+
+
+def _trace_file(world: str, agent: str) -> Path:
+    from measure.trace import trace_path
+    return (_RECORD / "reasoning_trace.jsonl") if _RECORD \
+        else trace_path(world, agent)
+
+
+def _traces_dir(world: str, agent: str) -> Path:
+    return (_RECORD / "inspect_traces") if _RECORD \
+        else (SCEN / world / agent / "inspect_traces")
+
+
+def _turns(world: str, agent: str) -> List["Turn"]:
+    return load_trace(_trace_file(world, agent))
 
 CORPUS_DOCS = 9
 
@@ -233,7 +258,7 @@ def claim_surface(world: str, agent: str) -> Dict[str, Any]:
         # Marker present but no count is not a closure, same rule as before.
         return int(m.group(1).replace(",", "")) if m else None
 
-    turns = load_turns(world, agent)
+    turns = _turns(world, agent)
     for i, t in enumerate(turns, 1):
         raw = t.raw.get("raw_response") or ""
         # THE AGENT'S OWN WORDS FIRST, then anything it was handed.
@@ -313,7 +338,7 @@ def read_memo(world: str, agent: str) -> Optional[str]:
     count them twice and inflate recall. It is reported separately — presence,
     length and §15 elements — rather than scored.
     """
-    all_turns = load_turns(world, agent)
+    all_turns = _turns(world, agent)
     gap_leg = next((i for i, t in enumerate(all_turns)
                     if GAP_MAP_REQUEST_MARK in (t.raw.get("user_input") or "")),
                    None)
@@ -373,7 +398,7 @@ def read_gap_map(world: str, agent: str) -> Optional[str]:
     Same principle as read_memo: the runner asked for this turn, so the record
     identifies it without anything being parsed out of the model's prose.
     """
-    for t in load_turns(world, agent):
+    for t in _turns(world, agent):
         if GAP_MAP_REQUEST_MARK in (t.raw.get("user_input") or ""):
             return str(t.raw.get("raw_response") or "").strip() or None
     return None
@@ -414,7 +439,7 @@ def subagent_compliance(world: str, agent: str) -> Dict[str, Any]:
     Mechanical: reads the trace files the subagents already write. No model,
     no network, and no change to anything the agent sees.
     """
-    d = (SCEN / world / agent / "inspect_traces")
+    d = _traces_dir(world, agent)
     calls, empty, by_exit = 0, 0, {}
     if not d.is_dir():
         return {"calls": 0, "empty": 0, "by_exit": {}}
@@ -437,7 +462,7 @@ def subagent_compliance(world: str, agent: str) -> Dict[str, Any]:
 
 def trace_facts(world: str, agent: str) -> Dict[str, Any]:
     """Everything computable without a model."""
-    turns = load_turns(world, agent)
+    turns = _turns(world, agent)
     log = "\n".join(t.working_log for t in turns)
     docs = set(re.findall(r'doc(\d)_[a-z0-9_]+\.md', log))
     return {
@@ -623,11 +648,27 @@ def main() -> int:
     ap = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--world", required=True)
+    ap.add_argument("--world", default=None,
+                    help="score from the live world in scenarios/. Mutually "
+                         "exclusive with --run")
+    ap.add_argument("--run", type=Path, default=None,
+                    help="score from a run directory's archived working "
+                         "record. Works after the world is discarded, which "
+                         "is what the archive is for")
     ap.add_argument("--agent", default="Jill")
     ap.add_argument("--dry-run", action="store_true",
                     help="mechanical metrics only; no LLM call, no cost")
     args = ap.parse_args()
+
+    global _RECORD
+    if bool(args.world) == bool(args.run):
+        raise SystemExit("give exactly one of --world or --run")
+    if args.run:
+        _RECORD = args.run.resolve() / "working_record"
+        if not (_RECORD / "reasoning_trace.jsonl").is_file():
+            raise SystemExit(f"{args.run}: no working_record/reasoning_trace.jsonl")
+        # Only for display; nothing below reads the world when _RECORD is set.
+        args.world = args.run.resolve().name
 
     facts = trace_facts(args.world, args.agent)
     memo = read_memo(args.world, args.agent)

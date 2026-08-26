@@ -146,12 +146,21 @@ def trace_path(world: str, agent: str) -> Path:
 
 
 def load_turns(world: str, agent: str) -> List[Turn]:
-    """All turns for one (world, agent), oldest first.
+    """All turns for one (world, agent), oldest first, from the live world."""
+    return load_trace(trace_path(world, agent))
+
+
+def load_trace(p: Path) -> List[Turn]:
+    """All turns in one trace file, oldest first.
+
+    Split out from load_turns so a caller can read an ARCHIVED trace — the copy
+    a run leaves in its working record — rather than only the live world. A run
+    that cannot be read after its world is discarded is not an archive, and
+    METHOD §14 says the world is discarded.
 
     A truncated tail row is skipped rather than fatal — the run may still be
     live and writing.
     """
-    p = trace_path(world, agent)
     if not p.exists():
         raise SystemExit(f"no trace at {p}")
 
