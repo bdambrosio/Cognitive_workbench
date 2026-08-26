@@ -1,0 +1,190 @@
+{
+  "citations": [
+    {
+      "cited": "doc1:19",
+      "document": "doc1_seller_listing_description.md",
+      "line": 19,
+      "through": 19,
+      "resolved": true,
+      "text": "19: *   **Reliability:** 99.9% uptime monitoring and daily automated database backups with 30-day retention."
+    },
+    {
+      "cited": "doc9:10",
+      "document": "doc9_seller_s_technical_claims_verbatim.md",
+      "line": 10,
+      "through": 10,
+      "resolved": true,
+      "text": "10: *   \"The database is backed up daily to Heroku's managed storage with 30-day retention.\""
+    },
+    {
+      "cited": "doc2:6",
+      "document": "doc2",
+      "line": 6,
+      "through": 6,
+      "resolved": false,
+      "why": "doc2_tech_stack_description_as_provided_by_se.md has 5 lines"
+    },
+    {
+      "cited": "doc1:18",
+      "document": "doc1_seller_listing_description.md",
+      "line": 18,
+      "through": 18,
+      "resolved": true,
+      "text": "18: *   **Scalable Architecture:** Built on a modern Rails 7 stack with platform-level redundancy and automatic failover."
+    },
+    {
+      "cited": "doc9:2",
+      "document": "doc9_seller_s_technical_claims_verbatim.md",
+      "line": 2,
+      "through": 2,
+      "resolved": true,
+      "text": "2: "
+    },
+    {
+      "cited": "doc1:17",
+      "document": "doc1_seller_listing_description.md",
+      "line": 17,
+      "through": 17,
+      "resolved": true,
+      "text": "17: **Technical Highlights**"
+    },
+    {
+      "cited": "doc2:2",
+      "document": "doc2_tech_stack_description_as_provided_by_se.md",
+      "line": 2,
+      "through": 2,
+      "resolved": true,
+      "text": "2: "
+    },
+    {
+      "cited": "doc9:1",
+      "document": "doc9_seller_s_technical_claims_verbatim.md",
+      "line": 1,
+      "through": 1,
+      "resolved": true,
+      "text": "1: # DOCUMENT 9: SELLER'S TECHNICAL CLAIMS (VERBATIM)"
+    },
+    {
+      "cited": "doc2:13",
+      "document": "doc2",
+      "line": 13,
+      "through": 13,
+      "resolved": false,
+      "why": "doc2_tech_stack_description_as_provided_by_se.md has 5 lines"
+    },
+    {
+      "cited": "doc1:24",
+      "document": "doc1_seller_listing_description.md",
+      "line": 24,
+      "through": 24,
+      "resolved": true,
+      "text": "24: **Why FlowMetrics?**"
+    },
+    {
+      "cited": "doc9:4",
+      "document": "doc9_seller_s_technical_claims_verbatim.md",
+      "line": 4,
+      "through": 4,
+      "resolved": true,
+      "text": "4: "
+    },
+    {
+      "cited": "doc1:25",
+      "document": "doc1_seller_listing_description.md",
+      "line": 25,
+      "through": 25,
+      "resolved": true,
+      "text": "25: We have built a robust, defensible product that solves a critical pain point for e-commerce sellers: visibility into product performance and pricing dynamics. The technology is proven, the customers are engaged, and the revenue is recurring. We are looking for a strategic partner to take FlowMetrics to the next level."
+    },
+    {
+      "cited": "doc9:6",
+      "document": "doc9_seller_s_technical_claims_verbatim.md",
+      "line": 6,
+      "through": 6,
+      "resolved": true,
+      "text": "6: *   \"We monitor uptime at 99.9% and maintain daily automated database backups.\""
+    },
+    {
+      "cited": "doc2:12",
+      "document": "doc2",
+      "line": 12,
+      "through": 12,
+      "resolved": false,
+      "why": "doc2_tech_stack_description_as_provided_by_se.md has 5 lines"
+    },
+    {
+      "cited": "doc1:5",
+      "document": "doc1_seller_listing_description.md",
+      "line": 5,
+      "through": 5,
+      "resolved": true,
+      "text": "5: **Asking Price:** $480,000 (12x blended MRR)"
+    },
+    {
+      "cited": "doc1:12",
+      "document": "doc1_seller_listing_description.md",
+      "line": 12,
+      "through": 12,
+      "resolved": true,
+      "text": "12: *   **Blended MRR:** $40,000"
+    },
+    {
+      "cited": "doc1:3",
+      "document": "doc1_seller_listing_description.md",
+      "line": 3,
+      "through": 3,
+      "resolved": true,
+      "text": "3: **FlowMetrics \u2014 B2B E-Commerce Analytics Platform**"
+    },
+    {
+      "cited": "doc1:13",
+      "document": "doc1_seller_listing_description.md",
+      "line": 13,
+      "through": 13,
+      "resolved": true,
+      "text": "13: *   **Active Customers:** 120"
+    },
+    {
+      "cited": "doc9:5",
+      "document": "doc9_seller_s_technical_claims_verbatim.md",
+      "line": 5,
+      "through": 5,
+      "resolved": true,
+      "text": "5: *   \"The system has redundancy and automatic failover through Heroku's platform-level process management.\""
+    },
+    {
+      "cited": "doc1:10",
+      "document": "doc1_seller_listing_description.md",
+      "line": 10,
+      "through": 10,
+      "resolved": true,
+      "text": "10: "
+    },
+    {
+      "cited": "doc2:4",
+      "document": "doc2_tech_stack_description_as_provided_by_se.md",
+      "line": 4,
+      "through": 4,
+      "resolved": true,
+      "text": "4: "
+    },
+    {
+      "cited": "doc2:11",
+      "document": "doc2",
+      "line": 11,
+      "through": 11,
+      "resolved": false,
+      "why": "doc2_tech_stack_description_as_provided_by_se.md has 5 lines"
+    },
+    {
+      "cited": "doc2:3",
+      "document": "doc2_tech_stack_description_as_provided_by_se.md",
+      "line": 3,
+      "through": 3,
+      "resolved": true,
+      "text": "3: FlowMetrics is built on a standard, modern SaaS stack designed for reliability and ease of maintenance. The core application is a Rails 7 application hosted on Heroku, which provides automatic scaling and failover capabilities at the platform level. This ensures that the application remains available even under varying load conditions, with no manual intervention required for routine operations."
+    }
+  ],
+  "total": 23,
+  "broken": 4
+}

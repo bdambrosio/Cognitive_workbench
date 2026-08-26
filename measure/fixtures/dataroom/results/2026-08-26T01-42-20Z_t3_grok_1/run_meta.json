@@ -1,0 +1,62 @@
+{
+  "world": "t3_grok_1",
+  "model_config": "measure/models/grok_4p6.yaml",
+  "workflow_mode": true,
+  "react_temperature": 0.7,
+  "react_max_tokens": 8192,
+  "resolved_model": "grok-4.6",
+  "resolved_temperature": 0.5,
+  "top_p": 0.95,
+  "llm_config": {
+    "sgl_model_path": null,
+    "reasoning_parser": null,
+    "server": "local",
+    "model": "grok-4.6",
+    "vllm_url": "https://api.x.ai/v1",
+    "api_key": "XAI_API_KEY",
+    "is_reasoning_model": true,
+    "reasoning_effort": "low"
+  },
+  "served_model_check": {
+    "checked": false,
+    "reason": "cloud model \u2014 nothing to interrogate",
+    "served": "grok-4.6"
+  },
+  "external_repo": "/home/bruce/Downloads/Cognitive_workbench/measure/fixtures/dataroom/corpus",
+  "target_rev": "4b60716dc43d478e337690b2c3f1bb7453f7d60a",
+  "harness_rev": "4b60716dc43d478e337690b2c3f1bb7453f7d60a",
+  "files_read": {
+    "doc1_seller_listing_description.md": "841f143530d3d2e8",
+    "doc2_tech_stack_description_as_provided_by_se.md": "4a5ca3d305fbb35c",
+    "doc3_git_history_summary.md": "59dfc92bad336208",
+    "doc4_infrastructure_config.md": "7fcc4e73582dcc8c",
+    "doc5_stripe_export_summary.md": "3d2f6ad5569b8fba",
+    "doc6_crm_export_summary.md": "9b3c9efd6de7c154",
+    "doc7_customer_contracts_summary.md": "ba0a2c08168ea435",
+    "doc8_external_dependency_list.md": "6ede605e66f0ebc6",
+    "doc9_seller_s_technical_claims_verbatim.md": "33e91c15d7f35934"
+  },
+  "legs": [
+    {
+      "leg": 1,
+      "sent": "The target is the data room bound to inspect_external: nine\ndocuments for a smal",
+      "exit_reason": "yield",
+      "reply_chars": 195
+    },
+    {
+      "leg": 2,
+      "sent": "continue\n\n[engagement state, recorded by the client's process \u2014 leg 2 of 25, 2 m",
+      "exit_reason": "respond",
+      "reply_chars": 7095
+    },
+    {
+      "leg": 3,
+      "sent": "The report is received. Now the Gap Map, per \u00a715. The whole reply is the Gap Map",
+      "exit_reason": "respond",
+      "reply_chars": 1103
+    }
+  ],
+  "wall_clock_s": 261.9,
+  "error": null,
+  "captured_at_utc": "2026-08-26T01-42-20Z"
+}
