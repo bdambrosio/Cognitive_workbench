@@ -1,0 +1,45 @@
+# Nemotron-3-Super-120B-A12B on DeepInfra, direct.
+#
+# WHY THIS EXISTS ALONGSIDE nemotron_super.yaml. That file reaches the same
+# weights through OpenRouter with `provider.order` pinned to DeepInfra. Same
+# model, one more hop, and the hop is a party that can reroute, rate-limit or
+# re-serve under its own id. Direct is one fewer thing to explain when a row
+# looks wrong.
+#
+# TEMPERATURE resolves through the substring key `nemotron-3-super` in
+# src/chat/model_params.py to 1.0, the publisher's agentic recommendation —
+# the same value the OpenRouter route gets, because those keys are
+# provider-spelling-agnostic on purpose. Nothing new is decided here.
+#
+# PROBED BEFORE RUNNING, with the real react-shaped request (system + user +
+# response_format=json_schema + max_tokens + temperature + top_p), not a
+# hello-world. Three things it established:
+#
+#  - `response_format: json_schema` is accepted, HTTP 200. That is the
+#    constraint that stopped luna emitting its ANSWER as JSON instead of an
+#    action (160 `unknown tool None`).
+#  - Reasoning arrives on `reasoning_content`, with `content` holding the bare
+#    action: `{"tool": "read_file"}`. Nothing leaks into the parse path.
+#  - `reasoning_effort` is a live dial, not inert: low cut completion tokens
+#    94 -> 39 on an identical prompt. On Gemma the same field is binary.
+#
+# One trap worth writing down: probe with a max_tokens a real call would use.
+# At 300 the response came back truncated mid-reasoning with prose in
+# `content`, which reads exactly like a model that cannot follow the format.
+#
+# MODEL ID IS THE DEEPINFRA SPELLING and is load-bearing: DeepInfra serves
+# `nvidia/NVIDIA-Nemotron-3-Super-120B-A12B`, OpenRouter serves
+# `nvidia/nemotron-3-super-120b-a12b`. Get it wrong and the request 404s.
+llm_config:
+  # _ChatBackend route 2: api_key set -> POSTs to
+  # {vllm_url}/v1/chat/completions with an Authorization bearer, and skips
+  # grammar / chat_template_kwargs (cloud rejects both).
+  server: local
+  model: "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B"
+  vllm_url: https://api.deepinfra.com
+  # NAME of the env var holding the bearer token, not the token.
+  api_key: DEEPINFRA
+  is_reasoning_model: true
+  # Matches grok_4p6, luna and both other DeepInfra models, so the campaign
+  # varies backend and not effort.
+  reasoning_effort: low
