@@ -515,22 +515,22 @@ Answer with one line per finding and nothing else:
 """
 
 
-# How many reviewers must agree before a finding the review failed is
-# accepted as failed. Three, and all three must say it fails: the reviewer
-# who wrote the review, plus CONFIRMING_REVIEWERS more obtained here.
-REVIEWERS_REQUIRED = 3
+# When the review fails a finding, retest it once. The fail stands only if
+# the retest agrees; a single disagreement ignores it. Two reviewers in
+# total: the one who wrote the review, plus CONFIRMING_REVIEWERS more.
+REVIEWERS_REQUIRED = 2
 CONFIRMING_REVIEWERS = REVIEWERS_REQUIRED - 1
 
 
 def confirm_exceptions(run: Path, world: str, model_path: Optional[Path],
                        target: Path, disputed: List[Dict[str, str]],
                        ) -> Dict[str, Any]:
-    """Two more blind opinions on the findings the first reviewer failed.
+    """Retest the findings the first reviewer failed.
 
-    THE RULE. A finding the review says fails is accepted as failed only
-    when three of three reviewers say it fails. This function obtains the
-    other two. If any one of the three disagrees, the finding is not accepted
-    as failed, and the disagreement is reported.
+    THE RULE. When the review fails a finding, that finding is retested
+    once, by a reviewer who has not seen the first verdict. The fail stands
+    only if the retest reaches the same verdict. A single disagreement
+    ignores the fail, and the disagreement is reported.
 
     WHY IT APPLIES ONLY TO FINDINGS THAT FAIL. §9 fails a whole report on a
     single exception, so one wrong judgement condemns the report. Measured on
@@ -542,23 +542,22 @@ def confirm_exceptions(run: Path, world: str, model_path: Optional[Path],
     asserting a defect in finished work carries the higher standard; a
     reviewer finding no defect does not.
 
-    A MIXED RESULT IS NOT NOISE. Two reviewers finding a fault and one not is
-    a genuinely borderline finding, and saying so is more use than rounding
-    it to yes or no. The tally is reported either way.
+    A DISAGREEMENT IS NOT NOISE. One reviewer finding a fault and the other
+    not means the finding is genuinely borderline, and saying so is more use
+    than rounding it to yes or no. The tally is reported either way.
 
-    BLIND. These reviewers are launched before `review.md` is written to
-    disk, so none of them can reach the first verdict through `inspect`, none
-    is told it, and none sees the others. They confirm; they do not overrule.
-    A finding not accepted as failed stays in the review as recorded, with
-    its tally.
+    BLIND. The retest is launched before `review.md` is written to disk, so
+    it cannot reach the first verdict through `inspect`, and it is not told
+    it. It confirms; it does not overrule. A finding whose fail does not
+    stand stays in the review as recorded, with its tally.
     """
     names = ", ".join(f"Finding {d['finding']}" for d in disputed)
     from chat.chat_loop import ChatLoop                        # noqa: E402
     t0, opinions, replies, models = time.time(), [], [], []
 
     for n in range(1, CONFIRMING_REVIEWERS + 1):
-        # A world each: these reviewers must not see each other any more than
-        # they see the first one.
+        # A world of its own: the retest must not see the first review any
+        # more than it is told its verdict.
         name, cfg = build_config(run, f"{world}_{n}", model_path, target)
         loop = ChatLoop(character_name=name, character_config=cfg)
         try:
@@ -567,7 +566,7 @@ def confirm_exceptions(run: Path, world: str, model_path: Optional[Path],
             reply = latest_reply(loop, SOURCE)
             models.append(loop.backend.resolved_model())
         except Exception as e:                                 # noqa: BLE001
-            logger.warning("confirming reviewer %d failed: %s", n, e)
+            logger.warning("retest %d failed: %s", n, e)
             return {"ran": False, "error": f"{type(e).__name__}: {e}",
                     "reviewers_required": REVIEWERS_REQUIRED,
                     "reviewers_obtained": len(opinions) + 1,
@@ -591,13 +590,12 @@ def confirm_exceptions(run: Path, world: str, model_path: Optional[Path],
         results.append({**d, "other_verdicts": others,
                         "agreeing": agreeing,
                         "of": REVIEWERS_REQUIRED,
-                        # Three of three, and a reviewer that returned no
-                        # verdict for this finding has not agreed to fail it.
+                        # The retest must have reached the same verdict. A
+                        # retest that returned no verdict for this finding
+                        # has not agreed to fail it.
                         "accepted_as_failed": agreeing == REVIEWERS_REQUIRED})
     n_acc = sum(1 for r in results if r["accepted_as_failed"])
-    logger.info("confirmation: %d of %d failed findings accepted, %d of %d "
-                "reviewers required", n_acc, len(results), REVIEWERS_REQUIRED,
-                REVIEWERS_REQUIRED)
+    logger.info("retest: %d of %d failed findings stand", n_acc, len(results))
     return {"ran": True, "error": None, "world": world,
             "reviewers_required": REVIEWERS_REQUIRED,
             "resolved_models": models,
@@ -607,35 +605,32 @@ def confirm_exceptions(run: Path, world: str, model_path: Optional[Path],
 
 
 def _confirmation_note(c: Dict[str, Any]) -> str:
-    """What the summary turn is told about the other two reviewers.
+    """What the summary turn is told about the retest.
 
-    States what each of them found and does not argue the verdict: REVIEW.md
-    §9 carries the rule, and a runner that also reasoned the conclusion would
-    be writing the review.
+    States what it found and does not argue the verdict: REVIEW.md §9 carries
+    the rule, and a runner that also reasoned the conclusion would be writing
+    the review.
     """
     if not c.get("ran"):
-        return ("\n\n[The client's process could not obtain the other two "
-                "reviewers. Three of three are required to accept a finding "
-                "as failed, so no finding you failed can be accepted. Report "
-                "each one as found but not accepted, with the reason, "
-                "per §9.]")
+        return ("\n\n[The client's process could not obtain the retest. A "
+                "finding you failed stands only if a retest agrees, so none "
+                "of them stands. Report each one as found but not retested, "
+                "with the reason, per §9.]")
     lines = []
     for r in c["results"]:
         others = ", ".join(f"[{v}]" if v else "[no verdict returned]"
                            for v in r["other_verdicts"])
         lines.append(
-            f"  Finding {r['finding']}: you found [{r['verdict']}]; the other "
-            f"two found {others} — {r['agreeing']} of {r['of']} — "
-            + ("ACCEPTED AS FAILED" if r["accepted_as_failed"]
-               else "NOT ACCEPTED"))
-    return ("\n\n[The other two reviewers, obtained by the client's process. "
-            "Neither was told your verdicts, neither saw your review, and "
-            "neither saw the other:\n" + "\n".join(lines) +
-            "\n\nApply §9. A finding you failed on judgement is accepted as "
-            "failed only where all three reviewers reached the same verdict "
-            "on it. Report a finding that was not accepted as found but not "
-            "accepted, and give the tally — do not delete it, and do not "
-            "restate it as agreement.]")
+            f"  Finding {r['finding']}: you found [{r['verdict']}]; the "
+            f"retest found {others} — {r['agreeing']} of {r['of']} — "
+            + ("STANDS" if r["accepted_as_failed"] else "DOES NOT STAND"))
+    return ("\n\n[The retest, obtained by the client's process from a reviewer "
+            "who was not told your verdicts and did not see your review:\n"
+            + "\n".join(lines) +
+            "\n\nApply §9. A finding you failed on judgement stands only where "
+            "the retest reached the same verdict on it. Report a finding "
+            "whose fail does not stand as found but not upheld, and give the "
+            "tally — do not delete it, and do not restate it as agreement.]")
 
 
 def main() -> int:
@@ -734,9 +729,8 @@ def main() -> int:
             # summary can state the outcome. See confirm_exceptions.
             disputed = judgement_exceptions(review_text)
             if disputed:
-                logger.info("%d finding(s) failed on judgement — obtaining "
-                            "%d more reviewers", len(disputed),
-                            CONFIRMING_REVIEWERS)
+                logger.info("%d finding(s) failed on judgement — retesting",
+                            len(disputed))
                 confirmation = confirm_exceptions(
                     run, f"{world}_confirm", args.model, target, disputed)
                 text = SUMMARY_REQUEST + _confirmation_note(confirmation)

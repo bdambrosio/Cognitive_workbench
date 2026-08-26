@@ -248,46 +248,46 @@ def test_only_judgement_disputes_need_confirming():
     assert judgement_exceptions("") == []
 
 
-def test_a_finding_is_accepted_as_failed_only_on_three_of_three():
-    """All three reviewers must reach the same verdict on the same finding.
+def test_a_failed_finding_stands_only_if_the_retest_agrees():
+    """One retest. A single disagreement means the fail does not stand.
 
-    A reviewer that returned no verdict for a finding has not agreed to fail
-    it, so a missing answer cannot make up the third voice.
+    A retest that returned no verdict for a finding has not agreed to fail
+    it, so silence cannot uphold a fail.
     """
-    from workflows.audit_review.runner import REVIEWERS_REQUIRED
-    assert REVIEWERS_REQUIRED == 3
+    from workflows.audit_review.runner import (REVIEWERS_REQUIRED,
+                                               CONFIRMING_REVIEWERS)
+    assert (REVIEWERS_REQUIRED, CONFIRMING_REVIEWERS) == (2, 1)
 
     def tally(mine, others):
         agreeing = 1 + sum(1 for v in others if v == mine)
         return agreeing, agreeing == REVIEWERS_REQUIRED
 
-    assert tally("unsupported", ["unsupported", "unsupported"]) == (3, True)
-    assert tally("unsupported", ["unsupported", "supported"]) == (2, False)
-    assert tally("unsupported", ["supported", "supported"]) == (1, False)
-    assert tally("unsupported", ["unsupported", None]) == (2, False)
+    assert tally("unsupported", ["unsupported"]) == (2, True)
+    assert tally("unsupported", ["supported"]) == (1, False)
+    assert tally("unsupported", [None]) == (1, False)
+    assert tally("indeterminate", ["indeterminate"]) == (2, True)
 
 
-def test_the_summary_is_told_what_each_reviewer_found():
+def test_the_summary_is_told_what_the_retest_found():
     """The runner reports the tally. §9 carries the rule.
 
-    An accepted finding and one that was not accepted must be
-    distinguishable, and one that was not accepted must survive into the
-    review rather than vanish.
+    A fail that stands and one that does not must be distinguishable, and one
+    that does not stand must survive into the review rather than vanish.
     """
     note = _confirmation_note({"ran": True, "results": [
         {"finding": "9", "verdict": "unsupported",
-         "other_verdicts": ["supported", "unsupported"],
-         "agreeing": 2, "of": 3, "accepted_as_failed": False},
+         "other_verdicts": ["supported"],
+         "agreeing": 1, "of": 2, "accepted_as_failed": False},
         {"finding": "7", "verdict": "indeterminate",
-         "other_verdicts": ["indeterminate", "indeterminate"],
-         "agreeing": 3, "of": 3, "accepted_as_failed": True}]})
-    assert "Finding 9" in note and "2 of 3" in note and "NOT ACCEPTED" in note
-    assert "Finding 7" in note and "3 of 3" in note
-    assert "ACCEPTED AS FAILED" in note
+         "other_verdicts": ["indeterminate"],
+         "agreeing": 2, "of": 2, "accepted_as_failed": True}]})
+    assert "Finding 9" in note and "1 of 2" in note and "DOES NOT STAND" in note
+    assert "Finding 7" in note and "2 of 2" in note and "STANDS" in note
     assert "do not delete it" in note
 
-    # If the other reviewers cannot be obtained, nothing is accepted as
-    # failed — and that must not read as a clearance either.
+    # If the retest cannot be obtained, no fail stands — and that must not
+    # read as a clearance either.
     failed = _confirmation_note({"ran": False, "error": "boom"})
-    assert "Three of three" in failed and "not accepted" in failed
-    assert "ACCEPTED AS FAILED" not in failed
+    assert "could not obtain the retest" in failed
+    assert "none of them stands" in failed
+    assert "STANDS" not in failed.replace("none of them stands", "")

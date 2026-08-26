@@ -317,27 +317,27 @@ is listed.
 from what it cites — whether the citation is wrong, unplaceable, or absent —
 which is the one thing this review exists to catch.
 
-**A finding you fail on judgement is accepted as failed only when three of
-three reviewers fail it.** `[unsupported]` and `[indeterminate]` rest on your
-reading of a line against a claim. The client's process obtains two more
-reviewers for every finding you gave one of those verdicts. Neither is told
-your verdict, neither sees your review, and neither sees the other. All three
-must reach the same verdict on the same finding. You are told what they found
-before you write §9.
+**A finding you fail on judgement is retested once.** `[unsupported]` and
+`[indeterminate]` rest on your reading of a line against a claim. For every
+finding you gave one of those verdicts, the client's process has a second
+reviewer check that finding. That reviewer is not told your verdict and does
+not see your review. You are told what it found before you write §9.
 
-A finding that is not accepted as failed does not count toward FAIL.
+The fail stands only if the retest reached the same verdict. A single
+disagreement means the fail does not stand, and a fail that does not stand
+does not count toward FAIL.
 
-`[broken citation]` and `[uncited]` need no second and third reviewer. A
-reference resolves or it does not, and a field carries a pointer or it does
-not. Both are settled by a file operation, and asking another model to
-re-derive a fact is not another opinion.
+`[broken citation]` and `[uncited]` are not retested. A reference resolves or
+it does not, and a field carries a pointer or it does not. Both are settled
+by a file operation, and asking another model to re-derive a fact is not
+another opinion.
 
-**Report a finding that was not accepted, and give the tally.** "Two of three
-reviewers found Finding 9 unsupported" is the honest line and it belongs in
-the review. Dropping the finding hides a real disagreement; restating it as
-agreement invents one. A split result is worth stating plainly: where
-reviewers divide, the finding is genuinely borderline, and that is something
-the reader should know rather than something to round away.
+**Report a fail that does not stand, and give the tally.** "I found Finding 9
+unsupported; the retest did not" is the honest line and it belongs in the
+review. Dropping the finding hides a real disagreement; restating it as
+agreement invents one. Where the two reviewers divide, the finding is
+genuinely borderline, and the reader should be told that rather than have it
+rounded away.
 
 **Why only findings that fail.** A reviewer asserting a defect in finished
 work carries the higher standard. The measurement says the same: §9 fails a
