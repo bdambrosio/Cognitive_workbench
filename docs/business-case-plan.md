@@ -66,7 +66,7 @@ refuses to do matters more than what it does.
 | **2** | Contracted software acceptance | **acceptance risk** — *is this what we contracted for?* | $5K is trivial against a $100K–$500K build. Buyer has standing to ask. |
 | **3** | Internal development audit | **development risk** — *we built this fast; do we know what we have?* | Real problem, fuzzy buyer. The prospect immediately asks why their own CTO cannot do it. |
 
-Note §11 of `audit/METHOD.md` currently rules out 2 and 3 — *"this method
+Note §11 of `workflows/claims_audit/method/METHOD.md` currently rules out 2 and 3 — *"this method
 applies to claims-verification in a transactional context: a buyer evaluating
 a target they do not own."* That boundary was drawn deliberately and now
 conflicts with the plan. Document 4 has to resolve it rather than ignore it;
@@ -81,7 +81,7 @@ Status: ✅ exists · ◐ partial · ○ to write
 | # | document | one line | status |
 |---|---|---|---|
 | 1 | **Opportunity Summary** | Two pages: the business, the customer problem, the beachhead market, why now, and the decision this analysis supports. | ○ |
-| 2 | **Product Definition** | Exactly what the audit examines, what evidence it uses, what the customer receives, how long it takes, and what is explicitly out of scope. | ◐ — `audit/METHOD.md` §2, §11, §16 |
+| 2 | **Product Definition** | Exactly what the audit examines, what evidence it uses, what the customer receives, how long it takes, and what is explicitly out of scope. | ◐ — `workflows/claims_audit/method/METHOD.md` §2, §11, §16 |
 | 3 | **Customer Problem / Why Now** | Evidence that buyers face a verification problem existing diligence, code review, testing and security processes do not solve. | ○ — **the document that decides everything** |
 | 4 | **Use-Case and Buyer Analysis** | The three hypotheses compared on buyer, trigger, pain, budget, urgency, sales process and required product changes — and whether they are one business or three. | ○ |
 | 5 | **Sample Audit / Proof of Product** | One complete engagement: inputs, investigation, findings, evidence, report — with defects consequential enough to show economic value. | ◐ — see below |

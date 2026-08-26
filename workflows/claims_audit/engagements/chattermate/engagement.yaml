@@ -1,0 +1,16 @@
+# claims-audit engagement: chattermate
+#
+# ChatterMate, an open-source AI customer-support platform. Python backend,
+# Vue frontend, roughly 1,100 tracked files.
+#
+# WHAT THE ENGAGEMENT SUPPLIES, and the method must not invent: the target, and
+# the claim sources named in brief.md (METHOD §12 step 1). Three models given
+# the same nine documents enumerated 62, 67 and 273 claims before the sources
+# were named per engagement.
+
+target: targets/chattermate
+
+# Runs land in runs/ beside this file. Retention is an engagement fact, not a
+# harness default: a real client's run holds verbatim client material and
+# carries a destruction date under the engagement letter (METHOD §14).
+retention: keep — public repository, no confidential material

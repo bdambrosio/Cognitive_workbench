@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Talk to a finished audit, using the record it left behind.
 
-    python3 measure/continuation.py --run measure/fixtures/dataroom/results/<dir>
-    python3 measure/continuation.py --run <dir> --model measure/models/grok_4p6.yaml
+    python3 workflows/claims_audit/continuation.py --run measure/fixtures/dataroom/results/<dir>
+    python3 workflows/claims_audit/continuation.py --run <dir> --model measure/models/grok_4p6.yaml
 
 WHY THIS EXISTS. A report ships the conclusions and deletes the machinery that
 produced them. The machinery is still on disk — every run leaves its
@@ -15,7 +15,7 @@ WHAT IT BINDS, and keeping the three apart is the whole design:
                        external_repo, so a citation in the report resolves by
                        the path that produced it
     inspect            the RUN DIRECTORY: deliverables, run_meta, working record
-    system prompt      audit/CONTINUATION.md, via scenarios/continuation.yaml
+    system prompt      workflows/claims_audit/method/CONTINUATION.md, via workflows/claims_audit/continuation.yaml
 
 Binding only the run directory is not enough. The report cites doc4:16-19, and
 those lines are in the corpus, which the run directory does not contain.
@@ -36,13 +36,13 @@ from typing import Any, Dict, Optional, Tuple
 
 import yaml
 
-HERE = Path(__file__).resolve().parent
-REPO = HERE.parent
+HERE = Path(__file__).resolve().parent          # workflows/claims_audit
+REPO = HERE.parent.parent
 for p in (str(REPO), str(REPO / "src")):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-SCENARIO = REPO / "scenarios" / "continuation.yaml"
+SCENARIO = HERE / "continuation.yaml"
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -107,7 +107,7 @@ def describe(run_dir: Path, meta: Dict[str, Any], target: Path) -> str:
     if delivered.is_file():
         try:
             from chat.workflow import load_workflow            # noqa: E402
-            now = load_workflow(REPO / "audit" / "METHOD.md")
+            now = load_workflow(HERE / "method" / "METHOD.md")
             same = now == delivered.read_text(encoding="utf-8")
             method = "as delivered, unchanged since" if same else \
                 "CHANGED since this run — the current method is not the one " \
@@ -198,7 +198,7 @@ def main() -> int:
             if text.lower() in ("quit", "exit"):
                 break
             loop._process_user_turn(source="User", text=text, close=False)
-            from measure.fixtures.dataroom.run import latest_reply   # noqa: E402
+            from workflows.claims_audit.runner import latest_reply  # noqa: E402
             print(f"\n{name}> {latest_reply(loop, 'User')}\n")
     finally:
         try:

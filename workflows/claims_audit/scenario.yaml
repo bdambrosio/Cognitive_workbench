@@ -8,7 +8,7 @@
 #   characters.Jill.external_repo   the target tree
 #   the claim sources               named in the opening turn (below)
 #
-# THE METHOD IS NOT IN THIS FILE. audit/METHOD.md is the authority: scope
+# THE METHOD IS NOT IN THIS FILE. workflows/claims_audit/method/METHOD.md is the authority: scope
 # rule, priority order, finding format, verdicts, correction protocol,
 # recommendation taxonomy, liability posture, run sequence. A copy here would
 # be a second source that drifts.
@@ -19,7 +19,7 @@
 # coordination runs were invalidated by exactly this. A new world_name is the
 # whole fix.
 #
-# WHAT LEAVES AN ENGAGEMENT: method only, as proposed edits to audit/METHOD.md,
+# WHAT LEAVES AN ENGAGEMENT: method only, as proposed edits to workflows/claims_audit/method/METHOD.md,
 # reviewed by a human before merge. Never a target fact. The test is in §12
 # step 7 — if a lesson cannot be stated without naming the target, it is not a
 # method lesson.
@@ -90,7 +90,7 @@ characters:
 
     # PER-TARGET — the tree under audit. inspect_external is bound to it and
     # can see nothing else. `inspect` reads inspect_repo below, where
-    # audit/METHOD.md lives.
+    # workflows/claims_audit/method/METHOD.md lives.
     external_repo: /path/to/target
 
     # THE `inspect` GEOFENCE, relative to the repo root. `audit/` holds
@@ -117,7 +117,7 @@ characters:
     #
     # Sections marked `<!-- audience: practice -->` are stripped by the
     # loader. They are for whoever runs the practice, not the auditor.
-    workflow: audit/METHOD.md
+    workflow: workflows/claims_audit/method/METHOD.md
 
     # An auditor running an engagement is not maintaining a relationship.
     # Suppresses discourse state, the per-turn companion-model update and the
@@ -133,7 +133,7 @@ characters:
     workflow_mode: true
 
     # PER-RUN — the model. Models live in measure/models/*.yaml and are applied by
-    # measure/fixtures/dataroom/run.py --model, which REPLACES this block rather
+    # workflows/claims_audit/runner.py --model, which REPLACES this block rather
     # than merging into it. Not duplicated here: a second copy drifts.
     #
     # NEVER LEAVE A GATEWAY MODEL UNPINNED. Four providers serve nemotron and
@@ -186,7 +186,7 @@ characters:
     capabilities: |
       This session is a due-diligence engagement, and her method is
       written down: `METHOD.md`, at the ROOT of what `inspect` reads —
-      not `audit/METHOD.md`, which is where the file sits in the wider
+      not `workflows/claims_audit/method/METHOD.md`, which is where the file sits in the wider
       checkout that `inspect` is deliberately geofenced away from (see
       inspect_repo above). Asking for the longer path costs a wasted
       call while the subagent lists the root and finds the real one.

@@ -244,7 +244,7 @@ one grading pass.**
 > until the next campaign reproduces it.
 
 The method now loads verbatim into the static system prompt
-(`scenarios/audit.yaml` -> `workflow: audit/METHOD.md`) instead of being
+(`workflows/claims_audit/scenario.yaml` -> `workflow: workflows/claims_audit/method/METHOD.md`) instead of being
 fetched with `inspect`. Three things reached an output for the first time:
 
 - **§9's taxonomy.** The report is headed `### §9 Recommendation: Material`.
@@ -288,8 +288,8 @@ Nothing further extends that campaign. Work from here is in three streams, and
 none of them is "one more run of the same thing":
 
 1. **Continuation.** Answering questions about a finished engagement from the
-   record it left. Built at `measure/continuation.py`, `audit/CONTINUATION.md`,
-   `scenarios/continuation.yaml`. One capability verified live — recomputing a
+   record it left. Built at `workflows/claims_audit/continuation.py`, `workflows/claims_audit/method/CONTINUATION.md`,
+   `workflows/claims_audit/continuation.yaml`. One capability verified live — recomputing a
    derived finding under a changed assumption, with the authority boundary
    holding unprompted. Three untested: retrieval of a claim that held and never
    reached the report, being argued out of a finding, and behaviour on a run
@@ -386,8 +386,8 @@ The decision taken 2026-08-25: this is worth preserving and generalising. The
 audit is one workflow; there will be others. The directory layout has not
 caught up, and the import direction shows it.
 
-**`measure/continuation.py` imports `latest_reply` from
-`measure.fixtures.dataroom.run`.** Product code reaching into a fixture for a
+**`workflows/claims_audit/continuation.py` imports `latest_reply` from
+`workflows.claims_audit.runner`.** Product code reaching into a fixture for a
 general utility — dependencies pointing from the general thing into the
 specific one, which is the reliable smell.
 
@@ -571,7 +571,7 @@ eval "$(grep -m1 '^export XAI_API_KEY=' ~/.bashrc)";    export XAI_API_KEY
 eval "$(grep -m1 '^export OPENAI_API_KEY=' ~/.bashrc)"; export OPENAI_API_KEY
 for i in 1 2 3; do for a in grok:grok_4p6 qwen:qwen_local luna:luna_openai; do
   n=${a%%:*}; f=${a##*:}
-  python3 $R/measure/fixtures/dataroom/run.py --world m1_${n}_$i \
+  python3 $R/workflows/claims_audit/runner.py --world m1_${n}_$i \
           --model $R/measure/models/${f}.yaml
 done; done
 ```
@@ -612,7 +612,7 @@ vector and **not** gated.
 - Grader misses B6 three times in four; Tier 3 noise 6/5/5/5. **Trust the
   threshold, not Tier 3.**
 - The fixture and `answer_key.md` still share a lineage. METHOD now has an
-  external reference (`audit/METHOD-gap-analysis.md`); the key does not.
+  external reference (`workflows/claims_audit/method/gap-analysis.md`); the key does not.
 - Saturation: all models cleared every criterion before the three new ones
   landed. If all nine pass tomorrow, the threshold has stopped discriminating
   and the vector is the only signal left.

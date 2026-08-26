@@ -2,7 +2,7 @@
 
 A workflow is the procedure a task-specific agent executes: its phases, the
 vocabulary its output must use, and what a finished deliverable looks like.
-`audit/METHOD.md` is the first one.
+`workflows/claims_audit/method/METHOD.md` is the first one.
 
 WHY THIS IS NOT A TOOL READ. The audit ran for a day reading its own method
 with `inspect`, and the recommendation taxonomy never survived to the turn

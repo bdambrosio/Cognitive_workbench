@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Drive one dataroom audit run, unattended.
 
-    python3 measure/fixtures/dataroom/run.py --world dataroom_1
-    python3 measure/fixtures/dataroom/run.py --world dataroom_2 \
+    python3 workflows/claims_audit/runner.py --world dataroom_1
+    python3 workflows/claims_audit/runner.py --world dataroom_2 \
             --model measure/models/nemotron_fp8.yaml --max-turns 20
 
-Loads `scenarios/audit.yaml`, points `inspect_external` at the fixture
+Loads `workflows/claims_audit/scenario.yaml`, points `inspect_external` at the fixture
 corpus, gives the brief as the opening turn, then drives "continue" for as
 long as the agent keeps yielding. Writes the reply and the trace next to the
 run so `score.py` can read them.
@@ -39,15 +39,15 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-HERE = Path(__file__).resolve().parent
-REPO = HERE.parent.parent.parent
+HERE = Path(__file__).resolve().parent          # workflows/claims_audit
+REPO = HERE.parent.parent
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "src"))
 
 import yaml                                                    # noqa: E402
 
-SCENARIO = REPO / "scenarios" / "audit.yaml"
-CORPUS = HERE / "corpus"
+SCENARIO = HERE / "scenario.yaml"
+ENGAGEMENTS = HERE / "engagements"
 SOURCE = "User"
 
 logging.basicConfig(level=logging.WARNING)
@@ -59,47 +59,9 @@ GAP_MARK = "=== GAP MAP ==="
 # line wrap is still a marker. Only used for the salvage path now.
 _GAP_RE = re.compile(r"\s+".join(re.escape(t) for t in GAP_MARK.split()))
 
-# THE BRIEF IS THE ENGAGEMENT, NOT THE METHOD. It used to open "Read
-# METHOD.md" and then restate the deliverable contract in full, because the
-# method was something the agent fetched with a tool and the contract had
-# nowhere else to live. Both are now in the workflow document, loaded verbatim
-# into the static system prompt (scenarios/audit.yaml `workflow:`), so what is
-# left here is only what a client would actually say: who the target is, what
-# is wanted, and the protocol for driving legs.
-#
-# Dropped with the contract: the paragraph telling the agent to quote figures
-# verbatim. That is §5, and §5 is now guaranteed present on every turn — which
-# is precisely what it was not when that paragraph was added.
-#
-# Dropped 2026-08-24: "Recap as the method says. Stop and tell me if you find a
-# delta." Both named procedures METHOD.md has since removed as unperformable —
-# there is no channel to the client mid-engagement — and §12 step 4 now says
-# the opposite. A client brief instructing behaviour the method forbids is a
-# contradiction the agent has to resolve at runtime, and it was doing so
-# silently. The brief must not outlive the method it refers to.
-#
-# Added 2026-08-25: the claim sources. §2 defines a claim as something the
-# SELLER asserts to the buyer, which makes doc3-doc8 evidence rather than
-# claims — but deciding that per run is a judgement, and three models made it
-# three ways. Measured: counts of 62, 67 and 273 on identical materials, then
-# 44, 21 and 321 under one definition and 66, 108 and none under another. The
-# engagement names the sources instead; §12 step 1 says so. This is the client
-# speaking, not the method, which is why it lives in the brief.
-BRIEF = """The target is the data room bound to inspect_external: nine
-documents for a small SaaS business called flowmetrics, offered for sale by a
-seller named Dave. I am the buyer's side. Audit it.
-
-The claim sources are doc1 (the listing), doc2 (the tech stack description)
-and doc9 (the technical claims). Those are the documents Dave asserts things
-in. The other six are evidence.
-
-Enumerate the claim surface first and close it as the method says, then work
-the priority order straight through.
-
-Work in as many legs as you need — end a leg with `yield` and I will say
-continue. End with the report; I will ask for the Gap Map after it.
-"""
-
+# The brief lives with its engagement, in engagements/<name>/brief.md — it is
+# what a client says, and it differs per engagement. Its history travels with
+# it as HTML comments in that file.
 CONTINUE = "continue"
 
 # THE SECOND DELIVERABLE IS ASKED FOR, NOT DETECTED. §16 puts the report in one
@@ -114,8 +76,34 @@ GAP_MAP_REQUEST = ("The report is received. Now the Gap Map, per §15. The whole
                    "report.")
 
 
+def load_engagement(name: str) -> Dict[str, Any]:
+    """Target, brief and run directory for one engagement.
+
+    THE ENGAGEMENT SUPPLIES WHAT THE METHOD MUST NOT INVENT: which tree is
+    under audit, and — through the brief — which of its documents carry the
+    seller's claims (METHOD §12 step 1). Both differ per engagement and neither
+    is knowable to the method's author.
+    """
+    d = ENGAGEMENTS / name
+    cfg_file = d / "engagement.yaml"
+    if not cfg_file.is_file():
+        have = ", ".join(sorted(x.name for x in ENGAGEMENTS.iterdir()
+                                if x.is_dir())) or "none"
+        raise SystemExit(f"no engagement '{name}' in {ENGAGEMENTS} (have: {have})")
+    cfg = yaml.safe_load(cfg_file.read_text(encoding="utf-8")) or {}
+    target = Path(cfg.get("target") or "")
+    if not target.is_absolute():
+        target = REPO / target
+    brief = d / "brief.md"
+    if not brief.is_file():
+        raise SystemExit(f"engagement '{name}' has no brief.md")
+    return {"name": name, "dir": d, "target": target.resolve(),
+            "brief": brief, "runs": d / "runs",
+            "retention": cfg.get("retention")}
+
+
 def engagement_state(world: str, agent: str, leg: int, max_legs: int,
-                     elapsed_s: float, fixture: bool = True) -> str:
+                     elapsed_s: float, corpus: Optional[Path] = None) -> str:
     """A ledger of what has happened, appended to each `continue`.
 
     WHY THE RUNNER CARRIES THIS. The agent's own record of its work decays by
@@ -138,7 +126,8 @@ def engagement_state(world: str, agent: str, leg: int, max_legs: int,
     # Fixture-only. A real target has a claim surface, not a document list,
     # and counting *.md in a 1,100-file repository would report progress
     # against a denominator that means nothing.
-    docs = sorted(f.name for f in CORPUS.glob("*.md")) if CORPUS.is_dir() else []
+    docs = sorted(f.name for f in corpus.glob("*.md")) \
+        if corpus and corpus.is_dir() else []
     traces = REPO / "scenarios" / world / agent / "inspect_traces"
     seen = set()
     if traces.is_dir():
@@ -151,7 +140,7 @@ def engagement_state(world: str, agent: str, leg: int, max_legs: int,
             seen.update(d for d in docs if d in body)
     head = (f"\n\n[engagement state, recorded by the client's process — "
             f"leg {leg} of {max_legs}, {elapsed_s / 60:.0f} min elapsed")
-    if fixture:
+    if docs:
         return head + (f". Data room: {len(seen)} of {len(docs)} documents "
                        f"opened so far.]")
     return head + ".]"
@@ -278,7 +267,7 @@ def build_config(world: str, model_path: Optional[Path],
     cfg["autonomy_enabled"] = False
     # The two per-target values, set here rather than by editing the committed
     # scenario, so a run leaves no diff behind.
-    cfg["external_repo"] = str(external_repo or CORPUS)
+    cfg["external_repo"] = str(external_repo)
     # WHY A FLAG AND NOT A SECOND SCENARIO. Comparing workflow_mode on
     # against off needs both, and audit.yaml's own header says why a copy is
     # the wrong way to get one: "a second copy is a second source that
@@ -333,20 +322,15 @@ def main() -> int:
     ap = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--engagement", required=True,
+                    help="engagement name under engagements/ — supplies the "
+                         "target, the brief, and where runs land")
     ap.add_argument("--world", required=True,
                     help="fresh world name; never reuse one")
     ap.add_argument("--model", type=Path, default=None,
                     help="YAML with an llm_config block; replaces the scenario's")
     ap.add_argument("--max-turns", type=int, default=25,
                     help="hard cap on legs (default 25)")
-    ap.add_argument("--external-repo", type=Path, default=None,
-                    help="audit a real target instead of the fixture corpus. "
-                         "Scoring against the answer key is meaningless for "
-                         "one — score.py is for the fixture")
-    ap.add_argument("--brief-file", type=Path, default=None,
-                    help="engagement brief for a real target; required with "
-                         "--external-repo, since the built-in brief names "
-                         "flowmetrics")
     ap.add_argument("--max-tokens", type=int, default=None,
                     help="override chat.react_max_tokens (scenario default "
                          "8192). Reasoning tokens bill against this budget")
@@ -363,8 +347,10 @@ def main() -> int:
             f"world '{args.world}' already exists — a second run in one world "
             f"inherits the first's conclusions as memories. Pick a fresh name.")
 
+    eng = load_engagement(args.engagement)
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
-    out = HERE / "results" / f"{ts}_{args.world}"
+    # RUNS BELONG TO THE ENGAGEMENT, not to the workflow and not to a fixture.
+    out = eng["runs"] / f"{ts}_{args.world}"
     out.mkdir(parents=True, exist_ok=True)
 
     arm_doc = (yaml.safe_load(Path(args.model).read_text(encoding="utf-8"))
@@ -375,16 +361,12 @@ def main() -> int:
 
     wf_mode = (None if args.workflow_mode is None
                else args.workflow_mode == "on")
-    if args.external_repo and not args.brief_file:
-        raise SystemExit(
-            "--external-repo needs --brief-file: the built-in brief "
-            "names flowmetrics and its nine documents, and handing "
-            "that to an agent pointed at a different target is the "
-            "kind of mismatch that produces a confident report about "
-            "the wrong thing.")
+    if not eng["target"].is_dir():
+        raise SystemExit(f"engagement '{eng['name']}': target "
+                         f"{eng['target']} does not exist")
     name, cfg = build_config(args.world, args.model, wf_mode,
                              args.temperature, args.max_tokens,
-                             args.external_repo)
+                             eng["target"])
     logger.info("world=%s model=%s model=%s", args.world, args.model,
                 (cfg.get("llm_config") or {}).get("model") or "(scenario default)")
 
@@ -408,8 +390,7 @@ def main() -> int:
     gap_map_sent = False
     report_text = ''
     try:
-        text = (args.brief_file.read_text(encoding='utf-8')
-                if args.brief_file else BRIEF)
+        text = eng["brief"].read_text(encoding='utf-8')
         text_first_leg = text
         for i in range(args.max_turns):
             loop._process_user_turn(source=SOURCE, text=text, close=False)
@@ -448,7 +429,7 @@ def main() -> int:
             if exit_reason == "yield":
                 text = CONTINUE + engagement_state(
                     args.world, name, i + 2, args.max_turns,
-                    time.time() - t0, fixture=args.external_repo is None)
+                    time.time() - t0, corpus=eng["target"])
                 continue
             # SALVAGE. An model may emit both documents in one turn whatever the
             # brief says. Splitting that is strictly better than spending a leg
@@ -525,7 +506,7 @@ def main() -> int:
     # which method produced the report, and a method that has moved since
     # supplies the wrong verdict vocabulary silently.
     #
-    # THE DELIVERED TEXT, NOT THE FILE. audit/METHOD.md is not what the agent
+    # THE DELIVERED TEXT, NOT THE FILE. workflows/claims_audit/method/METHOD.md is not what the agent
     # read: the loader strips every section marked for the practice. A commit
     # hash would name the file and still not answer what reached the model, and
     # it needs the repository at that revision to resolve at all. A copy is
@@ -606,8 +587,11 @@ def main() -> int:
     print(f"\n{len(legs)} legs, {wall}s, error={error}")
     print(f"deliverables: {out}/report.md, gap_map.md")
     print(f"meta: {out / 'run_meta.json'}")
+    # --run, not --world: the run directory is the archive and survives the
+    # world's deletion (§14). Scoring is fixture-only; a real engagement has no
+    # answer key.
     print(f"score with:  python3 measure/fixtures/dataroom/score.py "
-          f"--world {args.world}")
+          f"--run {out}")
     return 1 if error else 0
 
 

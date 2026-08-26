@@ -38,7 +38,7 @@ for p in (str(REPO), str(REPO / "src")):
 # Reused rather than reimplemented: the config build, the reply reader and the
 # exit-reason reader are the same machinery a scored run uses, and a second
 # copy would drift from it.
-from measure.fixtures.dataroom.run import (                    # noqa: E402
+from workflows.claims_audit.runner import (                    # noqa: E402
     build_config, latest_reply, last_exit_reason, SOURCE, CORPUS,
 )
 

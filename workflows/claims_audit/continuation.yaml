@@ -5,7 +5,7 @@
 # is it.
 #
 # NOT AN AUDIT. Nothing here conducts one. The engagement is over; this answers
-# questions about it from the record it left. The method is audit/CONTINUATION.md,
+# questions about it from the record it left. The method is workflows/claims_audit/method/CONTINUATION.md,
 # which is mostly prohibitions — see §2 there.
 #
 # THREE SOURCES, and keeping them apart is the whole design:
@@ -14,7 +14,7 @@
 #                      report resolves here by the path that produced it.
 #   inspect            the RUN DIRECTORY: deliverables, reasoning trace,
 #                      inspect_traces, run_meta.
-#   workflow           audit/CONTINUATION.md, in the static system prompt.
+#   workflow           workflows/claims_audit/method/CONTINUATION.md, in the static system prompt.
 #
 # Binding only the run directory is not enough. The report cites doc4:16-19 and
 # those lines are in the corpus, which the run directory does not contain — it
@@ -22,7 +22,7 @@
 #
 # RUNNING
 #
-#   python3 measure/continuation.py --run measure/fixtures/dataroom/results/<dir>
+#   python3 workflows/claims_audit/continuation.py --run measure/fixtures/dataroom/results/<dir>
 #
 # The launcher sets world_name, external_repo and inspect_repo from the run's
 # own run_meta.json. The paths below are placeholders and are always replaced.
@@ -62,7 +62,7 @@ characters:
     # The role, in the static system prompt for the reason audit.yaml gives:
     # a document read with `inspect` decays out of the history window, and by
     # the leg that needed it the method had shrunk to §1 and half of §2.
-    workflow: audit/CONTINUATION.md
+    workflow: workflows/claims_audit/method/CONTINUATION.md
 
     # OFF, unlike an engagement. audit.yaml suppresses discourse state, the
     # companion model and orientation because an auditor mid-engagement has no

@@ -338,7 +338,7 @@ advice, and needs a lawyer's review before the first paying engagement.**
 
 ## 12. Running an audit: sequence
 
-Launched with `scenarios/audit.yaml` — one scenario for every engagement,
+Launched with `workflows/claims_audit/scenario.yaml` — one scenario for every engagement,
 with two per-target lines (`world_name`, `external_repo`). Its header carries
 the operational detail; this section is the method.
 
@@ -652,7 +652,7 @@ is the proof.
 
 Kept out of §15 deliberately: an agent writing a deliverable should not be told
 it is writing a hook. Removals, retractions and the reasoning behind this split
-live in `audit/METHOD-gap-analysis.md`, not here.
+live in `workflows/claims_audit/method/gap-analysis.md`, not here.
 
 ## 18. Provenance
 
