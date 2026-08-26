@@ -276,34 +276,80 @@ Comparing across that line would be comparing two instruments. Those runs did
 their job — every fix above was found by running them — and they remain in
 git history if a specific claim ever needs checking.
 
-## Pick up here — 2026-08-25, end of session
+## Campaign m1 is closed. A new stage starts here — 2026-08-25
 
-**Campaign m1 is complete.** Nine runs, three per arm, on frozen instrument
-`bc4ae148` with scorer `3b1d6e07`. Results at the top of this file. grok 3/3
-PASS, qwen 1/3, luna 2/3; all three failures are the claim-surface criterion.
+**The base campaign is done.** Nine runs, three arms, one frozen instrument.
+grok 3/3 PASS, qwen 1/3, luna 2/3, and the working judgement is that grok
+clears the first gate for production use and the other two do not. Two full
+audits against real targets — ChatterMate and Body — completed cleanly on the
+same instrument. Results at the top of this file.
 
-### Next, in rough order of value
+Nothing further extends that campaign. Work from here is in three streams, and
+none of them is "one more run of the same thing":
 
-1. **Why does an arm skip enumeration?** All three failures emitted no marker
-   anywhere in the trace. Both of qwen's were single-leg runs and its two-leg
-   run closed the surface; luna 2 failed at three legs, so leg count is not the
-   whole mechanism. Read the three traces before running anything.
-2. **Nothing enforces §1a.** The scorer checks the §9 taxonomy was used, never
-   that coverage supports it. Verifying 15 of 273 claims and returning
-   "Material" scores the same as 45 of 273.
-3. **ChatterMate and Body have claim sources and one enumeration each.** Two
-   more arms per target would say whether the fixture's agreement (Jaccard
-   1.00 grok/qwen) is a property of the method or of three short documents;
-   ChatterMate is already at 0.41.
-4. **qwen's enumeration varies run to run** — 40 on the run that closed, and
-   32 and 70 on earlier days' fixtures. grok is 31/32/34. Not understood.
+1. **Continuation.** Answering questions about a finished engagement from the
+   record it left. Built at `measure/continuation.py`, `audit/CONTINUATION.md`,
+   `scenarios/continuation.yaml`. One capability verified live — recomputing a
+   derived finding under a changed assumption, with the authority boundary
+   holding unprompted. Three untested: retrieval of a claim that held and never
+   reached the report, being argued out of a finding, and behaviour on a run
+   that never closed its claim surface.
+2. **New arms and new fixtures.** Other models against this data room, and new
+   client data rooms against this method.
+3. **New methods.** The audit is one workflow. `audit.yaml` binds a method file
+   through `workflow:`, so a second workflow is a second method document and a
+   second scenario, not a second harness.
 
-### Do not repeat
+**What that changes about the instrument.** METHOD.md has been treated as *the*
+method. It is now one of several, and the machinery around it — the workflow
+loader, the practice-audience split, the claim-source declaration, the working
+record — is the part that generalises. Freezing was the right discipline for a
+single campaign; from here the question is which pieces are shared and which
+belong to one workflow.
 
-- Nine runs needed **no retries**. The earlier one-in-four estimate came from
-  the claims-only harness and repository-sized targets, not the fixture.
-- The threshold discriminates at n=3 and looked saturated at n=1. Do not draw
-  a conclusion about an arm from one run, including a smoke run.
+### QUEUED, and it must land before any further run
+
+**One deliverable per leg.** The report in one leg, the Gap Map in the next.
+Turn boundaries are structure the harness already maintains, and no model has
+to emit them correctly.
+
+This is a Tier 1 change — it alters what the agent does, so runs before and
+after are not comparable. That is acceptable now and would not have been
+yesterday.
+
+What it touches:
+
+- **METHOD §16** currently reads "Two documents, produced together in the final
+  turn... The final turn carries these two documents and nothing else," with a
+  rationale about anything written before the report becoming the report. The
+  rationale is still right and needs rewriting for two legs, not deleting.
+- **`run.py`'s stopping rule** is `GAP_MARK not in reply -> continue`. With the
+  Gap Map in its own leg there is no marker to stop on, and this is the hard
+  part of the change: the runner needs a completion signal that is not a string
+  in prose. Decide it before writing anything.
+- **The brief** says "Produce both deliverables together in your final reply."
+- **`score.py:split_deliverables`** becomes unnecessary for runs made after the
+  change, and must keep working for the ones already on disk.
+
+**Keep `=== GAP MAP ===` as a fallback rather than deleting it.** An arm will
+sometimes produce both documents in one leg regardless of instruction, and a
+run that does should be salvageable rather than lost.
+
+**What this does not fix**, and the reason it is a structural improvement
+rather than a marker fix: `=== LIMITATIONS ===` is a section inside the report
+and `=== CLAIM SURFACE ===` lives in the working log mid-engagement. Neither is
+a boundary between deliverables, so leg-splitting does not reach them. Their
+whitespace fragility was fixed separately in `5a3945ce`.
+
+### Also queued, smaller
+
+- **The claims-only harness measures something adjacent.** grok enumerated
+  ChatterMate at 244 and Body at 164 in enumeration-only runs, and both at 118
+  inside a full audit. Enumeration is drawn coarser when 118 claims then have
+  to be verified. Do not quote claims-only counts as engagement denominators.
+- **74 dropped quotes across nine runs** on the claim-attribution verbatim
+  check — 20 in one run. Designed degradation, never examined. Either arms
+  paraphrase evidence heavily or the check is too strict after normalising.
 
 ## The claim surface: named by the engagement, not inferred
 
