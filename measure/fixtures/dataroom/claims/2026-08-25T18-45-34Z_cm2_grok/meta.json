@@ -1,0 +1,19 @@
+{
+  "world": "cm2_grok",
+  "arm": "/home/bruce/Downloads/Cognitive_workbench/measure/arms/grok_4p6.yaml",
+  "resolved_model": "grok-4.6",
+  "resolved_temperature": 0.5,
+  "top_p": 0.95,
+  "external_repo": "/home/bruce/Downloads/Cognitive_workbench/targets/chattermate",
+  "exit_reason": "respond",
+  "wall_clock_s": 772.9,
+  "error": null,
+  "declared": true,
+  "count": 244,
+  "leg": 1,
+  "per_document": {
+    "HELP_CENTER_INFRA.md": 44,
+    "README.md": 148,
+    "llms.txt": 16
+  }
+}

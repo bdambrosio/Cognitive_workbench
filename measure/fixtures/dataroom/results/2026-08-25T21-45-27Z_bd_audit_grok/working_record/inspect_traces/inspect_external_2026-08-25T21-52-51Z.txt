@@ -1,0 +1,614 @@
+================================================================================
+[inspect_external] 2026-08-25T21-52-51Z exit=max_iters iters=12
+================================================================================
+Query: List the body/ package tree and deploy/; name every Python module and what each file's top-level docstring or first 40 lines say it does.
+
+--- iter 1 ---
+ACTION:
+{
+  "thought": "List repo root then body/ and deploy/ to map the package tree and Python modules.",
+  "tool": "list",
+  "path": "."
+}
+OBSERVATION:
+OK: ./
+body/	DIR
+deploy/	DIR
+docs/	DIR
+scripts/	DIR
+.gitignore	4689 bytes
+body_project_spec.md	22343 bytes
+config.json	1219 bytes
+LICENSE	1073 bytes
+README.md	8664 bytes
+requirements.txt	69 bytes
+
+--- iter 2 ---
+ACTION:
+{
+  "thought": "List body/ and deploy/ to map the package tree and find Python modules.",
+  "tool": "list",
+  "path": "body"
+}
+OBSERVATION:
+OK: body/
+lib/	DIR
+__init__.py	72 bytes
+cli.py	2976 bytes
+launcher.py	4288 bytes
+lidar_driver.py	1105 bytes
+motor_controller.py	6222 bytes
+oakd_driver.py	24018 bytes
+teleop.py	5544 bytes
+watchdog.py	3919 bytes
+
+--- iter 3 ---
+ACTION:
+{
+  "thought": "List body/lib and deploy/ to complete the package tree and find remaining Python modules.",
+  "tool": "list",
+  "path": "body/lib"
+}
+OBSERVATION:
+OK: body/lib/
+__init__.py	92 bytes
+diff_drive.py	2037 bytes
+schemas.py	5850 bytes
+zenoh_helpers.py	1850 bytes
+
+--- iter 4 ---
+ACTION:
+{
+  "thought": "List deploy/ to complete the tree and find remaining Python modules.",
+  "tool": "list",
+  "path": "deploy"
+}
+OBSERVATION:
+OK: deploy/
+zenohd-router.json	80 bytes
+
+--- iter 5 ---
+ACTION:
+{
+  "thought": "Read first ~40 lines of each body/ Python module for top-level docstrings; deploy has no .py files.",
+  "tool": "read",
+  "file": "body/__init__.py"
+}
+OBSERVATION:
+OK: 1|"""Onboard Body stack: Zenoh-linked processes for the robot chassis."""
+
+
+--- iter 6 ---
+ACTION:
+{
+  "thought": "Read remaining body/ Python modules' first ~40 lines for docstrings.",
+  "tool": "read",
+  "file": "body/cli.py",
+  "start_line": 1,
+  "end_line": 40
+}
+OBSERVATION:
+OK: 1|"""Pi-local CLI for Body Zenoh topics (same wire protocol as the desktop agent).
+2|
+3|Requires `zenohd` and the relevant Body processes (e.g. oakd_driver for OAK-D capture).
+4|"""
+5|
+6|from __future__ import annotations
+7|
+8|import argparse
+9|import base64
+10|import sys
+11|import time
+12|import uuid
+13|
+14|from body.lib import schemas, zenoh_helpers
+15|
+16|
+17|def _cmd_oakd_capture(args: argparse.Namespace) -> int:
+18|    request_id = str(uuid.uuid4())
+19|    body_cfg = zenoh_helpers.load_body_config()
+20|    session = zenoh_helpers.open_session(body_cfg)
+21|    result: dict | None = None
+22|
+23|    def on_rgb(_key: str, msg: dict) -> None:
+24|        nonlocal result
+25|        if msg.get("request_id") == request_id:
+26|            result = msg
+27|
+28|    zenoh_helpers.declare_subscriber_json(session, "body/oakd/rgb", on_rgb)
+29|    zenoh_helpers.publish_json(
+30|        session,
+31|        "body/oakd/config",
+32|        schemas.oakd_config_capture_rgb(request_id),
+33|    )
+34|    deadline = time.time() + float(args.timeout)
+35|    while time.time() < deadline and result is None:
+36|        time.sleep(0.02)
+37|    session.close()
+38|
+39|    if result is None:
+40|        print("oakd capture: timeout waiting for body/oakd/rgb", file=sys.stderr)
+
+
+--- iter 7 ---
+ACTION:
+{
+  "thought": "Read first 40 lines of remaining body/ modules starting with launcher.py.",
+  "tool": "read",
+  "file": "body/launcher.py",
+  "start_line": 1,
+  "end_line": 40
+}
+OBSERVATION:
+OK: 1|"""Start Body processes, prefix logs, restart with backoff, graceful shutdown."""
+2|
+3|from __future__ import annotations
+4|
+5|import os
+6|import signal
+7|import subprocess
+8|import sys
+9|import threading
+10|import time
+11|from dataclasses import dataclass, field
+12|from typing import Any
+13|
+14|from body.lib.zenoh_helpers import repo_root
+15|
+16|PROCESSES: list[dict[str, Any]] = [
+17|    {"name": "watchdog", "cmd": [sys.executable, "-m", "body.watchdog"]},
+18|    {"name": "motor_controller", "cmd": [sys.executable, "-m", "body.motor_controller"]},
+19|    {"name": "lidar_driver", "cmd": [sys.executable, "-m", "body.lidar_driver"]},
+20|    {"name": "oakd_driver", "cmd": [sys.executable, "-m", "body.oakd_driver"]},
+21|]
+22|
+23|
+24|@dataclass
+25|class Managed:
+26|    name: str
+27|    cmd: list[str]
+28|    proc: subprocess.Popen[str] | None = None
+29|    failures: int = 0
+30|    stable_since: float | None = None
+31|    next_start_monotonic: float = field(default_factory=time.monotonic)
+32|
+33|
+34|def _pump_stdout(managed: Managed, shutdown: threading.Event) -> None:
+35|    proc = managed.proc
+36|    if proc is None or proc.stdout is None:
+37|        return
+38|    prefix = f"{managed.name}"
+39|    try:
+40|        for line in proc.stdout:
+
+
+--- iter 8 ---
+ACTION:
+{
+  "thought": "Read first 40 lines of remaining body Python modules for docstrings.",
+  "tool": "read",
+  "file": "body/lidar_driver.py",
+  "start_line": 1,
+  "end_line": 40
+}
+OBSERVATION:
+OK: 1|"""LIDAR driver: stub publishes synthetic scans at ~10 Hz."""
+2|
+3|from __future__ import annotations
+4|
+5|import signal
+6|import sys
+7|import threading
+8|import time
+9|
+10|from body.lib import schemas, zenoh_helpers
+11|
+12|
+13|def main() -> None:
+14|    body_cfg = zenoh_helpers.load_body_config()
+15|    lidar_cfg = body_cfg.get("lidar", {})
+16|    hz = float(lidar_cfg.get("publish_hz", 10))
+17|    period = 1.0 / max(1.0, hz)
+18|
+19|    session = zenoh_helpers.open_session(body_cfg)
+20|    stop = threading.Event()
+21|
+22|    def handle_sigterm(_sig: int, _frame: object) -> None:
+23|        stop.set()
+24|
+25|    signal.signal(signal.SIGTERM, handle_sigterm)
+26|    signal.signal(signal.SIGINT, handle_sigterm)
+27|
+28|    next_tick = time.monotonic()
+29|    while not stop.is_set():
+30|        zenoh_helpers.publish_json(session, "body/lidar/scan", schemas.lidar_scan(scan_time_ms=int(round(period * 1000))))
+31|        next_tick += period
+32|        sleep_for = next_tick - time.monotonic()
+33|        if sleep_for > 0:
+34|            time.sleep(sleep_for)
+35|        else:
+36|            next_tick = time.monotonic()
+37|
+38|    session.close()
+39|    sys.exit(0)
+40|
+
+
+--- iter 9 ---
+ACTION:
+{
+  "thought": "Read first 40 lines of remaining body Python modules for docstrings.",
+  "tool": "read",
+  "file": "body/motor_controller.py",
+  "start_line": 1,
+  "end_line": 40
+}
+OBSERVATION:
+OK: 1|"""Motor controller: stub publishes synthetic odom/motor_state; subscribes to motion and safety topics."""
+2|
+3|from __future__ import annotations
+4|
+5|import signal
+6|import sys
+7|import threading
+8|import time
+9|from dataclasses import dataclass, field
+10|from typing import Any
+11|
+12|from body.lib import diff_drive, schemas, zenoh_helpers
+13|
+14|
+15|@dataclass
+16|class MotionState:
+17|    lock: threading.Lock = field(default_factory=threading.Lock)
+18|    last_twist: dict[str, Any] | None = None
+19|    last_direct: dict[str, Any] | None = None
+20|    last_cmd_wall_s: float = 0.0
+21|    status_e_stop: bool = False
+22|    e_stop_latched: bool = False
+23|    awaiting_cmd_vel_after_clear: bool = False
+24|
+25|
+26|def _print_cmd(kind: str, msg: dict[str, Any]) -> None:
+27|    print(f"motor_controller: {kind} {msg}", flush=True)
+28|
+29|
+30|def main() -> None:
+31|    body_cfg = zenoh_helpers.load_body_config()
+32|    motor_cfg = body_cfg.get("motor", {})
+33|    loop_hz = int(motor_cfg.get("loop_hz", 50))
+34|    period = 1.0 / max(1, loop_hz)
+35|    wheel_base_m = float(motor_cfg.get("wheel_base_m", 0.0))
+36|    wheel_radius_m = float(motor_cfg.get("wheel_radius_m", 0.0))
+37|    ticks_per_rev = int(motor_cfg.get("ticks_per_rev", 1920))
+38|    max_wheel_vel_ms = float(motor_cfg.get("max_wheel_vel_ms", 0.0))
+39|
+40|    state = MotionState()
+
+
+--- iter 10 ---
+ACTION:
+{
+  "thought": "Read first 40 lines of remaining body Python modules for docstrings.",
+  "tool": "read",
+  "file": "body/oakd_driver.py",
+  "start_line": 1,
+  "end_line": 40
+}
+OBSERVATION:
+OK: 1|"""OAK-D Lite driver: DepthAI IMU pipeline, Zenoh publish, optional depth placeholder.
+2|
+3|Aggregates high-rate accel/gyro into **arithmetic means** over ``imu_aggregate_interval_s`` and
+4|publishes ``body/oakd/imu`` at that rate. **Mean gyro ≠ integrated angle** and mean accel ≠
+5|velocity change over the window; for strapdown-equivalent dead reckoning you would integrate
+6|at full sensor rate on the Pi (or use fused orientation only as a slow state estimate).
+7|See module docstring in body_project_spec.md §5.6.
+8|
+9|Supports **DepthAI v2** (``dai.node.XLinkOut``) and **v3** (output queues on node outputs;
+10|no XLink).
+11|"""
+12|
+13|from __future__ import annotations
+14|
+15|import base64
+16|import queue
+17|import signal
+18|import sys
+19|import time
+20|from collections.abc import Callable
+21|from typing import Any
+22|
+23|import cv2
+24|import depthai as dai
+25|import numpy as np
+26|
+27|from body.lib import schemas, zenoh_helpers
+28|
+29|
+30|def _depthai_is_v3() -> bool:
+31|    return not hasattr(dai.node, "XLinkOut")
+32|
+33|
+34|def _is_depthai_imu_missing_error(exc: BaseException) -> bool:
+35|    msg = str(exc)
+36|    return "IMU not detected" in msg or "IMU invalid settings" in msg
+37|
+38|
+39|def _log_imu_missing_fallback(exc: RuntimeError) -> None:
+40|    err = str(exc)
+
+
+--- iter 11 ---
+ACTION:
+{
+  "thought": "Read first 40 lines of remaining body Python modules: teleop, watchdog, and body/lib.",
+  "tool": "read",
+  "file": "body/teleop.py",
+  "start_line": 1,
+  "end_line": 40
+}
+OBSERVATION:
+OK: 1|"""Standalone teleop client: publishes body/heartbeat and body/cmd_vel without Jill.
+2|
+3|Run from the repo root with PYTHONPATH set (same as launcher). Connects to the Zenoh router
+4|from config.json or ZENOH_CONNECT.
+5|"""
+6|
+7|from __future__ import annotations
+8|
+9|import argparse
+10|import signal
+11|import sys
+12|import threading
+13|import time
+14|from typing import Any
+15|
+16|from body.lib import schemas, zenoh_helpers
+17|
+18|
+19|def main() -> None:
+20|    parser = argparse.ArgumentParser(
+21|        description="Publish body/heartbeat and body/cmd_vel for local or remote Body stacks.",
+22|    )
+23|    parser.add_argument("--heartbeat-hz", type=float, default=2.0, help="Minimum spec is 2 Hz.")
+24|    parser.add_argument("--cmd-vel-hz", type=float, default=20.0)
+25|    parser.add_argument("--timeout-ms", type=int, default=500, help="cmd_vel timeout_ms field (robot-side).")
+26|    parser.add_argument(
+27|        "--verbose",
+28|        action="store_true",
+29|        help="Print every body/status sample (noisy). emergency_stop is always printed.",
+30|    )
+31|    args = parser.parse_args()
+32|
+33|    body_cfg = zenoh_helpers.load_body_config()
+34|    session = zenoh_helpers.open_session(body_cfg)
+35|
+36|    stop = threading.Event()
+37|    lock = threading.Lock()
+38|    linear_mps = 0.0
+39|    angular_rps = 0.0
+40|    hb_seq = 0
+
+
+--- iter 12 ---
+ACTION:
+{
+  "thought": "Read first 40 lines of watchdog.py and body/lib modules for docstrings.",
+  "tool": "read",
+  "file": "body/watchdog.py",
+  "start_line": 1,
+  "end_line": 40
+}
+OBSERVATION:
+OK: 1|"""Watchdog: heartbeat timeout, process topic staleness, status and emergency_stop."""
+2|
+3|from __future__ import annotations
+4|
+5|import signal
+6|import sys
+7|import threading
+8|import time
+9|from typing import Any
+10|
+11|from body.lib import schemas, zenoh_helpers
+12|
+13|TOPIC_TO_PROCESS: dict[str, str] = {
+14|    "body/odom": "motor_controller",
+15|    "body/lidar/scan": "lidar_driver",
+16|    "body/oakd/imu": "oakd_driver",
+17|}
+18|
+19|
+20|def main() -> None:
+21|    body_cfg = zenoh_helpers.load_body_config()
+22|    wd_cfg = body_cfg.get("watchdog", {})
+23|    hb_timeout_ms = float(wd_cfg.get("heartbeat_timeout_ms", 2000))
+24|    proc_timeout_ms = float(wd_cfg.get("process_timeout_ms", 5000))
+25|    status_hz = float(wd_cfg.get("status_publish_hz", 1))
+26|    monitored: list[str] = list(wd_cfg.get("monitored_topics", []))
+27|
+28|    last_hb = 0.0
+29|    last_seen: dict[str, float] = {t: 0.0 for t in monitored}
+30|    lock = threading.Lock()
+31|    e_stop_active = False
+32|    hb_lost_announced = False
+33|    start = time.time()
+34|
+35|    session = zenoh_helpers.open_session(body_cfg)
+36|
+37|    def on_heartbeat(_key: str, _msg: dict[str, Any]) -> None:
+38|        nonlocal last_hb
+39|        with lock:
+40|            last_hb = time.time()
+
+
+FINAL ANSWER:
+(inspect_external: hit max iterations without responding; consider narrowing the query)
+
+PARTIAL — what this call did find before it ran out, unsummarised:
+  step 1: OK: ./
+body/	DIR
+deploy/	DIR
+docs/	DIR
+scripts/	DIR
+.gitignore	4689 bytes
+body_project_spec.md	22343 bytes
+config.json	1219 bytes
+LICENSE	1073 bytes
+README.md	8664 bytes
+requirements.txt	69 bytes
+  step 2: OK: body/
+lib/	DIR
+__init__.py	72 bytes
+cli.py	2976 bytes
+launcher.py	4288 bytes
+lidar_driver.py	1105 bytes
+motor_controller.py	6222 bytes
+oakd_driver.py	24018 bytes
+teleop.py	5544 bytes
+watchdog.py	3919 bytes
+  step 3: OK: body/lib/
+__init__.py	92 bytes
+diff_drive.py	2037 bytes
+schemas.py	5850 bytes
+zenoh_helpers.py	1850 bytes
+  step 4: OK: deploy/
+zenohd-router.json	80 bytes
+  step 5: OK: 1|"""Onboard Body stack: Zenoh-linked processes for the robot chassis."""
+  step 6: OK: 1|"""Pi-local CLI for Body Zenoh topics (same wire protocol as the desktop agent).
+2|
+3|Requires `zenohd` and the relevant Body processes (e.g. oakd_driver for OAK-D capture).
+4|"""
+5|
+6|from __future__ import annotations
+7|
+8|import argparse
+9|import base64
+10|import sys
+11|import time
+12|import uuid
+13|
+14|from body.lib import schemas, zenoh_helpers
+15|
+16|
+17|def _cmd_oakd_capture(args: argparse.Namespace) -> int:
+18|    request_id = str(uuid.uuid4())
+19|    body_cfg = zenoh_helpers.load_body_config()
+20|    session = zenoh_helpers.open_session(body_cfg)
+21|    result: dict | None = Non …[trimmed]
+  step 7: OK: 1|"""Start Body processes, prefix logs, restart with backoff, graceful shutdown."""
+2|
+3|from __future__ import annotations
+4|
+5|import os
+6|import signal
+7|import subprocess
+8|import sys
+9|import threading
+10|import time
+11|from dataclasses import dataclass, field
+12|from typing import Any
+13|
+14|from body.lib.zenoh_helpers import repo_root
+15|
+16|PROCESSES: list[dict[str, Any]] = [
+17|    {"name": "watchdog", "cmd": [sys.executable, "-m", "body.watchdog"]},
+18|    {"name": "motor_controller", "cmd": [sys.executable, "-m", "body.motor_controller"]},
+19|    {"name": "lidar_driver", "cmd": …[trimmed]
+  step 8: OK: 1|"""LIDAR driver: stub publishes synthetic scans at ~10 Hz."""
+2|
+3|from __future__ import annotations
+4|
+5|import signal
+6|import sys
+7|import threading
+8|import time
+9|
+10|from body.lib import schemas, zenoh_helpers
+11|
+12|
+13|def main() -> None:
+14|    body_cfg = zenoh_helpers.load_body_config()
+15|    lidar_cfg = body_cfg.get("lidar", {})
+16|    hz = float(lidar_cfg.get("publish_hz", 10))
+17|    period = 1.0 / max(1.0, hz)
+18|
+19|    session = zenoh_helpers.open_session(body_cfg)
+20|    stop = threading.Event()
+21|
+22|    def handle_sigterm(_sig: int, _frame: object) -> None:
+23| …[trimmed]
+  step 9: OK: 1|"""Motor controller: stub publishes synthetic odom/motor_state; subscribes to motion and safety topics."""
+2|
+3|from __future__ import annotations
+4|
+5|import signal
+6|import sys
+7|import threading
+8|import time
+9|from dataclasses import dataclass, field
+10|from typing import Any
+11|
+12|from body.lib import diff_drive, schemas, zenoh_helpers
+13|
+14|
+15|@dataclass
+16|class MotionState:
+17|    lock: threading.Lock = field(default_factory=threading.Lock)
+18|    last_twist: dict[str, Any] | None = None
+19|    last_direct: dict[str, Any] | None = None
+20|    last_cmd_wall_s: float = 0.0
+21| …[trimmed]
+  step 10: OK: 1|"""OAK-D Lite driver: DepthAI IMU pipeline, Zenoh publish, optional depth placeholder.
+2|
+3|Aggregates high-rate accel/gyro into **arithmetic means** over ``imu_aggregate_interval_s`` and
+4|publishes ``body/oakd/imu`` at that rate. **Mean gyro ≠ integrated angle** and mean accel ≠
+5|velocity change over the window; for strapdown-equivalent dead reckoning you would integrate
+6|at full sensor rate on the Pi (or use fused orientation only as a slow state estimate).
+7|See module docstring in body_project_spec.md §5.6.
+8|
+9|Supports **DepthAI v2** (``dai.node.XLinkOut``) and **v3** (output qu …[trimmed]
+  step 11: OK: 1|"""Standalone teleop client: publishes body/heartbeat and body/cmd_vel without Jill.
+2|
+3|Run from the repo root with PYTHONPATH set (same as launcher). Connects to the Zenoh router
+4|from config.json or ZENOH_CONNECT.
+5|"""
+6|
+7|from __future__ import annotations
+8|
+9|import argparse
+10|import signal
+11|import sys
+12|import threading
+13|import time
+14|from typing import Any
+15|
+16|from body.lib import schemas, zenoh_helpers
+17|
+18|
+19|def main() -> None:
+20|    parser = argparse.ArgumentParser(
+21|        description="Publish body/heartbeat and body/cmd_vel for local or remote Body stac …[trimmed]
+  step 12: OK: 1|"""Watchdog: heartbeat timeout, process topic staleness, status and emergency_stop."""
+2|
+3|from __future__ import annotations
+4|
+5|import signal
+6|import sys
+7|import threading
+8|import time
+9|from typing import Any
+10|
+11|from body.lib import schemas, zenoh_helpers
+12|
+13|TOPIC_TO_PROCESS: dict[str, str] = {
+14|    "body/odom": "motor_controller",
+15|    "body/lidar/scan": "lidar_driver",
+16|    "body/oakd/imu": "oakd_driver",
+17|}
+18|
+19|
+20|def main() -> None:
+21|    body_cfg = zenoh_helpers.load_body_config()
+22|    wd_cfg = body_cfg.get("watchdog", {})
+23|    hb_timeout_ms = float( …[trimmed]

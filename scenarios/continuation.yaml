@@ -70,7 +70,7 @@ characters:
     # and audit.yaml's own note says this mode wants them back on.
     workflow_mode: false
 
-    # Interactive default: whatever the local vLLM serves. The launcher's --arm
+    # Interactive default: whatever the local vLLM serves. The launcher's --model
     # replaces this block, never merges into it.
     llm_config:
       server: local

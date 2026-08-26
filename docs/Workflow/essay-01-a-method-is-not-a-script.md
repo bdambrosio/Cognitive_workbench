@@ -302,7 +302,7 @@ tests no stated claim has nowhere to go: models reach the evidence and stop
 short of stating the conclusion. Give it a home and they use it — the shape is
 now used in essentially every run.
 
-What they put in it still varies. Across the three arms I run, the two planted
+What they put in it still varies. Across the three models I run, the two planted
 derived findings are recovered 1 of 2, 2 of 2 and 1 of 2. Same document, same
 format, same slots, three different degrees of actually doing the arithmetic.
 Whatever produces that difference is not the specification, because the

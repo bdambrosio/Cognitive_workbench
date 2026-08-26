@@ -54,9 +54,9 @@
 # proceeds by yield. With autonomy off, a yield spawns a remainder only
 # _handle_tick can fire, and a human becomes the scheduler for every leg.
 #
-# BACKEND is per-run; see the arm block below. A real engagement runs on
+# BACKEND is per-run; see the model block below. A real engagement runs on
 # single-tenant hardware: a client's materials should not transit an inference
-# provider chosen per-request by a gateway. The OpenRouter arms are for
+# provider chosen per-request by a gateway. The OpenRouter models are for
 # synthetic or own-code targets.
 #
 # VALIDATION. Point external_repo at measure/fixtures/dataroom/corpus and run
@@ -97,8 +97,8 @@ characters:
     # METHOD.md and nothing else, which is all an audit needs from this side.
     #
     # It was the whole checkout, which contains the fixture's answer key and
-    # every committed arm's report. On 2026-08-23 a run's grep for "Gap Map"
-    # returned a prior arm's full_reply.md. No arm is known to have used it,
+    # every committed model's report. On 2026-08-23 a run's grep for "Gap Map"
+    # returned a prior model's full_reply.md. No model is known to have used it,
     # but a benchmark whose answers sit inside the geofence measures nothing,
     # and the exposure grows with every committed run.
     #
@@ -132,14 +132,14 @@ characters:
     # would want all of this back on. Not built.
     workflow_mode: true
 
-    # PER-RUN — the arm. Arms live in measure/arms/*.yaml and are applied by
-    # measure/fixtures/dataroom/run.py --arm, which REPLACES this block rather
+    # PER-RUN — the model. Models live in measure/models/*.yaml and are applied by
+    # measure/fixtures/dataroom/run.py --model, which REPLACES this block rather
     # than merging into it. Not duplicated here: a second copy drifts.
     #
-    # NEVER LEAVE A GATEWAY ARM UNPINNED. Four providers serve nemotron and
+    # NEVER LEAVE A GATEWAY MODEL UNPINNED. Four providers serve nemotron and
     # the default route lands on the one with no `response_format` support —
     # the missing parameter behind the 160 "unknown tool None" failures fixed
-    # in 96e03f54. See measure/arms/nemotron_ultra.yaml for the measurements.
+    # in 96e03f54. See measure/models/nemotron_ultra.yaml for the measurements.
     #
     # This block is the interactive default: whatever the local vLLM serves.
     llm_config:

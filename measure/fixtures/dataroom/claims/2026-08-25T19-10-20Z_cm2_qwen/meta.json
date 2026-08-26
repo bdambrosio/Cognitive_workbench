@@ -1,0 +1,19 @@
+{
+  "world": "cm2_qwen",
+  "arm": "/home/bruce/Downloads/Cognitive_workbench/measure/arms/qwen_local.yaml",
+  "resolved_model": "Qwen/Qwen3.8-27B",
+  "resolved_temperature": 0.25,
+  "top_p": 0.95,
+  "external_repo": "/home/bruce/Downloads/Cognitive_workbench/targets/chattermate",
+  "exit_reason": "respond",
+  "wall_clock_s": 395.1,
+  "error": null,
+  "declared": true,
+  "count": 58,
+  "leg": 1,
+  "per_document": {
+    "HELP_CENTER_INFRA.md": 96,
+    "README.md": 127,
+    "llms.txt": 9
+  }
+}

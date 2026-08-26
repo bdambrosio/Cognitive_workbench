@@ -1,0 +1,310 @@
+================================================================================
+[inspect_external] 2026-08-25T21-43-39Z exit=respond iters=8
+================================================================================
+Query: Read backend/app/models/workflow.py lines 35-45. Read README.md line 54. Read llms.txt lines 1-49. Read HELP_CENTER_INFRA.md 163-194. Grep widget themeable CSS variables in frontend. Grep business hours handoff. Confirm Apache LICENSE line 1-4.
+
+--- iter 1 ---
+ACTION:
+{
+  "thought": "Start by reading backend/app/models/workflow.py lines 35-45 as requested.",
+  "tool": "read",
+  "file": "backend/app/models/workflow.py",
+  "start_line": 35,
+  "end_line": 45
+}
+OBSERVATION:
+OK: 35|    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+36|    name = Column(String(100), nullable=False)
+37|    description = Column(Text)
+38|    status = Column(Enum(WorkflowStatus), default=WorkflowStatus.DRAFT)
+39|    version = Column(Integer, default=1)
+40|    is_template = Column(Boolean, default=False)
+41|    default_language = Column(String(10), default="en")
+42|    created_at = Column(DateTime, default=datetime.utcnow)
+43|    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+44|    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+45|    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"))
+
+
+--- iter 2 ---
+ACTION:
+{
+  "thought": "Next requested read is README.md line 54.",
+  "tool": "read",
+  "file": "README.md",
+  "start_line": 54,
+  "end_line": 54
+}
+OBSERVATION:
+OK: 54|| 🌍 **Auto Translation** | Multilingual support with configurable **default language per workflow**. Serve customers globally in their preferred language. |
+
+
+--- iter 3 ---
+ACTION:
+{
+  "thought": "Next requested read is llms.txt lines 1-49.",
+  "tool": "read",
+  "file": "llms.txt",
+  "start_line": 1,
+  "end_line": 49
+}
+OBSERVATION:
+OK: 1|# ChatterMate
+2|
+3|> ChatterMate is an open-source AI customer-support chatbot platform. You can sign up, create AI
+4|> agents, add knowledge sources, and embed a chat widget — all from a browser, the terminal (CLI),
+5|> or programmatically via an AI agent over MCP.
+6|
+7|## Start here (AI agents & automation)
+8|
+9|Use the **ChatterMate CLI** (the `chattermate` command, installed with `pip install chattermate-cli`)
+10|to sign up and manage everything from the terminal. It is the account/config CLI — distinct from the
+11|self-host Docker tool (`npm install -g chattermate-deploy`).
+12|
+13|Minimal end-to-end flow:
+14|
+15|```bash
+16|pip install chattermate-cli
+17|chattermate signup --name "Acme Inc" --domain acme.com --admin-email you@acme.com --admin-name "You"
+18|chattermate agent create --name "Support" --type customer_support -i "Be concise" --json
+19|# Add knowledge from a URL or a local PDF:
+20|chattermate knowledge add-url --website https://docs.acme.com --agent-id <agent-id>
+21|chattermate knowledge add-file ./guide.pdf --agent-id <agent-id>
+22|# Create a widget to get the embed id:
+23|chattermate widget create --agent-id <agent-id> --name "Website widget"
+24|# Embed on your site:
+25|# <script>window.chattermateId='YOUR_WIDGET_ID';</script>
+26|# <script src="https://app.chattermate.chat/webclient/chattermate.min.js"></script>
+27|```
+28|
+29|## Docs
+30|
+31|- [AI Agent & Automation Quickstart](https://docs.chattermate.chat/features/agents-quickstart): copy-paste path from signup to a live widget, built for AI agents and CI.
+32|- [CLI reference](https://docs.chattermate.chat/features/cli): the account CLI — signup, login, tokens, agents, workflows, knowledge.
+33|- [MCP Server](https://docs.chattermate.chat/features/mcp-server): let an AI agent configure ChatterMate over the Model Context Protocol (`chattermate-mcp`).
+34|- [Quickstart](https://docs.chattermate.chat/quickstart): hosted vs self-host, side by side.
+35|- [Widget integration](https://docs.chattermate.chat/features/widget): embed the chat widget on any site.
+36|- [Widget Apps & API keys](https://docs.chattermate.chat/features/widget-apps): authenticated widgets and programmatic tokens.
+37|
+38|## Key URLs
+39|
+40|- Sign up / dashboard: https://app.chattermate.chat
+41|- Hosted API base: https://api.chattermate.chat (routes under `/api/v1`)
+42|- Widget script: https://app.chattermate.chat/webclient/chattermate.min.js
+43|- Documentation: https://docs.chattermate.chat
+44|- GitHub: https://github.com/chattermate/chattermate.chat
+45|
+46|## Self-hosting (optional)
+47|
+48|- [Self-host with Docker](https://docs.chattermate.chat/quickstart#option-b-self-host-with-docker): run the full stack on your own infrastructure with the self-host CLI (`npm install -g chattermate-deploy`, command `chattermate-deploy init/start/stop`).
+49|- [Docker deployment](https://docs.chattermate.chat/deployment/docker)
+
+
+--- iter 4 ---
+ACTION:
+{
+  "thought": "Read HELP_CENTER_INFRA.md lines 163-194 as the next requested file.",
+  "tool": "read",
+  "file": "HELP_CENTER_INFRA.md",
+  "start_line": 163,
+  "end_line": 194
+}
+OBSERVATION:
+OK: 163|## 3. Verification checklist after deploy
+164|1. `curl -sS -o /dev/null -w '%{http_code}\n' https://<slug>.help.chattermate.chat/` → `200` (and `http://` → `301`).
+165|2. `https://<slug>.help.chattermate.chat` in a browser → published FAQs render, widget loads; an article at `/a/<faq-slug>` returns `200`.
+166|3. `docker exec chattermate-backend-1 printenv HELP_CENTER_BASE_DOMAIN` → `help.chattermate.chat` (and the backend is `healthy`, not crash-looping on `HELP_CENTER_TARGET_IPS`).
+167|4. API unaffected: `https://app.chattermate.chat` / `https://api.chattermate.chat/api/v1/...` still route normally.
+168|5. `POST /ask` from the page returns an answer and appears in `help_center_queries`.
+169|6. `docker ps -a --filter name=certbot` → **empty**. `compose up -d` must not start a
+170|   certbot container; one that sticks around means the long-running loop entrypoint is
+171|   back (see the renewal note in §1) and nginx will stop reloading onto renewed certs.
+172|
+173|## 4. Enterprise (cloud) rollout prerequisite
+174|
+175|The feature is gated by the `help_center` plan flag, which lives in the
+176|**enterprise submodule** (separate repo/PR — required before cloud rollout):
+177|
+178|- add `"help_center": True` to PRO and ENTERPRISE in
+179|  `enterprise/models/plan.py::get_default_features` (FREE/BASE: `False`);
+180|- backfill existing plan rows' `features` JSON with the same values;
+181|- extend the message-limit check to add the org's period
+182|  `help_center_queries` count (`HelpCenterQueryRepository.count_for_period`)
+183|  to the bot-message count when the org runs on the ChatterMate-hosted model.
+184|
+185|Until that PR deploys, cloud orgs see the upgrade lock (`plan_allowed:
+186|false`); self-hosted/OSS installs are unrestricted immediately.
+187|
+188|## 5. Tunables (backend env)
+189|
+190|`HELP_CENTER_RESERVED_SLUGS` (labels never claimable as slugs — must mirror
+191|real infra records on the base domain), `FAQ_MAX_PAGES_PER_SOURCE` (300),
+192|`FAQ_MAX_BATCH_CHARS` (15000), `FAQ_IMPORT_MAX_PAGE_CHARS` (100000),
+193|`FAQ_IMPORT_FETCH_TIMEOUT` (30s) — the FAQ_* caps bound LLM spend per
+194|generation run.
+
+
+--- iter 5 ---
+ACTION:
+{
+  "thought": "Grep frontend for widget themeable CSS variables as requested next.",
+  "tool": "grep",
+  "path": "frontend",
+  "pattern": "--(cm|widget|chat)-"
+}
+OBSERVATION:
+OK: frontend/src/composables/useWidgetStyles.ts:23:// `--cm-*` vars set on `.chat-container`). These computeds return `var(--cm-*)`
+frontend/src/composables/useWidgetStyles.ts:28:        backgroundColor: 'var(--cm-card)',
+frontend/src/composables/useWidgetStyles.ts:29:        color: 'var(--cm-text)'
+frontend/src/composables/useWidgetStyles.ts:39:        backgroundColor: 'var(--cm-agent-bg)',
+frontend/src/composables/useWidgetStyles.ts:40:        color: 'var(--cm-text)'
+frontend/src/composables/useWidgetStyles.ts:44:        backgroundColor: 'var(--cm-accent)',
+frontend/src/composables/useWidgetStyles.ts:45:        color: 'var(--cm-on-accent)'
+frontend/src/composables/useWidgetStyles.ts:49:        color: 'var(--cm-text)'
+frontend/src/composables/useWidgetStyles.ts:53:        borderBottom: '1px solid var(--cm-hairline)'
+frontend/src/components/agent/AgentChatPreviewPanel.vue:293:// the real widget — so the preview can never drift. These return `var(--cm-*)` refs.
+frontend/src/components/agent/AgentChatPreviewPanel.vue:302:    backgroundColor: 'var(--cm-card)',
+frontend/src/components/agent/AgentChatPreviewPanel.vue:303:    color: 'var(--cm-text)'
+frontend/src/components/agent/AgentChatPreviewPanel.vue:312:    backgroundColor: 'var(--cm-agent-bg)',
+frontend/src/components/agent/AgentChatPreviewPanel.vue:313:    color: 'var(--cm-text)'
+frontend/src/components/agent/AgentChatPreviewPanel.vue:317:    backgroundColor: 'var(--cm-accent)',
+frontend/src/components/agent/AgentChatPreviewPanel.vue:318:    color: 'var(--cm-on-accent)'
+frontend/src/components/agent/AgentChatPreviewPanel.vue:322:    backgroundColor: 'var(--cm-accent)',
+frontend/src/components/agent/AgentChatPreviewPanel.vue:323:    color: 'var(--cm-on-accent)'
+frontend/src/components/agent/AgentChatPreviewPanel.vue:327:    color: 'var(--cm-text)'
+frontend/src/components/agent/AgentChatPreviewPanel.vue:392:        borderRadius: 'var(--cm-radius, 24px)'
+frontend/src/webclient/AskAiPanel.vue:24:  it in and handles the emitted intents. Colours come from the --cm-* theme tokens
+frontend/src/webclient/AskAiPanel.vue:311:/* Every colour is a --cm-* theme token, so light (Ask Anything) and dark (Aurora)
+frontend/src/webclient/AskAiPanel.vue:318:    background: var(--cm-card);
+frontend/src/webclient/AskAiPanel.vue:319:    color: var(--cm-text);
+frontend/src/webclient/AskAiPanel.vue:320:    font-family: var(--cm-body-font, inherit);
+frontend/src/webclient/AskAiPanel.vue:328:    border-bottom: 1px solid var(--cm-border);
+frontend/src/webclient/AskAiPanel.vue:333:    color: var(--cm-accent);
+frontend/src/webclient/AskAiPanel.vue:343:    color: var(--cm-text);
+frontend/src/webclient/AskAiPanel.vue:349:.askai__input::placeholder { color: var(--cm-muted); }
+frontend/src/webclient/AskAiPanel.vue:361:    border: 1px solid var(--cm-border);
+frontend/src/webclient/AskAiPanel.vue:365:    color: var(--cm-muted);
+frontend/src/webclient/AskAiPanel.vue:388:    color: var(--cm-text);
+frontend/src/webclient/AskAiPanel.vue:389:    border-color: var(--cm-accent);
+frontend/src/webclient/AskAiPanel.vue:395:    color: var(--cm-text);
+frontend/src/webclient/AskAiPanel.vue:396:    border-color: var(--cm-accent);
+frontend/src/webclient/AskAiPanel.vue:400:    border: 1px solid var(--cm-border);
+frontend/src/webclient/AskAiPanel.vue:405:    color: var(--cm-muted);
+frontend/src/webclient/AskAiPanel.vue:411:    color: var(--cm-text);
+frontend/src/webclient/AskAiPanel.vue:412:    border-color: var(--cm-accent);
+frontend/src/webclient/AskAiPanel.vue:447:    color: var(--cm-muted);
+frontend/src/webclient/AskAiPanel.vue:457:    color: var(--cm-muted);
+frontend/src/webclient/AskAiPanel.vue:470:    border: 1px solid var(--cm-border);
+frontend/src/webclient/AskAiPanel.vue:472:    background: var(--cm-agent-bg);
+frontend/src/webclient/AskAiPanel.vue:473:    color: var(--cm-text);
+frontend/src/webclient/AskAiPanel.vue:481:    border-color: var(--cm-accent);
+frontend/src/webclient/AskAiPanel.vue:486:.askai__suggestion svg { color: var(--cm-muted); flex-shrink: 0; }
+frontend/src/webclient/AskAiPanel.vue:501:    color: var(--cm-text);
+frontend/src/webclient/AskAiPanel.vue:513:    background: var(--cm-accent, currentColor);
+frontend/src/webclient/AskAiPanel.vue:527:.askai__answer :deep(a) { color: var(--cm-accent); }
+frontend/src/webclient/AskAiPanel.vue:529:    background: var(--cm-agent-bg);
+(grep capped at 50 hits — narrow the pattern for full coverage)
+
+--- iter 6 ---
+ACTION:
+{
+  "thought": "Grep business hours handoff next as requested.",
+  "tool": "grep",
+  "pattern": "business.?hours|handoff",
+  "path": ""
+}
+OBSERVATION:
+OK: README.md:9:[Omitted long matching line]
+README.md:48:| 🤝 **Smart Human Handoff** | Intelligent AI-to-human transfer with **business hours awareness**, real-time availability detection, and context-aware escalation messages. |
+README.md:65:![No-code AI chatbot workflow builder with drag-and-drop nodes and human handoff](.github/images/workflow-builder.webp)
+README.md:68:- **Drag-and-drop nodes** - AI responses, human handoff, conditions, and more
+README.md:161:answers, human handoff, and workflows as the web widget:
+README.md:195:> against the shared `ChannelAdapter` base — the inbox, AI, and handoff come for
+README.md:202:ChatterMate is a **free, open-source alternative to Intercom, Zendesk AI, and Chatbase** — with AI answers *and* human handoff in one inbox:
+README.md:209:| Built-in human handoff + shared inbox | ✅ | ✅ | ✅ | ⚠️ limited |
+README.md:226:![AI customer support shared inbox with human handoff](.github/images/inbox-human-handoff.webp)
+README.md:546:Yes — human handoff is a core feature, not an add-on. ChatterMate detects frustration or explicit requests for a human and transfers the conversation with full context, respecting business hours and agent availability.
+README.md:624:[Omitted long matching line]
+chattermate-test/index.html:317:            and seamless human handoff capabilities.
+backend/tests_live/test_behaviours_live.py:107:        """Either a real handoff or the out-of-hours fallback is correct — what
+backend/tests_live/test_behaviours_live.py:122:            "handoff request produced no transfer, contact request or ticket:\n"
+backend/tests/repo/test_customer_repo.py:400:        # Now the handoff form captures their real email.
+backend/tests/repo/test_organization_repo.py:31:    business_hours = {
+backend/tests/repo/test_organization_repo.py:40:        business_hours=business_hours
+backend/tests/repo/test_organization_repo.py:46:    assert org.business_hours == business_hours
+backend/tests/repo/test_organization_repo.py:153:def test_organization_with_business_hours(org_repo):
+backend/tests/repo/test_organization_repo.py:154:    """Test organization with business hours"""
+backend/tests/repo/test_organization_repo.py:155:    business_hours = {
+backend/tests/repo/test_organization_repo.py:167:        business_hours=business_hours
+backend/tests/repo/test_organization_repo.py:171:    assert retrieved_org.business_hours == business_hours
+backend/app/agents/transfer_agent.py:25:from app.utils.business_hours import DEFAULT_BUSINESS_HOURS, is_within_business_hours
+backend/app/agents/transfer_agent.py:34:# Wording used when the model can't produce a handoff line in time. The routing
+backend/app/agents/transfer_agent.py:35:# decision itself is computed from business hours and agent availability, so a
+backend/app/agents/transfer_agent.py:36:# timeout costs only the phrasing — the handoff still goes ahead.
+backend/app/agents/transfer_agent.py:54:            "If within business hours and agents are available, explain that you need to transfer to a better qualified agent to help.",
+backend/app/agents/transfer_agent.py:55:            "If outside business hours or no agents available, apologize and explain that the team will contact them via email.",
+backend/app/agents/transfer_agent.py:83:    async def get_business_context(self, business_hours: dict, available_agents: int) -> str:
+backend/app/agents/transfer_agent.py:86:            # Format business hours for each day
+backend/app/agents/transfer_agent.py:87:            business_hours_text = []
+backend/app/agents/transfer_agent.py:91:                if day in business_hours:
+backend/app/agents/transfer_agent.py:92:                    day_hours = business_hours[day]
+backend/app/agents/transfer_agent.py:94:                        business_hours_text.append(
+backend/app/agents/transfer_agent.py:98:                        business_hours_text.append(f"{day.capitalize()}: Closed")
+backend/app/agents/transfer_agent.py:102:                "\n".join(business_hours_text) + 
+backend/app/agents/transfer_agent.py:113:        business_hours: dict,
+backend/app/agents/transfer_agent.py:115:        is_business_hours: bool,
+backend/app/agents/transfer_agent.py:121:        business_context = await self.get_business_context(business_hours, available_agents)
+backend/app/agents/transfer_agent.py:137:            f"Currently within business hours: {is_business_hours}"
+backend/app/agents/transfer_agent.py:141:            f"1. If within business hours ({is_business_hours}) and agents available ({available_agents} online), "
+backend/app/agents/transfer_agent.py:143:            f"2. If outside business hours or no agents available, if jira tool is available, "
+backend/app/agents/transfer_agent.py:153:        will_transfer = is_business_hours and available_agents > 0
+backend/app/agents/transfer_agent.py:156:        # so a stuck run would hang the widget even though the handoff decision
+backend/app/agents/transfer_agent.py:166:                f"cancelled; falling back to a plain handoff line "
+backend/app/agents/transfer_agent.py:224:    # at a fake address — the handoff contact form collects a real one instead.
+backend/app/agents/transfer_agent.py:241:    # Get organization's business hours
+backend/app/agents/transfer_agent.py:248:    business_hours = getattr(org, 'business_hours', None) or DEFAULT_BUSINESS_HOURS
+backend/app/agents/transfer_agent.py:249:    is_business_hours = is_within_business_hours(org)
+(grep capped at 50 hits — narrow the pattern for full coverage)
+
+--- iter 7 ---
+ACTION:
+{
+  "thought": "Confirm Apache LICENSE lines 1-4 as the last requested check.",
+  "tool": "read",
+  "file": "LICENSE",
+  "start_line": 1,
+  "end_line": 4
+}
+OBSERVATION:
+OK: 1|
+2|                                 Apache License
+3|                           Version 2.0, January 2004
+4|                        http://www.apache.org/licenses/
+
+
+--- iter 8 ---
+ACTION:
+{
+  "thought": "All requested reads and greps are already in the working log; emit a concise confirmation of each item with citations.",
+  "tool": "respond",
+  "text": "Confirmed all requested reads/greps.\n\n**workflow.py:35-45** (`backend/app/models/workflow.py:35-45`): Workflow columns include `id` (UUID PK), `name` String(100), `description` Text, `status` Enum(WorkflowStatus) default DRAFT, `version` Integer default 1, `is_template` Boolean default False, `default_language` String(10) default `\"en\"`, `created_at`/`updated_at`, `created_by` \u2192 users.id, `organization_id` \u2192 organizations.id.\n\n**README.md:54**: Auto Translation row \u2014 multilingual support with configurable **default language per workflow**.\n\n**llms.txt:1-49**: ChatterMate OSS AI support platform; CLI (`chattermate` / `chattermate-cli`) vs self-host (`chattermate-deploy`); signup\u2192agent\u2192knowledge\u2192widget embed; docs/MCP/widget URLs; hosted `app`/`api.chattermate.chat`; GitHub chattermate/chattermate.chat.\n\n**HELP_CENTER_INFRA.md:163-194**: Post-deploy checklist (slug.help 200, FAQ `/a/<slug>`, `HELP_CENTER_BASE_DOMAIN`, no certbot); enterprise `help_center` plan flag in `enterprise/models/plan.py::get_default_features`; tunables `HELP_CENTER_RESERVED_SLUGS`, FAQ_* caps.\n\n**Widget `--cm-*` CSS** (frontend, grep capped at 50): `frontend/src/composables/useWidgetStyles.ts` (card/text/agent-bg/accent/on-accent/hairline); `AgentChatPreviewPanel.vue` (+ `--cm-radius`); `AskAiPanel.vue` (card/text/body-font/border/accent/muted/agent-bg).\n\n**Business hours handoff**: README smart handoff + FAQ; `backend/app/agents/transfer_agent.py` imports `is_within_business_hours` / `DEFAULT_BUSINESS_HOURS`, `will_transfer = is_business_hours and available_agents > 0`; org `business_hours` in `test_organization_repo.py`; live test `test_behaviours_live.py`.\n\n**LICENSE:1-4**: Apache License Version 2.0, January 2004 (`http://www.apache.org/licenses/`)."
+}
+OBSERVATION:
+(respond)
+
+FINAL ANSWER:
+Confirmed all requested reads/greps.
+
+**workflow.py:35-45** (`backend/app/models/workflow.py:35-45`): Workflow columns include `id` (UUID PK), `name` String(100), `description` Text, `status` Enum(WorkflowStatus) default DRAFT, `version` Integer default 1, `is_template` Boolean default False, `default_language` String(10) default `"en"`, `created_at`/`updated_at`, `created_by` → users.id, `organization_id` → organizations.id.
+
+**README.md:54**: Auto Translation row — multilingual support with configurable **default language per workflow**.
+
+**llms.txt:1-49**: ChatterMate OSS AI support platform; CLI (`chattermate` / `chattermate-cli`) vs self-host (`chattermate-deploy`); signup→agent→knowledge→widget embed; docs/MCP/widget URLs; hosted `app`/`api.chattermate.chat`; GitHub chattermate/chattermate.chat.
+
+**HELP_CENTER_INFRA.md:163-194**: Post-deploy checklist (slug.help 200, FAQ `/a/<slug>`, `HELP_CENTER_BASE_DOMAIN`, no certbot); enterprise `help_center` plan flag in `enterprise/models/plan.py::get_default_features`; tunables `HELP_CENTER_RESERVED_SLUGS`, FAQ_* caps.
+
+**Widget `--cm-*` CSS** (frontend, grep capped at 50): `frontend/src/composables/useWidgetStyles.ts` (card/text/agent-bg/accent/on-accent/hairline); `AgentChatPreviewPanel.vue` (+ `--cm-radius`); `AskAiPanel.vue` (card/text/body-font/border/accent/muted/agent-bg).
+
+**Business hours handoff**: README smart handoff + FAQ; `backend/app/agents/transfer_agent.py` imports `is_within_business_hours` / `DEFAULT_BUSINESS_HOURS`, `will_transfer = is_business_hours and available_agents > 0`; org `business_hours` in `test_organization_repo.py`; live test `test_behaviours_live.py`.
+
+**LICENSE:1-4**: Apache License Version 2.0, January 2004 (`http://www.apache.org/licenses/`).

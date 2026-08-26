@@ -2,7 +2,7 @@
 """Talk to a finished audit, using the record it left behind.
 
     python3 measure/continuation.py --run measure/fixtures/dataroom/results/<dir>
-    python3 measure/continuation.py --run <dir> --arm measure/arms/grok_4p6.yaml
+    python3 measure/continuation.py --run <dir> --model measure/models/grok_4p6.yaml
 
 WHY THIS EXISTS. A report ships the conclusions and deletes the machinery that
 produced them. The machinery is still on disk — every run leaves its
@@ -49,11 +49,11 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger("continuation")
 
 
-def build_config(run_dir: Path, world: str, arm_path: Optional[Path],
+def build_config(run_dir: Path, world: str, model_path: Optional[Path],
                  target: Path) -> Tuple[str, Dict[str, Any]]:
     """Assemble the character config, the way run.py:build_config does.
 
-    Same shape and the same reasons: the arm REPLACES the llm_config block
+    Same shape and the same reasons: the model REPLACES the llm_config block
     rather than merging into it, and the per-session paths are set here rather
     than by editing the committed scenario, so a session leaves no diff behind.
     """
@@ -62,15 +62,15 @@ def build_config(run_dir: Path, world: str, arm_path: Optional[Path],
     scenario = yaml.safe_load(SCENARIO.read_text(encoding="utf-8")) or {}
     scen_llm = dict(scenario.get("llm_config") or {})
 
-    if arm_path:
-        arm = yaml.safe_load(Path(arm_path).read_text(encoding="utf-8")) or {}
-        arm_llm = dict(arm.get("llm_config") or {})
-        if not arm_llm:
-            raise SystemExit(f"{arm_path}: no llm_config block")
+    if model_path:
+        model = yaml.safe_load(Path(model_path).read_text(encoding="utf-8")) or {}
+        model_llm = dict(model.get("llm_config") or {})
+        if not model_llm:
+            raise SystemExit(f"{model_path}: no llm_config block")
         for char in (scenario.get("characters") or {}).values():
             if isinstance(char, dict) and char.get("mode") == "chat":
-                char["llm_config"] = dict(arm_llm)
-        scen_llm.update(arm_llm)
+                char["llm_config"] = dict(model_llm)
+        scen_llm.update(model_llm)
 
     world_cfg = dict(scenario.get("world_config") or {})
     world_cfg["world_name"] = world
@@ -140,10 +140,10 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run", type=Path, required=True,
                     help="a results directory containing run_meta.json")
-    ap.add_argument("--arm", type=Path, default=None,
+    ap.add_argument("--model", type=Path, default=None,
                     help="YAML with an llm_config block; replaces the "
                          "scenario's. Omit to use whatever the local vLLM "
-                         "serves — this need not be the arm that produced "
+                         "serves — this need not be the model that produced "
                          "the run")
     ap.add_argument("--target", type=Path, default=None,
                     help="override the target tree. Use when the audited "
@@ -172,7 +172,7 @@ def main() -> int:
             f"questions about one engagement must not carry them into "
             f"another — pass --world with a fresh name.")
 
-    name, cfg = build_config(run_dir, world, args.arm, target)
+    name, cfg = build_config(run_dir, world, args.model, target)
 
     from chat.chat_loop import ChatLoop                        # noqa: E402
     from chat.model_params import TOP_P                        # noqa: E402

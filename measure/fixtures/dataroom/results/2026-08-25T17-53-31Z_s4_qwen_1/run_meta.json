@@ -1,0 +1,38 @@
+{
+  "world": "s4_qwen_1",
+  "arm": "/home/bruce/Downloads/Cognitive_workbench/measure/arms/qwen_local.yaml",
+  "workflow_mode": true,
+  "react_temperature": 0.7,
+  "react_max_tokens": 8192,
+  "resolved_model": "Qwen/Qwen3.8-27B",
+  "resolved_temperature": 0.25,
+  "top_p": 0.95,
+  "llm_config": {
+    "sgl_model_path": null,
+    "reasoning_parser": null,
+    "server": "local",
+    "model": "",
+    "vllm_url": "http://127.0.0.1:5000",
+    "is_reasoning_model": false
+  },
+  "served_model_check": {
+    "checked": true,
+    "endpoint": "http://127.0.0.1:5000/v1/models",
+    "served": [
+      "Qwen/Qwen3.8-27B"
+    ],
+    "expected": "Qwen3.8"
+  },
+  "external_repo": "/home/bruce/Downloads/Cognitive_workbench/measure/fixtures/dataroom/corpus",
+  "legs": [
+    {
+      "leg": 1,
+      "sent": "The target is the data room bound to inspect_external: nine\ndocuments for a smal",
+      "exit_reason": "respond",
+      "reply_chars": 9002
+    }
+  ],
+  "wall_clock_s": 362.4,
+  "error": null,
+  "captured_at_utc": "2026-08-25T17-53-31Z"
+}

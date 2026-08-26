@@ -94,8 +94,8 @@ def _spawn_serve():
     env.setdefault("CUDA_DEVICE_ORDER", "PCI_BUS_ID")
     env.setdefault("CUDA_VISIBLE_DEVICES", _IMAGE_GPU)
     # GpuPipeline.__init__ eagerly requires a path for BOTH the ternary and
-    # binary arms, but serve.sh only sets the binary path when the binary model
-    # is installed. We only ever request the ternary arm, so the binary arm is
+    # binary models, but serve.sh only sets the binary path when the binary model
+    # is installed. We only ever request the ternary model, so the binary model is
     # never loaded — point it at any installed gemlite transformer so
     # construction succeeds. (No-op if already set.)
     if "MFLUX_STUDIO_GPU_BINARY_TRANSFORMER_PATH" not in env:

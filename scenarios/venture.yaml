@@ -1,4 +1,4 @@
-# Cognitive Workbench — venture-memo benchmark, SOLO arm (2026-08-21)
+# Cognitive Workbench — venture-memo benchmark, SOLO model (2026-08-21)
 #
 # THE QUESTION. Given an open strategic brief and a bounded product
 # specification, does the agent run a coherent reasoning arc — identify the
@@ -22,7 +22,7 @@
 # memories. Bump `world_name` for every trial — see measure/README.md.
 #
 # Derived from coord_search.yaml (2026-08-13), whose empty-infospace design
-# and character block this reuses. The pair arm is venture_pair.yaml.
+# and character block this reuses. The pair model is venture_pair.yaml.
 #
 # Two peers given one research task, matched as closely as two prompts can
 # be, so that a coordination result is attributable to the backend rather
@@ -32,7 +32,7 @@
 # turn budget ("at least N candidates between you"), do two peers divide
 # the work, hold the division, and produce one coherent joint answer — or
 # do they duplicate each other, over/undershoot the target, and each report
-# as if alone? This is the local arm. `coord_search_luna.yaml` is the same
+# as if alone? This is the local model. `coord_search_luna.yaml` is the same
 # scenario on a cloud backend; the pair is the experiment.
 #
 # WHY NOT REUSE coord_exp.yaml. It asked a terrain question, and its

@@ -53,7 +53,7 @@ many subagent calls returned no answer, and whether the answer key was read.
 
 **One pinned LLM call:** matching the memo's findings onto key ids. This is
 a judgement about meaning, so it cannot be mechanical — but it runs on the
-same pinned grader `regrade.py` uses, held constant across arms. If the arm
+same pinned grader `regrade.py` uses, held constant across models. If the model
 under test did its own matching, a difference in matching quality would
 surface as the metric.
 
@@ -84,7 +84,7 @@ against it.
 | `derived` | true only after arithmetic on stated figures |
 
 Report the highest rung reached, not pass/fail. **Retire the fixture when
-every arm tops out on `derived`** — a probe everyone passes is not an
+every model tops out on `derived`** — a probe everyone passes is not an
 instrument, and that is precisely how the retired `bench/` died with 29 of
 34 rows at 1.0.
 
@@ -140,5 +140,5 @@ Nine documents, ~11.3k characters. Company `flowmetrics`, seller `dave`.
 ## Before trusting a number from this
 
 Run-to-run variance under fixed conditions is **still unmeasured** for this
-agent. Three runs per arm minimum. Two conclusions in this project have
+agent. Three runs per model minimum. Two conclusions in this project have
 already been retracted for treating a single run as a result.

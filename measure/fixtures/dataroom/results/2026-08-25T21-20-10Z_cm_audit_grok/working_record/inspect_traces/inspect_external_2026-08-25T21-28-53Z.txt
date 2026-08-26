@@ -1,0 +1,614 @@
+================================================================================
+[inspect_external] 2026-08-25T21-28-53Z exit=respond iters=12
+================================================================================
+Query: Grep README.md llms.txt HELP_CENTER_INFRA.md for backup, recover, restore, uptime, SLA, multi-tenant, isolation, encryption. Read backend/app/services/feature_gate.py lines 1-66. Read docker-compose.prod.yml postgres/redis volume and REDIS_ENABLED. Grep widget JWT/auth in backend/app/api/widget. List backend/app/tools for MCP. Grep MCP in backend/app.
+
+--- iter 1 ---
+ACTION:
+{
+  "thought": "Start by grepping the three docs for backup/recover/restore/uptime/SLA/multi-tenant/isolation/encryption.",
+  "tool": "grep",
+  "pattern": "backup|recover|restore|uptime|SLA|multi-tenant|isolation|encryption",
+  "path": "."
+}
+OBSERVATION:
+OK: README.md:72:- **Version control** - Save and restore workflow versions
+README.md:121:- **Cross-customer isolation on outbound messages.** Identifiers belonging to
+README.md:416:# FAQ queue only — useful when debugging generation/import in isolation
+README.md:424:(polled every 15s) and ticket lifecycle/SLA sweeps (every 5 min):
+chattermate-test/index.html:570:            // Also remove our specific keys (backup)
+backend/scripts/encrypt_chat_at_rest.py:16:One-off backfill: encrypt conversation content written before encryption at rest.
+backend/scripts/encrypt_chat_at_rest.py:29:(and has OOM'd production before), so app/core/encryption.py is loaded directly by
+backend/scripts/encrypt_chat_at_rest.py:77:def load_encryption() -> ModuleType:
+backend/scripts/encrypt_chat_at_rest.py:78:    """Load app.core.encryption without importing the `app` package.
+backend/scripts/encrypt_chat_at_rest.py:82:    and the import inside encryption.py resolves against these.
+backend/scripts/encrypt_chat_at_rest.py:92:    return _load_module("app.core.encryption", core / "encryption.py")
+backend/scripts/encrypt_chat_at_rest.py:181:    crypto = load_encryption()
+backend/assets/widget.js:8276:[Omitted long matching line]
+backend/assets/widget.js:8617:    this.id = t, this.recovered = n && this._pid === n, this._pid = n, this.connected = !0, this.emitBuffered(), this.emitReserved("connect"), this._drainQueue(!0);
+backend/alembic/versions/add_ticketing_core_001_add_native_ticketing.py:29:  pgvector embedding for dedup, SLA timestamps, external escalation ref)
+backend/alembic/versions/add_ticketing_core_001_add_native_ticketing.py:33:- organization_ticket_settings: autonomy level, SLA targets, comms templates,
+backend/app/workers/ticket_investigator.py:498:        restore = previous_status
+backend/app/workers/ticket_investigator.py:499:        if restore in (TicketStatus.TRIAGING.value, TicketStatus.INVESTIGATING.value):
+backend/app/workers/ticket_investigator.py:500:            restore = TicketStatus.OPEN.value
+backend/app/workers/ticket_investigator.py:501:        ticket.status = restore
+backend/tests/conftest.py:20:# Set before any app import: app.core.encryption reads these when it first loads a
+backend/tests/test_migrations.py:32:    reviewing either in isolation cannot catch it. This can.
+backend/tests/api/test_help_center_api.py:186:    """Emptying a field in the UI restores the derived default. The slug has no
+backend/tests/api/test_meta_channels_api.py:984:        Bob's number is unrecoverable: Bob's reply resolves BY PHONE to Bob, so
+backend/alembic/versions/hc_article_image_paths.py:42:    # The original bucket/region are not recoverable from the rewritten path,
+backend/alembic/versions/b7c4e91a2d38_add_agent_queue_and_people_permissions.py:136:    # not restored: the pre-migration state was ambiguous by definition.
+backend/tests/repo/test_chat_repo.py:195:    """Rows written before encryption at rest have no prefix and must still show."""
+backend/tests/repo/test_chat_repo.py:209:    # written before encryption at rest.
+backend/tests/agent/test_groq_structured_output.py:7:  - The Groq truncation salvage recovers the lead/end_chat fields from a failed tool call.
+backend/tests/agent/test_groq_structured_output.py:19:    recover_groq_no_capture,
+backend/tests/agent/test_groq_structured_output.py:56:    def test_recover_uses_salvaged_text(self):
+backend/tests/agent/test_groq_structured_output.py:58:        rc = recover_groq_no_capture(resp)
+backend/tests/agent/test_groq_structured_output.py:61:    def test_recover_parses_json_written_as_text(self):
+backend/tests/agent/test_groq_structured_output.py:64:        rc = recover_groq_no_capture(resp)
+backend/tests/agent/test_groq_structured_output.py:68:    def test_recover_no_text_yields_empty_for_fallback(self):
+backend/tests/agent/test_groq_structured_output.py:69:        # Nothing to recover → empty message; ensure_nonempty_message adds the fallback.
+backend/tests/agent/test_groq_structured_output.py:71:        rc = recover_groq_no_capture(resp)
+backend/tests/agent/test_groq_structured_output.py:137:def test_salvage_recovers_truncated_groq_tool_call():
+backend/tests/api/test_shopify_agent_config.py:55:    # Store original overrides to restore them later
+backend/tests/channels/test_slack_adapter.py:157:        monkeypatch.setattr(settings, "SLACK_SIGNING_SECRET", "sek")
+backend/tests/channels/test_slack_adapter.py:165:        monkeypatch.setattr(settings, "SLACK_SIGNING_SECRET", "sek")
+backend/tests/channels/test_slack_adapter.py:174:        monkeypatch.setattr(settings, "SLACK_SIGNING_SECRET", "sek")
+backend/tests/channels/test_slack_adapter.py:182:        monkeypatch.setattr(settings, "SLACK_SIGNING_SECRET", "")
+backend/tests/service/test_crm_sync.py:171:    async def test_auth_failure_recovers_after_forced_refresh(
+backend/tests/core/test_config.py:43:def test_unset_encryption_key_is_flagged():
+backend/tests/core/test_config.py:48:def test_legacy_public_encryption_key_is_still_flagged():
+backend/tests/core/test_config.py:57:        _config(ENCRYPTION_KEY="your_fernet_encryption_key_here")
+backend/tests/core/test_config.py:76:    """The audit and app.core.encryption must agree on what a real deployment is;
+backend/tests/core/test_config.py:94:def test_startup_fails_on_public_encryption_key():
+backend/tests/core/test_config.py:119:def test_escape_hatch_allows_only_the_encryption_key():
+(grep capped at 50 hits — narrow the pattern for full coverage)
+
+--- iter 2 ---
+ACTION:
+{
+  "thought": "Narrow the backup/SLA/isolation/encryption grep to README.md as requested (prior hit was repo-wide and capped).",
+  "tool": "grep",
+  "pattern": "backup|recover|restore|uptime|SLA|multi-tenant|isolation|encryption",
+  "path": "README.md"
+}
+OBSERVATION:
+OK: README.md:72:- **Version control** - Save and restore workflow versions
+README.md:121:- **Cross-customer isolation on outbound messages.** Identifiers belonging to
+README.md:416:# FAQ queue only — useful when debugging generation/import in isolation
+README.md:424:(polled every 15s) and ticket lifecycle/SLA sweeps (every 5 min):
+
+--- iter 3 ---
+ACTION:
+{
+  "thought": "Grep llms.txt for backup/recover/restore/uptime/SLA/multi-tenant/isolation/encryption as requested after README.",
+  "tool": "grep",
+  "pattern": "backup|recover|restore|uptime|SLA|multi-tenant|isolation|encryption",
+  "path": "llms.txt"
+}
+OBSERVATION:
+EMPTY: no matches for pattern 'backup|recover|restore|uptime|SLA|multi-tenant|isolation|encryption' in llms.txt
+
+--- iter 4 ---
+ACTION:
+{
+  "thought": "Grep HELP_CENTER_INFRA.md for backup/recover/restore/uptime/SLA/multi-tenant/isolation/encryption as the remaining requested doc.",
+  "tool": "grep",
+  "pattern": "backup|recover|restore|uptime|SLA|multi-tenant|isolation|encryption",
+  "path": "HELP_CENTER_INFRA.md"
+}
+OBSERVATION:
+EMPTY: no matches for pattern 'backup|recover|restore|uptime|SLA|multi-tenant|isolation|encryption' in HELP_CENTER_INFRA.md
+
+--- iter 5 ---
+ACTION:
+{
+  "thought": "Read backend/app/services/feature_gate.py lines 1-66 as requested next.",
+  "tool": "read",
+  "file": "backend/app/services/feature_gate.py",
+  "start_line": 1,
+  "end_line": 66
+}
+OBSERVATION:
+OK: 1|"""
+2|Copyright 2024-2026 ChatterMate
+3|
+4|Licensed under the Apache License, Version 2.0 (the "License");
+5|you may not use this file except in compliance with the License.
+6|You may obtain a copy of the License at
+7|
+8|    http://www.apache.org/licenses/LICENSE-2.0
+9|
+10|Unless required by applicable law or agreed to in writing, software
+11|distributed under the License is distributed on an "AS IS" BASIS,
+12|WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+13|See the License for the specific language governing permissions and
+14|limitations under the License.
+15|
+16|Generic plan-feature gating.
+17|
+18|Cloud (enterprise module installed): a feature is available when the org has
+19|an accessible subscription whose plan carries the feature flag. OSS/community
+20|deployments are always unrestricted. This generalizes the per-feature gates
+21|copied across the API layer (lead_capture, mcp_tool, workflow, ...) — new
+22|features should gate through here instead of minting another copy.
+23|"""
+24|
+25|from uuid import UUID
+26|
+27|from fastapi import HTTPException, status
+28|from sqlalchemy.orm import Session
+29|
+30|from app.core.logger import get_logger
+31|
+32|try:
+33|    from app.enterprise.repositories.plan import PlanRepository
+34|    from app.enterprise.services.feature_access import require_accessible_subscription
+35|    HAS_ENTERPRISE = True
+36|except ImportError:
+37|    HAS_ENTERPRISE = False
+38|
+39|logger = get_logger(__name__)
+40|
+41|
+42|def feature_allowed(db: Session, organization_id: UUID, feature: str) -> bool:
+43|    """Non-raising check. Any gating-lookup failure fails CLOSED (feature
+44|    hidden) rather than surfacing a 500 — used by public/unauthenticated
+45|    surfaces and background hooks."""
+46|    if not HAS_ENTERPRISE:
+47|        return True
+48|    try:
+49|        subscription = require_accessible_subscription(db, organization_id)
+50|        return PlanRepository(db).check_feature_availability(str(subscription.plan_id), feature)
+51|    except HTTPException:
+52|        return False
+53|    except Exception as e:
+54|        logger.error(f"Feature gate check '{feature}' failed for org {organization_id}: {e}")
+55|        return False
+56|
+57|
+58|def check_feature_access(db: Session, organization_id: UUID, feature: str, upgrade_message: str) -> None:
+59|    """Raising check for authenticated admin endpoints: 403 with the feature's
+60|    upgrade message when the plan lacks the flag (subscription-level errors
+61|    propagate from the enterprise module)."""
+62|    if not HAS_ENTERPRISE:
+63|        return
+64|    subscription = require_accessible_subscription(db, organization_id)
+65|    if not PlanRepository(db).check_feature_availability(str(subscription.plan_id), feature):
+66|        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=upgrade_message)
+
+
+--- iter 6 ---
+ACTION:
+{
+  "thought": "Read docker-compose.prod.yml for postgres/redis volumes and REDIS_ENABLED as the next requested item.",
+  "tool": "read",
+  "file": "docker-compose.prod.yml"
+}
+OBSERVATION:
+OK: 1|version: '3.8'
+2|
+3|services:
+4|  frontend:
+5|    image: chattermate/frontend:latest
+6|    ports:
+7|      - "80:80"
+8|    env_file:
+9|      - ./frontend/.env
+10|    depends_on:
+11|      - backend
+12|    networks:
+13|      - chattermate-network
+14|    restart: unless-stopped
+15|
+16|  backend:
+17|    image: chattermate/backend:latest
+18|    ports:
+19|      - "8000:8000"
+20|    environment:
+21|      - REDIS_ENABLED=true
+22|      - REDIS_URL=redis://redis:6379/0
+23|      - WORKERS=1
+24|      - TIMEOUT=120
+25|      - LOG_LEVEL=info
+26|      # HuggingFace caching configuration
+27|      - HF_HOME=/app/.cache/huggingface
+28|      - TRANSFORMERS_CACHE=/app/.cache/huggingface/transformers
+29|      - SENTENCE_TRANSFORMERS_HOME=/app/.cache/huggingface/sentence_transformers
+30|      - HF_HUB_CACHE=/app/.cache/huggingface/hub
+31|      - HF_HUB_DISABLE_TELEMETRY=1
+32|      # PyTorch configuration
+33|      - TORCH_HOME=/app/.cache/torch
+34|      - PYTORCH_TRANSFORMERS_CACHE=/app/.cache/pytorch_transformers
+35|      # Reduce parallelism to avoid conflicts
+36|      - EMBEDDING_MAX_WORKERS=4
+37|      - KB_MAX_WORKERS=4
+38|      # Enable safe embedding mode for Docker
+39|      - EMBEDDING_SINGLE_THREADED=true
+40|      - EMBEDDING_SEQUENTIAL_FALLBACK=true
+41|    env_file:
+42|      - ./backend/.env
+43|    depends_on:
+44|      db:
+45|        condition: service_healthy
+46|      redis:
+47|        condition: service_healthy
+48|    networks:
+49|      - chattermate-network
+50|    restart: unless-stopped
+51|    volumes:
+52|      - backend_data:/app/uploads
+53|      - temp_data:/app/temp
+54|      - ./config:/app/config
+55|      # Add caching volumes for models
+56|      - huggingface_cache:/app/.cache/huggingface
+57|      - torch_cache:/app/.cache/torch
+58|    healthcheck:
+59|      test: ["CMD", "curl", "-X", "GET", "-f", "http://localhost:8000/health"]
+60|      interval: 10s
+61|      timeout: 5s
+62|      retries: 5
+63|      start_period: 10s
+64|
+65|  knowledge_processor:
+66|    image: chattermate/backend:latest
+67|    command: python -m app.workers.knowledge_processor
+68|    environment:
+69|      - REDIS_ENABLED=true
+70|      - REDIS_URL=redis://redis:6379/0
+71|      - LOG_LEVEL=info
+72|      - PYTHONUNBUFFERED=1
+73|      # HuggingFace caching configuration (shared with backend)
+74|      - HF_HOME=/app/.cache/huggingface
+75|      - TRANSFORMERS_CACHE=/app/.cache/huggingface/transformers
+76|      - SENTENCE_TRANSFORMERS_HOME=/app/.cache/huggingface/sentence_transformers
+77|      - HF_HUB_CACHE=/app/.cache/huggingface/hub
+78|      - HF_HUB_DISABLE_TELEMETRY=1
+79|      # PyTorch configuration (shared with backend)
+80|      - TORCH_HOME=/app/.cache/torch
+81|      - PYTORCH_TRANSFORMERS_CACHE=/app/.cache/pytorch_transformers
+82|      # Reduce parallelism to avoid conflicts
+83|      - EMBEDDING_MAX_WORKERS=2
+84|      - KB_MAX_WORKERS=2
+85|      # Enable safe embedding mode for Docker
+86|      - EMBEDDING_SINGLE_THREADED=true
+87|      - EMBEDDING_SEQUENTIAL_FALLBACK=true
+88|    env_file:
+89|      - ./backend/.env
+90|    depends_on:
+91|      db:
+92|        condition: service_healthy
+93|      redis:
+94|        condition: service_healthy
+95|    networks:
+96|      - chattermate-network
+97|    restart: always
+98|    volumes:
+99|      - backend_data:/app/uploads
+100|      - temp_data:/app/temp
+101|      - ./config:/app/config
+102|      # Share the same caching volumes with backend
+103|      - huggingface_cache:/app/.cache/huggingface
+104|      - torch_cache:/app/.cache/torch
+105|    logging:
+106|      driver: "json-file"
+107|      options:
+108|        max-size: "10m"
+109|        max-file: "3"
+110|
+111|  crm_sync:
+112|    image: chattermate/backend:latest
+113|    command: python -m app.workers.crm_sync
+114|    environment:
+115|      - LOG_LEVEL=info
+116|      - PYTHONUNBUFFERED=1
+117|    env_file:
+118|      - ./backend/.env
+119|    depends_on:
+120|      db:
+121|        condition: service_healthy
+122|    networks:
+123|      - chattermate-network
+124|    restart: always
+125|    logging:
+126|      driver: "json-file"
+127|      options:
+128|        max-size: "10m"
+129|        max-file: "3"
+130|
+131|  ticket_investigator:
+132|    image: chattermate/backend:latest
+133|    command: python -m app.workers.ticket_investigator
+134|    environment:
+135|      - REDIS_ENABLED=true
+136|      - REDIS_URL=redis://redis:6379/0
+137|      - LOG_LEVEL=info
+138|      - PYTHONUNBUFFERED=1
+139|      # FastEmbed (dedup embeddings) shares the HuggingFace cache
+140|      - HF_HOME=/app/.cache/huggingface
+141|      - HF_HUB_CACHE=/app/.cache/huggingface/hub
+142|      - HF_HUB_DISABLE_TELEMETRY=1
+143|    env_file:
+144|      - ./backend/.env
+145|    depends_on:
+146|      db:
+147|        condition: service_healthy
+148|      redis:
+149|        condition: service_healthy
+150|    networks:
+151|      - chattermate-network
+152|    restart: always
+153|    volumes:
+154|      - huggingface_cache:/app/.cache/huggingface
+155|    logging:
+156|      driver: "json-file"
+157|      options:
+158|        max-size: "10m"
+159|        max-file: "3"
+160|
+161|  db:
+162|    build:
+163|      context: .
+164|      dockerfile: Dockerfile.postgres
+165|    ports:
+166|      - "5432:5432"
+167|    environment:
+168|      - POSTGRES_USER=postgres
+169|      - POSTGRES_PASSWORD=postgres
+170|      - POSTGRES_DB=chattermate
+171|    volumes:
+172|      - postgres_data:/var/lib/postgresql/data
+173|    networks:
+174|      - chattermate-network
+175|    restart: unless-stopped
+176|    healthcheck:
+177|      test: ["CMD-SHELL", "pg_isready -U postgres"]
+178|      interval: 10s
+179|      timeout: 5s
+180|      retries: 5
+181|      start_period: 10s
+182|
+183|  redis:
+184|    image: redis:7-alpine
+185|    ports:
+186|      - "6379:6379"
+187|    volumes:
+188|      - redis_data:/data
+189|    networks:
+190|      - chattermate-network
+191|    restart: unless-stopped
+192|    healthcheck:
+193|      test: ["CMD", "redis-cli", "ping"]
+194|      interval: 10s
+195|      timeout: 5s
+196|      retries: 5
+197|      start_period: 5s
+198|    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+199|
+200|networks:
+201|  chattermate-network:
+202|    driver: bridge
+203|
+204|volumes:
+205|  postgres_data:
+206|  redis_data:
+207|  backend_data:
+208|  temp_data:
+209|  # Add new volumes for model caching
+210|  huggingface_cache:
+211|  torch_cache:
+
+--- iter 7 ---
+ACTION:
+{
+  "thought": "Grep widget JWT/auth in backend/app/api/widget as requested next.",
+  "tool": "grep",
+  "pattern": "JWT|jwt|auth",
+  "path": "backend/app/api/widget"
+}
+OBSERVATION:
+ERROR: grep returned 2: rg: /home/bruce/Downloads/Cognitive_workbench/targets/chattermate/backend/app/api/widget: IO error for operation on /home/bruce/Downloads/Cognitive_workbench/targets/chattermate/backend/app/api/widget: No such file or directory (os error 2)
+
+--- iter 8 ---
+ACTION:
+{
+  "thought": "widget path missing; list backend/app/api then continue JWT grep, tools list, and MCP grep.",
+  "tool": "list",
+  "path": "backend/app/api"
+}
+OBSERVATION:
+OK: backend/app/api/
+channels/	DIR
+help_center/	DIR
+webhooks/	DIR
+__init__.py	616 bytes
+agent.py	34812 bytes
+ai_setup.py	15887 bytes
+analytics.py	26866 bytes
+chat.py	13365 bytes
+crm.py	13866 bytes
+file_upload.py	10254 bytes
+help_center_images.py	3407 bytes
+help_center_public.py	17550 bytes
+jira.py	19719 bytes
+knowledge.py	63118 bytes
+lead_capture.py	4904 bytes
+mcp_tool.py	14994 bytes
+notification.py	9206 bytes
+organizations.py	28106 bytes
+people.py	9678 bytes
+roles.py	9160 bytes
+session_to_agent.py	12607 bytes
+shopify.py	51338 bytes
+ticket_db_connectors.py	7803 bytes
+ticket_webhooks.py	5379 bytes
+tickets.py	29680 bytes
+token.py	18504 bytes
+user_groups.py	4912 bytes
+users.py	46187 bytes
+widget.py	25887 bytes
+widget_apps.py	11097 bytes
+widget_chat.py	103597 bytes
+workflow.py	9426 bytes
+workflow_node.py	8890 bytes
+
+--- iter 9 ---
+ACTION:
+{
+  "thought": "Grep JWT/auth in the widget API modules now that the path is widget.py not a directory.",
+  "tool": "grep",
+  "pattern": "JWT|jwt|auth",
+  "path": "backend/app/api/widget.py"
+}
+OBSERVATION:
+OK: backend/app/api/widget.py:21:from jose import JWTError
+backend/app/api/widget.py:30:from app.core.auth import get_current_user
+backend/app/api/widget.py:109:    authorization: Optional[str] = Header(None),
+backend/app/api/widget.py:113:    """Get widget UI and handle customer authentication"""
+backend/app/api/widget.py:133:    require_token_auth = getattr(agent, 'require_token_auth', False)
+backend/app/api/widget.py:138:    if authorization and authorization.startswith('Bearer '):
+backend/app/api/widget.py:139:        token = authorization.split(' ')[1]
+backend/app/api/widget.py:145:        except (JWTError, ValueError):
+backend/app/api/widget.py:148:    # SECURITY: If token auth is required, valid token MUST be provided
+backend/app/api/widget.py:149:    if require_token_auth:
+backend/app/api/widget.py:151:            logger.warning(f"Widget UI request denied: require_token_auth=true but no valid token for widget_id={widget_id}")
+backend/app/api/widget.py:169:    # Token auth NOT required - allow anonymous access
+backend/app/api/widget.py:309:    authorization: Optional[str] = Header(None),
+backend/app/api/widget.py:313:    logger.info(f"Getting widget data for widget_id {widget_id}, email {email}, has_token {bool(authorization)}")
+backend/app/api/widget.py:324:    require_token_auth = getattr(agent, 'require_token_auth', False)
+backend/app/api/widget.py:330:    if authorization and authorization.startswith('Bearer '):
+backend/app/api/widget.py:331:        token = authorization.split(' ')[1]
+backend/app/api/widget.py:337:        except (JWTError, ValueError):
+backend/app/api/widget.py:340:    # SECURITY: If token auth required, must have valid token with customer_id
+backend/app/api/widget.py:341:    if require_token_auth:
+backend/app/api/widget.py:343:            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized - Token required")
+backend/app/api/widget.py:355:    # ASK_ANYTHING / workflow agents already do. NOTE: this runs AFTER the require_token_auth
+backend/app/api/widget.py:363:    logger.debug(f"should_create_customer={should_create_customer}, customer_id={customer_id}, require_token_auth={require_token_auth}")
+backend/app/api/widget.py:468:                detail="Unauthorized"
+backend/app/api/widget.py:502:    authorization: Optional[str] = Header(None),
+backend/app/api/widget.py:507:        logger.info(f"End chat request received: widget_id={widget_id}, session_id={session_id}, reason={reason}, has_token={bool(authorization)}")
+backend/app/api/widget.py:511:        # straight through and closed any session by id, unauthenticated.
+backend/app/api/widget.py:512:        if not authorization or not authorization.startswith('Bearer '):
+backend/app/api/widget.py:513:            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+backend/app/api/widget.py:516:            token_data = verify_conversation_token(authorization.split(' ')[1])
+
+--- iter 10 ---
+ACTION:
+{
+  "thought": "List backend/app/tools and grep MCP in backend/app to finish remaining query items.",
+  "tool": "list",
+  "path": "backend/app/tools"
+}
+OBSERVATION:
+OK: backend/app/tools/
+faq_search.py	2567 bytes
+guardrailed_db_toolkit.py	11804 bytes
+jira_toolkit.py	34409 bytes
+knowledge_search_byagent.py	7105 bytes
+mcp_manager.py	19246 bytes
+shopify_toolkit.py	59932 bytes
+ticket_toolkit.py	10474 bytes
+
+--- iter 11 ---
+ACTION:
+{
+  "thought": "Grep MCP in backend/app and read widget JWT decode windows to complete remaining query items.",
+  "tool": "grep",
+  "pattern": "MCP|mcp",
+  "path": "backend/app"
+}
+OBSERVATION:
+OK: backend/app/workers/ticket_investigator.py:17:investigation with MCP evidence gathering) and runs lifecycle hygiene
+backend/app/workers/ticket_investigator.py:322:    from — MCP connectors OR a guardrailed DB connector. Auto-chaining on MCP
+backend/app/workers/ticket_investigator.py:324:    if settings_row.investigation_mcp_tool_ids or []:
+backend/app/workers/ticket_investigator.py:369:    """Connect the org's investigation tools (MCP connectors + guardrailed DB
+backend/app/workers/ticket_investigator.py:372:    MCP init, every tool call and cleanup must live in the same task or the
+backend/app/workers/ticket_investigator.py:373:    anyio cancel scope owning the MCP streams gets crossed on timeout. The
+backend/app/workers/ticket_investigator.py:378:    mcp_tools = []
+backend/app/workers/ticket_investigator.py:380:        tool_ids = settings_row.investigation_mcp_tool_ids or []
+backend/app/workers/ticket_investigator.py:383:            mcp_tools = await manager.initialize_mcp_tools_by_ids(
+backend/app/workers/ticket_investigator.py:388:            mcp_tools = list(mcp_tools) + [db_tools]
+backend/app/workers/ticket_investigator.py:389:        recorder.map_connectors(mcp_tools)
+backend/app/workers/ticket_investigator.py:391:            db, run, ticket, agent, context_message, mcp_tools, recorder
+backend/app/workers/ticket_investigator.py:394:        await manager.cleanup_mcp_tools()
+backend/app/workers/ticket_investigator.py:433:    from app.tools.mcp_manager import MCPToolsManager
+backend/app/workers/ticket_investigator.py:435:    mcp_manager = MCPToolsManager()
+backend/app/workers/ticket_investigator.py:442:                recorder, mcp_manager
+backend/app/workers/ticket_investigator.py:464:    # of its configured MCP tools (missing npx, bad key, unreachable server)
+backend/app/workers/ticket_investigator.py:466:    configured_tool_ids = settings_row.investigation_mcp_tool_ids or []
+backend/app/workers/ticket_investigator.py:470:            "loaded": len(mcp_manager.connected_tool_names),
+backend/app/workers/ticket_investigator.py:471:            "failed": mcp_manager.failed_tools,
+backend/app/main.py:24:from app.api import chat, organizations, users, ai_setup, knowledge, agent, notification, widget, widget_apps, user_groups, roles, analytics, jira, shopify, workflow, workflow_node, mcp_tool, file_upload, token, lead_capture, people, tickets
+backend/app/main.py:210:    mcp_tool.router,
+backend/app/main.py:211:    prefix=f"{settings.API_V1_STR}/mcp-tools",
+backend/app/main.py:212:    tags=["mcp-tools"]
+backend/app/tools/mcp_manager.py:20:from agno.tools.mcp import MCPTools, SSEClientParams, StreamableHTTPClientParams
+backend/app/tools/mcp_manager.py:22:from app.repositories.mcp_tool import MCPToolRepository
+backend/app/tools/mcp_manager.py:23:from app.models.mcp_tool import MCPTransportType
+backend/app/tools/mcp_manager.py:31:class MCPToolsManager:
+backend/app/tools/mcp_manager.py:32:    """Manager class for handling MCP tools initialization and cleanup"""
+backend/app/tools/mcp_manager.py:35:        self.mcp_tools: List[MCPTools] = []
+backend/app/tools/mcp_manager.py:37:        # didn't. Unlike mcp_tools (cleared on cleanup) these survive the run,
+backend/app/tools/mcp_manager.py:42:    async def initialize_mcp_tools_by_ids(
+backend/app/tools/mcp_manager.py:44:    ) -> List[MCPTools]:
+backend/app/tools/mcp_manager.py:46:        Initialize a specific set of the organization's MCP tools by id —
+backend/app/tools/mcp_manager.py:48:        (organization_ticket_settings.investigation_mcp_tool_ids) is
+backend/app/tools/mcp_manager.py:55:                configs = MCPToolRepository(db).get_by_ids(org_id, tool_ids)
+backend/app/tools/mcp_manager.py:57:            logger.error(f"Failed to load MCP tools {tool_ids} for org {org_id}: {e}")
+backend/app/tools/mcp_manager.py:68:    async def initialize_mcp_tools(self, agent_id: str, org_id: str) -> List[MCPTools]:
+backend/app/tools/mcp_manager.py:70:        Initialize MCP tools for an agent asynchronously.
+backend/app/tools/mcp_manager.py:71:        Returns a list of connected MCPTools instances.
+backend/app/tools/mcp_manager.py:77:            # Get MCP tools for this agent from database
+backend/app/tools/mcp_manager.py:79:                mcp_tool_repo = MCPToolRepository(db)
+backend/app/tools/mcp_manager.py:80:                agent_mcp_tools = mcp_tool_repo.get_agent_mcp_tools(agent_id)
+backend/app/tools/mcp_manager.py:82:            logger.error(f"Failed to get MCP tools for agent {agent_id}: {e}")
+backend/app/tools/mcp_manager.py:83:            return self.mcp_tools
+backend/app/tools/mcp_manager.py:84:        return await self._initialize_from_configs(agent_mcp_tools)
+backend/app/tools/mcp_manager.py:86:    async def _initialize_from_configs(self, configs) -> List[MCPTools]:
+backend/app/tools/mcp_manager.py:90:            # Initialize each MCP tool asynchronously
+backend/app/tools/mcp_manager.py:91:            for mcp_tool_config in configs:
+backend/app/tools/mcp_manager.py:93:                    logger.debug(f"Initializing MCP tool: {mcp_tool_config.name}")
+(grep capped at 50 hits — narrow the pattern for full coverage)
+
+--- iter 12 ---
+ACTION:
+{
+  "thought": "All requested greps/reads are complete; compile the findings into the final answer.",
+  "tool": "respond",
+  "text": "Docs (backup/recover/restore/uptime/SLA/multi-tenant/isolation/encryption)\n- README.md:72 version-control restore of workflow versions; README.md:121 cross-customer isolation on outbound messages; README.md:416 FAQ queue isolation for debugging; README.md:424 ticket lifecycle/SLA sweeps every 5 min. No backup/uptime/multi-tenant/encryption hits in README.\n- llms.txt: no matches.\n- HELP_CENTER_INFRA.md: no matches.\n\nfeature_gate.py:1-66\n- Generic plan-feature gating. Cloud/enterprise: feature available if org has accessible subscription whose plan has the flag. OSS/community (HAS_ENTERPRISE False): always unrestricted.\n- feature_allowed: non-raising; fail-closed on lookup errors (public/unauth surfaces).\n- check_feature_access: raising 403 with upgrade_message for admin endpoints.\n\ndocker-compose.prod.yml\n- REDIS_ENABLED=true on backend (21), knowledge_processor (69), ticket_investigator (135); REDIS_URL=redis://redis:6379/0.\n- db volumes: postgres_data:/var/lib/postgresql/data (171-172).\n- redis volumes: redis_data:/data (187-188); AOF + maxmemory 512mb allkeys-lru (198).\n- Named volumes: postgres_data, redis_data, backend_data, temp_data, huggingface_cache, torch_cache (204-211).\n\nWidget JWT/auth\n- backend/app/api/widget is not a directory; auth lives in backend/app/api/widget.py.\n- jose JWTError (21); get_current_user (30); Bearer header (109, 138-145, 330-337, 512-516).\n- require_token_auth on agent: if true, valid token required else 401 (148-151, 340-343).\n- If not required, anonymous access (169).\n- end-chat requires Bearer + verify_conversation_token (511-516).\n\nbackend/app/tools (MCP-related)\n- faq_search.py, guardrailed_db_toolkit.py, jira_toolkit.py, knowledge_search_byagent.py, mcp_manager.py, shopify_toolkit.py, ticket_toolkit.py.\n- MCP implementation: mcp_manager.py MCPToolsManager (agno.tools.mcp MCPTools; MCPToolRepository; initialize_mcp_tools / by_ids / cleanup).\n\nMCP in backend/app (sample; grep capped at 50)\n- main.py:24,210-212: mcp_tool.router at {API_V1_STR}/mcp-tools.\n- workers/ticket_investigator.py: investigation_mcp_tool_ids, MCPToolsManager, same-task MCP init/cleanup.\n- tools/mcp_manager.py: MCPToolsManager, MCPTransportType, initialize_mcp_tools*."
+}
+OBSERVATION:
+(respond)
+
+FINAL ANSWER:
+Docs (backup/recover/restore/uptime/SLA/multi-tenant/isolation/encryption)
+- README.md:72 version-control restore of workflow versions; README.md:121 cross-customer isolation on outbound messages; README.md:416 FAQ queue isolation for debugging; README.md:424 ticket lifecycle/SLA sweeps every 5 min. No backup/uptime/multi-tenant/encryption hits in README.
+- llms.txt: no matches.
+- HELP_CENTER_INFRA.md: no matches.
+
+feature_gate.py:1-66
+- Generic plan-feature gating. Cloud/enterprise: feature available if org has accessible subscription whose plan has the flag. OSS/community (HAS_ENTERPRISE False): always unrestricted.
+- feature_allowed: non-raising; fail-closed on lookup errors (public/unauth surfaces).
+- check_feature_access: raising 403 with upgrade_message for admin endpoints.
+
+docker-compose.prod.yml
+- REDIS_ENABLED=true on backend (21), knowledge_processor (69), ticket_investigator (135); REDIS_URL=redis://redis:6379/0.
+- db volumes: postgres_data:/var/lib/postgresql/data (171-172).
+- redis volumes: redis_data:/data (187-188); AOF + maxmemory 512mb allkeys-lru (198).
+- Named volumes: postgres_data, redis_data, backend_data, temp_data, huggingface_cache, torch_cache (204-211).
+
+Widget JWT/auth
+- backend/app/api/widget is not a directory; auth lives in backend/app/api/widget.py.
+- jose JWTError (21); get_current_user (30); Bearer header (109, 138-145, 330-337, 512-516).
+- require_token_auth on agent: if true, valid token required else 401 (148-151, 340-343).
+- If not required, anonymous access (169).
+- end-chat requires Bearer + verify_conversation_token (511-516).
+
+backend/app/tools (MCP-related)
+- faq_search.py, guardrailed_db_toolkit.py, jira_toolkit.py, knowledge_search_byagent.py, mcp_manager.py, shopify_toolkit.py, ticket_toolkit.py.
+- MCP implementation: mcp_manager.py MCPToolsManager (agno.tools.mcp MCPTools; MCPToolRepository; initialize_mcp_tools / by_ids / cleanup).
+
+MCP in backend/app (sample; grep capped at 50)
+- main.py:24,210-212: mcp_tool.router at {API_V1_STR}/mcp-tools.
+- workers/ticket_investigator.py: investigation_mcp_tool_ids, MCPToolsManager, same-task MCP init/cleanup.
+- tools/mcp_manager.py: MCPToolsManager, MCPTransportType, initialize_mcp_tools*.

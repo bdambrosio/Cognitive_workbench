@@ -1,0 +1,44 @@
+================================================================================
+[inspect_external] 2026-08-25T16-15-51Z exit=respond iters=2
+================================================================================
+Query: Read only doc5_stripe_export_summary.md verbatim with line numbers. Enumerate every distinct stated assertion that can receive exactly one audit verdict, preserving exact source line ranges. Do not verify implementation or summarize other files.
+
+--- iter 1 ---
+ACTION:
+{
+  "thought": "I will read only the requested document from the repository root, preserving its source line numbers.",
+  "tool": "read",
+  "file": "doc5_stripe_export_summary.md"
+}
+OBSERVATION:
+OK: 1|# DOCUMENT 5: STRIPE EXPORT SUMMARY
+2|
+3|**Period:** Last 12 Months
+4|**Total Active Subscriptions:** 94
+5|**Total MRR (Stripe):** $16,000
+6|
+7|**Plan Breakdown:**
+8|*   **Pro Plan:**
+9|    *   Count: 91 accounts
+10|    *   Price: $149/mo
+11|    *   Total MRR: $13,549
+12|*   **Enterprise Plan (Stripe Subscription):**
+13|    *   Count: 3 accounts
+14|    *   Price: $817/mo (Note: These are individual user logins for enterprise companies; the primary enterprise contract is paid via wire transfer and is not reflected in this Stripe total.)
+15|    *   Total MRR: $2,451
+16|
+17|**Total Stripe MRR:** $16,000 ($13,549 + $2,451)
+18|
+19|**Note:** The 3 enterprise companies (Acme Retail, GlobalMart, ShopStream) have separate contracts for $8,000/mo each, paid via wire transfer. These payments are not processed through Stripe and are not included in the $16,000 MRR figure above.
+
+
+--- iter 2 ---
+ACTION:
+{
+  "thought": "The document contains distinct auditable claims about the reporting period, subscription totals, plan breakdown, Stripe MRR arithmetic, and excluded wire-transfer contracts.",
+  "tool": "respond"
+}
+OBSERVATION:
+(respond)
+
+FINAL ANSWER:

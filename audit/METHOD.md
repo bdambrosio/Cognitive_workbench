@@ -427,15 +427,15 @@ the review happens after the run and before delivery.
 stating a recommendation without the coverage it rests on, so correcting this
 after delivery means reissuing under §7.
 
-**Why a review step and not a tighter rule.** Measured 2026-08-25: three arms
+**Why a review step and not a tighter rule.** Measured 2026-08-25: three models
 on the same nine documents returned 62, 67 and 273. Two attempts to define the
 unit precisely enough to close that spread both failed. The first — "one
 assertion that can take exactly one §6 verdict" — widened it to 44, 21 and
 321, because "one assertion" has no fixed size: "the infrastructure is
 redundant" is one assertion, and so are "there is one dyno", "the database is
 co-located" and "there are no replicas". The second, now in §12 step 2,
-produced 66 and 108 and left the third arm unable to close the surface at all.
-The residual disagreement is about scope, not grain: one arm counted only the
+produced 66 and 108 and left the third model unable to close the surface at all.
+The residual disagreement is about scope, not grain: one model counted only the
 seller's claim documents, another counted every checkable statement including
 the evidence documents.
 
@@ -446,7 +446,7 @@ does not meet that test, and a person confirming it is cheaper and more
 reliable than a third attempt at wording.
 
 **The marker's shape is fixed for the same reason.** Measured 2026-08-24: on
-first exposure, three arms read "state the count after the marker" three ways
+first exposure, three models read "state the count after the marker" three ways
 — one stated the count, one enumerated the surface and never counted it, one
 quoted the instruction back. All three were defensible readings, which is why
 §12 step 2 fixes the shape rather than describing it.

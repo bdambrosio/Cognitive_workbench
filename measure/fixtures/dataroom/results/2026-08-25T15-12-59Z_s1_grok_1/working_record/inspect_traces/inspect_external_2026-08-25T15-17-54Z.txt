@@ -1,0 +1,408 @@
+================================================================================
+[inspect_external] 2026-08-25T15-17-54Z exit=respond iters=12
+================================================================================
+Query: Quote verbatim with line numbers every statement about vendor lock-in, low lock-in, standard SaaS agreements, 99.9% uptime, monitoring, horizontal scale, one-click dynos, churn, turnkey, and Rails version from all nine documents.
+
+--- iter 1 ---
+ACTION:
+{
+  "thought": "List the corpus root to find all nine documents before searching for the requested phrases.",
+  "tool": "list",
+  "path": "."
+}
+OBSERVATION:
+OK: ./
+doc1_seller_listing_description.md	1984 bytes
+doc2_tech_stack_description_as_provided_by_se.md	1310 bytes
+doc3_git_history_summary.md	886 bytes
+doc4_infrastructure_config.md	1126 bytes
+doc5_stripe_export_summary.md	833 bytes
+doc6_crm_export_summary.md	718 bytes
+doc7_customer_contracts_summary.md	1800 bytes
+doc8_external_dependency_list.md	1482 bytes
+doc9_seller_s_technical_claims_verbatim.md	753 bytes
+
+--- iter 2 ---
+ACTION:
+{
+  "thought": "Grep the nine docs for lock-in, SaaS, uptime, monitoring, scale, dynos, churn, turnkey, and Rails.",
+  "tool": "grep",
+  "path": ".",
+  "pattern": "lock-in|lock in|SaaS|99\\.9%|uptime|monitor|horizontal|dyno|churn|turnkey|Rails",
+  "case_insensitive": true
+}
+OBSERVATION:
+OK: doc4_infrastructure_config.md:6:*   **Database:** `heroku-postgresql:standard-0` (running on the same dyno as the application)
+doc1_seller_listing_description.md:9:[Omitted long matching line]
+doc1_seller_listing_description.md:18:*   **Scalable Architecture:** Built on a modern Rails 7 stack with platform-level redundancy and automatic failover.
+doc1_seller_listing_description.md:19:*   **Reliability:** 99.9% uptime monitoring and daily automated database backups with 30-day retention.
+doc1_seller_listing_description.md:22:*   **Low Vendor Lock-in:** All third-party integrations are on standard SaaS agreements with no proprietary lock-in.
+doc2_tech_stack_description_as_provided_by_se.md:3:[Omitted long matching line]
+doc2_tech_stack_description_as_provided_by_se.md:5:[Omitted long matching line]
+doc7_customer_contracts_summary.md:8:    *   **SLA:** 99.9%
+doc7_customer_contracts_summary.md:16:    *   **SLA:** 99.9%
+doc8_external_dependency_list.md:15:    *   **Cost:** $25/mo (standard-1x dyno).
+doc8_external_dependency_list.md:16:    *   **SLA:** 99.95% platform uptime (not contractual for the app).
+doc9_seller_s_technical_claims_verbatim.md:6:*   "We monitor uptime at 99.9% and maintain daily automated database backups."
+doc9_seller_s_technical_claims_verbatim.md:8:*   "The stack is designed to scale horizontally — adding dynos is a one-click operation in the Heroku dashboard."
+doc9_seller_s_technical_claims_verbatim.md:9:*   "All third-party integrations are on standard SaaS agreements with no lock-in."
+doc9_seller_s_technical_claims_verbatim.md:11:*   "We use a modern Rails 7 stack with automatic SSL and managed DNS."
+
+--- iter 3 ---
+ACTION:
+{
+  "thought": "Read all nine docs to quote omitted and remaining statements verbatim with line numbers.",
+  "tool": "read",
+  "file": "doc1_seller_listing_description.md"
+}
+OBSERVATION:
+OK: 1|# DOCUMENT 1: SELLER LISTING DESCRIPTION
+2|
+3|**FlowMetrics — B2B E-Commerce Analytics Platform**
+4|
+5|**Asking Price:** $480,000 (12x blended MRR)
+6|
+7|**About the Business**
+8|
+9|FlowMetrics is a revenue-positive, recurring-revenue SaaS platform providing real-time analytics and product intelligence to e-commerce sellers. We have built a loyal customer base of 120 active accounts, ranging from independent merchants to mid-market enterprise retailers. Our blended Monthly Recurring Revenue (MRR) stands at $40,000, driven by a mix of high-value enterprise contracts and a broad base of month-to-month subscribers. The business operates with low churn, a scalable technology stack, and minimal operational overhead. This is a turnkey acquisition opportunity for a buyer looking to enter the e-commerce analytics space with proven product-market fit and immediate cash flow.
+10|
+11|**Key Financials**
+12|*   **Blended MRR:** $40,000
+13|*   **Active Customers:** 120
+14|*   **Churn:** Low (stable base of recurring subscribers)
+15|*   **Revenue Model:** Recurring subscription (Monthly & Annual Enterprise)
+16|
+17|**Technical Highlights**
+18|*   **Scalable Architecture:** Built on a modern Rails 7 stack with platform-level redundancy and automatic failover.
+19|*   **Reliability:** 99.9% uptime monitoring and daily automated database backups with 30-day retention.
+20|*   **Security:** Managed SSL, OAuth authentication, and secure payment processing via Stripe.
+21|*   **Code Quality:** Well-documented codebase with comprehensive test coverage across critical paths.
+22|*   **Low Vendor Lock-in:** All third-party integrations are on standard SaaS agreements with no proprietary lock-in.
+23|
+24|**Why FlowMetrics?**
+25|We have built a robust, defensible product that solves a critical pain point for e-commerce sellers: visibility into product performance and pricing dynamics. The technology is proven, the customers are engaged, and the revenue is recurring. We are looking for a strategic partner to take FlowMetrics to the next level.
+
+
+--- iter 4 ---
+ACTION:
+{
+  "thought": "Read remaining docs for verbatim quotes on lock-in, SaaS, uptime, monitoring, scale, dynos, churn, turnkey, and Rails.",
+  "tool": "read",
+  "file": "doc2_tech_stack_description_as_provided_by_se.md"
+}
+OBSERVATION:
+OK: 1|# DOCUMENT 2: TECH STACK DESCRIPTION (as provided by seller)
+2|
+3|FlowMetrics is built on a standard, modern SaaS stack designed for reliability and ease of maintenance. The core application is a Rails 7 application hosted on Heroku, which provides automatic scaling and failover capabilities at the platform level. This ensures that the application remains available even under varying load conditions, with no manual intervention required for routine operations.
+4|
+5|Data persistence is handled by PostgreSQL, which is configured with daily scheduled backups to ensure data integrity and recoverability. We utilize Redis for session caching to improve response times and user experience. Payment processing is securely handled through Stripe, which supports both credit card transactions and recurring billing. For our product intelligence features, we integrate with a third-party data enrichment API that provides real-time product data, allowing our users to make informed decisions about their inventory and pricing. The entire stack is managed through Heroku’s dashboard, ensuring that deployments, scaling, and monitoring are streamlined and efficient. We consider this a standard SaaS stack with platform-level redundancy, allowing us to focus on product development rather than infrastructure management.
+
+
+--- iter 5 ---
+ACTION:
+{
+  "thought": "Read remaining documents 3-9 for verbatim quotes on lock-in, SaaS, uptime, monitoring, scale, dynos, churn, turnkey, and Rails.",
+  "tool": "read",
+  "file": "doc3_git_history_summary.md"
+}
+OBSERVATION:
+OK: 1|# DOCUMENT 3: GIT HISTORY SUMMARY
+2|
+3|**Repository:** `flowmetrics-main`
+4|**Date Range:** 2024-08 to 2026-08
+5|**Total Commits:** 847
+6|
+7|**Contributor Breakdown:**
+8|*   **dave:** 618 commits (73%)
+9|*   **alice** (one-time contractor): 123 commits (15%)
+10|*   **bob** (one-time contractor): 56 commits (7%)
+11|*   **others:** 50 commits (5%)
+12|
+13|**Directory Breakdown (based on dave’s commits):**
+14|*   `auth/`: 47%
+15|*   `app/models/`: 22%
+16|*   `app/controllers/`: 15%
+17|*   `app/views/`: 8%
+18|*   **other:** 8%
+19|
+20|**Recent Activity:**
+21|*   **Last Commit:** 2026-07-30
+22|*   **Commits in Last 30 Days:** 0
+23|
+24|**CI/CD & Testing:**
+25|*   **CI/CD Pipeline:** None configured.
+26|*   **Test Suite:**
+27|    *   Unit Tests: 12 (all located in `test/utils/`)
+28|    *   Integration Tests: 0
+29|    *   Payment-Path Tests: 0
+30|*   **Staging Environment:** None.
+31|*   **Branch Protection:** None.
+32|*   **Code Review Process:** None documented.
+
+
+--- iter 6 ---
+ACTION:
+{
+  "thought": "Read remaining documents 4-9 for verbatim quotes on lock-in, SaaS, uptime, monitoring, scale, dynos, churn, turnkey, and Rails.",
+  "tool": "read",
+  "file": "doc4_infrastructure_config.md"
+}
+OBSERVATION:
+OK: 1|# DOCUMENT 4: INFRASTRUCTURE CONFIG
+2|
+3|**Hosting:**
+4|*   **Platform:** Heroku
+5|*   **Dyno:** `standard-1x` (1GB RAM, 0.5 CPU)
+6|*   **Database:** `heroku-postgresql:standard-0` (running on the same dyno as the application)
+7|*   **Read Replicas:** None.
+8|*   **Separate DB Instance:** No.
+9|
+10|**Caching:**
+11|*   **Service:** Heroku Redis Add-on
+12|*   **Plan:** `heroku-redis:bb-1`
+13|*   **Cost:** $50/mo
+14|
+15|**Backups:**
+16|*   **Schedule:** Daily at 2:00 AM via `heroku pg:backups schedule`
+17|*   **Status:** Failures recorded for the last 21 days.
+18|*   **Last Successful Backup:** 2026-07-30
+19|*   **Alerting:** None configured for backup failures.
+20|
+21|**Monitoring:**
+22|*   **Uptime Monitor:** None (No Pingdom, UptimeRobot, or custom checks).
+23|*   **Status Page:** Heroku built-in status page only.
+24|
+25|**Security & DNS:**
+26|*   **SSL:** Heroku-managed, auto-renewed.
+27|*   **DNS Provider:** GoDaddy
+28|*   **DNS Management:** Managed personally by 'dave'. No secondary DNS provider.
+29|*   **Secrets Management:** 14 secrets stored in Heroku config vars (Stripe keys, DataEnrich.io API key, Twilio credentials, Google OAuth, DB URL, Redis URL, etc.). No secrets vault.
+
+
+--- iter 7 ---
+ACTION:
+{
+  "thought": "Read remaining documents 5-9 for verbatim quotes on lock-in, SaaS, uptime, monitoring, scale, dynos, churn, turnkey, and Rails.",
+  "tool": "read",
+  "file": "doc5_stripe_export_summary.md"
+}
+OBSERVATION:
+OK: 1|# DOCUMENT 5: STRIPE EXPORT SUMMARY
+2|
+3|**Period:** Last 12 Months
+4|**Total Active Subscriptions:** 94
+5|**Total MRR (Stripe):** $16,000
+6|
+7|**Plan Breakdown:**
+8|*   **Pro Plan:**
+9|    *   Count: 91 accounts
+10|    *   Price: $149/mo
+11|    *   Total MRR: $13,549
+12|*   **Enterprise Plan (Stripe Subscription):**
+13|    *   Count: 3 accounts
+14|    *   Price: $817/mo (Note: These are individual user logins for enterprise companies; the primary enterprise contract is paid via wire transfer and is not reflected in this Stripe total.)
+15|    *   Total MRR: $2,451
+16|
+17|**Total Stripe MRR:** $16,000 ($13,549 + $2,451)
+18|
+19|**Note:** The 3 enterprise companies (Acme Retail, GlobalMart, ShopStream) have separate contracts for $8,000/mo each, paid via wire transfer. These payments are not processed through Stripe and are not included in the $16,000 MRR figure above.
+
+
+--- iter 8 ---
+ACTION:
+{
+  "thought": "Read remaining documents 6-9 for verbatim quotes on lock-in, SaaS, uptime, monitoring, scale, dynos, churn, turnkey, and Rails.",
+  "tool": "read",
+  "file": "doc6_crm_export_summary.md"
+}
+OBSERVATION:
+OK: 1|# DOCUMENT 6: CRM EXPORT SUMMARY
+2|
+3|**Total Accounts Marked 'Active':** 120
+4|
+5|**Breakdown:**
+6|*   **Stripe-Linked Accounts:** 94 (Corresponding to the 94 active subscriptions in Stripe).
+7|*   **Enterprise Accounts (Wire Transfer):** 3
+8|    *   Acme Retail
+9|    *   GlobalMart
+10|    *   ShopStream
+11|    *   *Note: These accounts have separate wire-transfer contracts and are not included in the Stripe subscription count.*
+12|*   **Phantom/Inactive Accounts:** 23
+13|    *   Created in Q1 2026.
+14|    *   No payment events in the last 90 days.
+15|    *   Last login dates: 60-120 days ago.
+16|    *   No notes or memos on file regarding creation or non-payment.
+17|
+18|**Status Field:** All 120 accounts are currently marked as 'active' in the CRM.
+
+
+--- iter 9 ---
+ACTION:
+{
+  "thought": "Read remaining documents 7-9 for verbatim quotes on lock-in, SaaS, uptime, monitoring, scale, dynos, churn, turnkey, and Rails.",
+  "tool": "read",
+  "file": "doc7_customer_contracts_summary.md"
+}
+OBSERVATION:
+OK: 1|# DOCUMENT 7: CUSTOMER CONTRACTS SUMMARY
+2|
+3|**Enterprise Contracts (3):**
+4|
+5|1.  **Acme Retail**
+6|    *   **Value:** $8,000/mo
+7|    *   **Term:** Annual (Renews 2027-03-15)
+8|    *   **SLA:** 99.9%
+9|    *   **Remedy:** Service credit of 10% of monthly fee per 0.1% below SLA.
+10|    *   **Termination:** 30-day notice for material SLA breach; 90-day non-renewal notice.
+11|    *   **Required Features:** Product matching, price comparison, real-time inventory sync.
+12|
+13|2.  **GlobalMart**
+14|    *   **Value:** $8,000/mo
+15|    *   **Term:** Annual (Renews 2026-11-01)
+16|    *   **SLA:** 99.9%
+17|    *   **Remedy:** Service credit of 10% of monthly fee per 0.1% below SLA.
+18|    *   **Termination:** 30-day notice for material SLA breach; 90-day non-renewal notice.
+19|    *   **Required Features:** Product matching, category classification, API access.
+20|
+21|3.  **ShopStream**
+22|    *   **Value:** $8,000/mo
+23|    *   **Term:** Annual (Renews 2027-06-20)
+24|    *   **SLA:** 99.5%
+25|    *   **Remedy:** Service credit of 10% of monthly fee per 0.1% below SLA.
+26|    *   **Termination:** 30-day notice for material SLA breach; 90-day non-renewal notice.
+27|    *   **Required Features:** Price comparison, product matching.
+28|
+29|**Month-to-Month Subscriptions (94):**
+30|*   **Agreement:** Standard Terms of Service (ToS).
+31|*   **Renewal:** Auto-renewal.
+32|*   **Cancellation:** No-penalty cancellation at end of billing cycle.
+33|*   **SLA:** None.
+34|*   **Individual Contract:** No.
+35|
+36|**Pilot Agreements (8):**
+37|*   **Term:** Free 90-day trial.
+38|*   **Expiration:** Q3 2026.
+39|*   **Payment Obligation:** None.
+40|*   **Conversion:** Optional conversion to Pro plan ($149/mo).
+41|
+42|**No-Contract Accounts (15):**
+43|*   **Status:** Individual users who upgraded to Pro plan.
+44|*   **Payment:** Via Stripe.
+45|*   **Legal Agreement:** No signed ToS on file (acceptance not recorded).
+
+
+--- iter 10 ---
+ACTION:
+{
+  "thought": "Read documents 8 and 9 for remaining verbatim statements on lock-in, SaaS, uptime, monitoring, scale, dynos, churn, turnkey, and Rails.",
+  "tool": "read",
+  "file": "doc8_external_dependency_list.md"
+}
+OBSERVATION:
+OK: 1|# DOCUMENT 8: EXTERNAL DEPENDENCY LIST
+2|
+3|1.  **Stripe**
+4|    *   **Function:** Payment processing.
+5|    *   **Cost:** 2.9% + $0.30 per transaction.
+6|    *   **Risk:** Low (standard merchant agreement).
+7|2.  **DataEnrich.io**
+8|    *   **Function:** Product data enrichment API (product matching, price comparison, category classification).
+9|    *   **Cost:** $400/mo flat.
+10|    *   **Termination Notice:** 90 days (either party).
+11|    *   **Dependency:** 40% of features depend on this API.
+12|    *   **Fallback:** None implemented. If API is down or pricing changes, product degrades to basic mode (no enrichment).
+13|3.  **Heroku**
+14|    *   **Function:** Hosting.
+15|    *   **Cost:** $25/mo (standard-1x dyno).
+16|    *   **SLA:** 99.95% platform uptime (not contractual for the app).
+17|4.  **Redis (Heroku Add-on)**
+18|    *   **Function:** Caching.
+19|    *   **Cost:** $50/mo.
+20|    *   **Risk:** If down, app is slow but functional.
+21|5.  **Twilio**
+22|    *   **Function:** Email/SMS notifications.
+23|    *   **Cost:** $100/mo.
+24|    *   **Risk:** If down, users do not receive notifications; core functionality works.
+25|6.  **Google OAuth**
+26|    *   **Function:** Authentication.
+27|    *   **Cost:** Free tier.
+28|    *   **Risk:** If Google changes API or revokes app, users cannot log in. No contractual relationship.
+29|7.  **GoDaddy**
+30|    *   **Function:** DNS.
+31|    *   **Cost:** $12/yr.
+32|    *   **Risk:** Managed personally by 'dave'. No secondary DNS. If domain expires or GoDaddy has an issue, the app is unreachable.
+
+
+--- iter 11 ---
+ACTION:
+{
+  "thought": "Read the last remaining document (doc9) so all nine files are covered, then emit the verbatim quotes with line numbers.",
+  "tool": "read",
+  "file": "doc9_seller_s_technical_claims_verbatim.md"
+}
+OBSERVATION:
+OK: 1|# DOCUMENT 9: SELLER'S TECHNICAL CLAIMS (VERBATIM)
+2|
+3|As stated in the listing and data room cover letter:
+4|
+5|*   "The system has redundancy and automatic failover through Heroku's platform-level process management."
+6|*   "We monitor uptime at 99.9% and maintain daily automated database backups."
+7|*   "The codebase is well-documented with comprehensive test coverage across all critical paths."
+8|*   "The stack is designed to scale horizontally — adding dynos is a one-click operation in the Heroku dashboard."
+9|*   "All third-party integrations are on standard SaaS agreements with no lock-in."
+10|*   "The database is backed up daily to Heroku's managed storage with 30-day retention."
+11|*   "We use a modern Rails 7 stack with automatic SSL and managed DNS."
+
+
+--- iter 12 ---
+ACTION:
+{
+  "thought": "All nine docs are read; emit verbatim quotes with line numbers for the requested topics.",
+  "tool": "respond",
+  "text": "Quotes from all nine documents (verbatim, with line numbers). Docs 3, 5, and 6 have no matching statements on vendor lock-in, low lock-in, standard SaaS agreements, 99.9% uptime, monitoring, horizontal scale, one-click dynos, churn, turnkey, or Rails version.\n\n**doc1_seller_listing_description.md**\n9: FlowMetrics is a revenue-positive, recurring-revenue SaaS platform providing real-time analytics and product intelligence to e-commerce sellers. We have built a loyal customer base of 120 active accounts, ranging from independent merchants to mid-market enterprise retailers. Our blended Monthly Recurring Revenue (MRR) stands at $40,000, driven by a mix of high-value enterprise contracts and a broad base of month-to-month subscribers. The business operates with low churn, a scalable technology stack, and minimal operational overhead. This is a turnkey acquisition opportunity for a buyer looking to enter the e-commerce analytics space with proven product-market fit and immediate cash flow.\n14: *   **Churn:** Low (stable base of recurring subscribers)\n18: *   **Scalable Architecture:** Built on a modern Rails 7 stack with platform-level redundancy and automatic failover.\n19: *   **Reliability:** 99.9% uptime monitoring and daily automated database backups with 30-day retention.\n22: *   **Low Vendor Lock-in:** All third-party integrations are on standard SaaS agreements with no proprietary lock-in.\n\n**doc2_tech_stack_description_as_provided_by_se.md**\n3: FlowMetrics is built on a standard, modern SaaS stack designed for reliability and ease of maintenance. The core application is a Rails 7 application hosted on Heroku, which provides automatic scaling and failover capabilities at the platform level. This ensures that the application remains available even under varying load conditions, with no manual intervention required for routine operations.\n5: Data persistence is handled by PostgreSQL, which is configured with daily scheduled backups to ensure data integrity and recoverability. We utilize Redis for session caching to improve response times and user experience. Payment processing is securely handled through Stripe, which supports both credit card transactions and recurring billing. For our product intelligence features, we integrate with a third-party data enrichment API that provides real-time product data, allowing our users to make informed decisions about their inventory and pricing. The entire stack is managed through Heroku\u2019s dashboard, ensuring that deployments, scaling, and monitoring are streamlined and efficient. We consider this a standard SaaS stack with platform-level redundancy, allowing us to focus on product development rather than infrastructure management.\n\n**doc3_git_history_summary.md**\n(none)\n\n**doc4_infrastructure_config.md**\n5: *   **Dyno:** `standard-1x` (1GB RAM, 0.5 CPU)\n6: *   **Database:** `heroku-postgresql:standard-0` (running on the same dyno as the application)\n21: **Monitoring:**\n22: *   **Uptime Monitor:** None (No Pingdom, UptimeRobot, or custom checks).\n\n**doc5_stripe_export_summary.md**\n(none)\n\n**doc6_crm_export_summary.md**\n(none)\n\n**doc7_customer_contracts_summary.md**\n8:     *   **SLA:** 99.9%\n16:     *   **SLA:** 99.9%\n\n**doc8_external_dependency_list.md**\n15:     *   **Cost:** $25/mo (standard-1x dyno).\n16:     *   **SLA:** 99.95% platform uptime (not contractual for the app).\n\n**doc9_seller_s_technical_claims_verbatim.md**\n6: *   \"We monitor uptime at 99.9% and maintain daily automated database backups.\"\n8: *   \"The stack is designed to scale horizontally \u2014 adding dynos is a one-click operation in the Heroku dashboard.\"\n9: *   \"All third-party integrations are on standard SaaS agreements with no lock-in.\"\n11: *   \"We use a modern Rails 7 stack with automatic SSL and managed DNS.\""
+}
+OBSERVATION:
+(respond)
+
+FINAL ANSWER:
+Quotes from all nine documents (verbatim, with line numbers). Docs 3, 5, and 6 have no matching statements on vendor lock-in, low lock-in, standard SaaS agreements, 99.9% uptime, monitoring, horizontal scale, one-click dynos, churn, turnkey, or Rails version.
+
+**doc1_seller_listing_description.md**
+9: FlowMetrics is a revenue-positive, recurring-revenue SaaS platform providing real-time analytics and product intelligence to e-commerce sellers. We have built a loyal customer base of 120 active accounts, ranging from independent merchants to mid-market enterprise retailers. Our blended Monthly Recurring Revenue (MRR) stands at $40,000, driven by a mix of high-value enterprise contracts and a broad base of month-to-month subscribers. The business operates with low churn, a scalable technology stack, and minimal operational overhead. This is a turnkey acquisition opportunity for a buyer looking to enter the e-commerce analytics space with proven product-market fit and immediate cash flow.
+14: *   **Churn:** Low (stable base of recurring subscribers)
+18: *   **Scalable Architecture:** Built on a modern Rails 7 stack with platform-level redundancy and automatic failover.
+19: *   **Reliability:** 99.9% uptime monitoring and daily automated database backups with 30-day retention.
+22: *   **Low Vendor Lock-in:** All third-party integrations are on standard SaaS agreements with no proprietary lock-in.
+
+**doc2_tech_stack_description_as_provided_by_se.md**
+3: FlowMetrics is built on a standard, modern SaaS stack designed for reliability and ease of maintenance. The core application is a Rails 7 application hosted on Heroku, which provides automatic scaling and failover capabilities at the platform level. This ensures that the application remains available even under varying load conditions, with no manual intervention required for routine operations.
+5: Data persistence is handled by PostgreSQL, which is configured with daily scheduled backups to ensure data integrity and recoverability. We utilize Redis for session caching to improve response times and user experience. Payment processing is securely handled through Stripe, which supports both credit card transactions and recurring billing. For our product intelligence features, we integrate with a third-party data enrichment API that provides real-time product data, allowing our users to make informed decisions about their inventory and pricing. The entire stack is managed through Heroku’s dashboard, ensuring that deployments, scaling, and monitoring are streamlined and efficient. We consider this a standard SaaS stack with platform-level redundancy, allowing us to focus on product development rather than infrastructure management.
+
+**doc3_git_history_summary.md**
+(none)
+
+**doc4_infrastructure_config.md**
+5: *   **Dyno:** `standard-1x` (1GB RAM, 0.5 CPU)
+6: *   **Database:** `heroku-postgresql:standard-0` (running on the same dyno as the application)
+21: **Monitoring:**
+22: *   **Uptime Monitor:** None (No Pingdom, UptimeRobot, or custom checks).
+
+**doc5_stripe_export_summary.md**
+(none)
+
+**doc6_crm_export_summary.md**
+(none)
+
+**doc7_customer_contracts_summary.md**
+8:     *   **SLA:** 99.9%
+16:     *   **SLA:** 99.9%
+
+**doc8_external_dependency_list.md**
+15:     *   **Cost:** $25/mo (standard-1x dyno).
+16:     *   **SLA:** 99.95% platform uptime (not contractual for the app).
+
+**doc9_seller_s_technical_claims_verbatim.md**
+6: *   "We monitor uptime at 99.9% and maintain daily automated database backups."
+8: *   "The stack is designed to scale horizontally — adding dynos is a one-click operation in the Heroku dashboard."
+9: *   "All third-party integrations are on standard SaaS agreements with no lock-in."
+11: *   "We use a modern Rails 7 stack with automatic SSL and managed DNS."

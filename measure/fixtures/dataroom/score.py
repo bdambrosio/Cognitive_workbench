@@ -13,7 +13,7 @@ iterations ran, whether the word ceiling held, whether the key was read —
 all read straight off the trace, no model involved. Deciding whether a
 paragraph in the memo *is* finding P2 is a judgement about meaning, so it
 runs through ONE LLM call on the pinned grader, held constant across runs
-for the same reason `regrade.py` pins it: if the arm under test also did the
+for the same reason `regrade.py` pins it: if the model under test also did the
 matching, a difference in matching quality would surface as the metric.
 
 THE KEY IS READABLE BY THE AGENT. `inspect` is geofenced to the repo root
@@ -63,7 +63,7 @@ TIER3 = ["B1", "B2", "B3", "B4", "B5", "B6", "B7"]   # unplanted, supported
 
 # Axis 2 — DIFFICULTY of noticing it (the README's ladder). This is the one
 # that keeps the fixture from saturating: report the highest rung reached
-# rather than pass/fail, and retire the fixture when every arm tops out.
+# rather than pass/fail, and retire the fixture when every model tops out.
 #   stated         a fact sitting in one document
 #   cross_document a seller claim contradicted by another document
 #   derived        true only after arithmetic on stated figures
@@ -153,7 +153,7 @@ SURFACE_MARK = "=== CLAIM SURFACE ==="
 def marker_re(mark: str) -> "re.Pattern":
     """A marker matcher tolerant of the whitespace between its tokens.
 
-    WHY NOT AN EXACT MATCH. 2026-08-25, on a real target: an arm emitted a
+    WHY NOT AN EXACT MATCH. 2026-08-25, on a real target: an model emitted a
     complete and correct limitations statement — all three required lines —
     under `===\nLIMITATIONS ===`. A line wrap in the middle of the literal.
     Exact matching reported the requirement as absent, which is the opposite
@@ -183,7 +183,7 @@ def agent_emissions(working_log: str) -> str:
     its tools returned (`$stepN: ...`). A claim surface is CLOSED BY THE
     AUDITOR. A marker inside a tool's output is the tool handing the
     instruction back, not a closure, and reading the two as equivalent
-    recorded a denominator the agent had itself rejected: on 2026-08-25 an arm
+    recorded a denominator the agent had itself rejected: on 2026-08-25 an model
     got `=== CLAIM SURFACE === / 14 claims` from a process_text call, said in
     its next thought that the output was unreliable because "it says 14 claims
     but lists 18", re-enumerated, and closed at 32. The scorer recorded 14 and
@@ -215,8 +215,8 @@ def claim_surface(world: str, agent: str) -> Dict[str, Any]:
     Mechanical, and DELIBERATELY STRICT. §12.2 fixes the shape — the marker,
     then a count and the word `claims` on the next line — so this matches that
     and nothing else. The first version took "the first integer on or after
-    the marker", which on first exposure returned n=1 for an arm that listed
-    its surface ("1) Asking $480k...") and n=463 for an arm that quoted the
+    the marker", which on first exposure returned n=1 for an model that listed
+    its surface ("1) Asking $480k...") and n=463 for an model that quoted the
     instruction back without ever closing anything. A confident wrong
     denominator is worse than none: every coverage figure divides by it.
 
@@ -238,8 +238,8 @@ def claim_surface(world: str, agent: str) -> Dict[str, Any]:
         raw = t.raw.get("raw_response") or ""
         # THE AGENT'S OWN WORDS FIRST, then anything it was handed.
         #
-        # An arm may close the surface THROUGH a tool — delegate enumeration to
-        # process_text and adopt the result — and that is a real closure. An arm
+        # An model may close the surface THROUGH a tool — delegate enumeration to
+        # process_text and adopt the result — and that is a real closure. An model
         # may also be handed a marker it then rejects. 2026-08-25: one run got
         # `14 claims` from process_text, said in its next thought that the
         # output was unreliable because "it says 14 claims but lists 18",
@@ -269,7 +269,7 @@ _VERDICTS = {"real", "real, minor caveat", "real, operational caveat",
              "partial", "delta", "unverifiable", "non-delta", "derived"}
 
 # §5's heading shape: **Finding N: <title> — [verdict]**. Tolerant of the dash
-# an arm chooses and of bold markers, because those vary and the verdict does
+# an model chooses and of bold markers, because those vary and the verdict does
 # not.
 _FINDING_RE = re.compile(r"^\s*\**\s*Finding\s+\d+[^\n\[]*\[([^\]]+)\]",
                          re.M | re.I)
@@ -282,7 +282,7 @@ def verdict_conformance(report: str) -> Dict[str, Any]:
     defines — the same standing as recommendation_of, not classification of
     free text. Added 2026-08-24 on noticing that removing a verdict from §6 had
     no scorer consequence whatever: nothing checked per-finding labels, so an
-    arm could invent them freely and still score clean.
+    model could invent them freely and still score clean.
     """
     found = [v.strip().lower() for v in _FINDING_RE.findall(report)]
     return {"findings": len(found),
@@ -337,15 +337,15 @@ def gap_map_elements(gap_map: str) -> Dict[str, bool]:
 
     ITS OWN RECOMMENDATION LOCATOR, and this is the trap. A first version
     reused recommendation_of and reported nine of twenty-five Gap Maps as
-    missing the recommendation. All nine were one arm, and all nine were wrong:
+    missing the recommendation. All nine were one model, and all nine were wrong:
     recommendation_of requires the term to open the document because §16 puts
     the recommendation first in a REPORT. §15 puts target identity first, so
-    that arm's recommendation sits on line 2 and a report-shaped locator cannot
+    that model's recommendation sits on line 2 and a report-shaped locator cannot
     see it. Here the term may stand as a verdict anywhere in the first few
     lines.
 
     Not gated. Reported, because two runs is not enough to know whether a
-    missing disclaimer is an arm's habit or an accident.
+    missing disclaimer is an model's habit or an accident.
     """
     head = "\n".join(gap_map.strip().splitlines()[:6])
     rec = None
@@ -399,7 +399,7 @@ def subagent_compliance(world: str, agent: str) -> Dict[str, Any]:
     returns nothing has failed that contract, and the parent sees only
     `EMPTY:` — so it retries, narrower, and the cost lands in the iteration
     count where nothing distinguishes it from thorough work. Measured
-    2026-08-24: one arm returned no answer on 12 of 33 `inspect_external`
+    2026-08-24: one model returned no answer on 12 of 33 `inspect_external`
     calls while two others managed 0 of 9 and 0 of 7. That difference took
     three passes of hand-reading traces to find, because no number reported
     it.
@@ -483,7 +483,7 @@ _REC_TERM_RE = {
         #
         # `(` IS A TERMINATOR, and its absence was the THIRD bug in this
         # function — 2026-08-25, same discovery method as the first two. An
-        # arm wrote "**Recommendation: Material** (coverage: 28 of 62 claims
+        # model wrote "**Recommendation: Material** (coverage: 28 of 62 claims
         # individually verified)." and scored FAIL on §9. The closing paren
         # was already here; the opening one was not, so a verdict followed by
         # a parenthetical qualifier failed the guard. Semantically an opening
@@ -509,7 +509,7 @@ def recommendation_of(report: str) -> Optional[str]:
     RECOMMENDATION**" then "**Verdict: Material.**"; hd1 put the term on the
     next line; hd3 wrote "Recommendation: **Material**", where the emphasis
     markers fall between the colon and the term. All four state Material. The
-    column had never once discriminated between arms — it only ever reported
+    column had never once discriminated between models — it only ever reported
     label formatting.
 
     The CLOSED VOCABULARY is not the bug and is kept: §9 defines five literal
@@ -529,7 +529,7 @@ def recommendation_of(report: str) -> Optional[str]:
     # WHOLE REPORT, NOT THE FIRST 4,000 CHARS. The head window was the second
     # locator bug in this function, found 2026-08-24 the same way as the
     # first — by re-scoring real runs. It was safe while reports ran ~7,000
-    # chars and led with the recommendation, as §16 requires. An arm that
+    # chars and led with the recommendation, as §16 requires. An model that
     # wrote 2,851 words and put "The recommendation is Material" at the END
     # scored "§9 recommendation used: FAIL" — reporting that it never used the
     # taxonomy when it had, at character ~16,000.
@@ -593,7 +593,7 @@ def recommendation_of(report: str) -> Optional[str]:
 # Length is a consequence of the subject matter's complexity, and bounding it
 # would force omission of required content.
 #
-# And it was actively inverting a measurement: an arm failed two of three runs
+# And it was actively inverting a measurement: an model failed two of three runs
 # on length alone while finding all three must-find items with zero
 # unsupported claims. A longer report covers more findings, so the gate
 # penalised coverage — the one thing §4 says must never be silently traded.
@@ -779,7 +779,7 @@ def main() -> int:
         ("no unsupported claims",     unsupported == 0),
         ("§6 verdicts only",           not vc["off_vocabulary"]),
         ("limitations statement",      bool(_LIMITS_RE.search(report))),
-        # A DECLARED ZERO IS NOT A CLOSURE. 2026-08-25: an arm's first
+        # A DECLARED ZERO IS NOT A CLOSURE. 2026-08-25: an model's first
         # external listing returned no entries, so it emitted the marker with
         # `0 claims`, recovered, and re-froze at 273 — which its report then
         # used throughout. This criterion tested `declared` alone and passed
@@ -795,7 +795,7 @@ def main() -> int:
     for label, ok in checks:
         print(f"      {'ok  ' if ok else 'FAIL'}  {label}")
 
-    print("\n  n=1 is anecdote. Run the fixture at least three times per arm.")
+    print("\n  n=1 is anecdote. Run the fixture at least three times per model.")
     return 0
 
 

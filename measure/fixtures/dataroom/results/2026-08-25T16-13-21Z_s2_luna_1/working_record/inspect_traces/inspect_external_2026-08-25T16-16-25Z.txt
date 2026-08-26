@@ -1,0 +1,100 @@
+================================================================================
+[inspect_external] 2026-08-25T16-16-25Z exit=respond iters=3
+================================================================================
+Query: Return the complete numbered contents of doc6_crm_export_summary.md and enumerate every distinct stated assertion that can receive exactly one audit verdict, preserving exact source line ranges. Do not verify implementation or read other files.
+
+--- iter 1 ---
+ACTION:
+{
+  "thought": "I\u2019ll locate doc6_crm_export_summary.md at the repository root level without opening any other files, then read it in full and extract its numbered contents and auditable assertions with exact line ranges.",
+  "tool": "list"
+}
+OBSERVATION:
+OK: ./
+doc1_seller_listing_description.md	1984 bytes
+doc2_tech_stack_description_as_provided_by_se.md	1310 bytes
+doc3_git_history_summary.md	886 bytes
+doc4_infrastructure_config.md	1126 bytes
+doc5_stripe_export_summary.md	833 bytes
+doc6_crm_export_summary.md	718 bytes
+doc7_customer_contracts_summary.md	1800 bytes
+doc8_external_dependency_list.md	1482 bytes
+doc9_seller_s_technical_claims_verbatim.md	753 bytes
+
+--- iter 2 ---
+ACTION:
+{
+  "thought": "I found the requested file at the repository root and will read only that file in full to preserve its numbered contents and exact source line ranges.",
+  "tool": "read",
+  "file": "doc6_crm_export_summary.md"
+}
+OBSERVATION:
+OK: 1|# DOCUMENT 6: CRM EXPORT SUMMARY
+2|
+3|**Total Accounts Marked 'Active':** 120
+4|
+5|**Breakdown:**
+6|*   **Stripe-Linked Accounts:** 94 (Corresponding to the 94 active subscriptions in Stripe).
+7|*   **Enterprise Accounts (Wire Transfer):** 3
+8|    *   Acme Retail
+9|    *   GlobalMart
+10|    *   ShopStream
+11|    *   *Note: These accounts have separate wire-transfer contracts and are not included in the Stripe subscription count.*
+12|*   **Phantom/Inactive Accounts:** 23
+13|    *   Created in Q1 2026.
+14|    *   No payment events in the last 90 days.
+15|    *   Last login dates: 60-120 days ago.
+16|    *   No notes or memos on file regarding creation or non-payment.
+17|
+18|**Status Field:** All 120 accounts are currently marked as 'active' in the CRM.
+
+
+--- iter 3 ---
+ACTION:
+{
+  "thought": "The file contains 18 source lines. I will return all numbered lines verbatim, followed by an atomic enumeration of each independently auditable assertion with its exact source line range.",
+  "tool": "respond",
+  "text": "Complete numbered contents of `doc6_crm_export_summary.md`:\n\n1|# DOCUMENT 6: CRM EXPORT SUMMARY\n2|\n3|**Total Accounts Marked 'Active':** 120\n4|\n5|**Breakdown:**\n6|*   **Stripe-Linked Accounts:** 94 (Corresponding to the 94 active subscriptions in Stripe).\n7|*   **Enterprise Accounts (Wire Transfer):** 3\n8|    *   Acme Retail\n9|    *   GlobalMart\n10|    *   ShopStream\n11|    *   *Note: These accounts have separate wire-transfer contracts and are not included in the Stripe subscription count.*\n12|*   **Phantom/Inactive Accounts:** 23\n13|    *   Created in Q1 2026.\n14|    *   No payment events in the last 90 days.\n15|    *   Last login dates: 60-120 days ago.\n16|    *   No notes or memos on file regarding creation or non-payment.\n17|\n18|**Status Field:** All 120 accounts are currently marked as 'active' in the CRM.\n\nDistinct stated assertions capable of exactly one audit verdict:\n\n1. **[Lines 3-3]** The total number of accounts marked \u201cActive\u201d is 120.\n2. **[Lines 6-6]** There are 94 Stripe-linked accounts.\n3. **[Lines 6-6]** The 94 Stripe-linked accounts correspond to 94 active subscriptions in Stripe.\n4. **[Lines 7-7]** There are 3 enterprise accounts using wire transfer.\n5. **[Lines 8-8]** Acme Retail is an enterprise account.\n6. **[Lines 9-9]** GlobalMart is an enterprise account.\n7. **[Lines 10-10]** ShopStream is an enterprise account.\n8. **[Lines 11-11]** The enterprise accounts have separate wire-transfer contracts.\n9. **[Lines 11-11]** The enterprise accounts are not included in the Stripe subscription count.\n10. **[Lines 12-12]** There are 23 phantom/inactive accounts.\n11. **[Lines 13-13]** The phantom/inactive accounts were created in Q1 2026.\n12. **[Lines 14-14]** The phantom/inactive accounts have had no payment events in the last 90 days.\n13. **[Lines 15-15]** The last login dates for the phantom/inactive accounts were 60\u2013120 days ago.\n14. **[Lines 16-16]** There are no notes or memos on file regarding the phantom/inactive accounts\u2019 creation or non-payment.\n15. **[Lines 18-18]** All 120 accounts are currently marked as \u201cactive\u201d in the CRM."
+}
+OBSERVATION:
+(respond)
+
+FINAL ANSWER:
+Complete numbered contents of `doc6_crm_export_summary.md`:
+
+1|# DOCUMENT 6: CRM EXPORT SUMMARY
+2|
+3|**Total Accounts Marked 'Active':** 120
+4|
+5|**Breakdown:**
+6|*   **Stripe-Linked Accounts:** 94 (Corresponding to the 94 active subscriptions in Stripe).
+7|*   **Enterprise Accounts (Wire Transfer):** 3
+8|    *   Acme Retail
+9|    *   GlobalMart
+10|    *   ShopStream
+11|    *   *Note: These accounts have separate wire-transfer contracts and are not included in the Stripe subscription count.*
+12|*   **Phantom/Inactive Accounts:** 23
+13|    *   Created in Q1 2026.
+14|    *   No payment events in the last 90 days.
+15|    *   Last login dates: 60-120 days ago.
+16|    *   No notes or memos on file regarding creation or non-payment.
+17|
+18|**Status Field:** All 120 accounts are currently marked as 'active' in the CRM.
+
+Distinct stated assertions capable of exactly one audit verdict:
+
+1. **[Lines 3-3]** The total number of accounts marked “Active” is 120.
+2. **[Lines 6-6]** There are 94 Stripe-linked accounts.
+3. **[Lines 6-6]** The 94 Stripe-linked accounts correspond to 94 active subscriptions in Stripe.
+4. **[Lines 7-7]** There are 3 enterprise accounts using wire transfer.
+5. **[Lines 8-8]** Acme Retail is an enterprise account.
+6. **[Lines 9-9]** GlobalMart is an enterprise account.
+7. **[Lines 10-10]** ShopStream is an enterprise account.
+8. **[Lines 11-11]** The enterprise accounts have separate wire-transfer contracts.
+9. **[Lines 11-11]** The enterprise accounts are not included in the Stripe subscription count.
+10. **[Lines 12-12]** There are 23 phantom/inactive accounts.
+11. **[Lines 13-13]** The phantom/inactive accounts were created in Q1 2026.
+12. **[Lines 14-14]** The phantom/inactive accounts have had no payment events in the last 90 days.
+13. **[Lines 15-15]** The last login dates for the phantom/inactive accounts were 60–120 days ago.
+14. **[Lines 16-16]** There are no notes or memos on file regarding the phantom/inactive accounts’ creation or non-payment.
+15. **[Lines 18-18]** All 120 accounts are currently marked as “active” in the CRM.

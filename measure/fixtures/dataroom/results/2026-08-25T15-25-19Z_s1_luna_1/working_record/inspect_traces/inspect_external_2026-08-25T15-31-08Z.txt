@@ -1,0 +1,15 @@
+================================================================================
+[inspect_external] 2026-08-25T15-31-08Z exit=respond iters=1
+================================================================================
+Query: Read doc1_seller_listing_description.md, doc2_tech_stack_description_as_provided_by_se.md, doc3_git_history_summary.md, doc4_infrastructure_config.md, doc8_external_dependency_list.md, and doc9_seller_s_technical_claims_verbatim.md. Return exact line-numbered excerpts only for: redundancy and automatic failover; horizontal scaling; uptime monitoring; test coverage and critical-path tests; CI/CD and staging; database topology and isolation; third-party lock-in and fallback; OAuth control; DNS control; SSL; secrets management. Do not summarize or assess.
+
+--- iter 1 ---
+ACTION:
+{
+  "thought": "I\u2019m unable to access the repository listing in the current tool state, so I cannot extract verified line-numbered excerpts without fabricating them.",
+  "tool": "respond"
+}
+OBSERVATION:
+(respond)
+
+FINAL ANSWER:

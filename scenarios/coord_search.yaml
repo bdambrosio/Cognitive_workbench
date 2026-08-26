@@ -8,7 +8,7 @@
 # turn budget ("at least N candidates between you"), do two peers divide
 # the work, hold the division, and produce one coherent joint answer — or
 # do they duplicate each other, over/undershoot the target, and each report
-# as if alone? This is the local arm. `coord_search_luna.yaml` is the same
+# as if alone? This is the local model. `coord_search_luna.yaml` is the same
 # scenario on a cloud backend; the pair is the experiment.
 #
 # WHY NOT REUSE coord_exp.yaml. It asked a terrain question, and its

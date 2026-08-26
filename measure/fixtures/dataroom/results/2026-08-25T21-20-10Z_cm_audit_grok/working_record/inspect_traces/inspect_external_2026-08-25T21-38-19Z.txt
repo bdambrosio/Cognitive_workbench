@@ -1,0 +1,405 @@
+================================================================================
+[inspect_external] 2026-08-25T21-38-19Z exit=respond iters=8
+================================================================================
+Query: Read HELP_CENTER_INFRA.md lines 30-45 and 160-175 with exact text. Read README.md 95-130 and 400-430. Read backend/app/core/config.py 213-236. Quote FAQ_MAX_BATCH_CHARS vs CEILING. Quote sql_guardrails BLOCKED_NODE_TYPES lines.
+
+--- iter 1 ---
+ACTION:
+{
+  "thought": "Reading the requested file ranges in parallel to quote exact text.",
+  "tool": "read",
+  "file": "HELP_CENTER_INFRA.md",
+  "start_line": 30,
+  "end_line": 45
+}
+OBSERVATION:
+OK: 30|
+31|Backend env (`backend.env` on the VPS):
+32|```
+33|HELP_CENTER_BASE_DOMAIN=help.chattermate.chat
+34|HELP_CENTER_TARGET_IPS=["<VPS_IPV4>"]   # JSON array — see gotcha below
+35|```
+36|> **Gotcha:** `HELP_CENTER_TARGET_IPS` is a `frozenset` setting, so
+37|> pydantic-settings JSON-parses the env value. A bare IP or comma list
+38|> (`<VPS_IPV4>`) fails validation and crash-loops the backend at startup —
+39|> it **must** be a JSON array: `["<VPS_IPV4>"]`. (Powers the per-org
+40|> custom-domain A-record verification in §2; unused by the wildcard site.)
+41|
+42|### Wildcard certificate (DNS-01 via Route53)
+43|HTTP-01 cannot issue wildcards. A dedicated IAM user with the standard certbot
+44|Route53 policy (`route53:ListHostedZones` + `GetChange` on `*`,
+45|`ChangeResourceRecordSets` on the zone) has its creds at `~/.aws/credentials`
+
+
+--- iter 2 ---
+ACTION:
+{
+  "thought": "Reading remaining requested ranges: HELP_CENTER 160-175, README 95-130 and 400-430, config.py 213-236, plus FAQ and sql_guardrails quotes.",
+  "tool": "read",
+  "file": "HELP_CENTER_INFRA.md",
+  "start_line": 160,
+  "end_line": 175
+}
+OBSERVATION:
+OK: 160|(`ask` endpoint). Deferred because Caddy would have to own port 443 for the
+161|whole VPS.
+162|
+163|## 3. Verification checklist after deploy
+164|1. `curl -sS -o /dev/null -w '%{http_code}\n' https://<slug>.help.chattermate.chat/` → `200` (and `http://` → `301`).
+165|2. `https://<slug>.help.chattermate.chat` in a browser → published FAQs render, widget loads; an article at `/a/<faq-slug>` returns `200`.
+166|3. `docker exec chattermate-backend-1 printenv HELP_CENTER_BASE_DOMAIN` → `help.chattermate.chat` (and the backend is `healthy`, not crash-looping on `HELP_CENTER_TARGET_IPS`).
+167|4. API unaffected: `https://app.chattermate.chat` / `https://api.chattermate.chat/api/v1/...` still route normally.
+168|5. `POST /ask` from the page returns an answer and appears in `help_center_queries`.
+169|6. `docker ps -a --filter name=certbot` → **empty**. `compose up -d` must not start a
+170|   certbot container; one that sticks around means the long-running loop entrypoint is
+171|   back (see the renewal note in §1) and nginx will stop reloading onto renewed certs.
+172|
+173|## 4. Enterprise (cloud) rollout prerequisite
+174|
+175|The feature is gated by the `help_center` plan flag, which lives in the
+
+
+--- iter 3 ---
+ACTION:
+{
+  "thought": "Reading README ranges, config.py, and grepping FAQ_MAX_BATCH_CHARS and BLOCKED_NODE_TYPES.",
+  "tool": "read",
+  "file": "README.md",
+  "start_line": 95,
+  "end_line": 130
+}
+OBSERVATION:
+OK: 95|#### Guardrails
+96|
+97|The investigation agent reads untrusted customer text and holds live tool
+98|access, so the limits are enforced in code, not by prompting:
+99|
+100|- **The SQL connector is read-only, structurally.** Queries are parsed to an AST
+101|  and rejected unless they are a single plain `SELECT`. Writes, DDL, multiple
+102|  statements, and a denylist of dangerous functions cannot pass. Table access is
+103|  restricted to an allowlist you pick, enforced through CTEs, joins and
+104|  subqueries. A `LIMIT` is forced. Comments are stripped before execution, since
+105|  MySQL executes `/*! */`. The connection itself is a read-only transaction with
+106|  a statement timeout — a second, independent barrier.
+107|- **Columns you mask are never readable.** Masked columns are blocked from being
+108|  referenced anywhere, including in a `WHERE` clause, so their values can't be
+109|  probed; whole-row tricks that would smuggle them out (`to_jsonb(t)`, `t::text`,
+110|  `to_json(t.*)`) are blocked too, and results are masked again on the way back.
+111|- **Nothing is written to your database, ever.** Approving an AI proposal records
+112|  the decision — any change to your systems is made by your team.
+113|- **Row-level scoping keeps one customer's data out of another's ticket.** Mark
+114|  the column that identifies the customer on any table holding per-customer rows
+115|  (`orders → customer_email`). Queries against it are rewritten to read only the
+116|  ticket customer's own rows — the AI cannot widen that, because the filter is
+117|  applied to the table it selects *from*, not to a condition it could write
+118|  around. A ticket with no known customer cannot query a scoped table at all,
+119|  rather than falling back to reading everything. Tables you leave unscoped
+120|  (products, error codes) stay fully readable.
+121|- **Cross-customer isolation on outbound messages.** Identifiers belonging to
+122|  anyone other than the recipient are stripped from every message sent to a
+123|  customer, and other customers' tickets are redacted before they reach the
+124|  model — a second line behind row scoping.
+125|- **Every query is audited.** Each attempt is logged with the SQL and outcome;
+126|  returned rows are deliberately never stored.
+127|
+128|> **When you connect a database:** set a row-scope column for every table that
+129|> holds per-customer rows — it's the control that stops the agent reading across
+130|> customers, and it's off until you set it. Point the connector at a service
+
+
+--- iter 4 ---
+ACTION:
+{
+  "thought": "Reading remaining README range, config.py, and grepping FAQ_MAX_BATCH_CHARS and BLOCKED_NODE_TYPES.",
+  "tool": "read",
+  "file": "README.md",
+  "start_line": 400,
+  "end_line": 430
+}
+OBSERVATION:
+OK: 400|
+401|Run each from the `backend/` directory with the virtualenv active.
+402|
+403|**FAQ / Help Center processor.** FAQ generation and import jobs (Generate FAQs,
+404|"Migrate an existing help center", PDF import) are drained by the *knowledge
+405|worker* — there is no separate FAQ container. Both knowledge entrypoints pick
+406|up the FAQ queue, so either one is enough:
+407|
+408|```bash
+409|# Recommended for local dev — knowledge and FAQ in one loop
+410|python -m app.workers.run_knowledge_processor
+411|
+412|# What Docker runs: knowledge and FAQ as independent asyncio tasks, so a long
+413|# FAQ generation never blocks knowledge ingestion
+414|python -m app.workers.knowledge_processor
+415|
+416|# FAQ queue only — useful when debugging generation/import in isolation
+417|python -m app.workers.faq_processor
+418|```
+419|
+420|Polls every 60s. On startup it fails any job left stuck in `processing` by a
+421|previous crash, so a killed worker doesn't strand a job forever.
+422|
+423|**Ticket investigator.** Runs two loops in one process — investigation runs
+424|(polled every 15s) and ticket lifecycle/SLA sweeps (every 5 min):
+425|
+426|```bash
+427|python -m app.workers.ticket_investigator
+428|```
+429|
+430|Needs Redis (`REDIS_URL`) to push live `ticket_update` frames to dashboard
+
+
+--- iter 5 ---
+ACTION:
+{
+  "thought": "Reading config.py 213-236 and grepping FAQ_MAX_BATCH_CHARS and BLOCKED_NODE_TYPES.",
+  "tool": "read",
+  "file": "backend/app/core/config.py",
+  "start_line": 213,
+  "end_line": 236
+}
+OBSERVATION:
+OK: 213|    HELP_CENTER_PUBLIC_MODE: str = os.getenv("HELP_CENTER_PUBLIC_MODE", "path")
+214|    # Base domain serving {slug}.<base> help centers.
+215|    HELP_CENTER_BASE_DOMAIN: str = os.getenv("HELP_CENTER_BASE_DOMAIN", "chattermate.help")
+216|    # CNAME target customers point their custom help-center domain at.
+217|    HELP_CENTER_CNAME_TARGET: str = os.getenv("HELP_CENTER_CNAME_TARGET", "cname.chattermate.chat")
+218|    # IPs the CNAME target resolves to — accepted when a provider flattens the
+219|    # CNAME into A/AAAA records (comma-separated).
+220|    HELP_CENTER_TARGET_IPS: frozenset = frozenset(
+221|        ip.strip() for ip in os.getenv("HELP_CENTER_TARGET_IPS", "").split(",") if ip.strip()
+222|    )
+223|    # FAQ generation cost caps (per source / per LLM call) and import fetch limits.
+224|    FAQ_MAX_PAGES_PER_SOURCE: int = int(os.getenv("FAQ_MAX_PAGES_PER_SOURCE", "300"))
+225|    FAQ_MAX_BATCH_CHARS: int = int(os.getenv("FAQ_MAX_BATCH_CHARS", "15000"))
+226|    # Ceiling for context-window-derived batch sizing (see utils/model_context.py)
+227|    # — a quality guard for very-large-context models, not a token limit.
+228|    FAQ_MAX_BATCH_CHARS_CEILING: int = int(os.getenv("FAQ_MAX_BATCH_CHARS_CEILING", "60000"))
+229|    # Force a context-window size (tokens) for exotic/self-hosted models; 0 = auto.
+230|    FAQ_CONTEXT_TOKENS_OVERRIDE: int = int(os.getenv("FAQ_CONTEXT_TOKENS_OVERRIDE", "0"))
+231|    # Meter FAQ generation credits even for orgs on their own API key
+232|    # (default: hosted CHATTERMATE model only).
+233|    FAQ_METER_OWN_KEY: bool = os.getenv("FAQ_METER_OWN_KEY", "false").lower() == "true"
+234|    FAQ_IMPORT_MAX_PAGE_CHARS: int = int(os.getenv("FAQ_IMPORT_MAX_PAGE_CHARS", "100000"))
+235|    FAQ_IMPORT_FETCH_TIMEOUT: int = int(os.getenv("FAQ_IMPORT_FETCH_TIMEOUT", "30"))
+236|    # Article-mode import (crawl linked pages, no LLM): crawl and re-host caps.
+
+
+--- iter 6 ---
+ACTION:
+{
+  "thought": "Grep BLOCKED_NODE_TYPES in sql_guardrails to quote those lines.",
+  "tool": "grep",
+  "pattern": "BLOCKED_NODE_TYPES",
+  "path": "."
+}
+OBSERVATION:
+OK: backend/app/services/sql_guardrails.py:62:BLOCKED_NODE_TYPES = (
+backend/app/services/sql_guardrails.py:259:    for node_type in BLOCKED_NODE_TYPES:
+
+--- iter 7 ---
+ACTION:
+{
+  "thought": "Reading BLOCKED_NODE_TYPES definition at sql_guardrails.py:62.",
+  "tool": "read",
+  "file": "backend/app/services/sql_guardrails.py",
+  "start_line": 55,
+  "end_line": 90
+}
+OBSERVATION:
+OK: 55|    "pg_create_logical_replication_slot", "pg_drop_replication_slot",
+56|    # mysql
+57|    "sleep", "benchmark", "load_file", "get_lock", "release_lock",
+58|    "master_pos_wait", "sys_eval", "sys_exec",
+59|}
+60|
+61|# Statement/expression node types that must never appear anywhere in the tree.
+62|BLOCKED_NODE_TYPES = (
+63|    exp.Insert, exp.Update, exp.Delete, exp.Merge,
+64|    exp.Create, exp.Drop, exp.Alter, exp.TruncateTable,
+65|    exp.Grant, exp.Command, exp.Transaction, exp.Set,
+66|    exp.Into, exp.Lock,
+67|)
+68|
+69|# Default schema names: a bare table reference resolves to these, so an
+70|# allowlist entry "public.orders" also authorizes "orders".
+71|DEFAULT_SCHEMAS = {"public", "dbo"}
+72|
+73|_DIALECTS = {"postgresql": "postgres", "postgres": "postgres", "mysql": "mysql"}
+74|
+75|
+76|@dataclass
+77|class SqlValidationResult:
+78|    ok: bool
+79|    sql: Optional[str] = None       # canonical SQL, only when ok
+80|    reason: Optional[str] = None    # block reason, only when not ok
+81|
+82|
+83|def _normalize_allowlist(allowed_tables: Iterable[str]) -> set:
+84|    """Expand allowlist entries so both qualified and bare references match
+85|    when the schema is a default one."""
+86|    allowed = set()
+87|    for entry in allowed_tables or []:
+88|        entry = (entry or "").strip().lower()
+89|        if not entry:
+90|            continue
+
+
+--- iter 8 ---
+ACTION:
+{
+  "thought": "All requested ranges and quotes are in hand; emit the compiled exact text.",
+  "tool": "respond",
+  "text": "HELP_CENTER_INFRA.md:30-45\n30|\n31|Backend env (`backend.env` on the VPS):\n32|\n33|HELP_CENTER_BASE_DOMAIN=help.chattermate.chat\n34|HELP_CENTER_TARGET_IPS=[\"<VPS_IPV4>\"]   # JSON array \u2014 see gotcha below\n35|\n36|> **Gotcha:** `HELP_CENTER_TARGET_IPS` is a `frozenset` setting, so\n37|> pydantic-settings JSON-parses the env value. A bare IP or comma list\n38|> (`<VPS_IPV4>`) fails validation and crash-loops the backend at startup \u2014\n39|> it **must** be a JSON array: `[\"<VPS_IPV4>\"]`. (Powers the per-org\n40|> custom-domain A-record verification in \u00a72; unused by the wildcard site.)\n41|\n42|### Wildcard certificate (DNS-01 via Route53)\n43|HTTP-01 cannot issue wildcards. A dedicated IAM user with the standard certbot\n44|Route53 policy (`route53:ListHostedZones` + `GetChange` on `*`,\n45|`ChangeResourceRecordSets` on the zone) has its creds at `~/.aws/credentials`\n\nHELP_CENTER_INFRA.md:160-175\n160|(`ask` endpoint). Deferred because Caddy would have to own port 443 for the\n161|whole VPS.\n162|\n163|## 3. Verification checklist after deploy\n164|1. `curl -sS -o /dev/null -w '%{http_code}\\n' https://<slug>.help.chattermate.chat/` \u2192 `200` (and `http://` \u2192 `301`).\n165|2. `https://<slug>.help.chattermate.chat` in a browser \u2192 published FAQs render, widget loads; an article at `/a/<faq-slug>` returns `200`.\n166|3. `docker exec chattermate-backend-1 printenv HELP_CENTER_BASE_DOMAIN` \u2192 `help.chattermate.chat` (and the backend is `healthy`, not crash-looping on `HELP_CENTER_TARGET_IPS`).\n167|4. API unaffected: `https://app.chattermate.chat` / `https://api.chattermate.chat/api/v1/...` still route normally.\n168|5. `POST /ask` from the page returns an answer and appears in `help_center_queries`.\n169|6. `docker ps -a --filter name=certbot` \u2192 **empty**. `compose up -d` must not start a\n170|   certbot container; one that sticks around means the long-running loop entrypoint is\n171|   back (see the renewal note in \u00a71) and nginx will stop reloading onto renewed certs.\n172|\n173|## 4. Enterprise (cloud) rollout prerequisite\n174|\n175|The feature is gated by the `help_center` plan flag, which lives in the\n\nREADME.md:95-130\n95|#### Guardrails\n96|\n97|The investigation agent reads untrusted customer text and holds live tool\n98|access, so the limits are enforced in code, not by prompting:\n99|\n100|- **The SQL connector is read-only, structurally.** Queries are parsed to an AST\n101|  and rejected unless they are a single plain `SELECT`. Writes, DDL, multiple\n102|  statements, and a denylist of dangerous functions cannot pass. Table access is\n103|  restricted to an allowlist you pick, enforced through CTEs, joins and\n104|  subqueries. A `LIMIT` is forced. Comments are stripped before execution, since\n105|  MySQL executes `/*! */`. The connection itself is a read-only transaction with\n106|  a statement timeout \u2014 a second, independent barrier.\n107|- **Columns you mask are never readable.** Masked columns are blocked from being\n108|  referenced anywhere, including in a `WHERE` clause, so their values can't be\n109|  probed; whole-row tricks that would smuggle them out (`to_jsonb(t)`, `t::text`,\n110|  `to_json(t.*)`) are blocked too, and results are masked again on the way back.\n111|- **Nothing is written to your database, ever.** Approving an AI proposal records\n112|  the decision \u2014 any change to your systems is made by your team.\n113|- **Row-level scoping keeps one customer's data out of another's ticket.** Mark\n114|  the column that identifies the customer on any table holding per-customer rows\n115|  (`orders \u2192 customer_email`). Queries against it are rewritten to read only the\n116|  ticket customer's own rows \u2014 the AI cannot widen that, because the filter is\n117|  applied to the table it selects *from*, not to a condition it could write\n118|  around. A ticket with no known customer cannot query a scoped table at all,\n119|  rather than falling back to reading everything. Tables you leave unscoped\n120|  (products, error codes) stay fully readable.\n121|- **Cross-customer isolation on outbound messages.** Identifiers belonging to\n122|  anyone other than the recipient are stripped from every message sent to a\n123|  customer, and other customers' tickets are redacted before they reach the\n124|  model \u2014 a second line behind row scoping.\n125|- **Every query is audited.** Each attempt is logged with the SQL and outcome;\n126|  returned rows are deliberately never stored.\n127|\n128|> **When you connect a database:** set a row-scope column for every table that\n129|> holds per-customer rows \u2014 it's the control that stops the agent reading across\n130|> customers, and it's off until you set it. Point the connector at a service\n\nREADME.md:400-430\n400|\n401|Run each from the `backend/` directory with the virtualenv active.\n402|\n403|**FAQ / Help Center processor.** FAQ generation and import jobs (Generate FAQs,\n404|\"Migrate an existing help center\", PDF import) are drained by the *knowledge\n405|worker* \u2014 there is no separate FAQ container. Both knowledge entrypoints pick\n406|up the FAQ queue, so either one is enough:\n407|\n408|bash\n409|# Recommended for local dev \u2014 knowledge and FAQ in one loop\n410|python -m app.workers.run_knowledge_processor\n411|\n412|# What Docker runs: knowledge and FAQ as independent asyncio tasks, so a long\n413|# FAQ generation never blocks knowledge ingestion\n414|python -m app.workers.knowledge_processor\n415|\n416|# FAQ queue only \u2014 useful when debugging generation/import in isolation\n417|python -m app.workers.faq_processor\n418|\n419|\n420|Polls every 60s. On startup it fails any job left stuck in `processing` by a\n421|previous crash, so a killed worker doesn't strand a job forever.\n422|\n423|**Ticket investigator.** Runs two loops in one process \u2014 investigation runs\n424|(polled every 15s) and ticket lifecycle/SLA sweeps (every 5 min):\n425|\n426|bash\n427|python -m app.workers.ticket_investigator\n428|\n429|\n430|Needs Redis (`REDIS_URL`) to push live `ticket_update` frames to dashboard\n\nbackend/app/core/config.py:213-236\n213|    HELP_CENTER_PUBLIC_MODE: str = os.getenv(\"HELP_CENTER_PUBLIC_MODE\", \"path\")\n214|    # Base domain serving {slug}.<base> help centers.\n215|    HELP_CENTER_BASE_DOMAIN: str = os.getenv(\"HELP_CENTER_BASE_DOMAIN\", \"chattermate.help\")\n216|    # CNAME target customers point their custom help-center domain at.\n217|    HELP_CENTER_CNAME_TARGET: str = os.getenv(\"HELP_CENTER_CNAME_TARGET\", \"cname.chattermate.chat\")\n218|    # IPs the CNAME target resolves to \u2014 accepted when a provider flattens the\n219|    # CNAME into A/AAAA records (comma-separated).\n220|    HELP_CENTER_TARGET_IPS: frozenset = frozenset(\n221|        ip.strip() for ip in os.getenv(\"HELP_CENTER_TARGET_IPS\", \"\").split(\",\") if ip.strip()\n222|    )\n223|    # FAQ generation cost caps (per source / per LLM call) and import fetch limits.\n224|    FAQ_MAX_PAGES_PER_SOURCE: int = int(os.getenv(\"FAQ_MAX_PAGES_PER_SOURCE\", \"300\"))\n225|    FAQ_MAX_BATCH_CHARS: int = int(os.getenv(\"FAQ_MAX_BATCH_CHARS\", \"15000\"))\n226|    # Ceiling for context-window-derived batch sizing (see utils/model_context.py)\n227|    # \u2014 a quality guard for very-large-context models, not a token limit.\n228|    FAQ_MAX_BATCH_CHARS_CEILING: int = int(os.getenv(\"FAQ_MAX_BATCH_CHARS_CEILING\", \"60000\"))\n229|    # Force a context-window size (tokens) for exotic/self-hosted models; 0 = auto.\n230|    FAQ_CONTEXT_TOKENS_OVERRIDE: int = int(os.getenv(\"FAQ_CONTEXT_TOKENS_OVERRIDE\", \"0\"))\n231|    # Meter FAQ generation credits even for orgs on their own API key\n232|    # (default: hosted CHATTERMATE model only).\n233|    FAQ_METER_OWN_KEY: bool = os.getenv(\"FAQ_METER_OWN_KEY\", \"false\").lower() == \"true\"\n234|    FAQ_IMPORT_MAX_PAGE_CHARS: int = int(os.getenv(\"FAQ_IMPORT_MAX_PAGE_CHARS\", \"100000\"))\n235|    FAQ_IMPORT_FETCH_TIMEOUT: int = int(os.getenv(\"FAQ_IMPORT_FETCH_TIMEOUT\", \"30\"))\n236|    # Article-mode import (crawl linked pages, no LLM): crawl and re-host caps.\n\nFAQ_MAX_BATCH_CHARS vs CEILING (config.py:225-228):\nFAQ_MAX_BATCH_CHARS default \"15000\"\nFAQ_MAX_BATCH_CHARS_CEILING default \"60000\"\n(comment: Ceiling for context-window-derived batch sizing \u2014 a quality guard for very-large-context models, not a token limit.)\n\nsql_guardrails BLOCKED_NODE_TYPES (backend/app/services/sql_guardrails.py:61-67):\n61|# Statement/expression node types that must never appear anywhere in the tree.\n62|BLOCKED_NODE_TYPES = (\n63|    exp.Insert, exp.Update, exp.Delete, exp.Merge,\n64|    exp.Create, exp.Drop, exp.Alter, exp.TruncateTable,\n65|    exp.Grant, exp.Command, exp.Transaction, exp.Set,\n66|    exp.Into, exp.Lock,\n67|)"
+}
+OBSERVATION:
+(respond)
+
+FINAL ANSWER:
+HELP_CENTER_INFRA.md:30-45
+30|
+31|Backend env (`backend.env` on the VPS):
+32|
+33|HELP_CENTER_BASE_DOMAIN=help.chattermate.chat
+34|HELP_CENTER_TARGET_IPS=["<VPS_IPV4>"]   # JSON array — see gotcha below
+35|
+36|> **Gotcha:** `HELP_CENTER_TARGET_IPS` is a `frozenset` setting, so
+37|> pydantic-settings JSON-parses the env value. A bare IP or comma list
+38|> (`<VPS_IPV4>`) fails validation and crash-loops the backend at startup —
+39|> it **must** be a JSON array: `["<VPS_IPV4>"]`. (Powers the per-org
+40|> custom-domain A-record verification in §2; unused by the wildcard site.)
+41|
+42|### Wildcard certificate (DNS-01 via Route53)
+43|HTTP-01 cannot issue wildcards. A dedicated IAM user with the standard certbot
+44|Route53 policy (`route53:ListHostedZones` + `GetChange` on `*`,
+45|`ChangeResourceRecordSets` on the zone) has its creds at `~/.aws/credentials`
+
+HELP_CENTER_INFRA.md:160-175
+160|(`ask` endpoint). Deferred because Caddy would have to own port 443 for the
+161|whole VPS.
+162|
+163|## 3. Verification checklist after deploy
+164|1. `curl -sS -o /dev/null -w '%{http_code}\n' https://<slug>.help.chattermate.chat/` → `200` (and `http://` → `301`).
+165|2. `https://<slug>.help.chattermate.chat` in a browser → published FAQs render, widget loads; an article at `/a/<faq-slug>` returns `200`.
+166|3. `docker exec chattermate-backend-1 printenv HELP_CENTER_BASE_DOMAIN` → `help.chattermate.chat` (and the backend is `healthy`, not crash-looping on `HELP_CENTER_TARGET_IPS`).
+167|4. API unaffected: `https://app.chattermate.chat` / `https://api.chattermate.chat/api/v1/...` still route normally.
+168|5. `POST /ask` from the page returns an answer and appears in `help_center_queries`.
+169|6. `docker ps -a --filter name=certbot` → **empty**. `compose up -d` must not start a
+170|   certbot container; one that sticks around means the long-running loop entrypoint is
+171|   back (see the renewal note in §1) and nginx will stop reloading onto renewed certs.
+172|
+173|## 4. Enterprise (cloud) rollout prerequisite
+174|
+175|The feature is gated by the `help_center` plan flag, which lives in the
+
+README.md:95-130
+95|#### Guardrails
+96|
+97|The investigation agent reads untrusted customer text and holds live tool
+98|access, so the limits are enforced in code, not by prompting:
+99|
+100|- **The SQL connector is read-only, structurally.** Queries are parsed to an AST
+101|  and rejected unless they are a single plain `SELECT`. Writes, DDL, multiple
+102|  statements, and a denylist of dangerous functions cannot pass. Table access is
+103|  restricted to an allowlist you pick, enforced through CTEs, joins and
+104|  subqueries. A `LIMIT` is forced. Comments are stripped before execution, since
+105|  MySQL executes `/*! */`. The connection itself is a read-only transaction with
+106|  a statement timeout — a second, independent barrier.
+107|- **Columns you mask are never readable.** Masked columns are blocked from being
+108|  referenced anywhere, including in a `WHERE` clause, so their values can't be
+109|  probed; whole-row tricks that would smuggle them out (`to_jsonb(t)`, `t::text`,
+110|  `to_json(t.*)`) are blocked too, and results are masked again on the way back.
+111|- **Nothing is written to your database, ever.** Approving an AI proposal records
+112|  the decision — any change to your systems is made by your team.
+113|- **Row-level scoping keeps one customer's data out of another's ticket.** Mark
+114|  the column that identifies the customer on any table holding per-customer rows
+115|  (`orders → customer_email`). Queries against it are rewritten to read only the
+116|  ticket customer's own rows — the AI cannot widen that, because the filter is
+117|  applied to the table it selects *from*, not to a condition it could write
+118|  around. A ticket with no known customer cannot query a scoped table at all,
+119|  rather than falling back to reading everything. Tables you leave unscoped
+120|  (products, error codes) stay fully readable.
+121|- **Cross-customer isolation on outbound messages.** Identifiers belonging to
+122|  anyone other than the recipient are stripped from every message sent to a
+123|  customer, and other customers' tickets are redacted before they reach the
+124|  model — a second line behind row scoping.
+125|- **Every query is audited.** Each attempt is logged with the SQL and outcome;
+126|  returned rows are deliberately never stored.
+127|
+128|> **When you connect a database:** set a row-scope column for every table that
+129|> holds per-customer rows — it's the control that stops the agent reading across
+130|> customers, and it's off until you set it. Point the connector at a service
+
+README.md:400-430
+400|
+401|Run each from the `backend/` directory with the virtualenv active.
+402|
+403|**FAQ / Help Center processor.** FAQ generation and import jobs (Generate FAQs,
+404|"Migrate an existing help center", PDF import) are drained by the *knowledge
+405|worker* — there is no separate FAQ container. Both knowledge entrypoints pick
+406|up the FAQ queue, so either one is enough:
+407|
+408|bash
+409|# Recommended for local dev — knowledge and FAQ in one loop
+410|python -m app.workers.run_knowledge_processor
+411|
+412|# What Docker runs: knowledge and FAQ as independent asyncio tasks, so a long
+413|# FAQ generation never blocks knowledge ingestion
+414|python -m app.workers.knowledge_processor
+415|
+416|# FAQ queue only — useful when debugging generation/import in isolation
+417|python -m app.workers.faq_processor
+418|
+419|
+420|Polls every 60s. On startup it fails any job left stuck in `processing` by a
+421|previous crash, so a killed worker doesn't strand a job forever.
+422|
+423|**Ticket investigator.** Runs two loops in one process — investigation runs
+424|(polled every 15s) and ticket lifecycle/SLA sweeps (every 5 min):
+425|
+426|bash
+427|python -m app.workers.ticket_investigator
+428|
+429|
+430|Needs Redis (`REDIS_URL`) to push live `ticket_update` frames to dashboard
+
+backend/app/core/config.py:213-236
+213|    HELP_CENTER_PUBLIC_MODE: str = os.getenv("HELP_CENTER_PUBLIC_MODE", "path")
+214|    # Base domain serving {slug}.<base> help centers.
+215|    HELP_CENTER_BASE_DOMAIN: str = os.getenv("HELP_CENTER_BASE_DOMAIN", "chattermate.help")
+216|    # CNAME target customers point their custom help-center domain at.
+217|    HELP_CENTER_CNAME_TARGET: str = os.getenv("HELP_CENTER_CNAME_TARGET", "cname.chattermate.chat")
+218|    # IPs the CNAME target resolves to — accepted when a provider flattens the
+219|    # CNAME into A/AAAA records (comma-separated).
+220|    HELP_CENTER_TARGET_IPS: frozenset = frozenset(
+221|        ip.strip() for ip in os.getenv("HELP_CENTER_TARGET_IPS", "").split(",") if ip.strip()
+222|    )
+223|    # FAQ generation cost caps (per source / per LLM call) and import fetch limits.
+224|    FAQ_MAX_PAGES_PER_SOURCE: int = int(os.getenv("FAQ_MAX_PAGES_PER_SOURCE", "300"))
+225|    FAQ_MAX_BATCH_CHARS: int = int(os.getenv("FAQ_MAX_BATCH_CHARS", "15000"))
+226|    # Ceiling for context-window-derived batch sizing (see utils/model_context.py)
+227|    # — a quality guard for very-large-context models, not a token limit.
+228|    FAQ_MAX_BATCH_CHARS_CEILING: int = int(os.getenv("FAQ_MAX_BATCH_CHARS_CEILING", "60000"))
+229|    # Force a context-window size (tokens) for exotic/self-hosted models; 0 = auto.
+230|    FAQ_CONTEXT_TOKENS_OVERRIDE: int = int(os.getenv("FAQ_CONTEXT_TOKENS_OVERRIDE", "0"))
+231|    # Meter FAQ generation credits even for orgs on their own API key
+232|    # (default: hosted CHATTERMATE model only).
+233|    FAQ_METER_OWN_KEY: bool = os.getenv("FAQ_METER_OWN_KEY", "false").lower() == "true"
+234|    FAQ_IMPORT_MAX_PAGE_CHARS: int = int(os.getenv("FAQ_IMPORT_MAX_PAGE_CHARS", "100000"))
+235|    FAQ_IMPORT_FETCH_TIMEOUT: int = int(os.getenv("FAQ_IMPORT_FETCH_TIMEOUT", "30"))
+236|    # Article-mode import (crawl linked pages, no LLM): crawl and re-host caps.
+
+FAQ_MAX_BATCH_CHARS vs CEILING (config.py:225-228):
+FAQ_MAX_BATCH_CHARS default "15000"
+FAQ_MAX_BATCH_CHARS_CEILING default "60000"
+(comment: Ceiling for context-window-derived batch sizing — a quality guard for very-large-context models, not a token limit.)
+
+sql_guardrails BLOCKED_NODE_TYPES (backend/app/services/sql_guardrails.py:61-67):
+61|# Statement/expression node types that must never appear anywhere in the tree.
+62|BLOCKED_NODE_TYPES = (
+63|    exp.Insert, exp.Update, exp.Delete, exp.Merge,
+64|    exp.Create, exp.Drop, exp.Alter, exp.TruncateTable,
+65|    exp.Grant, exp.Command, exp.Transaction, exp.Set,
+66|    exp.Into, exp.Lock,
+67|)

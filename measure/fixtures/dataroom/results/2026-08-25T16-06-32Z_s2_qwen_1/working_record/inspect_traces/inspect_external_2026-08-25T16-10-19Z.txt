@@ -1,0 +1,173 @@
+================================================================================
+[inspect_external] 2026-08-25T16-10-19Z exit=respond iters=5
+================================================================================
+Query: In doc8_external_dependency_list.md, quote verbatim the DataEnrich.io entry (all lines) and the GoDaddy entry. In doc9, quote the claim about low vendor lock-in. In doc4, quote the DNS management lines.
+
+--- iter 1 ---
+ACTION:
+{
+  "thought": "Find the three docs in the corpus.",
+  "tool": "list",
+  "path": "."
+}
+OBSERVATION:
+OK: ./
+doc1_seller_listing_description.md	1984 bytes
+doc2_tech_stack_description_as_provided_by_se.md	1310 bytes
+doc3_git_history_summary.md	886 bytes
+doc4_infrastructure_config.md	1126 bytes
+doc5_stripe_export_summary.md	833 bytes
+doc6_crm_export_summary.md	718 bytes
+doc7_customer_contracts_summary.md	1800 bytes
+doc8_external_dependency_list.md	1482 bytes
+doc9_seller_s_technical_claims_verbatim.md	753 bytes
+
+--- iter 2 ---
+ACTION:
+{
+  "thought": "Read all three target docs in parallel.",
+  "tool": "read",
+  "file": "doc8_external_dependency_list.md"
+}
+OBSERVATION:
+OK: 1|# DOCUMENT 8: EXTERNAL DEPENDENCY LIST
+2|
+3|1.  **Stripe**
+4|    *   **Function:** Payment processing.
+5|    *   **Cost:** 2.9% + $0.30 per transaction.
+6|    *   **Risk:** Low (standard merchant agreement).
+7|2.  **DataEnrich.io**
+8|    *   **Function:** Product data enrichment API (product matching, price comparison, category classification).
+9|    *   **Cost:** $400/mo flat.
+10|    *   **Termination Notice:** 90 days (either party).
+11|    *   **Dependency:** 40% of features depend on this API.
+12|    *   **Fallback:** None implemented. If API is down or pricing changes, product degrades to basic mode (no enrichment).
+13|3.  **Heroku**
+14|    *   **Function:** Hosting.
+15|    *   **Cost:** $25/mo (standard-1x dyno).
+16|    *   **SLA:** 99.95% platform uptime (not contractual for the app).
+17|4.  **Redis (Heroku Add-on)**
+18|    *   **Function:** Caching.
+19|    *   **Cost:** $50/mo.
+20|    *   **Risk:** If down, app is slow but functional.
+21|5.  **Twilio**
+22|    *   **Function:** Email/SMS notifications.
+23|    *   **Cost:** $100/mo.
+24|    *   **Risk:** If down, users do not receive notifications; core functionality works.
+25|6.  **Google OAuth**
+26|    *   **Function:** Authentication.
+27|    *   **Cost:** Free tier.
+28|    *   **Risk:** If Google changes API or revokes app, users cannot log in. No contractual relationship.
+29|7.  **GoDaddy**
+30|    *   **Function:** DNS.
+31|    *   **Cost:** $12/yr.
+32|    *   **Risk:** Managed personally by 'dave'. No secondary DNS. If domain expires or GoDaddy has an issue, the app is unreachable.
+
+
+--- iter 3 ---
+ACTION:
+{
+  "thought": "Read doc9 and doc4 to get the remaining quotes.",
+  "tool": "read",
+  "file": "doc9_seller_s_technical_claims_verbatim.md"
+}
+OBSERVATION:
+OK: 1|# DOCUMENT 9: SELLER'S TECHNICAL CLAIMS (VERBATIM)
+2|
+3|As stated in the listing and data room cover letter:
+4|
+5|*   "The system has redundancy and automatic failover through Heroku's platform-level process management."
+6|*   "We monitor uptime at 99.9% and maintain daily automated database backups."
+7|*   "The codebase is well-documented with comprehensive test coverage across all critical paths."
+8|*   "The stack is designed to scale horizontally — adding dynos is a one-click operation in the Heroku dashboard."
+9|*   "All third-party integrations are on standard SaaS agreements with no lock-in."
+10|*   "The database is backed up daily to Heroku's managed storage with 30-day retention."
+11|*   "We use a modern Rails 7 stack with automatic SSL and managed DNS."
+
+
+--- iter 4 ---
+ACTION:
+{
+  "thought": "Read doc4 to get the DNS management lines.",
+  "tool": "read",
+  "file": "doc4_infrastructure_config.md"
+}
+OBSERVATION:
+OK: 1|# DOCUMENT 4: INFRASTRUCTURE CONFIG
+2|
+3|**Hosting:**
+4|*   **Platform:** Heroku
+5|*   **Dyno:** `standard-1x` (1GB RAM, 0.5 CPU)
+6|*   **Database:** `heroku-postgresql:standard-0` (running on the same dyno as the application)
+7|*   **Read Replicas:** None.
+8|*   **Separate DB Instance:** No.
+9|
+10|**Caching:**
+11|*   **Service:** Heroku Redis Add-on
+12|*   **Plan:** `heroku-redis:bb-1`
+13|*   **Cost:** $50/mo
+14|
+15|**Backups:**
+16|*   **Schedule:** Daily at 2:00 AM via `heroku pg:backups schedule`
+17|*   **Status:** Failures recorded for the last 21 days.
+18|*   **Last Successful Backup:** 2026-07-30
+19|*   **Alerting:** None configured for backup failures.
+20|
+21|**Monitoring:**
+22|*   **Uptime Monitor:** None (No Pingdom, UptimeRobot, or custom checks).
+23|*   **Status Page:** Heroku built-in status page only.
+24|
+25|**Security & DNS:**
+26|*   **SSL:** Heroku-managed, auto-renewed.
+27|*   **DNS Provider:** GoDaddy
+28|*   **DNS Management:** Managed personally by 'dave'. No secondary DNS provider.
+29|*   **Secrets Management:** 14 secrets stored in Heroku config vars (Stripe keys, DataEnrich.io API key, Twilio credentials, Google OAuth, DB URL, Redis URL, etc.). No secrets vault.
+
+
+--- iter 5 ---
+ACTION:
+{
+  "thought": "I have all three docs read in full. Now I can compose the final answer with verbatim quotes and line citations.",
+  "tool": "respond",
+  "text": "## doc8_external_dependency_list.md \u2014 DataEnrich.io entry (lines 7-12)\n\n\n2.  **DataEnrich.io**\n    *   **Function:** Product data enrichment API (product matching, price comparison, category classification).\n    *   **Cost:** $400/mo flat.\n    *   **Termination Notice:** 90 days (either party).\n    *   **Dependency:** 40% of features depend on this API.\n    *   **Fallback:** None implemented. If API is down or pricing changes, product degrades to basic mode (no enrichment).\n\n\n## doc8_external_dependency_list.md \u2014 GoDaddy entry (lines 29-32)\n\n\n7.  **GoDaddy**\n    *   **Function:** DNS.\n    *   **Cost:** $12/yr.\n    *   **Risk:** Managed personally by 'dave'. No secondary DNS. If domain expires or GoDaddy has an issue, the app is unreachable.\n\n\n## doc9_seller_s_technical_claims_verbatim.md \u2014 low vendor lock-in claim (line 9)\n\n\n*   \"All third-party integrations are on standard SaaS agreements with no lock-in.\"\n\n\n## doc4_infrastructure_config.md \u2014 DNS management lines (lines 25-28)\n\n\n**Security & DNS:**\n*   **SSL:** Heroku-managed, auto-renewed.\n*   **DNS Provider:** GoDaddy\n*   **DNS Management:** Managed personally by 'dave'. No secondary DNS provider.\n\n\nNote: the \"Security & DNS\" section header (line 25) is included for context; the strictly DNS-specific lines are 27-28. The SSL line (26) is part of the same section but is not DNS management per se."
+}
+OBSERVATION:
+(respond)
+
+FINAL ANSWER:
+## doc8_external_dependency_list.md — DataEnrich.io entry (lines 7-12)
+
+
+2.  **DataEnrich.io**
+    *   **Function:** Product data enrichment API (product matching, price comparison, category classification).
+    *   **Cost:** $400/mo flat.
+    *   **Termination Notice:** 90 days (either party).
+    *   **Dependency:** 40% of features depend on this API.
+    *   **Fallback:** None implemented. If API is down or pricing changes, product degrades to basic mode (no enrichment).
+
+
+## doc8_external_dependency_list.md — GoDaddy entry (lines 29-32)
+
+
+7.  **GoDaddy**
+    *   **Function:** DNS.
+    *   **Cost:** $12/yr.
+    *   **Risk:** Managed personally by 'dave'. No secondary DNS. If domain expires or GoDaddy has an issue, the app is unreachable.
+
+
+## doc9_seller_s_technical_claims_verbatim.md — low vendor lock-in claim (line 9)
+
+
+*   "All third-party integrations are on standard SaaS agreements with no lock-in."
+
+
+## doc4_infrastructure_config.md — DNS management lines (lines 25-28)
+
+
+**Security & DNS:**
+*   **SSL:** Heroku-managed, auto-renewed.
+*   **DNS Provider:** GoDaddy
+*   **DNS Management:** Managed personally by 'dave'. No secondary DNS provider.
+
+
+Note: the "Security & DNS" section header (line 25) is included for context; the strictly DNS-specific lines are 27-28. The SSL line (26) is part of the same section but is not DNS management per se.

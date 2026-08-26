@@ -1,0 +1,18 @@
+{
+  "world": "bd1_grok",
+  "arm": "/home/bruce/Downloads/Cognitive_workbench/measure/arms/grok_4p6.yaml",
+  "resolved_model": "grok-4.6",
+  "resolved_temperature": 0.5,
+  "top_p": 0.95,
+  "external_repo": "/home/bruce/projects/Body/Body",
+  "exit_reason": "respond",
+  "wall_clock_s": 489.3,
+  "error": null,
+  "declared": true,
+  "count": 164,
+  "leg": 1,
+  "per_document": {
+    "README.md": 34,
+    "body_project_spec.md": 123
+  }
+}

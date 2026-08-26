@@ -1,0 +1,784 @@
+================================================================================
+[inspect_external] 2026-08-25T21-39-48Z exit=max_iters iters=12
+================================================================================
+Query: Quote README.md lines 40-80, 400-430, 600-625. Grep jira, slack, translation, i18n in backend/app and list key files with lines. Read sql_guardrails.py for row-scope rewrite, masked columns, audit (no rows stored). Read help_center_host.py first 80 lines. Grep POST /ask help_center. Quote FAQ_MAX_BATCH and CEILING in config.py. Grep crash-fail stuck jobs knowledge_processor.
+
+--- iter 1 ---
+ACTION:
+{
+  "thought": "Start by quoting README.md lines 40-80 as requested.",
+  "tool": "read",
+  "file": "README.md",
+  "start_line": 40,
+  "end_line": 80
+}
+OBSERVATION:
+OK: 40|---
+41|
+42|## Features
+43|
+44|### Core Features
+45|
+46|| Feature | Description |
+47||---------|-------------|
+48|| 🤝 **Smart Human Handoff** | Intelligent AI-to-human transfer with **business hours awareness**, real-time availability detection, and context-aware escalation messages. |
+49|| 🛍️ **Shopify & E-commerce Support** | Native **Shopify integration** ([App Store listing](https://apps.shopify.com/chattermate-chat)) — answer order, shipping, and product questions from store data. Works for any online store. |
+50|| 📝 **WordPress Plugin** | Official **WordPress plugin** ([download](https://github.com/chattermate/chattermate-wordpress-plugin/releases/latest/download/chattermate-chat.zip)) — add the chat widget to any WordPress site by entering your Widget ID. No theme edits required. |
+51|| 🧠 **Multi-Model AI Support** | Choose your AI provider — **OpenAI**, **Anthropic (Claude)**, **Google Gemini**, **Mistral**, **xAI (Grok)**, **DeepSeek**, and **Groq** — with your own API key, or enter a custom model ID. Switch providers anytime without code changes. |
+52|| 💬 **Ask Anything Mode** | Let visitors start conversations instantly — no signup or email required. Perfect for Q&A, documentation assistants, and exploratory chat experiences. |
+53|| 📎 **File Attachments** | Customers can share **images, PDFs, Word docs, spreadsheets**, and more directly in chat. Secure uploads with S3 storage and magic byte validation. |
+54|| 🌍 **Auto Translation** | Multilingual support with configurable **default language per workflow**. Serve customers globally in their preferred language. |
+55|| 🎫 **AI Ticketing** | Native tickets raised straight from chat, then **auto-triaged and investigated by AI** — it forms hypotheses, gathers evidence from your observability tools and databases, and writes a root-cause analysis you can read and audit. See [AI Ticketing](#ai-ticketing). |
+56|| 🔗 **Jira Ticket Creation** | Create and manage **Jira tickets directly from chat** conversations. OAuth 2.0 secure integration with automatic ticket tracking. Native tickets can also escalate to Jira one-way. |
+57|| 🔑 **Widget Authentication** | **Token-based security** for embedded widgets. Support both public Q&A and private authenticated conversations. |
+58|| 💼 **Slack Integration** | Connect your **Slack workspace** for internal product support. Teams get AI-powered assistance directly in Slack channels. |
+59|| 🧩 **Visual Workflow Builder** | Design conversation flows with a **drag-and-drop interface**. Branching logic, conditional responses, and multi-step workflows without coding. |
+60|
+61|### Workflow Builder
+62|
+63|Build sophisticated conversation flows visually with our intuitive workflow builder:
+64|
+65|![No-code AI chatbot workflow builder with drag-and-drop nodes and human handoff](.github/images/workflow-builder.webp)
+66|
+67|**Workflow Builder Features:**
+68|- **Drag-and-drop nodes** - AI responses, human handoff, conditions, and more
+69|- **Branching logic** - Create different paths based on user input
+70|- **Node types** - Start, AI Response, Human Transfer, Condition, End nodes
+71|- **Real-time preview** - Test workflows before deploying
+72|- **Version control** - Save and restore workflow versions
+73|
+74|### AI Ticketing
+75|
+76|Tickets are raised from a conversation (by the AI or an agent), or from an alert
+77|webhook. Each one is triaged, deduplicated against open tickets, and then
+78|investigated: the AI proposes hypotheses, tests each against your connected
+79|tools, and records every query it ran as evidence you can inspect. The result is
+80|a versioned root-cause analysis with citations back to that evidence.
+
+
+--- iter 2 ---
+ACTION:
+{
+  "thought": "Continue quoting README.md lines 400-430 as requested.",
+  "tool": "read",
+  "file": "README.md",
+  "start_line": 400,
+  "end_line": 430
+}
+OBSERVATION:
+OK: 400|
+401|Run each from the `backend/` directory with the virtualenv active.
+402|
+403|**FAQ / Help Center processor.** FAQ generation and import jobs (Generate FAQs,
+404|"Migrate an existing help center", PDF import) are drained by the *knowledge
+405|worker* — there is no separate FAQ container. Both knowledge entrypoints pick
+406|up the FAQ queue, so either one is enough:
+407|
+408|```bash
+409|# Recommended for local dev — knowledge and FAQ in one loop
+410|python -m app.workers.run_knowledge_processor
+411|
+412|# What Docker runs: knowledge and FAQ as independent asyncio tasks, so a long
+413|# FAQ generation never blocks knowledge ingestion
+414|python -m app.workers.knowledge_processor
+415|
+416|# FAQ queue only — useful when debugging generation/import in isolation
+417|python -m app.workers.faq_processor
+418|```
+419|
+420|Polls every 60s. On startup it fails any job left stuck in `processing` by a
+421|previous crash, so a killed worker doesn't strand a job forever.
+422|
+423|**Ticket investigator.** Runs two loops in one process — investigation runs
+424|(polled every 15s) and ticket lifecycle/SLA sweeps (every 5 min):
+425|
+426|```bash
+427|python -m app.workers.ticket_investigator
+428|```
+429|
+430|Needs Redis (`REDIS_URL`) to push live `ticket_update` frames to dashboard
+
+
+--- iter 3 ---
+ACTION:
+{
+  "thought": "Quote README.md lines 600-625 as requested next.",
+  "tool": "read",
+  "file": "README.md",
+  "start_line": 600,
+  "end_line": 625
+}
+OBSERVATION:
+OK: 600|## License
+601|
+602|ChatterMate follows an **open-core** model:
+603|
+604|**Open Source Core ([Apache-2.0](https://opensource.org/licenses/Apache-2.0))**
+605|- Free for personal and commercial use — including proprietary and SaaS deployments
+606|- No source-disclosure or copyleft obligations
+607|- Includes an explicit patent grant
+608|- See [LICENSE](LICENSE) and [NOTICE](NOTICE)
+609|
+610|**Enterprise features & support**
+611|- Advanced/enterprise capabilities are provided separately under a commercial arrangement
+612|- Priority support, warranties, and indemnification available
+613|- Contact: [contact@chattermate.chat](mailto:contact@chattermate.chat)
+614|
+615|Contributions are accepted under Apache-2.0 with a [Developer Certificate of Origin](DCO) sign-off — see [CONTRIBUTING.md](CONTRIBUTING.md).
+616|
+617|---
+618|
+619|<p align="center">
+620|  Made with ❤️ by the ChatterMate team
+621|</p>
+622|
+623|<p align="center">
+624|  <b>Keywords:</b> AI customer support, AI chatbot, Shopify chatbot, WordPress chatbot, WordPress chat plugin, ecommerce chatbot, customer support automation, open source help desk, live chat software, self-hosted chatbot, Intercom alternative, Zendesk alternative, Chatbase alternative, no-code chatbot builder, human handoff, Jira integration, Slack bot, multilingual chatbot
+625|</p>
+
+
+--- iter 4 ---
+ACTION:
+{
+  "thought": "Grep backend/app for jira, slack, translation, and i18n to list key files and lines.",
+  "tool": "grep",
+  "pattern": "jira|slack|translation|i18n",
+  "path": "backend/app"
+}
+OBSERVATION:
+OK: backend/app/main.py:24:from app.api import chat, organizations, users, ai_setup, knowledge, agent, notification, widget, widget_apps, user_groups, roles, analytics, jira, shopify, workflow, workflow_node, mcp_tool, file_upload, token, lead_capture, people, tickets
+backend/app/main.py:254:    jira.router,
+backend/app/main.py:255:    prefix=f"{settings.API_V1_STR}/jira",
+backend/app/main.py:256:    tags=["jira"]
+backend/app/workers/ticket_investigator.py:236:    from app.services.ticket_jira import maybe_escalate_to_jira
+backend/app/workers/ticket_investigator.py:237:    await maybe_escalate_to_jira(db, service, ticket, settings_row)
+backend/app/tools/jira_toolkit.py:21:from app.services.jira import JiraService
+backend/app/tools/jira_toolkit.py:23:from app.api.jira import CreateJiraIssueModel
+backend/app/tools/jira_toolkit.py:33:        super().__init__(name="jira_tools")
+backend/app/tools/jira_toolkit.py:37:        self.jira_service = JiraService()
+backend/app/tools/jira_toolkit.py:40:        self.register(self.create_jira_ticket)
+backend/app/tools/jira_toolkit.py:44:    def create_jira_ticket(
+backend/app/tools/jira_toolkit.py:117:                from app.models.jira import AgentJiraConfig
+backend/app/tools/jira_toolkit.py:118:                jira_config = db.query(AgentJiraConfig).filter(
+backend/app/tools/jira_toolkit.py:122:                if not jira_config or not jira_config.enabled:
+backend/app/tools/jira_toolkit.py:130:                    projectKey=jira_config.project_key,
+backend/app/tools/jira_toolkit.py:131:                    issueTypeId=jira_config.issue_type_id,
+backend/app/tools/jira_toolkit.py:139:                from app.models.jira import JiraToken
+backend/app/tools/jira_toolkit.py:151:            is_valid = self.jira_service.validate_token(token)
+backend/app/tools/jira_toolkit.py:214:                create_meta_url = f"https://api.atlassian.com/ex/jira/{str(token.cloud_id)}/rest/api/3/issue/createmeta?projectKeys={issue_data.projectKey}&issuetypeIds={issue_data.issueTypeId}&expand=projects.issuetypes.fields"
+backend/app/tools/jira_toolkit.py:277:                    existing_ticket_url = f"https://api.atlassian.com/ex/jira/{str(token.cloud_id)}/rest/api/3/issue/{existing_ticket_id}"
+backend/app/tools/jira_toolkit.py:331:                    url = f"https://api.atlassian.com/ex/jira/{str(token.cloud_id)}/rest/api/3/issue/{existing_ticket_id}"
+backend/app/tools/jira_toolkit.py:351:                    url = f"https://api.atlassian.com/ex/jira/{str(token.cloud_id)}/rest/api/3/issue"
+backend/app/tools/jira_toolkit.py:504:                from app.models.jira import JiraToken
+backend/app/tools/jira_toolkit.py:516:            is_valid = self.jira_service.validate_token(token)
+backend/app/tools/jira_toolkit.py:577:            url = f"https://api.atlassian.com/ex/jira/{str(token.cloud_id)}/rest/api/3/issue/{ticket_id_str}"
+backend/app/repositories/lead_capture.py:57:        config.slack_notify_enabled = data.slack_notify_enabled
+backend/app/models/ticket_settings.py:77:    # Jira escalation (one-way sync). jira_escalation_priority is the minimum
+backend/app/models/ticket_settings.py:79:    jira_escalation_enabled = Column(Boolean, nullable=False, default=False, server_default=expression.false())
+backend/app/models/ticket_settings.py:80:    jira_escalation_priority = Column(String, nullable=True)
+backend/app/models/jira.py:27:    __tablename__ = "jira_tokens"
+backend/app/models/jira.py:41:    organization = relationship("Organization", back_populates="jira_tokens")
+backend/app/models/jira.py:45:    __tablename__ = "agent_jira_configs"
+backend/app/models/lead_capture.py:87:    slack_notify_enabled = Column(Boolean, default=False, server_default=false(), nullable=False)
+backend/app/models/__init__.py:31:from app.models.jira import JiraToken
+backend/app/models/organization.py:68:    jira_tokens = relationship("JiraToken", back_populates="organization", cascade="all, delete-orphan")
+backend/app/models/organization.py:101:def setup_jira_relationships(mapper, class_):
+backend/app/models/organization.py:103:        from app.models.jira import JiraToken
+backend/app/models/organization.py:105:        if not hasattr(class_, 'jira_tokens'):
+backend/app/models/organization.py:106:            class_.jira_tokens = relationship(
+backend/app/models/organization.py:113:        logger.info("Jira module not available - jira_tokens relationship not configured")
+backend/app/models/organization.py:114:        class_.jira_tokens = None
+backend/app/repositories/jira.py:20:from app.models.jira import AgentJiraConfig
+backend/app/repositories/jira.py:24:from app.models.schemas.jira import AgentWithJiraConfig
+backend/app/repositories/jira.py:33:    def get_agent_with_jira_config(self, agent_id: str) -> Optional[AgentWithJiraConfig]:
+backend/app/repositories/jira.py:54:            jira_config = self.db.query(AgentJiraConfig).filter(
+backend/app/repositories/jira.py:102:                jira_enabled=False,
+backend/app/repositories/jira.py:103:                jira_project_key=None,
+backend/app/repositories/jira.py:104:                jira_issue_type_id=None
+backend/app/repositories/jira.py:108:            if jira_config:
+(grep capped at 50 hits — narrow the pattern for full coverage)
+
+--- iter 5 ---
+ACTION:
+{
+  "thought": "Narrow grep for FAQ_MAX_BATCH and CEILING in backend config after the jira-heavy first grep.",
+  "tool": "grep",
+  "path": "backend",
+  "pattern": "FAQ_MAX_BATCH|CEILING"
+}
+OBSERVATION:
+OK: backend/tests/utils/test_model_context.py:45:    assert batch_chars == settings.FAQ_MAX_BATCH_CHARS
+backend/tests/utils/test_model_context.py:51:    assert batch_chars == settings.FAQ_MAX_BATCH_CHARS_CEILING
+backend/tests/utils/test_model_context.py:52:    assert batch_chars > settings.FAQ_MAX_BATCH_CHARS
+backend/tests/utils/test_model_context.py:58:    assert settings.FAQ_MAX_BATCH_CHARS <= batch_chars <= settings.FAQ_MAX_BATCH_CHARS_CEILING
+backend/app/utils/model_context.py:103:    batch_chars is floored at FAQ_MAX_BATCH_CHARS (today's behaviour for
+backend/app/utils/model_context.py:104:    small-context models) and ceilinged at FAQ_MAX_BATCH_CHARS_CEILING — a
+backend/app/utils/model_context.py:112:    batch_chars = max(settings.FAQ_MAX_BATCH_CHARS, min(raw_chars, settings.FAQ_MAX_BATCH_CHARS_CEILING))
+backend/app/services/faq_generation.py:123:    max_chars = max_chars or settings.FAQ_MAX_BATCH_CHARS
+backend/app/services/faq_generation.py:131:    max_chars = max_chars or settings.FAQ_MAX_BATCH_CHARS
+backend/app/core/config.py:225:    FAQ_MAX_BATCH_CHARS: int = int(os.getenv("FAQ_MAX_BATCH_CHARS", "15000"))
+backend/app/core/config.py:228:    FAQ_MAX_BATCH_CHARS_CEILING: int = int(os.getenv("FAQ_MAX_BATCH_CHARS_CEILING", "60000"))
+
+--- iter 6 ---
+ACTION:
+{
+  "thought": "Locate sql_guardrails.py then read it for row-scope rewrite, masked columns, and audit behavior.",
+  "tool": "grep",
+  "pattern": "sql_guardrails",
+  "path": "."
+}
+OBSERVATION:
+OK: backend/tests/services/test_sql_guardrails.py:22:from app.services.sql_guardrails import MASK_VALUE, mask_rows, validate_sql
+backend/app/tools/guardrailed_db_toolkit.py:21:1. sql_guardrails AST validation (SELECT-only, table allowlist, masked-column
+backend/app/tools/guardrailed_db_toolkit.py:41:from app.services.sql_guardrails import mask_rows, normalize_scope_map, validate_sql
+backend/app/services/db_connector_service.py:60:    # customer's own rows. See sql_guardrails._apply_row_scope.
+
+--- iter 7 ---
+ACTION:
+{
+  "thought": "Read sql_guardrails.py for row-scope rewrite, masked columns, and audit (no rows stored).",
+  "tool": "read",
+  "file": "backend/app/services/sql_guardrails.py",
+  "start_line": 1,
+  "end_line": 120
+}
+OBSERVATION:
+OK: 1|"""
+2|Copyright 2024-2026 ChatterMate
+3|
+4|Licensed under the Apache License, Version 2.0 (the "License");
+5|you may not use this file except in compliance with the License.
+6|You may obtain a copy of the License at
+7|
+8|    http://www.apache.org/licenses/LICENSE-2.0
+9|
+10|Unless required by applicable law or agreed to in writing, software
+11|distributed under the License is distributed on an "AS IS" BASIS,
+12|WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+13|See the License for the specific language governing permissions and
+14|limitations under the License.
+15|
+16|SQL guardrails for the AI ticket investigator's database connector.
+17|
+18|The model's SQL is untrusted input. Every guarantee here is enforced OUTSIDE
+19|the model, on the parsed AST (sqlglot):
+20|
+21|- exactly one statement, and it must be a plain SELECT (no INTO, no locking)
+22|- every referenced table — including inside CTEs, subqueries, joins and
+23|  unions — must be on the connector's explicit allowlist
+24|- dangerous functions (sleep/file/network/admin) are denied
+25|- a LIMIT is always enforced (added or clamped to the connector's max_rows)
+26|- row-scoped tables are rewritten into a subquery pre-filtered to the ticket
+27|  customer's own rows, so the agent cannot read across customers
+28|- the statement is re-rendered from the AST, so only canonical SQL executes
+29|
+30|The executor adds the second, independent barrier: a read-only transaction
+31|with a statement timeout. Column masking happens on the result rows.
+32|"""
+33|
+34|from dataclasses import dataclass
+35|from typing import Iterable, List, Optional, Sequence
+36|
+37|import sqlglot
+38|from sqlglot import exp
+39|
+40|MASK_VALUE = "***MASKED***"
+41|
+42|# Time-wasting, file, network and admin functions. The read-only transaction
+43|# already blocks writes — this denylist is defense-in-depth against DoS and
+44|# data exfiltration via server-side functions.
+45|BLOCKED_FUNCTIONS = {
+46|    # postgres
+47|    "pg_sleep", "pg_sleep_for", "pg_sleep_until",
+48|    "pg_read_file", "pg_read_binary_file", "pg_ls_dir", "pg_stat_file",
+49|    "pg_terminate_backend", "pg_cancel_backend", "pg_reload_conf",
+50|    "pg_rotate_logfile", "set_config", "pg_promote",
+51|    "dblink", "dblink_exec", "dblink_connect", "dblink_connect_u",
+52|    "lo_import", "lo_export",
+53|    "query_to_xml", "database_to_xml", "table_to_xml",
+54|    "pg_logical_slot_get_changes", "pg_logical_slot_peek_changes",
+55|    "pg_create_logical_replication_slot", "pg_drop_replication_slot",
+56|    # mysql
+57|    "sleep", "benchmark", "load_file", "get_lock", "release_lock",
+58|    "master_pos_wait", "sys_eval", "sys_exec",
+59|}
+60|
+61|# Statement/expression node types that must never appear anywhere in the tree.
+62|BLOCKED_NODE_TYPES = (
+63|    exp.Insert, exp.Update, exp.Delete, exp.Merge,
+64|    exp.Create, exp.Drop, exp.Alter, exp.TruncateTable,
+65|    exp.Grant, exp.Command, exp.Transaction, exp.Set,
+66|    exp.Into, exp.Lock,
+67|)
+68|
+69|# Default schema names: a bare table reference resolves to these, so an
+70|# allowlist entry "public.orders" also authorizes "orders".
+71|DEFAULT_SCHEMAS = {"public", "dbo"}
+72|
+73|_DIALECTS = {"postgresql": "postgres", "postgres": "postgres", "mysql": "mysql"}
+74|
+75|
+76|@dataclass
+77|class SqlValidationResult:
+78|    ok: bool
+79|    sql: Optional[str] = None       # canonical SQL, only when ok
+80|    reason: Optional[str] = None    # block reason, only when not ok
+81|
+82|
+83|def _normalize_allowlist(allowed_tables: Iterable[str]) -> set:
+84|    """Expand allowlist entries so both qualified and bare references match
+85|    when the schema is a default one."""
+86|    allowed = set()
+87|    for entry in allowed_tables or []:
+88|        entry = (entry or "").strip().lower()
+89|        if not entry:
+90|            continue
+91|        allowed.add(entry)
+92|        if "." in entry:
+93|            schema, _, name = entry.rpartition(".")
+94|            if schema in DEFAULT_SCHEMAS:
+95|                allowed.add(name)
+96|    return allowed
+97|
+98|
+99|def _table_reference(table: exp.Table) -> str:
+100|    name = (table.name or "").lower()
+101|    if table.db:
+102|        return f"{table.db.lower()}.{name}"
+103|    return name
+104|
+105|
+106|def _cte_names(statement: exp.Expression) -> set:
+107|    return {cte.alias_or_name.lower() for cte in statement.find_all(exp.CTE)}
+108|
+109|
+110|def _blocked_function(statement: exp.Expression) -> Optional[str]:
+111|    for func in statement.find_all(exp.Func):
+112|        name = (func.sql_name() or "").lower()
+113|        if name in BLOCKED_FUNCTIONS:
+114|            return name
+115|        if isinstance(func, exp.Anonymous):
+116|            anon = (func.name or "").lower()
+117|            if anon in BLOCKED_FUNCTIONS:
+118|                return anon
+119|    return None
+120|
+
+
+--- iter 8 ---
+ACTION:
+{
+  "thought": "Continue sql_guardrails.py after line 120 for row-scope rewrite, masking, and audit.",
+  "tool": "read",
+  "file": "backend/app/services/sql_guardrails.py",
+  "start_line": 120,
+  "end_line": 280
+}
+OBSERVATION:
+OK: 120|
+121|
+122|def normalize_scope_map(row_scope: Optional[dict]) -> dict:
+123|    """Expand row-scope entries the same way as the allowlist, so a rule on
+124|    "public.orders" also binds a bare "orders" reference."""
+125|    scoped = {}
+126|    for raw_table, raw_column in (row_scope or {}).items():
+127|        table = (raw_table or "").strip().lower()
+128|        column = (raw_column or "").strip()
+129|        if not table or not column:
+130|            continue
+131|        scoped[table] = column
+132|        if "." in table:
+133|            schema, _, name = table.rpartition(".")
+134|            if schema in DEFAULT_SCHEMAS:
+135|                scoped.setdefault(name, column)
+136|    return scoped
+137|
+138|
+139|def _apply_row_scope(
+140|    statement: exp.Select,
+141|    scoped: dict,
+142|    scope_value: Optional[str],
+143|    cte_names: set,
+144|    case_insensitive: bool = False,
+145|) -> tuple:
+146|    """Rewrite every scoped base table into a pre-filtered subquery:
+147|
+148|        FROM orders o  ->  FROM (SELECT * FROM orders WHERE email = 'x') AS o
+149|
+150|    Filtering the *relation* rather than checking the model's WHERE clause is
+151|    what makes this unbypassable. Whatever the model writes outside — OR 1=1,
+152|    a UNION arm, a correlated subquery — it can only ever see rows the wrapper
+153|    already returned. Validating a model-supplied predicate instead would mean
+154|    proving that no OR, no join and no outer reference widens it, which is not
+155|    a thing you can check reliably.
+156|
+157|    Returns (statement, error). Fails closed: a scoped table with no value to
+158|    scope by is refused, never silently unscoped.
+159|    """
+160|    targets = []
+161|    for table in statement.find_all(exp.Table):
+162|        reference = _table_reference(table)
+163|        if not reference:
+164|            continue
+165|        if not table.db and reference in cte_names:
+166|            continue
+167|        column = scoped.get(reference)
+168|        if column is None and table.name:
+169|            column = scoped.get(table.name.lower())
+170|        if column:
+171|            targets.append((table, column))
+172|
+173|    if not targets:
+174|        return statement, None
+175|
+176|    if not (scope_value or "").strip():
+177|        return None, (
+178|            "This table is restricted to the rows of the ticket's own customer, "
+179|            "and this ticket has no customer identity to scope by. Set the "
+180|            "ticket's customer, or query a table that is not customer-scoped."
+181|        )
+182|
+183|    value = scope_value.strip()
+184|    for table, column in targets:
+185|        alias_name = table.alias or table.name
+186|        inner_table = table.copy()
+187|        inner_table.set("alias", None)
+188|        column_ref = exp.Column(this=exp.to_identifier(column))
+189|        # Emails are compared case-insensitively — the same person may be
+190|        # stored as Bob@x.com here and bob@x.com there, and an exact match
+191|        # would silently return nothing rather than their rows. Costs an index
+192|        # on the raw column unless one exists on LOWER(col).
+193|        predicate = exp.EQ(
+194|            this=exp.Lower(this=column_ref) if case_insensitive else column_ref,
+195|            # Literal.string escapes on render — never string-format a value
+196|            # into SQL.
+197|            expression=exp.Literal.string(value.lower() if case_insensitive else value),
+198|        )
+199|        inner = (
+200|            exp.Select().select(exp.Star()).from_(inner_table).where(predicate)
+201|        )
+202|        table.replace(
+203|            exp.Subquery(this=inner, alias=exp.TableAlias(this=exp.to_identifier(alias_name)))
+204|        )
+205|    return statement, None
+206|
+207|
+208|def _force_limit(statement: exp.Select, max_rows: int) -> exp.Select:
+209|    """Add a LIMIT, or clamp an existing numeric one, to max_rows."""
+210|    limit_node = statement.args.get("limit")
+211|    if limit_node is not None:
+212|        literal = limit_node.expression
+213|        if isinstance(literal, exp.Literal) and literal.is_int:
+214|            if int(literal.this) <= max_rows:
+215|                return statement
+216|    return statement.limit(max_rows, copy=False)
+217|
+218|
+219|def validate_sql(
+220|    raw_sql: str,
+221|    allowed_tables: Sequence[str],
+222|    max_rows: int,
+223|    engine: str = "postgresql",
+224|    masked_columns: Optional[Iterable[str]] = None,
+225|    row_scope: Optional[dict] = None,
+226|    scope_value: Optional[str] = None,
+227|    scope_case_insensitive: bool = False,
+228|) -> SqlValidationResult:
+229|    """Validate untrusted SQL against the connector policy. Returns canonical
+230|    SQL to execute, or the reason it was blocked.
+231|
+232|    row_scope maps a table to the column identifying the customer who owns the
+233|    row ({"orders": "customer_email"}); scope_value is that customer's value
+234|    for the ticket being investigated. Listed tables are rewritten so only
+235|    their rows are visible."""
+236|    dialect = _DIALECTS.get((engine or "").lower(), "postgres")
+237|    if not (raw_sql or "").strip():
+238|        return SqlValidationResult(ok=False, reason="Empty query")
+239|
+240|    try:
+241|        statements = sqlglot.parse(raw_sql, read=dialect)
+242|    except sqlglot.errors.ParseError as e:
+243|        return SqlValidationResult(ok=False, reason=f"SQL could not be parsed: {e}")
+244|
+245|    statements = [s for s in statements if s is not None]
+246|    if len(statements) != 1:
+247|        return SqlValidationResult(
+248|            ok=False, reason="Exactly one SQL statement is allowed"
+249|        )
+250|    statement = statements[0]
+251|
+252|    if not isinstance(statement, exp.Select):
+253|        return SqlValidationResult(
+254|            ok=False,
+255|            reason="Only plain SELECT statements are allowed "
+256|            "(wrap set operations like UNION in a subquery)",
+257|        )
+258|
+259|    for node_type in BLOCKED_NODE_TYPES:
+260|        found = statement.find(node_type)
+261|        if found is not None:
+262|            return SqlValidationResult(
+263|                ok=False, reason=f"Disallowed SQL construct: {found.key.upper()}"
+264|            )
+265|
+266|    blocked_func = _blocked_function(statement)
+267|    if blocked_func is not None:
+268|        return SqlValidationResult(ok=False, reason=f"Disallowed function: {blocked_func}")
+269|
+270|    allowed = _normalize_allowlist(allowed_tables)
+271|    if not allowed:
+272|        return SqlValidationResult(ok=False, reason="No tables are allowlisted for this connector")
+273|    cte_names = _cte_names(statement)
+274|    for table in statement.find_all(exp.Table):
+275|        reference = _table_reference(table)
+276|        if not reference:
+277|            continue
+278|        # References to CTE names defined in this query are fine — the CTE
+279|        # bodies themselves are walked by this same loop.
+280|        if not table.db and reference in cte_names:
+
+
+--- iter 9 ---
+ACTION:
+{
+  "thought": "Continue sql_guardrails.py from line 280 for masking and audit; also grep mask_rows and audit.",
+  "tool": "read",
+  "file": "backend/app/services/sql_guardrails.py",
+  "start_line": 280,
+  "end_line": 420
+}
+OBSERVATION:
+OK: 280|        if not table.db and reference in cte_names:
+281|            continue
+282|        if reference not in allowed:
+283|            return SqlValidationResult(
+284|                ok=False, reason=f"Table not on the allowlist: {reference}"
+285|            )
+286|
+287|    # Masked columns may not be referenced at all — output-name masking alone
+288|    # is alias-bypassable (SELECT email AS x), and blocking references also
+289|    # prevents value probing via WHERE clauses. SELECT * and t.* stay allowed:
+290|    # they expand to real column names that mask_rows redacts by name.
+291|    masked = {c.strip().lower() for c in masked_columns or [] if c and c.strip()}
+292|    if masked:
+293|        # Names that denote a whole row when used as a bare value.
+294|        scope_names = {t.name.lower() for t in statement.find_all(exp.Table) if t.name}
+295|        scope_names |= {
+296|            t.alias.lower() for t in statement.find_all(exp.Table) if t.alias
+297|        }
+298|        scope_names |= cte_names
+299|
+300|        for column in statement.find_all(exp.Column):
+301|            # A qualified/bare star (t.* or *) nested inside a function or cast
+302|            # collapses the row into one value (to_jsonb(c.*), (c.*)::text),
+303|            # defeating name-based masking — only a top-level projection star
+304|            # is safe. Same for a bare Star node.
+305|            if isinstance(column.this, exp.Star) and not isinstance(column.parent, exp.Select):
+306|                return SqlValidationResult(
+307|                    ok=False,
+308|                    reason="Row expansion (t.*) inside an expression is not allowed with masked columns",
+309|                )
+310|            if (column.name or "").lower() in masked and not isinstance(column.this, exp.Star):
+311|                return SqlValidationResult(
+312|                    ok=False,
+313|                    reason=f"Column '{column.name}' is masked and cannot be referenced",
+314|                )
+315|            # A bare (unqualified) reference to a table/alias/CTE name is a
+316|            # whole-row value — SELECT customers, to_jsonb(c), c::text, row(c).
+317|            # These serialize masked fields past name-based masking.
+318|            if not column.table and (column.name or "").lower() in scope_names:
+319|                return SqlValidationResult(
+320|                    ok=False,
+321|                    reason=(
+322|                        f"Whole-row reference to '{column.name}' is not allowed with "
+323|                        "masked columns — select individual columns instead"
+324|                    ),
+325|                )
+326|        for star in statement.find_all(exp.Star):
+327|            # Safe: top-level projection (SELECT *), the star of a t.* Column
+328|            # node (handled above), and count(*) — a cardinality marker that
+329|            # never exposes row values.
+330|            if not isinstance(star.parent, (exp.Select, exp.Column, exp.Count)):
+331|                return SqlValidationResult(
+332|                    ok=False,
+333|                    reason="Row expansion (*) inside an expression is not allowed with masked columns",
+334|                )
+335|
+336|    # Last, so the rewrite can't perturb the checks above: they inspect what
+337|    # the model actually wrote, not the wrappers added on its behalf.
+338|    scoped = normalize_scope_map(row_scope)
+339|    if scoped:
+340|        statement, scope_error = _apply_row_scope(
+341|            statement, scoped, scope_value, cte_names,
+342|            case_insensitive=scope_case_insensitive,
+343|        )
+344|        if scope_error is not None:
+345|            return SqlValidationResult(ok=False, reason=scope_error)
+346|
+347|    statement = _force_limit(statement, max_rows)
+348|    # comments=False: comments are dropped from the canonical SQL — MySQL
+349|    # executable comments (/*! ... */) must never reach the server.
+350|    return SqlValidationResult(
+351|        ok=True, sql=statement.sql(dialect=dialect, comments=False)
+352|    )
+353|
+354|
+355|def mask_rows(
+356|    columns: List[str], rows: List[tuple], masked_columns: Iterable[str]
+357|) -> List[tuple]:
+358|    """Replace values of masked columns (matched by column name, case
+359|    insensitive) so PII never reaches the model."""
+360|    masked = {c.strip().lower() for c in masked_columns or [] if c and c.strip()}
+361|    if not masked:
+362|        return rows
+363|    mask_indexes = {i for i, col in enumerate(columns) if col.lower() in masked}
+364|    if not mask_indexes:
+365|        return rows
+366|    return [
+367|        tuple(MASK_VALUE if i in mask_indexes else value for i, value in enumerate(row))
+368|        for row in rows
+369|    ]
+
+
+--- iter 10 ---
+ACTION:
+{
+  "thought": "Need remaining pieces: audit/no-rows in sql_guardrails or callers, help_center_host first 80, POST /ask, knowledge_processor crash-fail stuck jobs, plus slack/i18n grep.",
+  "tool": "grep",
+  "pattern": "audit|no rows|MASK_VALUE",
+  "path": "backend/app/services"
+}
+OBSERVATION:
+OK: backend/app/services/sql_guardrails.py:40:MASK_VALUE = "***MASKED***"
+backend/app/services/sql_guardrails.py:367:        tuple(MASK_VALUE if i in mask_indexes else value for i, value in enumerate(row))
+backend/app/services/knowledge_vector_links.py:67:    Returns None when the source has no rows in the vector table yet (nothing to
+backend/app/services/ticket.py:104:    activity table is the audit trail, never bypass it."""
+backend/app/services/ticket.py:695:        often this fires, and every write here appends to the audit feed."""
+
+--- iter 11 ---
+ACTION:
+{
+  "thought": "Find audit/no-rows storage for SQL results, help_center POST /ask, and knowledge_processor crash-fail stuck jobs.",
+  "tool": "grep",
+  "pattern": "no rows|audit|stuck|processing",
+  "path": "backend/app/workers"
+}
+OBSERVATION:
+OK: backend/app/workers/faq_processor.py:56:            job_repo.mark_processing(job.id)
+backend/app/workers/faq_processor.py:110:    """Reap orphaned `processing` jobs the first time the processor runs in
+backend/app/workers/faq_processor.py:137:    """Fail jobs left in `processing` by a previous crash/kill. Runs once at
+backend/app/workers/faq_processor.py:138:    startup: this worker is the only writer of `processing`, so on a fresh boot
+backend/app/workers/faq_processor.py:143:            reaped = FAQGenerationJobRepository(db).fail_orphaned_processing(
+backend/app/workers/faq_processor.py:147:            logger.warning(f"Reaped {reaped} orphaned FAQ job(s) left in 'processing' on startup")
+backend/app/workers/run_knowledge_processor.py:75:            # Calculate how long the processing took
+backend/app/workers/run_knowledge_processor.py:79:            # If the processing took less than the polling interval, sleep for the remainder
+backend/app/workers/chat_auto_closer.py:77:            # Calculate how long the processing took
+backend/app/workers/knowledge_processor.py:131:                # Update to processing
+backend/app/workers/knowledge_processor.py:133:                queue_item.processing_stage = ProcessingStage.NOT_STARTED
+backend/app/workers/knowledge_processor.py:141:                # Create notification for successful processing
+backend/app/workers/knowledge_processor.py:171:            logger.error(f"Error processing queue item {queue_item_id}: {str(e)}")
+backend/app/workers/knowledge_processor.py:177:                # Create notification for failed processing
+backend/app/workers/knowledge_processor.py:211:            # Reduce concurrent processing to 2 to conserve connections on t3.micro
+
+--- iter 12 ---
+ACTION:
+{
+  "thought": "Read help_center_host.py first 80 lines and grep POST /ask plus knowledge_processor crash-fail and sql audit no-rows.",
+  "tool": "read",
+  "file": "backend/app/services/help_center_host.py",
+  "start_line": 1,
+  "end_line": 80
+}
+OBSERVATION:
+ERROR: read invalid or out-of-scope file: 'backend/app/services/help_center_host.py'
+
+FINAL ANSWER:
+(inspect_external: hit max iterations without responding; consider narrowing the query)
+
+PARTIAL — what this call did find before it ran out, unsummarised:
+  step 1: OK: 40|---
+41|
+42|## Features
+43|
+44|### Core Features
+45|
+46|| Feature | Description |
+47||---------|-------------|
+48|| 🤝 **Smart Human Handoff** | Intelligent AI-to-human transfer with **business hours awareness**, real-time availability detection, and context-aware escalation messages. |
+49|| 🛍️ **Shopify & E-commerce Support** | Native **Shopify integration** ([App Store listing](https://apps.shopify.com/chattermate-chat)) — answer order, shipping, and product questions from store data. Works for any online store. |
+50|| 📝 **WordPress Plugin** | Official **WordPress plugin** ([download](h …[trimmed]
+  step 2: OK: 400|
+401|Run each from the `backend/` directory with the virtualenv active.
+402|
+403|**FAQ / Help Center processor.** FAQ generation and import jobs (Generate FAQs,
+404|"Migrate an existing help center", PDF import) are drained by the *knowledge
+405|worker* — there is no separate FAQ container. Both knowledge entrypoints pick
+406|up the FAQ queue, so either one is enough:
+407|
+408|```bash
+409|# Recommended for local dev — knowledge and FAQ in one loop
+410|python -m app.workers.run_knowledge_processor
+411|
+412|# What Docker runs: knowledge and FAQ as independent asyncio tasks, so a long
+413 …[trimmed]
+  step 3: OK: 600|## License
+601|
+602|ChatterMate follows an **open-core** model:
+603|
+604|**Open Source Core ([Apache-2.0](https://opensource.org/licenses/Apache-2.0))**
+605|- Free for personal and commercial use — including proprietary and SaaS deployments
+606|- No source-disclosure or copyleft obligations
+607|- Includes an explicit patent grant
+608|- See [LICENSE](LICENSE) and [NOTICE](NOTICE)
+609|
+610|**Enterprise features & support**
+611|- Advanced/enterprise capabilities are provided separately under a commercial arrangement
+612|- Priority support, warranties, and indemnification available
+613|- C …[trimmed]
+  step 4: OK: backend/app/main.py:24:from app.api import chat, organizations, users, ai_setup, knowledge, agent, notification, widget, widget_apps, user_groups, roles, analytics, jira, shopify, workflow, workflow_node, mcp_tool, file_upload, token, lead_capture, people, tickets
+backend/app/main.py:254:    jira.router,
+backend/app/main.py:255:    prefix=f"{settings.API_V1_STR}/jira",
+backend/app/main.py:256:    tags=["jira"]
+backend/app/workers/ticket_investigator.py:236:    from app.services.ticket_jira import maybe_escalate_to_jira
+backend/app/workers/ticket_investigator.py:237:    await maybe_escalate …[trimmed]
+  step 5: OK: backend/tests/utils/test_model_context.py:45:    assert batch_chars == settings.FAQ_MAX_BATCH_CHARS
+backend/tests/utils/test_model_context.py:51:    assert batch_chars == settings.FAQ_MAX_BATCH_CHARS_CEILING
+backend/tests/utils/test_model_context.py:52:    assert batch_chars > settings.FAQ_MAX_BATCH_CHARS
+backend/tests/utils/test_model_context.py:58:    assert settings.FAQ_MAX_BATCH_CHARS <= batch_chars <= settings.FAQ_MAX_BATCH_CHARS_CEILING
+backend/app/utils/model_context.py:103:    batch_chars is floored at FAQ_MAX_BATCH_CHARS (today's behaviour for
+backend/app/utils/model_context.py:10 …[trimmed]
+  step 6: OK: backend/tests/services/test_sql_guardrails.py:22:from app.services.sql_guardrails import MASK_VALUE, mask_rows, validate_sql
+backend/app/tools/guardrailed_db_toolkit.py:21:1. sql_guardrails AST validation (SELECT-only, table allowlist, masked-column
+backend/app/tools/guardrailed_db_toolkit.py:41:from app.services.sql_guardrails import mask_rows, normalize_scope_map, validate_sql
+backend/app/services/db_connector_service.py:60:    # customer's own rows. See sql_guardrails._apply_row_scope.
+  step 7: OK: 1|"""
+2|Copyright 2024-2026 ChatterMate
+3|
+4|Licensed under the Apache License, Version 2.0 (the "License");
+5|you may not use this file except in compliance with the License.
+6|You may obtain a copy of the License at
+7|
+8|    http://www.apache.org/licenses/LICENSE-2.0
+9|
+10|Unless required by applicable law or agreed to in writing, software
+11|distributed under the License is distributed on an "AS IS" BASIS,
+12|WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+13|See the License for the specific language governing permissions and
+14|limitations under the License.
+15 …[trimmed]
+  step 8: OK: 120|
+121|
+122|def normalize_scope_map(row_scope: Optional[dict]) -> dict:
+123|    """Expand row-scope entries the same way as the allowlist, so a rule on
+124|    "public.orders" also binds a bare "orders" reference."""
+125|    scoped = {}
+126|    for raw_table, raw_column in (row_scope or {}).items():
+127|        table = (raw_table or "").strip().lower()
+128|        column = (raw_column or "").strip()
+129|        if not table or not column:
+130|            continue
+131|        scoped[table] = column
+132|        if "." in table:
+133|            schema, _, name = table.rpartition(".")
+134| …[trimmed]
+…[4 further observations omitted for length]

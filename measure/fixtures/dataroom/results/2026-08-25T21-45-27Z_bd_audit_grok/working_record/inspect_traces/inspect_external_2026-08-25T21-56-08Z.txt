@@ -1,0 +1,840 @@
+================================================================================
+[inspect_external] 2026-08-25T21-56-08Z exit=respond iters=10
+================================================================================
+Query: Read body/lib/schemas.py, body/lidar_driver.py, body/teleop.py, requirements.txt, deploy/zenohd-router.json, and the first 80 lines of body/oakd_driver.py with line numbers. Summarize oakd_driver topics published and IMU/depth/placeholder behavior with line citations.
+
+--- iter 1 ---
+ACTION:
+{
+  "thought": "Start by reading body/lib/schemas.py as requested.",
+  "tool": "read",
+  "file": "body/lib/schemas.py"
+}
+OBSERVATION:
+OK: 1|"""JSON message helpers for Body Zenoh topics (see body_project_spec.md)."""
+2|
+3|from __future__ import annotations
+4|
+5|import math
+6|import time
+7|from typing import Any
+8|
+9|
+10|def now_ts() -> float:
+11|    return time.time()
+12|
+13|
+14|def cmd_vel(ts: float | None = None, linear: float = 0.0, angular: float = 0.0, timeout_ms: int = 500) -> dict[str, Any]:
+15|    return {"ts": now_ts() if ts is None else ts, "linear": linear, "angular": angular, "timeout_ms": timeout_ms}
+16|
+17|
+18|def cmd_direct(ts: float | None = None, left: float = 0.0, right: float = 0.0, timeout_ms: int = 500) -> dict[str, Any]:
+19|    return {"ts": now_ts() if ts is None else ts, "left": left, "right": right, "timeout_ms": timeout_ms}
+20|
+21|
+22|def odom(
+23|    ts: float | None = None,
+24|    x: float = 0.0,
+25|    y: float = 0.0,
+26|    theta: float = 0.0,
+27|    vx: float = 0.0,
+28|    vtheta: float = 0.0,
+29|    left_ticks: int = 0,
+30|    right_ticks: int = 0,
+31|    dt_ms: int = 20,
+32|) -> dict[str, Any]:
+33|    ts_val = now_ts() if ts is None else ts
+34|    th = math.atan2(math.sin(theta), math.cos(theta))
+35|    return {
+36|        "ts": ts_val,
+37|        "x": x,
+38|        "y": y,
+39|        "theta": th,
+40|        "vx": vx,
+41|        "vtheta": vtheta,
+42|        "left_ticks": left_ticks,
+43|        "right_ticks": right_ticks,
+44|        "dt_ms": dt_ms,
+45|    }
+46|
+47|
+48|def motor_state(
+49|    ts: float | None = None,
+50|    left_pwm: float = 0.0,
+51|    right_pwm: float = 0.0,
+52|    left_dir: str = "fwd",
+53|    right_dir: str = "fwd",
+54|    e_stop_active: bool = False,
+55|    cmd_timeout_active: bool = False,
+56|) -> dict[str, Any]:
+57|    return {
+58|        "ts": now_ts() if ts is None else ts,
+59|        "left_pwm": left_pwm,
+60|        "right_pwm": right_pwm,
+61|        "left_dir": left_dir,
+62|        "right_dir": right_dir,
+63|        "e_stop_active": e_stop_active,
+64|        "cmd_timeout_active": cmd_timeout_active,
+65|    }
+66|
+67|
+68|def lidar_scan(
+69|    ts: float | None = None,
+70|    num_points: int = 360,
+71|    range_const: float = 2.0,
+72|    scan_time_ms: int = 100,
+73|) -> dict[str, Any]:
+74|    angle_increment = (2.0 * math.pi) / num_points
+75|    ranges: list[float | None] = [range_const for _ in range(num_points)]
+76|    return {
+77|        "ts": now_ts() if ts is None else ts,
+78|        "angle_min": 0.0,
+79|        "angle_max": 2.0 * math.pi,
+80|        "angle_increment": angle_increment,
+81|        "range_min": 0.05,
+82|        "range_max": 12.0,
+83|        "ranges": ranges,
+84|        "scan_time_ms": scan_time_ms,
+85|    }
+86|
+87|
+88|def oakd_imu(ts: float | None = None) -> dict[str, Any]:
+89|    t = now_ts() if ts is None else ts
+90|    return {
+91|        "ts": t,
+92|        "accel": {"x": 0.0, "y": 0.0, "z": 9.81},
+93|        "gyro": {"x": 0.0, "y": 0.0, "z": 0.0},
+94|        "orientation": {"w": 1.0, "x": 0.0, "y": 0.0, "z": 0.0},
+95|    }
+96|
+97|
+98|def oakd_imu_report(
+99|    ts: float,
+100|    accel_xyz: tuple[float, float, float],
+101|    gyro_xyz: tuple[float, float, float],
+102|    quat_wxyz: tuple[float, float, float, float] | None = None,
+103|) -> dict[str, Any]:
+104|    """Build body/oakd/imu JSON per body_project_spec.md §5.6 (sensor frame)."""
+105|    msg: dict[str, Any] = {
+106|        "ts": ts,
+107|        "accel": {"x": accel_xyz[0], "y": accel_xyz[1], "z": accel_xyz[2]},
+108|        "gyro": {"x": gyro_xyz[0], "y": gyro_xyz[1], "z": gyro_xyz[2]},
+109|    }
+110|    if quat_wxyz is not None:
+111|        msg["orientation"] = {
+112|            "w": quat_wxyz[0],
+113|            "x": quat_wxyz[1],
+114|            "y": quat_wxyz[2],
+115|            "z": quat_wxyz[3],
+116|        }
+117|    return msg
+118|
+119|
+120|def oakd_depth_placeholder(ts: float | None = None) -> dict[str, Any]:
+121|    return {"ts": now_ts() if ts is None else ts, "format": "placeholder", "note": "TBD per body_project_spec.md §5.7"}
+122|
+123|
+124|def oakd_depth_stream_frame(
+125|    width: int,
+126|    height: int,
+127|    data_base64: str,
+128|    *,
+129|    ts: float | None = None,
+130|    dtype: str = "uint16",
+131|    units: str = "mm",
+132|    layout: str = "row_major",
+133|) -> dict[str, Any]:
+134|    """body/oakd/depth — streamed depth from StereoDepth (host-resized), raw uint16 row-major."""
+135|    return {
+136|        "ts": now_ts() if ts is None else ts,
+137|        "format": "depth_uint16_mm",
+138|        "width": width,
+139|        "height": height,
+140|        "dtype": dtype,
+141|        "units": units,
+142|        "layout": layout,
+143|        "encoding": "base64",
+144|        "data": data_base64,
+145|    }
+146|
+147|
+148|def oakd_config_capture_rgb(request_id: str) -> dict[str, Any]:
+149|    """body/oakd/config — request a single RGB frame (handled by oakd_driver)."""
+150|    return {"action": "capture_rgb", "request_id": request_id}
+151|
+152|
+153|def oakd_rgb_capture_ok(
+154|    request_id: str,
+155|    jpeg_base64: str,
+156|    width: int,
+157|    height: int,
+158|    ts: float | None = None,
+159|) -> dict[str, Any]:
+160|    """body/oakd/rgb — successful on-request JPEG (base64)."""
+161|    return {
+162|        "ts": now_ts() if ts is None else ts,
+163|        "request_id": request_id,
+164|        "ok": True,
+165|        "format": "jpeg",
+166|        "encoding": "base64",
+167|        "data": jpeg_base64,
+168|        "width": width,
+169|        "height": height,
+170|    }
+171|
+172|
+173|def oakd_rgb_capture_error(request_id: str, error: str, ts: float | None = None) -> dict[str, Any]:
+174|    """body/oakd/rgb — capture failed (e.g. rgb disabled or no frame)."""
+175|    return {
+176|        "ts": now_ts() if ts is None else ts,
+177|        "request_id": request_id,
+178|        "ok": False,
+179|        "error": error,
+180|    }
+181|
+182|
+183|def heartbeat(ts: float | None = None, seq: int = 0) -> dict[str, Any]:
+184|    return {"ts": now_ts() if ts is None else ts, "seq": seq}
+185|
+186|
+187|def status(
+188|    processes: dict[str, str],
+189|    heartbeat_ok: bool,
+190|    e_stop_active: bool,
+191|    uptime_s: float,
+192|    ts: float | None = None,
+193|) -> dict[str, Any]:
+194|    return {
+195|        "ts": now_ts() if ts is None else ts,
+196|        "processes": processes,
+197|        "heartbeat_ok": heartbeat_ok,
+198|        "e_stop_active": e_stop_active,
+199|        "uptime_s": uptime_s,
+200|    }
+201|
+202|
+203|def emergency_stop(reason: str, source: str = "watchdog", ts: float | None = None) -> dict[str, Any]:
+204|    return {"ts": now_ts() if ts is None else ts, "reason": reason, "source": source}
+
+
+--- iter 2 ---
+ACTION:
+{
+  "thought": "Next read body/lidar_driver.py as requested.",
+  "tool": "read",
+  "file": "body/lidar_driver.py"
+}
+OBSERVATION:
+OK: 1|"""LIDAR driver: stub publishes synthetic scans at ~10 Hz."""
+2|
+3|from __future__ import annotations
+4|
+5|import signal
+6|import sys
+7|import threading
+8|import time
+9|
+10|from body.lib import schemas, zenoh_helpers
+11|
+12|
+13|def main() -> None:
+14|    body_cfg = zenoh_helpers.load_body_config()
+15|    lidar_cfg = body_cfg.get("lidar", {})
+16|    hz = float(lidar_cfg.get("publish_hz", 10))
+17|    period = 1.0 / max(1.0, hz)
+18|
+19|    session = zenoh_helpers.open_session(body_cfg)
+20|    stop = threading.Event()
+21|
+22|    def handle_sigterm(_sig: int, _frame: object) -> None:
+23|        stop.set()
+24|
+25|    signal.signal(signal.SIGTERM, handle_sigterm)
+26|    signal.signal(signal.SIGINT, handle_sigterm)
+27|
+28|    next_tick = time.monotonic()
+29|    while not stop.is_set():
+30|        zenoh_helpers.publish_json(session, "body/lidar/scan", schemas.lidar_scan(scan_time_ms=int(round(period * 1000))))
+31|        next_tick += period
+32|        sleep_for = next_tick - time.monotonic()
+33|        if sleep_for > 0:
+34|            time.sleep(sleep_for)
+35|        else:
+36|            next_tick = time.monotonic()
+37|
+38|    session.close()
+39|    sys.exit(0)
+40|
+41|
+42|if __name__ == "__main__":
+43|    main()
+
+
+--- iter 3 ---
+ACTION:
+{
+  "thought": "Read body/teleop.py next as requested.",
+  "tool": "read",
+  "file": "body/teleop.py"
+}
+OBSERVATION:
+OK: 1|"""Standalone teleop client: publishes body/heartbeat and body/cmd_vel without Jill.
+2|
+3|Run from the repo root with PYTHONPATH set (same as launcher). Connects to the Zenoh router
+4|from config.json or ZENOH_CONNECT.
+5|"""
+6|
+7|from __future__ import annotations
+8|
+9|import argparse
+10|import signal
+11|import sys
+12|import threading
+13|import time
+14|from typing import Any
+15|
+16|from body.lib import schemas, zenoh_helpers
+17|
+18|
+19|def main() -> None:
+20|    parser = argparse.ArgumentParser(
+21|        description="Publish body/heartbeat and body/cmd_vel for local or remote Body stacks.",
+22|    )
+23|    parser.add_argument("--heartbeat-hz", type=float, default=2.0, help="Minimum spec is 2 Hz.")
+24|    parser.add_argument("--cmd-vel-hz", type=float, default=20.0)
+25|    parser.add_argument("--timeout-ms", type=int, default=500, help="cmd_vel timeout_ms field (robot-side).")
+26|    parser.add_argument(
+27|        "--verbose",
+28|        action="store_true",
+29|        help="Print every body/status sample (noisy). emergency_stop is always printed.",
+30|    )
+31|    args = parser.parse_args()
+32|
+33|    body_cfg = zenoh_helpers.load_body_config()
+34|    session = zenoh_helpers.open_session(body_cfg)
+35|
+36|    stop = threading.Event()
+37|    lock = threading.Lock()
+38|    linear_mps = 0.0
+39|    angular_rps = 0.0
+40|    hb_seq = 0
+41|    latest_status: dict[str, Any] | None = None
+42|
+43|    def on_status(_key: str, msg: dict[str, Any]) -> None:
+44|        nonlocal latest_status
+45|        with lock:
+46|            latest_status = msg
+47|        if args.verbose:
+48|            print(f"[status] {msg}", flush=True)
+49|
+50|    def on_emergency_stop(_key: str, msg: dict[str, Any]) -> None:
+51|        print(f"[emergency_stop] {msg}", flush=True)
+52|
+53|    zenoh_helpers.declare_subscriber_json(session, "body/status", on_status)
+54|    zenoh_helpers.declare_subscriber_json(session, "body/emergency_stop", on_emergency_stop)
+55|
+56|    hb_period = 1.0 / max(0.5, args.heartbeat_hz)
+57|    cv_period = 1.0 / max(1.0, args.cmd_vel_hz)
+58|
+59|    def heartbeat_loop() -> None:
+60|        nonlocal hb_seq
+61|        next_tick = time.monotonic()
+62|        while not stop.is_set():
+63|            with lock:
+64|                seq = hb_seq
+65|                hb_seq += 1
+66|            zenoh_helpers.publish_json(session, "body/heartbeat", schemas.heartbeat(seq=seq))
+67|            next_tick += hb_period
+68|            sleep_for = next_tick - time.monotonic()
+69|            if sleep_for > 0:
+70|                stop.wait(sleep_for)
+71|            else:
+72|                next_tick = time.monotonic()
+73|
+74|    def cmd_vel_loop() -> None:
+75|        next_tick = time.monotonic()
+76|        while not stop.is_set():
+77|            with lock:
+78|                lin = linear_mps
+79|                ang = angular_rps
+80|            zenoh_helpers.publish_json(
+81|                session,
+82|                "body/cmd_vel",
+83|                schemas.cmd_vel(linear=lin, angular=ang, timeout_ms=args.timeout_ms),
+84|            )
+85|            next_tick += cv_period
+86|            sleep_for = next_tick - time.monotonic()
+87|            if sleep_for > 0:
+88|                stop.wait(sleep_for)
+89|            else:
+90|                next_tick = time.monotonic()
+91|
+92|    hb_thread = threading.Thread(target=heartbeat_loop, name="heartbeat", daemon=True)
+93|    cv_thread = threading.Thread(target=cmd_vel_loop, name="cmd_vel", daemon=True)
+94|    hb_thread.start()
+95|    cv_thread.start()
+96|
+97|    def handle_signal(_sig: int, _frame: Any) -> None:
+98|        stop.set()
+99|
+100|    signal.signal(signal.SIGTERM, handle_signal)
+101|    signal.signal(signal.SIGINT, handle_signal)
+102|
+103|    print(
+104|        "Body teleop: vel LINEAR_MPS [ANGULAR_RPS] | stop | status | help | quit",
+105|        flush=True,
+106|    )
+107|    try:
+108|        while not stop.is_set():
+109|            try:
+110|                line = input("teleop> ")
+111|            except EOFError:
+112|                break
+113|            parts = line.strip().split()
+114|            if not parts:
+115|                continue
+116|            cmd = parts[0].lower()
+117|            if cmd in ("quit", "exit", "q"):
+118|                break
+119|            if cmd == "help":
+120|                print(
+121|                    "  vel LINEAR [ANGULAR] — linear m/s, angular rad/s (CCW +); "
+122|                    "default angular 0\n"
+123|                    "  stop — latch zero velocity\n"
+124|                    "  status — last body/status JSON (if received)\n"
+125|                    "  quit — exit",
+126|                    flush=True,
+127|                )
+128|                continue
+129|            if cmd == "stop":
+130|                with lock:
+131|                    linear_mps = 0.0
+132|                    angular_rps = 0.0
+133|                print("latched linear=0 angular=0", flush=True)
+134|                continue
+135|            if cmd == "status":
+136|                with lock:
+137|                    st = latest_status
+138|                print(st if st is not None else "(no body/status yet)", flush=True)
+139|                continue
+140|            if cmd == "vel" and len(parts) >= 2:
+141|                try:
+142|                    lin = float(parts[1])
+143|                    ang = float(parts[2]) if len(parts) >= 3 else 0.0
+144|                except ValueError:
+145|                    print("vel: expected numbers", flush=True)
+146|                    continue
+147|                with lock:
+148|                    linear_mps = lin
+149|                    angular_rps = ang
+150|                print(f"latched linear={linear_mps} angular={angular_rps}", flush=True)
+151|                continue
+152|            print("unknown command; try help", flush=True)
+153|    except KeyboardInterrupt:
+154|        pass
+155|    finally:
+156|        stop.set()
+157|        hb_thread.join(timeout=2.0)
+158|        cv_thread.join(timeout=2.0)
+159|        session.close()
+160|
+161|    sys.exit(0)
+162|
+163|
+164|if __name__ == "__main__":
+165|    main()
+
+
+--- iter 4 ---
+ACTION:
+{
+  "thought": "Read first 80 lines of body/oakd_driver.py for topics and IMU/depth/placeholder behavior.",
+  "tool": "read",
+  "file": "body/oakd_driver.py",
+  "start_line": 1,
+  "end_line": 80
+}
+OBSERVATION:
+OK: 1|"""OAK-D Lite driver: DepthAI IMU pipeline, Zenoh publish, optional depth placeholder.
+2|
+3|Aggregates high-rate accel/gyro into **arithmetic means** over ``imu_aggregate_interval_s`` and
+4|publishes ``body/oakd/imu`` at that rate. **Mean gyro ≠ integrated angle** and mean accel ≠
+5|velocity change over the window; for strapdown-equivalent dead reckoning you would integrate
+6|at full sensor rate on the Pi (or use fused orientation only as a slow state estimate).
+7|See module docstring in body_project_spec.md §5.6.
+8|
+9|Supports **DepthAI v2** (``dai.node.XLinkOut``) and **v3** (output queues on node outputs;
+10|no XLink).
+11|"""
+12|
+13|from __future__ import annotations
+14|
+15|import base64
+16|import queue
+17|import signal
+18|import sys
+19|import time
+20|from collections.abc import Callable
+21|from typing import Any
+22|
+23|import cv2
+24|import depthai as dai
+25|import numpy as np
+26|
+27|from body.lib import schemas, zenoh_helpers
+28|
+29|
+30|def _depthai_is_v3() -> bool:
+31|    return not hasattr(dai.node, "XLinkOut")
+32|
+33|
+34|def _is_depthai_imu_missing_error(exc: BaseException) -> bool:
+35|    msg = str(exc)
+36|    return "IMU not detected" in msg or "IMU invalid settings" in msg
+37|
+38|
+39|def _log_imu_missing_fallback(exc: RuntimeError) -> None:
+40|    err = str(exc)
+41|    print(
+42|        "[oakd] DepthAI IMU error:\n"
+43|        f"  {err}\n"
+44|        "  Falling back to synthetic IMU on Zenoh. To skip opening the OAK for IMU entirely, "
+45|        "set oakd.imu_hardware_present to false. If you have a BNO IMU that needs flashing, set "
+46|        "oakd.imu_enable_firmware_update to true (DepthAI v3 uses device.startIMUFirmwareUpdate), "
+47|        "keep USB stable, wait for 100%.",
+48|        file=sys.stderr,
+49|        flush=True,
+50|    )
+51|
+52|
+53|def _cleanup_v3_after_failed_pipeline_start(device: Any, pipeline: Any) -> None:
+54|    try:
+55|        if getattr(pipeline, "isRunning", lambda: False)():
+56|            pipeline.stop()
+57|    except Exception:
+58|        pass
+59|    try:
+60|        close = getattr(device, "close", None)
+61|        if callable(close):
+62|            close()
+63|    except Exception:
+64|        pass
+65|
+66|
+67|def _configure_imu_node(imu: Any, oakd_cfg: dict[str, Any], *, depthai_v3: bool) -> None:
+68|    # DepthAI v2: optional IMU node firmware flag (deprecated on v3 — use Device.startIMUFirmwareUpdate).
+69|    if (
+70|        not depthai_v3
+71|        and oakd_cfg.get("imu_enable_firmware_update", False)
+72|        and hasattr(imu, "enableFirmwareUpdate")
+73|    ):
+74|        imu.enableFirmwareUpdate(True)
+75|
+76|    accel_hz = int(oakd_cfg.get("imu_accel_hz", 500))
+77|    gyro_hz = int(oakd_cfg.get("imu_gyro_hz", 400))
+78|    rot_hz = int(oakd_cfg.get("imu_rotation_vector_hz", 400))
+79|    use_rot = bool(oakd_cfg.get("rotation_vector_enabled", True))
+80|
+
+
+--- iter 5 ---
+ACTION:
+{
+  "thought": "Read remaining requested files: requirements.txt and zenohd-router.json, then more of oakd_driver for publish topics.",
+  "tool": "read",
+  "file": "requirements.txt"
+}
+OBSERVATION:
+OK: 1|eclipse-zenoh~=1.9.0
+2|depthai>=2.24,<4
+3|opencv-python-headless>=4.8,<5
+
+
+--- iter 6 ---
+ACTION:
+{
+  "thought": "Read deploy/zenohd-router.json and grep oakd_driver for publish topics and IMU/depth/placeholder.",
+  "tool": "grep",
+  "path": "body/oakd_driver.py",
+  "pattern": "publish|body/oakd|placeholder|imu|depth"
+}
+OBSERVATION:
+OK: body/oakd_driver.py:1:"""OAK-D Lite driver: DepthAI IMU pipeline, Zenoh publish, optional depth placeholder.
+body/oakd_driver.py:3:Aggregates high-rate accel/gyro into **arithmetic means** over ``imu_aggregate_interval_s`` and
+body/oakd_driver.py:4:publishes ``body/oakd/imu`` at that rate. **Mean gyro ≠ integrated angle** and mean accel ≠
+body/oakd_driver.py:24:import depthai as dai
+body/oakd_driver.py:30:def _depthai_is_v3() -> bool:
+body/oakd_driver.py:34:def _is_depthai_imu_missing_error(exc: BaseException) -> bool:
+body/oakd_driver.py:39:def _log_imu_missing_fallback(exc: RuntimeError) -> None:
+body/oakd_driver.py:45:        "set oakd.imu_hardware_present to false. If you have a BNO IMU that needs flashing, set "
+body/oakd_driver.py:46:        "oakd.imu_enable_firmware_update to true (DepthAI v3 uses device.startIMUFirmwareUpdate), "
+body/oakd_driver.py:67:def _configure_imu_node(imu: Any, oakd_cfg: dict[str, Any], *, depthai_v3: bool) -> None:
+body/oakd_driver.py:70:        not depthai_v3
+body/oakd_driver.py:71:        and oakd_cfg.get("imu_enable_firmware_update", False)
+body/oakd_driver.py:72:        and hasattr(imu, "enableFirmwareUpdate")
+body/oakd_driver.py:74:        imu.enableFirmwareUpdate(True)
+body/oakd_driver.py:76:    accel_hz = int(oakd_cfg.get("imu_accel_hz", 500))
+body/oakd_driver.py:77:    gyro_hz = int(oakd_cfg.get("imu_gyro_hz", 400))
+body/oakd_driver.py:78:    rot_hz = int(oakd_cfg.get("imu_rotation_vector_hz", 400))
+body/oakd_driver.py:81:    imu.enableIMUSensor(dai.IMUSensor.ACCELEROMETER_RAW, accel_hz)
+body/oakd_driver.py:82:    imu.enableIMUSensor(dai.IMUSensor.GYROSCOPE_RAW, gyro_hz)
+body/oakd_driver.py:84:        imu.enableIMUSensor(dai.IMUSensor.ROTATION_VECTOR, rot_hz)
+body/oakd_driver.py:86:    imu.setBatchReportThreshold(1)
+body/oakd_driver.py:87:    imu.setMaxBatchReports(10)
+body/oakd_driver.py:108:def _depth_output_dims(oakd_cfg: dict[str, Any]) -> tuple[int, int]:
+body/oakd_driver.py:109:    w = int(oakd_cfg.get("depth_out_width", 80))
+body/oakd_driver.py:110:    h = int(oakd_cfg.get("depth_out_height", 60))
+body/oakd_driver.py:114:def _depth_drain_latest(depth_queue: Any) -> Any | None:
+body/oakd_driver.py:117:        f = depth_queue.tryGet()
+body/oakd_driver.py:124:def _depth_frame_to_stream_msg(frame: Any, out_w: int, out_h: int) -> dict[str, Any]:
+body/oakd_driver.py:135:    return schemas.oakd_depth_stream_frame(out_w, out_h, b64)
+body/oakd_driver.py:138:def _create_v3_stereo_depth_queue(pipeline: Any, oakd_cfg: dict[str, Any]) -> Any:
+body/oakd_driver.py:147:    return stereo.depth.createOutputQueue(maxSize=4, blocking=False)
+body/oakd_driver.py:204:            zenoh_helpers.publish_json(
+body/oakd_driver.py:206:                "body/oakd/rgb",
+body/oakd_driver.py:209:                    "no_rgb_pipeline_set_oakd_rgb_enabled_true_or_fix_imu_rgb_fallback",
+body/oakd_driver.py:215:            zenoh_helpers.publish_json(
+body/oakd_driver.py:217:                "body/oakd/rgb",
+body/oakd_driver.py:223:            zenoh_helpers.publish_json(
+body/oakd_driver.py:225:                "body/oakd/rgb",
+body/oakd_driver.py:230:            zenoh_helpers.publish_json(
+body/oakd_driver.py:232:                "body/oakd/rgb",
+body/oakd_driver.py:237:def _run_imu_loop(
+body/oakd_driver.py:238:    imu_queue: dai.MessageQueue,
+body/oakd_driver.py:242:    depth_period: float,
+body/oakd_driver.py:246:    depth_queue: Any | None = None,
+body/oakd_driver.py:257:    next_depth = time.monotonic()
+body/oakd_driver.py:261:        imu_data = imu_queue.tryGet()
+body/oakd_driver.py:262:        if imu_data is not None:
+body/oakd_driver.py:263:            for pkt in imu_data.packets:
+body/oakd_driver.py:288:            msg = schemas.oakd_imu_report(ts, (ax, ay, az), (gx, gy, gz), quat_wxyz=quat)
+body/oakd_driver.py:289:            zenoh_helpers.publish_json(session, "body/oakd/imu", msg)
+(grep capped at 50 hits — narrow the pattern for full coverage)
+
+--- iter 7 ---
+ACTION:
+{
+  "thought": "Grep remaining publish sites and read IMU loop plus depth/placeholder sections in oakd_driver.py.",
+  "tool": "grep",
+  "path": "body/oakd_driver.py",
+  "pattern": "publish_json|oakd_depth_placeholder|body/oakd"
+}
+OBSERVATION:
+OK: body/oakd_driver.py:4:publishes ``body/oakd/imu`` at that rate. **Mean gyro ≠ integrated angle** and mean accel ≠
+body/oakd_driver.py:204:            zenoh_helpers.publish_json(
+body/oakd_driver.py:206:                "body/oakd/rgb",
+body/oakd_driver.py:215:            zenoh_helpers.publish_json(
+body/oakd_driver.py:217:                "body/oakd/rgb",
+body/oakd_driver.py:223:            zenoh_helpers.publish_json(
+body/oakd_driver.py:225:                "body/oakd/rgb",
+body/oakd_driver.py:230:            zenoh_helpers.publish_json(
+body/oakd_driver.py:232:                "body/oakd/rgb",
+body/oakd_driver.py:289:            zenoh_helpers.publish_json(session, "body/oakd/imu", msg)
+body/oakd_driver.py:313:                        zenoh_helpers.publish_json(
+body/oakd_driver.py:315:                            "body/oakd/depth",
+body/oakd_driver.py:321:                zenoh_helpers.publish_json(
+body/oakd_driver.py:322:                    session, "body/oakd/depth", schemas.oakd_depth_placeholder()
+body/oakd_driver.py:340:    """Synthetic ``body/oakd/imu``; depth placeholder or StereoDepth stream; optional ``rgb_queue``."""
+body/oakd_driver.py:347:            zenoh_helpers.publish_json(session, "body/oakd/imu", schemas.oakd_imu())
+body/oakd_driver.py:355:                        zenoh_helpers.publish_json(
+body/oakd_driver.py:357:                            "body/oakd/depth",
+body/oakd_driver.py:363:                zenoh_helpers.publish_json(
+body/oakd_driver.py:364:                    session, "body/oakd/depth", schemas.oakd_depth_placeholder()
+body/oakd_driver.py:465:        "[oakd] stereo + RGB pipeline running (synthetic IMU; depth uint16 stream on body/oakd/depth)",
+body/oakd_driver.py:646:    zenoh_helpers.declare_subscriber_json(session, "body/oakd/config", on_oakd_config)
+
+--- iter 8 ---
+ACTION:
+{
+  "thought": "Read IMU/depth publish loops and zenohd-router.json for the requested summary.",
+  "tool": "read",
+  "file": "body/oakd_driver.py",
+  "start_line": 237,
+  "end_line": 370
+}
+OBSERVATION:
+OK: 237|def _run_imu_loop(
+238|    imu_queue: dai.MessageQueue,
+239|    session: Any,
+240|    oakd_cfg: dict[str, Any],
+241|    interval_s: float,
+242|    depth_period: float,
+243|    continue_fn: Callable[[], bool],
+244|    config_pending: queue.Queue[dict[str, Any]],
+245|    rgb_queue: Any | None,
+246|    depth_queue: Any | None = None,
+247|) -> None:
+248|    window_ax: list[float] = []
+249|    window_ay: list[float] = []
+250|    window_az: list[float] = []
+251|    window_gx: list[float] = []
+252|    window_gy: list[float] = []
+253|    window_gz: list[float] = []
+254|    last_quat: tuple[float, float, float, float] | None = None
+255|
+256|    window_start = time.monotonic()
+257|    next_depth = time.monotonic()
+258|
+259|    while continue_fn():
+260|        _process_oakd_config_queue(session, config_pending, rgb_queue)
+261|        imu_data = imu_queue.tryGet()
+262|        if imu_data is not None:
+263|            for pkt in imu_data.packets:
+264|                a = pkt.acceleroMeter
+265|                g = pkt.gyroscope
+266|                window_ax.append(float(a.x))
+267|                window_ay.append(float(a.y))
+268|                window_az.append(float(a.z))
+269|                window_gx.append(float(g.x))
+270|                window_gy.append(float(g.y))
+271|                window_gz.append(float(g.z))
+272|                rv = pkt.rotationVector
+273|                if rv is not None:
+274|                    last_quat = (float(rv.real), float(rv.i), float(rv.j), float(rv.k))
+275|
+276|        now = time.monotonic()
+277|
+278|        if now >= window_start + interval_s and window_ax:
+279|            n = len(window_ax)
+280|            ax = sum(window_ax) / n
+281|            ay = sum(window_ay) / n
+282|            az = sum(window_az) / n
+283|            gx = sum(window_gx) / n
+284|            gy = sum(window_gy) / n
+285|            gz = sum(window_gz) / n
+286|            ts = time.time()
+287|            quat = last_quat if oakd_cfg.get("rotation_vector_enabled", True) else None
+288|            msg = schemas.oakd_imu_report(ts, (ax, ay, az), (gx, gy, gz), quat_wxyz=quat)
+289|            zenoh_helpers.publish_json(session, "body/oakd/imu", msg)
+290|            q_str = (
+291|                f" quat=({quat[0]:.3f},{quat[1]:.3f},{quat[2]:.3f},{quat[3]:.3f})" if quat else ""
+292|            )
+293|            print(
+294|                f"[oakd] imu mean over {interval_s:.2f}s: n={n} "
+295|                f"accel=({ax:.3f},{ay:.3f},{az:.3f}) m/s² "
+296|                f"gyro=({gx:.4f},{gy:.4f},{gz:.4f}) rad/s{q_str}",
+297|                flush=True,
+298|            )
+299|            window_ax.clear()
+300|            window_ay.clear()
+301|            window_az.clear()
+302|            window_gx.clear()
+303|            window_gy.clear()
+304|            window_gz.clear()
+305|            window_start = now
+306|
+307|        if now >= next_depth:
+308|            if depth_queue is not None:
+309|                df = _depth_drain_latest(depth_queue)
+310|                if df is not None:
+311|                    dw, dh = _depth_output_dims(oakd_cfg)
+312|                    try:
+313|                        zenoh_helpers.publish_json(
+314|                            session,
+315|                            "body/oakd/depth",
+316|                            _depth_frame_to_stream_msg(df, dw, dh),
+317|                        )
+318|                    except Exception as e:
+319|                        print(f"[oakd] depth stream encode error: {e}", file=sys.stderr, flush=True)
+320|            else:
+321|                zenoh_helpers.publish_json(
+322|                    session, "body/oakd/depth", schemas.oakd_depth_placeholder()
+323|                )
+324|            next_depth += depth_period
+325|
+326|        if imu_data is None:
+327|            time.sleep(0.001)
+328|
+329|
+330|def _run_synthetic_imu_depth_config_loop(
+331|    session: Any,
+332|    oakd_cfg: dict[str, Any],
+333|    interval_s: float,
+334|    depth_period: float,
+335|    stop_ref: list[bool],
+336|    config_pending: queue.Queue[dict[str, Any]],
+337|    rgb_queue: Any | None,
+338|    depth_queue: Any | None = None,
+339|) -> None:
+340|    """Synthetic ``body/oakd/imu``; depth placeholder or StereoDepth stream; optional ``rgb_queue``."""
+341|    next_imu = time.monotonic()
+342|    next_depth = time.monotonic()
+343|    while not stop_ref[0]:
+344|        _process_oakd_config_queue(session, config_pending, rgb_queue)
+345|        now = time.monotonic()
+346|        if now >= next_imu:
+347|            zenoh_helpers.publish_json(session, "body/oakd/imu", schemas.oakd_imu())
+348|            next_imu += interval_s
+349|        if now >= next_depth:
+350|            if depth_queue is not None:
+351|                df = _depth_drain_latest(depth_queue)
+352|                if df is not None:
+353|                    dw, dh = _depth_output_dims(oakd_cfg)
+354|                    try:
+355|                        zenoh_helpers.publish_json(
+356|                            session,
+357|                            "body/oakd/depth",
+358|                            _depth_frame_to_stream_msg(df, dw, dh),
+359|                        )
+360|                    except Exception as e:
+361|                        print(f"[oakd] depth stream encode error: {e}", file=sys.stderr, flush=True)
+362|            else:
+363|                zenoh_helpers.publish_json(
+364|                    session, "body/oakd/depth", schemas.oakd_depth_placeholder()
+365|                )
+366|            next_depth += depth_period
+367|        time.sleep(0.02)
+368|
+369|
+370|def _run_stub_imu_publisher(
+
+
+--- iter 9 ---
+ACTION:
+{
+  "thought": "Read deploy/zenohd-router.json then deliver the oakd topics/IMU/depth summary.",
+  "tool": "read",
+  "file": "deploy/zenohd-router.json"
+}
+OBSERVATION:
+OK: 1|{
+2|  "mode": "router",
+3|  "listen": {
+4|    "endpoints": ["tcp/0.0.0.0:7447"]
+5|  }
+6|}
+
+
+--- iter 10 ---
+ACTION:
+{
+  "thought": "All requested files were read; emit the oakd_driver topic/IMU/depth summary with citations.",
+  "tool": "respond",
+  "text": "Requested files were read. Summary of oakd_driver publish topics and IMU/depth/placeholder behavior:\n\n**Topics published (`body/oakd_driver.py`)**\n- `body/oakd/imu` \u2014 hardware mean IMU (`oakd_imu_report`) at 289; synthetic `schemas.oakd_imu()` at 347.\n- `body/oakd/depth` \u2014 streamed uint16 mm frames via `_depth_frame_to_stream_msg` (313\u2013316, 355\u2013358) or `schemas.oakd_depth_placeholder()` when no `depth_queue` (321\u2013322, 363\u2013364).\n- `body/oakd/rgb` \u2014 on-request JPEG/error replies (204\u2013232).\n- Subscribes `body/oakd/config` (646).\n\n**IMU (1\u20137, 237\u2013305, 330\u2013348)**\nDocstring: high-rate accel/gyro aggregated as **arithmetic means** over `imu_aggregate_interval_s`; mean gyro is not integrated angle. Hardware loop drains IMU packets, averages windows, optional last rotation-vector quat, then publishes. Missing IMU falls back to synthetic (39\u201350, 340\u2013347): identity-ish accel z=9.81 via `schemas.oakd_imu` (`body/lib/schemas.py`:88\u201395).\n\n**Depth / placeholder (307\u2013324, 349\u2013365; schemas 120\u2013145)**\nIf `depth_queue` is set, latest stereo frame is resized and published as `format: depth_uint16_mm` base64. Else placeholder `{\"format\": \"placeholder\", \"note\": \"TBD per body_project_spec.md \u00a75.7\"}` (`oakd_depth_placeholder`, schemas.py:120\u2013121).\n\n**First 80 lines of oakd_driver.py:** module docstring (DepthAI v2/v3, mean IMU caveats), `_depthai_is_v3`, IMU-missing fallback logging, v3 cleanup, start of `_configure_imu_node` (accel/gyro/rot Hz).\n\n**Other requested files (context, not oakd topics)**\n- `body/lib/schemas.py`: cmd_vel/odom/lidar/oakd IMU+depth+RGB helpers.\n- `body/lidar_driver.py`: stub ~10 Hz `body/lidar/scan`.\n- `body/teleop.py`: publishes `body/heartbeat` + `body/cmd_vel`; subs `body/status`, `body/emergency_stop`.\n- `requirements.txt`: eclipse-zenoh~=1.9.0, depthai>=2.24,<4, opencv-python-headless>=4.8,<5.\n- `deploy/zenohd-router.json`: mode router, listen tcp/0.0.0.0:7447."
+}
+OBSERVATION:
+(respond)
+
+FINAL ANSWER:
+Requested files were read. Summary of oakd_driver publish topics and IMU/depth/placeholder behavior:
+
+**Topics published (`body/oakd_driver.py`)**
+- `body/oakd/imu` — hardware mean IMU (`oakd_imu_report`) at 289; synthetic `schemas.oakd_imu()` at 347.
+- `body/oakd/depth` — streamed uint16 mm frames via `_depth_frame_to_stream_msg` (313–316, 355–358) or `schemas.oakd_depth_placeholder()` when no `depth_queue` (321–322, 363–364).
+- `body/oakd/rgb` — on-request JPEG/error replies (204–232).
+- Subscribes `body/oakd/config` (646).
+
+**IMU (1–7, 237–305, 330–348)**
+Docstring: high-rate accel/gyro aggregated as **arithmetic means** over `imu_aggregate_interval_s`; mean gyro is not integrated angle. Hardware loop drains IMU packets, averages windows, optional last rotation-vector quat, then publishes. Missing IMU falls back to synthetic (39–50, 340–347): identity-ish accel z=9.81 via `schemas.oakd_imu` (`body/lib/schemas.py`:88–95).
+
+**Depth / placeholder (307–324, 349–365; schemas 120–145)**
+If `depth_queue` is set, latest stereo frame is resized and published as `format: depth_uint16_mm` base64. Else placeholder `{"format": "placeholder", "note": "TBD per body_project_spec.md §5.7"}` (`oakd_depth_placeholder`, schemas.py:120–121).
+
+**First 80 lines of oakd_driver.py:** module docstring (DepthAI v2/v3, mean IMU caveats), `_depthai_is_v3`, IMU-missing fallback logging, v3 cleanup, start of `_configure_imu_node` (accel/gyro/rot Hz).
+
+**Other requested files (context, not oakd topics)**
+- `body/lib/schemas.py`: cmd_vel/odom/lidar/oakd IMU+depth+RGB helpers.
+- `body/lidar_driver.py`: stub ~10 Hz `body/lidar/scan`.
+- `body/teleop.py`: publishes `body/heartbeat` + `body/cmd_vel`; subs `body/status`, `body/emergency_stop`.
+- `requirements.txt`: eclipse-zenoh~=1.9.0, depthai>=2.24,<4, opencv-python-headless>=4.8,<5.
+- `deploy/zenohd-router.json`: mode router, listen tcp/0.0.0.0:7447.

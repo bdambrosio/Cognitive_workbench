@@ -7,9 +7,9 @@
     python3 measure/report.py --worlds-matching 'coord_search.*'
 
 Deliberately prints a VECTOR, never a single score. The v2 suite collapsed
-`turn_taking` to 1.0 for an arm whose trace recorded `premature_reply:
+`turn_taking` to 1.0 for an model whose trace recorded `premature_reply:
 True` — the one case in the whole campaign where a probe separated the
-arms, discarded by the mean. Nothing here averages a discriminating fact
+models, discarded by the mean. Nothing here averages a discriminating fact
 away.
 
 There is no ship gate and no composite. Run it as a reporting instrument

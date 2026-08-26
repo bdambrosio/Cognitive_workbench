@@ -3,7 +3,7 @@
 Written 2026-08-24. **Purpose: break a circularity.** The fixture, the answer
 key and the method were authored by the same process — `answer_key.md` was
 recovered from an agent exchange, METHOD.md is amended by agents through §14,
-and `score.py` grades against tiers derived from that key. When every arm
+and `score.py` grades against tiers derived from that key. When every model
 passes, nothing currently in the loop can distinguish "the method is good"
 from "the fixture rewards what the method happens to specify."
 
@@ -69,7 +69,7 @@ A reader cannot tell what confidence "Material" carries. Neither can a court.
 
 This is also the gap most entangled with the fixture: `score.py` checks that
 the §9 taxonomy was *used*, never that the conclusion's strength matches the
-evidence actually obtained. An arm that verifies 12 of 50 claims and returns
+evidence actually obtained. An model that verifies 12 of 50 claims and returns
 "Material" scores identically to one that verifies 45.
 
 **Slot needed:** a statement of assurance level, and either a conclusion form
@@ -115,7 +115,7 @@ buyer should price the gap." But nothing states **what magnitude of gap is
 worth reporting at all**. "Material" is used as a verdict label without a
 threshold behind it.
 
-Consequence, visible in our own measurements: across three arms on one
+Consequence, visible in our own measurements: across three models on one
 fixture, Tier 3 counts came in at 6, 3 and 2. Some of that is grader noise —
 but some of it is three reporters drawing the reporting threshold in three
 different places, because the method does not tell them where it is.
@@ -209,13 +209,13 @@ Three of these gaps are **invisible to the current scorer by construction**:
 
 - Assurance level (§1 above) — `score.py` checks the taxonomy was used, never
   whether the conclusion's strength is earned by the coverage.
-- Materiality (§3) — the Tier 3 spread across arms is partly a measurement of
+- Materiality (§3) — the Tier 3 spread across models is partly a measurement of
   a threshold the method never sets.
 - Frozen criteria (§4) — a mid-engagement change to the claim population would
   not register anywhere.
 
 That is the value of an external reference, and it is exactly what
-self-authored criteria cannot provide: **the fixture cannot fail an arm for a
+self-authored criteria cannot provide: **the fixture cannot fail an model for a
 thing the method never asked for.** Every gap above is a way an audit could be
 professionally deficient while scoring a clean PASS.
 

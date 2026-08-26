@@ -1,0 +1,21 @@
+{
+  "world": "c1_qwen_b",
+  "arm": "/home/bruce/Downloads/Cognitive_workbench/measure/arms/qwen_local.yaml",
+  "resolved_model": "Qwen/Qwen3.8-27B",
+  "resolved_temperature": 0.25,
+  "top_p": 0.95,
+  "external_repo": "/home/bruce/Downloads/Cognitive_workbench/measure/fixtures/dataroom/corpus",
+  "exit_reason": "respond",
+  "wall_clock_s": 112.3,
+  "error": null,
+  "declared": true,
+  "count": 70,
+  "leg": 1,
+  "per_document": {
+    "doc1": 84,
+    "doc2": 46,
+    "doc3": 2,
+    "doc8": 2,
+    "doc9": 40
+  }
+}

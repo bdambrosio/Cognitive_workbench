@@ -1,5 +1,5 @@
 # Cognitive Workbench — cooperative-search coordination experiment (2026-08-13)
-# CLOUD ARM — see coord_search.yaml for the local arm.
+# CLOUD MODEL — see coord_search.yaml for the local model.
 #
 # Two peers given one research task, matched as closely as two prompts can
 # be, so that a coordination result is attributable to the backend rather
@@ -9,7 +9,7 @@
 # turn budget ("at least N candidates between you"), do two peers divide
 # the work, hold the division, and produce one coherent joint answer — or
 # do they duplicate each other, over/undershoot the target, and each report
-# as if alone? This is the CLOUD arm. `coord_search.yaml` is the same
+# as if alone? This is the CLOUD model. `coord_search.yaml` is the same
 # scenario on the local backend; the pair is the experiment.
 #
 # The ONLY intended differences from coord_search.yaml are world_name and

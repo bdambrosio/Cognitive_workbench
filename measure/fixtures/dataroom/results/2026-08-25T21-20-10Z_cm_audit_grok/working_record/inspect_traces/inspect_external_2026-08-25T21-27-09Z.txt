@@ -1,0 +1,447 @@
+================================================================================
+[inspect_external] 2026-08-25T21-27-09Z exit=respond iters=10
+================================================================================
+Query: Read backend/app/enterprise listing and .gitmodules. Read backend/app/services/feature_gate.py with line numbers. Read backend/app/services/sql_guardrails.py lines 1-80 and 230-280. Grep README and llms.txt for backup, stripe, billing, subscription, enterprise. Grep S3, attachments, AES, encryption in backend/app.
+
+--- iter 1 ---
+ACTION:
+{
+  "thought": "Start by listing backend/app/enterprise as requested.",
+  "tool": "list",
+  "path": "backend/app/enterprise"
+}
+OBSERVATION:
+OK: backend/app/enterprise/
+(empty)
+
+--- iter 2 ---
+ACTION:
+{
+  "thought": "Enterprise dir is empty; next read .gitmodules at repo root.",
+  "tool": "read",
+  "file": ".gitmodules"
+}
+OBSERVATION:
+OK: 1|[submodule "backend/app/enterprise"]
+2|	path = backend/app/enterprise
+3|	url = git@github.com-chattermate:chattermate/enterprise_backend.git
+4|	branch = main
+5|[submodule "frontend/src/modules/enterprise"]
+6|	path = frontend/src/modules/enterprise
+7|	url = git@github.com-chattermate:chattermate/enterprise_frontend.git
+8|	branch = main
+
+
+--- iter 3 ---
+ACTION:
+{
+  "thought": "Read feature_gate.py next as requested, with line numbers from the read tool.",
+  "tool": "read",
+  "file": "backend/app/services/feature_gate.py"
+}
+OBSERVATION:
+OK: 1|"""
+2|Copyright 2024-2026 ChatterMate
+3|
+4|Licensed under the Apache License, Version 2.0 (the "License");
+5|you may not use this file except in compliance with the License.
+6|You may obtain a copy of the License at
+7|
+8|    http://www.apache.org/licenses/LICENSE-2.0
+9|
+10|Unless required by applicable law or agreed to in writing, software
+11|distributed under the License is distributed on an "AS IS" BASIS,
+12|WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+13|See the License for the specific language governing permissions and
+14|limitations under the License.
+15|
+16|Generic plan-feature gating.
+17|
+18|Cloud (enterprise module installed): a feature is available when the org has
+19|an accessible subscription whose plan carries the feature flag. OSS/community
+20|deployments are always unrestricted. This generalizes the per-feature gates
+21|copied across the API layer (lead_capture, mcp_tool, workflow, ...) — new
+22|features should gate through here instead of minting another copy.
+23|"""
+24|
+25|from uuid import UUID
+26|
+27|from fastapi import HTTPException, status
+28|from sqlalchemy.orm import Session
+29|
+30|from app.core.logger import get_logger
+31|
+32|try:
+33|    from app.enterprise.repositories.plan import PlanRepository
+34|    from app.enterprise.services.feature_access import require_accessible_subscription
+35|    HAS_ENTERPRISE = True
+36|except ImportError:
+37|    HAS_ENTERPRISE = False
+38|
+39|logger = get_logger(__name__)
+40|
+41|
+42|def feature_allowed(db: Session, organization_id: UUID, feature: str) -> bool:
+43|    """Non-raising check. Any gating-lookup failure fails CLOSED (feature
+44|    hidden) rather than surfacing a 500 — used by public/unauthenticated
+45|    surfaces and background hooks."""
+46|    if not HAS_ENTERPRISE:
+47|        return True
+48|    try:
+49|        subscription = require_accessible_subscription(db, organization_id)
+50|        return PlanRepository(db).check_feature_availability(str(subscription.plan_id), feature)
+51|    except HTTPException:
+52|        return False
+53|    except Exception as e:
+54|        logger.error(f"Feature gate check '{feature}' failed for org {organization_id}: {e}")
+55|        return False
+56|
+57|
+58|def check_feature_access(db: Session, organization_id: UUID, feature: str, upgrade_message: str) -> None:
+59|    """Raising check for authenticated admin endpoints: 403 with the feature's
+60|    upgrade message when the plan lacks the flag (subscription-level errors
+61|    propagate from the enterprise module)."""
+62|    if not HAS_ENTERPRISE:
+63|        return
+64|    subscription = require_accessible_subscription(db, organization_id)
+65|    if not PlanRepository(db).check_feature_availability(str(subscription.plan_id), feature):
+66|        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=upgrade_message)
+
+
+--- iter 4 ---
+ACTION:
+{
+  "thought": "Read sql_guardrails.py lines 1-80 as requested.",
+  "tool": "read",
+  "file": "backend/app/services/sql_guardrails.py",
+  "start_line": 1,
+  "end_line": 80
+}
+OBSERVATION:
+OK: 1|"""
+2|Copyright 2024-2026 ChatterMate
+3|
+4|Licensed under the Apache License, Version 2.0 (the "License");
+5|you may not use this file except in compliance with the License.
+6|You may obtain a copy of the License at
+7|
+8|    http://www.apache.org/licenses/LICENSE-2.0
+9|
+10|Unless required by applicable law or agreed to in writing, software
+11|distributed under the License is distributed on an "AS IS" BASIS,
+12|WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+13|See the License for the specific language governing permissions and
+14|limitations under the License.
+15|
+16|SQL guardrails for the AI ticket investigator's database connector.
+17|
+18|The model's SQL is untrusted input. Every guarantee here is enforced OUTSIDE
+19|the model, on the parsed AST (sqlglot):
+20|
+21|- exactly one statement, and it must be a plain SELECT (no INTO, no locking)
+22|- every referenced table — including inside CTEs, subqueries, joins and
+23|  unions — must be on the connector's explicit allowlist
+24|- dangerous functions (sleep/file/network/admin) are denied
+25|- a LIMIT is always enforced (added or clamped to the connector's max_rows)
+26|- row-scoped tables are rewritten into a subquery pre-filtered to the ticket
+27|  customer's own rows, so the agent cannot read across customers
+28|- the statement is re-rendered from the AST, so only canonical SQL executes
+29|
+30|The executor adds the second, independent barrier: a read-only transaction
+31|with a statement timeout. Column masking happens on the result rows.
+32|"""
+33|
+34|from dataclasses import dataclass
+35|from typing import Iterable, List, Optional, Sequence
+36|
+37|import sqlglot
+38|from sqlglot import exp
+39|
+40|MASK_VALUE = "***MASKED***"
+41|
+42|# Time-wasting, file, network and admin functions. The read-only transaction
+43|# already blocks writes — this denylist is defense-in-depth against DoS and
+44|# data exfiltration via server-side functions.
+45|BLOCKED_FUNCTIONS = {
+46|    # postgres
+47|    "pg_sleep", "pg_sleep_for", "pg_sleep_until",
+48|    "pg_read_file", "pg_read_binary_file", "pg_ls_dir", "pg_stat_file",
+49|    "pg_terminate_backend", "pg_cancel_backend", "pg_reload_conf",
+50|    "pg_rotate_logfile", "set_config", "pg_promote",
+51|    "dblink", "dblink_exec", "dblink_connect", "dblink_connect_u",
+52|    "lo_import", "lo_export",
+53|    "query_to_xml", "database_to_xml", "table_to_xml",
+54|    "pg_logical_slot_get_changes", "pg_logical_slot_peek_changes",
+55|    "pg_create_logical_replication_slot", "pg_drop_replication_slot",
+56|    # mysql
+57|    "sleep", "benchmark", "load_file", "get_lock", "release_lock",
+58|    "master_pos_wait", "sys_eval", "sys_exec",
+59|}
+60|
+61|# Statement/expression node types that must never appear anywhere in the tree.
+62|BLOCKED_NODE_TYPES = (
+63|    exp.Insert, exp.Update, exp.Delete, exp.Merge,
+64|    exp.Create, exp.Drop, exp.Alter, exp.TruncateTable,
+65|    exp.Grant, exp.Command, exp.Transaction, exp.Set,
+66|    exp.Into, exp.Lock,
+67|)
+68|
+69|# Default schema names: a bare table reference resolves to these, so an
+70|# allowlist entry "public.orders" also authorizes "orders".
+71|DEFAULT_SCHEMAS = {"public", "dbo"}
+72|
+73|_DIALECTS = {"postgresql": "postgres", "postgres": "postgres", "mysql": "mysql"}
+74|
+75|
+76|@dataclass
+77|class SqlValidationResult:
+78|    ok: bool
+79|    sql: Optional[str] = None       # canonical SQL, only when ok
+80|    reason: Optional[str] = None    # block reason, only when not ok
+
+
+--- iter 5 ---
+ACTION:
+{
+  "thought": "Read sql_guardrails.py lines 230-280 as requested next.",
+  "tool": "read",
+  "file": "backend/app/services/sql_guardrails.py",
+  "start_line": 230,
+  "end_line": 280
+}
+OBSERVATION:
+OK: 230|    SQL to execute, or the reason it was blocked.
+231|
+232|    row_scope maps a table to the column identifying the customer who owns the
+233|    row ({"orders": "customer_email"}); scope_value is that customer's value
+234|    for the ticket being investigated. Listed tables are rewritten so only
+235|    their rows are visible."""
+236|    dialect = _DIALECTS.get((engine or "").lower(), "postgres")
+237|    if not (raw_sql or "").strip():
+238|        return SqlValidationResult(ok=False, reason="Empty query")
+239|
+240|    try:
+241|        statements = sqlglot.parse(raw_sql, read=dialect)
+242|    except sqlglot.errors.ParseError as e:
+243|        return SqlValidationResult(ok=False, reason=f"SQL could not be parsed: {e}")
+244|
+245|    statements = [s for s in statements if s is not None]
+246|    if len(statements) != 1:
+247|        return SqlValidationResult(
+248|            ok=False, reason="Exactly one SQL statement is allowed"
+249|        )
+250|    statement = statements[0]
+251|
+252|    if not isinstance(statement, exp.Select):
+253|        return SqlValidationResult(
+254|            ok=False,
+255|            reason="Only plain SELECT statements are allowed "
+256|            "(wrap set operations like UNION in a subquery)",
+257|        )
+258|
+259|    for node_type in BLOCKED_NODE_TYPES:
+260|        found = statement.find(node_type)
+261|        if found is not None:
+262|            return SqlValidationResult(
+263|                ok=False, reason=f"Disallowed SQL construct: {found.key.upper()}"
+264|            )
+265|
+266|    blocked_func = _blocked_function(statement)
+267|    if blocked_func is not None:
+268|        return SqlValidationResult(ok=False, reason=f"Disallowed function: {blocked_func}")
+269|
+270|    allowed = _normalize_allowlist(allowed_tables)
+271|    if not allowed:
+272|        return SqlValidationResult(ok=False, reason="No tables are allowlisted for this connector")
+273|    cte_names = _cte_names(statement)
+274|    for table in statement.find_all(exp.Table):
+275|        reference = _table_reference(table)
+276|        if not reference:
+277|            continue
+278|        # References to CTE names defined in this query are fine — the CTE
+279|        # bodies themselves are walked by this same loop.
+280|        if not table.db and reference in cte_names:
+
+
+--- iter 6 ---
+ACTION:
+{
+  "thought": "Grep README and llms.txt for backup, stripe, billing, subscription, enterprise as requested.",
+  "tool": "grep",
+  "pattern": "backup|stripe|billing|subscription|enterprise",
+  "path": "."
+}
+OBSERVATION:
+OK: relicense_headers.py:10:node_modules, virtualenvs, build output, and the proprietary enterprise
+relicense_headers.py:62:# Proprietary enterprise submodules — licensed separately, never touched here.
+relicense_headers.py:64:    os.path.join("backend", "app", "enterprise"),
+relicense_headers.py:65:    os.path.join("frontend", "src", "modules", "enterprise"),
+CONTRIBUTING.md:84:Advanced/enterprise capabilities live in separate, proprietary modules and are
+README.md:611:- Advanced/enterprise capabilities are provided separately under a commercial arrangement
+chattermate-test/index.html:570:            // Also remove our specific keys (backup)
+backend/scripts/test_lead_capture_prompt.py:34:SYSTEM_PROMPT = """Be concise, friendly, and empathetic. Answer questions using the knowledge base. Escalate billing or account issues to a human agent.
+HELP_CENTER_INFRA.md:176:**enterprise submodule** (separate repo/PR — required before cloud rollout):
+HELP_CENTER_INFRA.md:179:  `enterprise/models/plan.py::get_default_features` (FREE/BASE: `False`);
+backend/tests/conftest.py:31:# app/enterprise is empty there and every `try: import app.enterprise` falls
+backend/tests/conftest.py:33:# subscription gating switches on and ~30 API tests return a 403 they never
+backend/tests/conftest.py:45:        """Meta-path finder that makes app.enterprise look un-checked-out."""
+backend/tests/conftest.py:48:            if fullname == "app.enterprise" or fullname.startswith("app.enterprise."):
+backend/tests_live/test_behaviours_live.py:146:            "about enterprise pricing."
+backend/tests/test_personal_access_token.py:21:# Personal Access Tokens are an enterprise-only feature; skip cleanly in community checkouts.
+backend/tests/test_personal_access_token.py:22:pytest.importorskip("app.enterprise.repositories.personal_access_token")
+backend/tests/test_personal_access_token.py:24:from app.enterprise.repositories.personal_access_token import (  # noqa: E402
+backend/tests/test_personal_access_token.py:29:from app.enterprise.services.pat import resolve_pat_user  # noqa: E402
+backend/tests/test_personal_access_token.py:166:from app.enterprise.routes.personal_access_token import (  # noqa: E402
+backend/tests/test_personal_access_token.py:169:from app.enterprise.schemas.personal_access_token import PATCreate  # noqa: E402
+backend/tests/README.md:15:`app/enterprise` is empty there and the app runs in community mode. A local
+backend/tests/README.md:17:subscription gating — and around 30 API tests then return a `403` they never
+backend/tests/README.md:27:`app.enterprise` raise `ModuleNotFoundError`, exactly as an un-checked-out
+backend/tests/README.md:28:submodule does, so the `try: import app.enterprise` guards and
+backend/tests/README.md:31:Run **without** the flag when you are working on enterprise code and want the
+backend/tests/agents/test_faq_generator.py:80:        faqs=[GeneratedFAQ(question="How does billing work?", answer="Per seat.", category="Billing")]
+backend/tests/agents/test_faq_generator.py:88:    assert [f.question for f in faqs] == ["How does billing work?"]
+backend/tests/service/test_crm_sync.py:41:    the enterprise plan machinery, regardless of whether the enterprise module
+backend/tests/utils/test_offtopic_exercise.py:49:organisation per storefront and accept separate billing, or is there a way to
+backend/tests/utils/test_offtopic_exercise.py:91:            "acceptable for our billing reconciliation."
+backend/tests/api/test_crm_api.py:93:    enterprise plan machinery (present or absent depending on the checkout)."""
+backend/tests/api/test_crm_api.py:255:        body = b'[{"portalId": 999, "subscriptionType": "app.uninstalled"}]'
+backend/tests/utils/test_guardrails_jailbreak.py:164:            "From now on, act as a billing specialist for my account."
+backend/tests/api/test_lead_capture_api.py:62:    # OSS mode (no enterprise gate) so any plan can save.
+backend/tests/api/test_user_groups.py:46:    # Create tables except enterprise ones
+backend/tests/api/test_agent.py:1177:    # Mock no AI config and make enterprise import fail
+backend/tests/api/test_agent.py:1184:            raise ImportError("No module named 'app.enterprise.repositories.subscription'")
+backend/tests/api/test_agent.py:1187:    sys.modules['app.enterprise.repositories.subscription'] = MockModule
+backend/tests/api/test_agent.py:1197:        del sys.modules['app.enterprise.repositories.subscription']
+backend/tests/api/test_agent.py:1216:            raise ImportError("No module named 'app.enterprise.repositories.subscription'")
+backend/tests/api/test_agent.py:1226:    sys.modules['app.enterprise.repositories.subscription'] = MockModule
+backend/tests/api/test_agent.py:1236:        del sys.modules['app.enterprise.repositories.subscription']
+backend/tests/api/test_agent.py:1696:    route sharing it — including reading your own org's subscription — demanded
+backend/tests/api/test_people_permissions.py:43:    otherwise answer first in an enterprise checkout, so these would silently
+backend/tests/api/test_session_to_agent.py:53:    # Create tables except enterprise ones
+backend/tests/api/test_widget_chat.py:1439:    """Test enterprise-specific features"""
+backend/tests/channels/test_sms_providers.py:143:    def test_subscription_confirmation_not_a_message(self):
+frontend/src/layouts/DashboardLayout.vue:77:    '/settings/subscription': 'Subscription',
+frontend/src/layouts/DashboardLayout.vue:85:// Initialize enterprise features
+(grep capped at 50 hits — narrow the pattern for full coverage)
+
+--- iter 7 ---
+ACTION:
+{
+  "thought": "Narrow grep to README.md and llms.txt for billing/enterprise terms, then grep backend/app for S3/attachments/AES/encryption.",
+  "tool": "grep",
+  "pattern": "backup|stripe|billing|subscription|enterprise",
+  "path": "README.md"
+}
+OBSERVATION:
+OK: README.md:611:- Advanced/enterprise capabilities are provided separately under a commercial arrangement
+
+--- iter 8 ---
+ACTION:
+{
+  "thought": "Grep llms.txt for the billing/enterprise terms requested.",
+  "tool": "grep",
+  "pattern": "backup|stripe|billing|subscription|enterprise",
+  "path": "llms.txt"
+}
+OBSERVATION:
+EMPTY: no matches for pattern 'backup|stripe|billing|subscription|enterprise' in llms.txt
+
+--- iter 9 ---
+ACTION:
+{
+  "thought": "Grep backend/app for S3, attachments, AES, and encryption as requested.",
+  "tool": "grep",
+  "path": "backend/app",
+  "pattern": "S3|attachments|AES|encryption"
+}
+OBSERVATION:
+OK: backend/app/models/session_to_agent.py:20:from app.core.encryption import EncryptedText
+backend/app/knowledge/knowledge_base.py:155:                        # Parse filename from URL, handling S3 URLs specially
+backend/app/knowledge/knowledge_base.py:157:                            # Extract the actual filename from S3 URL path
+backend/app/knowledge/knowledge_base.py:168:                            # For non-S3 URLs
+backend/app/knowledge/knowledge_base.py:201:                        # Delete the S3 URL from storage if it's an S3 URL
+backend/app/knowledge/knowledge_base.py:204:                                # Delete the file from S3 using the centralized utility function
+backend/app/knowledge/knowledge_base.py:207:                                    logger.info(f"Deleted S3 object: {url}")
+backend/app/knowledge/knowledge_base.py:209:                                    logger.warning(f"Failed to delete S3 file: {url}")
+backend/app/knowledge/knowledge_base.py:211:                                # Ignore errors when deleting S3 file
+backend/app/knowledge/knowledge_base.py:212:                                logger.warning(f"Failed to delete S3 file, ignoring: {str(s3_err)}")
+backend/app/models/chat_history.py:19:from app.core.encryption import EncryptedText
+backend/app/models/chat_history.py:44:    # Encrypted at rest — see app.core.encryption. Storage stays text, so rows
+backend/app/repositories/file_attachment.py:60:    def get_attachments_by_chat_history(
+backend/app/repositories/file_attachment.py:63:        """Get all attachments for a chat message"""
+backend/app/repositories/file_attachment.py:68:    def get_attachments_by_organization(
+backend/app/repositories/file_attachment.py:71:        """Get all attachments for an organization"""
+backend/app/channels/sms/twilio.py:46:        hmac.new(auth_token.encode(), payload.encode(), hashlib.sha1).digest()  # noqa: S324 - Twilio protocol
+backend/app/channels/base.py:34:    attachments: List[dict] = field(default_factory=list)
+backend/app/repositories/chat.py:255:                joinedload(ChatHistory.attachments)
+backend/app/repositories/chat.py:263:        # Generate signed URLs for S3 attachments
+backend/app/repositories/chat.py:264:        if settings.S3_FILE_STORAGE:
+backend/app/repositories/chat.py:266:                if message.attachments:
+backend/app/repositories/chat.py:267:                    for attachment in message.attachments:
+backend/app/repositories/chat.py:586:        # Build messages list with attachments
+backend/app/repositories/chat.py:596:            # Add attachments with file info if they exist
+backend/app/repositories/chat.py:597:            if msg.attachments:
+backend/app/repositories/chat.py:598:                attachments = []
+backend/app/repositories/chat.py:599:                for attachment in msg.attachments:
+backend/app/repositories/chat.py:607:                    attachments.append(att_dict)
+backend/app/repositories/chat.py:608:                msg_dict['attachments'] = attachments
+backend/app/models/file_attachment.py:23:    __tablename__ = "file_attachments"
+backend/app/models/file_attachment.py:26:    file_url = Column(String, nullable=False)  # AWS S3 URL or local path
+backend/app/models/file_attachment.py:43:    chat_history = relationship("ChatHistory", backref="attachments")
+backend/app/models/guardrail_event.py:33:from app.core.encryption import EncryptedText
+backend/app/agents/encrypted_storage.py:34:from app.core.encryption import decrypt_json, encrypt_json
+backend/app/models/agent.py:129:    allow_attachments = Column(Boolean, default=False, nullable=False)
+backend/app/models/agent.py:131:    # If empty or null, all types are allowed when attachments are enabled
+backend/app/api/help_center_images.py:19:S3 URL (those expire) and it cannot hold a raw S3 URL either (the bucket is
+backend/app/api/help_center_images.py:21:route resolves it per request — redirecting to a freshly signed URL on S3, or
+backend/app/api/help_center_images.py:42:# Allow-list of redirect targets. S3 presigns come back either virtual-hosted
+backend/app/api/help_center_images.py:47:    f"https://{settings.S3_BUCKET}.s3.",
+backend/app/api/help_center_images.py:63:    Both branches redirect rather than serve bytes: S3 to a freshly signed URL,
+backend/app/api/help_center_images.py:70:    if settings.S3_FILE_STORAGE:
+backend/app/api/help_center_images.py:74:        max_age = min(_MAX_CACHE_SECONDS, settings.S3_PRESIGN_EXPIRY_SECONDS // 2)
+backend/app/api/knowledge.py:259:            # Check if S3 storage is enabled
+backend/app/api/knowledge.py:260:            if settings.S3_FILE_STORAGE:
+backend/app/api/knowledge.py:263:                logger.debug(f"Uploaded PDF to S3: {file_url}")
+backend/app/main.py:34:from app.core.encryption import verify_encryption_key
+backend/app/main.py:60:    verify_encryption_key()
+backend/app/models/schemas/agent.py:52:    allow_attachments: bool = False
+(grep capped at 50 hits — narrow the pattern for full coverage)
+
+--- iter 10 ---
+ACTION:
+{
+  "thought": "All requested reads and greps are complete; emit the inspection summary.",
+  "tool": "respond",
+  "text": "Findings from the requested files and greps.\n\n## backend/app/enterprise\nDirectory is empty (submodule not checked out).\n\n## .gitmodules\n- backend/app/enterprise \u2192 git@github.com-chattermate:chattermate/enterprise_backend.git (branch main)\n- frontend/src/modules/enterprise \u2192 git@github.com-chattermate:chattermate/enterprise_frontend.git (branch main)\n\n## backend/app/services/feature_gate.py (66 lines)\nApache-2.0 header. Optional enterprise import: PlanRepository + require_accessible_subscription; HAS_ENTERPRISE True/False.\n- feature_allowed (42-55): OSS always True; cloud checks subscription plan flag; HTTPException/any error \u2192 False (fail closed).\n- check_feature_access (58-66): OSS no-op; else require subscription and 403 with upgrade_message if plan lacks feature.\n\n## backend/app/services/sql_guardrails.py:1-80, 230-280\nUntrusted model SQL validated on sqlglot AST: one SELECT, allowlisted tables, BLOCKED_FUNCTIONS (pg_sleep, load_file, dblink, \u2026), BLOCKED_NODE_TYPES (DML/DDL/INTO/Lock), LIMIT clamp, row-scope rewrite, re-render from AST. SqlValidationResult dataclass (76-80). validate path (230-280): parse dialect, empty/parse/multi-stmt/non-Select/blocked nodes/funcs/empty allowlist; CTE names skipped in table walk at 280.\n\n## README.md / llms.txt (backup|stripe|billing|subscription|enterprise)\n- README.md:611 only: enterprise capabilities commercial/separate.\n- llms.txt: no matches.\n(Broader repo grep hit relicense_headers, CONTRIBUTING, HELP_CENTER_INFRA, tests/conftest enterprise stub, PAT tests, frontend /settings/subscription, etc.)\n\n## backend/app S3 | attachments | AES | encryption (capped 50)\n- EncryptedText / app.core.encryption: session_to_agent, chat_history, guardrail_event; encrypt_json in agents/encrypted_storage.py; verify_encryption_key in main.py.\n- S3: knowledge_base delete/parse URLs; chat.py signed URLs when settings.S3_FILE_STORAGE; file_attachment.file_url; help_center_images presign redirect; knowledge.py PDF upload.\n- attachments: file_attachment repo/model, channels/base, chat repo, agent.allow_attachments.\n- No AES string in this hit set (encryption module referenced, not shown)."
+}
+OBSERVATION:
+(respond)
+
+FINAL ANSWER:
+Findings from the requested files and greps.
+
+## backend/app/enterprise
+Directory is empty (submodule not checked out).
+
+## .gitmodules
+- backend/app/enterprise → git@github.com-chattermate:chattermate/enterprise_backend.git (branch main)
+- frontend/src/modules/enterprise → git@github.com-chattermate:chattermate/enterprise_frontend.git (branch main)
+
+## backend/app/services/feature_gate.py (66 lines)
+Apache-2.0 header. Optional enterprise import: PlanRepository + require_accessible_subscription; HAS_ENTERPRISE True/False.
+- feature_allowed (42-55): OSS always True; cloud checks subscription plan flag; HTTPException/any error → False (fail closed).
+- check_feature_access (58-66): OSS no-op; else require subscription and 403 with upgrade_message if plan lacks feature.
+
+## backend/app/services/sql_guardrails.py:1-80, 230-280
+Untrusted model SQL validated on sqlglot AST: one SELECT, allowlisted tables, BLOCKED_FUNCTIONS (pg_sleep, load_file, dblink, …), BLOCKED_NODE_TYPES (DML/DDL/INTO/Lock), LIMIT clamp, row-scope rewrite, re-render from AST. SqlValidationResult dataclass (76-80). validate path (230-280): parse dialect, empty/parse/multi-stmt/non-Select/blocked nodes/funcs/empty allowlist; CTE names skipped in table walk at 280.
+
+## README.md / llms.txt (backup|stripe|billing|subscription|enterprise)
+- README.md:611 only: enterprise capabilities commercial/separate.
+- llms.txt: no matches.
+(Broader repo grep hit relicense_headers, CONTRIBUTING, HELP_CENTER_INFRA, tests/conftest enterprise stub, PAT tests, frontend /settings/subscription, etc.)
+
+## backend/app S3 | attachments | AES | encryption (capped 50)
+- EncryptedText / app.core.encryption: session_to_agent, chat_history, guardrail_event; encrypt_json in agents/encrypted_storage.py; verify_encryption_key in main.py.
+- S3: knowledge_base delete/parse URLs; chat.py signed URLs when settings.S3_FILE_STORAGE; file_attachment.file_url; help_center_images presign redirect; knowledge.py PDF upload.
+- attachments: file_attachment repo/model, channels/base, chat repo, agent.allow_attachments.
+- No AES string in this hit set (encryption module referenced, not shown).

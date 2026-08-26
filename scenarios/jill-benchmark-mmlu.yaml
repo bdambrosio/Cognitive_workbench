@@ -31,16 +31,16 @@ characters:
   Jill:
     mode: chat
 
-    # Reasoning arm of the 2026-08-15 A/B. The bench runner builds ChatLoop
+    # Reasoning model of the 2026-08-15 A/B. The bench runner builds ChatLoop
     # directly rather than through launcher.py, so the --reasoning flag
     # cannot reach it; ChatLoop reads this same key off character_config,
     # which is what the flag sets. Sent per request, where it overrides a
     # server started with enable_thinking=false — so the server needs no
-    # restart and the two arms differ in exactly this one field.
+    # restart and the two models differ in exactly this one field.
     # Left OFF by default: a backend without --reasoning-parser (Gemma-4
     # was served without one) would have thinking switched on with nothing
     # to split it out, so it lands in the answer text. Uncomment for the
-    # reasoning arm, against a server that has the parser configured.
+    # reasoning model, against a server that has the parser configured.
     # reasoning_effort: low
 
     llm_config:

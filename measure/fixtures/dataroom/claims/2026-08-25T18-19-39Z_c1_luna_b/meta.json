@@ -1,0 +1,19 @@
+{
+  "world": "c1_luna_b",
+  "arm": "/home/bruce/Downloads/Cognitive_workbench/measure/arms/luna_openai.yaml",
+  "resolved_model": "gpt-5.6-luna",
+  "resolved_temperature": 0.2,
+  "top_p": 0.95,
+  "external_repo": "/home/bruce/Downloads/Cognitive_workbench/measure/fixtures/dataroom/corpus",
+  "exit_reason": "respond",
+  "wall_clock_s": 131.7,
+  "error": null,
+  "declared": true,
+  "count": 88,
+  "leg": 1,
+  "per_document": {
+    "doc1": 86,
+    "doc2": 62,
+    "doc9": 34
+  }
+}

@@ -1,0 +1,219 @@
+================================================================================
+[inspect_external] 2026-08-25T20-59-47Z exit=respond iters=5
+================================================================================
+Query: List the nine documents in the data room, then read doc1, doc2, and doc9 in full with line numbers. Treat only those three as claim sources and enumerate every separately checkable assertion about flowmetrics, grouped by document, without testing any claim yet.
+
+--- iter 1 ---
+ACTION:
+{
+  "thought": "I\u2019m listing the repository root to identify the data-room documents and any top-level guidance before reading the requested files.",
+  "tool": "list"
+}
+OBSERVATION:
+OK: ./
+doc1_seller_listing_description.md	1984 bytes
+doc2_tech_stack_description_as_provided_by_se.md	1310 bytes
+doc3_git_history_summary.md	886 bytes
+doc4_infrastructure_config.md	1126 bytes
+doc5_stripe_export_summary.md	833 bytes
+doc6_crm_export_summary.md	718 bytes
+doc7_customer_contracts_summary.md	1800 bytes
+doc8_external_dependency_list.md	1482 bytes
+doc9_seller_s_technical_claims_verbatim.md	753 bytes
+
+--- iter 2 ---
+ACTION:
+{
+  "thought": "The root listing identifies exactly nine documents; I\u2019ll now read doc1 in full with line numbers as requested.",
+  "tool": "read",
+  "file": "doc1_seller_listing_description.md"
+}
+OBSERVATION:
+OK: 1|# DOCUMENT 1: SELLER LISTING DESCRIPTION
+2|
+3|**FlowMetrics — B2B E-Commerce Analytics Platform**
+4|
+5|**Asking Price:** $480,000 (12x blended MRR)
+6|
+7|**About the Business**
+8|
+9|FlowMetrics is a revenue-positive, recurring-revenue SaaS platform providing real-time analytics and product intelligence to e-commerce sellers. We have built a loyal customer base of 120 active accounts, ranging from independent merchants to mid-market enterprise retailers. Our blended Monthly Recurring Revenue (MRR) stands at $40,000, driven by a mix of high-value enterprise contracts and a broad base of month-to-month subscribers. The business operates with low churn, a scalable technology stack, and minimal operational overhead. This is a turnkey acquisition opportunity for a buyer looking to enter the e-commerce analytics space with proven product-market fit and immediate cash flow.
+10|
+11|**Key Financials**
+12|*   **Blended MRR:** $40,000
+13|*   **Active Customers:** 120
+14|*   **Churn:** Low (stable base of recurring subscribers)
+15|*   **Revenue Model:** Recurring subscription (Monthly & Annual Enterprise)
+16|
+17|**Technical Highlights**
+18|*   **Scalable Architecture:** Built on a modern Rails 7 stack with platform-level redundancy and automatic failover.
+19|*   **Reliability:** 99.9% uptime monitoring and daily automated database backups with 30-day retention.
+20|*   **Security:** Managed SSL, OAuth authentication, and secure payment processing via Stripe.
+21|*   **Code Quality:** Well-documented codebase with comprehensive test coverage across critical paths.
+22|*   **Low Vendor Lock-in:** All third-party integrations are on standard SaaS agreements with no proprietary lock-in.
+23|
+24|**Why FlowMetrics?**
+25|We have built a robust, defensible product that solves a critical pain point for e-commerce sellers: visibility into product performance and pricing dynamics. The technology is proven, the customers are engaged, and the revenue is recurring. We are looking for a strategic partner to take FlowMetrics to the next level.
+
+
+--- iter 3 ---
+ACTION:
+{
+  "thought": "The root contains nine documents, and doc1 has been read in full; I\u2019ll read doc2 in full with line numbers next.",
+  "tool": "read",
+  "file": "doc2_tech_stack_description_as_provided_by_se.md"
+}
+OBSERVATION:
+OK: 1|# DOCUMENT 2: TECH STACK DESCRIPTION (as provided by seller)
+2|
+3|FlowMetrics is built on a standard, modern SaaS stack designed for reliability and ease of maintenance. The core application is a Rails 7 application hosted on Heroku, which provides automatic scaling and failover capabilities at the platform level. This ensures that the application remains available even under varying load conditions, with no manual intervention required for routine operations.
+4|
+5|Data persistence is handled by PostgreSQL, which is configured with daily scheduled backups to ensure data integrity and recoverability. We utilize Redis for session caching to improve response times and user experience. Payment processing is securely handled through Stripe, which supports both credit card transactions and recurring billing. For our product intelligence features, we integrate with a third-party data enrichment API that provides real-time product data, allowing our users to make informed decisions about their inventory and pricing. The entire stack is managed through Heroku’s dashboard, ensuring that deployments, scaling, and monitoring are streamlined and efficient. We consider this a standard SaaS stack with platform-level redundancy, allowing us to focus on product development rather than infrastructure management.
+
+
+--- iter 4 ---
+ACTION:
+{
+  "thought": "Doc1 and doc2 are fully captured; I\u2019ll read doc9 in full with line numbers, then enumerate only the separately checkable FlowMetrics assertions from those three documents.",
+  "tool": "read",
+  "file": "doc9_seller_s_technical_claims_verbatim.md"
+}
+OBSERVATION:
+OK: 1|# DOCUMENT 9: SELLER'S TECHNICAL CLAIMS (VERBATIM)
+2|
+3|As stated in the listing and data room cover letter:
+4|
+5|*   "The system has redundancy and automatic failover through Heroku's platform-level process management."
+6|*   "We monitor uptime at 99.9% and maintain daily automated database backups."
+7|*   "The codebase is well-documented with comprehensive test coverage across all critical paths."
+8|*   "The stack is designed to scale horizontally — adding dynos is a one-click operation in the Heroku dashboard."
+9|*   "All third-party integrations are on standard SaaS agreements with no lock-in."
+10|*   "The database is backed up daily to Heroku's managed storage with 30-day retention."
+11|*   "We use a modern Rails 7 stack with automatic SSL and managed DNS."
+
+
+--- iter 5 ---
+ACTION:
+{
+  "thought": "The requested documents are fully read; I\u2019ll report the nine-document inventory and enumerate only untested, separately checkable assertions from documents 1, 2, and 9.",
+  "tool": "respond",
+  "text": "Nine documents in the data room:\n1. `doc1_seller_listing_description.md`\n2. `doc2_tech_stack_description_as_provided_by_se.md`\n3. `doc3_git_history_summary.md`\n4. `doc4_infrastructure_config.md`\n5. `doc5_stripe_export_summary.md`\n6. `doc6_crm_export_summary.md`\n7. `doc7_customer_contracts_summary.md`\n8. `doc8_external_dependency_list.md`\n9. `doc9_seller_s_technical_claims_verbatim.md`\n\nThe following are claims only from docs 1, 2, and 9; none has been tested.\n\n## Document 1 \u2014 Seller listing description\n\n### Business and financial claims\n1. FlowMetrics is a B2B e-commerce analytics platform (`doc1_seller_listing_description.md:3`).\n2. FlowMetrics is revenue-positive (`doc1_seller_listing_description.md:9`).\n3. FlowMetrics is a recurring-revenue SaaS platform (`doc1_seller_listing_description.md:9`).\n4. The platform provides real-time analytics (`doc1_seller_listing_description.md:9`).\n5. The platform provides product intelligence for e-commerce sellers (`doc1_seller_listing_description.md:9`).\n6. FlowMetrics has 120 active accounts (`doc1_seller_listing_description.md:9`; `doc1_seller_listing_description.md:13`).\n7. The customer base ranges from independent merchants to mid-market enterprise retailers (`doc1_seller_listing_description.md:9`).\n8. FlowMetrics has a blended MRR of $40,000 (`doc1_seller_listing_description.md:9`; `doc1_seller_listing_description.md:13`).\n9. MRR is driven by high-value enterprise contracts (`doc1_seller_listing_description.md:9`).\n10. MRR is also driven by a broad base of month-to-month subscribers (`doc1_seller_listing_description.md:9`).\n11. The business operates with low churn (`doc1_seller_listing_description.md:9`; `doc1_seller_listing_description.md:14`).\n12. The customer base is a stable base of recurring subscribers (`doc1_seller_listing_description.md:14`).\n13. The technology stack is scalable (`doc1_seller_listing_description.md:9`).\n14. The business has minimal operational overhead (`doc1_seller_listing_description.md:9`).\n15. The revenue model is recurring subscription revenue (`doc1_seller_listing_description.md:15`).\n16. The subscription revenue model includes monthly subscriptions (`doc1_seller_listing_description.md:15`).\n17. The subscription revenue model includes annual enterprise subscriptions (`doc1_seller_listing_description.md:15`).\n18. FlowMetrics has built a loyal customer base (`doc1_seller_listing_description.md:9`).\n19. FlowMetrics is a turnkey acquisition opportunity (`doc1_seller_listing_description.md:9`).\n20. FlowMetrics has proven product-market fit (`doc1_seller_listing_description.md:9`).\n21. The business provides immediate cash flow (`doc1_seller_listing_description.md:9`).\n22. FlowMetrics solves a critical pain point for e-commerce sellers (`doc1_seller_listing_description.md:25`).\n23. The product provides visibility into product performance (`doc1_seller_listing_description.md:25`).\n24. The product provides visibility into pricing dynamics (`doc1_seller_listing_description.md:25`).\n25. The product is robust and defensible (`doc1_seller_listing_description.md:25`).\n26. The technology is proven (`doc1_seller_listing_description.md:25`).\n27. Customers are engaged (`doc1_seller_listing_description.md:25`).\n28. Revenue is recurring (`doc1_seller_listing_description.md:25`).\n29. The asking price is $480,000 (`doc1_seller_listing_description.md:5`).\n30. The asking price represents 12x blended MRR (`doc1_seller_listing_description.md:5`).\n\n### Technical and operational claims\n31. FlowMetrics uses a Rails 7 stack (`doc1_seller_listing_description.md:18`).\n32. The architecture has platform-level redundancy (`doc1_seller_listing_description.md:18`).\n33. The architecture has automatic failover (`doc1_seller_listing_description.md:18`).\n34. Uptime is monitored at 99.9% (`doc1_seller_listing_description.md:19`).\n35. The database has daily automated backups (`doc1_seller_listing_description.md:19`).\n36. Database backups have 30-day retention (`doc1_seller_listing_description.md:19`).\n37. FlowMetrics uses managed SSL (`doc1_seller_listing_description.md:20`).\n38. FlowMetrics uses OAuth authentication (`doc1_seller_listing_description.md:20`).\n39. Payment processing is securely handled through Stripe (`doc1_seller_listing_description.md:20`).\n40. The codebase is well-documented (`doc1_seller_listing_description.md:21`).\n41. The codebase has comprehensive test coverage across critical paths (`doc1_seller_listing_description.md:21`).\n42. Third-party integrations use standard SaaS agreements (`doc1_seller_listing_description.md:22`).\n43. Third-party integrations have no proprietary lock-in (`doc1_seller_listing_description.md:22`).\n\n## Document 2 \u2014 Tech stack description as provided by seller\n\n1. FlowMetrics is built on a standard modern SaaS stack (`doc2_tech_stack_description_as_provided_by_se.md:3`).\n2. The stack is designed for reliability (`doc2_tech_stack_description_as_provided_by_se.md:3`).\n3. The stack is designed for ease of maintenance (`doc2_tech_stack_description_as_provided_by_se.md:3`).\n4. The core application is a Rails 7 application (`doc2_tech_stack_description_as_provided_by_se.md:3`).\n5. The application is hosted on Heroku (`doc2_tech_stack_description_as_provided_by_se.md:3`).\n6. Heroku provides automatic scaling (`doc2_tech_stack_description_as_provided_by_se.md:3`).\n7. Heroku provides failover capabilities at the platform level (`doc2_tech_stack_description_as_provided_by_se.md:3`).\n8. The application remains available under varying load conditions (`doc2_tech_stack_description_as_provided_by_se.md:3`).\n9. No manual intervention is required for routine operations (`doc2_tech_stack_description_as_provided_by_se.md:3`).\n10. Data persistence is handled by PostgreSQL (`doc2_tech_stack_description_as_provided_by_se.md:5`).\n11. PostgreSQL is configured with daily scheduled backups (`doc2_tech_stack_description_as_provided_by_se.md:5`).\n12. The backups ensure data integrity (`doc2_tech_stack_description_as_provided_by_se.md:5`).\n13. The backups ensure recoverability (`doc2_tech_stack_description_as_provided_by_se.md:5`).\n14. FlowMetrics uses Redis for session caching (`doc2_tech_stack_description_as_provided_by_se.md:5`).\n15. Redis session caching improves response times (`doc2_tech_stack_description_as_provided_by_se.md:5`).\n16. Redis session caching improves user experience (`doc2_tech_stack_description_as_provided_by_se.md:5`).\n17. Payment processing is securely handled through Stripe (`doc2_tech_stack_description_as_provided_by_se.md:5`).\n18. Stripe supports credit-card transactions (`doc2_tech_stack_description_as_provided_by_se.md:5`).\n19. Stripe supports recurring billing (`doc2_tech_stack_description_as_provided_by_se.md:5`).\n20. FlowMetrics integrates with a third-party data-enrichment API (`doc2_tech_stack_description_as_provided_by_se.md:5`).\n21. The API provides real-time product data (`doc2_tech_stack_description_as_provided_by_se.md:5`).\n22. The product-intelligence features use that product data (`doc2_tech_stack_description_as_provided_by_se.md:5`).\n23. The product data allows users to make informed inventory decisions (`doc2_tech_stack_description_as_provided_by_se.md:5`).\n24. The product data allows users to make informed pricing decisions (`doc2_tech_stack_description_as_provided_by_se.md:5`).\n25. The entire stack is managed through Heroku\u2019s dashboard (`doc2_tech_stack_description_as_provided_by_se.md:5`).\n26. Heroku\u2019s dashboard streamlines deployments (`doc2_tech_stack_description_as_provided_by_se.md:5`).\n27. Heroku\u2019s dashboard streamlines scaling (`doc2_tech_stack_description_as_provided_by_se.md:5`).\n28. Heroku\u2019s dashboard streamlines monitoring (`doc2_tech_stack_description_as_provided_by_se.md:5`).\n29. The stack has platform-level redundancy (`doc2_tech_stack_description_as_provided_by_se.md:5`).\n30. The platform-level redundancy lets the seller focus on product development rather than infrastructure management (`doc2_tech_stack_description_as_provided_by_se.md:5`).\n\n## Document 9 \u2014 Seller\u2019s technical claims verbatim\n\n1. The system has redundancy (`doc9_seller_s_technical_claims_verbatim.md:5`).\n2. The system has automatic failover (`doc9_seller_s_technical_claims_verbatim.md:5`).\n3. Redundancy and failover are provided through Heroku\u2019s platform-level process management (`doc9_seller_s_technical_claims_verbatim.md:5`).\n4. Uptime is monitored at 99.9% (`doc9_seller_s_technical_claims_verbatim.md:6`).\n5. Daily automated database backups are maintained (`doc9_seller_s_technical_claims_verbatim.md:6`).\n6. The codebase is well-documented (`doc9_seller_s_technical_claims_verbatim.md:7`).\n7. The codebase has comprehensive test coverage across all critical paths (`doc9_seller_s_technical_claims_verbatim.md:7`).\n8. The stack is designed to scale horizontally (`doc9_seller_s_technical_claims_verbatim.md:8`).\n9. Adding dynos is a one-click operation in the Heroku dashboard (`doc9_seller_s_technical_claims_verbatim.md:8`).\n10. All third-party integrations are on standard SaaS agreements (`doc9_seller_s_technical_claims_verbatim.md:9`).\n11. Third-party integrations have no lock-in (`doc9_seller_s_technical_claims_verbatim.md:9`).\n12. The database is backed up daily (`doc9_seller_s_technical_claims_verbatim.md:10`).\n13. Database backups are stored in Heroku\u2019s managed storage (`doc9_seller_s_technical_claims_verbatim.md:10`).\n14. Database backups have 30-day retention (`doc9_seller_s_technical_claims_verbatim.md:10`).\n15. FlowMetrics uses a modern Rails 7 stack (`doc9_seller_s_technical_claims_verbatim.md:11`).\n16. FlowMetrics uses automatic SSL (`doc9_seller_s_technical_claims_verbatim.md:11`).\n17. FlowMetrics uses managed DNS (`doc9_seller_s_technical_claims_verbatim.md:11`)."
+}
+OBSERVATION:
+(respond)
+
+FINAL ANSWER:
+Nine documents in the data room:
+1. `doc1_seller_listing_description.md`
+2. `doc2_tech_stack_description_as_provided_by_se.md`
+3. `doc3_git_history_summary.md`
+4. `doc4_infrastructure_config.md`
+5. `doc5_stripe_export_summary.md`
+6. `doc6_crm_export_summary.md`
+7. `doc7_customer_contracts_summary.md`
+8. `doc8_external_dependency_list.md`
+9. `doc9_seller_s_technical_claims_verbatim.md`
+
+The following are claims only from docs 1, 2, and 9; none has been tested.
+
+## Document 1 — Seller listing description
+
+### Business and financial claims
+1. FlowMetrics is a B2B e-commerce analytics platform (`doc1_seller_listing_description.md:3`).
+2. FlowMetrics is revenue-positive (`doc1_seller_listing_description.md:9`).
+3. FlowMetrics is a recurring-revenue SaaS platform (`doc1_seller_listing_description.md:9`).
+4. The platform provides real-time analytics (`doc1_seller_listing_description.md:9`).
+5. The platform provides product intelligence for e-commerce sellers (`doc1_seller_listing_description.md:9`).
+6. FlowMetrics has 120 active accounts (`doc1_seller_listing_description.md:9`; `doc1_seller_listing_description.md:13`).
+7. The customer base ranges from independent merchants to mid-market enterprise retailers (`doc1_seller_listing_description.md:9`).
+8. FlowMetrics has a blended MRR of $40,000 (`doc1_seller_listing_description.md:9`; `doc1_seller_listing_description.md:13`).
+9. MRR is driven by high-value enterprise contracts (`doc1_seller_listing_description.md:9`).
+10. MRR is also driven by a broad base of month-to-month subscribers (`doc1_seller_listing_description.md:9`).
+11. The business operates with low churn (`doc1_seller_listing_description.md:9`; `doc1_seller_listing_description.md:14`).
+12. The customer base is a stable base of recurring subscribers (`doc1_seller_listing_description.md:14`).
+13. The technology stack is scalable (`doc1_seller_listing_description.md:9`).
+14. The business has minimal operational overhead (`doc1_seller_listing_description.md:9`).
+15. The revenue model is recurring subscription revenue (`doc1_seller_listing_description.md:15`).
+16. The subscription revenue model includes monthly subscriptions (`doc1_seller_listing_description.md:15`).
+17. The subscription revenue model includes annual enterprise subscriptions (`doc1_seller_listing_description.md:15`).
+18. FlowMetrics has built a loyal customer base (`doc1_seller_listing_description.md:9`).
+19. FlowMetrics is a turnkey acquisition opportunity (`doc1_seller_listing_description.md:9`).
+20. FlowMetrics has proven product-market fit (`doc1_seller_listing_description.md:9`).
+21. The business provides immediate cash flow (`doc1_seller_listing_description.md:9`).
+22. FlowMetrics solves a critical pain point for e-commerce sellers (`doc1_seller_listing_description.md:25`).
+23. The product provides visibility into product performance (`doc1_seller_listing_description.md:25`).
+24. The product provides visibility into pricing dynamics (`doc1_seller_listing_description.md:25`).
+25. The product is robust and defensible (`doc1_seller_listing_description.md:25`).
+26. The technology is proven (`doc1_seller_listing_description.md:25`).
+27. Customers are engaged (`doc1_seller_listing_description.md:25`).
+28. Revenue is recurring (`doc1_seller_listing_description.md:25`).
+29. The asking price is $480,000 (`doc1_seller_listing_description.md:5`).
+30. The asking price represents 12x blended MRR (`doc1_seller_listing_description.md:5`).
+
+### Technical and operational claims
+31. FlowMetrics uses a Rails 7 stack (`doc1_seller_listing_description.md:18`).
+32. The architecture has platform-level redundancy (`doc1_seller_listing_description.md:18`).
+33. The architecture has automatic failover (`doc1_seller_listing_description.md:18`).
+34. Uptime is monitored at 99.9% (`doc1_seller_listing_description.md:19`).
+35. The database has daily automated backups (`doc1_seller_listing_description.md:19`).
+36. Database backups have 30-day retention (`doc1_seller_listing_description.md:19`).
+37. FlowMetrics uses managed SSL (`doc1_seller_listing_description.md:20`).
+38. FlowMetrics uses OAuth authentication (`doc1_seller_listing_description.md:20`).
+39. Payment processing is securely handled through Stripe (`doc1_seller_listing_description.md:20`).
+40. The codebase is well-documented (`doc1_seller_listing_description.md:21`).
+41. The codebase has comprehensive test coverage across critical paths (`doc1_seller_listing_description.md:21`).
+42. Third-party integrations use standard SaaS agreements (`doc1_seller_listing_description.md:22`).
+43. Third-party integrations have no proprietary lock-in (`doc1_seller_listing_description.md:22`).
+
+## Document 2 — Tech stack description as provided by seller
+
+1. FlowMetrics is built on a standard modern SaaS stack (`doc2_tech_stack_description_as_provided_by_se.md:3`).
+2. The stack is designed for reliability (`doc2_tech_stack_description_as_provided_by_se.md:3`).
+3. The stack is designed for ease of maintenance (`doc2_tech_stack_description_as_provided_by_se.md:3`).
+4. The core application is a Rails 7 application (`doc2_tech_stack_description_as_provided_by_se.md:3`).
+5. The application is hosted on Heroku (`doc2_tech_stack_description_as_provided_by_se.md:3`).
+6. Heroku provides automatic scaling (`doc2_tech_stack_description_as_provided_by_se.md:3`).
+7. Heroku provides failover capabilities at the platform level (`doc2_tech_stack_description_as_provided_by_se.md:3`).
+8. The application remains available under varying load conditions (`doc2_tech_stack_description_as_provided_by_se.md:3`).
+9. No manual intervention is required for routine operations (`doc2_tech_stack_description_as_provided_by_se.md:3`).
+10. Data persistence is handled by PostgreSQL (`doc2_tech_stack_description_as_provided_by_se.md:5`).
+11. PostgreSQL is configured with daily scheduled backups (`doc2_tech_stack_description_as_provided_by_se.md:5`).
+12. The backups ensure data integrity (`doc2_tech_stack_description_as_provided_by_se.md:5`).
+13. The backups ensure recoverability (`doc2_tech_stack_description_as_provided_by_se.md:5`).
+14. FlowMetrics uses Redis for session caching (`doc2_tech_stack_description_as_provided_by_se.md:5`).
+15. Redis session caching improves response times (`doc2_tech_stack_description_as_provided_by_se.md:5`).
+16. Redis session caching improves user experience (`doc2_tech_stack_description_as_provided_by_se.md:5`).
+17. Payment processing is securely handled through Stripe (`doc2_tech_stack_description_as_provided_by_se.md:5`).
+18. Stripe supports credit-card transactions (`doc2_tech_stack_description_as_provided_by_se.md:5`).
+19. Stripe supports recurring billing (`doc2_tech_stack_description_as_provided_by_se.md:5`).
+20. FlowMetrics integrates with a third-party data-enrichment API (`doc2_tech_stack_description_as_provided_by_se.md:5`).
+21. The API provides real-time product data (`doc2_tech_stack_description_as_provided_by_se.md:5`).
+22. The product-intelligence features use that product data (`doc2_tech_stack_description_as_provided_by_se.md:5`).
+23. The product data allows users to make informed inventory decisions (`doc2_tech_stack_description_as_provided_by_se.md:5`).
+24. The product data allows users to make informed pricing decisions (`doc2_tech_stack_description_as_provided_by_se.md:5`).
+25. The entire stack is managed through Heroku’s dashboard (`doc2_tech_stack_description_as_provided_by_se.md:5`).
+26. Heroku’s dashboard streamlines deployments (`doc2_tech_stack_description_as_provided_by_se.md:5`).
+27. Heroku’s dashboard streamlines scaling (`doc2_tech_stack_description_as_provided_by_se.md:5`).
+28. Heroku’s dashboard streamlines monitoring (`doc2_tech_stack_description_as_provided_by_se.md:5`).
+29. The stack has platform-level redundancy (`doc2_tech_stack_description_as_provided_by_se.md:5`).
+30. The platform-level redundancy lets the seller focus on product development rather than infrastructure management (`doc2_tech_stack_description_as_provided_by_se.md:5`).
+
+## Document 9 — Seller’s technical claims verbatim
+
+1. The system has redundancy (`doc9_seller_s_technical_claims_verbatim.md:5`).
+2. The system has automatic failover (`doc9_seller_s_technical_claims_verbatim.md:5`).
+3. Redundancy and failover are provided through Heroku’s platform-level process management (`doc9_seller_s_technical_claims_verbatim.md:5`).
+4. Uptime is monitored at 99.9% (`doc9_seller_s_technical_claims_verbatim.md:6`).
+5. Daily automated database backups are maintained (`doc9_seller_s_technical_claims_verbatim.md:6`).
+6. The codebase is well-documented (`doc9_seller_s_technical_claims_verbatim.md:7`).
+7. The codebase has comprehensive test coverage across all critical paths (`doc9_seller_s_technical_claims_verbatim.md:7`).
+8. The stack is designed to scale horizontally (`doc9_seller_s_technical_claims_verbatim.md:8`).
+9. Adding dynos is a one-click operation in the Heroku dashboard (`doc9_seller_s_technical_claims_verbatim.md:8`).
+10. All third-party integrations are on standard SaaS agreements (`doc9_seller_s_technical_claims_verbatim.md:9`).
+11. Third-party integrations have no lock-in (`doc9_seller_s_technical_claims_verbatim.md:9`).
+12. The database is backed up daily (`doc9_seller_s_technical_claims_verbatim.md:10`).
+13. Database backups are stored in Heroku’s managed storage (`doc9_seller_s_technical_claims_verbatim.md:10`).
+14. Database backups have 30-day retention (`doc9_seller_s_technical_claims_verbatim.md:10`).
+15. FlowMetrics uses a modern Rails 7 stack (`doc9_seller_s_technical_claims_verbatim.md:11`).
+16. FlowMetrics uses automatic SSL (`doc9_seller_s_technical_claims_verbatim.md:11`).
+17. FlowMetrics uses managed DNS (`doc9_seller_s_technical_claims_verbatim.md:11`).

@@ -1,6 +1,6 @@
-"""Every arm and scenario must name a model with a configured temperature.
+"""Every model and scenario must name a model with a configured temperature.
 
-This is the guard that catches the failure of 2026-08-24: an arm added without
+This is the guard that catches the failure of 2026-08-24: an model added without
 a sampling setting, silently inheriting a default nobody chose. Runs offline —
 no GPU, no network, no API key.
 """
@@ -23,7 +23,7 @@ from chat.model_params import (  # noqa: E402
 
 
 def _arms():
-    return sorted(glob.glob(os.path.join(REPO, "measure", "arms", "*.yaml")))
+    return sorted(glob.glob(os.path.join(REPO, "measure", "models", "*.yaml")))
 
 
 def _scenario_models():
@@ -53,9 +53,9 @@ def test_top_p_is_the_house_value():
 
 @pytest.mark.parametrize("path", _arms(), ids=os.path.basename)
 def test_every_arm_resolves(path):
-    """An arm names a model with a temperature, or declares expects_served_model.
+    """An model names a model with a temperature, or declares expects_served_model.
 
-    A local arm legitimately says model:"" — it takes whatever is served — but
+    A local model legitimately says model:"" — it takes whatever is served — but
     it must then declare what it expects, so the row can name its own backend
     and the served id can be checked against the table.
     """

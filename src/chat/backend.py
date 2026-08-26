@@ -27,7 +27,7 @@ logger = logging.getLogger('chat_loop')
 # generation, not generation alone: a turn fans out into reflection, claim
 # grading and concern triage against the same server, and a call sitting
 # behind four others spends that time on the socket. Measured 2026-08-21 on
-# the local arm — 9k prompt tokens returned in 9.2s idle, while a 19-token
+# the local model — 9k prompt tokens returned in 9.2s idle, while a 19-token
 # prompt took 20.6s mid-turn. At 120s the queued call died and the turn came
 # back as a degraded reply, twice in two runs.
 _HTTP_TIMEOUT_S = 300
@@ -71,7 +71,7 @@ class _ChatBackend:
         # OpenRouter's `provider` routing being the case that forced it. Four
         # providers serve nemotron-3-ultra at three different quantizations
         # (fp4/fp8/unknown) and one of them does not support response_format,
-        # so an unpinned arm is four arms wearing one name, and 96e03f54 is
+        # so an unpinned model is four models wearing one name, and 96e03f54 is
         # what a missing response_format costs. Anthropic and legacy-cloud
         # routes ignore this.
         self.extra_body = dict(extra_body or {})
@@ -148,7 +148,7 @@ class _ChatBackend:
         # the server did not say, so stop asking.
         self._server_max_model_len: Optional[int] = None
         # Resolved model identity and its temperature, both lazy. For a
-        # cloud arm the identity IS self.model; for a local one declaring
+        # cloud model the identity IS self.model; for a local one declaring
         # model:"" it is whatever /v1/models reports, so it cannot be known
         # until the server is reachable. Resolved on the first chat() call
         # and cached — late enough not to make construction depend on a
@@ -225,7 +225,7 @@ class _ChatBackend:
     def resolved_model(self) -> str:
         """The model actually answering, not the one the config wrote down.
 
-        A local arm declares model:"" and takes whatever is served, so its
+        A local model declares model:"" and takes whatever is served, so its
         identity has to be read off /v1/models. Recording the config value
         instead is how a Qwen row gets labelled Gemma.
         """
@@ -393,7 +393,7 @@ class _ChatBackend:
              max_tokens: int = 600,
              # None means "the model's configured temperature", which is the
              # only correct default. The old literal 0.7 here was inherited
-             # by every scenario and every arm, silently, and cost a whole
+             # by every scenario and every model, silently, and cost a whole
              # campaign. An explicit value is still honoured — run.py's
              # --temperature is a real experimental knob — but it is now a
              # decision someone made rather than one nobody made.

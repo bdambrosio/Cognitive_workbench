@@ -42,10 +42,10 @@ logger = logging.getLogger('chat_loop')
 # concerns without introducing room for runaway loops to wander.
 #
 # 12→16 on 2026-08-23. The dataroom fixture is the first task that reaches
-# the cap as a matter of course rather than by wandering: an arm read the
+# the cap as a matter of course rather than by wandering: an model read the
 # method, listed a 9-document corpus and read the documents one per call,
 # and hit 12 at the exact iteration ingestion finished — sound work, no
-# repeats, no budget left to do the job it had just prepared for. Arms that
+# repeats, no budget left to do the job it had just prepared for. Models that
 # batch reads (3 docs per call) finish comfortably, so the cap was
 # selecting for batching rather than for reasoning.
 #
@@ -278,7 +278,7 @@ class ReactMixin:
         # rule — so an instruction reading "use the §5 finding format, the §6
         # verdict vocabulary and the §9 taxonomy" is four dangling pointers,
         # and the sub-model invents plausible formats instead. Observed
-        # 2026-08-24: one arm wrote exactly that instruction; another
+        # 2026-08-24: one model wrote exactly that instruction; another
         # compensated by inlining ~3,000 characters of contract into every
         # call, which is the correct workaround and an expensive one.
         #
@@ -352,7 +352,7 @@ class ReactMixin:
         if not text:
             return 'EMPTY: process_text produced no output'
 
-        # NO-OP DETECTION. Observed 2026-08-24: an arm issued the same removal
+        # NO-OP DETECTION. Observed 2026-08-24: an model issued the same removal
         # instruction ten times against a document process_text kept handing
         # back byte-identical, burning ten of sixteen iterations and finishing
         # one short of the cap. Every call answered `OK:` followed by the whole
@@ -439,13 +439,13 @@ class ReactMixin:
         # content ran straight into this trailer separated by one newline.
         # Harmless for a short observation; not harmless for a long one.
         #
-        # Observed 2026-08-24: an arm processing an 8,000-character report
+        # Observed 2026-08-24: an model processing an 8,000-character report
         # read "Emit next action:" as the document's final line and spent ten
         # of sixteen iterations instructing process_text to delete it. The
         # string appears zero times in the delivered report and ten times in
         # the trace — every one inside an instruction asking for its removal.
         # process_text correctly returned the text unchanged each time, which
-        # the arm read as the edit failing.
+        # the model read as the edit failing.
         #
         # A closing header, mirroring the opening one, is the whole fix. It
         # preserves the store-and-append discipline above (appended once, at

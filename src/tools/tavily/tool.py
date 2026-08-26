@@ -2,7 +2,7 @@
 Web search returning the sources' own text (Tavily /search).
 
 The complement to `search-web`: that tool hands the agent one model's
-synthesis and keeps the documents at arm's length; this one hands over
+synthesis and keeps the documents at model's length; this one hands over
 ranked pages with their own words attached, so a claim built on the
 result rests on a document rather than on a summary of one. That is why
 `tavily` is listed in claims._DIRECT_OBSERVATION_TOOLS and `search-web`

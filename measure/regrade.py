@@ -8,7 +8,7 @@
 
 WHY THIS EXISTS. The live grader calls `self.backend.chat`, so the backend
 under test grades its own output. Grounding numbers are therefore not
-comparable across arms — the measuring instrument changes with the thing
+comparable across models — the measuring instrument changes with the thing
 measured, which is the one confound a comparison bench exists to remove.
 
 WHY IT IS A SEPARATE PASS, not a change to the live path. Production
@@ -48,7 +48,7 @@ OUT_DIR = REPO / "measure" / "regraded"
 
 # THE PINNED INSTRUMENT. Changing any of this invalidates comparison with
 # every number already produced — it is the instrument, not a parameter.
-# Matches the cloud arm in scenarios/coord_search_luna.yaml.
+# Matches the cloud model in scenarios/coord_search_luna.yaml.
 GRADER = {
     "server": "local",          # _ChatBackend route 2: api_key set -> bearer
     "model": "gpt-5.6-terra",

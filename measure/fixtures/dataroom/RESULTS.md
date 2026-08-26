@@ -5,7 +5,7 @@ discarded, deliberately — see "Why every earlier run was discarded".
 
 ## Scored runs — campaign m1, 2026-08-25
 
-Nine runs, three per arm, interleaved by round. Instrument frozen at
+Nine runs, three per model, interleaved by round. Instrument frozen at
 `bc4ae148` (METHOD.md, run.py, audit.yaml); scorer at `3b1d6e07`. Every run
 completed with `error=None`. No retries were needed.
 
@@ -25,20 +25,20 @@ completed with `error=None`. No retries were needed.
 
 ### The threshold does discriminate. Yesterday's saturation was an n=1 artifact
 
-On 2026-08-24 all three arms passed all eight criteria once each, and this file
+On 2026-08-24 all three models passed all eight criteria once each, and this file
 recorded that the threshold had stopped discriminating. At n=3 it separates the
-arms cleanly. One run per arm was not enough to see it, which is the reason the
+models cleanly. One run per model was not enough to see it, which is the reason the
 scorer prints "n=1 is anecdote" after every run.
 
 ### Every failure is the claim surface, and the marker is simply absent
 
 All three FAILs are the same criterion, and no other criterion failed more than
 once across nine runs. In all three the marker appears **nowhere** in the trace
-— not truncated, not echoed from a tool, not present without a count. The arm
+— not truncated, not echoed from a tool, not present without a count. The model
 did not enumerate.
 
 **Both of qwen's failures are single-leg runs**, and its one two-leg run closed
-the surface. An arm that compresses the whole engagement into one turn appears
+the surface. An model that compresses the whole engagement into one turn appears
 to skip enumeration and go straight to verification. Two observations is not a
 finding, and luna 2 is a counterexample at three legs, so leg count is not the
 whole mechanism.
@@ -50,12 +50,12 @@ place in the threshold.
 ### What replicated
 
 - **luna's subagent no-answer rate: 19%, 31%, 20%.** Predicted 25-36%. Real,
-  arm-specific, and slightly below the band. Both other arms are 0% across all
+  model-specific, and slightly below the band. Both other models are 0% across all
   six of their runs.
 - **grok's stability.** Tier 2 2/2 on all three runs, claim surface 31/32/34,
-  zero subagent failures, threshold PASS every time. No other arm is stable on
+  zero subagent failures, threshold PASS every time. No other model is stable on
   any of those axes.
-- **Report thickness tracks the arm.** luna 8, 11, 8 findings with 3-4 distinct
+- **Report thickness tracks the model.** luna 8, 11, 8 findings with 3-4 distinct
   verdicts; grok 12-16 with 6-7; qwen 15-29 with 3-6.
 - **Placement is saturated.** Eight of nine runs lead with P2, the key's
   top-ranked finding. This column no longer discriminates and should be
@@ -116,7 +116,7 @@ replaced it. The next one runs on a frozen instrument or it will discard too.
 returned None for anything else. Hand-checked against all 19 reports in the
 campaign: **every one stated a valid §9 term**, and the check missed four —
 every `—` that was ever in the column. It had never once discriminated
-between arms; it only ever reported label formatting.
+between models; it only ever reported label formatting.
 
 Those reports are deleted. The fix is not evidence about models, it is a
 repair to the instrument, and it is covered by unit tests that do not depend
@@ -181,7 +181,7 @@ where a sentence in §16 costs nothing and says what was always meant.
 §16 now carries that sentence, which changes the instrument — every run from
 here is on the post-2026-08-24 method.
 
-## Pick arms by output tokens per call, not parameter count
+## Pick models by output tokens per call, not parameter count
 
 Kept as a selection rule; the model that produced it is dropped.
 
@@ -190,7 +190,7 @@ against a 6k-character prompt, where DeepSeek used 18. At ~21 tok/s that is
 140 seconds per call, and this architecture makes 35-187 calls per audit.
 Neither throttling nor cache — both were tested. **A model that cannot answer
 briefly cannot be used in a call-heavy agent, whatever its parameter count.**
-Measure tokens-per-call on a trivial prompt before committing an arm to a
+Measure tokens-per-call on a trivial prompt before committing an model to a
 campaign; it costs one call and it is the cheapest disqualifier available.
 
 ## The threshold, and why it is the number that matters
@@ -266,8 +266,8 @@ finished.
 | change | effect |
 |---|---|
 | method in the static prompt | §3-§16 reach the agent at all; before, the surviving fragment ended mid-sentence in §2 |
-| iteration cap 12 -> 16 | an arm reading one document per call can finish ingesting and still have budget to work |
-| `inspect` geofenced to `audit/` | the answer key and prior arms' reports are out of reach |
+| iteration cap 12 -> 16 | an model reading one document per call can finish ingesting and still have budget to work |
+| `inspect` geofenced to `audit/` | the answer key and prior models' reports are out of reach |
 | empty-answer sentinel fixed | a subagent returning nothing says so, instead of reporting `OK` |
 | Gap Map marker as the stopping rule | a turn that stops with a stated plan is no longer scored as a finished audit |
 | engagement ledger on each `continue` | legs, minutes and documents-opened are carried by the runner |
@@ -278,7 +278,7 @@ git history if a specific claim ever needs checking.
 
 ## Campaign m1 is closed. A new stage starts here — 2026-08-25
 
-**The base campaign is done.** Nine runs, three arms, one frozen instrument.
+**The base campaign is done.** Nine runs, three models, one frozen instrument.
 grok 3/3 PASS, qwen 1/3, luna 2/3, and the working judgement is that grok
 clears the first gate for production use and the other two do not. Two full
 audits against real targets — ChatterMate and Body — completed cleanly on the
@@ -294,7 +294,7 @@ none of them is "one more run of the same thing":
    holding unprompted. Three untested: retrieval of a claim that held and never
    reached the report, being argued out of a finding, and behaviour on a run
    that never closed its claim surface.
-2. **New arms and new fixtures.** Other models against this data room, and new
+2. **New models and new fixtures.** Other models against this data room, and new
    client data rooms against this method.
 3. **New methods.** The audit is one workflow. `audit.yaml` binds a method file
    through `workflow:`, so a second workflow is a second method document and a
@@ -331,7 +331,7 @@ What it touches:
 - **`score.py:split_deliverables`** becomes unnecessary for runs made after the
   change, and must keep working for the ones already on disk.
 - **The runner should stop judging completeness.** `GAP_MARK not in reply` is
-  there because "done is a deliverable, not an exit reason" — an arm once wrote
+  there because "done is a deliverable, not an exit reason" — an model once wrote
   "I will now begin working the priority order", ended the turn, and scored as
   complete. That check belongs in the scorer, which already has the criteria: a
   241-word report with zero findings fails `_FINDING_RE`, fails Tier 1, fails
@@ -340,7 +340,7 @@ What it touches:
   `backend.last_finish_reason` — and needs no sentinel in the text, though note
   `backend.py:456` leaves it None on the legacy cloud route.
 
-**Keep `=== GAP MAP ===` as a fallback rather than deleting it.** An arm will
+**Keep `=== GAP MAP ===` as a fallback rather than deleting it.** An model will
 sometimes produce both documents in one leg regardless of instruction, and a
 run that does should be salvageable rather than lost.
 
@@ -374,9 +374,9 @@ detecting compliance with a string, test the thing itself.
 
 **Write the test against §15's shape, not §16's.** A first attempt at this
 check reported nine of twenty-five Gap Maps as missing the recommendation. All
-nine were one arm, and all nine were wrong: `recommendation_of` requires the
+nine were one model, and all nine were wrong: `recommendation_of` requires the
 term to open the document, because §16 puts the recommendation first in a
-REPORT. §15 puts target identity first, so that arm's recommendation sits on
+REPORT. §15 puts target identity first, so that model's recommendation sits on
 line 2 and the report-shaped locator could not see it. The measurement was
 worse than the thing it measured. A Gap Map check needs its own locator.
 
@@ -439,20 +439,20 @@ assumption going into it.
   inside a full audit. Enumeration is drawn coarser when 118 claims then have
   to be verified. Do not quote claims-only counts as engagement denominators.
 - **74 dropped quotes across nine runs** on the claim-attribution verbatim
-  check — 20 in one run. Designed degradation, never examined. Either arms
+  check — 20 in one run. Designed degradation, never examined. Either models
   paraphrase evidence heavily or the check is too strict after normalising.
 
 ## The claim surface: named by the engagement, not inferred
 
-**The problem.** Three arms given the same nine documents enumerated 62, 67 and
+**The problem.** Three models given the same nine documents enumerated 62, 67 and
 273 claims. Every coverage figure in a report divides by that number.
 
 **Two attempts to fix it by defining a claim more precisely both failed.**
 "One claim is one assertion that can take exactly one §6 verdict" widened the
-spread to 44, 21 and 321 — "one assertion" has no fixed size, and two arms read
+spread to 44, 21 and 321 — "one assertion" has no fixed size, and two models read
 it at different scales without either misreading it. A second, procedural
-version produced 66 and 108 and left the third arm unable to close the surface
-at all: it was longer, and the arm relayed the instruction text into a subagent
+version produced 66 and 108 and left the third model unable to close the surface
+at all: it was longer, and the model relayed the instruction text into a subagent
 query instead of executing it.
 
 **What worked.** §2 defines a claim as an assertion the seller makes to the
@@ -484,14 +484,14 @@ general result.
 
 `claims.py` enumerates and stops — one leg, no verification, about a fifth of a
 scored run. `overlap.py` compares two surfaces by what they cited, because two
-arms both reporting 28 claims may have enumerated two different sets of 28.
+models both reporting 28 claims may have enumerated two different sets of 28.
 
 ## The scorer read a tool's output as the auditor's closure
 
-An arm reported 28 findings against a 14-claim surface. That is impossible, and
-the 14 was the scorer's number rather than the arm's. It came from a
+An model reported 28 findings against a 14-claim surface. That is impossible, and
+the 14 was the scorer's number rather than the model's. It came from a
 `process_text` call whose observation arrived truncated at the 1000-char trace
-cap, announcing 14 while listing 18. The arm said so in its next thought — "the
+cap, announcing 14 while listing 18. The model said so in its next thought — "the
 output is unreliable... it says 14 claims but lists 18" — discarded it,
 re-enumerated, and closed at 32 in its own words. `claim_surface` took the
 first marker with a count and recorded the one the agent had rejected.
@@ -501,7 +501,7 @@ stored record is re-injected in full into the next few turns' prompts, so the
 cap bounds prompt text as well as trace size. Raising it changes what every
 model reads on every later turn.
 
-**Excluding tool output was tried first and was wrong.** An arm may close the
+**Excluding tool output was tried first and was wrong.** An model may close the
 surface through a tool — delegate the enumeration and adopt the result — and
 that is a real closure. Across the 15 runs on disk, excluding observations
 turned three legitimate tool-delegated closures into no count at all, which
@@ -546,14 +546,14 @@ same 33 an independent enumeration-only run produced.
 
 ## Open
 
-- **One arm's enumeration varies run to run.** qwen has closed the same three
+- **One model's enumeration varies run to run.** qwen has closed the same three
   documents at 70 and at 32. grok gave 33 twice; luna 88 and 86. Not
   understood.
 - **ChatterMate agreement is 0.41.** Whether that is the target's size, its
-  prose style, or the arms, is untested. Two more arms on ChatterMate would
+  prose style, or the models, is untested. Two more models on ChatterMate would
   say.
 - **`score.py` checks the §9 taxonomy was used, never that coverage supports
-  it.** An arm verifying 15 of 273 claims and returning "Material" scores the
+  it.** An model verifying 15 of 273 claims and returning "Material" scores the
   same as one verifying 45. §1a forbids the conclusion without the coverage;
   nothing enforces it.
 
@@ -563,7 +563,7 @@ same 33 an independent enumeration-only run produced.
 pass, zero runs on the board. Everything below is measurement, not more
 instrument work.
 
-### Tomorrow: three runs per arm
+### Tomorrow: three runs per model
 
 ```bash
 R=~/Downloads/Cognitive_workbench
@@ -572,11 +572,11 @@ eval "$(grep -m1 '^export OPENAI_API_KEY=' ~/.bashrc)"; export OPENAI_API_KEY
 for i in 1 2 3; do for a in grok:grok_4p6 qwen:qwen_local luna:luna_openai; do
   n=${a%%:*}; f=${a##*:}
   python3 $R/measure/fixtures/dataroom/run.py --world m1_${n}_$i \
-          --arm $R/measure/arms/${f}.yaml
+          --model $R/measure/models/${f}.yaml
 done; done
 ```
 
-Interleave by round, not blocked by arm, so a mid-campaign disturbance hits
+Interleave by round, not blocked by model, so a mid-campaign disturbance hits
 all three equally. Nine runs, roughly 90 minutes on last night's timings
 (grok ~440s, qwen ~650s, luna ~950s). Then
 `score.py --world <w>` per run; the grader costs one call each.
@@ -597,7 +597,7 @@ vector and **not** gated.
 ### What to expect, so a surprise is legible
 
 - **Luna's subagent no-answer rate.** 36% before the harness fixes, 25% after,
-  against 0% for both other arms. The only arm-specific effect that has
+  against 0% for both other models. The only model-specific effect that has
   replicated across two instruments. If it vanishes, suspect the instrument.
 - **grok's derived-finding recall** was 2/2 in three consecutive runs on the
   old instrument. Untested since.
@@ -613,7 +613,7 @@ vector and **not** gated.
   threshold, not Tier 3.**
 - The fixture and `answer_key.md` still share a lineage. METHOD now has an
   external reference (`audit/METHOD-gap-analysis.md`); the key does not.
-- Saturation: all arms cleared every criterion before the three new ones
+- Saturation: all models cleared every criterion before the three new ones
   landed. If all nine pass tomorrow, the threshold has stopped discriminating
   and the vector is the only signal left.
 - DeepSeek, both Nemotrons and gemma-4-31B are in the settings table and have
@@ -626,7 +626,7 @@ The runs behind this are deleted; the observations are kept because they are
 what the fixes were aimed at, and a fix nobody stated a prediction for cannot
 be shown to have worked. **Predictions, written before the re-run.**
 
-Pre-change behaviour, one run per arm, all at the corrected per-model
+Pre-change behaviour, one run per model, all at the corrected per-model
 temperatures:
 
 | | legs | iters | `process_text` | `inspect_external` | words |
@@ -659,7 +659,7 @@ citation rule. Four pointers to a document the sub-call had never seen.
 > unchanged — which would mean the sub-model was already guessing the format
 > correctly and the references never mattered.
 
-**3. Contract inlining (same fix, opposite arm).** Luna compensated correctly
+**3. Contract inlining (same fix, opposite model).** Luna compensated correctly
 for the same gap by pasting ~3,000 characters of taxonomy and finding
 structure into every composition instruction.
 
@@ -667,8 +667,8 @@ structure into every composition instruction.
 > because the contract is now in the sub-call's context. **This is the cheap
 > falsifiable one** — instruction length is mechanical to measure.
 
-**A caution against reading these as model comparisons.** n=1 per arm, and
-the three arms differ in temperature by design. What is being tested is
+**A caution against reading these as model comparisons.** n=1 per model, and
+the three models differ in temperature by design. What is being tested is
 whether two harness defects stopped happening, not which model is better.
 
 ## Subagent contract compliance — counted, not repaired
@@ -681,9 +681,9 @@ answer in `text`. A call that returns nothing has failed it. The parent sees
 only `EMPTY:`, retries narrower, and the cost lands in the iteration count
 where nothing distinguishes it from thorough work.
 
-First measurement, one run per arm:
+First measurement, one run per model:
 
-| arm | `inspect_external` calls | returned NO answer | exits |
+| model | `inspect_external` calls | returned NO answer | exits |
 |---|---|---|---|
 | grok-4.6 | 9 | **0 (0%)** | respond 8, **llm_error 1** |
 | Qwen3.8-27B | 7 | **0 (0%)** | respond 7 |
@@ -749,7 +749,7 @@ Report Tier 3 as an indicator, never as a score.
 
 ## Runs deleted 2026-08-24, and what they showed
 
-Seven runs (three arms) deleted when METHOD.md changed — §8's working recap
+Seven runs (three models) deleted when METHOD.md changed — §8's working recap
 and §12's delta-confirmation removed as unperformable, `[real, with a
 structural note]` removed as unused, and `run.py`'s brief corrected where it
 still instructed both removed procedures. Everything they measured is
@@ -757,7 +757,7 @@ downstream of that.
 
 Kept because they are the only observations of these behaviours:
 
-| arm | n | threshold | Tier 2 | subagent no-answer | words |
+| model | n | threshold | Tier 2 | subagent no-answer | words |
 |---|---|---|---|---|---|
 | grok-4.6 | 3 | **3/3 PASS** | **2/2 every run** | 0 of 22 | 928-1,194 |
 | Qwen3.8-27B | 3 | 1/3 PASS | 2/2 once, 1/2 twice | 0 of 24 | 1,804-2,851 |
@@ -843,8 +843,8 @@ Two observations outlive the discard because they are about behaviour rather
 than scores. Both deserve a probe of their own rather than being folded into
 this fixture:
 
-- An arm ended a turn with a stated-but-unexecuted plan — "I will now begin
+- An model ended a turn with a stated-but-unexecuted plan — "I will now begin
   working the priority order" — which its own character block forbids.
-- An arm received the budget nudge at iteration 10 of 12 (`react.py:418`:
+- An model received the budget nudge at iteration 10 of 12 (`react.py:418`:
   *do NOT start anything new, emit `yield` NOW*) and then started new work
   three more times.

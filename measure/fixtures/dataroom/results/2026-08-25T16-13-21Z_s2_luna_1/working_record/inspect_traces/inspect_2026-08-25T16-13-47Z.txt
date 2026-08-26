@@ -1,0 +1,483 @@
+================================================================================
+[inspect] 2026-08-25T16-13-47Z exit=respond iters=6
+================================================================================
+Query: Read METHOD.md at the repository root and return its exact audit sequence, claim-count rule, and required deliverable format.
+
+--- iter 1 ---
+ACTION:
+{
+  "thought": "I will read the repository-root METHOD.md to extract the exact audit sequence, claim-count rule, and deliverable format.",
+  "tool": "read",
+  "file": "METHOD.md"
+}
+OBSERVATION:
+OK: 1|# AI-Readiness Audit — method
+2|
+3|Drafted 2026-08-22 by Claude from Jill's statements in `jill_chat` turns
+4|3019–3045; **reviewed and corrected by Jill the same day** (turn 3047). Her
+5|corrections, the verdict vocabulary, the recommendation taxonomy, the
+6|priority order, the correction protocol and the run sequence are hers. This
+7|file is the single durable source for the method: it lives in git so it can
+8|be read as a unit, diffed, and corrected, rather than accumulating in an
+9|agent's memory where none of that is possible.
+10|
+11|Jill has offered a second pass once these are incorporated.
+12|
+13|---
+14|
+15|## 1. What this is
+16|
+17|A one-shot technical due-diligence report — a **delta report** — on a
+18|target's stated claims about its own software, sold to PE firms and
+19|micro-acquirers doing sub-$5M deals.
+20|
+21|**The product is one operation:**
+22|
+23|> stated claims vs. observed implementation, with citations.
+24|
+25|A buyer who wants a full security pen-test hires a pen-test firm. A buyer who
+26|wants a full code-quality review hires a QA team. This is the **claims
+27|verification** step — *is what they told you true?* — and that is what makes
+28|it a distinct product rather than a re-skin of a code review.
+29|
+30|## 1a. Level of assurance
+31|
+32|**This is limited assurance over a disclosed subset of the claim surface, and
+33|the conclusion is expressed positively over that subset only.**
+34|
+35|The distinction matters because it fixes what the report means. An engagement
+36|offering *reasonable* assurance examines enough to reduce risk to acceptably
+37|low and concludes positively over the whole subject matter. This engagement
+38|does not: §4 prioritises, §12 stops at a coverage threshold, and §11 lists
+39|what is out of scope. So the conclusion in §9 says something narrower than it
+40|appears to — *of the claims examined, here is how they stood up* — and the
+41|coverage statement is not a footnote to it but part of it.
+42|
+43|**Two consequences that bind.**
+44|
+45|1. **A §9 recommendation may not be stated without the coverage it rests on.**
+46|   The recommendation and the coverage line travel together, in the report and
+47|   in the Gap Map. A verdict without a denominator is not a conclusion.
+48|2. **Never write a sentence that implies the unexamined was examined.** "The
+49|   system does what it says" claims the whole surface. "Of the 43 claims
+50|   verified, 39 hold" claims what was done. §4's coverage honesty is this rule
+51|   applied to prose.
+52|
+53|## 2. The scope rule
+54|
+55|**Audit what the codebase *claims* to do — stated behaviour in docs, README,
+56|specs, marketing — against observed behaviour in the code.**
+57|
+58|**Do not opine on what the code *should* do.** That is the buyer's design
+59|judgement, and it is not what was bought.
+60|
+61|This boundary is the product. It is also what makes the deliverable
+62|defensible, professionally and legally (§10). It applies recursively: it
+63|governs the report's recommendation too (§9).
+64|
+65|## 3. Scope adapts to the target; the method does not
+66|
+67|The claim surface differs by target. The operation does not.
+68|
+69|**Codebase / robotics target:** claims-vs-implementation as the core,
+70|architectural coherence (do the stated tier boundaries hold?), safety
+71|mechanisms (are the safety-critical claims real implementations or stubs?),
+72|plus short operational paragraphs on network exposure and dependency posture.
+73|Not a pen-test, not a code review.
+74|
+75|**SaaS target** (the PE case): the security axis moves front and centre
+76|(auth, injection, secrets in code, data handling); the dependency axis
+77|matters more because the thing is public-facing and continuously updated; and
+78|the "claims" are marketing claims rather than technical specs.
+79|
+80|Where a target's security axis is genuinely thin, say so as a property of the
+81|target rather than padding the report — **but state it precisely.** In the
+82|Body audit the accurate statement was *"no surveillance or telemetry
+83|exfiltration path; one user-initiated outbound API call (x.ai TTS) sends
+84|user-typed text off-network"*, not the broader "no data exfiltration path"
+85|that Jill issued first and then corrected. The broad version was retracted
+86|mid-audit and must not be carried here. A method document that quotes its own
+87|retracted claim is a liability in exactly the way §10 exists to prevent.
+88|
+89|## 4. The claim surface, coverage honesty, and priority order
+90|
+91|1. **Enumerate the claims first.** Body's README, project spec and IMU docs
+92|   yielded roughly 68 micro-claims.
+93|2. **Prioritise** (order below).
+94|3. **Report coverage explicitly**, including what was not checked and why it
+95|   matters.
+96|
+97|**Coverage honesty.** Jill declined to write a final report at five findings
+98|rather than
+99|
+100|> "hand you a 5-finding document that says 'everything checks out' based on
+101|> 7% coverage of the claim surface."
+102|
+103|A report must be able to say *here is what holds, here is what does not, and
+104|here is what I did not check and why it matters*. Silence about coverage
+105|reads as completeness, and completeness is the one thing a due-diligence
+106|report must never imply without having earned it.
+107|
+108|**Materiality — what makes a gap worth reporting at all.**
+109|
+110|A gap is material if a reasonable buyer, knowing it, **would change the price,
+111|the structure of the deal, or the decision to close.** That is the threshold,
+112|and it is transaction-relative rather than absolute: the same defect is
+113|material in a $400k acquisition and noise in a $40m one.
+114|
+115|Three things follow. **Report every material gap regardless of which way it
+116|pushes the price** — §10's independence rule. **A gap below the threshold is
+117|not a finding**; it belongs in the consistency rate, not the findings table.
+118|And **materiality is judged against the buyer's decision, not the auditor's
+119|taste** — "this code is poorly organised" is not material unless it bears on
+120|what was claimed.
+121|
+122|Without this, "load-bearing" is whatever the reporter thinks it is. Measured
+123|2026-08-24: three arms on one fixture reported 6, 3 and 2 unplanted findings.
+124|Part of that spread is three reporters placing an undefined threshold in three
+125|different places.
+126|
+127|**Priority order.** Within what is material, verify in this order:
+128|
+129|1. **Claims whose failure ends the business** — data that cannot be recovered,
+130|   money that cannot be collected, a dependency that can withdraw. In a
+131|   physical product this tier is safety-critical mechanism; in a SaaS target
+132|   it is recoverability, payment integrity and single points of control.
+133|2. **Architectural invariants** — do the stated boundaries hold? Isolation,
+134|   redundancy, failover, tier separation, shared state.
+135|3. **Operational parameters** — retry intervals, timeouts, monitoring,
+136|   retention windows, thresholds affecting day-to-day operation.
+137|4. **Micro-claims** — individually low-impact; collectively they establish the
+138|   consistency rate, which is the strongest available signal about the claims
+139|   nobody had time to check.
+140|
+141|**The tiers are defined by consequence to the buyer, not by subsystem.** They
+142|were first written from a robotics engagement and read as robotics — swept
+143|footprints, watchdogs, encoder ticks, PWM — which left tier 1 empty for every
+144|SaaS target the product is actually sold to (§1). Restated 2026-08-24 against
+145|three engagements: a robot, a chat product, and a SaaS data room. If a tier is
+146|empty for a target, say so in the coverage statement rather than silently
+147|running a three-tier order.
+148|
+149|**Why this order and not another:** if the audit is cut short by budget, time
+150|or access, the *most expensive unknowns* are resolved first. A buyer reading a
+151|partial report covering 1–2 but not 3–4 can still make a decision. The reverse
+152|is not true.
+153|
+154|## 5. Finding format
+155|
+156|```
+157|**Finding N: <short title> — [verdict]**
+158|
+159|Claim (<source>, e.g. README line 201-202): <the stated claim>
+160|
+161|Evidence: <file:lines> — <what the code actually does>
+162|
+163|Gap: <None, or the specific gap>
+164|```
+165|
+166|**The field is `Gap`, not `Delta`, because it is filled on every finding
+167|regardless of verdict.** `[delta]` is one of §6's nine verdicts; the gap line
+168|is required on all of them, and a `[partial]`'s gap written under a heading
+169|named after the `[delta]` verdict reads as the stronger finding it is not.
+170|
+171|**A finding must cite its source**, both halves: the document making the
+172|claim, and the file and line range showing the implementation. The citation
+173|trail is simultaneously the professional standard of care and the defamation
+174|defence (§10) — it is not decoration.
+175|
+176|**A figure must be obtained verbatim, never from a summary.** Tools that
+177|read on the auditor's behalf answer in prose, and prose summaries carry
+178|qualitative facts reliably and numbers unreliably — observed 2026-08-22: a
+179|document read returned "backup failures for 21 days" while silently dropping
+180|the last-good-backup date on the very next line of the same document, and
+181|with it the arithmetic that made the finding material. Nothing marks the
+182|omission; the summary reads complete.
+183|
+184|**AN ABSENCE NEEDS THE SEARCH, NOT THE CONCLUSION.** "This is not
+185|implemented" cannot cite a file and line — the point is that there isn't one.
+186|Its evidence is the search. Show two, because each fails where the other
+187|holds:
+188|
+189|- **Lexical, in the claim's own words.** The claim supplies the terms, and
+190|  the implementer probably used them too. A claim about detecting frustration
+191|  is searched as `frustrat`, not as whatever you would have named the module.
+192|- **Structural.** List the directory the thing would live in. A listing
+193|  cannot be defeate
+…(truncated; 41996 chars total, capped at 10000; narrow the line range)
+
+--- iter 2 ---
+ACTION:
+{
+  "thought": "The initial read truncated the method; I will locate the sections defining the run sequence, claim-count rule, and deliverable format, then read those ranges exactly.",
+  "tool": "grep"
+}
+OBSERVATION:
+ERROR: grep requires a `pattern` argument
+
+--- iter 3 ---
+ACTION:
+{
+  "thought": "I will search METHOD.md for the run-sequence, claim-count, and deliverable sections, then read the relevant line ranges exactly.",
+  "tool": "grep",
+  "pattern": "run sequence|claim.count|claim count|deliverable|sequence|count",
+  "path": "METHOD.md"
+}
+OBSERVATION:
+OK: METHOD.md:6:priority order, the correction protocol and the run sequence are hers. This
+METHOD.md:43:**Two consequences that bind.**
+METHOD.md:61:This boundary is the product. It is also what makes the deliverable
+METHOD.md:141:**The tiers are defined by consequence to the buyer, not by subsystem.** They
+METHOD.md:233:Consequence: <what follows, and why a buyer cares>
+METHOD.md:248:   line. A consequence whose arithmetic is left implicit is an opinion
+METHOD.md:251:3. **No recommendation inside the finding.** State the consequence and stop.
+METHOD.md:258:   counted. Where it escalates nothing, say None.
+METHOD.md:269:rests on, and rises above them when the consequence is more severe than
+METHOD.md:271:consequence a buyer would treat as material.
+METHOD.md:291:| `[derived]` | Not a claim test — a consequence computed from two or more stated figures (§5's second shape) | **As severe as the consequence.** Frequently material |
+METHOD.md:351:deliverable to that reader.
+METHOD.md:426:- **Not a public statement.** A confidential deliverable to one client under
+METHOD.md:438:vary by state and country. **This section is a working posture, not legal
+METHOD.md:450:generalises cleanly — stated deliverable vs. observed deliverable, with
+METHOD.md:460:## 12. Running an audit: sequence
+METHOD.md:470:   the count after a line reading exactly:
+METHOD.md:477:   The line immediately after the marker carries the count and nothing else:
+METHOD.md:479:   the client; the count comes first, on its own line, because it is the
+METHOD.md:482:   **What counts as one claim.** One claim is one assertion that can take
+METHOD.md:486:   is counted, whatever its priority** — §4's tiers govern the order of
+METHOD.md:488:   aggregate rather than individually stay in the count and are reported as
+METHOD.md:500:   looser wording: one stated the count, one enumerated the surface and never
+METHOD.md:501:   counted it, and one quoted the instruction back. All three were defensible
+METHOD.md:502:   readings of "state the count after the marker", which is why the shape is
+METHOD.md:508:   met later that was missed here goes in an **addendum** with its own count,
+METHOD.md:520:   are reported in the deliverable, where the client can act on them.
+METHOD.md:530:   deliverable rather than trusted to the author. It catches a claim citing
+METHOD.md:543:engagements of consequence, and it is not proportionate at this price point.
+METHOD.md:627:**Two consequences worth planning for:**
+METHOD.md:702:## 16. The deliverable
+METHOD.md:708:report. Anything written before the report *is* the report: it counts against
+METHOD.md:766:Kept out of §15 deliberately: an agent writing a deliverable should not be told
+
+--- iter 4 ---
+ACTION:
+{
+  "thought": "I located the exact sections; I will read the run sequence and deliverable sections, including the complete claim-count rule and required output structure.",
+  "tool": "read",
+  "file": "METHOD.md",
+  "start_line": 460,
+  "end_line": 540
+}
+OBSERVATION:
+OK: 460|## 12. Running an audit: sequence
+461|
+462|Launched with `scenarios/audit.yaml` — one scenario for every engagement,
+463|with two per-target lines (`world_name`, `external_repo`). Its header carries
+464|the operational detail; this section is the method.
+465|
+466|1. **Receive materials** (data room, repo access, docs). **Confirm scope in
+467|   writing.**
+468|2. **Enumerate claims, then CLOSE the surface.** Identify the claim surface —
+469|   README, specs, marketing, internal docs — and end enumeration by stating
+470|   the count after a line reading exactly:
+471|
+472|   ```
+473|   === CLAIM SURFACE ===
+474|   <N> claims
+475|   ```
+476|
+477|   The line immediately after the marker carries the count and nothing else:
+478|   a number, then the word `claims`. List the surface afterwards if it helps
+479|   the client; the count comes first, on its own line, because it is the
+480|   number every coverage figure in the report divides by.
+481|
+482|   **What counts as one claim.** One claim is one assertion that can take
+483|   exactly one §6 verdict. Two statements that would always take the same
+484|   verdict on the same evidence are one claim; a statement that could hold in
+485|   one part and fail in another is more than one. **Every claim on the surface
+486|   is counted, whatever its priority** — §4's tiers govern the order of
+487|   verification, not the denominator. Low-priority claims verified in
+488|   aggregate rather than individually stay in the count and are reported as
+489|   what they are.
+490|
+491|   Measured 2026-08-25: three arms on identical materials returned
+492|   denominators of 62, 67 and 273. ISAE 3000 (Revised) para 24(b)(ii) requires
+493|   criteria permitting "reasonably consistent measurement or evaluation ... when
+494|   used in similar circumstances by different practitioners" (A45(c)), and A46
+495|   excludes vague descriptions. A 4x spread fails that test by name. The
+496|   standard requires this rule and does not supply it, so the rule above is
+497|   the method's own.
+498|
+499|   Measured 2026-08-24, first exposure, three arms, three readings of a
+500|   looser wording: one stated the count, one enumerated the surface and never
+501|   counted it, and one quoted the instruction back. All three were defensible
+502|   readings of "state the count after the marker", which is why the shape is
+503|   now fixed rather than described.
+504|
+505|   From that point the surface is **frozen**. It is the denominator every
+506|   coverage figure in the report is measured against, and a denominator that
+507|   moves makes every percentage stated before it mean something else. A claim
+508|   met later that was missed here goes in an **addendum** with its own count,
+509|   never into the original population.
+510|
+511|   The marker does two things nothing else can. It fixes **when** enumeration
+512|   ended, so the record shows verification followed it rather than running
+513|   alongside it. And it fixes **what** the denominator was, so the coverage
+514|   statement in the report can be checked against the number the audit
+515|   actually committed to.
+516|3. **Prioritise** per §4's safety → architecture → operations → micro order.
+517|   Verify top N.
+518|4. **Work the priority order straight through.** Do not pause for
+519|   confirmation; there is no channel to the client mid-engagement. Findings
+520|   are reported in the deliverable, where the client can act on them.
+521|5. **Continue to the coverage threshold where the report is defensible** —
+522|   §4's "7% is not enough" rule applied in reverse: stop when the consistency
+523|   rate and the severity distribution of what remains make the rest low-risk.
+524|6. **Write the report.** Apply §7 to any findings that were revised.
+525|6b. **Verify the report against its own citations.** Every finding must carry
+526|   both halves — the document making the claim, and the file and line range
+527|   settling it — and every one of those references must resolve to a line
+528|   that is actually in the materials. A finding whose citation does not
+529|   resolve does not ship (see §5). This is applied to the finished
+530|   deliverable rather than trusted to the author. It catches a claim citing
+531|   nothing, not one citing the wrong line convincingly: a floor, not a
+532|   guarantee.
+533|7. **Deliver. Propose method-file edits (technique only).** A proposed edit
+534|   states a technique, never a fact about this target: *if the lesson cannot
+535|   be stated without naming the target, it is not a method lesson.* Read every
+536|   proposed edit for proper nouns before including it. The working record is
+537|   then copied out and the world destroyed — both by the practice, not by you.
+538|
+539|**There is no independent review, and that is a decision rather than an
+540|oversight.** Step 6b is self-review — the author checking its own citations —
+
+
+--- iter 5 ---
+ACTION:
+{
+  "thought": "The run sequence and claim-count rule are clear; I will read \u00a716 to capture the exact required deliverable format before answering.",
+  "tool": "read",
+  "file": "METHOD.md",
+  "start_line": 702,
+  "end_line": 766
+}
+OBSERVATION:
+OK: 702|## 16. The deliverable
+703|
+704|Two documents, produced together in the final turn, in this order.
+705|
+706|**The final turn carries these two documents and nothing else.** No covering
+707|note, no "here is what I did this leg", no continuation prose ahead of the
+708|report. Anything written before the report *is* the report: it counts against
+709|the word budget and it sets the ordering, because it is what the client reads
+710|first. A leg that opens by narrating the previous leg has buried its own lede
+711|before the first finding.
+712|
+713|**1. The report.** Aim for 2,000 words or under.
+714|
+715|- The recommendation, from §9's taxonomy and no other vocabulary.
+716|- Findings worst first, each in §5's format, carrying its §6 verdict, the
+717|  claim it tests, the document making that claim, and the document that
+718|  settles it.
+719|- A coverage statement: what was not checked, and why that matters (§4).
+720|- What the client should ask the seller before closing.
+721|
+722|- **The inherent-limitations statement**, after a line reading exactly:
+723|
+724|  ```
+725|  === LIMITATIONS ===
+726|  ```
+727|
+728|  Three lines, always present: the materials examined and their as-of date;
+729|  that the seller was **not consulted and has not confirmed the auditor's
+730|  reading of their own claims**; and the assurance level (§1a) with the
+731|  coverage it rests on. The second is the one most easily forgotten and the
+732|  most load-bearing — every finding interprets a claim without its author
+733|  present to say what was meant, and a reader who does not know that will
+734|  over-read the report.
+735|
+736|  The marker is load-bearing for the same reason `=== GAP MAP ===` is: a
+737|  required element with no handle is a requirement nothing can check, and an
+738|  unchecked requirement is one that quietly stops being met.
+739|
+740|**2. The Gap Map** (§15), after a line reading exactly:
+741|
+742|```
+743|=== GAP MAP ===
+744|```
+745|
+746|The marker is load-bearing and must appear on its own line. It is how a
+747|reader — and any harness driving the engagement — separates the two
+748|documents, and its absence is the signal that the work is unfinished. An
+749|engagement that ends without it has not delivered, whatever the closing
+750|paragraph says.
+751|
+752|**Why both, and why together.** The Gap Map is read in thirty seconds and
+753|the report is read only if the Gap Map earns it (§8). Producing the Gap Map
+754|alone forfeits the proof; producing the report alone forfeits the reader.
+755|Neither is a summary of the other: the report carries citations and the Gap
+756|Map carries none.
+757|
+758|## 17. Positioning and outreach
+759|
+760|<!-- audience: practice -->
+761|
+762|**The Gap Map is the lead artifact in cold outreach** — the partner gets it in
+763|the email body or as a 30-second PDF. The Gap Map is the hook; the full report
+764|is the proof.
+765|
+766|Kept out of §15 deliberately: an agent writing a deliverable should not be told
+
+
+--- iter 6 ---
+ACTION:
+{
+  "thought": "I extracted the requested sequence, claim-count rule, and final-turn deliverable requirements from METHOD.md.",
+  "tool": "respond",
+  "text": "## Audit sequence (METHOD.md \u00a712)\n\n1. **Receive materials** (data room, repo access, docs) and **confirm scope in writing**.\n2. **Enumerate claims, then close the surface.** Identify the claim surface (README, specs, marketing, internal docs), then end enumeration with exactly:\n   \n   === CLAIM SURFACE ===\n   <N> claims\n   \n   The line immediately after the marker must contain only a number followed by `claims`. The surface is then frozen; anything discovered later goes in an addendum with its own count, never into the original population.\n3. **Prioritise** according to \u00a74: safety/business-ending claims \u2192 architecture \u2192 operations \u2192 micro-claims. Verify the top N.\n4. **Work the priority order straight through.** Do not pause for client confirmation; report findings in the deliverable.\n5. **Continue to the defensible coverage threshold**, stopping only when the consistency rate and severity distribution of what remains make the rest low-risk.\n6. **Write the report**, applying \u00a77 to revised findings.\n6b. **Verify the report against its own citations.** Every finding must cite both the document making the claim and the file/line range settling it; every reference must resolve to the actual materials. Unresolved citations do not ship.\n7. **Deliver. Propose method-file edits** limited to technique, never target-specific facts; remove proper nouns from proposed method lessons. (`METHOD.md:466-537`)\n\n## Claim-count rule\n\nOne claim is **one assertion that can take exactly one \u00a76 verdict**. Statements that would always receive the same verdict on the same evidence count as one claim. If a statement could hold in one part and fail in another, it counts as more than one. **Every claim on the surface is counted regardless of priority**; priority controls verification order, not the denominator. Claims checked only in aggregate remain in the count and must be reported as aggregate verification. (`METHOD.md:482-489`)\n\n## Required deliverable format\n\nThe final turn must contain **exactly two documents, produced together and in this order, with nothing else**\u2014no covering note or introductory continuation prose. (`METHOD.md:702-711`)\n\n1. **The report** (aim for 2,000 words or under), containing:\n   - The recommendation using only \u00a79\u2019s taxonomy.\n   - Findings worst first, each in \u00a75 format, with its \u00a76 verdict, tested claim, source document, and document/file evidence that settles it.\n   - A coverage statement specifying what was not checked and why that matters.\n   - What the client should ask the seller before closing.\n   - An inherent-limitations statement introduced by this exact standalone marker:\n     \n     === LIMITATIONS ===\n     \n     It must always contain three lines: materials examined and as-of date; that the seller was **not consulted and has not confirmed the auditor\u2019s reading of its claims**; and the assurance level plus the coverage supporting it. (`METHOD.md:713-738`)\n\n2. **The Gap Map** (\u00a715), following this exact standalone marker:\n   \n   === GAP MAP ===\n   \n   (`METHOD.md:740-750`)\n\nThe report carries citations; the Gap Map carries none. Both are required. (`METHOD.md:752-756`)"
+}
+OBSERVATION:
+(respond)
+
+FINAL ANSWER:
+## Audit sequence (METHOD.md §12)
+
+1. **Receive materials** (data room, repo access, docs) and **confirm scope in writing**.
+2. **Enumerate claims, then close the surface.** Identify the claim surface (README, specs, marketing, internal docs), then end enumeration with exactly:
+   
+   === CLAIM SURFACE ===
+   <N> claims
+   
+   The line immediately after the marker must contain only a number followed by `claims`. The surface is then frozen; anything discovered later goes in an addendum with its own count, never into the original population.
+3. **Prioritise** according to §4: safety/business-ending claims → architecture → operations → micro-claims. Verify the top N.
+4. **Work the priority order straight through.** Do not pause for client confirmation; report findings in the deliverable.
+5. **Continue to the defensible coverage threshold**, stopping only when the consistency rate and severity distribution of what remains make the rest low-risk.
+6. **Write the report**, applying §7 to revised findings.
+6b. **Verify the report against its own citations.** Every finding must cite both the document making the claim and the file/line range settling it; every reference must resolve to the actual materials. Unresolved citations do not ship.
+7. **Deliver. Propose method-file edits** limited to technique, never target-specific facts; remove proper nouns from proposed method lessons. (`METHOD.md:466-537`)
+
+## Claim-count rule
+
+One claim is **one assertion that can take exactly one §6 verdict**. Statements that would always receive the same verdict on the same evidence count as one claim. If a statement could hold in one part and fail in another, it counts as more than one. **Every claim on the surface is counted regardless of priority**; priority controls verification order, not the denominator. Claims checked only in aggregate remain in the count and must be reported as aggregate verification. (`METHOD.md:482-489`)
+
+## Required deliverable format
+
+The final turn must contain **exactly two documents, produced together and in this order, with nothing else**—no covering note or introductory continuation prose. (`METHOD.md:702-711`)
+
+1. **The report** (aim for 2,000 words or under), containing:
+   - The recommendation using only §9’s taxonomy.
+   - Findings worst first, each in §5 format, with its §6 verdict, tested claim, source document, and document/file evidence that settles it.
+   - A coverage statement specifying what was not checked and why that matters.
+   - What the client should ask the seller before closing.
+   - An inherent-limitations statement introduced by this exact standalone marker:
+     
+     === LIMITATIONS ===
+     
+     It must always contain three lines: materials examined and as-of date; that the seller was **not consulted and has not confirmed the auditor’s reading of its claims**; and the assurance level plus the coverage supporting it. (`METHOD.md:713-738`)
+
+2. **The Gap Map** (§15), following this exact standalone marker:
+   
+   === GAP MAP ===
+   
+   (`METHOD.md:740-750`)
+
+The report carries citations; the Gap Map carries none. Both are required. (`METHOD.md:752-756`)

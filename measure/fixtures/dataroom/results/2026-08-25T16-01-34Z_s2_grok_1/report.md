@@ -1,0 +1,1 @@
+(I couldn't formulate a response. — 403 Forbidden for https://api.x.ai/v1/chat/completions: {"code":"permission-denied","error":"Your team e2f51c66-2d6c-45b8-974a-30f8207d48c5 has either used all available credits or reached its monthly spending limit. To continue making API requests, please purchase more credits or raise your spending limit."})

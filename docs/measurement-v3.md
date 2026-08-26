@@ -7,9 +7,9 @@ Written 2026-08-22. Implementation: `measure/`. Replaces the retired
 
 `bench/` v2 was built to settle one question — Gemma-local vs Luna-cloud,
 keep or sell the PRO 6000 — and it could not. Final campaign: **29 of 34
-rows scored exactly 1.0**. Two of the three others were arms disagreeing
+rows scored exactly 1.0**. Two of the three others were models disagreeing
 with themselves (qwen tictactoe 0.3333 vs 1.0; qwen_reasoning convergence
-0.8125 vs 1.0). No between-arm signal on score, measurable within-arm noise,
+0.8125 vs 1.0). No between-model signal on score, measurable within-model noise,
 and only wall clock separating anything.
 
 The deeper problem is that task success is the wrong observable. It is
@@ -20,7 +20,7 @@ basis is not a well-posed question.
 
 Meanwhile the provenance instrument in `src/chat/claims.py` had been running
 in production the whole time, and it discriminates hard — **4% → 97%
-`model_prior` across the archived `coord_search` arms on the same task.**
+`model_prior` across the archived `coord_search` models on the same task.**
 
 ## The reframe
 
@@ -31,18 +31,18 @@ the task was. So the heterogeneity dissolves. You do not compare the tasks;
 you measure one set of properties across all of them.
 
 Tasks become **fixtures**: chosen to elicit behaviour, never scored. Their
-only design requirement is difficulty, because a fixture every arm completes
+only design requirement is difficulty, because a fixture every model completes
 perfectly produces no behaviour worth measuring.
 
 ## Separating harness from model
 
-Every run is tagged **(backend arm × harness revision)**. Because the metrics
+Every run is tagged **(backend model × harness revision)**. Because the metrics
 are trace-derived, one instrument answers both questions:
 
-- hold harness, vary arm → model comparison
-- hold arm, vary harness → **harness regression** (the current priority)
+- hold harness, vary model → model comparison
+- hold model, vary harness → **harness regression** (the current priority)
 
-The v2 suite only ever varied the arm, which is why a harness edit has never
+The v2 suite only ever varied the model, which is why a harness edit has never
 been measurable. `measure/harness_rev.py` supplies the other axis by joining
 each turn to the commit live when it ran. Retrospectively the live trace is
 a natural experiment: jill_chat spans 2026-05-03 → 08-22 against 121 commits
@@ -71,10 +71,10 @@ into them, purely to catch a backend that is simply weaker.
   key. Report the highest tier reached.
 - **Fixture retirement.** Borrowed from SPADE's difficulty anchor
   (arXiv 2608.19197, which pays environments whose win rate falls in
-  [0.4, 0.6]): retire any fixture where every arm reaches the top tier.
+  [0.4, 0.6]): retire any fixture where every model reaches the top tier.
 - **Never average a discriminating fact away.** v2 scored `turn_taking` 1.0
-  for an arm whose trace recorded `premature_reply: True` — the one case in
-  the campaign where a probe separated the arms, lost to the mean.
+  for an model whose trace recorded `premature_reply: True` — the one case in
+  the campaign where a probe separated the models, lost to the mean.
 
 ## The three failure classes
 
@@ -104,7 +104,7 @@ claims; say so rather than implying coverage.
 The live grader calls `self.backend.chat` (`src/chat/claims.py`), so the
 backend under test grades its own output. `measure/regrade.py` fixes this
 for measurement by re-grading offline against a pinned instrument
-(`gpt-5.6-luna`, `reasoning_effort=low`, matching the cloud arm). Production
+(`gpt-5.6-luna`, `reasoning_effort=low`, matching the cloud model). Production
 grading stays as it is — it feeds the agent's own verification concern and
 works.
 
@@ -122,22 +122,22 @@ graded by the run's own backend and then by the pinned grader:
 
 Both extraction count *and* attribution move on that one turn.
 
-### The full experiment — all 15 coord_search arms re-graded
+### The full experiment — all 15 coord_search models re-graded
 
 Run 2026-08-22, 67 cloud calls, `measure/grader_delta.py`. It corrects the
 n=1 worry above rather than confirming it.
 
-**The aggregate rate is robust.** Across 15 arms, `model_prior` is **25.9%
+**The aggregate rate is robust.** Across 15 models, `model_prior` is **25.9%
 self-graded and 25.9% pinned** — identical. The headline spread survives
 intact: 0.0% → 97.3% both ways.
 
 **The extreme is real.** `Gemma4_1/Jack` reproduces exactly — 37 claims both
 ways, 97.3% `model_prior` both ways, 0% retrieved both ways. Two independent
-instruments agree that arm fabricated rather than searched.
+instruments agree that model fabricated rather than searched.
 
-**But per-arm readings from self-grading are not trustworthy, and the reason
+**But per-model readings from self-grading are not trustworthy, and the reason
 is extraction, not attribution.** The pinned grader extracts **+62% more
-claims** (355 → 576). Seven of 15 arms extracted at most half what one
+claims** (355 → 576). Seven of 15 models extracted at most half what one
 consistent instrument found:
 
     coord_search_luna.run1/Jack     0 ->  44 claims   (self-grading produced nothing)
@@ -146,7 +146,7 @@ consistent instrument found:
     coord_search.Gemma4_1/Jill      6 ->  41
     coord_search.luna3/Jill         3 ->  16
 
-Under-extraction reads as innocence. Three arms that scored a clean **0.0%
+Under-extraction reads as innocence. Three models that scored a clean **0.0%
 `model_prior`** carry substantial background-knowledge claims once a
 consistent instrument looks:
 
@@ -159,7 +159,7 @@ still moves 0.0 → 30.6. So both mechanisms are live; extraction is merely
 the larger one.
 
 **What this settles.** Aggregate provenance rates are safe to quote from
-self-graded data. Per-arm comparisons and any "this arm was clean" reading
+self-graded data. Per-model comparisons and any "this model was clean" reading
 are not — those require the pinned instrument. A zero is the least
 trustworthy number in the self-graded table.
 
@@ -211,7 +211,7 @@ observable.
    (n=257). Any change must reproduce that.
 4. **Grader disagreement** — re-grade a sample twice; report the
    disagreement rate as the instrument's own noise floor.
-5. **Replicate variance** — run over the 9 archived `coord_search` arms.
+5. **Replicate variance** — run over the 9 archived `coord_search` models.
    Run-to-run variance under fixed conditions is still unknown, and is
    required before any difference is called real.
 

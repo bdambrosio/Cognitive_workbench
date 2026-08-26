@@ -2,8 +2,8 @@
 """Join a turn to the harness revision that was live when it ran.
 
 This is what makes harness-change regression measurable at all. The v2
-suite only ever varied the backend arm, so a harness edit could not be
-seen. Every metric here is tagged (arm x harness revision); this supplies
+suite only ever varied the backend model, so a harness edit could not be
+seen. Every metric here is tagged (model x harness revision); this supplies
 the second half.
 
 Retrospectively the live trace is a natural experiment: jill_chat spans

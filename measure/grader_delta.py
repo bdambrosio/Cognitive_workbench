@@ -7,9 +7,9 @@ Answers one question: how much of a provenance difference between two runs
 is the agent, and how much is the grader?
 
 It matters because the live grader calls `self.backend.chat` — each run
-graded itself — so any cross-arm comparison built on `claims.jsonl` alone
+graded itself — so any cross-model comparison built on `claims.jsonl` alone
 confounds the model under test with the instrument measuring it. The
-`4% -> 97% model_prior` spread across the archived coord_search arms is
+`4% -> 97% model_prior` spread across the archived coord_search models is
 exactly such a comparison.
 
 Reads `claims.jsonl` (self-graded) and `measure/regraded/<world>.<agent>.jsonl`
@@ -101,7 +101,7 @@ def main() -> int:
         rt = f"{pct(sg['retrieved'], sn)} / {pct(pg['retrieved'], pn)}"
         print(f"{label:34} {f'{sn} / {pn}':>13}   {mp:>13}   {rt:>13}")
 
-    # Range across arms, computed both ways. If the pinned range is much
+    # Range across models, computed both ways. If the pinned range is much
     # narrower than the self-graded one, the spread was the instrument.
     def rng(idx_g, idx_n, key):
         vals = [pct(r[idx_g][key], r[idx_n]) for r in rows_out
@@ -112,13 +112,13 @@ def main() -> int:
     s_lo, s_hi = rng(1, 2, "model_prior")
     p_lo, p_hi = rng(3, 4, "model_prior")
     print("-" * 82)
-    print(f"model_prior range across arms:")
-    print(f"    self-graded (each arm graded itself) : {s_lo}% .. {s_hi}%"
+    print(f"model_prior range across models:")
+    print(f"    self-graded (each model graded itself) : {s_lo}% .. {s_hi}%"
           f"   spread {round(s_hi - s_lo, 1) if s_lo is not None else '?'}pp")
     print(f"    pinned grader (one instrument)       : {p_lo}% .. {p_hi}%"
           f"   spread {round(p_hi - p_lo, 1) if p_lo is not None else '?'}pp")
     print("\nA pinned spread much narrower than the self-graded one means the "
-          "range\nwas the instrument, not the agents. n per arm is small — "
+          "range\nwas the instrument, not the agents. n per model is small — "
           "read the counts.")
     return 0
 

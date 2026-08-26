@@ -1,0 +1,19 @@
+{
+  "world": "c1_grok",
+  "arm": "/home/bruce/Downloads/Cognitive_workbench/measure/arms/grok_4p6.yaml",
+  "resolved_model": "grok-4.6",
+  "resolved_temperature": 0.5,
+  "top_p": 0.95,
+  "external_repo": "/home/bruce/Downloads/Cognitive_workbench/measure/fixtures/dataroom/corpus",
+  "exit_reason": "respond",
+  "wall_clock_s": 108.3,
+  "error": null,
+  "declared": true,
+  "count": 33,
+  "leg": 1,
+  "per_document": {
+    "doc1": 36,
+    "doc2": 20,
+    "doc9": 16
+  }
+}

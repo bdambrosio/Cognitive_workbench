@@ -2,9 +2,9 @@
 
 WHY THIS FILE EXISTS. On 2026-08-24 twelve benchmark runs were made at
 temperature 0.7 and thrown away. Nothing was misconfigured: no scenario and no
-arm set a temperature, so every one of them inherited the code default, and
+model set a temperature, so every one of them inherited the code default, and
 `run.py --help` reported that default as though it were a decision. The three
-DeepInfra arms are the sharp case — their yaml states the publisher's 1.0,
+DeepInfra models are the sharp case — their yaml states the publisher's 1.0,
 explains that the runner must pass it, and warns in as many words about "the
 silent second variable this exists to avoid". All true, all in the file, none
 of it executed.
@@ -29,7 +29,7 @@ from typing import Dict, List
 
 # ---------------------------------------------------------------------------
 # GLOBAL. Every model, every call site: runs, scoring, the grader, chat,
-# subagents. Not a per-arm setting and not overridable by convention — the
+# subagents. Not a per-model setting and not overridable by convention — the
 # grader's old `top_p=1.0` pin was removed rather than kept as an exception.
 # Route 1 (Anthropic) omits top_p entirely because Opus 4.7 rejects it; that
 # is a protocol limit, not an exemption, and no Anthropic model is currently
@@ -42,7 +42,7 @@ TOP_P: float = 0.95
 #
 # Keys are matched against the served / configured model id: exact first, then
 # unique case-insensitive substring. `Qwen3.8` is a substring key because the
-# local server reports `Qwen/Qwen3.8-27B` while arms declare `model: ""`.
+# local server reports `Qwen/Qwen3.8-27B` while models declare `model: ""`.
 # ---------------------------------------------------------------------------
 MODEL_TEMPERATURE: Dict[str, float] = {
     # Cloud, closed.
@@ -58,7 +58,7 @@ MODEL_TEMPERATURE: Dict[str, float] = {
     # under different ids depending on the route — DeepInfra serves
     # `nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B`, OpenRouter serves
     # `nvidia/nemotron-3-ultra-550b-a55b`. Keying on the full id meant an
-    # arm that had a temperature under one route had none under another,
+    # model that had a temperature under one route had none under another,
     # which the guard test caught on the first run.
     "DeepSeek-V4-Flash": 1.0,
     "nemotron-3-ultra": 1.0,

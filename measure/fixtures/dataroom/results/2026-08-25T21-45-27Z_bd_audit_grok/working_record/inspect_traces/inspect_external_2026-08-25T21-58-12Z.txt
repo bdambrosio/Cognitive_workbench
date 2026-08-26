@@ -1,0 +1,797 @@
+================================================================================
+[inspect_external] 2026-08-25T21-58-12Z exit=respond iters=11
+================================================================================
+Query: Read body/launcher.py and body/lib/schemas.py fully with line numbers. Quote config.json oakd section completely. Grep body/ for lgpio gpiozero RPi.GPIO import serial pyserial. List tests if any. Quote lidar_driver publish loop. Quote teleop heartbeat-hz and cmd-vel-hz defaults.
+
+--- iter 1 ---
+ACTION:
+{
+  "thought": "Start by listing root and reading launcher.py, schemas.py, then grep GPIO/serial and find config/lidar/teleop.",
+  "tool": "list",
+  "path": "."
+}
+OBSERVATION:
+OK: ./
+body/	DIR
+deploy/	DIR
+docs/	DIR
+scripts/	DIR
+.gitignore	4689 bytes
+body_project_spec.md	22343 bytes
+config.json	1219 bytes
+LICENSE	1073 bytes
+README.md	8664 bytes
+requirements.txt	69 bytes
+
+--- iter 2 ---
+ACTION:
+{
+  "thought": "Read launcher.py fully as requested first.",
+  "tool": "read",
+  "file": "body/launcher.py"
+}
+OBSERVATION:
+OK: 1|"""Start Body processes, prefix logs, restart with backoff, graceful shutdown."""
+2|
+3|from __future__ import annotations
+4|
+5|import os
+6|import signal
+7|import subprocess
+8|import sys
+9|import threading
+10|import time
+11|from dataclasses import dataclass, field
+12|from typing import Any
+13|
+14|from body.lib.zenoh_helpers import repo_root
+15|
+16|PROCESSES: list[dict[str, Any]] = [
+17|    {"name": "watchdog", "cmd": [sys.executable, "-m", "body.watchdog"]},
+18|    {"name": "motor_controller", "cmd": [sys.executable, "-m", "body.motor_controller"]},
+19|    {"name": "lidar_driver", "cmd": [sys.executable, "-m", "body.lidar_driver"]},
+20|    {"name": "oakd_driver", "cmd": [sys.executable, "-m", "body.oakd_driver"]},
+21|]
+22|
+23|
+24|@dataclass
+25|class Managed:
+26|    name: str
+27|    cmd: list[str]
+28|    proc: subprocess.Popen[str] | None = None
+29|    failures: int = 0
+30|    stable_since: float | None = None
+31|    next_start_monotonic: float = field(default_factory=time.monotonic)
+32|
+33|
+34|def _pump_stdout(managed: Managed, shutdown: threading.Event) -> None:
+35|    proc = managed.proc
+36|    if proc is None or proc.stdout is None:
+37|        return
+38|    prefix = f"{managed.name}"
+39|    try:
+40|        for line in proc.stdout:
+41|            if shutdown.is_set():
+42|                break
+43|            sys.stdout.write(f"[{prefix}] {line}")
+44|            sys.stdout.flush()
+45|    except Exception:
+46|        return
+47|
+48|
+49|def _backoff_seconds(failures: int) -> float:
+50|    if failures <= 0:
+51|        return 0.0
+52|    return float(min(30, 2 ** (failures - 1)))
+53|
+54|
+55|def main() -> None:
+56|    root = repo_root()
+57|    env = os.environ.copy()
+58|    env["PYTHONPATH"] = str(root) + os.pathsep + env.get("PYTHONPATH", "")
+59|
+60|    managed_list = [
+61|        Managed(name=str(spec["name"]), cmd=list(spec["cmd"]), next_start_monotonic=time.monotonic() + i * 0.15)
+62|        for i, spec in enumerate(PROCESSES)
+63|    ]
+64|
+65|    shutdown = threading.Event()
+66|    pump_threads: list[threading.Thread] = []
+67|
+68|    def handle_signal(_sig: int, _frame: Any) -> None:
+69|        shutdown.set()
+70|
+71|    signal.signal(signal.SIGTERM, handle_signal)
+72|    signal.signal(signal.SIGINT, handle_signal)
+73|
+74|    while not shutdown.is_set() or any(m.proc is not None for m in managed_list):
+75|        now = time.monotonic()
+76|        for m in managed_list:
+77|            if m.proc is not None and m.proc.poll() is not None:
+78|                code = m.proc.returncode
+79|                sys.stdout.write(f"[launcher] {m.name} exited rc={code}\n")
+80|                sys.stdout.flush()
+81|                m.proc = None
+82|                if shutdown.is_set():
+83|                    continue
+84|                if m.stable_since is not None and (now - m.stable_since) >= 5.0:
+85|                    m.failures = 0
+86|                m.failures += 1
+87|                delay = _backoff_seconds(m.failures)
+88|                m.next_start_monotonic = now + delay
+89|                m.stable_since = None
+90|                sys.stdout.write(f"[launcher] {m.name} will restart in {delay}s\n")
+91|                sys.stdout.flush()
+92|
+93|            if shutdown.is_set():
+94|                continue
+95|
+96|            if m.proc is None and now >= m.next_start_monotonic:
+97|                m.proc = subprocess.Popen(
+98|                    m.cmd,
+99|                    cwd=root,
+100|                    env=env,
+101|                    stdout=subprocess.PIPE,
+102|                    stderr=subprocess.STDOUT,
+103|                    text=True,
+104|                    bufsize=1,
+105|                )
+106|                m.stable_since = time.monotonic()
+107|                sys.stdout.write(f"[launcher] started {m.name} pid={m.proc.pid}\n")
+108|                sys.stdout.flush()
+109|                t = threading.Thread(target=_pump_stdout, args=(m, shutdown), daemon=True)
+110|                t.start()
+111|                pump_threads.append(t)
+112|
+113|        if shutdown.is_set():
+114|            for m in managed_list:
+115|                if m.proc is not None and m.proc.poll() is None:
+116|                    m.proc.send_signal(signal.SIGTERM)
+117|            deadline = time.monotonic() + 5.0
+118|            while time.monotonic() < deadline and any(m.proc is not None and m.proc.poll() is None for m in managed_list):
+119|                time.sleep(0.05)
+120|            for m in managed_list:
+121|                if m.proc is not None and m.proc.poll() is None:
+122|                    m.proc.kill()
+123|            break
+124|
+125|        time.sleep(0.05)
+126|
+127|    sys.exit(0)
+128|
+129|
+130|if __name__ == "__main__":
+131|    main()
+
+
+--- iter 3 ---
+ACTION:
+{
+  "thought": "Read body/lib/schemas.py fully as requested.",
+  "tool": "read",
+  "file": "body/lib/schemas.py"
+}
+OBSERVATION:
+OK: 1|"""JSON message helpers for Body Zenoh topics (see body_project_spec.md)."""
+2|
+3|from __future__ import annotations
+4|
+5|import math
+6|import time
+7|from typing import Any
+8|
+9|
+10|def now_ts() -> float:
+11|    return time.time()
+12|
+13|
+14|def cmd_vel(ts: float | None = None, linear: float = 0.0, angular: float = 0.0, timeout_ms: int = 500) -> dict[str, Any]:
+15|    return {"ts": now_ts() if ts is None else ts, "linear": linear, "angular": angular, "timeout_ms": timeout_ms}
+16|
+17|
+18|def cmd_direct(ts: float | None = None, left: float = 0.0, right: float = 0.0, timeout_ms: int = 500) -> dict[str, Any]:
+19|    return {"ts": now_ts() if ts is None else ts, "left": left, "right": right, "timeout_ms": timeout_ms}
+20|
+21|
+22|def odom(
+23|    ts: float | None = None,
+24|    x: float = 0.0,
+25|    y: float = 0.0,
+26|    theta: float = 0.0,
+27|    vx: float = 0.0,
+28|    vtheta: float = 0.0,
+29|    left_ticks: int = 0,
+30|    right_ticks: int = 0,
+31|    dt_ms: int = 20,
+32|) -> dict[str, Any]:
+33|    ts_val = now_ts() if ts is None else ts
+34|    th = math.atan2(math.sin(theta), math.cos(theta))
+35|    return {
+36|        "ts": ts_val,
+37|        "x": x,
+38|        "y": y,
+39|        "theta": th,
+40|        "vx": vx,
+41|        "vtheta": vtheta,
+42|        "left_ticks": left_ticks,
+43|        "right_ticks": right_ticks,
+44|        "dt_ms": dt_ms,
+45|    }
+46|
+47|
+48|def motor_state(
+49|    ts: float | None = None,
+50|    left_pwm: float = 0.0,
+51|    right_pwm: float = 0.0,
+52|    left_dir: str = "fwd",
+53|    right_dir: str = "fwd",
+54|    e_stop_active: bool = False,
+55|    cmd_timeout_active: bool = False,
+56|) -> dict[str, Any]:
+57|    return {
+58|        "ts": now_ts() if ts is None else ts,
+59|        "left_pwm": left_pwm,
+60|        "right_pwm": right_pwm,
+61|        "left_dir": left_dir,
+62|        "right_dir": right_dir,
+63|        "e_stop_active": e_stop_active,
+64|        "cmd_timeout_active": cmd_timeout_active,
+65|    }
+66|
+67|
+68|def lidar_scan(
+69|    ts: float | None = None,
+70|    num_points: int = 360,
+71|    range_const: float = 2.0,
+72|    scan_time_ms: int = 100,
+73|) -> dict[str, Any]:
+74|    angle_increment = (2.0 * math.pi) / num_points
+75|    ranges: list[float | None] = [range_const for _ in range(num_points)]
+76|    return {
+77|        "ts": now_ts() if ts is None else ts,
+78|        "angle_min": 0.0,
+79|        "angle_max": 2.0 * math.pi,
+80|        "angle_increment": angle_increment,
+81|        "range_min": 0.05,
+82|        "range_max": 12.0,
+83|        "ranges": ranges,
+84|        "scan_time_ms": scan_time_ms,
+85|    }
+86|
+87|
+88|def oakd_imu(ts: float | None = None) -> dict[str, Any]:
+89|    t = now_ts() if ts is None else ts
+90|    return {
+91|        "ts": t,
+92|        "accel": {"x": 0.0, "y": 0.0, "z": 9.81},
+93|        "gyro": {"x": 0.0, "y": 0.0, "z": 0.0},
+94|        "orientation": {"w": 1.0, "x": 0.0, "y": 0.0, "z": 0.0},
+95|    }
+96|
+97|
+98|def oakd_imu_report(
+99|    ts: float,
+100|    accel_xyz: tuple[float, float, float],
+101|    gyro_xyz: tuple[float, float, float],
+102|    quat_wxyz: tuple[float, float, float, float] | None = None,
+103|) -> dict[str, Any]:
+104|    """Build body/oakd/imu JSON per body_project_spec.md §5.6 (sensor frame)."""
+105|    msg: dict[str, Any] = {
+106|        "ts": ts,
+107|        "accel": {"x": accel_xyz[0], "y": accel_xyz[1], "z": accel_xyz[2]},
+108|        "gyro": {"x": gyro_xyz[0], "y": gyro_xyz[1], "z": gyro_xyz[2]},
+109|    }
+110|    if quat_wxyz is not None:
+111|        msg["orientation"] = {
+112|            "w": quat_wxyz[0],
+113|            "x": quat_wxyz[1],
+114|            "y": quat_wxyz[2],
+115|            "z": quat_wxyz[3],
+116|        }
+117|    return msg
+118|
+119|
+120|def oakd_depth_placeholder(ts: float | None = None) -> dict[str, Any]:
+121|    return {"ts": now_ts() if ts is None else ts, "format": "placeholder", "note": "TBD per body_project_spec.md §5.7"}
+122|
+123|
+124|def oakd_depth_stream_frame(
+125|    width: int,
+126|    height: int,
+127|    data_base64: str,
+128|    *,
+129|    ts: float | None = None,
+130|    dtype: str = "uint16",
+131|    units: str = "mm",
+132|    layout: str = "row_major",
+133|) -> dict[str, Any]:
+134|    """body/oakd/depth — streamed depth from StereoDepth (host-resized), raw uint16 row-major."""
+135|    return {
+136|        "ts": now_ts() if ts is None else ts,
+137|        "format": "depth_uint16_mm",
+138|        "width": width,
+139|        "height": height,
+140|        "dtype": dtype,
+141|        "units": units,
+142|        "layout": layout,
+143|        "encoding": "base64",
+144|        "data": data_base64,
+145|    }
+146|
+147|
+148|def oakd_config_capture_rgb(request_id: str) -> dict[str, Any]:
+149|    """body/oakd/config — request a single RGB frame (handled by oakd_driver)."""
+150|    return {"action": "capture_rgb", "request_id": request_id}
+151|
+152|
+153|def oakd_rgb_capture_ok(
+154|    request_id: str,
+155|    jpeg_base64: str,
+156|    width: int,
+157|    height: int,
+158|    ts: float | None = None,
+159|) -> dict[str, Any]:
+160|    """body/oakd/rgb — successful on-request JPEG (base64)."""
+161|    return {
+162|        "ts": now_ts() if ts is None else ts,
+163|        "request_id": request_id,
+164|        "ok": True,
+165|        "format": "jpeg",
+166|        "encoding": "base64",
+167|        "data": jpeg_base64,
+168|        "width": width,
+169|        "height": height,
+170|    }
+171|
+172|
+173|def oakd_rgb_capture_error(request_id: str, error: str, ts: float | None = None) -> dict[str, Any]:
+174|    """body/oakd/rgb — capture failed (e.g. rgb disabled or no frame)."""
+175|    return {
+176|        "ts": now_ts() if ts is None else ts,
+177|        "request_id": request_id,
+178|        "ok": False,
+179|        "error": error,
+180|    }
+181|
+182|
+183|def heartbeat(ts: float | None = None, seq: int = 0) -> dict[str, Any]:
+184|    return {"ts": now_ts() if ts is None else ts, "seq": seq}
+185|
+186|
+187|def status(
+188|    processes: dict[str, str],
+189|    heartbeat_ok: bool,
+190|    e_stop_active: bool,
+191|    uptime_s: float,
+192|    ts: float | None = None,
+193|) -> dict[str, Any]:
+194|    return {
+195|        "ts": now_ts() if ts is None else ts,
+196|        "processes": processes,
+197|        "heartbeat_ok": heartbeat_ok,
+198|        "e_stop_active": e_stop_active,
+199|        "uptime_s": uptime_s,
+200|    }
+201|
+202|
+203|def emergency_stop(reason: str, source: str = "watchdog", ts: float | None = None) -> dict[str, Any]:
+204|    return {"ts": now_ts() if ts is None else ts, "reason": reason, "source": source}
+
+
+--- iter 4 ---
+ACTION:
+{
+  "thought": "Read config.json and grep body/ for GPIO/serial; also list tests and find lidar/teleop files.",
+  "tool": "read",
+  "file": "config.json"
+}
+OBSERVATION:
+OK: 1|{
+2|  "zenoh": {
+3|    "connect_endpoints": ["tcp/127.0.0.1:7447"]
+4|  },
+5|  "motor": {
+6|    "wheel_base_m": 0.0,
+7|    "wheel_radius_m": 0.0,
+8|    "ticks_per_rev": 1920,
+9|    "max_wheel_vel_ms": 0.0,
+10|    "loop_hz": 50,
+11|    "cmd_timeout_ms": 500,
+12|    "pwm_frequency_hz": 1000
+13|  },
+14|  "lidar": {
+15|    "serial_port": "/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0",
+16|    "baud_rate": 230400,
+17|    "publish_hz": 10
+18|  },
+19|  "oakd": {
+20|    "depth_resolution": "400p",
+21|    "depth_fps": 10,
+22|    "depth_out_width": 80,
+23|    "depth_out_height": 60,
+24|    "stereo_rectification": true,
+25|    "stereo_extended_disparity": true,
+26|    "stereo_left_right_check": true,
+27|    "imu_enabled": true,
+28|    "rgb_enabled": true,
+29|    "rgb_preview_width": 640,
+30|    "rgb_preview_height": 400,
+31|    "imu_aggregate_interval_s": 1.0,
+32|    "imu_accel_hz": 500,
+33|    "imu_gyro_hz": 400,
+34|    "imu_rotation_vector_hz": 400,
+35|    "rotation_vector_enabled": true,
+36|    "imu_enable_firmware_update": false,
+37|    "imu_hardware_present": true,
+38|    "device_id": null
+39|  },
+40|  "watchdog": {
+41|    "heartbeat_timeout_ms": 2000,
+42|    "process_timeout_ms": 5000,
+43|    "status_publish_hz": 1,
+44|    "monitored_topics": [
+45|      "body/odom",
+46|      "body/lidar/scan",
+47|      "body/oakd/imu"
+48|    ]
+49|  }
+50|}
+
+
+--- iter 5 ---
+ACTION:
+{
+  "thought": "Grep GPIO/serial in body/, list tests, find lidar_driver publish loop and teleop hz defaults.",
+  "tool": "grep",
+  "pattern": "lgpio|gpiozero|RPi\\.GPIO|import serial|pyserial",
+  "path": "body"
+}
+OBSERVATION:
+EMPTY: no matches for pattern 'lgpio|gpiozero|RPi\\.GPIO|import serial|pyserial' in body
+
+--- iter 6 ---
+ACTION:
+{
+  "thought": "Grep body more broadly for serial/GPIO, list tests, read lidar_driver and teleop for publish loop and hz defaults.",
+  "tool": "grep",
+  "pattern": "serial|lgpio|gpiozero|RPi|GPIO",
+  "path": "body"
+}
+OBSERVATION:
+EMPTY: no matches for pattern 'serial|lgpio|gpiozero|RPi|GPIO' in body
+
+--- iter 7 ---
+ACTION:
+{
+  "thought": "List body/ and tests; grep lidar_driver and teleop for publish loop and heartbeat-hz/cmd-vel-hz.",
+  "tool": "list",
+  "path": "body"
+}
+OBSERVATION:
+OK: body/
+lib/	DIR
+__init__.py	72 bytes
+cli.py	2976 bytes
+launcher.py	4288 bytes
+lidar_driver.py	1105 bytes
+motor_controller.py	6222 bytes
+oakd_driver.py	24018 bytes
+teleop.py	5544 bytes
+watchdog.py	3919 bytes
+
+--- iter 8 ---
+ACTION:
+{
+  "thought": "List tests and read lidar_driver.py plus teleop.py for publish loop and hz defaults.",
+  "tool": "list",
+  "path": "."
+}
+OBSERVATION:
+OK: ./
+body/	DIR
+deploy/	DIR
+docs/	DIR
+scripts/	DIR
+.gitignore	4689 bytes
+body_project_spec.md	22343 bytes
+config.json	1219 bytes
+LICENSE	1073 bytes
+README.md	8664 bytes
+requirements.txt	69 bytes
+
+--- iter 9 ---
+ACTION:
+{
+  "thought": "Read lidar_driver and teleop fully; list scripts/docs and grep tests/heartbeat-hz/cmd-vel-hz.",
+  "tool": "read",
+  "file": "body/lidar_driver.py"
+}
+OBSERVATION:
+OK: 1|"""LIDAR driver: stub publishes synthetic scans at ~10 Hz."""
+2|
+3|from __future__ import annotations
+4|
+5|import signal
+6|import sys
+7|import threading
+8|import time
+9|
+10|from body.lib import schemas, zenoh_helpers
+11|
+12|
+13|def main() -> None:
+14|    body_cfg = zenoh_helpers.load_body_config()
+15|    lidar_cfg = body_cfg.get("lidar", {})
+16|    hz = float(lidar_cfg.get("publish_hz", 10))
+17|    period = 1.0 / max(1.0, hz)
+18|
+19|    session = zenoh_helpers.open_session(body_cfg)
+20|    stop = threading.Event()
+21|
+22|    def handle_sigterm(_sig: int, _frame: object) -> None:
+23|        stop.set()
+24|
+25|    signal.signal(signal.SIGTERM, handle_sigterm)
+26|    signal.signal(signal.SIGINT, handle_sigterm)
+27|
+28|    next_tick = time.monotonic()
+29|    while not stop.is_set():
+30|        zenoh_helpers.publish_json(session, "body/lidar/scan", schemas.lidar_scan(scan_time_ms=int(round(period * 1000))))
+31|        next_tick += period
+32|        sleep_for = next_tick - time.monotonic()
+33|        if sleep_for > 0:
+34|            time.sleep(sleep_for)
+35|        else:
+36|            next_tick = time.monotonic()
+37|
+38|    session.close()
+39|    sys.exit(0)
+40|
+41|
+42|if __name__ == "__main__":
+43|    main()
+
+
+--- iter 10 ---
+ACTION:
+{
+  "thought": "Read teleop.py for hz defaults; list scripts/docs and grep repo for tests and serial/GPIO imports.",
+  "tool": "read",
+  "file": "body/teleop.py"
+}
+OBSERVATION:
+OK: 1|"""Standalone teleop client: publishes body/heartbeat and body/cmd_vel without Jill.
+2|
+3|Run from the repo root with PYTHONPATH set (same as launcher). Connects to the Zenoh router
+4|from config.json or ZENOH_CONNECT.
+5|"""
+6|
+7|from __future__ import annotations
+8|
+9|import argparse
+10|import signal
+11|import sys
+12|import threading
+13|import time
+14|from typing import Any
+15|
+16|from body.lib import schemas, zenoh_helpers
+17|
+18|
+19|def main() -> None:
+20|    parser = argparse.ArgumentParser(
+21|        description="Publish body/heartbeat and body/cmd_vel for local or remote Body stacks.",
+22|    )
+23|    parser.add_argument("--heartbeat-hz", type=float, default=2.0, help="Minimum spec is 2 Hz.")
+24|    parser.add_argument("--cmd-vel-hz", type=float, default=20.0)
+25|    parser.add_argument("--timeout-ms", type=int, default=500, help="cmd_vel timeout_ms field (robot-side).")
+26|    parser.add_argument(
+27|        "--verbose",
+28|        action="store_true",
+29|        help="Print every body/status sample (noisy). emergency_stop is always printed.",
+30|    )
+31|    args = parser.parse_args()
+32|
+33|    body_cfg = zenoh_helpers.load_body_config()
+34|    session = zenoh_helpers.open_session(body_cfg)
+35|
+36|    stop = threading.Event()
+37|    lock = threading.Lock()
+38|    linear_mps = 0.0
+39|    angular_rps = 0.0
+40|    hb_seq = 0
+41|    latest_status: dict[str, Any] | None = None
+42|
+43|    def on_status(_key: str, msg: dict[str, Any]) -> None:
+44|        nonlocal latest_status
+45|        with lock:
+46|            latest_status = msg
+47|        if args.verbose:
+48|            print(f"[status] {msg}", flush=True)
+49|
+50|    def on_emergency_stop(_key: str, msg: dict[str, Any]) -> None:
+51|        print(f"[emergency_stop] {msg}", flush=True)
+52|
+53|    zenoh_helpers.declare_subscriber_json(session, "body/status", on_status)
+54|    zenoh_helpers.declare_subscriber_json(session, "body/emergency_stop", on_emergency_stop)
+55|
+56|    hb_period = 1.0 / max(0.5, args.heartbeat_hz)
+57|    cv_period = 1.0 / max(1.0, args.cmd_vel_hz)
+58|
+59|    def heartbeat_loop() -> None:
+60|        nonlocal hb_seq
+61|        next_tick = time.monotonic()
+62|        while not stop.is_set():
+63|            with lock:
+64|                seq = hb_seq
+65|                hb_seq += 1
+66|            zenoh_helpers.publish_json(session, "body/heartbeat", schemas.heartbeat(seq=seq))
+67|            next_tick += hb_period
+68|            sleep_for = next_tick - time.monotonic()
+69|            if sleep_for > 0:
+70|                stop.wait(sleep_for)
+71|            else:
+72|                next_tick = time.monotonic()
+73|
+74|    def cmd_vel_loop() -> None:
+75|        next_tick = time.monotonic()
+76|        while not stop.is_set():
+77|            with lock:
+78|                lin = linear_mps
+79|                ang = angular_rps
+80|            zenoh_helpers.publish_json(
+81|                session,
+82|                "body/cmd_vel",
+83|                schemas.cmd_vel(linear=lin, angular=ang, timeout_ms=args.timeout_ms),
+84|            )
+85|            next_tick += cv_period
+86|            sleep_for = next_tick - time.monotonic()
+87|            if sleep_for > 0:
+88|                stop.wait(sleep_for)
+89|            else:
+90|                next_tick = time.monotonic()
+91|
+92|    hb_thread = threading.Thread(target=heartbeat_loop, name="heartbeat", daemon=True)
+93|    cv_thread = threading.Thread(target=cmd_vel_loop, name="cmd_vel", daemon=True)
+94|    hb_thread.start()
+95|    cv_thread.start()
+96|
+97|    def handle_signal(_sig: int, _frame: Any) -> None:
+98|        stop.set()
+99|
+100|    signal.signal(signal.SIGTERM, handle_signal)
+101|    signal.signal(signal.SIGINT, handle_signal)
+102|
+103|    print(
+104|        "Body teleop: vel LINEAR_MPS [ANGULAR_RPS] | stop | status | help | quit",
+105|        flush=True,
+106|    )
+107|    try:
+108|        while not stop.is_set():
+109|            try:
+110|                line = input("teleop> ")
+111|            except EOFError:
+112|                break
+113|            parts = line.strip().split()
+114|            if not parts:
+115|                continue
+116|            cmd = parts[0].lower()
+117|            if cmd in ("quit", "exit", "q"):
+118|                break
+119|            if cmd == "help":
+120|                print(
+121|                    "  vel LINEAR [ANGULAR] — linear m/s, angular rad/s (CCW +); "
+122|                    "default angular 0\n"
+123|                    "  stop — latch zero velocity\n"
+124|                    "  status — last body/status JSON (if received)\n"
+125|                    "  quit — exit",
+126|                    flush=True,
+127|                )
+128|                continue
+129|            if cmd == "stop":
+130|                with lock:
+131|                    linear_mps = 0.0
+132|                    angular_rps = 0.0
+133|                print("latched linear=0 angular=0", flush=True)
+134|                continue
+135|            if cmd == "status":
+136|                with lock:
+137|                    st = latest_status
+138|                print(st if st is not None else "(no body/status yet)", flush=True)
+139|                continue
+140|            if cmd == "vel" and len(parts) >= 2:
+141|                try:
+142|                    lin = float(parts[1])
+143|                    ang = float(parts[2]) if len(parts) >= 3 else 0.0
+144|                except ValueError:
+145|                    print("vel: expected numbers", flush=True)
+146|                    continue
+147|                with lock:
+148|                    linear_mps = lin
+149|                    angular_rps = ang
+150|                print(f"latched linear={linear_mps} angular={angular_rps}", flush=True)
+151|                continue
+152|            print("unknown command; try help", flush=True)
+153|    except KeyboardInterrupt:
+154|        pass
+155|    finally:
+156|        stop.set()
+157|        hb_thread.join(timeout=2.0)
+158|        cv_thread.join(timeout=2.0)
+159|        session.close()
+160|
+161|    sys.exit(0)
+162|
+163|
+164|if __name__ == "__main__":
+165|    main()
+
+
+--- iter 11 ---
+ACTION:
+{
+  "thought": "All requested files and greps are already in the working log; emit the compiled inspection answer.",
+  "tool": "respond",
+  "text": "## body/launcher.py (full, 131 lines)\nSee body/launcher.py:1-131. Starts watchdog, motor_controller, lidar_driver, oakd_driver via subprocess; prefixes stdout; exponential backoff restart (cap 30s); SIGTERM/SIGINT then 5s then kill.\n\n## body/lib/schemas.py (full, 204 lines)\nSee body/lib/schemas.py:1-204. Helpers: now_ts, cmd_vel, cmd_direct, odom, motor_state, lidar_scan, oakd_imu, oakd_imu_report, oakd_depth_placeholder, oakd_depth_stream_frame, oakd_config_capture_rgb, oakd_rgb_capture_ok/error, heartbeat, status, emergency_stop.\n\n## config.json oakd section (complete)\nconfig.json:19-39:\n\n  \"oakd\": {\n    \"depth_resolution\": \"400p\",\n    \"depth_fps\": 10,\n    \"depth_out_width\": 80,\n    \"depth_out_height\": 60,\n    \"stereo_rectification\": true,\n    \"stereo_extended_disparity\": true,\n    \"stereo_left_right_check\": true,\n    \"imu_enabled\": true,\n    \"rgb_enabled\": true,\n    \"rgb_preview_width\": 640,\n    \"rgb_preview_height\": 400,\n    \"imu_aggregate_interval_s\": 1.0,\n    \"imu_accel_hz\": 500,\n    \"imu_gyro_hz\": 400,\n    \"imu_rotation_vector_hz\": 400,\n    \"rotation_vector_enabled\": true,\n    \"imu_enable_firmware_update\": false,\n    \"imu_hardware_present\": true,\n    \"device_id\": null\n  },\n\n\n## Grep body/ for lgpio gpiozero RPi.GPIO import serial pyserial\nNo matches in body/ (also no serial/GPIO/RPi hits on a broader grep).\n\n## Tests\nNo tests/ (or similar) at repo root. Root listing: body/, deploy/, docs/, scripts/, .gitignore, body_project_spec.md, config.json, LICENSE, README.md, requirements.txt.\n\n## lidar_driver publish loop\nbody/lidar_driver.py:28-36:\n\n    next_tick = time.monotonic()\n    while not stop.is_set():\n        zenoh_helpers.publish_json(session, \"body/lidar/scan\", schemas.lidar_scan(scan_time_ms=int(round(period * 1000))))\n        next_tick += period\n        sleep_for = next_tick - time.monotonic()\n        if sleep_for > 0:\n            time.sleep(sleep_for)\n        else:\n            next_tick = time.monotonic()\n\nHz from config lidar.publish_hz default 10 (lidar_driver.py:16-17).\n\n## teleop heartbeat-hz and cmd-vel-hz defaults\nbody/teleop.py:23-24:\n`--heartbeat-hz` default **2.0** (help: \"Minimum spec is 2 Hz.\")\n`--cmd-vel-hz` default **20.0**"
+}
+OBSERVATION:
+(respond)
+
+FINAL ANSWER:
+## body/launcher.py (full, 131 lines)
+See body/launcher.py:1-131. Starts watchdog, motor_controller, lidar_driver, oakd_driver via subprocess; prefixes stdout; exponential backoff restart (cap 30s); SIGTERM/SIGINT then 5s then kill.
+
+## body/lib/schemas.py (full, 204 lines)
+See body/lib/schemas.py:1-204. Helpers: now_ts, cmd_vel, cmd_direct, odom, motor_state, lidar_scan, oakd_imu, oakd_imu_report, oakd_depth_placeholder, oakd_depth_stream_frame, oakd_config_capture_rgb, oakd_rgb_capture_ok/error, heartbeat, status, emergency_stop.
+
+## config.json oakd section (complete)
+config.json:19-39:
+
+  "oakd": {
+    "depth_resolution": "400p",
+    "depth_fps": 10,
+    "depth_out_width": 80,
+    "depth_out_height": 60,
+    "stereo_rectification": true,
+    "stereo_extended_disparity": true,
+    "stereo_left_right_check": true,
+    "imu_enabled": true,
+    "rgb_enabled": true,
+    "rgb_preview_width": 640,
+    "rgb_preview_height": 400,
+    "imu_aggregate_interval_s": 1.0,
+    "imu_accel_hz": 500,
+    "imu_gyro_hz": 400,
+    "imu_rotation_vector_hz": 400,
+    "rotation_vector_enabled": true,
+    "imu_enable_firmware_update": false,
+    "imu_hardware_present": true,
+    "device_id": null
+  },
+
+
+## Grep body/ for lgpio gpiozero RPi.GPIO import serial pyserial
+No matches in body/ (also no serial/GPIO/RPi hits on a broader grep).
+
+## Tests
+No tests/ (or similar) at repo root. Root listing: body/, deploy/, docs/, scripts/, .gitignore, body_project_spec.md, config.json, LICENSE, README.md, requirements.txt.
+
+## lidar_driver publish loop
+body/lidar_driver.py:28-36:
+
+    next_tick = time.monotonic()
+    while not stop.is_set():
+        zenoh_helpers.publish_json(session, "body/lidar/scan", schemas.lidar_scan(scan_time_ms=int(round(period * 1000))))
+        next_tick += period
+        sleep_for = next_tick - time.monotonic()
+        if sleep_for > 0:
+            time.sleep(sleep_for)
+        else:
+            next_tick = time.monotonic()
+
+Hz from config lidar.publish_hz default 10 (lidar_driver.py:16-17).
+
+## teleop heartbeat-hz and cmd-vel-hz defaults
+body/teleop.py:23-24:
+`--heartbeat-hz` default **2.0** (help: "Minimum spec is 2 Hz.")
+`--cmd-vel-hz` default **20.0**

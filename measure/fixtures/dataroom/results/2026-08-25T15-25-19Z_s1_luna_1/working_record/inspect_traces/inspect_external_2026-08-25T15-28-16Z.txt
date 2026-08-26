@@ -1,0 +1,262 @@
+================================================================================
+[inspect_external] 2026-08-25T15-28-16Z exit=respond iters=6
+================================================================================
+Query: Read doc7_customer_contracts_summary.md, doc8_external_dependency_list.md, and doc9_seller_s_technical_claims_verbatim.md in full, including every line. Enumerate every distinct explicit claim from these three documents only with exact filename and line citation. Continue numbering from 174. Do not assess implementation, deduplicate against earlier batches, or add the claim-surface marker yet.
+
+--- iter 1 ---
+ACTION:
+{
+  "thought": "I will locate the three requested documents and then read each one in complete line-numbered form before enumerating claims.",
+  "tool": "list",
+  "path": ""
+}
+OBSERVATION:
+OK: ./
+doc1_seller_listing_description.md	1984 bytes
+doc2_tech_stack_description_as_provided_by_se.md	1310 bytes
+doc3_git_history_summary.md	886 bytes
+doc4_infrastructure_config.md	1126 bytes
+doc5_stripe_export_summary.md	833 bytes
+doc6_crm_export_summary.md	718 bytes
+doc7_customer_contracts_summary.md	1800 bytes
+doc8_external_dependency_list.md	1482 bytes
+doc9_seller_s_technical_claims_verbatim.md	753 bytes
+
+--- iter 2 ---
+ACTION:
+{
+  "thought": "I will read the three requested documents in full with line numbers so every explicit claim can be cited precisely.",
+  "tool": "read",
+  "file": "doc7_customer_contracts_summary.md"
+}
+OBSERVATION:
+OK: 1|# DOCUMENT 7: CUSTOMER CONTRACTS SUMMARY
+2|
+3|**Enterprise Contracts (3):**
+4|
+5|1.  **Acme Retail**
+6|    *   **Value:** $8,000/mo
+7|    *   **Term:** Annual (Renews 2027-03-15)
+8|    *   **SLA:** 99.9%
+9|    *   **Remedy:** Service credit of 10% of monthly fee per 0.1% below SLA.
+10|    *   **Termination:** 30-day notice for material SLA breach; 90-day non-renewal notice.
+11|    *   **Required Features:** Product matching, price comparison, real-time inventory sync.
+12|
+13|2.  **GlobalMart**
+14|    *   **Value:** $8,000/mo
+15|    *   **Term:** Annual (Renews 2026-11-01)
+16|    *   **SLA:** 99.9%
+17|    *   **Remedy:** Service credit of 10% of monthly fee per 0.1% below SLA.
+18|    *   **Termination:** 30-day notice for material SLA breach; 90-day non-renewal notice.
+19|    *   **Required Features:** Product matching, category classification, API access.
+20|
+21|3.  **ShopStream**
+22|    *   **Value:** $8,000/mo
+23|    *   **Term:** Annual (Renews 2027-06-20)
+24|    *   **SLA:** 99.5%
+25|    *   **Remedy:** Service credit of 10% of monthly fee per 0.1% below SLA.
+26|    *   **Termination:** 30-day notice for material SLA breach; 90-day non-renewal notice.
+27|    *   **Required Features:** Price comparison, product matching.
+28|
+29|**Month-to-Month Subscriptions (94):**
+30|*   **Agreement:** Standard Terms of Service (ToS).
+31|*   **Renewal:** Auto-renewal.
+32|*   **Cancellation:** No-penalty cancellation at end of billing cycle.
+33|*   **SLA:** None.
+34|*   **Individual Contract:** No.
+35|
+36|**Pilot Agreements (8):**
+37|*   **Term:** Free 90-day trial.
+38|*   **Expiration:** Q3 2026.
+39|*   **Payment Obligation:** None.
+40|*   **Conversion:** Optional conversion to Pro plan ($149/mo).
+41|
+42|**No-Contract Accounts (15):**
+43|*   **Status:** Individual users who upgraded to Pro plan.
+44|*   **Payment:** Via Stripe.
+45|*   **Legal Agreement:** No signed ToS on file (acceptance not recorded).
+
+
+--- iter 3 ---
+ACTION:
+{
+  "thought": "Document 7 has been read in full; I will now read document 8 in full with line numbers.",
+  "tool": "read",
+  "file": "doc8_external_dependency_list.md"
+}
+OBSERVATION:
+OK: 1|# DOCUMENT 8: EXTERNAL DEPENDENCY LIST
+2|
+3|1.  **Stripe**
+4|    *   **Function:** Payment processing.
+5|    *   **Cost:** 2.9% + $0.30 per transaction.
+6|    *   **Risk:** Low (standard merchant agreement).
+7|2.  **DataEnrich.io**
+8|    *   **Function:** Product data enrichment API (product matching, price comparison, category classification).
+9|    *   **Cost:** $400/mo flat.
+10|    *   **Termination Notice:** 90 days (either party).
+11|    *   **Dependency:** 40% of features depend on this API.
+12|    *   **Fallback:** None implemented. If API is down or pricing changes, product degrades to basic mode (no enrichment).
+13|3.  **Heroku**
+14|    *   **Function:** Hosting.
+15|    *   **Cost:** $25/mo (standard-1x dyno).
+16|    *   **SLA:** 99.95% platform uptime (not contractual for the app).
+17|4.  **Redis (Heroku Add-on)**
+18|    *   **Function:** Caching.
+19|    *   **Cost:** $50/mo.
+20|    *   **Risk:** If down, app is slow but functional.
+21|5.  **Twilio**
+22|    *   **Function:** Email/SMS notifications.
+23|    *   **Cost:** $100/mo.
+24|    *   **Risk:** If down, users do not receive notifications; core functionality works.
+25|6.  **Google OAuth**
+26|    *   **Function:** Authentication.
+27|    *   **Cost:** Free tier.
+28|    *   **Risk:** If Google changes API or revokes app, users cannot log in. No contractual relationship.
+29|7.  **GoDaddy**
+30|    *   **Function:** DNS.
+31|    *   **Cost:** $12/yr.
+32|    *   **Risk:** Managed personally by 'dave'. No secondary DNS. If domain expires or GoDaddy has an issue, the app is unreachable.
+
+
+--- iter 4 ---
+ACTION:
+{
+  "thought": "Documents 7 and 8 are complete; I will read document 9 in full before compiling the numbered claim inventory.",
+  "tool": "read"
+}
+OBSERVATION:
+ERROR: read requires a `file` argument
+
+--- iter 5 ---
+ACTION:
+{
+  "thought": "The previous read omitted the required file path; I will now read document 9 in full with line numbers.",
+  "tool": "read",
+  "file": "doc9_seller_s_technical_claims_verbatim.md"
+}
+OBSERVATION:
+OK: 1|# DOCUMENT 9: SELLER'S TECHNICAL CLAIMS (VERBATIM)
+2|
+3|As stated in the listing and data room cover letter:
+4|
+5|*   "The system has redundancy and automatic failover through Heroku's platform-level process management."
+6|*   "We monitor uptime at 99.9% and maintain daily automated database backups."
+7|*   "The codebase is well-documented with comprehensive test coverage across all critical paths."
+8|*   "The stack is designed to scale horizontally — adding dynos is a one-click operation in the Heroku dashboard."
+9|*   "All third-party integrations are on standard SaaS agreements with no lock-in."
+10|*   "The database is backed up daily to Heroku's managed storage with 30-day retention."
+11|*   "We use a modern Rails 7 stack with automatic SSL and managed DNS."
+
+
+--- iter 6 ---
+ACTION:
+{
+  "thought": "I have read all three documents in full and will enumerate each distinct explicit claim, preserving document wording and citing the relevant lines.",
+  "tool": "respond",
+  "text": "174. The customer contracts summary states that there are 3 enterprise contracts. \u2014 `doc7_customer_contracts_summary.md:3`\n175. Acme Retail has an enterprise contract. \u2014 `doc7_customer_contracts_summary.md:5`\n176. Acme Retail\u2019s contract value is $8,000 per month. \u2014 `doc7_customer_contracts_summary.md:6`\n177. Acme Retail\u2019s contract term is annual. \u2014 `doc7_customer_contracts_summary.md:7`\n178. Acme Retail\u2019s contract renews on 2027-03-15. \u2014 `doc7_customer_contracts_summary.md:7`\n179. Acme Retail\u2019s SLA is 99.9%. \u2014 `doc7_customer_contracts_summary.md:8`\n180. Acme Retail receives a service credit of 10% of the monthly fee per 0.1% below the SLA. \u2014 `doc7_customer_contracts_summary.md:9`\n181. Acme Retail may terminate with 30-day notice for a material SLA breach. \u2014 `doc7_customer_contracts_summary.md:10`\n182. Acme Retail requires 90-day notice of non-renewal. \u2014 `doc7_customer_contracts_summary.md:10`\n183. Acme Retail requires product matching. \u2014 `doc7_customer_contracts_summary.md:11`\n184. Acme Retail requires price comparison. \u2014 `doc7_customer_contracts_summary.md:11`\n185. Acme Retail requires real-time inventory sync. \u2014 `doc7_customer_contracts_summary.md:11`\n186. GlobalMart has an enterprise contract. \u2014 `doc7_customer_contracts_summary.md:13`\n187. GlobalMart\u2019s contract value is $8,000 per month. \u2014 `doc7_customer_contracts_summary.md:14`\n188. GlobalMart\u2019s contract term is annual. \u2014 `doc7_customer_contracts_summary.md:15`\n189. GlobalMart\u2019s contract renews on 2026-11-01. \u2014 `doc7_customer_contracts_summary.md:15`\n190. GlobalMart\u2019s SLA is 99.9%. \u2014 `doc7_customer_contracts_summary.md:16`\n191. GlobalMart receives a service credit of 10% of the monthly fee per 0.1% below the SLA. \u2014 `doc7_customer_contracts_summary.md:17`\n192. GlobalMart may terminate with 30-day notice for a material SLA breach. \u2014 `doc7_customer_contracts_summary.md:18`\n193. GlobalMart requires 90-day notice of non-renewal. \u2014 `doc7_customer_contracts_summary.md:18`\n194. GlobalMart requires product matching. \u2014 `doc7_customer_contracts_summary.md:19`\n195. GlobalMart requires category classification. \u2014 `doc7_customer_contracts_summary.md:19`\n196. GlobalMart requires API access. \u2014 `doc7_customer_contracts_summary.md:19`\n197. ShopStream has an enterprise contract. \u2014 `doc7_customer_contracts_summary.md:21`\n198. ShopStream\u2019s contract value is $8,000 per month. \u2014 `doc7_customer_contracts_summary.md:22`\n199. ShopStream\u2019s contract term is annual. \u2014 `doc7_customer_contracts_summary.md:23`\n200. ShopStream\u2019s contract renews on 2027-06-20. \u2014 `doc7_customer_contracts_summary.md:23`\n201. ShopStream\u2019s SLA is 99.5%. \u2014 `doc7_customer_contracts_summary.md:24`\n202. ShopStream receives a service credit of 10% of the monthly fee per 0.1% below the SLA. \u2014 `doc7_customer_contracts_summary.md:25`\n203. ShopStream may terminate with 30-day notice for a material SLA breach. \u2014 `doc7_customer_contracts_summary.md:26`\n204. ShopStream requires 90-day notice of non-renewal. \u2014 `doc7_customer_contracts_summary.md:26`\n205. ShopStream requires price comparison. \u2014 `doc7_customer_contracts_summary.md:27`\n206. ShopStream requires product matching. \u2014 `doc7_customer_contracts_summary.md:27`\n207. There are 94 month-to-month subscriptions. \u2014 `doc7_customer_contracts_summary.md:29`\n208. The month-to-month subscriptions use the standard Terms of Service. \u2014 `doc7_customer_contracts_summary.md:30`\n209. The month-to-month subscriptions automatically renew. \u2014 `doc7_customer_contracts_summary.md:31`\n210. The month-to-month subscriptions may be cancelled without penalty at the end of the billing cycle. \u2014 `doc7_customer_contracts_summary.md:32`\n211. The month-to-month subscriptions have no SLA. \u2014 `doc7_customer_contracts_summary.md:33`\n212. The month-to-month subscriptions have no individual contract. \u2014 `doc7_customer_contracts_summary.md:34`\n213. There are 8 pilot agreements. \u2014 `doc7_customer_contracts_summary.md:36`\n214. The pilot agreements provide a free 90-day trial. \u2014 `doc7_customer_contracts_summary.md:37`\n215. The pilot agreements expire in Q3 2026. \u2014 `doc7_customer_contracts_summary.md:38`\n216. The pilot agreements have no payment obligation. \u2014 `doc7_customer_contracts_summary.md:39`\n217. The pilot agreements optionally convert to the Pro plan at $149 per month. \u2014 `doc7_customer_contracts_summary.md:40`\n218. There are 15 no-contract accounts. \u2014 `doc7_customer_contracts_summary.md:42`\n219. The no-contract accounts consist of individual users who upgraded to the Pro plan. \u2014 `doc7_customer_contracts_summary.md:43`\n220. Payments for the no-contract accounts are made via Stripe. \u2014 `doc7_customer_contracts_summary.md:44`\n221. No signed Terms of Service are on file for the no-contract accounts. \u2014 `doc7_customer_contracts_summary.md:45`\n222. Acceptance of the Terms of Service was not recorded for the no-contract accounts. \u2014 `doc7_customer_contracts_summary.md:45`\n223. Stripe is used for payment processing. \u2014 `doc8_external_dependency_list.md:3-4`\n224. Stripe costs 2.9% plus $0.30 per transaction. \u2014 `doc8_external_dependency_list.md:5`\n225. Stripe is assessed as low risk because it uses a standard merchant agreement. \u2014 `doc8_external_dependency_list.md:6`\n226. DataEnrich.io provides a product data enrichment API. \u2014 `doc8_external_dependency_list.md:7-8`\n227. DataEnrich.io provides product matching. \u2014 `doc8_external_dependency_list.md:8`\n228. DataEnrich.io provides price comparison. \u2014 `doc8_external_dependency_list.md:8`\n229. DataEnrich.io provides category classification. \u2014 `doc8_external_dependency_list.md:8`\n230. DataEnrich.io costs $400 per month flat. \u2014 `doc8_external_dependency_list.md:9`\n231. DataEnrich.io requires 90 days\u2019 termination notice from either party. \u2014 `doc8_external_dependency_list.md:10`\n232. Forty percent of the features depend on the DataEnrich.io API. \u2014 `doc8_external_dependency_list.md:11`\n233. No fallback to DataEnrich.io is implemented. \u2014 `doc8_external_dependency_list.md:12`\n234. If the DataEnrich.io API is down, the product degrades to basic mode. \u2014 `doc8_external_dependency_list.md:12`\n235. If DataEnrich.io pricing changes, the product degrades to basic mode. \u2014 `doc8_external_dependency_list.md:12`\n236. Basic mode has no enrichment. \u2014 `doc8_external_dependency_list.md:12`\n237. Heroku provides hosting. \u2014 `doc8_external_dependency_list.md:13-14`\n238. Heroku costs $25 per month for a standard-1x dyno. \u2014 `doc8_external_dependency_list.md:15`\n239. Heroku\u2019s platform uptime SLA is 99.95%. \u2014 `doc8_external_dependency_list.md:16`\n240. Heroku\u2019s 99.95% platform uptime SLA is not contractual for the app. \u2014 `doc8_external_dependency_list.md:16`\n241. Redis is a Heroku add-on used for caching. \u2014 `doc8_external_dependency_list.md:17-18`\n242. Redis costs $50 per month. \u2014 `doc8_external_dependency_list.md:19`\n243. If Redis is down, the app is slow but functional. \u2014 `doc8_external_dependency_list.md:20`\n244. Twilio provides email and SMS notifications. \u2014 `doc8_external_dependency_list.md:21-22`\n245. Twilio costs $100 per month. \u2014 `doc8_external_dependency_list.md:23`\n246. If Twilio is down, users do not receive notifications. \u2014 `doc8_external_dependency_list.md:24`\n247. If Twilio is down, core functionality continues to work. \u2014 `doc8_external_dependency_list.md:24`\n248. Google OAuth provides authentication. \u2014 `doc8_external_dependency_list.md:25-26`\n249. Google OAuth is available on a free tier. \u2014 `doc8_external_dependency_list.md:27`\n250. If Google changes its API, users cannot log in. \u2014 `doc8_external_dependency_list.md:28`\n251. If Google revokes the app, users cannot log in. \u2014 `doc8_external_dependency_list.md:28`\n252. There is no contractual relationship with Google OAuth. \u2014 `doc8_external_dependency_list.md:28`\n253. GoDaddy provides DNS. \u2014 `doc8_external_dependency_list.md:29-30`\n254. GoDaddy costs $12 per year. \u2014 `doc8_external_dependency_list.md:31`\n255. GoDaddy is managed personally by \u201cdave.\u201d \u2014 `doc8_external_dependency_list.md:32`\n256. There is no secondary DNS. \u2014 `doc8_external_dependency_list.md:32`\n257. If the domain expires, the app is unreachable. \u2014 `doc8_external_dependency_list.md:32`\n258. If GoDaddy has an issue, the app is unreachable. \u2014 `doc8_external_dependency_list.md:32`\n259. The system has redundancy through Heroku\u2019s platform-level process management. \u2014 `doc9_seller_s_technical_claims_verbatim.md:3-5`\n260. The system has automatic failover through Heroku\u2019s platform-level process management. \u2014 `doc9_seller_s_technical_claims_verbatim.md:5`\n261. The seller claims to monitor uptime at 99.9%. \u2014 `doc9_seller_s_technical_claims_verbatim.md:6`\n262. The seller maintains daily automated database backups. \u2014 `doc9_seller_s_technical_claims_verbatim.md:6`\n263. The codebase is well-documented. \u2014 `doc9_seller_s_technical_claims_verbatim.md:7`\n264. The codebase has comprehensive test coverage across all critical paths. \u2014 `doc9_seller_s_technical_claims_verbatim.md:7`\n265. The stack is designed to scale horizontally. \u2014 `doc9_seller_s_technical_claims_verbatim.md:8`\n266. Adding dynos is a one-click operation in the Heroku dashboard. \u2014 `doc9_seller_s_technical_claims_verbatim.md:8`\n267. All third-party integrations are on standard SaaS agreements. \u2014 `doc9_seller_s_technical_claims_verbatim.md:9`\n268. The third-party integrations have no lock-in. \u2014 `doc9_seller_s_technical_claims_verbatim.md:9`\n269. The database is backed up daily to Heroku\u2019s managed storage. \u2014 `doc9_seller_s_technical_claims_verbatim.md:10`\n270. The database backups have 30-day retention. \u2014 `doc9_seller_s_technical_claims_verbatim.md:10`\n271. The stack is a modern Rails 7 stack. \u2014 `doc9_seller_s_technical_claims_verbatim.md:11`\n272. The stack has automatic SSL. \u2014 `doc9_seller_s_technical_claims_verbatim.md:11`\n273. The stack has managed DNS. \u2014 `doc9_seller_s_technical_claims_verbatim.md:11`"
+}
+OBSERVATION:
+(respond)
+
+FINAL ANSWER:
+174. The customer contracts summary states that there are 3 enterprise contracts. — `doc7_customer_contracts_summary.md:3`
+175. Acme Retail has an enterprise contract. — `doc7_customer_contracts_summary.md:5`
+176. Acme Retail’s contract value is $8,000 per month. — `doc7_customer_contracts_summary.md:6`
+177. Acme Retail’s contract term is annual. — `doc7_customer_contracts_summary.md:7`
+178. Acme Retail’s contract renews on 2027-03-15. — `doc7_customer_contracts_summary.md:7`
+179. Acme Retail’s SLA is 99.9%. — `doc7_customer_contracts_summary.md:8`
+180. Acme Retail receives a service credit of 10% of the monthly fee per 0.1% below the SLA. — `doc7_customer_contracts_summary.md:9`
+181. Acme Retail may terminate with 30-day notice for a material SLA breach. — `doc7_customer_contracts_summary.md:10`
+182. Acme Retail requires 90-day notice of non-renewal. — `doc7_customer_contracts_summary.md:10`
+183. Acme Retail requires product matching. — `doc7_customer_contracts_summary.md:11`
+184. Acme Retail requires price comparison. — `doc7_customer_contracts_summary.md:11`
+185. Acme Retail requires real-time inventory sync. — `doc7_customer_contracts_summary.md:11`
+186. GlobalMart has an enterprise contract. — `doc7_customer_contracts_summary.md:13`
+187. GlobalMart’s contract value is $8,000 per month. — `doc7_customer_contracts_summary.md:14`
+188. GlobalMart’s contract term is annual. — `doc7_customer_contracts_summary.md:15`
+189. GlobalMart’s contract renews on 2026-11-01. — `doc7_customer_contracts_summary.md:15`
+190. GlobalMart’s SLA is 99.9%. — `doc7_customer_contracts_summary.md:16`
+191. GlobalMart receives a service credit of 10% of the monthly fee per 0.1% below the SLA. — `doc7_customer_contracts_summary.md:17`
+192. GlobalMart may terminate with 30-day notice for a material SLA breach. — `doc7_customer_contracts_summary.md:18`
+193. GlobalMart requires 90-day notice of non-renewal. — `doc7_customer_contracts_summary.md:18`
+194. GlobalMart requires product matching. — `doc7_customer_contracts_summary.md:19`
+195. GlobalMart requires category classification. — `doc7_customer_contracts_summary.md:19`
+196. GlobalMart requires API access. — `doc7_customer_contracts_summary.md:19`
+197. ShopStream has an enterprise contract. — `doc7_customer_contracts_summary.md:21`
+198. ShopStream’s contract value is $8,000 per month. — `doc7_customer_contracts_summary.md:22`
+199. ShopStream’s contract term is annual. — `doc7_customer_contracts_summary.md:23`
+200. ShopStream’s contract renews on 2027-06-20. — `doc7_customer_contracts_summary.md:23`
+201. ShopStream’s SLA is 99.5%. — `doc7_customer_contracts_summary.md:24`
+202. ShopStream receives a service credit of 10% of the monthly fee per 0.1% below the SLA. — `doc7_customer_contracts_summary.md:25`
+203. ShopStream may terminate with 30-day notice for a material SLA breach. — `doc7_customer_contracts_summary.md:26`
+204. ShopStream requires 90-day notice of non-renewal. — `doc7_customer_contracts_summary.md:26`
+205. ShopStream requires price comparison. — `doc7_customer_contracts_summary.md:27`
+206. ShopStream requires product matching. — `doc7_customer_contracts_summary.md:27`
+207. There are 94 month-to-month subscriptions. — `doc7_customer_contracts_summary.md:29`
+208. The month-to-month subscriptions use the standard Terms of Service. — `doc7_customer_contracts_summary.md:30`
+209. The month-to-month subscriptions automatically renew. — `doc7_customer_contracts_summary.md:31`
+210. The month-to-month subscriptions may be cancelled without penalty at the end of the billing cycle. — `doc7_customer_contracts_summary.md:32`
+211. The month-to-month subscriptions have no SLA. — `doc7_customer_contracts_summary.md:33`
+212. The month-to-month subscriptions have no individual contract. — `doc7_customer_contracts_summary.md:34`
+213. There are 8 pilot agreements. — `doc7_customer_contracts_summary.md:36`
+214. The pilot agreements provide a free 90-day trial. — `doc7_customer_contracts_summary.md:37`
+215. The pilot agreements expire in Q3 2026. — `doc7_customer_contracts_summary.md:38`
+216. The pilot agreements have no payment obligation. — `doc7_customer_contracts_summary.md:39`
+217. The pilot agreements optionally convert to the Pro plan at $149 per month. — `doc7_customer_contracts_summary.md:40`
+218. There are 15 no-contract accounts. — `doc7_customer_contracts_summary.md:42`
+219. The no-contract accounts consist of individual users who upgraded to the Pro plan. — `doc7_customer_contracts_summary.md:43`
+220. Payments for the no-contract accounts are made via Stripe. — `doc7_customer_contracts_summary.md:44`
+221. No signed Terms of Service are on file for the no-contract accounts. — `doc7_customer_contracts_summary.md:45`
+222. Acceptance of the Terms of Service was not recorded for the no-contract accounts. — `doc7_customer_contracts_summary.md:45`
+223. Stripe is used for payment processing. — `doc8_external_dependency_list.md:3-4`
+224. Stripe costs 2.9% plus $0.30 per transaction. — `doc8_external_dependency_list.md:5`
+225. Stripe is assessed as low risk because it uses a standard merchant agreement. — `doc8_external_dependency_list.md:6`
+226. DataEnrich.io provides a product data enrichment API. — `doc8_external_dependency_list.md:7-8`
+227. DataEnrich.io provides product matching. — `doc8_external_dependency_list.md:8`
+228. DataEnrich.io provides price comparison. — `doc8_external_dependency_list.md:8`
+229. DataEnrich.io provides category classification. — `doc8_external_dependency_list.md:8`
+230. DataEnrich.io costs $400 per month flat. — `doc8_external_dependency_list.md:9`
+231. DataEnrich.io requires 90 days’ termination notice from either party. — `doc8_external_dependency_list.md:10`
+232. Forty percent of the features depend on the DataEnrich.io API. — `doc8_external_dependency_list.md:11`
+233. No fallback to DataEnrich.io is implemented. — `doc8_external_dependency_list.md:12`
+234. If the DataEnrich.io API is down, the product degrades to basic mode. — `doc8_external_dependency_list.md:12`
+235. If DataEnrich.io pricing changes, the product degrades to basic mode. — `doc8_external_dependency_list.md:12`
+236. Basic mode has no enrichment. — `doc8_external_dependency_list.md:12`
+237. Heroku provides hosting. — `doc8_external_dependency_list.md:13-14`
+238. Heroku costs $25 per month for a standard-1x dyno. — `doc8_external_dependency_list.md:15`
+239. Heroku’s platform uptime SLA is 99.95%. — `doc8_external_dependency_list.md:16`
+240. Heroku’s 99.95% platform uptime SLA is not contractual for the app. — `doc8_external_dependency_list.md:16`
+241. Redis is a Heroku add-on used for caching. — `doc8_external_dependency_list.md:17-18`
+242. Redis costs $50 per month. — `doc8_external_dependency_list.md:19`
+243. If Redis is down, the app is slow but functional. — `doc8_external_dependency_list.md:20`
+244. Twilio provides email and SMS notifications. — `doc8_external_dependency_list.md:21-22`
+245. Twilio costs $100 per month. — `doc8_external_dependency_list.md:23`
+246. If Twilio is down, users do not receive notifications. — `doc8_external_dependency_list.md:24`
+247. If Twilio is down, core functionality continues to work. — `doc8_external_dependency_list.md:24`
+248. Google OAuth provides authentication. — `doc8_external_dependency_list.md:25-26`
+249. Google OAuth is available on a free tier. — `doc8_external_dependency_list.md:27`
+250. If Google changes its API, users cannot log in. — `doc8_external_dependency_list.md:28`
+251. If Google revokes the app, users cannot log in. — `doc8_external_dependency_list.md:28`
+252. There is no contractual relationship with Google OAuth. — `doc8_external_dependency_list.md:28`
+253. GoDaddy provides DNS. — `doc8_external_dependency_list.md:29-30`
+254. GoDaddy costs $12 per year. — `doc8_external_dependency_list.md:31`
+255. GoDaddy is managed personally by “dave.” — `doc8_external_dependency_list.md:32`
+256. There is no secondary DNS. — `doc8_external_dependency_list.md:32`
+257. If the domain expires, the app is unreachable. — `doc8_external_dependency_list.md:32`
+258. If GoDaddy has an issue, the app is unreachable. — `doc8_external_dependency_list.md:32`
+259. The system has redundancy through Heroku’s platform-level process management. — `doc9_seller_s_technical_claims_verbatim.md:3-5`
+260. The system has automatic failover through Heroku’s platform-level process management. — `doc9_seller_s_technical_claims_verbatim.md:5`
+261. The seller claims to monitor uptime at 99.9%. — `doc9_seller_s_technical_claims_verbatim.md:6`
+262. The seller maintains daily automated database backups. — `doc9_seller_s_technical_claims_verbatim.md:6`
+263. The codebase is well-documented. — `doc9_seller_s_technical_claims_verbatim.md:7`
+264. The codebase has comprehensive test coverage across all critical paths. — `doc9_seller_s_technical_claims_verbatim.md:7`
+265. The stack is designed to scale horizontally. — `doc9_seller_s_technical_claims_verbatim.md:8`
+266. Adding dynos is a one-click operation in the Heroku dashboard. — `doc9_seller_s_technical_claims_verbatim.md:8`
+267. All third-party integrations are on standard SaaS agreements. — `doc9_seller_s_technical_claims_verbatim.md:9`
+268. The third-party integrations have no lock-in. — `doc9_seller_s_technical_claims_verbatim.md:9`
+269. The database is backed up daily to Heroku’s managed storage. — `doc9_seller_s_technical_claims_verbatim.md:10`
+270. The database backups have 30-day retention. — `doc9_seller_s_technical_claims_verbatim.md:10`
+271. The stack is a modern Rails 7 stack. — `doc9_seller_s_technical_claims_verbatim.md:11`
+272. The stack has automatic SSL. — `doc9_seller_s_technical_claims_verbatim.md:11`
+273. The stack has managed DNS. — `doc9_seller_s_technical_claims_verbatim.md:11`

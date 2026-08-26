@@ -22,7 +22,7 @@
 #
 # Character prose is BYTE-IDENTICAL to jill-chat. That is deliberate: the point
 # is what this model is like AS JILL, so her character, capabilities and
-# self_model must not drift between arms.
+# self_model must not drift between models.
 #
 # RUN WITH --autonomy.  Not for the seeds (there are none) but because the
 # claim-verification concern is spawned by post-turn grading and fires through
@@ -31,13 +31,13 @@
 #
 #   python3 launcher.py relay_test.yaml --cli --autonomy --reasoning
 #
-# Swapping arms: local arms come from whatever is served on :5000, so switching
+# Swapping models: local models come from whatever is served on :5000, so switching
 # gemma/qwen means restarting the server. relay_test_luna.yaml is the cloud
 # sibling — same file, cloud llm_config, own world. Mirrors the
 # coord_search / coord_search_luna pair.
 #
 # Archive between runs so results are not overwritten:
-#   mv scenarios/relay_test scenarios/relay_test.<arm>
+#   mv scenarios/relay_test scenarios/relay_test.<model>
 #
 world_config:
   world_name: relay_test

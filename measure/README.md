@@ -33,7 +33,7 @@ Read-only with respect to agent state. Needs no GPU, no server, no network.
 | `harness_rev.py` | joins a turn to the harness commit live when it ran |
 | `report.py` | prints the vector |
 | `regrade.py` | offline re-grade against the PINNED grader (costs money) |
-| `grader_delta.py` | self-graded vs pinned, per arm — the instrument's own effect |
+| `grader_delta.py` | self-graded vs pinned, per model — the instrument's own effect |
 
 `provenance.py` reuses `src/chat/claims.py` (`valid_refs_for`,
 `_restore_observations`) rather than reimplementing it. The live grader is
@@ -42,8 +42,8 @@ production code and works; this reads what it produces.
 ## Two rules that are not negotiable
 
 **Report a vector, never a score.** The v2 suite collapsed `turn_taking` to
-1.0 for an arm whose own trace recorded `premature_reply: True` — the single
-case in the whole campaign where a probe separated the arms, discarded by
+1.0 for an model whose own trace recorded `premature_reply: True` — the single
+case in the whole campaign where a probe separated the models, discarded by
 the mean.
 
 **Every rate carries its denominator.** Coverage varies enormously:
@@ -97,30 +97,30 @@ Eleven v1 suites were cut 2026-08-18 (`dcd9e85d`) because they measured
 capability while every failure that cost time was harness behaviour. The v2
 replacement — six probes, mechanical scoring — was built to settle
 Gemma-local vs Luna-cloud and **failed to**: 29 of 34 rows scored exactly
-1.0, and two of the three others were arms disagreeing with themselves. No
-between-arm signal, measurable within-arm noise; only wall clock separated.
+1.0, and two of the three others were models disagreeing with themselves. No
+between-model signal, measurable within-model noise; only wall clock separated.
 
 Meanwhile the provenance instrument had been running in production the whole
 time and spans **4% → 97% `model_prior` across the archived coord_search
-arms** on the same task. It discriminates; the task scorers did not.
+models** on the same task. It discriminates; the task scorers did not.
 
-**All 15 arms have since been re-graded against the pinned instrument**
+**All 15 models have since been re-graded against the pinned instrument**
 (2026-08-22, 67 cloud calls). The spread is real: 0.0% -> 97.3% both ways,
 and aggregate `model_prior` is 25.9% self-graded and 25.9% pinned. The
 extreme reproduces exactly — `Gemma4_1/Jack`, 37 claims and 97.3% both ways.
 
-What is NOT trustworthy from self-graded data is any per-arm reading,
+What is NOT trustworthy from self-graded data is any per-model reading,
 because the pinned grader extracts **+62% more claims** (355 -> 576) and
-under-extraction reads as innocence. Three arms scoring a clean 0.0%
-`model_prior` carry 25-49% once one instrument looks at all of them; one arm
+under-extraction reads as innocence. Three models scoring a clean 0.0%
+`model_prior` carry 25-49% once one instrument looks at all of them; one model
 self-graded 0 claims where the pinned grader found 44. Quote aggregates from
-`claims.jsonl`; use `regrade.py` before comparing arms. See
+`claims.jsonl`; use `regrade.py` before comparing models. See
 `docs/measurement-v3.md` for the table.
 
 Worth keeping from the retired work, and carried forward here:
 
 - mechanical scoring, no judge where a judge can be avoided
-- hold the measuring instrument constant across arms
+- hold the measuring instrument constant across models
 - n ≥ 3; a single run is anecdote (two conclusions were retracted for this)
 - never change the instrument mid-campaign
 - a suspiciously uniform result is a bug until proven otherwise — six metric
@@ -146,7 +146,7 @@ step changes over three months were Factorio being shelved, not any commit.
 defects at graded discoverability, a 900-word deliverable so that *what earns
 space* is itself measured, and a difficulty ladder (*stated* →
 *cross_document* → *derived*) so it reports the highest rung reached rather
-than pass/fail. Retire it when every arm tops out. See its README.
+than pass/fail. Retire it when every model tops out. See its README.
 
     python3 launcher.py dataroom.yaml --cli --autonomy
     python3 measure/fixtures/dataroom/score.py --world dataroom_1 --dry-run

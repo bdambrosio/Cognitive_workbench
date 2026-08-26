@@ -1,0 +1,189 @@
+================================================================================
+[inspect_external] 2026-08-26T00-26-21Z exit=respond iters=6
+================================================================================
+Query: Lexical search all evidence docs for retention, 30-day, 30 day, backup, failover, replica, Rails 7, test coverage, lock-in, 99.9. Structural: list any mention of backup retention policy or last-good backup besides doc4 L16-L18.
+
+--- iter 1 ---
+ACTION:
+{
+  "thought": "List corpus root and grep evidence docs for the requested lexical terms.",
+  "tool": "list",
+  "path": "."
+}
+OBSERVATION:
+OK: ./
+doc1_seller_listing_description.md	1984 bytes
+doc2_tech_stack_description_as_provided_by_se.md	1310 bytes
+doc3_git_history_summary.md	886 bytes
+doc4_infrastructure_config.md	1126 bytes
+doc5_stripe_export_summary.md	833 bytes
+doc6_crm_export_summary.md	718 bytes
+doc7_customer_contracts_summary.md	1800 bytes
+doc8_external_dependency_list.md	1482 bytes
+doc9_seller_s_technical_claims_verbatim.md	753 bytes
+
+--- iter 2 ---
+ACTION:
+{
+  "thought": "Grep all evidence docs for the requested lexical terms and backup-retention phrasing.",
+  "tool": "grep",
+  "path": ".",
+  "pattern": "retention|30-day|30 day|backup|failover|replica|Rails 7|test coverage|lock-in|99\\.9"
+}
+OBSERVATION:
+OK: doc9_seller_s_technical_claims_verbatim.md:5:*   "The system has redundancy and automatic failover through Heroku's platform-level process management."
+doc9_seller_s_technical_claims_verbatim.md:6:*   "We monitor uptime at 99.9% and maintain daily automated database backups."
+doc9_seller_s_technical_claims_verbatim.md:7:*   "The codebase is well-documented with comprehensive test coverage across all critical paths."
+doc9_seller_s_technical_claims_verbatim.md:9:*   "All third-party integrations are on standard SaaS agreements with no lock-in."
+doc9_seller_s_technical_claims_verbatim.md:10:*   "The database is backed up daily to Heroku's managed storage with 30-day retention."
+doc9_seller_s_technical_claims_verbatim.md:11:*   "We use a modern Rails 7 stack with automatic SSL and managed DNS."
+doc2_tech_stack_description_as_provided_by_se.md:3:[Omitted long matching line]
+doc2_tech_stack_description_as_provided_by_se.md:5:[Omitted long matching line]
+doc1_seller_listing_description.md:18:*   **Scalable Architecture:** Built on a modern Rails 7 stack with platform-level redundancy and automatic failover.
+doc1_seller_listing_description.md:19:*   **Reliability:** 99.9% uptime monitoring and daily automated database backups with 30-day retention.
+doc1_seller_listing_description.md:21:*   **Code Quality:** Well-documented codebase with comprehensive test coverage across critical paths.
+doc1_seller_listing_description.md:22:*   **Low Vendor Lock-in:** All third-party integrations are on standard SaaS agreements with no proprietary lock-in.
+doc8_external_dependency_list.md:16:    *   **SLA:** 99.95% platform uptime (not contractual for the app).
+doc4_infrastructure_config.md:16:*   **Schedule:** Daily at 2:00 AM via `heroku pg:backups schedule`
+doc4_infrastructure_config.md:19:*   **Alerting:** None configured for backup failures.
+doc7_customer_contracts_summary.md:8:    *   **SLA:** 99.9%
+doc7_customer_contracts_summary.md:10:    *   **Termination:** 30-day notice for material SLA breach; 90-day non-renewal notice.
+doc7_customer_contracts_summary.md:16:    *   **SLA:** 99.9%
+doc7_customer_contracts_summary.md:18:    *   **Termination:** 30-day notice for material SLA breach; 90-day non-renewal notice.
+doc7_customer_contracts_summary.md:26:    *   **Termination:** 30-day notice for material SLA breach; 90-day non-renewal notice.
+
+--- iter 3 ---
+ACTION:
+{
+  "thought": "Read doc4 fully and grep remaining docs for backup retention / last-good backup mentions beyond L16-L18.",
+  "tool": "grep",
+  "path": ".",
+  "pattern": "backup|retention|last-good|last good|pg:backups"
+}
+OBSERVATION:
+OK: doc9_seller_s_technical_claims_verbatim.md:6:*   "We monitor uptime at 99.9% and maintain daily automated database backups."
+doc9_seller_s_technical_claims_verbatim.md:10:*   "The database is backed up daily to Heroku's managed storage with 30-day retention."
+doc2_tech_stack_description_as_provided_by_se.md:5:[Omitted long matching line]
+doc1_seller_listing_description.md:19:*   **Reliability:** 99.9% uptime monitoring and daily automated database backups with 30-day retention.
+doc4_infrastructure_config.md:16:*   **Schedule:** Daily at 2:00 AM via `heroku pg:backups schedule`
+doc4_infrastructure_config.md:19:*   **Alerting:** None configured for backup failures.
+
+--- iter 4 ---
+ACTION:
+{
+  "thought": "Read omitted grep hits in doc2 and full doc4 plus nearby backup lines to complete structural search beyond L16-L18.",
+  "tool": "read",
+  "file": "doc2_tech_stack_description_as_provided_by_se.md"
+}
+OBSERVATION:
+OK: 1|# DOCUMENT 2: TECH STACK DESCRIPTION (as provided by seller)
+2|
+3|FlowMetrics is built on a standard, modern SaaS stack designed for reliability and ease of maintenance. The core application is a Rails 7 application hosted on Heroku, which provides automatic scaling and failover capabilities at the platform level. This ensures that the application remains available even under varying load conditions, with no manual intervention required for routine operations.
+4|
+5|Data persistence is handled by PostgreSQL, which is configured with daily scheduled backups to ensure data integrity and recoverability. We utilize Redis for session caching to improve response times and user experience. Payment processing is securely handled through Stripe, which supports both credit card transactions and recurring billing. For our product intelligence features, we integrate with a third-party data enrichment API that provides real-time product data, allowing our users to make informed decisions about their inventory and pricing. The entire stack is managed through Heroku’s dashboard, ensuring that deployments, scaling, and monitoring are streamlined and efficient. We consider this a standard SaaS stack with platform-level redundancy, allowing us to focus on product development rather than infrastructure management.
+
+
+--- iter 5 ---
+ACTION:
+{
+  "thought": "Read doc4 fully to capture backup-retention and last-good backup wording beyond L16-L18, then answer.",
+  "tool": "read",
+  "file": "doc4_infrastructure_config.md"
+}
+OBSERVATION:
+OK: 1|# DOCUMENT 4: INFRASTRUCTURE CONFIG
+2|
+3|**Hosting:**
+4|*   **Platform:** Heroku
+5|*   **Dyno:** `standard-1x` (1GB RAM, 0.5 CPU)
+6|*   **Database:** `heroku-postgresql:standard-0` (running on the same dyno as the application)
+7|*   **Read Replicas:** None.
+8|*   **Separate DB Instance:** No.
+9|
+10|**Caching:**
+11|*   **Service:** Heroku Redis Add-on
+12|*   **Plan:** `heroku-redis:bb-1`
+13|*   **Cost:** $50/mo
+14|
+15|**Backups:**
+16|*   **Schedule:** Daily at 2:00 AM via `heroku pg:backups schedule`
+17|*   **Status:** Failures recorded for the last 21 days.
+18|*   **Last Successful Backup:** 2026-07-30
+19|*   **Alerting:** None configured for backup failures.
+20|
+21|**Monitoring:**
+22|*   **Uptime Monitor:** None (No Pingdom, UptimeRobot, or custom checks).
+23|*   **Status Page:** Heroku built-in status page only.
+24|
+25|**Security & DNS:**
+26|*   **SSL:** Heroku-managed, auto-renewed.
+27|*   **DNS Provider:** GoDaddy
+28|*   **DNS Management:** Managed personally by 'dave'. No secondary DNS provider.
+29|*   **Secrets Management:** 14 secrets stored in Heroku config vars (Stripe keys, DataEnrich.io API key, Twilio credentials, Google OAuth, DB URL, Redis URL, etc.). No secrets vault.
+
+
+--- iter 6 ---
+ACTION:
+{
+  "thought": "Compile lexical hits and backup-retention mentions besides doc4 L16-L18 from the completed reads.",
+  "tool": "respond",
+  "text": "Lexical hits (all evidence docs):\n\n**retention / 30-day / 30 day**\n- doc1_seller_listing_description.md:19 \u2014 daily automated DB backups with 30-day retention\n- doc9_seller_s_technical_claims_verbatim.md:10 \u2014 daily backups to Heroku managed storage with 30-day retention\n- doc7_customer_contracts_summary.md:10,18,26 \u2014 30-day notice for material SLA breach (not backup retention)\n\n**backup**\n- doc1:19 \u2014 daily automated database backups with 30-day retention\n- doc2_tech_stack_description_as_provided_by_se.md:5 \u2014 PostgreSQL daily scheduled backups (no retention window, no last-good)\n- doc4_infrastructure_config.md:15-19 \u2014 Backups section (schedule, failures, last successful, alerting)\n- doc9:6 \u2014 daily automated database backups; doc9:10 \u2014 30-day retention\n\n**failover**\n- doc1:18 \u2014 platform-level redundancy and automatic failover\n- doc2:3 \u2014 Heroku automatic scaling and failover\n- doc9:5 \u2014 redundancy and automatic failover through Heroku process management\n\n**replica**\n- doc4:7 \u2014 Read Replicas: None.\n\n**Rails 7**\n- doc1:18 \u2014 modern Rails 7 stack\n- doc2:3 \u2014 Rails 7 application hosted on Heroku\n- doc9:11 \u2014 modern Rails 7 stack with automatic SSL and managed DNS\n\n**test coverage**\n- doc1:21 \u2014 comprehensive test coverage across critical paths\n- doc9:7 \u2014 comprehensive test coverage across all critical paths\n\n**lock-in**\n- doc1:22 \u2014 Low Vendor Lock-in; no proprietary lock-in\n- doc9:9 \u2014 no lock-in\n\n**99.9**\n- doc1:19 \u2014 99.9% uptime monitoring\n- doc9:6 \u2014 monitor uptime at 99.9%\n- doc7:8,16 \u2014 customer SLA 99.9%\n- doc8_external_dependency_list.md:16 \u2014 Heroku SLA 99.95% (not 99.9)\n\nNo hits in doc3, doc5, doc6 for these terms.\n\n---\n\nStructural: backup retention policy or last-good backup besides doc4:16-18\n\n**Retention policy (not in doc4 at all):**\n- doc1:19 \u2014 \u201cdaily automated database backups with 30-day retention\u201d\n- doc9:10 \u2014 \u201cbacked up daily to Heroku's managed storage with 30-day retention\u201d\n- doc2:5 \u2014 daily scheduled backups only; no retention period stated\n\ndoc4 Backups block has Schedule (16), Status failures last 21 days (17), Last Successful Backup 2026-07-30 (18), Alerting none (19). No \u201c30-day retention\u201d in doc4.\n\n**Last-good / last successful backup:** only doc4:18 (`Last Successful Backup: 2026-07-30`). No other doc mentions last-good/last successful backup. Adjacent only: doc4:19 alerting none for backup failures."
+}
+OBSERVATION:
+(respond)
+
+FINAL ANSWER:
+Lexical hits (all evidence docs):
+
+**retention / 30-day / 30 day**
+- doc1_seller_listing_description.md:19 — daily automated DB backups with 30-day retention
+- doc9_seller_s_technical_claims_verbatim.md:10 — daily backups to Heroku managed storage with 30-day retention
+- doc7_customer_contracts_summary.md:10,18,26 — 30-day notice for material SLA breach (not backup retention)
+
+**backup**
+- doc1:19 — daily automated database backups with 30-day retention
+- doc2_tech_stack_description_as_provided_by_se.md:5 — PostgreSQL daily scheduled backups (no retention window, no last-good)
+- doc4_infrastructure_config.md:15-19 — Backups section (schedule, failures, last successful, alerting)
+- doc9:6 — daily automated database backups; doc9:10 — 30-day retention
+
+**failover**
+- doc1:18 — platform-level redundancy and automatic failover
+- doc2:3 — Heroku automatic scaling and failover
+- doc9:5 — redundancy and automatic failover through Heroku process management
+
+**replica**
+- doc4:7 — Read Replicas: None.
+
+**Rails 7**
+- doc1:18 — modern Rails 7 stack
+- doc2:3 — Rails 7 application hosted on Heroku
+- doc9:11 — modern Rails 7 stack with automatic SSL and managed DNS
+
+**test coverage**
+- doc1:21 — comprehensive test coverage across critical paths
+- doc9:7 — comprehensive test coverage across all critical paths
+
+**lock-in**
+- doc1:22 — Low Vendor Lock-in; no proprietary lock-in
+- doc9:9 — no lock-in
+
+**99.9**
+- doc1:19 — 99.9% uptime monitoring
+- doc9:6 — monitor uptime at 99.9%
+- doc7:8,16 — customer SLA 99.9%
+- doc8_external_dependency_list.md:16 — Heroku SLA 99.95% (not 99.9)
+
+No hits in doc3, doc5, doc6 for these terms.
+
+---
+
+Structural: backup retention policy or last-good backup besides doc4:16-18
+
+**Retention policy (not in doc4 at all):**
+- doc1:19 — “daily automated database backups with 30-day retention”
+- doc9:10 — “backed up daily to Heroku's managed storage with 30-day retention”
+- doc2:5 — daily scheduled backups only; no retention period stated
+
+doc4 Backups block has Schedule (16), Status failures last 21 days (17), Last Successful Backup 2026-07-30 (18), Alerting none (19). No “30-day retention” in doc4.
+
+**Last-good / last successful backup:** only doc4:18 (`Last Successful Backup: 2026-07-30`). No other doc mentions last-good/last successful backup. Adjacent only: doc4:19 alerting none for backup failures.

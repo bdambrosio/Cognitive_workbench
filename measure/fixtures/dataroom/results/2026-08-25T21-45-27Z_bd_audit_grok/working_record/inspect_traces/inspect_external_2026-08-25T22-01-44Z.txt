@@ -1,0 +1,917 @@
+================================================================================
+[inspect_external] 2026-08-25T22-01-44Z exit=max_iters iters=12
+================================================================================
+Query: Quote body/launcher.py lines 16-21 PROCESSES, 49-52 backoff, 100-127 SIGTERM wait. Quote body/lib/zenoh_helpers.py ZENOH_CONNECT and connect_endpoints. Quote body_project_spec.md 349, 406-412, 457, 480-501, 290-310 e-stop latch. Quote oakd_driver IMU/depth rates vs 100Hz/15Hz stub claim. Confirm no tests/ and no gpiozero/pyserial imports.
+
+--- iter 1 ---
+ACTION:
+{
+  "thought": "Start at repo root and locate the cited files plus tests/gpiozero/pyserial.",
+  "tool": "list",
+  "path": "."
+}
+OBSERVATION:
+OK: ./
+body/	DIR
+deploy/	DIR
+docs/	DIR
+scripts/	DIR
+.gitignore	4689 bytes
+body_project_spec.md	22343 bytes
+config.json	1219 bytes
+LICENSE	1073 bytes
+README.md	8664 bytes
+requirements.txt	69 bytes
+
+--- iter 2 ---
+ACTION:
+{
+  "thought": "Read launcher.py, zenoh_helpers, spec sections, oakd rates, and grep tests/gpiozero/pyserial.",
+  "tool": "read",
+  "file": "body/launcher.py",
+  "start_line": 1,
+  "end_line": 140
+}
+OBSERVATION:
+OK: 1|"""Start Body processes, prefix logs, restart with backoff, graceful shutdown."""
+2|
+3|from __future__ import annotations
+4|
+5|import os
+6|import signal
+7|import subprocess
+8|import sys
+9|import threading
+10|import time
+11|from dataclasses import dataclass, field
+12|from typing import Any
+13|
+14|from body.lib.zenoh_helpers import repo_root
+15|
+16|PROCESSES: list[dict[str, Any]] = [
+17|    {"name": "watchdog", "cmd": [sys.executable, "-m", "body.watchdog"]},
+18|    {"name": "motor_controller", "cmd": [sys.executable, "-m", "body.motor_controller"]},
+19|    {"name": "lidar_driver", "cmd": [sys.executable, "-m", "body.lidar_driver"]},
+20|    {"name": "oakd_driver", "cmd": [sys.executable, "-m", "body.oakd_driver"]},
+21|]
+22|
+23|
+24|@dataclass
+25|class Managed:
+26|    name: str
+27|    cmd: list[str]
+28|    proc: subprocess.Popen[str] | None = None
+29|    failures: int = 0
+30|    stable_since: float | None = None
+31|    next_start_monotonic: float = field(default_factory=time.monotonic)
+32|
+33|
+34|def _pump_stdout(managed: Managed, shutdown: threading.Event) -> None:
+35|    proc = managed.proc
+36|    if proc is None or proc.stdout is None:
+37|        return
+38|    prefix = f"{managed.name}"
+39|    try:
+40|        for line in proc.stdout:
+41|            if shutdown.is_set():
+42|                break
+43|            sys.stdout.write(f"[{prefix}] {line}")
+44|            sys.stdout.flush()
+45|    except Exception:
+46|        return
+47|
+48|
+49|def _backoff_seconds(failures: int) -> float:
+50|    if failures <= 0:
+51|        return 0.0
+52|    return float(min(30, 2 ** (failures - 1)))
+53|
+54|
+55|def main() -> None:
+56|    root = repo_root()
+57|    env = os.environ.copy()
+58|    env["PYTHONPATH"] = str(root) + os.pathsep + env.get("PYTHONPATH", "")
+59|
+60|    managed_list = [
+61|        Managed(name=str(spec["name"]), cmd=list(spec["cmd"]), next_start_monotonic=time.monotonic() + i * 0.15)
+62|        for i, spec in enumerate(PROCESSES)
+63|    ]
+64|
+65|    shutdown = threading.Event()
+66|    pump_threads: list[threading.Thread] = []
+67|
+68|    def handle_signal(_sig: int, _frame: Any) -> None:
+69|        shutdown.set()
+70|
+71|    signal.signal(signal.SIGTERM, handle_signal)
+72|    signal.signal(signal.SIGINT, handle_signal)
+73|
+74|    while not shutdown.is_set() or any(m.proc is not None for m in managed_list):
+75|        now = time.monotonic()
+76|        for m in managed_list:
+77|            if m.proc is not None and m.proc.poll() is not None:
+78|                code = m.proc.returncode
+79|                sys.stdout.write(f"[launcher] {m.name} exited rc={code}\n")
+80|                sys.stdout.flush()
+81|                m.proc = None
+82|                if shutdown.is_set():
+83|                    continue
+84|                if m.stable_since is not None and (now - m.stable_since) >= 5.0:
+85|                    m.failures = 0
+86|                m.failures += 1
+87|                delay = _backoff_seconds(m.failures)
+88|                m.next_start_monotonic = now + delay
+89|                m.stable_since = None
+90|                sys.stdout.write(f"[launcher] {m.name} will restart in {delay}s\n")
+91|                sys.stdout.flush()
+92|
+93|            if shutdown.is_set():
+94|                continue
+95|
+96|            if m.proc is None and now >= m.next_start_monotonic:
+97|                m.proc = subprocess.Popen(
+98|                    m.cmd,
+99|                    cwd=root,
+100|                    env=env,
+101|                    stdout=subprocess.PIPE,
+102|                    stderr=subprocess.STDOUT,
+103|                    text=True,
+104|                    bufsize=1,
+105|                )
+106|                m.stable_since = time.monotonic()
+107|                sys.stdout.write(f"[launcher] started {m.name} pid={m.proc.pid}\n")
+108|                sys.stdout.flush()
+109|                t = threading.Thread(target=_pump_stdout, args=(m, shutdown), daemon=True)
+110|                t.start()
+111|                pump_threads.append(t)
+112|
+113|        if shutdown.is_set():
+114|            for m in managed_list:
+115|                if m.proc is not None and m.proc.poll() is None:
+116|                    m.proc.send_signal(signal.SIGTERM)
+117|            deadline = time.monotonic() + 5.0
+118|            while time.monotonic() < deadline and any(m.proc is not None and m.proc.poll() is None for m in managed_list):
+119|                time.sleep(0.05)
+120|            for m in managed_list:
+121|                if m.proc is not None and m.proc.poll() is None:
+122|                    m.proc.kill()
+123|            break
+124|
+125|        time.sleep(0.05)
+126|
+127|    sys.exit(0)
+128|
+129|
+130|if __name__ == "__main__":
+131|    main()
+
+
+--- iter 3 ---
+ACTION:
+{
+  "thought": "Read zenoh_helpers for ZENOH_CONNECT and connect_endpoints.",
+  "tool": "read",
+  "file": "body/lib/zenoh_helpers.py"
+}
+OBSERVATION:
+OK: 1|"""Zenoh session setup and JSON pub/sub helpers."""
+2|
+3|from __future__ import annotations
+4|
+5|import json
+6|import os
+7|from pathlib import Path
+8|from typing import Any, Callable
+9|
+10|import zenoh
+11|
+12|
+13|def repo_root() -> Path:
+14|    """Repository root (directory containing config.json)."""
+15|    return Path(__file__).resolve().parents[2]
+16|
+17|
+18|def load_body_config(path: Path | None = None) -> dict[str, Any]:
+19|    """Load JSON config; merge Zenoh endpoints from env when set."""
+20|    cfg_path = path or (repo_root() / "config.json")
+21|    with open(cfg_path, encoding="utf-8") as f:
+22|        data: dict[str, Any] = json.load(f)
+23|    override = os.environ.get("ZENOH_CONNECT", "").strip()
+24|    if override:
+25|        zenoh_cfg = data.setdefault("zenoh", {})
+26|        zenoh_cfg["connect_endpoints"] = [override]
+27|    return data
+28|
+29|
+30|def zenoh_config_from_body(body_cfg: dict[str, Any]) -> zenoh.Config:
+31|    endpoints = body_cfg.get("zenoh", {}).get("connect_endpoints", ["tcp/127.0.0.1:7447"])
+32|    merged = {"connect": {"endpoints": endpoints}}
+33|    return zenoh.Config.from_json5(json.dumps(merged))
+34|
+35|
+36|def open_session(body_cfg: dict[str, Any]) -> zenoh.Session:
+37|    return zenoh.open(zenoh_config_from_body(body_cfg))
+38|
+39|
+40|def publish_json(session: zenoh.Session, key_expr: str, payload: dict[str, Any]) -> None:
+41|    session.put(key_expr, json.dumps(payload))
+42|
+43|
+44|def declare_subscriber_json(
+45|    session: zenoh.Session,
+46|    key_expr: str,
+47|    handler: Callable[[str, dict[str, Any]], None],
+48|) -> zenoh.Subscriber:
+49|    def _cb(sample: zenoh.Sample) -> None:
+50|        key = str(sample.key_expr)
+51|        try:
+52|            text = sample.payload.to_string()
+53|            obj = json.loads(text)
+54|            if isinstance(obj, dict):
+55|                handler(key, obj)
+56|        except (json.JSONDecodeError, UnicodeDecodeError):
+57|            return
+58|
+59|    return session.declare_subscriber(key_expr, _cb)
+
+
+--- iter 4 ---
+ACTION:
+{
+  "thought": "Read spec line ranges for e-stop and cited sections; grep oakd rates and gpiozero/pyserial; list tests.",
+  "tool": "read",
+  "file": "body_project_spec.md",
+  "start_line": 280,
+  "end_line": 510
+}
+OBSERVATION:
+OK: 280|### 5.10 `body/emergency_stop` (watchdog → motor_controller)
+281|
+282|```json
+283|{
+284|  "ts": 1713264000.123456,
+285|  "reason": "heartbeat_timeout",
+286|  "source": "watchdog"
+287|}
+288|```
+289|
+290|Motor controller immediately sets PWM to zero on receipt. Latched: motor output stays at zero until a new `cmd_vel` is received AND `e_stop_active` is cleared by the watchdog (which requires heartbeat recovery).
+291|
+292|## 6. Process Specifications
+293|
+294|### 6.1 `motor_controller`
+295|
+296|**Responsibility:** Translate velocity commands into PWM output. Read encoders. Publish odometry.
+297|
+298|**Hardware ownership:** MDD10A (4 GPIO pins), encoder inputs (4 GPIO pins).
+299|
+300|**Loop structure:**
+301|- Main loop at 50 Hz (20ms cycle).
+302|- Each cycle: read encoders → compute odometry → check for cmd timeout → compute PWM from latest command → write GPIO → publish odom and motor_state.
+303|- Zenoh subscription callback for `cmd_vel`, `cmd_direct`, `emergency_stop` sets shared state variables (protected by a simple lock since callbacks run on Zenoh's internal thread).
+304|
+305|**Differential drive math:**
+306|```
+307|wheel_base = W  (meters, measured)
+308|wheel_radius = R  (meters, measured)
+309|
+310|From cmd_vel (linear v, angular ω):
+311|  v_left  = v - (ω * W / 2)
+312|  v_right = v + (ω * W / 2)
+313|
+314|PWM mapping:
+315|  pwm = clamp(velocity / max_wheel_velocity, -1.0, 1.0)
+316|  direction = "fwd" if pwm >= 0 else "rev"
+317|  duty_cycle = abs(pwm)
+318|```
+319|
+320|**Odometry integration:**
+321|```
+322|From encoder ticks since last cycle:
+323|  d_left  = left_ticks * (2π * R / ticks_per_revolution)
+324|  d_right = right_ticks * (2π * R / ticks_per_revolution)
+325|  d_center = (d_left + d_right) / 2
+326|  d_theta  = (d_right - d_left) / W
+327|
+328|  x     += d_center * cos(theta + d_theta/2)
+329|  y     += d_center * sin(theta + d_theta/2)
+330|  theta += d_theta
+331|```
+332|
+333|**Configuration (constants at top of file, move to config file later):**
+334|```
+335|WHEEL_BASE_M = 0.0         # measure during build
+336|WHEEL_RADIUS_M = 0.0       # measure during build
+337|TICKS_PER_REV = 1920        # Pololu 4752: 64 CPR × 30:1 gear ratio
+338|MAX_WHEEL_VEL_MS = 0.0     # determine experimentally (330 RPM no-load × wheel circumference)
+339|LOOP_HZ = 50
+340|CMD_TIMEOUT_MS = 500
+341|PWM_FREQUENCY_HZ = 1000
+342|```
+343|
+344|**Encoder counting (software, initial implementation):**
+345|Uses `lgpio` edge callbacks on both A and B channels per motor for quadrature decoding. At full speed (330 RPM), edge rate is ~10.5 kHz per motor. Python callback overhead may cause missed counts at high speeds. Acceptable for initial development at typical indoor speeds (50–150 RPM, ~1.6–4.8 kHz). Monitor odometry drift under load as a health indicator.
+346|
+347|**Known upgrade path:** If software counting proves lossy, add a Raspberry Pi Pico as a dedicated encoder counter (and optionally PWM driver). The Pico communicates cumulative tick counts to the Pi over USB serial. The motor_controller process swaps GPIO reads for serial reads; the Zenoh interface does not change. Chassis design should reserve physical space for a Pico on the compute layer.
+348|
+349|**Stub deliverable:** A Python script that connects to Zenoh, subscribes to `cmd_vel` and `cmd_direct`, prints received commands, publishes synthetic odom at 50 Hz with incrementing timestamps and zero motion, publishes motor_state. No GPIO access.
+350|
+351|### 6.2 `lidar_driver`
+352|
+353|**Responsibility:** Acquire scans from STL-19P, publish to Zenoh.
+354|
+355|**Hardware ownership:** USB serial port (typically `/dev/ttyUSB0`).
+356|
+357|**Loop structure:**
+358|- Blocking read on serial port to accumulate a complete 360° scan.
+359|- Parse ranges and (if available) intensities.
+360|- Publish to `body/lidar/scan`.
+361|- The STL-19P drives the loop rate (~10 Hz). No sleep needed.
+362|
+363|**Configuration:**
+364|```
+365|SERIAL_PORT = "/dev/ttyUSB0"
+366|BAUD_RATE = 230400           # verify against STL-19P datasheet
+367|```
+368|
+369|**Stub deliverable:** A Python script that connects to Zenoh, publishes a synthetic scan at 10 Hz with plausible ranges (e.g., constant 2.0m in all directions). No serial access.
+370|
+371|### 6.3 `oakd_driver`
+372|
+373|**Responsibility:** Configure and run DepthAI pipeline on OAK-D-Lite, publish IMU and depth to Zenoh.
+374|
+375|**Hardware ownership:** OAK-D-Lite USB3.
+376|
+377|**Loop structure:**
+378|- Build DepthAI pipeline on startup (depth + IMU nodes, optionally RGB).
+379|- Main loop calls `device.getOutputQueue().get()` for each enabled stream.
+380|- Repackage into Zenoh messages and publish.
+381|- IMU at ~100 Hz, depth at ~15-30 Hz depending on resolution config.
+382|
+383|**Configuration:**
+384|```
+385|DEPTH_RESOLUTION = "400p"     # 640x400 stereo
+386|DEPTH_FPS = 15
+387|IMU_ENABLED = True
+388|RGB_ENABLED = False           # keep off unless needed, saves bandwidth
+389|```
+390|
+391|**Stub deliverable:** A Python script that connects to Zenoh, publishes synthetic IMU data at 100 Hz (gravity vector only) and a placeholder depth message at 15 Hz. No DepthAI access.
+392|
+393|### 6.4 `watchdog`
+394|
+395|**Responsibility:** Monitor system health, enforce safety stops.
+396|
+397|**Behavior:**
+398|- Subscribes to `body/heartbeat`. If no message received within `HEARTBEAT_TIMEOUT_MS`, publishes `body/emergency_stop` with reason `heartbeat_timeout`.
+399|- Periodically checks that all expected Zenoh topics are being published. If a process appears dead (no publications for `PROCESS_TIMEOUT_MS`), updates `body/status` accordingly.
+400|- On emergency stop: publishes `body/emergency_stop`. Clears stop condition only when heartbeat resumes AND Jill sends a new `cmd_vel` (explicit re-engagement, not automatic).
+401|- Publishes `body/status` at 1 Hz.
+402|
+403|**Configuration:**
+404|```
+405|HEARTBEAT_TIMEOUT_MS = 2000
+406|PROCESS_TIMEOUT_MS = 5000
+407|STATUS_PUBLISH_HZ = 1
+408|MONITORED_TOPICS = [
+409|    "body/odom",
+410|    "body/lidar/scan",
+411|    "body/oakd/imu"
+412|]
+413|```
+414|
+415|**Stub deliverable:** A Python script that connects to Zenoh, subscribes to `body/heartbeat`, publishes `body/status` at 1 Hz. Implements the heartbeat timeout logic. Publishes `body/emergency_stop` when heartbeat is lost. No dependency on other Body processes running.
+416|
+417|### 6.5 `launcher`
+418|
+419|**Responsibility:** Start all Body processes, monitor them, restart on crash, provide orderly shutdown.
+420|
+421|**Behavior:**
+422|- Reads a process list from a config file or hardcoded list.
+423|- Starts each process as a subprocess.
+424|- Captures stdout/stderr with process-name prefixes.
+425|- Monitors subprocess health. On unexpected exit, restarts with backoff (1s, 2s, 4s, max 30s).
+426|- On SIGTERM/SIGINT: sends SIGTERM to all children, waits up to 5s, then SIGKILL.
+427|
+428|**Process list (default):**
+429|```
+430|PROCESSES = [
+431|    {"name": "watchdog",         "cmd": ["python3", "watchdog.py"]},
+432|    {"name": "motor_controller", "cmd": ["python3", "motor_controller.py"]},
+433|    {"name": "lidar_driver",     "cmd": ["python3", "lidar_driver.py"]},
+434|    {"name": "oakd_driver",      "cmd": ["python3", "oakd_driver.py"]},
+435|]
+436|```
+437|
+438|Watchdog starts first. Motor controller before sensors (so it's listening for emergency stop before anything else is live).
+439|
+440|**Stub deliverable:** Fully functional launcher. This is not a stub — the launcher itself is hardware-independent and can be implemented completely in the first pass.
+441|
+442|## 7. Project Structure
+443|
+444|```
+445|body/
+446|  README.md
+447|  config.json              # zenoh connection, hardware params
+448|  launcher.py
+449|  watchdog.py
+450|  motor_controller.py
+451|  lidar_driver.py
+452|  oakd_driver.py
+453|  lib/
+454|    zenoh_helpers.py       # session setup, common publish/subscribe patterns
+455|    schemas.py             # message construction/validation helpers
+456|    diff_drive.py          # kinematic math (twist↔wheel, odometry integration)
+457|  requirements.txt         # zenoh, gpiozero, depthai, pyserial
+458|```
+459|
+460|## 8. Desktop-Side Assumptions
+461|
+462|The following assumptions apply to the desktop agent (Jill / CW) and are **out of scope** for this project but must be satisfied for the system to function:
+463|
+464|1. **Zenoh connectivity.** The desktop must connect to the Zenoh router running on the Pi at `tcp://<pi-ip>:7447`. This may require a new Zenoh session configuration in the CW infrastructure or a new "robot" tool/skill that manages the connection.
+465|
+466|2. **Heartbeat publication.** Jill (or a CW-side robot interface module) must publish `body/heartbeat` at ≥2 Hz whenever she expects the robot to be active. If she stops publishing, the robot stops moving. This is by design.
+467|
+468|3. **Command publication.** Jill publishes `body/cmd_vel` to drive the robot. She is responsible for rate-limiting her own commands sensibly (10–20 Hz is reasonable). She must respect the timeout semantics — if she wants the robot to keep moving, she must keep publishing.
+469|
+470|4. **Subscription and interpretation.** Jill subscribes to `body/odom`, `body/lidar/scan`, `body/oakd/imu`, `body/oakd/depth`, `body/status`, and `body/motor_state` as needed. She is responsible for interpreting these in her OODA loop.
+471|
+472|5. **Coordinate frame.** The robot's coordinate frame is: x-forward, y-left, z-up, angles CCW from x-axis. Odometry origin is the robot's position at boot time. Jill must manage any world-frame transforms on her side.
+473|
+474|6. **No guaranteed delivery.** Zenoh pub/sub is best-effort. Messages can be lost, especially over wifi. Jill should not depend on receiving every scan or odom update. The `cmd_vel` timeout mechanism handles the inverse case (lost commands → robot stops).
+475|
+476|7. **Emergency stop acknowledgment.** When `body/emergency_stop` fires, the robot will not move until heartbeat recovers AND a new `cmd_vel` is received. Jill should treat emergen
+…(truncated; 12522 chars total, capped at 10000; narrow the line range)
+
+--- iter 5 ---
+ACTION:
+{
+  "thought": "Finish spec 480-501, oakd_driver rates, and confirm no tests/gpiozero/pyserial.",
+  "tool": "read",
+  "file": "body_project_spec.md",
+  "start_line": 476,
+  "end_line": 505
+}
+OBSERVATION:
+OK: 476|7. **Emergency stop acknowledgment.** When `body/emergency_stop` fires, the robot will not move until heartbeat recovers AND a new `cmd_vel` is received. Jill should treat emergency stop as a state requiring explicit re-engagement, not automatic recovery.
+477|
+478|## 9. Implementation Sequence
+479|
+480|| Phase | Deliverable | Validates |
+481||---|---|---|
+482|| 1 | Zenoh topic spec (this document) | Contract between Body and desktop |
+483|| 2 | Launcher + all process stubs publishing synthetic data | Zenoh communication, process lifecycle, watchdog logic |
+484|| 3 | Desktop-side subscriber (minimal script or CW tool) confirming receipt of all topics | End-to-end network path |
+485|| 4 | Motor controller with real GPIO (no encoders yet) | PWM output, direction control, cmd_vel → wheel mapping |
+486|| 5 | Encoder reading + odometry | Closed-loop velocity, dead reckoning |
+487|| 6 | Lidar driver with real STL-19P | 2D scan data flowing to desktop |
+488|| 7 | OAK-D pipeline (IMU first, then depth) | 9-axis IMU, depth data |
+489|| 8 | Jill integration: robot body API as CW tool/skill | Agent-driven motion |
+490|
+491|Phase 2 is the critical milestone. Once it's running, every subsequent phase is swapping a stub for real hardware behind the same Zenoh interface.
+492|
+493|## 10. Open Questions
+494|
+495|- **Encoder software counting viability:** Pololu 4752 delivers 1920 CPR at output shaft, ~10.5 kHz edge rate at full speed. Software counting via `lgpio` is the initial approach. Monitor for missed counts at speed. Pico upgrade path documented in §6.1 if needed.
+496|- **OAK-D depth format:** JSON is impractical for full depth maps. Likely needs Zenoh raw bytes with a compact encoding. Decide during Phase 7.
+497|- **Config file format:** JSON for now. TOML or YAML if it gets complex. Don't over-think this.
+498|- **WiFi latency:** Zenoh over WiFi may introduce 5–50ms jitter. Acceptable for Jill's planning loop but worth measuring. If problematic, ethernet or a USB WiFi adapter with better antenna may help.
+499|- **Pi 5 GPIO library:** `gpiozero` backed by `lgpio` is the current recommendation for Pi 5. `RPi.GPIO` does not work on Pi 5. Confirm during Phase 4.
+500|- **Motor driver current sensing:** The MDD10A does not provide current feedback. If motor stall detection is needed later, it will require additional hardware (e.g., INA219 on I2C).
+501|- **Stall protection:** Pololu rates continuous load limit at 10 kg·cm. Stall current is 5.5A per motor. The MDD10A can handle this (10A per channel) but prolonged stall will damage the motors. Without current sensing, software stall detection (encoder velocity drops to zero while PWM is nonzero) is the available option.
+
+
+--- iter 6 ---
+ACTION:
+{
+  "thought": "Grep oakd rates, gpiozero, pyserial; list tests; read oakd_driver for IMU/depth Hz.",
+  "tool": "grep",
+  "pattern": "gpiozero|pyserial|100 Hz|15 Hz|IMU|DEPTH_FPS",
+  "path": "."
+}
+OBSERVATION:
+OK: README.md:9:[Omitted long matching line]
+body_project_spec.md:23:| OAK-D-Lite | USB3 (DepthAI) | Stereo depth, RGB, onboard IMU (BNO086) |
+body_project_spec.md:124:    imu              # IMU readings
+body_project_spec.md:373:**Responsibility:** Configure and run DepthAI pipeline on OAK-D-Lite, publish IMU and depth to Zenoh.
+body_project_spec.md:378:- Build DepthAI pipeline on startup (depth + IMU nodes, optionally RGB).
+body_project_spec.md:381:- IMU at ~100 Hz, depth at ~15-30 Hz depending on resolution config.
+body_project_spec.md:386:DEPTH_FPS = 15
+body_project_spec.md:387:IMU_ENABLED = True
+body_project_spec.md:391:**Stub deliverable:** A Python script that connects to Zenoh, publishes synthetic IMU data at 100 Hz (gravity vector only) and a placeholder depth message at 15 Hz. No DepthAI access.
+body_project_spec.md:457:  requirements.txt         # zenoh, gpiozero, depthai, pyserial
+body_project_spec.md:488:| 7 | OAK-D pipeline (IMU first, then depth) | 9-axis IMU, depth data |
+body_project_spec.md:499:- **Pi 5 GPIO library:** `gpiozero` backed by `lgpio` is the current recommendation for Pi 5. `RPi.GPIO` does not work on Pi 5. Confirm during Phase 4.
+body/oakd_driver.py:1:"""OAK-D Lite driver: DepthAI IMU pipeline, Zenoh publish, optional depth placeholder.
+body/oakd_driver.py:36:    return "IMU not detected" in msg or "IMU invalid settings" in msg
+body/oakd_driver.py:42:        "[oakd] DepthAI IMU error:\n"
+body/oakd_driver.py:44:        "  Falling back to synthetic IMU on Zenoh. To skip opening the OAK for IMU entirely, "
+body/oakd_driver.py:45:        "set oakd.imu_hardware_present to false. If you have a BNO IMU that needs flashing, set "
+body/oakd_driver.py:46:        "oakd.imu_enable_firmware_update to true (DepthAI v3 uses device.startIMUFirmwareUpdate), "
+body/oakd_driver.py:68:    # DepthAI v2: optional IMU node firmware flag (deprecated on v3 — use Device.startIMUFirmwareUpdate).
+body/oakd_driver.py:81:    imu.enableIMUSensor(dai.IMUSensor.ACCELEROMETER_RAW, accel_hz)
+body/oakd_driver.py:82:    imu.enableIMUSensor(dai.IMUSensor.GYROSCOPE_RAW, gyro_hz)
+body/oakd_driver.py:84:        imu.enableIMUSensor(dai.IMUSensor.ROTATION_VECTOR, rot_hz)
+body/oakd_driver.py:378:    """No DepthAI IMU (e.g. OAK-D-Lite Kickstarter boards without IMU): synthetic Zenoh traffic."""
+body/oakd_driver.py:399:    """IMU pipeline unusable: ColorCamera-only pipeline + synthetic IMU/depth on Zenoh (DepthAI v2)."""
+body/oakd_driver.py:412:            print("[oakd] RGB-only pipeline running (synthetic IMU/depth on Zenoh)", flush=True)
+body/oakd_driver.py:443:    """IMU unusable: StereoDepth + RGB + synthetic IMU; depth stream + optional capture_rgb (DepthAI v3)."""
+body/oakd_driver.py:465:        "[oakd] stereo + RGB pipeline running (synthetic IMU; depth uint16 stream on body/oakd/depth)",
+body/oakd_driver.py:482:    """DepthAI v3: optional BNO IMU flash via Device API. No-op if disabled in config."""
+body/oakd_driver.py:485:    print("[oakd] IMU firmware update: starting (keep USB connected; may take ~1–2 min)…", flush=True)
+body/oakd_driver.py:486:    device.startIMUFirmwareUpdate(False)
+body/oakd_driver.py:490:        done, progress = device.getIMUFirmwareUpdateStatus()
+body/oakd_driver.py:492:            print(f"[oakd] IMU firmware update: {progress:.0f}%", flush=True)
+body/oakd_driver.py:498:            print("[oakd] IMU firmware update: complete.", flush=True)
+body/oakd_driver.py:501:            f"[oakd] IMU firmware update failed (device reported done with progress={progress}). "
+body/oakd_driver.py:502:            "If this OAK-D-Lite has no IMU chip, set oakd.imu_hardware_present to false.",
+body/oakd_driver.py:506:        raise RuntimeError("IMU firmware update failed")
+body/oakd_driver.py:507:    raise TimeoutError("IMU firmware update timed out")
+body/oakd_driver.py:523:    imu = pipeline.create(dai.node.IMU)
+body/oakd_driver.py:561:            print("[oakd] IMU failed: trying RGB-only pipeline for capture_rgb", flush=True)
+body/oakd_driver.py:589:    imu = pipeline.create(dai.node.IMU)
+body/oakd_driver.py:607:            "[oakd] IMU failed: trying StereoDepth + optional RGB (synthetic IMU, depth stream)",
+body/oakd_driver.py:658:                "[oakd] imu_hardware_present=false — no DepthAI IMU node; "
+body/oakd_driver.py:659:                "Luxonis notes some OAK-D-Lite (e.g. Kickstarter) have no IMU chip.",
+
+--- iter 7 ---
+ACTION:
+{
+  "thought": "Need oakd_driver rate constants vs stub 100/15 Hz, plus tests/ and gpiozero/pyserial import confirmation.",
+  "tool": "grep",
+  "pattern": "gpiozero|pyserial|from serial|import serial",
+  "path": "."
+}
+OBSERVATION:
+OK: body_project_spec.md:457:  requirements.txt         # zenoh, gpiozero, depthai, pyserial
+body_project_spec.md:499:- **Pi 5 GPIO library:** `gpiozero` backed by `lgpio` is the current recommendation for Pi 5. `RPi.GPIO` does not work on Pi 5. Confirm during Phase 4.
+
+--- iter 8 ---
+ACTION:
+{
+  "thought": "Find oakd IMU/depth publish rates and confirm no tests/ plus no gpiozero/pyserial imports.",
+  "tool": "grep",
+  "pattern": "Hz|period|sleep|100|15",
+  "path": "body/oakd_driver.py"
+}
+OBSERVATION:
+OK: body/oakd_driver.py:47:        "keep USB stable, wait for 100%.",
+body/oakd_driver.py:174:        time.sleep(0.005)
+body/oakd_driver.py:242:    depth_period: float,
+body/oakd_driver.py:324:            next_depth += depth_period
+body/oakd_driver.py:327:            time.sleep(0.001)
+body/oakd_driver.py:334:    depth_period: float,
+body/oakd_driver.py:366:            next_depth += depth_period
+body/oakd_driver.py:367:        time.sleep(0.02)
+body/oakd_driver.py:374:    depth_period: float,
+body/oakd_driver.py:383:        depth_period,
+body/oakd_driver.py:395:    depth_period: float,
+body/oakd_driver.py:417:                depth_period,
+body/oakd_driver.py:428:            depth_period,
+body/oakd_driver.py:439:    depth_period: float,
+body/oakd_driver.py:458:            depth_period,
+body/oakd_driver.py:473:            depth_period,
+body/oakd_driver.py:495:            time.sleep(0.15)
+body/oakd_driver.py:515:    depth_period: float,
+body/oakd_driver.py:551:                depth_period,
+body/oakd_driver.py:563:                oakd_cfg, dev_info, session, interval_s, depth_period, stop_ref, config_pending
+body/oakd_driver.py:570:                depth_period,
+body/oakd_driver.py:581:    depth_period: float,
+body/oakd_driver.py:611:            oakd_cfg, dev_info, session, interval_s, depth_period, stop_ref, config_pending
+body/oakd_driver.py:620:            depth_period,
+body/oakd_driver.py:636:    depth_fps = float(oakd_cfg.get("depth_fps", 15))
+body/oakd_driver.py:637:    depth_period = 1.0 / max(1.0, depth_fps)
+body/oakd_driver.py:663:                session, oakd_cfg, interval_s, depth_period, stop_ref, config_pending
+body/oakd_driver.py:678:                    oakd_cfg, dev_info, session, interval_s, depth_period, stop_ref, config_pending
+body/oakd_driver.py:682:                    oakd_cfg, dev_info, session, interval_s, depth_period, stop_ref, config_pending
+
+--- iter 9 ---
+ACTION:
+{
+  "thought": "Read oakd_driver rate setup and requirements; list for tests/; grep import gpiozero/serial in body/.",
+  "tool": "read",
+  "file": "body/oakd_driver.py",
+  "start_line": 620,
+  "end_line": 670
+}
+OBSERVATION:
+OK: 620|            depth_period,
+621|            _continue,
+622|            config_pending,
+623|            rgb_queue_v3,
+624|            depth_queue_v3,
+625|        )
+626|
+627|
+628|def main() -> None:
+629|    body_cfg = zenoh_helpers.load_body_config()
+630|    oakd_cfg = body_cfg.get("oakd", {})
+631|    if not oakd_cfg.get("imu_enabled", True):
+632|        print("oakd_driver: imu_enabled is false; nothing to run", file=sys.stderr)
+633|        sys.exit(1)
+634|
+635|    interval_s = float(oakd_cfg.get("imu_aggregate_interval_s", 1.0))
+636|    depth_fps = float(oakd_cfg.get("depth_fps", 15))
+637|    depth_period = 1.0 / max(1.0, depth_fps)
+638|    device_id = oakd_cfg.get("device_id")
+639|
+640|    session = zenoh_helpers.open_session(body_cfg)
+641|    config_pending: queue.Queue[dict[str, Any]] = queue.Queue()
+642|
+643|    def on_oakd_config(_key: str, msg: dict[str, Any]) -> None:
+644|        config_pending.put(msg)
+645|
+646|    zenoh_helpers.declare_subscriber_json(session, "body/oakd/config", on_oakd_config)
+647|    stop_ref: list[bool] = [False]
+648|
+649|    def handle_sigterm(_sig: int, _frame: Any) -> None:
+650|        stop_ref[0] = True
+651|
+652|    signal.signal(signal.SIGTERM, handle_sigterm)
+653|    signal.signal(signal.SIGINT, handle_sigterm)
+654|
+655|    try:
+656|        if not oakd_cfg.get("imu_hardware_present", True):
+657|            print(
+658|                "[oakd] imu_hardware_present=false — no DepthAI IMU node; "
+659|                "Luxonis notes some OAK-D-Lite (e.g. Kickstarter) have no IMU chip.",
+660|                flush=True,
+661|            )
+662|            _run_stub_imu_publisher(
+663|                session, oakd_cfg, interval_s, depth_period, stop_ref, config_pending
+664|            )
+665|        else:
+666|            dev_info = _pick_device(device_id if isinstance(device_id, str) else None)
+667|            if dev_info is None:
+668|                print(
+669|                    "oakd_driver: no DepthAI device found (connect OAK-D-Lite, check udev / USB)",
+670|                    file=sys.stderr,
+
+
+--- iter 10 ---
+ACTION:
+{
+  "thought": "Need IMU Hz vs 100Hz stub, tests/ absence, requirements.txt, and oakd config defaults.",
+  "tool": "read",
+  "file": "config.json"
+}
+OBSERVATION:
+OK: 1|{
+2|  "zenoh": {
+3|    "connect_endpoints": ["tcp/127.0.0.1:7447"]
+4|  },
+5|  "motor": {
+6|    "wheel_base_m": 0.0,
+7|    "wheel_radius_m": 0.0,
+8|    "ticks_per_rev": 1920,
+9|    "max_wheel_vel_ms": 0.0,
+10|    "loop_hz": 50,
+11|    "cmd_timeout_ms": 500,
+12|    "pwm_frequency_hz": 1000
+13|  },
+14|  "lidar": {
+15|    "serial_port": "/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0",
+16|    "baud_rate": 230400,
+17|    "publish_hz": 10
+18|  },
+19|  "oakd": {
+20|    "depth_resolution": "400p",
+21|    "depth_fps": 10,
+22|    "depth_out_width": 80,
+23|    "depth_out_height": 60,
+24|    "stereo_rectification": true,
+25|    "stereo_extended_disparity": true,
+26|    "stereo_left_right_check": true,
+27|    "imu_enabled": true,
+28|    "rgb_enabled": true,
+29|    "rgb_preview_width": 640,
+30|    "rgb_preview_height": 400,
+31|    "imu_aggregate_interval_s": 1.0,
+32|    "imu_accel_hz": 500,
+33|    "imu_gyro_hz": 400,
+34|    "imu_rotation_vector_hz": 400,
+35|    "rotation_vector_enabled": true,
+36|    "imu_enable_firmware_update": false,
+37|    "imu_hardware_present": true,
+38|    "device_id": null
+39|  },
+40|  "watchdog": {
+41|    "heartbeat_timeout_ms": 2000,
+42|    "process_timeout_ms": 5000,
+43|    "status_publish_hz": 1,
+44|    "monitored_topics": [
+45|      "body/odom",
+46|      "body/lidar/scan",
+47|      "body/oakd/imu"
+48|    ]
+49|  }
+50|}
+
+
+--- iter 11 ---
+ACTION:
+{
+  "thought": "Read stub IMU publisher and requirements; list tests; grep body/ for gpiozero/serial imports.",
+  "tool": "read",
+  "file": "body/oakd_driver.py",
+  "start_line": 330,
+  "end_line": 390
+}
+OBSERVATION:
+OK: 330|def _run_synthetic_imu_depth_config_loop(
+331|    session: Any,
+332|    oakd_cfg: dict[str, Any],
+333|    interval_s: float,
+334|    depth_period: float,
+335|    stop_ref: list[bool],
+336|    config_pending: queue.Queue[dict[str, Any]],
+337|    rgb_queue: Any | None,
+338|    depth_queue: Any | None = None,
+339|) -> None:
+340|    """Synthetic ``body/oakd/imu``; depth placeholder or StereoDepth stream; optional ``rgb_queue``."""
+341|    next_imu = time.monotonic()
+342|    next_depth = time.monotonic()
+343|    while not stop_ref[0]:
+344|        _process_oakd_config_queue(session, config_pending, rgb_queue)
+345|        now = time.monotonic()
+346|        if now >= next_imu:
+347|            zenoh_helpers.publish_json(session, "body/oakd/imu", schemas.oakd_imu())
+348|            next_imu += interval_s
+349|        if now >= next_depth:
+350|            if depth_queue is not None:
+351|                df = _depth_drain_latest(depth_queue)
+352|                if df is not None:
+353|                    dw, dh = _depth_output_dims(oakd_cfg)
+354|                    try:
+355|                        zenoh_helpers.publish_json(
+356|                            session,
+357|                            "body/oakd/depth",
+358|                            _depth_frame_to_stream_msg(df, dw, dh),
+359|                        )
+360|                    except Exception as e:
+361|                        print(f"[oakd] depth stream encode error: {e}", file=sys.stderr, flush=True)
+362|            else:
+363|                zenoh_helpers.publish_json(
+364|                    session, "body/oakd/depth", schemas.oakd_depth_placeholder()
+365|                )
+366|            next_depth += depth_period
+367|        time.sleep(0.02)
+368|
+369|
+370|def _run_stub_imu_publisher(
+371|    session: Any,
+372|    oakd_cfg: dict[str, Any],
+373|    interval_s: float,
+374|    depth_period: float,
+375|    stop_ref: list[bool],
+376|    config_pending: queue.Queue[dict[str, Any]],
+377|) -> None:
+378|    """No DepthAI IMU (e.g. OAK-D-Lite Kickstarter boards without IMU): synthetic Zenoh traffic."""
+379|    _run_synthetic_imu_depth_config_loop(
+380|        session,
+381|        oakd_cfg,
+382|        interval_s,
+383|        depth_period,
+384|        stop_ref,
+385|        config_pending,
+386|        None,
+387|    )
+388|
+389|
+390|def _run_depthai_v2_rgb_only(
+
+
+--- iter 12 ---
+ACTION:
+{
+  "thought": "Confirm no tests/ dir and no gpiozero/pyserial imports in code, then deliver quoted answer.",
+  "tool": "grep",
+  "pattern": "import gpiozero|from gpiozero|import serial|from serial|import pyserial",
+  "path": "."
+}
+OBSERVATION:
+EMPTY: no matches for pattern 'import gpiozero|from gpiozero|import serial|from serial|import pyserial' in .
+
+FINAL ANSWER:
+(inspect_external: hit max iterations without responding; consider narrowing the query)
+
+PARTIAL — what this call did find before it ran out, unsummarised:
+  step 1: OK: ./
+body/	DIR
+deploy/	DIR
+docs/	DIR
+scripts/	DIR
+.gitignore	4689 bytes
+body_project_spec.md	22343 bytes
+config.json	1219 bytes
+LICENSE	1073 bytes
+README.md	8664 bytes
+requirements.txt	69 bytes
+  step 2: OK: 1|"""Start Body processes, prefix logs, restart with backoff, graceful shutdown."""
+2|
+3|from __future__ import annotations
+4|
+5|import os
+6|import signal
+7|import subprocess
+8|import sys
+9|import threading
+10|import time
+11|from dataclasses import dataclass, field
+12|from typing import Any
+13|
+14|from body.lib.zenoh_helpers import repo_root
+15|
+16|PROCESSES: list[dict[str, Any]] = [
+17|    {"name": "watchdog", "cmd": [sys.executable, "-m", "body.watchdog"]},
+18|    {"name": "motor_controller", "cmd": [sys.executable, "-m", "body.motor_controller"]},
+19|    {"name": "lidar_driver", "cmd": …[trimmed]
+  step 3: OK: 1|"""Zenoh session setup and JSON pub/sub helpers."""
+2|
+3|from __future__ import annotations
+4|
+5|import json
+6|import os
+7|from pathlib import Path
+8|from typing import Any, Callable
+9|
+10|import zenoh
+11|
+12|
+13|def repo_root() -> Path:
+14|    """Repository root (directory containing config.json)."""
+15|    return Path(__file__).resolve().parents[2]
+16|
+17|
+18|def load_body_config(path: Path | None = None) -> dict[str, Any]:
+19|    """Load JSON config; merge Zenoh endpoints from env when set."""
+20|    cfg_path = path or (repo_root() / "config.json")
+21|    with open(cfg_path, encoding= …[trimmed]
+  step 4: OK: 280|### 5.10 `body/emergency_stop` (watchdog → motor_controller)
+281|
+282|```json
+283|{
+284|  "ts": 1713264000.123456,
+285|  "reason": "heartbeat_timeout",
+286|  "source": "watchdog"
+287|}
+288|```
+289|
+290|Motor controller immediately sets PWM to zero on receipt. Latched: motor output stays at zero until a new `cmd_vel` is received AND `e_stop_active` is cleared by the watchdog (which requires heartbeat recovery).
+291|
+292|## 6. Process Specifications
+293|
+294|### 6.1 `motor_controller`
+295|
+296|**Responsibility:** Translate velocity commands into PWM output. Read encoders. Publish odometr …[trimmed]
+  step 5: OK: 476|7. **Emergency stop acknowledgment.** When `body/emergency_stop` fires, the robot will not move until heartbeat recovers AND a new `cmd_vel` is received. Jill should treat emergency stop as a state requiring explicit re-engagement, not automatic recovery.
+477|
+478|## 9. Implementation Sequence
+479|
+480|| Phase | Deliverable | Validates |
+481||---|---|---|
+482|| 1 | Zenoh topic spec (this document) | Contract between Body and desktop |
+483|| 2 | Launcher + all process stubs publishing synthetic data | Zenoh communication, process lifecycle, watchdog logic |
+484|| 3 | Desktop-side subscr …[trimmed]
+  step 6: OK: README.md:9:[Omitted long matching line]
+body_project_spec.md:23:| OAK-D-Lite | USB3 (DepthAI) | Stereo depth, RGB, onboard IMU (BNO086) |
+body_project_spec.md:124:    imu              # IMU readings
+body_project_spec.md:373:**Responsibility:** Configure and run DepthAI pipeline on OAK-D-Lite, publish IMU and depth to Zenoh.
+body_project_spec.md:378:- Build DepthAI pipeline on startup (depth + IMU nodes, optionally RGB).
+body_project_spec.md:381:- IMU at ~100 Hz, depth at ~15-30 Hz depending on resolution config.
+body_project_spec.md:386:DEPTH_FPS = 15
+body_project_spec.md:387:IMU_ENABLED …[trimmed]
+  step 7: OK: body_project_spec.md:457:  requirements.txt         # zenoh, gpiozero, depthai, pyserial
+body_project_spec.md:499:- **Pi 5 GPIO library:** `gpiozero` backed by `lgpio` is the current recommendation for Pi 5. `RPi.GPIO` does not work on Pi 5. Confirm during Phase 4.
+  step 8: OK: body/oakd_driver.py:47:        "keep USB stable, wait for 100%.",
+body/oakd_driver.py:174:        time.sleep(0.005)
+body/oakd_driver.py:242:    depth_period: float,
+body/oakd_driver.py:324:            next_depth += depth_period
+body/oakd_driver.py:327:            time.sleep(0.001)
+body/oakd_driver.py:334:    depth_period: float,
+body/oakd_driver.py:366:            next_depth += depth_period
+body/oakd_driver.py:367:        time.sleep(0.02)
+body/oakd_driver.py:374:    depth_period: float,
+body/oakd_driver.py:383:        depth_period,
+body/oakd_driver.py:395:    depth_period: float,
+body/oakd …[trimmed]
+  step 9: OK: 620|            depth_period,
+621|            _continue,
+622|            config_pending,
+623|            rgb_queue_v3,
+624|            depth_queue_v3,
+625|        )
+626|
+627|
+628|def main() -> None:
+629|    body_cfg = zenoh_helpers.load_body_config()
+630|    oakd_cfg = body_cfg.get("oakd", {})
+631|    if not oakd_cfg.get("imu_enabled", True):
+632|        print("oakd_driver: imu_enabled is false; nothing to run", file=sys.stderr)
+633|        sys.exit(1)
+634|
+635|    interval_s = float(oakd_cfg.get("imu_aggregate_interval_s", 1.0))
+636|    depth_fps = float(oakd_cfg.get("depth_fps", 15))
+637 …[trimmed]
+…[3 further observations omitted for length]

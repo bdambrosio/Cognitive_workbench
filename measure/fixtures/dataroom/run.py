@@ -3,7 +3,7 @@
 
     python3 measure/fixtures/dataroom/run.py --world dataroom_1
     python3 measure/fixtures/dataroom/run.py --world dataroom_2 \
-            --arm measure/arms/nemotron_fp8.yaml --max-turns 20
+            --model measure/models/nemotron_fp8.yaml --max-turns 20
 
 Loads `scenarios/audit.yaml`, points `inspect_external` at the fixture
 corpus, gives the brief as the opening turn, then drives "continue" for as
@@ -20,9 +20,9 @@ sensor, so a run is deterministic in its leg count and a stall is visible as
 a stall rather than as a missing tick. Concern CREATION happens in-turn and
 needs no autonomy; only FIRING is gated.
 
-WHY THE ARM REPLACES llm_config RATHER THAN MERGING. A merge lets a stale
+WHY THE MODEL REPLACES llm_config RATHER THAN MERGING. A merge lets a stale
 field from the scenario — an api_key, a reasoning_effort — survive into an
-arm that never declared one, which is the silent second variable this exists
+model that never declared one, which is the silent second variable this exists
 to avoid. Shape and rationale recovered from the retired bench/common.py.
 """
 
@@ -80,7 +80,7 @@ _GAP_RE = re.compile(r"\s+".join(re.escape(t) for t in GAP_MARK.split()))
 #
 # Added 2026-08-25: the claim sources. §2 defines a claim as something the
 # SELLER asserts to the buyer, which makes doc3-doc8 evidence rather than
-# claims — but deciding that per run is a judgement, and three arms made it
+# claims — but deciding that per run is a judgement, and three models made it
 # three ways. Measured: counts of 62, 67 and 273 on identical materials, then
 # 44, 21 and 321 under one definition and 66, 108 and none under another. The
 # engagement names the sources instead; §12 step 1 says so. This is the client
@@ -157,24 +157,24 @@ def engagement_state(world: str, agent: str, leg: int, max_legs: int,
     return head + ".]"
 
 
-def verify_served_model(arm: Dict[str, Any], timeout: float = 10.0
+def verify_served_model(model: Dict[str, Any], timeout: float = 10.0
                         ) -> Dict[str, Any]:
     """Ask the server what it is serving, and refuse to run if it is not the
-    arm we think we are measuring.
+    model we think we are measuring.
 
     Recovered from the retired bench/common.py on 2026-08-22, the day it was
-    needed: both local arms declare model:"" (whatever is served), so when the
-    box switched from Qwen to Gemma the qwen arm would have produced a Gemma
+    needed: both local models declare model:"" (whatever is served), so when the
+    box switched from Qwen to Gemma the qwen model would have produced a Gemma
     run labelled Qwen. A comparison whose backend identity rests on
     recollection is not a comparison. The result is recorded verbatim into
     run_meta.json so a row can always name its own backend.
     """
     import urllib.request, urllib.error
-    expect = arm.get("expects_served_model")
+    expect = model.get("expects_served_model")
     if not expect:
-        return {"checked": False, "reason": "cloud arm — nothing to interrogate",
-                "served": (arm.get("llm_config") or {}).get("model")}
-    base = ((arm.get("llm_config") or {}).get("vllm_url") or "").rstrip("/")
+        return {"checked": False, "reason": "cloud model — nothing to interrogate",
+                "served": (model.get("llm_config") or {}).get("model")}
+    base = ((model.get("llm_config") or {}).get("vllm_url") or "").rstrip("/")
     if base.endswith("/v1"):
         base = base[:-3]
     url = f"{base}/v1/models"
@@ -189,13 +189,13 @@ def verify_served_model(arm: Dict[str, Any], timeout: float = 10.0
     served = [m.get("id", "") for m in (payload.get("data") or [])]
     if not any(expect.lower() in s.lower() for s in served):
         raise SystemExit(
-            f"arm expects a model matching {expect!r} but {url} is serving "
+            f"model expects a model matching {expect!r} but {url} is serving "
             f"{served}. Restart on the right model, or this row is mislabelled.")
     return {"checked": True, "endpoint": url, "served": served,
             "expected": expect}
 
 
-def build_config(world: str, arm_path: Optional[Path],
+def build_config(world: str, model_path: Optional[Path],
                  workflow_mode: Optional[bool] = None,
                  temperature: Optional[float] = None,
                  max_tokens: Optional[int] = None,
@@ -206,16 +206,16 @@ def build_config(world: str, arm_path: Optional[Path],
     scenario = yaml.safe_load(SCENARIO.read_text(encoding="utf-8")) or {}
     scen_llm = dict(scenario.get("llm_config") or {})
 
-    arm_llm = None
-    if arm_path:
-        arm = yaml.safe_load(Path(arm_path).read_text(encoding="utf-8")) or {}
-        arm_llm = dict(arm.get("llm_config") or {})
-        if not arm_llm:
-            raise SystemExit(f"{arm_path}: no llm_config block")
+    model_llm = None
+    if model_path:
+        model = yaml.safe_load(Path(model_path).read_text(encoding="utf-8")) or {}
+        model_llm = dict(model.get("llm_config") or {})
+        if not model_llm:
+            raise SystemExit(f"{model_path}: no llm_config block")
         for char in (scenario.get("characters") or {}).values():
             if isinstance(char, dict) and char.get("mode") == "chat":
-                char["llm_config"] = dict(arm_llm)   # REPLACE, never merge
-        scen_llm.update(arm_llm)
+                char["llm_config"] = dict(model_llm)   # REPLACE, never merge
+        scen_llm.update(model_llm)
 
     world_cfg = dict(scenario.get("world_config") or {})
     world_cfg["world_name"] = world
@@ -287,7 +287,7 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--world", required=True,
                     help="fresh world name; never reuse one")
-    ap.add_argument("--arm", type=Path, default=None,
+    ap.add_argument("--model", type=Path, default=None,
                     help="YAML with an llm_config block; replaces the scenario's")
     ap.add_argument("--max-turns", type=int, default=25,
                     help="hard cap on legs (default 25)")
@@ -319,8 +319,8 @@ def main() -> int:
     out = HERE / "results" / f"{ts}_{args.world}"
     out.mkdir(parents=True, exist_ok=True)
 
-    arm_doc = (yaml.safe_load(Path(args.arm).read_text(encoding="utf-8"))
-               if args.arm else {})
+    arm_doc = (yaml.safe_load(Path(args.model).read_text(encoding="utf-8"))
+               if args.model else {})
     served_check = verify_served_model(arm_doc)
     if served_check.get("checked"):
         logger.info("served-model check OK: %s", served_check["served"])
@@ -334,10 +334,10 @@ def main() -> int:
             "that to an agent pointed at a different target is the "
             "kind of mismatch that produces a confident report about "
             "the wrong thing.")
-    name, cfg = build_config(args.world, args.arm, wf_mode,
+    name, cfg = build_config(args.world, args.model, wf_mode,
                              args.temperature, args.max_tokens,
                              args.external_repo)
-    logger.info("world=%s arm=%s model=%s", args.world, args.arm,
+    logger.info("world=%s model=%s model=%s", args.world, args.model,
                 (cfg.get("llm_config") or {}).get("model") or "(scenario default)")
 
     from chat.chat_loop import ChatLoop                        # noqa: E402
@@ -387,7 +387,7 @@ def main() -> int:
                 break
             # THE RUNNER DRIVES; THE SCORER JUDGES. This loop used to continue
             # until `=== GAP MAP ===` appeared in a reply, because "done is a
-            # deliverable, not an exit reason": on 2026-08-22 an arm wrote "I
+            # deliverable, not an exit reason": on 2026-08-22 an model wrote "I
             # will now begin working the priority order", ended the turn, and
             # was scored as complete. But detecting completeness by matching a
             # string in prose is what that check actually was, and score.py
@@ -402,7 +402,7 @@ def main() -> int:
                     args.world, name, i + 2, args.max_turns,
                     time.time() - t0, fixture=args.external_repo is None)
                 continue
-            # SALVAGE. An arm may emit both documents in one turn whatever the
+            # SALVAGE. An model may emit both documents in one turn whatever the
             # brief says. Splitting that is strictly better than spending a leg
             # asking for a Gap Map it has already written.
             if _GAP_RE.search(reply):
@@ -432,7 +432,7 @@ def main() -> int:
     # which is not somewhere a human reads a report from.
     # TWO TURNS, TWO FILES (§16). The runner asked for each, so it knows which
     # reply is which and nothing is parsed out of prose. The marker path
-    # survives only as salvage, for an arm that emitted both in one turn.
+    # survives only as salvage, for an model that emitted both in one turn.
     final = latest_reply(loop, SOURCE)
     if final:
         (out / "full_reply.md").write_text(final, encoding="utf-8")
@@ -515,7 +515,7 @@ def main() -> int:
 
     (out / "run_meta.json").write_text(json.dumps({
         "world": args.world,
-        "arm": str(args.arm) if args.arm else "(scenario default)",
+        "model_config": str(args.model) if args.model else "(scenario default)",
         "workflow_mode": bool(cfg.get("workflow_mode")),
         "react_temperature": (cfg.get("chat") or {}).get(
             "react_temperature", 0.7),

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Enumerate the claim surface and stop. One leg, no verification.
 
-    python3 measure/fixtures/dataroom/claims.py --world c1_grok --arm measure/arms/grok_4p6.yaml
+    python3 measure/fixtures/dataroom/claims.py --world c1_grok --model measure/models/grok_4p6.yaml
 
 WHAT THIS IS FOR. The claim count is the denominator every coverage figure in
 a report divides by, and it has not been stable: given the same nine documents
@@ -82,7 +82,7 @@ def extract(world: str, agent: str) -> dict:
         tail = body.split(SURFACE_MARK, 1)[1]
         m = re.search(r"(\d[\d,]*)\s+\S*claims\b", tail, re.I)
         # A MARKER WITHOUT A COUNT IS NOT A CLOSURE, and it is often not even
-        # an emission: an arm that quotes the instruction back into a tool
+        # an emission: an model that quotes the instruction back into a tool
         # query puts the literal marker in its own working log. Declaring on
         # the marker alone reported declared=True / count=None for a run whose
         # five inspection attempts all returned nothing. Same rule as
@@ -104,7 +104,7 @@ def extract(world: str, agent: str) -> dict:
 
 # Reused from overlap.py rather than kept as a second copy: this one matched
 # only the fixture's `docN` form and returned {} for every real target, whose
-# arms cite `README.md:9`. One parser, one set of fixes.
+# models cite `README.md:9`. One parser, one set of fixes.
 from measure.fixtures.dataroom.overlap import per_document   # noqa: E402,F401
 
 
@@ -112,7 +112,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--world", required=True, help="fresh world name; never reuse one")
-    ap.add_argument("--arm", type=Path, default=None,
+    ap.add_argument("--model", type=Path, default=None,
                     help="YAML with an llm_config block; replaces the scenario's")
     ap.add_argument("--brief-file", type=Path, default=None,
                     help="brief for a target other than the fixture")
@@ -130,7 +130,7 @@ def main() -> int:
     out = HERE / "claims" / f"{ts}_{args.world}"
     out.mkdir(parents=True, exist_ok=True)
 
-    name, cfg = build_config(args.world, args.arm, None, None, None,
+    name, cfg = build_config(args.world, args.model, None, None, None,
                              args.external_repo)
 
     from chat.chat_loop import ChatLoop                        # noqa: E402
@@ -166,7 +166,7 @@ def main() -> int:
     surface = extract(args.world, name)
     meta = {
         "world": args.world,
-        "arm": str(args.arm) if args.arm else None,
+        "model_config": str(args.model) if args.model else None,
         "resolved_model": resolved_model,
         "resolved_temperature": resolved_temperature,
         "top_p": TOP_P,

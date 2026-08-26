@@ -335,7 +335,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # for an agent executing a procedure, which wants the most likely
         # action rather than a sampled one.
         #
-        # Measured 2026-08-23: four runs of one arm on one config produced
+        # Measured 2026-08-23: four runs of one model on one config produced
         # four different strategies — 11 document reads and no arithmetic in
         # one, a calculator and a script in another, 10 tool calls against
         # 16. At 0.7 across 10-16 sequential choices, each sampled action
@@ -345,9 +345,9 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         #
         # Deliberately NOT part of workflow_mode. Bundling it would change
         # what that flag means and invalidate the runs already scored under
-        # it; one variable at a time is the whole point of the arm mechanism.
+        # it; one variable at a time is the whole point of the model mechanism.
         # None means "resolve from the model" (src/chat/model_params.py). It
-        # was 0.7, and because no scenario or arm ever set react_temperature,
+        # was 0.7, and because no scenario or model ever set react_temperature,
         # that literal WAS the temperature of every run this project has made.
         # A default nobody chose is not a default; it is a silent variable.
         _rt = (character_config.get('chat') or {}).get('react_temperature')
@@ -470,10 +470,10 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # WHY IT EXISTS. `inspect` reads this checkout, and this checkout
         # contains measure/fixtures/dataroom/ — the audit fixture's
         # answer_key.md ("Do not place this file where an agent under test
-        # can read it", its own line 3), plus every prior arm's committed
+        # can read it", its own line 3), plus every prior model's committed
         # report.md. An audit run could grep its way to the answers. Observed
         # 2026-08-23: a run's grep for "Gap Map"/"claim surface" returned a
-        # previous arm's full_reply.md among its hits.
+        # previous model's full_reply.md among its hits.
         self._inspect_root: Optional[Path] = None
         yaml_inspect = (character_config.get('inspect_repo') or '').strip()
         if yaml_inspect:

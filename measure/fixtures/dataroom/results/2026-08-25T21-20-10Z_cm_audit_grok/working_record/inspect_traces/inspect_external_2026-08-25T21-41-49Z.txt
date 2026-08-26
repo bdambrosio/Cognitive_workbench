@@ -1,0 +1,391 @@
+================================================================================
+[inspect_external] 2026-08-25T21-41-49Z exit=respond iters=10
+================================================================================
+Query: Read README.md line 54 and around 410-425 for FAQ 300/15000/100000/30s claims with numbers. Read backend/app/api/workflow_node.py around 240-280 for multi-language. Grep default_language language_code in frontend and backend. Grep chattermate-cli and chattermate-deploy in repo. Read llms.txt with line numbers. Confirm wordpress directory listing.
+
+--- iter 1 ---
+ACTION:
+{
+  "thought": "Start at repo root and README.md, then drill into the cited files and greps.",
+  "tool": "list",
+  "path": "."
+}
+OBSERVATION:
+OK: ./
+.github/	DIR
+backend/	DIR
+chattermate-test/	DIR
+frontend/	DIR
+temp/	DIR
+wordpress/	DIR
+.coverage	167936 bytes
+.gitignore	1655 bytes
+.gitmodules	323 bytes
+CONTRIBUTING.md	2635 bytes
+DCO	1421 bytes
+docker-compose.prod.yml	5620 bytes
+docker-compose.yml	6009 bytes
+Dockerfile	2375 bytes
+Dockerfile.backend.prod	2472 bytes
+Dockerfile.frontend	967 bytes
+Dockerfile.frontend.prod	2040 bytes
+Dockerfile.postgres	983 bytes
+HELP_CENTER_INFRA.md	9577 bytes
+LICENSE	11358 bytes
+llms.txt	2765 bytes
+NOTICE	226 bytes
+README.md	27476 bytes
+relicense_headers.py	5561 bytes
+tsconfig.json	53 bytes
+
+--- iter 2 ---
+ACTION:
+{
+  "thought": "Read README.md around line 54 and 410-425 for FAQ numeric claims.",
+  "tool": "read",
+  "file": "README.md",
+  "start_line": 45,
+  "end_line": 70
+}
+OBSERVATION:
+OK: 45|
+46|| Feature | Description |
+47||---------|-------------|
+48|| 🤝 **Smart Human Handoff** | Intelligent AI-to-human transfer with **business hours awareness**, real-time availability detection, and context-aware escalation messages. |
+49|| 🛍️ **Shopify & E-commerce Support** | Native **Shopify integration** ([App Store listing](https://apps.shopify.com/chattermate-chat)) — answer order, shipping, and product questions from store data. Works for any online store. |
+50|| 📝 **WordPress Plugin** | Official **WordPress plugin** ([download](https://github.com/chattermate/chattermate-wordpress-plugin/releases/latest/download/chattermate-chat.zip)) — add the chat widget to any WordPress site by entering your Widget ID. No theme edits required. |
+51|| 🧠 **Multi-Model AI Support** | Choose your AI provider — **OpenAI**, **Anthropic (Claude)**, **Google Gemini**, **Mistral**, **xAI (Grok)**, **DeepSeek**, and **Groq** — with your own API key, or enter a custom model ID. Switch providers anytime without code changes. |
+52|| 💬 **Ask Anything Mode** | Let visitors start conversations instantly — no signup or email required. Perfect for Q&A, documentation assistants, and exploratory chat experiences. |
+53|| 📎 **File Attachments** | Customers can share **images, PDFs, Word docs, spreadsheets**, and more directly in chat. Secure uploads with S3 storage and magic byte validation. |
+54|| 🌍 **Auto Translation** | Multilingual support with configurable **default language per workflow**. Serve customers globally in their preferred language. |
+55|| 🎫 **AI Ticketing** | Native tickets raised straight from chat, then **auto-triaged and investigated by AI** — it forms hypotheses, gathers evidence from your observability tools and databases, and writes a root-cause analysis you can read and audit. See [AI Ticketing](#ai-ticketing). |
+56|| 🔗 **Jira Ticket Creation** | Create and manage **Jira tickets directly from chat** conversations. OAuth 2.0 secure integration with automatic ticket tracking. Native tickets can also escalate to Jira one-way. |
+57|| 🔑 **Widget Authentication** | **Token-based security** for embedded widgets. Support both public Q&A and private authenticated conversations. |
+58|| 💼 **Slack Integration** | Connect your **Slack workspace** for internal product support. Teams get AI-powered assistance directly in Slack channels. |
+59|| 🧩 **Visual Workflow Builder** | Design conversation flows with a **drag-and-drop interface**. Branching logic, conditional responses, and multi-step workflows without coding. |
+60|
+61|### Workflow Builder
+62|
+63|Build sophisticated conversation flows visually with our intuitive workflow builder:
+64|
+65|![No-code AI chatbot workflow builder with drag-and-drop nodes and human handoff](.github/images/workflow-builder.webp)
+66|
+67|**Workflow Builder Features:**
+68|- **Drag-and-drop nodes** - AI responses, human handoff, conditions, and more
+69|- **Branching logic** - Create different paths based on user input
+70|- **Node types** - Start, AI Response, Human Transfer, Condition, End nodes
+
+
+--- iter 3 ---
+ACTION:
+{
+  "thought": "Read README.md FAQ around lines 410-425 for numeric claims 300/15000/100000/30s.",
+  "tool": "read",
+  "file": "README.md",
+  "start_line": 400,
+  "end_line": 430
+}
+OBSERVATION:
+OK: 400|
+401|Run each from the `backend/` directory with the virtualenv active.
+402|
+403|**FAQ / Help Center processor.** FAQ generation and import jobs (Generate FAQs,
+404|"Migrate an existing help center", PDF import) are drained by the *knowledge
+405|worker* — there is no separate FAQ container. Both knowledge entrypoints pick
+406|up the FAQ queue, so either one is enough:
+407|
+408|```bash
+409|# Recommended for local dev — knowledge and FAQ in one loop
+410|python -m app.workers.run_knowledge_processor
+411|
+412|# What Docker runs: knowledge and FAQ as independent asyncio tasks, so a long
+413|# FAQ generation never blocks knowledge ingestion
+414|python -m app.workers.knowledge_processor
+415|
+416|# FAQ queue only — useful when debugging generation/import in isolation
+417|python -m app.workers.faq_processor
+418|```
+419|
+420|Polls every 60s. On startup it fails any job left stuck in `processing` by a
+421|previous crash, so a killed worker doesn't strand a job forever.
+422|
+423|**Ticket investigator.** Runs two loops in one process — investigation runs
+424|(polled every 15s) and ticket lifecycle/SLA sweeps (every 5 min):
+425|
+426|```bash
+427|python -m app.workers.ticket_investigator
+428|```
+429|
+430|Needs Redis (`REDIS_URL`) to push live `ticket_update` frames to dashboard
+
+
+--- iter 4 ---
+ACTION:
+{
+  "thought": "Read workflow_node.py around 240-280 for multi-language claims.",
+  "tool": "read",
+  "file": "backend/app/api/workflow_node.py",
+  "start_line": 230,
+  "end_line": 290
+}
+OBSERVATION:
+OK: 230|            node_id=node_id,
+231|            organization_id=current_user.organization_id
+232|        )
+233|        
+234|        if not node:
+235|            raise HTTPException(status_code=400, detail="Node not found")
+236|        
+237|        return node
+238|        
+239|    except HTTPException:
+240|        # Let intended HTTP errors (e.g. 403 plan feature-gate, 400, 404) propagate
+241|        # instead of being masked as a generic 500.
+242|        raise
+243|    except Exception as e:
+244|        logger.error(f"Error getting workflow node: {str(e)}")
+245|        raise HTTPException(status_code=500, detail=f"Failed to get workflow node: {str(e)}") 
+
+--- iter 5 ---
+ACTION:
+{
+  "thought": "FAQ numbers were not at README 410-425; grep for 300/15000/100000/30s and default_language next.",
+  "tool": "grep",
+  "pattern": "15000|100000|default_language|language_code"
+}
+OBSERVATION:
+OK: HELP_CENTER_INFRA.md:192:`FAQ_MAX_BATCH_CHARS` (15000), `FAQ_IMPORT_MAX_PAGE_CHARS` (100000),
+backend/tests/api/test_widget_workflow.py:101:        default_language="en",
+backend/tests/api/test_widget_chat_workflow.py:87:        default_language="en",
+backend/tests/api/test_token.py:938:                    "ttl_seconds": 100000  # More than 86400
+backend/tests/services/test_faq_generation.py:111:    batches = pack_batches(pages, max_chars=15000)
+backend/tests/services/test_faq_generation.py:118:    batches = pack_batches(["x" * 20000, "y" * 10], max_chars=15000)
+backend/tests/services/test_faq_generation.py:120:    assert len(batches[0]) <= 15000  # oversized item truncated, never split
+backend/tests/services/test_faq_generation.py:192:    mock_generator = SimpleNamespace(generate_from_text=AsyncMock(return_value=generated), batch_chars=15000)
+backend/tests/services/test_faq_generation.py:220:    mock_generator = SimpleNamespace(generate_from_text=AsyncMock(side_effect=RuntimeError("boom")), batch_chars=15000)
+backend/tests/services/test_faq_generation.py:245:    mock_generator = SimpleNamespace(generate_from_text=AsyncMock(return_value=[]), batch_chars=15000)
+backend/tests/services/test_faq_generation.py:268:    mock_generator = SimpleNamespace(generate_from_text=AsyncMock(return_value=[]), batch_chars=15000)
+backend/tests/services/test_faq_generation.py:283:    with patch.object(faq_generation, "build_generator", return_value=SimpleNamespace(batch_chars=15000)):
+backend/tests/services/test_faq_generation.py:307:    mock_generator = SimpleNamespace(generate_from_text=AsyncMock(return_value=[]), batch_chars=15000)
+backend/tests/api/test_widget_chat_enhanced.py:76:        default_language="en",
+backend/tests/api/test_agent_workflow.py:132:        default_language="en",
+backend/tests/services/test_workflow_service.py:77:            default_language="en",
+backend/tests/api/test_workflow.py:138:        default_language="en",
+backend/tests/services/test_faq_import.py:71:    mock_generator = SimpleNamespace(extract_from_faq_page=AsyncMock(return_value=extracted), batch_chars=15000)
+backend/tests/services/test_faq_import.py:100:        batch_chars=15000,
+backend/tests/services/test_faq_import.py:170:    mock_generator = SimpleNamespace(generate_from_text=AsyncMock(return_value=generated), batch_chars=15000)
+backend/tests/services/test_workflow_node.py:63:    workflow.default_language = "en"
+backend/tests/services/test_sql_guardrails.py:160:            "SELECT benchmark(1000000, md5('x')) FROM orders",
+backend/alembic/versions/7fd0447b3d45_workflow_tables_added.py:47:    sa.Column('default_language', sa.String(length=10), nullable=True),
+backend/app/models/workflow.py:41:    default_language = Column(String(10), default="en")
+frontend/src/composables/useTicketDetail.ts:33:const IDLE_POLL_MS = 15000
+backend/app/models/schemas/workflow.py:34:    default_language: str = "en"
+backend/app/models/schemas/workflow.py:78:    default_language: Optional[str] = None
+backend/app/api/workflow.py:86:            default_language=workflow.default_language,
+backend/app/api/workflow.py:141:            default_language=workflow.default_language,
+backend/app/api/workflow.py:197:            default_language=workflow.default_language,
+backend/app/core/config.py:225:    FAQ_MAX_BATCH_CHARS: int = int(os.getenv("FAQ_MAX_BATCH_CHARS", "15000"))
+backend/app/core/config.py:234:    FAQ_IMPORT_MAX_PAGE_CHARS: int = int(os.getenv("FAQ_IMPORT_MAX_PAGE_CHARS", "100000"))
+
+--- iter 6 ---
+ACTION:
+{
+  "thought": "Continue: list wordpress, read llms.txt, grep chattermate-cli/deploy, language_code, and FAQ 300/30s claims.",
+  "tool": "list",
+  "path": "wordpress"
+}
+OBSERVATION:
+OK: wordpress/
+chattermate-chat.zip	13853 bytes
+
+--- iter 7 ---
+ACTION:
+{
+  "thought": "Grep chattermate-cli/deploy, language_code, FAQ 300/30s; read llms.txt and workflow_node for language.",
+  "tool": "grep",
+  "pattern": "chattermate-cli|chattermate-deploy|language_code|FAQ_MAX|300|30s|30 s"
+}
+OBSERVATION:
+OK: Dockerfile.frontend.prod:59:HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+HELP_CENTER_INFRA.md:191:real infra records on the base domain), `FAQ_MAX_PAGES_PER_SOURCE` (300),
+HELP_CENTER_INFRA.md:192:`FAQ_MAX_BATCH_CHARS` (15000), `FAQ_IMPORT_MAX_PAGE_CHARS` (100000),
+HELP_CENTER_INFRA.md:193:`FAQ_IMPORT_FETCH_TIMEOUT` (30s) — the FAQ_* caps bound LLM spend per
+llms.txt:9:Use the **ChatterMate CLI** (the `chattermate` command, installed with `pip install chattermate-cli`)
+llms.txt:11:self-host Docker tool (`npm install -g chattermate-deploy`).
+llms.txt:16:pip install chattermate-cli
+llms.txt:48:- [Self-host with Docker](https://docs.chattermate.chat/quickstart#option-b-self-host-with-docker): run the full stack on your own infrastructure with the self-host CLI (`npm install -g chattermate-deploy`, command `chattermate-deploy init/start/stop`).
+README.md:4:[![npm version](https://img.shields.io/npm/v/chattermate-deploy.svg)](https://www.npmjs.com/package/chattermate-deploy)
+README.md:246:pip install chattermate-cli          # installs the `chattermate` command
+README.md:266:npm install -g chattermate-deploy
+README.md:269:chattermate-deploy init my-chattermate-project
+README.md:271:chattermate-deploy start                  # then open http://localhost/
+README.md:278:chattermate-deploy init <project-name>    # Scaffold a new self-hosted project
+README.md:279:chattermate-deploy start                  # Start all services (Docker)
+README.md:280:chattermate-deploy stop                   # Stop all services
+README.md:281:chattermate-deploy status                 # Check service status
+README.md:282:chattermate-deploy logs                   # View service logs
+README.md:283:chattermate-deploy reset                  # Reset and remove all data
+README.md:288:> (`pip install chattermate-cli`) signs you up and manages agents/knowledge against the
+README.md:289:> ChatterMate API. The **self-host CLI** (`npm install -g chattermate-deploy`) scaffolds and runs
+README.md:298:> (`pip install chattermate-cli`). The methods below are for **self-hosting**.
+README.md:315:The self-host CLI (`chattermate-deploy`, installed via npm) scaffolds and runs the Docker stack.
+README.md:320:npm install -g chattermate-deploy
+README.md:321:chattermate-deploy init my-project
+README.md:323:chattermate-deploy start
+README.md:555:Yes. Run the full stack (Postgres, Redis, backend, frontend) on your own infrastructure with `npm install -g chattermate-deploy` — see [Quick Start](#quick-start). Self-hosting gives you complete data ownership.
+docker-compose.yml:9:      - "3000:3000"
+Dockerfile.frontend:37:cd /app && npm run dev -- --host 0.0.0.0 --port 3000' > /usr/local/bin/start.sh
+Dockerfile.frontend:43:EXPOSE 3000
+backend/tests_live/conftest.py:142:        print(f"\n  > {message[:120]}\n  < {(response.message or '')[:300]}")
+backend/app/workers/ticket_investigator.py:50:LIFECYCLE_POLL_INTERVAL_SECONDS = 300
+backend/app/workers/ticket_investigator.py:119:        bits.append(f"other identifiers: {_json.dumps(customer.meta_data)[:300]}")
+chattermate-test/package-lock.json:241:      "integrity": "sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg==",
+chattermate-test/server.js:10:const port = process.env.PORT || 3000;
+chattermate-test/README.md:32:3. Open http://localhost:3000 in your browser
+chattermate-test/README.md:64:  domains (Organization settings). The port matters: `localhost:3000` allowed does not
+frontend/package-lock.json:5651:        "caniuse-lite": "^1.0.30001803",
+frontend/package-lock.json:5756:      "version": "1.0.30001806",
+frontend/package-lock.json:5757:      "resolved": "https://registry.npmjs.org/caniuse-lite/-/caniuse-lite-1.0.30001806.tgz",
+frontend/package-lock.json:7245:      "integrity": "sha512-kVscqXk4OCp68SZ0dkgEKVi6/8ij300KBWTJq32P/dYeWTSwK41WyTxalN1eRmA5Z9UU/LX9D7FWSmV9SAYx6g==",
+backend/app/knowledge/crawl4ai_fallback.py:106:                    await page.wait_for_timeout(3000)  # 3 seconds for JS to execute
+backend/app/core/config.py:191:    # GUARDRAIL_STORE_EXCERPT        -> store an encrypted 300-char excerpt of the
+backend/app/core/config.py:224:    FAQ_MAX_PAGES_PER_SOURCE: int = int(os.getenv("FAQ_MAX_PAGES_PER_SOURCE", "300"))
+backend/app/core/config.py:225:    FAQ_MAX_BATCH_CHARS: int = int(os.getenv("FAQ_MAX_BATCH_CHARS", "15000"))
+backend/app/core/config.py:228:    FAQ_MAX_BATCH_CHARS_CEILING: int = int(os.getenv("FAQ_MAX_BATCH_CHARS_CEILING", "60000"))
+frontend/src/webclient/chattermate.js:1291:      }, 300);
+frontend/src/views/LoginView.vue:134:                }, 300)
+frontend/src/views/LoginView.vue:139:                }, 300)
+frontend/src/views/LoginView.vue:711:    width: 300px;
+(grep capped at 50 hits — narrow the pattern for full coverage)
+
+--- iter 8 ---
+ACTION:
+{
+  "thought": "Read llms.txt fully and grep language_code plus FAQ timeout defaults in config.",
+  "tool": "read",
+  "file": "llms.txt"
+}
+OBSERVATION:
+OK: 1|# ChatterMate
+2|
+3|> ChatterMate is an open-source AI customer-support chatbot platform. You can sign up, create AI
+4|> agents, add knowledge sources, and embed a chat widget — all from a browser, the terminal (CLI),
+5|> or programmatically via an AI agent over MCP.
+6|
+7|## Start here (AI agents & automation)
+8|
+9|Use the **ChatterMate CLI** (the `chattermate` command, installed with `pip install chattermate-cli`)
+10|to sign up and manage everything from the terminal. It is the account/config CLI — distinct from the
+11|self-host Docker tool (`npm install -g chattermate-deploy`).
+12|
+13|Minimal end-to-end flow:
+14|
+15|```bash
+16|pip install chattermate-cli
+17|chattermate signup --name "Acme Inc" --domain acme.com --admin-email you@acme.com --admin-name "You"
+18|chattermate agent create --name "Support" --type customer_support -i "Be concise" --json
+19|# Add knowledge from a URL or a local PDF:
+20|chattermate knowledge add-url --website https://docs.acme.com --agent-id <agent-id>
+21|chattermate knowledge add-file ./guide.pdf --agent-id <agent-id>
+22|# Create a widget to get the embed id:
+23|chattermate widget create --agent-id <agent-id> --name "Website widget"
+24|# Embed on your site:
+25|# <script>window.chattermateId='YOUR_WIDGET_ID';</script>
+26|# <script src="https://app.chattermate.chat/webclient/chattermate.min.js"></script>
+27|```
+28|
+29|## Docs
+30|
+31|- [AI Agent & Automation Quickstart](https://docs.chattermate.chat/features/agents-quickstart): copy-paste path from signup to a live widget, built for AI agents and CI.
+32|- [CLI reference](https://docs.chattermate.chat/features/cli): the account CLI — signup, login, tokens, agents, workflows, knowledge.
+33|- [MCP Server](https://docs.chattermate.chat/features/mcp-server): let an AI agent configure ChatterMate over the Model Context Protocol (`chattermate-mcp`).
+34|- [Quickstart](https://docs.chattermate.chat/quickstart): hosted vs self-host, side by side.
+35|- [Widget integration](https://docs.chattermate.chat/features/widget): embed the chat widget on any site.
+36|- [Widget Apps & API keys](https://docs.chattermate.chat/features/widget-apps): authenticated widgets and programmatic tokens.
+37|
+38|## Key URLs
+39|
+40|- Sign up / dashboard: https://app.chattermate.chat
+41|- Hosted API base: https://api.chattermate.chat (routes under `/api/v1`)
+42|- Widget script: https://app.chattermate.chat/webclient/chattermate.min.js
+43|- Documentation: https://docs.chattermate.chat
+44|- GitHub: https://github.com/chattermate/chattermate.chat
+45|
+46|## Self-hosting (optional)
+47|
+48|- [Self-host with Docker](https://docs.chattermate.chat/quickstart#option-b-self-host-with-docker): run the full stack on your own infrastructure with the self-host CLI (`npm install -g chattermate-deploy`, command `chattermate-deploy init/start/stop`).
+49|- [Docker deployment](https://docs.chattermate.chat/deployment/docker)
+
+
+--- iter 9 ---
+ACTION:
+{
+  "thought": "Need language_code hits, FAQ timeout default, and any workflow_node language fields the 240-280 window missed.",
+  "tool": "grep",
+  "pattern": "language_code|FAQ_IMPORT_FETCH_TIMEOUT|default_language"
+}
+OBSERVATION:
+OK: HELP_CENTER_INFRA.md:193:`FAQ_IMPORT_FETCH_TIMEOUT` (30s) — the FAQ_* caps bound LLM spend per
+backend/alembic/versions/7fd0447b3d45_workflow_tables_added.py:47:    sa.Column('default_language', sa.String(length=10), nullable=True),
+backend/app/core/config.py:235:    FAQ_IMPORT_FETCH_TIMEOUT: int = int(os.getenv("FAQ_IMPORT_FETCH_TIMEOUT", "30"))
+backend/tests/services/test_workflow_service.py:77:            default_language="en",
+backend/app/services/faq_article_import.py:175:        fallback = get_crawl4ai_fallback(timeout=settings.FAQ_IMPORT_FETCH_TIMEOUT)
+backend/app/services/faq_article_import.py:500:    client = httpx.Client(timeout=settings.FAQ_IMPORT_FETCH_TIMEOUT, headers=_FETCH_HEADERS)
+backend/app/services/faq_import.py:83:        with httpx.Client(timeout=settings.FAQ_IMPORT_FETCH_TIMEOUT, headers=_FETCH_HEADERS) as client:
+backend/app/services/faq_import.py:111:        fallback = get_crawl4ai_fallback(timeout=settings.FAQ_IMPORT_FETCH_TIMEOUT)
+backend/tests/services/test_workflow_node.py:63:    workflow.default_language = "en"
+backend/tests/api/test_widget_workflow.py:101:        default_language="en",
+backend/tests/api/test_widget_chat_workflow.py:87:        default_language="en",
+backend/tests/api/test_agent_workflow.py:132:        default_language="en",
+backend/tests/api/test_widget_chat_enhanced.py:76:        default_language="en",
+backend/tests/api/test_workflow.py:138:        default_language="en",
+backend/app/models/workflow.py:41:    default_language = Column(String(10), default="en")
+backend/app/api/workflow.py:86:            default_language=workflow.default_language,
+backend/app/api/workflow.py:141:            default_language=workflow.default_language,
+backend/app/api/workflow.py:197:            default_language=workflow.default_language,
+backend/app/models/schemas/workflow.py:34:    default_language: str = "en"
+backend/app/models/schemas/workflow.py:78:    default_language: Optional[str] = None
+
+--- iter 10 ---
+ACTION:
+{
+  "thought": "All requested reads/greps are complete; compile findings with citations.",
+  "tool": "respond",
+  "text": "Findings from the cited files and greps:\n\n## README.md line 54 (not FAQ numbers)\nREADME.md:54 is the Auto Translation feature row: multilingual support with configurable **default language per workflow**. No 300/15000/100000/30s figures.\n\n## README.md 410-425 (not FAQ numeric FAQ)\nREADME.md:403-421 is the FAQ/Help Center **worker** section: `run_knowledge_processor` / `knowledge_processor` / `faq_processor`. Polls every **60s** (420), not 30s. Ticket investigator polls 15s / 5 min (423-424). The 300/15000/100000/30s claims are **not** in README around 410-425.\n\nThose numbers live in HELP_CENTER_INFRA.md:191-193 and backend/app/core/config.py:224-235:\n- FAQ_MAX_PAGES_PER_SOURCE default **300** (config.py:224)\n- FAQ_MAX_BATCH_CHARS default **15000** (config.py:225)\n- FAQ_IMPORT_MAX_PAGE_CHARS default **100000** (config.py:234)\n- FAQ_IMPORT_FETCH_TIMEOUT default **30** seconds (config.py:235)\n\n## backend/app/api/workflow_node.py 240-280\nNot multi-language. 239-245 is HTTPException re-raise vs 500 wrapping. No language fields in that window.\n\n## default_language / language_code\n- **language_code**: no hits in frontend or backend.\n- **default_language**: workflow model default `\"en\"` (backend/app/models/workflow.py:41), schemas (backend/app/models/schemas/workflow.py:34,78), API create/update (backend/app/api/workflow.py:86,141,197), alembic 7fd0447b3d45, plus tests. Frontend grep for these two names did not surface `default_language` in this search (only backend/tests/docs).\n\n## chattermate-cli / chattermate-deploy\nPresent in-repo as **docs/install names**, not as source trees:\n- llms.txt:9-11,16,48\n- README.md:4,246,266-283,288-289,298,315-323,555\nNo `chattermate-cli` or `chattermate-deploy` package directories in this repo root listing.\n\n## llms.txt (full, 49 lines)\nOpen-source AI support chatbot; CLI `pip install chattermate-cli` vs self-host `npm install -g chattermate-deploy`; signup/agent/knowledge/widget flow; docs URLs; hosted app/api/widget; Docker self-host pointer.\n\n## wordpress/\nConfirmed: only `wordpress/chattermate-chat.zip` (13853 bytes). No unpacked plugin tree."
+}
+OBSERVATION:
+(respond)
+
+FINAL ANSWER:
+Findings from the cited files and greps:
+
+## README.md line 54 (not FAQ numbers)
+README.md:54 is the Auto Translation feature row: multilingual support with configurable **default language per workflow**. No 300/15000/100000/30s figures.
+
+## README.md 410-425 (not FAQ numeric FAQ)
+README.md:403-421 is the FAQ/Help Center **worker** section: `run_knowledge_processor` / `knowledge_processor` / `faq_processor`. Polls every **60s** (420), not 30s. Ticket investigator polls 15s / 5 min (423-424). The 300/15000/100000/30s claims are **not** in README around 410-425.
+
+Those numbers live in HELP_CENTER_INFRA.md:191-193 and backend/app/core/config.py:224-235:
+- FAQ_MAX_PAGES_PER_SOURCE default **300** (config.py:224)
+- FAQ_MAX_BATCH_CHARS default **15000** (config.py:225)
+- FAQ_IMPORT_MAX_PAGE_CHARS default **100000** (config.py:234)
+- FAQ_IMPORT_FETCH_TIMEOUT default **30** seconds (config.py:235)
+
+## backend/app/api/workflow_node.py 240-280
+Not multi-language. 239-245 is HTTPException re-raise vs 500 wrapping. No language fields in that window.
+
+## default_language / language_code
+- **language_code**: no hits in frontend or backend.
+- **default_language**: workflow model default `"en"` (backend/app/models/workflow.py:41), schemas (backend/app/models/schemas/workflow.py:34,78), API create/update (backend/app/api/workflow.py:86,141,197), alembic 7fd0447b3d45, plus tests. Frontend grep for these two names did not surface `default_language` in this search (only backend/tests/docs).
+
+## chattermate-cli / chattermate-deploy
+Present in-repo as **docs/install names**, not as source trees:
+- llms.txt:9-11,16,48
+- README.md:4,246,266-283,288-289,298,315-323,555
+No `chattermate-cli` or `chattermate-deploy` package directories in this repo root listing.
+
+## llms.txt (full, 49 lines)
+Open-source AI support chatbot; CLI `pip install chattermate-cli` vs self-host `npm install -g chattermate-deploy`; signup/agent/knowledge/widget flow; docs URLs; hosted app/api/widget; Docker self-host pointer.
+
+## wordpress/
+Confirmed: only `wordpress/chattermate-chat.zip` (13853 bytes). No unpacked plugin tree.

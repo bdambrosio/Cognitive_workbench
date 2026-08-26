@@ -9,7 +9,7 @@ made at an inherited default nobody chose.
 ## top_p — global
 
 **0.95, every model, every call site.** Runs, scoring, the grader, chat,
-subagents. Not a per-arm setting.
+subagents. Not a per-model setting.
 
 There is one exemption and it is a protocol limit rather than a choice: the
 Anthropic route in `backend.py` omits `top_p` entirely because Opus 4.7
@@ -38,7 +38,7 @@ numbers are trusted.**
 
 Keys match the served or configured model id: exact first, then unique
 case-insensitive substring. `Qwen3.8` is a substring key because the local
-server reports `Qwen/Qwen3.8-27B` while arms declare `model: ""`. A model id
+server reports `Qwen/Qwen3.8-27B` while models declare `model: ""`. A model id
 matching two keys with **different** temperatures raises rather than letting
 match order decide.
 
@@ -79,15 +79,15 @@ mislabelled result.
 - An explicit `temperature=` argument is still honoured — `run.py
   --temperature` is a real experimental knob — but it is now a decision
   someone made rather than one nobody made.
-- `tests/test_model_params.py` walks every arm and scenario and asserts each
+- `tests/test_model_params.py` walks every model and scenario and asserts each
   names a model that resolves.
 
 ## Why this exists at all
 
-Nothing was misconfigured on 2026-08-24. No scenario and no arm set a
+Nothing was misconfigured on 2026-08-24. No scenario and no model set a
 temperature, so all twelve runs inherited `chat_loop.py`'s 0.7, and
 `run.py --help` reported that default as though it were a decision. The three
-DeepInfra arms are the sharp case: their yaml states the publisher's 1.0,
+DeepInfra models are the sharp case: their yaml states the publisher's 1.0,
 explains that the runner must pass it, and warns in as many words about "the
 silent second variable this exists to avoid".
 

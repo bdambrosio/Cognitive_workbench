@@ -1,0 +1,557 @@
+================================================================================
+[inspect_external] 2026-08-25T21-50-52Z exit=respond iters=5
+================================================================================
+Query: Read body_project_spec.md lines 1 through 250 only, every line numbered, no summary.
+
+--- iter 1 ---
+ACTION:
+{
+  "thought": "Read the requested spec file lines 1-250 as specified.",
+  "tool": "read",
+  "file": "body_project_spec.md",
+  "start_line": 1,
+  "end_line": 250
+}
+OBSERVATION:
+OK: 1|# Body: Robot Body Software Project Specification
+2|
+3|**Version:** 0.2 draft
+4|**Date:** 2026-04-16
+5|**Author:** Bruce + Claude (initial spec generation)
+6|**Hardware target:** Raspberry Pi 5 (assumed), differential drive chassis
+7|**Language:** Python 3.11+
+8|**Transport:** Zenoh (pyzenoh)
+9|
+10|---
+11|
+12|## 1. Purpose
+13|
+14|Body is the onboard software stack for a differential-drive robot chassis. It provides sensor acquisition, motor control, and safety supervision as a set of independent communicating processes linked by Zenoh. The desktop agent (Jill, running on the CW workstation) connects to the same Zenoh network and interacts with Body exclusively through published topics. Body has no knowledge of Jill's internals; Jill has no knowledge of Body's process structure. The Zenoh topic schema defined in this document is the contract between them.
+15|
+16|## 2. Hardware Inventory
+17|
+18|| Component | Interface | Notes |
+19||---|---|---|
+20|| Cytron MDD10A dual 10A motor driver | GPIO: 2x PWM + 2x DIR | Channel A = left motor, Channel B = right motor |
+21|| Pololu #4752 30:1 gearmotor w/ encoder (x2) | GPIO: 2x quadrature (A/B per motor) | 64 CPR motor shaft, 1920 CPR output shaft. 330 RPM no-load @ 12V. Stall: 14 kg·cm / 5.5A |
+22|| LDROBOT STL-19P lidar | USB serial | 360° 2D scan, ~10Hz typical |
+23|| OAK-D-Lite | USB3 (DepthAI) | Stereo depth, RGB, onboard IMU (BNO086) |
+24|| Raspberry Pi 5 | — | 4-core, 8GB assumed. Runs all Body processes |
+25|
+26|### GPIO Pin Assignments (provisional, confirm during wiring)
+27|
+28|| Function | BCM Pin | Notes |
+29||---|---|---|
+30|| Motor A PWM | 12 | Hardware PWM channel 0 |
+31|| Motor A DIR | 5 | HIGH = forward, LOW = reverse (verify with MDD10A datasheet) |
+32|| Motor B PWM | 13 | Hardware PWM channel 1 |
+33|| Motor B DIR | 6 | Same convention |
+34|| Encoder L channel A | 23 | Pull-up enabled |
+35|| Encoder L channel B | 24 | Pull-up enabled |
+36|| Encoder R channel A | 27 | Pull-up enabled |
+37|| Encoder R channel B | 22 | Pull-up enabled |
+38|
+39|These assignments avoid SPI/I2C/UART pins. Adjust as needed during physical build.
+40|
+41|## 3. Architecture Overview
+42|
+43|```
+44|┌─────────────────────────────────────────────────────┐
+45|│  Raspberry Pi                                       │
+46|│                                                     │
+47|│  ┌──────────────┐  ┌─────────────┐  ┌───────────┐  │
+48|│  │ motor_       │  │ lidar_      │  │ oakd_     │  │
+49|│  │ controller   │  │ driver      │  │ driver    │  │
+50|│  └──────┬───────┘  └──────┬──────┘  └─────┬─────┘  │
+51|│         │                 │               │         │
+52|│         └────────┬────────┴───────┬───────┘         │
+53|│                  │   Zenoh bus    │                  │
+54|│            ┌─────┴─────┐         │                  │
+55|│            │ watchdog   │         │                  │
+56|│            └─────┬─────┘         │                  │
+57|│                  │               │                  │
+58|└──────────────────┼───────────────┼──────────────────┘
+59|                   │               │
+60|              ─────┴───────────────┴───── network
+61|                          │
+62|              ┌───────────┴───────────┐
+63|              │  Desktop workstation  │
+64|              │  (Jill / CW)          │
+65|              └───────────────────────┘
+66|```
+67|
+68|All inter-process communication, both local (Pi-to-Pi) and remote (Pi-to-desktop), uses the same Zenoh topics. There is no separate local IPC mechanism.
+69|
+70|### 3.1 Process Inventory
+71|
+72|| Process | Owns | Publishes | Subscribes |
+73||---|---|---|---|
+74|| `motor_controller` | MDD10A GPIO, encoder GPIO | `body/odom`, `body/motor_state` | `body/cmd_vel`, `body/cmd_direct` |
+75|| `lidar_driver` | STL-19P USB | `body/lidar/scan` | — |
+76|| `oakd_driver` | OAK-D-Lite USB | `body/oakd/depth`, `body/oakd/imu`, `body/oakd/rgb` (optional) | `body/oakd/config` (optional) |
+77|| `watchdog` | safety authority | `body/status` | `body/heartbeat`, all `body/*` for monitoring |
+78|| `launcher` | process lifecycle | — | — |
+79|
+80|### 3.2 Design Principles
+81|
+82|- Each process is a standalone Python script with its own `main()` and Zenoh session.
+83|- No shared memory, no threading across process boundaries.
+84|- Processes do not import each other. The Zenoh topic schema is the only coupling.
+85|- Every process logs to stdout. The launcher captures and tags output.
+86|- Every process handles SIGTERM gracefully: releases hardware, closes Zenoh session, exits.
+87|- Motor output defaults to zero (stopped) on startup and on any error.
+88|
+89|## 4. Zenoh Configuration
+90|
+91|### 4.1 Transport
+92|
+93|Body processes use Zenoh in **peer mode** for local communication. The desktop agent connects via Zenoh **router mode** or direct peer over TCP.
+94|
+95|Recommended: run a `zenohd` router on the Pi that both local processes and the remote desktop connect to. This simplifies discovery and avoids multicast issues over wifi.
+96|
+97|```
+98|# /etc/zenoh/config.json (Pi router)
+99|{
+100|  "mode": "router",
+101|  "listen": {
+102|    "endpoints": ["tcp/0.0.0.0:7447"]
+103|  }
+104|}
+105|```
+106|
+107|Each Body process connects as a peer to `tcp/localhost:7447`. The desktop agent connects to `tcp://<pi-ip>:7447`.
+108|
+109|### 4.2 Key Expression Namespace
+110|
+111|All Body topics live under the `body/` prefix.
+112|
+113|```
+114|body/
+115|  cmd_vel            # commanded twist velocity (from Jill)
+116|  cmd_direct         # direct wheel velocities (from Jill, low-level override)
+117|  heartbeat          # periodic heartbeat from Jill
+118|  odom               # encoder-derived odometry
+119|  motor_state        # motor driver status
+120|  lidar/
+121|    scan             # 2D laser scan
+122|  oakd/
+123|    depth            # depth frame or point cloud
+124|    imu              # IMU readings
+125|    rgb              # color frame (optional, high bandwidth)
+126|    config           # runtime pipeline reconfiguration (optional)
+127|  status             # system-level health from watchdog
+128|  emergency_stop     # published by watchdog on safety violation
+129|```
+130|
+131|## 5. Message Schemas
+132|
+133|All messages are JSON-encoded UTF-8 strings published as Zenoh values. Timestamps are Unix epoch float (seconds with microsecond precision). All spatial units are SI: meters, radians, meters/second, radians/second.
+134|
+135|### 5.1 `body/cmd_vel` (Jill → motor_controller)
+136|
+137|Twist command in robot body frame. Linear is forward/back, angular is rotation (positive = counterclockwise viewed from above).
+138|
+139|```json
+140|{
+141|  "ts": 1713264000.123456,
+142|  "linear": 0.2,
+143|  "angular": 0.0,
+144|  "timeout_ms": 500
+145|}
+146|```
+147|
+148|- `linear`: m/s, positive = forward. Clamped by motor_controller to hardware limits.
+149|- `angular`: rad/s, positive = CCW.
+150|- `timeout_ms`: if no new `cmd_vel` arrives within this window, motor_controller sets output to zero. Safety backstop independent of watchdog.
+151|
+152|### 5.2 `body/cmd_direct` (Jill → motor_controller)
+153|
+154|Direct wheel velocity command. Bypasses twist-to-differential math. For calibration and testing.
+155|
+156|```json
+157|{
+158|  "ts": 1713264000.123456,
+159|  "left": 0.15,
+160|  "right": 0.15,
+161|  "timeout_ms": 500
+162|}
+163|```
+164|
+165|- `left`, `right`: m/s at wheel surface. Sign convention: positive = forward.
+166|
+167|### 5.3 `body/odom` (motor_controller → Jill)
+168|
+169|Dead-reckoned pose from encoder integration. Frame: robot starting position at origin, x-forward, y-left, theta CCW from x.
+170|
+171|```json
+172|{
+173|  "ts": 1713264000.123456,
+174|  "x": 0.0,
+175|  "y": 0.0,
+176|  "theta": 0.0,
+177|  "vx": 0.0,
+178|  "vtheta": 0.0,
+179|  "left_ticks": 0,
+180|  "right_ticks": 0,
+181|  "dt_ms": 20
+182|}
+183|```
+184|
+185|- `x`, `y`: meters from origin.
+186|- `theta`: radians, normalized to [-π, π].
+187|- `vx`, `vtheta`: instantaneous velocity estimates.
+188|- `left_ticks`, `right_ticks`: raw cumulative encoder counts. Allows Jill to do her own integration if desired.
+189|- `dt_ms`: time since last odom publication.
+190|
+191|### 5.4 `body/motor_state` (motor_controller → all)
+192|
+193|```json
+194|{
+195|  "ts": 1713264000.123456,
+196|  "left_pwm": 0.0,
+197|  "right_pwm": 0.0,
+198|  "left_dir": "fwd",
+199|  "right_dir": "fwd",
+200|  "e_stop_active": false,
+201|  "cmd_timeout_active": false
+202|}
+203|```
+204|
+205|- PWM values are duty cycle 0.0–1.0.
+206|- `e_stop_active`: true if watchdog has triggered emergency stop.
+207|- `cmd_timeout_active`: true if no `cmd_vel`/`cmd_direct` received within timeout window.
+208|
+209|### 5.5 `body/lidar/scan` (lidar_driver → Jill)
+210|
+211|```json
+212|{
+213|  "ts": 1713264000.123456,
+214|  "angle_min": 0.0,
+215|  "angle_max": 6.2832,
+216|  "angle_increment": 0.01745,
+217|  "range_min": 0.05,
+218|  "range_max": 12.0,
+219|  "ranges": [1.2, 1.3, 1.1, "..."],
+220|  "intensities": [200, 195, 210, "..."],
+221|  "scan_time_ms": 100
+222|}
+223|```
+224|
+225|- Angles in radians. 0 = forward, increasing CCW.
+226|- Invalid/out-of-range readings: `null` in the array.
+227|- `intensities`: included if the STL-19P provides them, omit field otherwise.
+228|
+229|### 5.6 `body/oakd/imu` (oakd_driver → Jill)
+230|
+231|```json
+232|{
+233|  "ts": 1713264000.123456,
+234|  "accel": {"x": 0.0, "y": 0.0, "z": 9.81},
+235|  "gyro": {"x": 0.0, "y": 0.0, "z": 0.0},
+236|  "mag": {"x": 0.0, "y": 0.0, "z": 0.0},
+237|  "orientation": {"w": 1.0, "x": 0.0, "y": 0.0, "z": 0.0}
+238|}
+239|```
+240|
+241|- `accel`: m/s², sensor frame.
+242|- `gyro`: rad/s.
+243|- `mag`: if available from BNO086, omit if not configured.
+244|- `orientation`: quaternion from BNO086 onboard fusion, if available.
+245|
+246|### 5.7 `body/oakd/depth` (oakd_driver → Jill)
+247|
+248|**TBD.** This is the highest-bandwidth topic and the one most likely to need a non-JSON encoding or compression strategy. Options include publishing a downsampled depth map as a flat array, publishing only a local obstacle summary, or using 
+…(truncated; 10217 chars total, capped at 10000; narrow the line range)
+
+--- iter 2 ---
+ACTION:
+{
+  "thought": "Prior read truncated near line 248; fetch remaining lines 248-250 to complete the requested range.",
+  "tool": "read",
+  "file": "body_project_spec.md",
+  "start_line": 246,
+  "end_line": 250
+}
+OBSERVATION:
+OK: 246|### 5.7 `body/oakd/depth` (oakd_driver → Jill)
+247|
+248|**TBD.** This is the highest-bandwidth topic and the one most likely to need a non-JSON encoding or compression strategy. Options include publishing a downsampled depth map as a flat array, publishing only a local obstacle summary, or using Zenoh's raw bytes mode with a compact binary format. Defer detailed schema until the OAK-D pipeline design is done. For the initial skeleton, publish a placeholder.
+249|
+250|### 5.8 `body/heartbeat` (Jill → watchdog)
+
+
+--- iter 3 ---
+ACTION:
+(unparseable; raw follows)
+{"thought": "User asked for every numbered line 1-250 with no summary; emit the complete range from the two reads.", "tool": "respond", "text": "1|# Body: Robot Body Software Project Specification\n2|\n3|**Version:** 0.2 draft\n4|**Date:** 2026-04-16\n5|**Author:** Bruce + Claude (initial spec generation)\n6|**Hardware target:** Raspberry Pi 5 (assumed), differential drive chassis\n7|**Language:** Python 3.11+\n8|**Transport:** Zenoh (pyzenoh)\n9|\n10|---\n11|\n12|## 1. Purpose\n13|\n14|Body is the onboard software stack for a differential-drive robot chassis. It provides sensor acquisition, motor control, and safety supervision as a set of independent communicating processes linked by Zenoh. The desktop agent (Jill, running on the CW workstation) connects to the same Zenoh network and interacts with Body exclusively through published topics. Body has no knowledge of Jill's internals; Jill has no knowledge of Body's process structure. The Zenoh topic schema defined in this document is the contract between them.\n15|\n16|## 2. Hardware Inventory\n17|\n18|| Component | Interface | Notes |\n19||---|---|---|\n20|| Cytron MDD10A dual 10A motor driver | GPIO: 2x PWM + 2x DIR | Channel A = left motor, Channel B = right motor |\n21|| Pololu #4752 30:1 gearmotor w/ encoder (x2) | GPIO: 2x quadrature (A/B per motor) | 64 CPR motor shaft, 1920 CPR output shaft. 330 RPM no-load @ 12V. Stall: 14 kg\u00b7cm / 5.5A |\n22|| LDROBOT STL-19P lidar | USB serial | 360\u00b0 2D scan, ~10Hz typical |\n23|| OAK-D-Lite | USB3 (DepthAI) | Stereo depth, RGB, onboard IMU (BNO086) |\n24|| Raspberry Pi 5 | \u2014 | 4-core, 8GB assumed. Runs all Body processes |\n25|\n26|### GPIO Pin Assignments (provisional, confirm during wiring)\n27|\n28|| Function | BCM Pin | Notes |\n29||---|---|---|\n30|| Motor A PWM | 12 | Hardware PWM channel 0 |\n31|| Motor A DIR | 5 | HIGH = forward, LOW = reverse (verify with MDD10A datasheet) |\n32|| Motor B PWM | 13 | Hardware PWM channel 1 |\n33|| Motor B DIR | 6 | Same convention |\n34|| Encoder L channel A | 23 | Pull-up enabled |\n35|| Encoder L channel B | 24 | Pull-up enabled |\n36|| Encoder R channel A | 27 | Pull-up enabled |\n37|| Encoder R channel B | 22 | Pull-up enabled |\n38|\n39|These assignments avoid SPI/I2C/UART pins. Adjust as needed during physical build.\n40|\n41|## 3. Architecture Overview\n42|\n43|```\n44|\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n45|\u2502  Raspberry Pi                                       \u2502\n46|\u2502                                                     \u2502\n47|\u2502  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510  \u2502\n48|\u2502  \u2502 motor_       \u2502  \u2502 lidar_      \u2502  \u2502 oakd_     \u2502  \u2502\n49|\u2502  \u2502 controller   \u2502  \u2502 driver      \u2502  \u2502 driver    \u2502  \u2502\n50|\u2502  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2518  \u2514\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2518  \u2502\n51|\u2502         \u2502                 \u2502               \u2502         \u2502\n52|\u2502         \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518         \u2502\n53|\u2502                  \u2502   Zenoh bus    \u2502                  \u2502\n54|\u2502            \u250c\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2510         \u2502                  \u2502\n55|\u2502            \u2502 watchdog   \u2502         \u2502                  \u2502\n56|\u2502            \u2514\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2518         \u2502                  \u2502\n57|\u2502                  \u2502               \u2502                  \u2502\n58|\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n59|                   \u2502               \u2502\n60|              \u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500 network\n61|                          \u2502\n62|              \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n63|              \u2502  Desktop workstation  \u2502\n64|              \u2502  (Jill / CW)          \u2502\n65|              \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n66|```\n67|\n68|All inter-process communication, both local (Pi-to-Pi) and remote (Pi-to-desktop), uses the same Zenoh topics. There is no separate local IPC mechanism.\n69|\n70|### 3.1 Process Inventory\n71|\n72|| Process | Owns | Publishes | Subscribes |\n73||---|---|---|---|\n74|| `motor_controller` | MDD10A GPIO, encoder GPIO | `body/odom`, `body/motor_state` | `body/cmd_vel`, `body/cmd_direct` |\n75|| `lidar_driver` | STL-19P USB | `body/lidar/scan` | \u2014 |\n76|| `oakd_driver` | OAK-D-Lite USB | `body/oakd/depth`, `body/oakd/imu`, `body/oakd/rgb` (optional) | `body/oakd/config` (optional) |\n77|| `watchdog` | safety authority | `body/status` | `body/heartbeat`, all `body/*` for monitoring |\n78|| `launcher` | process lifecycle | \u2014 | \u2014 |\n79|\n80|### 3.2 Design Principles\n81|\n82|- Each process is a standalone Python script with its own `main()` and Zenoh session.\n83|- No shared memory, no threading across process boundaries.\n84|- Processes do not import each other. The Zenoh topic schema is the only coupling.\n85|- Every process logs to stdout. The launcher captures and tags output.\n86|- Every process handles SIGTERM gracefully: releases hardware, closes Zenoh session, exits.\n87|- Motor output defaults to zero (stopped) on startup and on any error.\n88|\n89|## 4. Zenoh Configuration\n90|\n91|### 4.1 Transport\n92|\n93|Body processes use Zenoh in **peer mode** for local communication. The desktop agent connects via Zenoh **router mode** or direct peer over TCP.\n94|\n95|Recommended: run a `zenohd` router on the Pi that both local processes and the remote desktop connect to. This simplifies discovery and avoids multicast issues over wifi.\n96|\n97|```\n98|# /etc/zenoh/config.json (Pi router)\n99|{\n100|  \"mode\": \"router\",\n101|  \"listen\": {\n102|    \"endpoints\": [\"tcp/0.0.0.0:7447\"]\n103|  }\n104|}\n105|```\n106|\n107|Each Body process connects as a peer to `tcp/localhost:7447`. The desktop agent connects to `tcp://<pi-ip>:7447`.\n108|\n109|### 4.2 Key Expression Namespace\n110|\n111|All Body topics live under the `body/` prefix.\n112|\n113|```\n114|body/\n115|  cmd_vel            # commanded twist velocity (from Jill)\n116|  cmd_direct         # direct wheel velocities (from Jill, low-level override)\n117|  heartbeat          # periodic heartbeat from Jill\n118|  odom               # encoder-derived odometry\n119|  motor_state        # motor driver status\n120|  lidar/\n121|    scan             # 2D laser scan\n122|  oakd/\n123|    depth            # depth frame or point cloud\n124|    imu              # IMU readings\n125|    rgb              # color frame (optional, high bandwidth)\n126|    config           # runtime pipeline reconfiguration (optional)\n127|  status             # system-level health from watchdog\n128|  emergency_stop     # published by watchdog on safety violation\n129|```\n130|\n131|## 5. Message Schemas\n132|\n133|All messages are JSON-encoded UTF-8 strings published as Zenoh values. Timestamps are Unix epoch float (seconds with microsecond precision). All spatial units are SI: meters, radians, meters/second, radians/second.\n134|\n135|### 5.1 `body/cmd_vel` (Jill \u2192 motor_controller)\n136|\n137|Twist command in robot body frame. Linear is forward/back, angular is rotation (positive = counterclockwise viewed from above).\n138|\n139|```json\n140|{\n141|  \"ts\": 1713264000.123456,\n142|  \"linear\": 0.2,\n143|  \"angular\": 0.0,\n144|  \"timeout_ms\": 500\n145|}\n146|```\n147|\n148|- `linear`: m/s, positive = forward. Clamped by motor_controller to hardware limits.\n149|- `angular`: rad/s, positive = CCW.\n150|- `timeout_ms`: if no new `cmd_vel` arrives within this window, motor_controller sets output to zero. Safety backstop independent of watchdog.\n151|\n152|### 5.2 `body/cmd_direct` (Jill \u2192 motor_controller)\n153|\n154|Direct wheel velocity command. Bypasses twist-to-differential math. For calibration and testing.\n155|\n156|```json\n157|{\n158|  \"ts\": 1713264000.123456,\n159|  \"left\": 0.15,\n160|  \"right\": 0.15,\n161|  \"timeout_ms\": 500\n162|}\n163|```\n164|\n165|- `left`, `right`: m/s at wheel surface. Sign convention: positive = forward.\n166|\n167|### 5.3 `body/odom` (motor_controller \u2192 Jill)\n168|\n169|Dead-reckoned pose from encoder integration. Frame: robot starting position at origin, x-forward, y-left, theta CCW from x.\n170|\n171|```json\n172|{\n173|  \"ts\": 1713264000.123456,\n174|  \"x\": 0.0,\n175|  \"y\": 0.0,\n176|  \"theta\": 0.0,\n177|  \"vx\": 0.0,\n178|  \"vtheta\": 0.0,\n179|  \"left_ticks\": 0,\n180|  \"right_ticks\": 0,\n181|  \"dt_ms\": 20\n182|}\n183|```\n184|\n185|- `x`, `y`: meters from origin.\n186|- `theta`: radians, normalized to [-\u03c0, \u03c0].\n187|- `vx`, `vtheta`: instantaneous velocity estimates.\n188|- `left_ticks`, `right_ticks`: raw cumulative encoder counts. Allows Jill to do her own integration if desired.\n189|- `dt_ms`: time since last odom publication.\n190|\n191|### 5.4 `body/motor_state` (motor_controller \u2192 all)\n192|\n193|```json\n194|{\n195|  \"ts\": 1713264000.123456,\n196|  \"left_pwm\": 0.0,\n197
+OBSERVATION:
+(unparseable)
+
+--- iter 4 ---
+ACTION:
+(unparseable; raw follows)
+{"thought": "Emit numbered lines 1-250 from the two reads, no summary.", "tool": "respond", "text": "1|# Body: Robot Body Software Project Specification\n2|\n3|**Version:** 0.2 draft\n4|**Date:** 2026-04-16\n5|**Author:** Bruce + Claude (initial spec generation)\n6|**Hardware target:** Raspberry Pi 5 (assumed), differential drive chassis\n7|**Language:** Python 3.11+\n8|**Transport:** Zenoh (pyzenoh)\n9|\n10|---\n11|\n12|## 1. Purpose\n13|\n14|Body is the onboard software stack for a differential-drive robot chassis. It provides sensor acquisition, motor control, and safety supervision as a set of independent communicating processes linked by Zenoh. The desktop agent (Jill, running on the CW workstation) connects to the same Zenoh network and interacts with Body exclusively through published topics. Body has no knowledge of Jill's internals; Jill has no knowledge of Body's process structure. The Zenoh topic schema defined in this document is the contract between them.\n15|\n16|## 2. Hardware Inventory\n17|\n18|| Component | Interface | Notes |\n19||---|---|---|\n20|| Cytron MDD10A dual 10A motor driver | GPIO: 2x PWM + 2x DIR | Channel A = left motor, Channel B = right motor |\n21|| Pololu #4752 30:1 gearmotor w/ encoder (x2) | GPIO: 2x quadrature (A/B per motor) | 64 CPR motor shaft, 1920 CPR output shaft. 330 RPM no-load @ 12V. Stall: 14 kg\u00b7cm / 5.5A |\n22|| LDROBOT STL-19P lidar | USB serial | 360\u00b0 2D scan, ~10Hz typical |\n23|| OAK-D-Lite | USB3 (DepthAI) | Stereo depth, RGB, onboard IMU (BNO086) |\n24|| Raspberry Pi 5 | \u2014 | 4-core, 8GB assumed. Runs all Body processes |\n25|\n26|### GPIO Pin Assignments (provisional, confirm during wiring)\n27|\n28|| Function | BCM Pin | Notes |\n29||---|---|---|\n30|| Motor A PWM | 12 | Hardware PWM channel 0 |\n31|| Motor A DIR | 5 | HIGH = forward, LOW = reverse (verify with MDD10A datasheet) |\n32|| Motor B PWM | 13 | Hardware PWM channel 1 |\n33|| Motor B DIR | 6 | Same convention |\n34|| Encoder L channel A | 23 | Pull-up enabled |\n35|| Encoder L channel B | 24 | Pull-up enabled |\n36|| Encoder R channel A | 27 | Pull-up enabled |\n37|| Encoder R channel B | 22 | Pull-up enabled |\n38|\n39|These assignments avoid SPI/I2C/UART pins. Adjust as needed during physical build.\n40|\n41|## 3. Architecture Overview\n42|\n43|```\n44|\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n45|\u2502  Raspberry Pi                                       \u2502\n46|\u2502                                                     \u2502\n47|\u2502  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510  \u2502\n48|\u2502  \u2502 motor_       \u2502  \u2502 lidar_      \u2502  \u2502 oakd_     \u2502  \u2502\n49|\u2502  \u2502 controller   \u2502  \u2502 driver      \u2502  \u2502 driver    \u2502  \u2502\n50|\u2502  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2518  \u2514\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2518  \u2502\n51|\u2502         \u2502                 \u2502               \u2502         \u2502\n52|\u2502         \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518         \u2502\n53|\u2502                  \u2502   Zenoh bus    \u2502                  \u2502\n54|\u2502            \u250c\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2510         \u2502                  \u2502\n55|\u2502            \u2502 watchdog   \u2502         \u2502                  \u2502\n56|\u2502            \u2514\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2518         \u2502                  \u2502\n57|\u2502                  \u2502               \u2502                  \u2502\n58|\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n59|                   \u2502               \u2502\n60|              \u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500 network\n61|                          \u2502\n62|              \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n63|              \u2502  Desktop workstation  \u2502\n64|              \u2502  (Jill / CW)          \u2502\n65|              \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n66|```\n67|\n68|All inter-process communication, both local (Pi-to-Pi) and remote (Pi-to-desktop), uses the same Zenoh topics. There is no separate local IPC mechanism.\n69|\n70|### 3.1 Process Inventory\n71|\n72|| Process | Owns | Publishes | Subscribes |\n73||---|---|---|---|\n74|| `motor_controller` | MDD10A GPIO, encoder GPIO | `body/odom`, `body/motor_state` | `body/cmd_vel`, `body/cmd_direct` |\n75|| `lidar_driver` | STL-19P USB | `body/lidar/scan` | \u2014 |\n76|| `oakd_driver` | OAK-D-Lite USB | `body/oakd/depth`, `body/oakd/imu`, `body/oakd/rgb` (optional) | `body/oakd/config` (optional) |\n77|| `watchdog` | safety authority | `body/status` | `body/heartbeat`, all `body/*` for monitoring |\n78|| `launcher` | process lifecycle | \u2014 | \u2014 |\n79|\n80|### 3.2 Design Principles\n81|\n82|- Each process is a standalone Python script with its own `main()` and Zenoh session.\n83|- No shared memory, no threading across process boundaries.\n84|- Processes do not import each other. The Zenoh topic schema is the only coupling.\n85|- Every process logs to stdout. The launcher captures and tags output.\n86|- Every process handles SIGTERM gracefully: releases hardware, closes Zenoh session, exits.\n87|- Motor output defaults to zero (stopped) on startup and on any error.\n88|\n89|## 4. Zenoh Configuration\n90|\n91|### 4.1 Transport\n92|\n93|Body processes use Zenoh in **peer mode** for local communication. The desktop agent connects via Zenoh **router mode** or direct peer over TCP.\n94|\n95|Recommended: run a `zenohd` router on the Pi that both local processes and the remote desktop connect to. This simplifies discovery and avoids multicast issues over wifi.\n96|\n97|```\n98|# /etc/zenoh/config.json (Pi router)\n99|{\n100|  \"mode\": \"router\",\n101|  \"listen\": {\n102|    \"endpoints\": [\"tcp/0.0.0.0:7447\"]\n103|  }\n104|}\n105|```\n106|\n107|Each Body process connects as a peer to `tcp/localhost:7447`. The desktop agent connects to `tcp://<pi-ip>:7447`.\n108|\n109|### 4.2 Key Expression Namespace\n110|\n111|All Body topics live under the `body/` prefix.\n112|\n113|```\n114|body/\n115|  cmd_vel            # commanded twist velocity (from Jill)\n116|  cmd_direct         # direct wheel velocities (from Jill, low-level override)\n117|  heartbeat          # periodic heartbeat from Jill\n118|  odom               # encoder-derived odometry\n119|  motor_state        # motor driver status\n120|  lidar/\n121|    scan             # 2D laser scan\n122|  oakd/\n123|    depth            # depth frame or point cloud\n124|    imu              # IMU readings\n125|    rgb              # color frame (optional, high bandwidth)\n126|    config           # runtime pipeline reconfiguration (optional)\n127|  status             # system-level health from watchdog\n128|  emergency_stop     # published by watchdog on safety violation\n129|```\n130|\n131|## 5. Message Schemas\n132|\n133|All messages are JSON-encoded UTF-8 strings published as Zenoh values. Timestamps are Unix epoch float (seconds with microsecond precision). All spatial units are SI: meters, radians, meters/second, radians/second.\n134|\n135|### 5.1 `body/cmd_vel` (Jill \u2192 motor_controller)\n136|\n137|Twist command in robot body frame. Linear is forward/back, angular is rotation (positive = counterclockwise viewed from above).\n138|\n139|```json\n140|{\n141|  \"ts\": 1713264000.123456,\n142|  \"linear\": 0.2,\n143|  \"angular\": 0.0,\n144|  \"timeout_ms\": 500\n145|}\n146|```\n147|\n148|- `linear`: m/s, positive = forward. Clamped by motor_controller to hardware limits.\n149|- `angular`: rad/s, positive = CCW.\n150|- `timeout_ms`: if no new `cmd_vel` arrives within this window, motor_controller sets output to zero. Safety backstop independent of watchdog.\n151|\n152|### 5.2 `body/cmd_direct` (Jill \u2192 motor_controller)\n153|\n154|Direct wheel velocity command. Bypasses twist-to-differential math. For calibration and testing.\n155|\n156|```json\n157|{\n158|  \"ts\": 1713264000.123456,\n159|  \"left\": 0.15,\n160|  \"right\": 0.15,\n161|  \"timeout_ms\": 500\n162|}\n163|```\n164|\n165|- `left`, `right`: m/s at wheel surface. Sign convention: positive = forward.\n166|\n167|### 5.3 `body/odom` (motor_controller \u2192 Jill)\n168|\n169|Dead-reckoned pose from encoder integration. Frame: robot starting position at origin, x-forward, y-left, theta CCW from x.\n170|\n171|```json\n172|{\n173|  \"ts\": 1713264000.123456,\n174|  \"x\": 0.0,\n175|  \"y\": 0.0,\n176|  \"theta\": 0.0,\n177|  \"vx\": 0.0,\n178|  \"vtheta\": 0.0,\n179|  \"left_ticks\": 0,\n180|  \"right_ticks\": 0,\n181|  \"dt_ms\": 20\n182|}\n183|```\n184|\n185|- `x`, `y`: meters from origin.\n186|- `theta`: radians, normalized to [-\u03c0, \u03c0].\n187|- `vx`, `vtheta`: instantaneous velocity estimates.\n188|- `left_ticks`, `right_ticks`: raw cumulative encoder counts. Allows Jill to do her own integration if desired.\n189|- `dt_ms`: time since last odom publication.\n190|\n191|### 5.4 `body/motor_state` (motor_controller \u2192 all)\n192|\n193|```json\n194|{\n195|  \"ts\": 1713264000.123456,\n196|  \"left_pwm\": 0.0,\n197|  \"right_pwm\": 
+OBSERVATION:
+(unparseable)
+
+--- iter 5 ---
+ACTION:
+{
+  "thought": "Deliver numbered lines 1-250 as requested.",
+  "tool": "respond",
+  "text": "1|# Body: Robot Body Software Project Specification\n2|\n3|**Version:** 0.2 draft\n4|**Date:** 2026-04-16\n5|**Author:** Bruce + Claude (initial spec generation)\n6|**Hardware target:** Raspberry Pi 5 (assumed), differential drive chassis\n7|**Language:** Python 3.11+\n8|**Transport:** Zenoh (pyzenoh)\n9|\n10|---\n11|\n12|## 1. Purpose\n13|\n14|Body is the onboard software stack for a differential-drive robot chassis. It provides sensor acquisition, motor control, and safety supervision as a set of independent communicating processes linked by Zenoh. The desktop agent (Jill, running on the CW workstation) connects to the same Zenoh network and interacts with Body exclusively through published topics. Body has no knowledge of Jill's internals; Jill has no knowledge of Body's process structure. The Zenoh topic schema defined in this document is the contract between them.\n15|\n16|## 2. Hardware Inventory\n17|\n18|| Component | Interface | Notes |\n19||---|---|---|\n20|| Cytron MDD10A dual 10A motor driver | GPIO: 2x PWM + 2x DIR | Channel A = left motor, Channel B = right motor |\n21|| Pololu #4752 30:1 gearmotor w/ encoder (x2) | GPIO: 2x quadrature (A/B per motor) | 64 CPR motor shaft, 1920 CPR output shaft. 330 RPM no-load @ 12V. Stall: 14 kg\u00b7cm / 5.5A |\n22|| LDROBOT STL-19P lidar | USB serial | 360\u00b0 2D scan, ~10Hz typical |\n23|| OAK-D-Lite | USB3 (DepthAI) | Stereo depth, RGB, onboard IMU (BNO086) |\n24|| Raspberry Pi 5 | \u2014 | 4-core, 8GB assumed. Runs all Body processes |\n25|\n26|### GPIO Pin Assignments (provisional, confirm during wiring)\n27|\n28|| Function | BCM Pin | Notes |\n29||---|---|---|\n30|| Motor A PWM | 12 | Hardware PWM channel 0 |\n31|| Motor A DIR | 5 | HIGH = forward, LOW = reverse (verify with MDD10A datasheet) |\n32|| Motor B PWM | 13 | Hardware PWM channel 1 |\n33|| Motor B DIR | 6 | Same convention |\n34|| Encoder L channel A | 23 | Pull-up enabled |\n35|| Encoder L channel B | 24 | Pull-up enabled |\n36|| Encoder R channel A | 27 | Pull-up enabled |\n37|| Encoder R channel B | 22 | Pull-up enabled |\n38|\n39|These assignments avoid SPI/I2C/UART pins. Adjust as needed during physical build.\n40|\n41|## 3. Architecture Overview\n42|\n43|\n44|\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n45|\u2502  Raspberry Pi                                       \u2502\n46|\u2502                                                     \u2502\n47|\u2502  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510  \u2502\n48|\u2502  \u2502 motor_       \u2502  \u2502 lidar_      \u2502  \u2502 oakd_     \u2502  \u2502\n49|\u2502  \u2502 controller   \u2502  \u2502 driver      \u2502  \u2502 driver    \u2502  \u2502\n50|\u2502  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2518  \u2514\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2518  \u2502\n51|\u2502         \u2502                 \u2502               \u2502         \u2502\n52|\u2502         \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518         \u2502\n53|\u2502                  \u2502   Zenoh bus    \u2502                  \u2502\n54|\u2502            \u250c\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2510         \u2502                  \u2502\n55|\u2502            \u2502 watchdog   \u2502         \u2502                  \u2502\n56|\u2502            \u2514\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2518         \u2502                  \u2502\n57|\u2502                  \u2502               \u2502                  \u2502\n58|\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n59|                   \u2502               \u2502\n60|              \u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500 network\n61|                          \u2502\n62|              \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n63|              \u2502  Desktop workstation  \u2502\n64|              \u2502  (Jill / CW)          \u2502\n65|              \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n66|\n67|\n68|All inter-process communication, both local (Pi-to-Pi) and remote (Pi-to-desktop), uses the same Zenoh topics. There is no separate local IPC mechanism.\n69|\n70|### 3.1 Process Inventory\n71|\n72|| Process | Owns | Publishes | Subscribes |\n73||---|---|---|---|\n74|| `motor_controller` | MDD10A GPIO, encoder GPIO | `body/odom`, `body/motor_state` | `body/cmd_vel`, `body/cmd_direct` |\n75|| `lidar_driver` | STL-19P USB | `body/lidar/scan` | \u2014 |\n76|| `oakd_driver` | OAK-D-Lite USB | `body/oakd/depth`, `body/oakd/imu`, `body/oakd/rgb` (optional) | `body/oakd/config` (optional) |\n77|| `watchdog` | safety authority | `body/status` | `body/heartbeat`, all `body/*` for monitoring |\n78|| `launcher` | process lifecycle | \u2014 | \u2014 |\n79|\n80|### 3.2 Design Principles\n81|\n82|- Each process is a standalone Python script with its own `main()` and Zenoh session.\n83|- No shared memory, no threading across process boundaries.\n84|- Processes do not import each other. The Zenoh topic schema is the only coupling.\n85|- Every process logs to stdout. The launcher captures and tags output.\n86|- Every process handles SIGTERM gracefully: releases hardware, closes Zenoh session, exits.\n87|- Motor output defaults to zero (stopped) on startup and on any error.\n88|\n89|## 4. Zenoh Configuration\n90|\n91|### 4.1 Transport\n92|\n93|Body processes use Zenoh in **peer mode** for local communication. The desktop agent connects via Zenoh **router mode** or direct peer over TCP.\n94|\n95|Recommended: run a `zenohd` router on the Pi that both local processes and the remote desktop connect to. This simplifies discovery and avoids multicast issues over wifi.\n96|\n97|\n98|# /etc/zenoh/config.json (Pi router)\n99|{\n100|  \"mode\": \"router\",\n101|  \"listen\": {\n102|    \"endpoints\": [\"tcp/0.0.0.0:7447\"]\n103|  }\n104|}\n105|\n106|\n107|Each Body process connects as a peer to `tcp/localhost:7447`. The desktop agent connects to `tcp://<pi-ip>:7447`.\n108|\n109|### 4.2 Key Expression Namespace\n110|\n111|All Body topics live under the `body/` prefix.\n112|\n113|\n114|body/\n115|  cmd_vel            # commanded twist velocity (from Jill)\n116|  cmd_direct         # direct wheel velocities (from Jill, low-level override)\n117|  heartbeat          # periodic heartbeat from Jill\n118|  odom               # encoder-derived odometry\n119|  motor_state        # motor driver status\n120|  lidar/\n121|    scan             # 2D laser scan\n122|  oakd/\n123|    depth            # depth frame or point cloud\n124|    imu              # IMU readings\n125|    rgb              # color frame (optional, high bandwidth)\n126|    config           # runtime pipeline reconfiguration (optional)\n127|  status             # system-level health from watchdog\n128|  emergency_stop     # published by watchdog on safety violation\n129|\n130|\n131|## 5. Message Schemas\n132|\n133|All messages are JSON-encoded UTF-8 strings published as Zenoh values. Timestamps are Unix epoch float (seconds with microsecond precision). All spatial units are SI: meters, radians, meters/second, radians/second.\n134|\n135|### 5.1 `body/cmd_vel` (Jill \u2192 motor_controller)\n136|\n137|Twist command in robot body frame. Linear is forward/back, angular is rotation (positive = counterclockwise viewed from above).\n138|\n139|\n140|{\n141|  \"ts\": 1713264000.123456,\n142|  \"linear\": 0.2,\n143|  \"angular\": 0.0,\n144|  \"timeout_ms\": 500\n145|}\n146|\n147|\n148|- `linear`: m/s, positive = forward. Clamped by motor_controller to hardware limits.\n149|- `angular`: rad/s, positive = CCW.\n150|- `timeout_ms`: if no new `cmd_vel` arrives within this window, motor_controller sets output to zero. Safety backstop independent of watchdog.\n151|\n152|### 5.2 `body/cmd_direct` (Jill \u2192 motor_controller)\n153|\n154|Direct wheel velocity command. Bypasses twist-to-differential math. For calibration and testing.\n155|\n156|\n157|{\n158|  \"ts\": 1713264000.123456,\n159|  \"left\": 0.15,\n160|  \"right\": 0.15,\n161|  \"timeout_ms\": 500\n162|}\n163|\n164|\n165|- `left`, `right`: m/s at wheel surface. Sign convention: positive = forward.\n166|\n167|### 5.3 `body/odom` (motor_controller \u2192 Jill)\n168|\n169|Dead-reckoned pose from encoder integration. Frame: robot starting position at origin, x-forward, y-left, theta CCW from x.\n170|\n171|\n172|{\n173|  \"ts\": 1713264000.123456,\n174|  \"x\": 0.0,\n175|  \"y\": 0.0,\n176|  \"theta\": 0.0,\n177|  \"vx\": 0.0,\n178|  \"vtheta\": 0.0,\n179|  \"left_ticks\": 0,\n180|  \"right_ticks\": 0,\n181|  \"dt_ms\": 20\n182|}\n183|\n184|\n185|- `x`, `y`: meters from origin.\n186|- `theta`: radians, normalized to [-\u03c0, \u03c0].\n187|- `vx`, `vtheta`: instantaneous velocity estimates.\n188|- `left_ticks`, `right_ticks`: raw cumulative encoder counts. Allows Jill to do her own integration if desired.\n189|- `dt_ms`: time since last odom publication.\n190|\n191|### 5.4 `body/motor_state` (motor_controller \u2192 all)\n192|\n193|\n194|{\n195|  \"ts\": 1713264000.123456,\n196|  \"left_pwm\": 0.0,\n197|  \"right_pwm\": 0.0,\n198|  \"left_dir\": \"fwd\",\n199|  \"right_dir\": \"fwd\",\n200|  \"e_stop_active\": false,\n201|  \"cmd_timeout_active\": false\n202|}\n203|\n204|\n205|- PWM values are duty cycle 0.0\u20131.0.\n206|- `e_stop_active`: true if watchdog has triggered emergency stop.\n207|- `cmd_timeout_active`: true if no `cmd_vel`/`cmd_direct` received within timeout window.\n208|\n209|### 5.5 `body/lidar/scan` (lidar_driver \u2192 Jill)\n210|\n211|\n212|{\n213|  \"ts\": 1713264000.123456,\n214|  \"angle_min\": 0.0,\n215|  \"angle_max\": 6.2832,\n216|  \"angle_increment\": 0.01745,\n217|  \"range_min\": 0.05,\n218|  \"range_max\": 12.0,\n219|  \"ranges\": [1.2, 1.3, 1.1, \"...\"],\n220|  \"intensities\": [200, 195, 210, \"...\"],\n221|  \"scan_time_ms\": 100\n222|}\n223|\n224|\n225|- Angles in radians. 0 = forward, increasing CCW.\n226|- Invalid/out-of-range readings: `null` in the array.\n227|- `intensities`: included if the STL-19P provides them, omit field otherwise.\n228|\n229|### 5.6 `body/oakd/imu` (oakd_driver \u2192 Jill)\n230|\n231|\n232|{\n233|  \"ts\": 1713264000.123456,\n234|  \"accel\": {\"x\": 0.0, \"y\": 0.0, \"z\": 9.81},\n235|  \"gyro\": {\"x\": 0.0, \"y\": 0.0, \"z\": 0.0},\n236|  \"mag\": {\"x\": 0.0, \"y\": 0.0, \"z\": 0.0},\n237|  \"orientation\": {\"w\": 1.0, \"x\": 0.0, \"y\": 0.0, \"z\": 0.0}\n238|}\n239|\n240|\n241|- `accel`: m/s\u00b2, sensor frame.\n242|- `gyro`: rad/s.\n243|- `mag`: if available from BNO086, omit if not configured.\n244|- `orientation`: quaternion from BNO086 onboard fusion, if available.\n245|\n246|### 5.7 `body/oakd/depth` (oakd_driver \u2192 Jill)\n247|\n248|**TBD.** This is the highest-bandwidth topic and the one most likely to need a non-JSON encoding or compression strategy. Options include publishing a downsampled depth map as a flat array, publishing only a local obstacle summary, or using Zenoh's raw bytes mode with a compact binary format. Defer detailed schema until the OAK-D pipeline design is done. For the initial skeleton, publish a placeholder.\n249|\n250|### 5.8 `body/heartbeat` (Jill \u2192 watchdog)"
+}
+OBSERVATION:
+(respond)
+
+FINAL ANSWER:
+1|# Body: Robot Body Software Project Specification
+2|
+3|**Version:** 0.2 draft
+4|**Date:** 2026-04-16
+5|**Author:** Bruce + Claude (initial spec generation)
+6|**Hardware target:** Raspberry Pi 5 (assumed), differential drive chassis
+7|**Language:** Python 3.11+
+8|**Transport:** Zenoh (pyzenoh)
+9|
+10|---
+11|
+12|## 1. Purpose
+13|
+14|Body is the onboard software stack for a differential-drive robot chassis. It provides sensor acquisition, motor control, and safety supervision as a set of independent communicating processes linked by Zenoh. The desktop agent (Jill, running on the CW workstation) connects to the same Zenoh network and interacts with Body exclusively through published topics. Body has no knowledge of Jill's internals; Jill has no knowledge of Body's process structure. The Zenoh topic schema defined in this document is the contract between them.
+15|
+16|## 2. Hardware Inventory
+17|
+18|| Component | Interface | Notes |
+19||---|---|---|
+20|| Cytron MDD10A dual 10A motor driver | GPIO: 2x PWM + 2x DIR | Channel A = left motor, Channel B = right motor |
+21|| Pololu #4752 30:1 gearmotor w/ encoder (x2) | GPIO: 2x quadrature (A/B per motor) | 64 CPR motor shaft, 1920 CPR output shaft. 330 RPM no-load @ 12V. Stall: 14 kg·cm / 5.5A |
+22|| LDROBOT STL-19P lidar | USB serial | 360° 2D scan, ~10Hz typical |
+23|| OAK-D-Lite | USB3 (DepthAI) | Stereo depth, RGB, onboard IMU (BNO086) |
+24|| Raspberry Pi 5 | — | 4-core, 8GB assumed. Runs all Body processes |
+25|
+26|### GPIO Pin Assignments (provisional, confirm during wiring)
+27|
+28|| Function | BCM Pin | Notes |
+29||---|---|---|
+30|| Motor A PWM | 12 | Hardware PWM channel 0 |
+31|| Motor A DIR | 5 | HIGH = forward, LOW = reverse (verify with MDD10A datasheet) |
+32|| Motor B PWM | 13 | Hardware PWM channel 1 |
+33|| Motor B DIR | 6 | Same convention |
+34|| Encoder L channel A | 23 | Pull-up enabled |
+35|| Encoder L channel B | 24 | Pull-up enabled |
+36|| Encoder R channel A | 27 | Pull-up enabled |
+37|| Encoder R channel B | 22 | Pull-up enabled |
+38|
+39|These assignments avoid SPI/I2C/UART pins. Adjust as needed during physical build.
+40|
+41|## 3. Architecture Overview
+42|
+43|
+44|┌─────────────────────────────────────────────────────┐
+45|│  Raspberry Pi                                       │
+46|│                                                     │
+47|│  ┌──────────────┐  ┌─────────────┐  ┌───────────┐  │
+48|│  │ motor_       │  │ lidar_      │  │ oakd_     │  │
+49|│  │ controller   │  │ driver      │  │ driver    │  │
+50|│  └──────┬───────┘  └──────┬──────┘  └─────┬─────┘  │
+51|│         │                 │               │         │
+52|│         └────────┬────────┴───────┬───────┘         │
+53|│                  │   Zenoh bus    │                  │
+54|│            ┌─────┴─────┐         │                  │
+55|│            │ watchdog   │         │                  │
+56|│            └─────┬─────┘         │                  │
+57|│                  │               │                  │
+58|└──────────────────┼───────────────┼──────────────────┘
+59|                   │               │
+60|              ─────┴───────────────┴───── network
+61|                          │
+62|              ┌───────────┴───────────┐
+63|              │  Desktop workstation  │
+64|              │  (Jill / CW)          │
+65|              └───────────────────────┘
+66|
+67|
+68|All inter-process communication, both local (Pi-to-Pi) and remote (Pi-to-desktop), uses the same Zenoh topics. There is no separate local IPC mechanism.
+69|
+70|### 3.1 Process Inventory
+71|
+72|| Process | Owns | Publishes | Subscribes |
+73||---|---|---|---|
+74|| `motor_controller` | MDD10A GPIO, encoder GPIO | `body/odom`, `body/motor_state` | `body/cmd_vel`, `body/cmd_direct` |
+75|| `lidar_driver` | STL-19P USB | `body/lidar/scan` | — |
+76|| `oakd_driver` | OAK-D-Lite USB | `body/oakd/depth`, `body/oakd/imu`, `body/oakd/rgb` (optional) | `body/oakd/config` (optional) |
+77|| `watchdog` | safety authority | `body/status` | `body/heartbeat`, all `body/*` for monitoring |
+78|| `launcher` | process lifecycle | — | — |
+79|
+80|### 3.2 Design Principles
+81|
+82|- Each process is a standalone Python script with its own `main()` and Zenoh session.
+83|- No shared memory, no threading across process boundaries.
+84|- Processes do not import each other. The Zenoh topic schema is the only coupling.
+85|- Every process logs to stdout. The launcher captures and tags output.
+86|- Every process handles SIGTERM gracefully: releases hardware, closes Zenoh session, exits.
+87|- Motor output defaults to zero (stopped) on startup and on any error.
+88|
+89|## 4. Zenoh Configuration
+90|
+91|### 4.1 Transport
+92|
+93|Body processes use Zenoh in **peer mode** for local communication. The desktop agent connects via Zenoh **router mode** or direct peer over TCP.
+94|
+95|Recommended: run a `zenohd` router on the Pi that both local processes and the remote desktop connect to. This simplifies discovery and avoids multicast issues over wifi.
+96|
+97|
+98|# /etc/zenoh/config.json (Pi router)
+99|{
+100|  "mode": "router",
+101|  "listen": {
+102|    "endpoints": ["tcp/0.0.0.0:7447"]
+103|  }
+104|}
+105|
+106|
+107|Each Body process connects as a peer to `tcp/localhost:7447`. The desktop agent connects to `tcp://<pi-ip>:7447`.
+108|
+109|### 4.2 Key Expression Namespace
+110|
+111|All Body topics live under the `body/` prefix.
+112|
+113|
+114|body/
+115|  cmd_vel            # commanded twist velocity (from Jill)
+116|  cmd_direct         # direct wheel velocities (from Jill, low-level override)
+117|  heartbeat          # periodic heartbeat from Jill
+118|  odom               # encoder-derived odometry
+119|  motor_state        # motor driver status
+120|  lidar/
+121|    scan             # 2D laser scan
+122|  oakd/
+123|    depth            # depth frame or point cloud
+124|    imu              # IMU readings
+125|    rgb              # color frame (optional, high bandwidth)
+126|    config           # runtime pipeline reconfiguration (optional)
+127|  status             # system-level health from watchdog
+128|  emergency_stop     # published by watchdog on safety violation
+129|
+130|
+131|## 5. Message Schemas
+132|
+133|All messages are JSON-encoded UTF-8 strings published as Zenoh values. Timestamps are Unix epoch float (seconds with microsecond precision). All spatial units are SI: meters, radians, meters/second, radians/second.
+134|
+135|### 5.1 `body/cmd_vel` (Jill → motor_controller)
+136|
+137|Twist command in robot body frame. Linear is forward/back, angular is rotation (positive = counterclockwise viewed from above).
+138|
+139|
+140|{
+141|  "ts": 1713264000.123456,
+142|  "linear": 0.2,
+143|  "angular": 0.0,
+144|  "timeout_ms": 500
+145|}
+146|
+147|
+148|- `linear`: m/s, positive = forward. Clamped by motor_controller to hardware limits.
+149|- `angular`: rad/s, positive = CCW.
+150|- `timeout_ms`: if no new `cmd_vel` arrives within this window, motor_controller sets output to zero. Safety backstop independent of watchdog.
+151|
+152|### 5.2 `body/cmd_direct` (Jill → motor_controller)
+153|
+154|Direct wheel velocity command. Bypasses twist-to-differential math. For calibration and testing.
+155|
+156|
+157|{
+158|  "ts": 1713264000.123456,
+159|  "left": 0.15,
+160|  "right": 0.15,
+161|  "timeout_ms": 500
+162|}
+163|
+164|
+165|- `left`, `right`: m/s at wheel surface. Sign convention: positive = forward.
+166|
+167|### 5.3 `body/odom` (motor_controller → Jill)
+168|
+169|Dead-reckoned pose from encoder integration. Frame: robot starting position at origin, x-forward, y-left, theta CCW from x.
+170|
+171|
+172|{
+173|  "ts": 1713264000.123456,
+174|  "x": 0.0,
+175|  "y": 0.0,
+176|  "theta": 0.0,
+177|  "vx": 0.0,
+178|  "vtheta": 0.0,
+179|  "left_ticks": 0,
+180|  "right_ticks": 0,
+181|  "dt_ms": 20
+182|}
+183|
+184|
+185|- `x`, `y`: meters from origin.
+186|- `theta`: radians, normalized to [-π, π].
+187|- `vx`, `vtheta`: instantaneous velocity estimates.
+188|- `left_ticks`, `right_ticks`: raw cumulative encoder counts. Allows Jill to do her own integration if desired.
+189|- `dt_ms`: time since last odom publication.
+190|
+191|### 5.4 `body/motor_state` (motor_controller → all)
+192|
+193|
+194|{
+195|  "ts": 1713264000.123456,
+196|  "left_pwm": 0.0,
+197|  "right_pwm": 0.0,
+198|  "left_dir": "fwd",
+199|  "right_dir": "fwd",
+200|  "e_stop_active": false,
+201|  "cmd_timeout_active": false
+202|}
+203|
+204|
+205|- PWM values are duty cycle 0.0–1.0.
+206|- `e_stop_active`: true if watchdog has triggered emergency stop.
+207|- `cmd_timeout_active`: true if no `cmd_vel`/`cmd_direct` received within timeout window.
+208|
+209|### 5.5 `body/lidar/scan` (lidar_driver → Jill)
+210|
+211|
+212|{
+213|  "ts": 1713264000.123456,
+214|  "angle_min": 0.0,
+215|  "angle_max": 6.2832,
+216|  "angle_increment": 0.01745,
+217|  "range_min": 0.05,
+218|  "range_max": 12.0,
+219|  "ranges": [1.2, 1.3, 1.1, "..."],
+220|  "intensities": [200, 195, 210, "..."],
+221|  "scan_time_ms": 100
+222|}
+223|
+224|
+225|- Angles in radians. 0 = forward, increasing CCW.
+226|- Invalid/out-of-range readings: `null` in the array.
+227|- `intensities`: included if the STL-19P provides them, omit field otherwise.
+228|
+229|### 5.6 `body/oakd/imu` (oakd_driver → Jill)
+230|
+231|
+232|{
+233|  "ts": 1713264000.123456,
+234|  "accel": {"x": 0.0, "y": 0.0, "z": 9.81},
+235|  "gyro": {"x": 0.0, "y": 0.0, "z": 0.0},
+236|  "mag": {"x": 0.0, "y": 0.0, "z": 0.0},
+237|  "orientation": {"w": 1.0, "x": 0.0, "y": 0.0, "z": 0.0}
+238|}
+239|
+240|
+241|- `accel`: m/s², sensor frame.
+242|- `gyro`: rad/s.
+243|- `mag`: if available from BNO086, omit if not configured.
+244|- `orientation`: quaternion from BNO086 onboard fusion, if available.
+245|
+246|### 5.7 `body/oakd/depth` (oakd_driver → Jill)
+247|
+248|**TBD.** This is the highest-bandwidth topic and the one most likely to need a non-JSON encoding or compression strategy. Options include publishing a downsampled depth map as a flat array, publishing only a local obstacle summary, or using Zenoh's raw bytes mode with a compact binary format. Defer detailed schema until the OAK-D pipeline design is done. For the initial skeleton, publish a placeholder.
+249|
+250|### 5.8 `body/heartbeat` (Jill → watchdog)

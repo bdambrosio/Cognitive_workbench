@@ -1,0 +1,61 @@
+{
+  "world": "s2_luna_1",
+  "arm": "/home/bruce/Downloads/Cognitive_workbench/measure/arms/luna_openai.yaml",
+  "workflow_mode": true,
+  "react_temperature": 0.7,
+  "react_max_tokens": 8192,
+  "resolved_model": "gpt-5.6-luna",
+  "resolved_temperature": 0.2,
+  "top_p": 0.95,
+  "llm_config": {
+    "sgl_model_path": null,
+    "reasoning_parser": null,
+    "server": "local",
+    "model": "gpt-5.6-luna",
+    "vllm_url": "https://api.openai.com/v1",
+    "api_key": "OPENAI_API_KEY",
+    "is_reasoning_model": true,
+    "reasoning_effort": "low"
+  },
+  "served_model_check": {
+    "checked": false,
+    "reason": "cloud arm \u2014 nothing to interrogate",
+    "served": "gpt-5.6-luna"
+  },
+  "external_repo": "/home/bruce/Downloads/Cognitive_workbench/measure/fixtures/dataroom/corpus",
+  "legs": [
+    {
+      "leg": 1,
+      "sent": "The target is the data room bound to inspect_external: nine\ndocuments for a smal",
+      "exit_reason": "yield",
+      "reply_chars": 208
+    },
+    {
+      "leg": 2,
+      "sent": "continue\n\n[engagement state, recorded by the client's process \u2014 leg 2 of 25, 3 m",
+      "exit_reason": "yield",
+      "reply_chars": 192
+    },
+    {
+      "leg": 3,
+      "sent": "continue\n\n[engagement state, recorded by the client's process \u2014 leg 3 of 25, 6 m",
+      "exit_reason": "yield",
+      "reply_chars": 164
+    },
+    {
+      "leg": 4,
+      "sent": "continue\n\n[engagement state, recorded by the client's process \u2014 leg 4 of 25, 9 m",
+      "exit_reason": "yield",
+      "reply_chars": 154
+    },
+    {
+      "leg": 5,
+      "sent": "continue\n\n[engagement state, recorded by the client's process \u2014 leg 5 of 25, 13 ",
+      "exit_reason": "respond",
+      "reply_chars": 7423
+    }
+  ],
+  "wall_clock_s": 946.5,
+  "error": null,
+  "captured_at_utc": "2026-08-25T16-13-21Z"
+}
