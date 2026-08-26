@@ -301,7 +301,11 @@ class _ChatBackend:
                 "%d-token window; output reservation cannot be met",
                 est_prompt, room, window)
             return max(room, 256)
-        logger.info(
+        # WARNING, not INFO: run logs are WARNING-level, so a clamp at INFO
+        # is invisible — and run_meta records the max_tokens we ASKED for,
+        # not the one that was used. A measurement that quietly ran at a
+        # lower ceiling than the one it reports is worse than a loud one.
+        logger.warning(
             "_ChatBackend: clamping max_tokens %d -> %d (est prompt %d, "
             "window %d)", max_tokens, room, est_prompt, window)
         return room

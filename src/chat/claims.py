@@ -184,7 +184,10 @@ on retrieved claims; tag fields only where defined above and known. \
 Use an empty list if the reply makes no factual claims."""
 
 
-_OBS_CAP_MARKER_RE = re.compile(r' …\[observation capped at \d+ chars\]')
+# Matches the marker written in chat_loop, INCLUDING the retrieval
+# pointer appended to it. Anything up to the closing bracket, so a
+# reworded pointer cannot leave a dangling fragment in a restored log.
+_OBS_CAP_MARKER_RE = re.compile(r' …\[observation capped at \d+ chars[^\]]*\]')
 
 
 def _restore_observations(working_log: str,

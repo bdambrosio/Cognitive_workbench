@@ -1732,7 +1732,9 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                             content = (
                                 content[:_REASONING_HISTORY_OBS_CAP].rstrip()
                                 + f" …[observation capped at "
-                                  f"{_REASONING_HISTORY_OBS_CAP} chars]")
+                                  f"{_REASONING_HISTORY_OBS_CAP} chars; "
+                                  f"ask recall for this turn's "
+                                  f"OBSERVATIONS_FULL]")
                         log_lines.append(f"{label}: {content}")
                         if it.get('tool_meta'):
                             tool_meta[label] = it['tool_meta']

@@ -74,7 +74,21 @@ def _cap_turn(text: str) -> str:
 
 _REASONING_HISTORY_FULL = 3          # of those, how many in full vs compressed
 
-_REASONING_HISTORY_OBS_CAP = 1000    # per-iter observation cap in stored trace
+# Per-iteration observation cap in the stored trace.
+#
+# Raised 1000 -> 4096 on 2026-08-26. 1,000 characters is smaller than a
+# single configuration block, so evidence the model read verbatim reached
+# the next leg as an ellipsis — a documented cause of citations being
+# reconstructed rather than copied.
+#
+# Measured before changing it, over the five claims-audit runs on disk:
+# the working log grows 1.22x to 1.54x, worst case +12,151 chars (~3k
+# tokens) on one turn. It is affordable HERE because an audit runs 2-3
+# turns, so only 2-3 records ever exist and _REASONING_HISTORY_FULL never
+# binds. A long chat session has many more records and the multiplier does
+# apply — that is where a recency-weighted retention policy belongs, and
+# it is not built.
+_REASONING_HISTORY_OBS_CAP = 4096
 
 # When the cap above elides part of an observation, the untruncated text
 # is kept under record['observations_full'] for claim attribution only —

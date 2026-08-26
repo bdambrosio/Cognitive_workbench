@@ -58,7 +58,12 @@ REACT_MAX_ITERS = 16
 # Output ceiling for one process_text pass. Reasoning tokens bill
 # against this same budget on a thinking model, so raising it is not
 # free and lowering it truncates rewrites — see _run_process_text.
-_PROCESS_TEXT_MAX_TOKENS = 4096
+#
+# Raised 4096 -> 8192 on 2026-08-26, with the subagent ceiling and for the
+# same reason: on the claims-audit path two models were cut mid-emission
+# (`finish=length`), which reads exactly like a model that cannot follow
+# the format. A ceiling only permits longer output; it never forces it.
+_PROCESS_TEXT_MAX_TOKENS = 8192
 
 # Per-iteration budget for re-emitting a malformed/truncated action. A
 # parse failure (commonly a `thought` that ran long and got cut off by the
