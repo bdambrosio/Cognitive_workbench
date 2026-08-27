@@ -41,6 +41,11 @@ INADMISSIBLE 3 of 3.
 Only after all three does the publisher's recommended agentic temperature get
 looked up and put to Bruce — see [model-settings.md](model-settings.md).
 
+**What follows this screen.** Passing all three gates makes a model a
+candidate, not a qualified one. Whether its reports can be shipped is decided
+by three runs against the frozen criteria in
+[model-qualification.md](model-qualification.md).
+
 ## Two traps this screen exists to avoid
 
 **`max_tokens` must be what a real call uses.** At 512 the reasoning models

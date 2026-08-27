@@ -195,6 +195,11 @@ campaign; it costs one call and it is the cheapest disqualifier available.
 
 ## The threshold, and why it is the number that matters
 
+> The threshold is a **run-level** result. What a *model* has to do across
+> three runs to qualify is frozen in `docs/model-qualification.md`, and it
+> reads this table one criterion at a time rather than through the
+> conjunction verdict.
+
 Tier counts are a score; a business case needs a floor. `score.py` reports
 PASS/FAIL against six criteria a delivered report would be judged on: all
 three must-find items, a Gap Map, a §9 recommendation, leading with a top-3
