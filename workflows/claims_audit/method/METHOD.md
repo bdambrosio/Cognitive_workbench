@@ -11,8 +11,8 @@ What this audit does not do is in §11.
 
 ## 1a. Level of assurance, and the coverage vocabulary
 
-This is a **limited assurance** engagement. The audit examines part of the
-target's claims, not all of them: §4 sets the order of work, §12 sets where it
+This is a **limited assurance** engagement. The audit resolves part of the
+target's identified claims, not all of them: §4 sets the order of work, §12 sets where it
 stops, and §11 lists what is out of scope.
 
 The report states its conclusion positively — of the claims it resolved, these
@@ -105,7 +105,7 @@ knowing it, **would change the price, the structure of the deal, or the
 decision to close.** The threshold is relative to the transaction: the same
 defect is material in a $400k acquisition and noise in a $40m one.
 
-Three things follow. **Report every material gap whichever way it pushes the
+Five things follow. **Report every material gap whichever way it pushes the
 price** — one that favours the seller is still a gap. **A gap below the
 threshold does not make the claim fail**: record it under `[real, minor
 caveat]` — the verdict exists for a discrepancy that does not change the
@@ -114,9 +114,9 @@ the materials bear out with nothing to note. Materiality decides whether a
 discrepancy is worth the buyer's attention; it does not decide whether the
 claim was accurate, and the verdict must not say it was.
 
-**It still gets a finding.** Every claim you *resolve* produces one, the ones
-that hold included — §1a requires the report to say which claims hold and which
-do not, and a rate alone does not say which. A claim you attempted and could
+**It still gets a finding.** Every claim you *resolve* produces one, the
+supported ones included — §1a requires the report to say which resolved claims
+are supported and which are not, and a rate alone does not say which. A claim you attempted and could
 not settle is `[unverifiable]`, which is not a finding (§6) and belongs in the
 coverage statement. **The consistency rate is `supported` over `resolved`
 (§1a)** — a ratio over claims, so `[derived]` findings are outside it because
@@ -143,30 +143,31 @@ business-ending or trivial, and it takes the tier its failure earns.
    seller described, so the buyer is acquiring a different asset at the agreed
    price. Usually the stated boundaries: isolation, redundancy, failover, tier
    separation, shared state.
-3. **Failure costs money or time to put right, and the deal survives it** —
-   priced in, not walked away from. Usually operational parameters: retry
-   intervals, timeouts, monitoring, retention windows, thresholds.
-4. **Failure changes nothing on its own** — individually minor; collectively
-   they set the consistency rate (§1a), which is the best available signal
-   about the claims nobody had time to check.
+3. **Failure imposes a bounded remediation cost in money or time** — it can
+   be put right without changing what is being bought. Usually operational
+   parameters: retry intervals, timeouts, monitoring, retention windows,
+   thresholds.
+4. **Failure changes nothing on its own** — individually minor. They are
+   verified last, so they are also the claims most often left unattempted, and
+   the ones you did resolve are the best available evidence about the ones you
+   did not. (The consistency rate is over *all* resolved claims, not this tier
+   — §1a.)
 
 **Those four levels are the tiers.** A **claim finding** takes the tier of the
 claim it tests. A **derived finding** takes the highest tier among the figures
 it rests on, and rises above them when the consequence is more severe than
 either input — §5 states it there too, because that is where a derived finding
-is written. They were re-cast onto a single consequence axis on 2026-08-27:
-tiers 2 and 3 had named subject matter — "architectural invariants",
-"operational parameters" — while 1 and 4 named severity, so the section claimed
-one axis and used two, and a business-ending architectural claim had no correct
-tier. If a tier is empty for a target, say so in the coverage statement rather
-than silently running a three-tier order. The order exists so that an audit cut
+is written.
+
+If a tier is empty for a target, say so in the coverage statement rather than
+silently running a three-tier order. The order exists so that an audit cut
 short by budget, time or access has resolved the most expensive unknowns
 first.
 
 ## 5. Finding format
 
 ```
-**Finding N: <short title> — [verdict]**
+**Finding N: <short title> — [claim verdict]**
 
 Claim (<document:lines>): <the stated claim>
 
@@ -255,7 +256,7 @@ Four rules:
 **A derived finding that resolves to a date carries that date as its own
 expiry.** "The last recoverable backup ages out on 2026-08-29" is true when
 written, serious a week later, and meaningless a month after that. State the
-date and what happens on it. The report as a whole carries an **as-of date for
+date and what happens on it. The deliverable carries an **as-of date for
 the materials**: a data room is a snapshot, and every conclusion in the report
 is a conclusion about that snapshot.
 
@@ -263,7 +264,7 @@ is a conclusion about that snapshot.
 rests on, and rises above them when the consequence is more severe than either
 input.
 
-## 6. Verdict vocabulary
+## 6. Verdicts, statuses and observation types
 
 Three vocabularies, and they answer different questions. Reading them as one
 table is what made `[derived]` look like a verdict on a claim and
@@ -316,15 +317,11 @@ own figures, taken together, entail something neither document states. It
 carries no claim source because there is no claim — which is why it needs §5's
 second shape rather than the format above.
 
-**`[unclaimed]` was called `[non-delta]` until 2026-08-27, and the name was
-actively misleading**: it reads as the negation of `[delta]` — "the claim is
-not false" — when it means there was no claim in the first place.
-
 **`[unverifiable]` must never be reported as `[delta]`.** "I could not find
 it" is not the same as "it is not there." The first belongs in the coverage
 statement; only the second is a finding.
 
-Use the narrowest verdict that fits.
+Use the narrowest claim verdict that fits.
 
 ## 7. Correction protocol
 
@@ -355,49 +352,24 @@ explain back to a colleague.
 
 ## 9. Report-level conclusion
 
-§1a already calls this the report's **conclusion**, and that is the word this
-document uses. It was headed "recommendation" until 2026-08-27, which put an
-advisory name on a statement about evidence — and the definitions had drifted
-to match.
-
 | Conclusion | Meaning |
 |---|---|
 | **Clear** | **No material findings of any kind.** Every resolved claim is supported, and no caveats of note. |
 | **Clear with caveats** | **No material findings of any kind.** Documentation drift, maintenance debt or operational notes a buyer should know, which do not bear on valuation. |
-| **Conditional** | Material findings, each localised and remediable — a fix of known shape, or a claim about a non-critical feature. |
-| **Material** | Material findings that bear on valuation or risk profile. |
+| **Conditional** | Material findings, but all are localised and remediable — each has a correction of known scope and does not change what is being bought. |
+| **Material** | Material findings whose consequence is not bounded to a localised remediation, and which materially change valuation or risk profile. |
 | **Systemically inconsistent** | The claims do not describe the target: material findings across independent claims, or a claim source contradicted throughout. |
 
 **The audit concludes; the buyer decides.** The audit says "Conditional: the
 seller claims 30-day retention, the materials show 7." Whether 7 days is
 acceptable is the buyer's call. The audit does not say "you should walk."
 
-**Keep the two vocabularies apart, and note that this one did not.** The five
+**Keep the two vocabularies apart.** The five
 terms above describe what the audit found — the state of the claims and of any
 derived finding, since a `[derived]` finding describes no claim and can still
 decide the conclusion. *Proceed, negotiate, walk* is the buyer's action
 vocabulary, and using it would put the audit in the business of
-advising on the deal (§2). Until 2026-08-27 **Walk** was one of the five terms
-— the forbidden word used as a conclusion — while **Conditional** read "Proceed
-if the seller will fix them" and **Material** read "the buyer must price this in
-explicitly". Three uses of the register these very lines forbid.
-
-**"Material finding" is the boundary, and it is deliberately not "`[delta]` or
-`[partial]`".** Until 2026-08-27 the first two rows were defined by the absence
-of those two claim verdicts, which let a catastrophic `[derived]` finding sit
-inside `Clear` — every stated claim `[real]`, and the seller's own figures
-together entailing something that ends the business. That is not a corner case:
-it is §5's flagship derived finding, where a retention period in one document
-and a last-good-backup date in another fix a date after which the business
-cannot be restored, with neither claim false. The conclusion must turn on
-material findings of any kind, which is the currency §4 already defines and the
-one thing every finding type shares.
-
-**And `Clear` stated a conclusion §1a forbids.** It read "The system does what
-it says", which §1a names as the example of a sentence claiming more than the
-work performed: *"'The system does what it says' is a claim about everything.
-'Of the 43 claims identified, 39 resolved and 37 supported' is a claim about the
-work done. Write the second."* Now it says the second.
+advising on the deal (§2).
 
 **One narrow exception, and it is the Gap Map's alone.** Its closing line may
 offer a judgement — "the gaps are addressable within the existing integration
@@ -657,10 +629,6 @@ The report now carries what the working record used to be needed for.
 **What the report still does not carry is the negative space**, and that is
 what a negligence claim asks about:
 
-- **The searches behind an absence.** §5 requires two searches for "this is not
-  implemented" and the report states the conclusion, not the queries. *"A
-  documented search proves diligence, not absence"* — and the document is the
-  trace, not the report.
 - **The dead ends behind a finding.** A finding cites the file that settled it.
   It does not cite the six that did not, and "did you look properly" is a
   question about those six.
@@ -732,8 +700,9 @@ for proper nouns.
 - A footer in small type: "technical claims verification · not a pen-test,
   not legal advice"
 
-Each key item is a one-line claim and a short note. No line citations; those
-are in the report.
+Each key item is a finding, stated in one line, with a short note. No line
+citations; those are in the report. ("Claim" is reserved for what the seller
+asserted — §2 — and a Gap Map item is what the audit concluded about one.)
 
 **When the conclusion is Clear or Clear with caveats, include what holds,
 not only the caveats.** The buyer needs to see *what* is clear — "the payment
@@ -814,8 +783,8 @@ to protect.
 
 Budget per finding instead. A claim that is **supported** needs its verdict,
 its citations and a clause — around twenty to thirty words. A claim that is
-**not** needs the claim, the evidence that settles it, and what the gap costs
-the buyer — around eighty.
+**not supported** needs the claim, the evidence that settles it, and what the
+gap costs the buyer — around eighty.
 
 **The two things length pressure will suggest are the two you must not do:**
 drop citations, or merge several claims into one finding. A finding carrying
@@ -830,8 +799,8 @@ findings to prose shrinks the surface anyone can review it against.
 3. the assurance level (§1a) and the coverage it rests on.
 
 The second is the one most often left out and the one that matters most. Every
-finding interprets a claim without its author present to say what was meant,
-and a reader who does not know that will over-read the report.
+claim finding interprets a claim without its author present to say what was
+meant, and a reader who does not know that will over-read the report.
 
 It is a block of its own and it belongs to the same delivered document as the
 report block — the client receives one deliverable with these lines in it.
@@ -847,37 +816,6 @@ The Gap Map is read in thirty seconds; the report is read only if the Gap Map
 earns it. The Gap Map alone forfeits the proof, the report alone forfeits the
 reader, and neither is a summary of the other: the report carries the citations
 and the Gap Map carries none.
-
-### Why markers and not turn boundaries
-
-This reverses an earlier decision, and the reason is worth stating so it is not
-reversed back. These markers were removed once, on the argument that a turn
-boundary separates the documents without either having to announce itself — so
-that "if you are asked for the Gap Map, the report is done".
-
-That does not hold. On 2026-08-27 an engagement ended a turn with its claim
-enumeration and the sentence "I'll work the priority order straight through
-now". The client's process had nothing it could test, took the enumeration as
-the report, and asked for the Gap Map — which was then written about a document
-that did not exist. **A turn boundary proves a turn ended. It does not prove a
-document was written.**
-
-A block says what it is. That is the whole reason the markers are back, and it
-is why the method no longer says how many turns to take: once a block announces
-itself, the turn boundary has no work left to do, and prescribing one would be
-this method telling you how to pace work that is yours to pace.
-
-### Considered and rejected: being asked for each block in turn
-
-A process that requested the claim surface, then the report, then the
-limitations, then the Gap Map would be driving the method rather than accepting
-its results — deciding what happens next at every step, which is yours to
-decide. It would also flatten the engagement: every auditor prompted through
-the same four steps produces the same shape of work, and the method would stop
-being something you follow.
-
-Self-delimiting blocks are what make it unnecessary. You are asked for nothing
-while the blocks arrive; you are told only when one has not.
 
 ## 17. Positioning and outreach
 
@@ -924,3 +862,89 @@ perform.
 
 Jill offered a second pass on 2026-08-22, before the ISAE 3000 / AT-C 205 gap
 closure and the §12.2 work. Probably stale; re-ask rather than assume.
+
+## 19. Superseded rules, and why they changed
+
+<!-- audience: practice -->
+
+**This section exists because the changelog was in the auditor's prompt.** Until
+2026-08-27 each of these paragraphs sat in the section it describes. Two costs,
+and the first is the serious one.
+
+**A changelog names retired vocabulary, and the prompt is where vocabulary is
+copied from.** §9 carried the sentence "Until 2026-08-27 **Walk** was one of the
+five terms" three lines under the five-row conclusion table — reintroducing the
+one word §9 forbids, in the position a model reads a table's terms from. That is
+the same shape as the defect it documented, where `Clear` was defined using the
+sentence §1a forbids.
+
+**And it is prompt budget spent on rules that no longer exist.** The auditor
+does not need to know what the method used to say. Whoever edits the method
+does, which is this audience.
+
+The marker is section-scoped — `<!-- audience: practice -->` anywhere in a `##`
+section drops the whole section — so a paragraph cannot be marked in place.
+History has to live in its own section, which is this one.
+
+### §4 — the tiers
+
+Re-cast onto a single consequence axis on 2026-08-27. Tiers 2 and 3 had named
+subject matter — "architectural invariants", "operational parameters" — while 1
+and 4 named severity, so the section claimed one axis and used two, and a
+business-ending architectural claim had no correct tier.
+
+Tier 3 lost "and the deal survives it — priced in, not walked away from" on the
+same day: buyer-action language inside a tier definition, which §2 and §9
+forbid everywhere else.
+
+### §6 — `[unclaimed]`
+
+Called `[non-delta]` until 2026-08-27. The name was actively misleading: it
+reads as the negation of `[delta]` — "the claim is not false" — when it means
+there was no claim in the first place.
+
+### §9 — the conclusion
+
+**Headed "recommendation" until 2026-08-27**, which put an advisory name on a
+statement about evidence — and the definitions had drifted to match. §1a already
+called it the conclusion.
+
+**`Walk` was one of the five terms** — the forbidden word used as a conclusion —
+while **Conditional** read "Proceed if the seller will fix them" and **Material**
+read "the buyer must price this in explicitly". Three uses of the register §9's
+own lines forbid. `Walk` became **Systemically inconsistent**.
+
+**The first two rows were defined by the absence of `[delta]` and `[partial]`**,
+which let a catastrophic `[derived]` finding sit inside `Clear` — every stated
+claim `[real]`, and the seller's own figures together entailing something that
+ends the business. Not a corner case: it is §5's flagship derived finding, where
+a retention period in one document and a last-good-backup date in another fix a
+date after which the business cannot be restored, with neither claim false. The
+boundary is now material findings of any kind, which is the currency §4 defines
+and the one thing every finding type shares.
+
+**`Clear` read "The system does what it says"** — verbatim the sentence §1a
+names as claiming more than the work performed.
+
+### §16 — why markers and not turn boundaries
+
+The markers were removed once, on the argument that a turn boundary separates
+the documents without either having to announce itself — so that "if you are
+asked for the Gap Map, the report is done".
+
+That does not hold. On 2026-08-27 an engagement ended a turn with its claim
+enumeration and the sentence "I'll work the priority order straight through
+now". The client's process had nothing it could test, took the enumeration as
+the report, and asked for the Gap Map — which was then written about a document
+that did not exist. **A turn boundary proves a turn ended. It does not prove a
+document was written.**
+
+A block says what it is. That is why the markers are back, and why the method no
+longer says how many turns to take: once a block announces itself, the turn
+boundary has no work left to do.
+
+**Considered and rejected: asking for each block in turn.** A process that
+requested the claim surface, then the report, then the limitations, then the Gap
+Map would be driving the method rather than accepting its results, and would
+flatten the engagement — every auditor prompted through the same four steps
+produces the same shape of work. Self-delimiting blocks make it unnecessary.
