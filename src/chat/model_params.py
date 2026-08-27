@@ -67,6 +67,17 @@ MODEL_TEMPERATURE: Dict[str, float] = {
     # benchmark config. top_p is not recorded here — theirs happens to equal
     # the global, and TOP_P stays a single value with no per-model override.
     "minimax-m3": 1.0,
+    # NO PUBLISHER RECOMMENDATION EXISTS for this one. The card gives only
+    # per-benchmark configurations and they disagree (1.0/0.95 HLE-with-tools,
+    # 1.0/1.0 NL2Repo and Terminal-Bench, 0.95/1.0 DeepSWE). Bruce chose the
+    # 1.0 / top_p 0.95 pair on 2026-08-26 — the same category of decision as
+    # grok-4.6's 0.5, not a publisher value.
+    #
+    # The key must stay `glm-5.3-flash` and not shorten to `glm-5.3`: a
+    # `glm-5.3` key would ALSO match this model id, and two matching keys with
+    # different values raise. Adding the full GLM-5.3 later means keeping both
+    # keys spelled out.
+    "glm-5.3-flash": 1.0,
 }
 
 # Retired deliberately, so a stale config naming one fails with a reason

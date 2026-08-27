@@ -36,6 +36,7 @@ numbers are trusted.**
 | `nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B` | 1.0 | publisher (NVIDIA examples run 1.0 / 0.95) |
 | `nvidia/nemotron-3-super-120b-a12b` | 1.0 | Bruce, 2026-08-24, same publisher as Ultra |
 | `minimax/minimax-m3` | 1.0 | publisher, 2026-08-26 — the MiniMax-M3 card gives 1.0 / top_p 0.95 as general guidance for best performance, not a benchmark config. Confirmed by Bruce. Their top_p equals our global, so nothing per-model is recorded for it |
+| `z-ai/glm-5.3-flash` | 1.0 | Bruce, 2026-08-26. **Z.ai publishes no general recommendation** — the card gives only per-benchmark configs and they disagree (1.0/0.95 HLE-with-tools, 1.0/1.0 NL2Repo and Terminal-Bench, 0.95/1.0 DeepSWE). Chose the standard 1.0 / top_p 0.95 pair |
 
 Keys match the served or configured model id: exact first, then unique
 case-insensitive substring. `Qwen3.8` is a substring key because the local
