@@ -8,9 +8,14 @@ therefore rebuilds the request body. The schema is imported rather than copied;
 the rest of the body shape must be re-checked against `_ChatBackend.chat()`
 whenever that changes.
 
-TEMPERATURE IS OMITTED ON PURPOSE, so results are at each provider's default
-sampling. This screens capability and cost, never quality. Nothing here is a
-benchmark result.
+TEMPERATURE IS OMITTED BY DEFAULT, so results are at each provider's default
+sampling and every row in the table is comparable to every other. This screens
+capability and cost, never quality. Nothing here is a benchmark result.
+
+`--temperature` sends an explicit one. It exists for a single question — does
+temperature move tokens per call at all — and a row probed with it is NOT
+comparable to the rest of the table. It is opt-in for that reason: there is no
+default to inherit, which is the same stance src/chat/model_params.py takes.
 
 THE THREE GATES, in the order that eliminates cheapest-first:
 
@@ -83,7 +88,8 @@ USER = (
 
 def probe(model: str, tag: str, effort: str | None = "low",
           max_tokens: int = 16384, timeout: int = 300,
-          url: str = URL, key_env: str = "OPENROUTER_API_KEY") -> dict:
+          url: str = URL, key_env: str = "OPENROUTER_API_KEY",
+          temperature: float | None = None) -> dict:
     """One endpoint, one call. Returns a row; never raises.
 
     `tag` pins the OpenRouter provider. For a direct route (a provider's own
@@ -106,6 +112,10 @@ def probe(model: str, tag: str, effort: str | None = "low",
         body["provider"] = {"order": [tag], "allow_fallbacks": False}
     if effort:
         body["reasoning_effort"] = effort
+    # Sent only when asked for. Absent means the provider default, which is
+    # what the comparable rows in docs/model-prescreen.md were probed at.
+    if temperature is not None:
+        body["temperature"] = temperature
     key = os.environ.get(key_env)
     if not key:
         return {"model": model, "tag": tag, "status": "NOKEY",
@@ -145,6 +155,7 @@ def probe(model: str, tag: str, effort: str | None = "low",
             print(f"  ({tag}: content did not parse as JSON: {e})",
                   file=sys.stderr)
     return {"model": model, "tag": tag, "status": "ok",
+            "temperature": temperature,
             "finish": choice.get("finish_reason"),
             "secs": round(dt, 1),
             "prompt_tok": usage.get("prompt_tokens"),

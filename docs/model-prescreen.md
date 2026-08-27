@@ -167,6 +167,52 @@ call signature DeepInfra showed on DeepSeek-V4-Flash, which cost that run
 slow route. Nemotron Super direct is fine at 50.7 tok/s; only Ultra is
 affected.
 
+### Qwen3.8-Flash (`qwen/qwen3.8-flash`, $0.16/$0.47 per M)
+
+**One endpoint exists**: `alibaba`, quantization **unknown**, 1M context. No
+provider diversity, and nothing to pin precision against — the tag carries the
+quantization elsewhere in this file, and here there is no tag to carry it.
+
+Probed 2026-08-26, two calls (provider default and an explicit 1.0): **both
+429, rate-limited upstream.** Gates 1 and 2 are unanswered, not failed. Retry
+before drawing any conclusion.
+
+Watch item when it does answer: **Qwen3.8-27B is on record as unusable for this
+METHOD** — 13 of 27 references past end-of-file on `r1_qwen_1`, two of three
+runs inadmissible, caused by citing claim ordinals rather than line numbers.
+Flash is a different model so that does not transfer, but it is the same family
+and the defect was a citation convention. Check the scheme numbers first.
+
+### Gate 3 results
+
+The screen's first two gates are cheap and mechanical. This is what happened
+when a candidate that passed them was given a real fixture run.
+
+| run | model | route | wall clock | outcome |
+|---|---|---|---|---|
+| `b2_grok_1` | grok-4.6 | xAI | 321s | **ADMISSIBLE, 10 of 10, PASS** — the baseline |
+| `ns1_super_1` | Nemotron 3 Super | DeepInfra direct | **1,966s** | **FAIL — no report produced** |
+
+**Nemotron 3 Super passed gates 1 and 2 and failed gate 3 categorically.** It
+ran 33 minutes across 4 legs, read 7 of 9 documents, enumerated 29 claims,
+checked 15 of them — and wrote a `report.md` whose entire content is the
+literal string `<the entire report>`. Its closing reply names four
+substantively correct findings with **zero citations** and ends "Full report
+with citations available on request." `error: None`; nothing failed
+mechanically.
+
+This is the argument for gate 3 existing. Nothing in gates 1 or 2 predicted it:
+the model accepted the schema, emitted well-formed actions, and spent a
+reasonable 235 completion tokens on a one-line action.
+
+**It also found a hole in the acceptance layer.** `claims_audit/runner.py`
+refuses "I'm done" without the Gap Map marker — *done is a deliverable, not an
+exit reason* — and that rule did not fire here, because the model did respond;
+it responded with a placeholder. A 20-byte report walked through. The runner
+checks that a reply happened and that the Gap Map leg ran, not that the report
+is a report. A minimum length, or the absence of any citation, would have
+failed this at the runner rather than at a human 33 minutes later.
+
 ### Reference points, from earlier probes
 
 | model | ctok for a one-line action | source |
