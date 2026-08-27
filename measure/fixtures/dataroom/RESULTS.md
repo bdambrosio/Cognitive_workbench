@@ -15,6 +15,51 @@ ran on the turn-based instrument and is not comparable to this.
 | `b3_glm_2` | GLM-5.3-Flash | 1 | **0** | ADMISSIBLE · 11/11 · PASS | PASS |
 | `b3_glm_3` | GLM-5.3-Flash | 3 | REPORT ×1, GAP MAP ×1 | ADMISSIBLE · 10/10 · PASS | FAIL — no unsupported claims |
 
+**Qwen3.8-27B DISQUALIFIED on Q3** (review PASS in at least 2 of 3), local
+SGLang, temperature 0.25, top_p 0.95.
+
+| run | legs | prompts | review |
+|---|---|---|---|
+| `b3_qwen_1` | 1 | 0 | ADMISSIBLE · 21 of 24 · **FAIL** |
+| `b3_qwen_2` | — | — | **VOID** — llm_error, 300s client read timeout at iter 7 |
+| `b3_qwen_3` | 3 | LIMITATIONS ×1, GAP MAP ×1 | ADMISSIBLE · 32 of 47 · **FAIL** |
+
+Two FAILs make PASS-in-2-of-3 unreachable, so the verdict does not depend on
+replacing the void run. The replacement was queued and never ran.
+
+**This is the counterweight to GLM's reversal: the b2 board was not uniformly
+artifact.** GLM's disqualification turned on a delivery misreading and did not
+survive the instrument change. Qwen's did. Delivery was never its problem — it
+delivered in one leg unprompted on run 1 — and it fails on what it was ruled
+out for: it cannot reliably say where its findings come from.
+
+**The defect changes form every run, which is why it was hard to name.**
+
+| | b2 | `b3_qwen_1` | `b3_qwen_3` |
+|---|---|---|---|
+| line references | ordinals dressed as line numbers | **0** | 128 in the report, 59 parsed, all resolving, 0 past EOF |
+| evidence fields pointing nowhere | — | 20 of 47 | 10 of 93 |
+| failure | INADMISSIBLE | 4 `[uncited]`, 1 standing | 9 `[uncited]`, 2 `[unsupported]` standing 2 of 2 |
+
+Run 3 cited lines **correctly** and still failed. So the ordinal defect is not
+the disease; it was one presentation of it.
+
+**Qwen enumerates far more and holds less of it.** 47 findings against grok's 17
+and GLM's 10-12, with 15 of 47 not surviving the check.
+
+**The retest discriminates rather than rubber-stamping.** It overturned one
+`[unsupported]` in run 1 (1 of 2, did not stand) and confirmed two in run 3
+(2 of 2, stood).
+
+**The void, and why it is a void.** `b3_qwen_2` died at `backend.py`'s
+`_HTTP_TIMEOUT_S = 300` on iteration 7 after 570s, with the server healthy
+before and after. One iteration exceeded 300s against a ~39s average for run 1.
+The plausible mechanism is qwen's one-leg style producing a very long
+generation at a near-greedy 0.25 — `qwen_reasoning.yaml` warns that temperature
+"invites repetition in exactly the long generations" this produces — but the
+call died, so there is no partial output and this is a hypothesis. Q0 voids it
+because the turn crashed; the model did not decline to deliver.
+
 **GLM-5.3-Flash QUALIFIES** — Q1 admissible 3 of 3, Q2 review PASS 3 of 3, Q3
 no single mechanical criterion failing twice. It was disqualified on the b2
 instrument the same day, and the reversal is the instrument, not the model.
