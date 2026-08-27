@@ -59,8 +59,16 @@ an April snapshot, and the July build — the model id identical in all three.
 
 Probed 2026-08-26 via OpenRouter unless noted. `ctok` is completion tokens for
 one one-line action; `reas` is reasoning characters on the separate channel.
+
+**EVERY FIGURE BELOW IS n=1 UNLESS THE ROW SAYS OTHERWISE, AND `ctok` IS
+HIGH-VARIANCE.** The one route sampled twice — Kimi K2.7-Code on `together` —
+returned 727 and 1,877 completion tokens on byte-identical requests, and
+MiniMax M3 on `coreweave/fp4` returned 433 and 62. Read `ctok` as an order of
+magnitude, not a value, and do not compare two routes on it without spending
+the samples deliberately. Gate 1 is binary and does not have this problem.
+
 **Seconds are not comparable to in-run seconds-per-call** — the probe prompt is
-~200 tokens and a real call carries ~58k. `tok/s` and `ctok` are comparable.
+~200 tokens and a real call carries ~58k. `tok/s` is comparable.
 
 ### Kimi K2.7-Code (`moonshotai/kimi-k2.7-code`, $0.67/$3.40 per M)
 
@@ -87,6 +95,52 @@ servable.
 | `modelrun/fp4` | fp4 | **pass** | 644 | 1171 | 160.9 | reasoning emitted |
 | `parasail/fp8` | fp8 | — | | | | 429, twice |
 | `atlas-cloud/fp8`, `novita/fp8` | fp8 | — | | | | listed, not servable |
+
+### GLM-5.3-Flash (`z-ai/glm-5.3-flash`, $0.075/$0.25 per M)
+
+1.31M context. **All 8 endpoints are fp8** — no int4 or fp4 anywhere in the
+list, which is the cleanest quantization picture of any candidate here.
+
+| endpoint | quant | gate 1 | ctok | reas | tok/s | note |
+|---|---|---|---|---|---|---|
+| `modal/fp8` | fp8 | **pass** | 59 | 16 | 23.5 | |
+| `cloudflare` | unknown | **pass** | 101–164 | 0–192 | 40–59 | n=2 |
+| `z-ai/fp8` (first-party) | fp8 | — | | | | not servable at probe time |
+| `novita/fp8`, `gmicloud/fp8`, `io-net/fp8`, `baseten/fp8` | fp8 | — | | | | not servable |
+| `deepinfra/fp8` | fp8 | — | | | | 429 |
+
+**6 of 8 endpoints did not answer**, which reads as a very recent launch rather
+than a defect. Worth re-probing before it is written off or committed to.
+
+Reference, same family: `z-ai/glm-5.3` (the full model, $1.40/$4.40) on its
+first-party `z-ai/fp8` **failed gate 1 in a way worth recording** — it accepted
+`response_format: json_schema` and returned a markdown-fenced ```` ```json ````
+block instead of raw JSON. Structured output accepted but not honoured. Our
+fence-stripping utility would survive it; nothing in the endpoints API predicts
+it.
+
+### DeepSeek V4 Flash 0731 (`deepseek/deepseek-v4-flash-0731`)
+
+Not re-probed — these are the existing records, from
+`measure/models/or_deepseek_v4flash.yaml` and `docs/model-settings.md`.
+
+| endpoint | quant | gate 1 | tok/s | note |
+|---|---|---|---|---|
+| `baidu/fp8` | fp8 | **pass** | 69 | the configured route |
+| `parasail/fp8` | fp8 | **pass** | 58 | |
+| `siliconflow/fp8` | fp8 | **pass** | 50 | |
+| `deepinfra/fp8` | fp8 | **pass** | 49 | |
+| `akashml/fp8` | fp8 | **pass** | 46 | |
+| `gmicloud`, `novita`, `streamlake`, `coreweave`, `baseten` | — | **FAIL** | | 404, no `json_schema` |
+
+**Gate 2: 18 completion tokens** for a one-line answer — the lowest of any
+model on record here, against grok's 33. Gate 3 passed the mechanical screen at
+226s / 28 calls / 8.1s per call on `baidu/fp8`, with zero evidence fields
+pointing nowhere.
+
+Its known defect is invisible to all three gates: five of twelve findings cited
+a line that resolves cleanly to the **wrong** line. Recorded here because it is
+the standing argument for gate 3 being a reviewed run rather than a screen.
 
 ### Nemotron 3 (re-probed on the current instrument)
 
@@ -128,12 +182,17 @@ schema-valid ReAct action. That is a different answer from the DeepSeek case,
 where five of ten endpoints refused `json_schema` outright, and it means
 structured output is not the discriminator for these two candidates.
 
-**Provider choice changes token spend by up to 8x on identical payloads.** Kimi
-K2.7-Code emitted 782 reasoning characters on the first-party endpoint and
-8,190 on `alibaba/fp8` — same model id, same request. MiniMax M3 emitted no
-reasoning at all on two endpoints and 1,171 characters on a third. Since tokens
-per call is what sets wall clock here, **the endpoint is a bigger variable than
-the model** and must be pinned before any comparison means anything.
+**Token spend per action varies widely, but NOT demonstrably by provider.**
+The first pass looked like an 8x provider effect — Kimi K2.7-Code emitting 782
+reasoning characters on the first-party endpoint and 8,190 on `alibaba/fp8`.
+A repeat killed that reading: the *same* endpoint returned 727 and 1,877
+completion tokens on identical requests. Per-call variance is at least 2.6x, so
+n=1 cannot separate a provider from a bad draw, and the earlier claim here that
+it could has been withdrawn.
+
+What survives: emission is high-variance for reasoning models, which matters
+because tokens per call sets wall clock. Whether the endpoint or the model
+dominates is **not established** and needs a deliberate sample.
 
 **`reasoning_effort: low` was accepted everywhere and visibly did little.**
 No endpoint returned a 400, and no endpoint of either model lists
@@ -141,7 +200,20 @@ No endpoint returned a 400, and no endpoint of either model lists
 silently ignored is not established — note that SGLang returns 200 for unknown
 parameters, so acceptance is not evidence of effect.
 
-**On tokens per call, none of these beats grok's 33.** The best candidate
-figures are Nemotron Ultra at 107 and MiniMax M3 at 226. Price per token is
-roughly 1/5 of grok's, which on a run costing a few dollars against a $5K
-engagement is not the binding constraint.
+**On tokens per call, only DeepSeek beats grok.** DeepSeek V4 Flash at 18
+against grok's 33; then GLM-5.3-Flash around 59-101, Nemotron Ultra 107,
+MiniMax M3 226, Kimi K2.7-Code 238-1,928. All single samples except where
+noted, so read the ordering as coarse.
+
+**Price per token is not the binding constraint, and the arithmetic says why.**
+A run sends ~58k of context on each of 28-43 calls — order 1.2M input tokens
+against 1k-40k output tokens. At grok's rates that is roughly $1.50 of input
+against half a cent of output, so run cost is essentially context size x call
+count x *input* price and is close to model-independent. What emission
+verbosity actually costs is **wall clock**: 1,300 tokens per action at 250
+tok/s is ~5s per call, ~3 minutes across a run, against nothing at all for 33
+tokens. That gap is what separated DeepSeek's 1,432s run from its 226s one.
+
+This is arithmetic from probe medians and the known context size, not a
+measurement — per-run token totals are not recorded. If cost ever becomes a
+decision variable rather than a footnote, that is the `run_meta` field to add.
