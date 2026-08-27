@@ -3,7 +3,63 @@
 Started 2026-08-23, on the workflow harness. Everything before it was
 discarded, deliberately — see "Why every earlier run was discarded".
 
-## The board — campaign b2, current
+## The board — campaign b3, current
+
+The block instrument (METHOD §16, 2026-08-27). Everything on the b2 board below
+ran on the turn-based instrument and is not comparable to this.
+
+| run | model | legs | prompts | review | threshold (maj. of 3) |
+|---|---|---|---|---|---|
+| `b3_grok_1` | grok-4.6 | 2 | **0** | ADMISSIBLE · 17/17 · PASS | PASS |
+| `b3_glm_1` | GLM-5.3-Flash | 2 | REPORT ×1 | ADMISSIBLE · 12/12 · PASS | FAIL — leads with a top-3 finding |
+| `b3_glm_2` | GLM-5.3-Flash | 1 | **0** | ADMISSIBLE · 11/11 · PASS | PASS |
+| `b3_glm_3` | GLM-5.3-Flash | 3 | REPORT ×1, GAP MAP ×1 | ADMISSIBLE · 10/10 · PASS | FAIL — no unsupported claims |
+
+**GLM-5.3-Flash QUALIFIES** — Q1 admissible 3 of 3, Q2 review PASS 3 of 3, Q3
+no single mechanical criterion failing twice. It was disqualified on the b2
+instrument the same day, and the reversal is the instrument, not the model.
+
+`b3_grok_1` is a re-baseline and **its review is not independent** — grok
+reviewed grok, which the criteria forbid. It stands as an instrument check and
+not as a qualification data point. Who reviews grok's runs is unsettled.
+
+### What the block instrument showed that the old one could not
+
+**GLM never uses `yield`.** Every leg of all three runs ended in `respond`. The
+old runner read that as a completion claim, which GLM was not making — it
+simply does not use the other signal. `b2_glm_2`'s INADMISSIBLE and the
+disqualification that followed rest entirely on that misreading. grok yields
+mid-work and responds when finished, so the same runner read grok correctly and
+GLM wrongly.
+
+**The failure is recoverable, and nothing was telling the model.** `b3_glm_1`
+leg 1 is `b2_glm_2` happening again: claim surface closed, turn ended, no
+report. Told which block was missing, GLM delivered a 1,630-word report with 37
+references, all resolving, none past end-of-file.
+
+**`blocks_prompted` discriminates on its first outing** — grok 0, GLM 1/0/2.
+
+### Three things this campaign did not settle
+
+**The claim surface is half grok's, and nothing gates it.** GLM enumerated 20,
+25 and 22 claims where grok enumerated 51 on the same nine documents. §12a is
+explicit that if the surface is wrong every coverage figure is wrong, because
+it is the denominator. A model that identifies half the claims reports better
+coverage of a smaller problem, and no criterion in `docs/model-qualification.md`
+touches this.
+
+**`b3_glm_2` carried ZERO line references and passed every check.** 0 `docN:NN`
+references in the whole report; it cited by section name with verbatim quotes —
+42 of them, 37 contiguous, 0 evidence fields pointing nowhere. It is genuinely
+checkable, so this is a §5 conformance failure and not an evidence failure. But
+**the admissibility gate is built to catch WRONG references and structurally
+cannot see ABSENT ones**: with 0 references, `line_refs_exceeding_file_length`
+is trivially 0. `refs 0` and `refs 45, 0 past EOF` print identically as clean.
+Recommended and NOT applied: record `line_refs` in `conformance.json`.
+
+**Wall clock.** GLM 621/370/401s against grok's 233s.
+
+## The board — campaign b2, superseded 2026-08-27
 
 Runs on the workflow instrument with the review layer. Everything before b2 was
 deleted on 2026-08-26; the m1 table below is retained for the instrument

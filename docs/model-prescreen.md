@@ -148,7 +148,14 @@ surface on leg 1, which is the criterion every failure in campaign m1 failed.
 Detail in `measure/fixtures/dataroom/RESULTS.md`. That is one run; three decide
 qualification — see [model-qualification.md](model-qualification.md).
 
-**And three runs DISQUALIFIED it.** `b2_glm_2` came back INADMISSIBLE and
+**And then the instrument was wrong.** On the block instrument (§16,
+2026-08-27) GLM-5.3-Flash ran 3 of 3 ADMISSIBLE, 3 of 3 review PASS, and
+QUALIFIED. What disqualified it below was a runner that read its `respond` as a
+completion claim it never made. The paragraph that follows is kept because the
+lesson about gate 3 survives the reversal intact — it is a screen that removes
+candidates and never evidence that one is usable.
+
+**On the superseded turn-based instrument, three runs DISQUALIFIED it.** `b2_glm_2` came back INADMISSIBLE and
 `b2_glm_3` ADMISSIBLE 15 of 15 PASS, so admissibility ran 2 of 3 against Q1's
 required 3 of 3. **Gate 3 passed a model that qualification rejected**, which
 is the measured cost of grading a single run: run 1 was the good draw. Read
