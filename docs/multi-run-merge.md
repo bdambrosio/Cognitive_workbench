@@ -70,13 +70,60 @@ weaker requirement and a much larger candidate pool.
 
 ## What would have to be settled first
 
-**Deduplication is the hard part and it must not be keyword matching.** Two runs
-will state the same finding in different words. Matching by citation is the
-obvious first cut — same document, same lines, same claim — and `overlap.py`
-does exactly that, but citation forms vary between runs of the same model (37,
-0 and 44 line references across three runs), so citation alone will not carry
-it. Anything beyond that is a meaning-based match and belongs to an LLM call or
-an embedding, per the project rule.
+**Deduplication is the hard part. Dedup on SOURCE, not on finding text.**
+(Bruce, 2026-08-27.) Two runs will word the same finding differently, but the
+evidence quotes are not free text — they are substrings of a corpus we hold, so
+two findings quoting the same passage are pointing at the same evidence, and
+that is a file fact rather than a judgement. This is not keyword matching: it
+measures co-reference to shared source text, not classification from a word
+list.
+
+**Compare resolved positions, not quote strings.**
+`audit_review/runner.py:resolve_quotes` already locates every quote in a
+document — it has to, to decide `contiguous` against `split` — but
+`citations.json` stores only the quote text, the document and segment counts.
+No offsets. Recording start/end offsets is a small change and it turns
+"percentage overlap between two strings" into "overlap between two intervals in
+one document", which is exact. Paraphrase, truncation and reordering vanish once
+both sides are located, and the only threshold left is how much interval overlap
+counts as the same evidence.
+
+**Source identity is not finding identity, so use it as a BLOCKING KEY.** In the
+current corpus doc4's Backups section supports at least two distinct findings —
+"failures recorded for the last 21 days" and "no alerting configured for backup
+failures". Overlapping quotes, different findings; merging them loses one. The
+converse also occurs: two runs supporting the same gap from different evidence
+read as distinct. Overlap should therefore generate candidate pairs cheaply and
+mechanically, leaving a small, well-posed same-or-different question with both
+quotes in hand — not decide the merge outright.
+
+**Tune toward under-merging.** False-distinct is cheap: redundancy the reader
+can see. False-merge is expensive: a finding silently disappears.
+
+**Near-exact where it matters most.** For the claim surface the unit of merge
+*is* a source assertion, so interval overlap approaches identity — and that is
+where the payoff is largest, because it is the denominator problem. Mechanical
+union for the surface; blocking key plus a judgement step for findings.
+
+**Unciteable findings drop out, and that must be explicit.** A finding with no
+resolvable quote cannot be deduped on source at all — one run this week had 20
+of 47 evidence fields pointing nowhere and another had 9 `[uncited]` findings.
+Requiring a resolvable quote before merge is defensible, since an unciteable
+finding cannot be verified either, but it must be a stated rule with a reported
+count rather than a silent filter.
+
+**Calibration is real work.** `resolve_quotes` rejected a similarity threshold
+on the grounds that it "would put a judgement in the layer that exists to keep
+judgement out, and would need calibrating against failures we do not have". The
+first half does not apply — this is a different layer answering a different
+question — but the second half does. A threshold needs hand-labelled
+same/different pairs, and the runs already on disk are the material for that
+set.
+
+`measure/fixtures/dataroom/overlap.py` compares surfaces by citation rather than
+by count and is the existing primitive to build on. Citation alone will not
+carry it: citation forms vary between runs of the same model — 37, 0 and 44
+line references across three runs.
 
 **Cost multiplies.** N audits plus N reviews plus a merge step. On the fixture
 that is cents; on a real engagement it is the wall clock that matters, and the
