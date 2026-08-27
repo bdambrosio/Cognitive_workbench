@@ -14,6 +14,27 @@ boundary exactly as a change to the instrument does. Three campaigns were
 discarded on 2026-08-24 for instrument drift; the same rule applies here, and
 for the same reason — a bar that moves is not a bar.
 
+## Which instrument these criteria apply to
+
+**The instrument changed on 2026-08-27** — METHOD §16 went to four
+self-delimiting blocks and the runner stopped reading a turn boundary as
+delivery. Every run on the `b2` board predates that and is historical: `b2`
+results and `b3` results are not comparable, by the same rule that discarded
+three campaigns for drift on 2026-08-24.
+
+Two consequences for what follows.
+
+**A model disqualified on `b2` is not thereby disqualified.** GLM-5.3-Flash
+failed Q1 on a run where no report was ever delivered, and the review layer —
+the only thing that noticed — labelled that INADMISSIBLE. On the block
+instrument the same behaviour is a named missing block and a prompt, so the
+question it was disqualified on can no longer be asked the same way.
+
+**`blocks_prompted` is new and has no baseline.** It counts how many times the
+runner had to name a block that had not arrived. It gates nothing, and it will
+not until its variance is known — three runs on one model is the minimum, and
+`b3_grok_1` is the first.
+
 ## The unit of qualification
 
 **Three valid runs of one model on the dataroom fixture, on one instrument
