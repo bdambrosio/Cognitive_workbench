@@ -158,6 +158,12 @@ Gap: <None, or the specific gap>
 that settles it, each with line numbers. Without both, a reader cannot check
 the finding and the practice cannot defend it.
 
+**That is the obligation for a claim finding.** A derived finding has no claim
+to cite, so its obligation takes the other shape below: every Basis line cited,
+and the derivation written out. The requirement underneath both is the same — a
+reader must be able to reach every fact the finding rests on — and neither
+shape is an exemption from it.
+
 **Quote figures from the source line, never from a summary.** Tools that read
 on your behalf answer in prose, and prose carries qualitative facts reliably
 and numbers unreliably. A summary that has dropped the second of two figures
@@ -474,10 +480,12 @@ the operational detail; this section is the method.
    supported consistently.
    Say in the coverage statement where you stopped and why.
 6. **Write the report.** Apply §7 to any findings that were revised.
-6b. **Check the report against its own citations.** Every finding must carry
-   both halves — the document making the claim, and the document or file
-   settling it — and every reference must resolve to a line that is really in
-   the materials. A finding whose citation does not resolve does not ship (see
+6b. **Check the report against its own citations.** Every **claim finding**
+   must carry both halves — the document making the claim, and the document or
+   file settling it. Every **derived finding** must carry a cited Basis line
+   for each figure it rests on, and its derivation written out (§5's second
+   shape). In both cases every reference must resolve to a line that is really
+   in the materials. A finding whose citation does not resolve does not ship (see
    §5). This catches a citation pointing at nothing. It will not catch one
    pointing convincingly at the wrong line.
 7. **Deliver. Propose method-file edits (technique only).** A proposed edit
@@ -739,9 +747,10 @@ three claims cannot be checked against any of them, and a report that demotes
 findings to prose shrinks the surface anyone can review it against.
 
 - The conclusion, in §9's vocabulary and no other.
-- Findings worst first, each in §5's format, carrying its §6 verdict, the
-  claim it tests, the document making that claim, and the document that
-  settles it.
+- Findings worst first, each in §5's format. A **claim finding** carries its
+  §6 verdict, the claim it tests, the document making that claim, and the
+  document that settles it. A **derived finding** carries `[derived]`, a cited
+  Basis line per figure, and its derivation (§5's second shape).
 - A coverage statement in §1a's vocabulary — identified, resolved, supported —
   what was not attempted and why that matters (§4), and the **consistency
   rate**, supported over resolved;
