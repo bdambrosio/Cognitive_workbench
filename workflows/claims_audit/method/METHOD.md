@@ -115,8 +115,9 @@ claim was accurate, and the verdict must not say it was.
 that hold included — §1a requires the report to say which claims hold and which
 do not, and a rate alone does not say which. A claim you attempted and could
 not settle is `[unverifiable]`, which is not a finding (§6) and belongs in the
-coverage statement. The consistency rate is computed from the findings, not
-written instead of them. And
+coverage statement. **The consistency rate is `supported` over `resolved`
+(§1a)** — a ratio over claims, so `[derived]` findings are outside it because
+they test no claim. It summarises the findings; it never replaces them. And
 **materiality is judged against the buyer's decision, not your own taste**:
 "this code is poorly organised" is not material unless it bears on what was
 claimed.
@@ -255,13 +256,18 @@ no verdict was reached. Not a finding.
 A claim you never attempted is neither of these. It is `unattempted` (§1a),
 and the coverage statement accounts for it by number.
 
-**Observation types — things that are not claim tests at all.** Findings, but
-not verdicts on any claim.
+**Neither a claim verdict nor an examination status.** Both label something
+the seller did not claim. One produces a finding and one does not, and that is
+the distinction to keep.
 
-| Type | Meaning | Buyer impact |
+| Type | Meaning | Finding? |
 |---|---|---|
-| `[derived]` | A consequence computed from two or more stated figures (§5's second shape) | **As severe as the consequence.** Frequently material |
-| `[unclaimed]` | The materials cover something the seller made no claim about | Noted in the coverage statement (§16); rarely material |
+| `[derived]` | A consequence computed from two or more stated figures (§5's second shape) | **Yes** — as severe as the consequence, and frequently material |
+| `[unclaimed]` | The materials cover something the seller made no claim about | **No** — noted in the coverage statement (§16); rarely material |
+
+**So a finding is one of two things**: a resolved claim carrying one of the five
+claim verdicts, or a `[derived]` finding. Nothing else is a finding, and the
+report contains nothing else in §5's format.
 
 **`[partial]` vs `[delta]` is a real distinction.** `[partial]` is "the claim
 is 80% true and here is the 20% that is not, with a citation to the corner
