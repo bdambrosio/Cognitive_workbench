@@ -106,16 +106,40 @@ servable.
 1.31M context. **All 8 endpoints are fp8** — no int4 or fp4 anywhere in the
 list, which is the cleanest quantization picture of any candidate here.
 
-| endpoint | quant | gate 1 | ctok | reas | tok/s | note |
-|---|---|---|---|---|---|---|
-| `modal/fp8` | fp8 | **pass** | 59 | 16 | 23.5 | |
-| `cloudflare` | unknown | **pass** | 101–164 | 0–192 | 40–59 | n=2 |
-| `z-ai/fp8` (first-party) | fp8 | — | | | | not servable at probe time |
-| `novita/fp8`, `gmicloud/fp8`, `io-net/fp8`, `baseten/fp8` | fp8 | — | | | | not servable |
-| `deepinfra/fp8` | fp8 | — | | | | 429 |
+**Re-probed 2026-08-27**, and the listing had changed under it: 12 endpoints
+where there were 8, three of them new. Both probes are below because the pair
+is the finding.
 
-**6 of 8 endpoints did not answer**, which reads as a very recent launch rather
-than a defect. Worth re-probing before it is written off or committed to.
+| endpoint | quant | gate 1 | ctok | reas | tok/s | 08-26 | 08-27 |
+|---|---|---|---|---|---|---|---|
+| `modal/fp8` | fp8 | **pass** | 111 / 93 / 84 | 0 / 0 / 21 | 6.3 / 32.7 / 47.8 | answered | **3 of 3** |
+| `together` | unknown | **pass** | 69 / 102 | 0 | 15.2 / 24.2 | not listed | 2 of 3 |
+| `cloudflare` | unknown | **pass** (08-26) | 101–164 | 0–192 | 40–59 | n=2 | 429 |
+| `parasail/fp8`, `reka/fp8` | fp8 | — | | | | not listed | 429 |
+| `deepinfra/fp8` | fp8 | — | | | | 429 | 429 |
+| `z-ai/fp8` (first-party) | fp8 | — | | | | not servable | 404 |
+| `novita/fp8`, `gmicloud/fp8`, `baseten/fp8` | fp8 | — | | | | not servable | 404 |
+| `io-net/fp8`, `venice` | fp8 / unknown | — | | | | not servable | not probed |
+
+**`modal/fp8` is the configured route** — `measure/models/or_glm53flash.yaml`.
+It is the only endpoint that answered every time and declares its
+quantization. `together` answered twice and is the standby, but its tag carries
+no precision, so a run on it does not record which artifact produced it.
+
+**The 429 names the model, not the endpoint** — *"z-ai/glm-5.3-flash is
+temporarily rate-limited upstream… or add your own key"*. The throttle sits
+above the provider split, so the 404/429 pattern is a reading of one hour and
+not a property of these endpoints. The 404s are the durable half: `z-ai/fp8`,
+`novita/fp8`, `gmicloud/fp8` and `baseten/fp8` returned "No endpoints found"
+across both sessions while the API listed `response_format: true` for all four.
+
+**Read the tok/s column as a range and nothing finer.** Three Modal probes on
+one 141-token prompt ran 6.3, then 32.7, then 47.8 — the first a cold start,
+and the spread on the other two is what n=3 buys at this prompt size.
+
+Every endpoint reports the artifact `z-ai/glm-5.3-flash-20260826`, so today the
+provider pin fixes the weights on its own. That will not hold: the
+DeepSeek-V4-Flash id served three different artifacts on one day.
 
 Reference, same family: `z-ai/glm-5.3` (the full model, $1.40/$4.40) on its
 first-party `z-ai/fp8` **failed gate 1 in a way worth recording** — it accepted

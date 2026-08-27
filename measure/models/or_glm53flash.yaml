@@ -1,0 +1,82 @@
+# GLM-5.3-Flash via OpenRouter, pinned to Modal at fp8.
+#
+# PROBED 2026-08-27 with the real payload (json_schema carrying
+# REACT_ACTION_SCHEMA + reasoning_effort, max_tokens 16384). Gates 1 and 2 pass
+# on this route. Gate 3 — one fixture run graded on admissibility — is not run
+# yet. See docs/model-prescreen.md.
+#
+# WHY MODAL AND NOT THE FIRST PARTY. The first-party endpoint does not serve
+# this model to us. Every endpoint probed today, in the order the listing gives
+# them:
+#
+#   modal/fp8       3 of 3 answered · ctok 111 / 93 / 84 · all schema-valid
+#   together        2 of 3 answered · ctok 69 / 102 · quantization UNKNOWN
+#   parasail/fp8    429      reka/fp8       429
+#   deepinfra/fp8   429      cloudflare     429
+#   z-ai/fp8        404      novita/fp8     404
+#   gmicloud/fp8    404      baseten/fp8    404
+#
+# 404 here reads "No endpoints found for z-ai/glm-5.3-flash" — listed by the
+# endpoints API, not servable. The API lists `response_format: true` for all
+# four of them.
+#
+# Modal is the only route that answered every time AND declares its
+# quantization. Together answered twice and is the standby, but its tag carries
+# no precision, so a run on it does not record which artifact produced it.
+#
+# THE 429 NAMES THE MODEL, NOT THE ENDPOINT: "z-ai/glm-5.3-flash is temporarily
+# rate-limited upstream. Please retry shortly, or add your own key". The
+# throttle is upstream of the provider split, so the 404/429 pattern above is a
+# reading of one hour and not a property of these endpoints. Re-probe before
+# concluding anything from it.
+#
+# THE RISK THIS ROUTE CARRIES, AND WHAT TO WATCH. Modal is the lowest-uptime
+# servable route in the list — endpoint status -2, 91.6% over the last 30
+# minutes, against 99.8% for parasail and 98.2% for together. Fallbacks are off
+# by policy, and an audit makes 35-187 calls. **A mid-run provider failure is
+# the most likely way the first fixture run dies, and it is not a model
+# result.** A run that fails this way is VOID under docs/model-qualification.md
+# Q0 and is re-run, not scored.
+#
+# FIRST-CALL THROUGHPUT IS NOT THIS ROUTE'S THROUGHPUT. The three Modal probes
+# ran 6.3, 32.7 and 47.8 tok/s in that order on the same 141-token prompt. The
+# first is a cold start. Do not quote it, and do not quote the third either —
+# n=3 on a small prompt sets an order of magnitude.
+#
+# ONE SNAPSHOT TODAY, AND THE ID WILL FLOAT. Every endpoint reports the same
+# artifact, `z-ai/glm-5.3-flash-20260826`, so pinning the provider is enough to
+# fix the weights right now. It will not stay that way — the DeepSeek-V4-Flash
+# id served three different artifacts on 2026-08-26 — so record the resolved
+# name from a run's first response rather than assuming this one.
+#
+# REASONING IS EFFECTIVELY SILENT AT `low`. Four of the five successful probes
+# returned zero characters on the reasoning channel and the fifth returned 21.
+# `low` is set to match grok, luna and both DeepInfra models, so the campaign
+# varies the backend and not the effort. Whether the dial does anything on this
+# model at higher settings is UNTESTED — on Gemma the level is inert and on
+# grok it is live, so it needs checking rather than assuming.
+#
+# No expects_served_model: a cloud route has no /v1/models to interrogate, so
+# `model` is load-bearing — get it wrong and the row is mislabelled with
+# nothing to catch it.
+#
+# TEMPERATURE resolves through the substring key `glm-5.3-flash` in
+# src/chat/model_params.py to 1.0 — Bruce's choice on 2026-08-26, not a
+# publisher value: Z.ai publishes only per-benchmark configs and they disagree
+# with each other. Provenance in docs/model-settings.md. Nothing is decided
+# here.
+llm_config:
+  # _ChatBackend route 2: api_key set -> POSTs to
+  # {vllm_url}/v1/chat/completions with an Authorization bearer, and skips
+  # grammar / chat_template_kwargs (cloud rejects both).
+  server: local
+  model: "z-ai/glm-5.3-flash"
+  vllm_url: https://openrouter.ai/api/v1
+  # NAME of the env var holding the bearer token, not the token.
+  api_key: OPENROUTER_API_KEY
+  is_reasoning_model: true
+  reasoning_effort: low
+  extra_body:
+    provider:
+      order: ["modal/fp8"]
+      allow_fallbacks: false
