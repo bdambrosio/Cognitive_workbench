@@ -15,9 +15,9 @@ This is a **limited assurance** engagement. The audit examines part of the
 target's claims, not all of them: §4 sets the order of work, §12 sets where it
 stops, and §11 lists what is out of scope.
 
-The report states its conclusion positively — of the claims examined, these
-hold and these do not — but only about the claims examined. It says nothing
-about the rest.
+The report states its conclusion positively — of the claims it resolved, these
+are supported and these are not — but only about those. It says nothing about
+the rest.
 
 Two rules follow.
 
@@ -26,9 +26,11 @@ Two rules follow.
    report and in the Gap Map. A conclusion without that number gives the
    reader nothing to rely on.
 
-**The four quantities every fraction in the report divides by.** Use these
-words and no others: a coverage figure whose denominator is unstated is the
-failure §1a exists to prevent.
+**The four claim-state quantities used in coverage reporting.** Wherever the
+report states a count or a fraction of claims, use these words and no others —
+"checked", "examined" and "verified" each blur `attempted` and `resolved`, and
+a coverage figure whose denominator is unstated is the failure §1a exists to
+prevent. Ordinary English is fine everywhere else; this binds the numbers.
 
 | term | meaning |
 |---|---|
@@ -37,17 +39,23 @@ failure §1a exists to prevent.
 | **resolved** | attempted claims that reached one of §6's five claim verdicts |
 | **supported** | resolved claims whose verdict is `[real]` or a caveat form |
 
-An attempted claim that did not resolve is `[unverifiable]`. An identified claim
-never attempted is unchecked, and is accounted for by number in the coverage
-statement.
+An attempted claim that did not resolve is `[unverifiable]`. An identified
+claim never attempted is *unattempted*, and is accounted for by number in the
+coverage statement.
 
 **Coverage is resolved over identified. The consistency rate is supported over
-resolved.** Different denominators, different figures: state both, and never let
-one stand in for the other.
+resolved.** Two rates, two denominators: state both, and never let one stand in
+for the other. `attempted` sits in neither rate and is still required — it is
+what separates "we could not settle it" from "we never looked", and
+`[unverifiable]` is exactly `attempted` minus `resolved`.
 
-2. **Never write a sentence that implies you examined more than you did.**
+The canonical form: **"Coverage: 39 of 43 identified claims resolved; 37 of 39
+resolved claims supported."**
+
+2. **Never write a sentence that implies you resolved more than you did.**
    "The system does what it says" is a claim about everything. "Of the 43
-   claims examined, 39 hold" is a claim about the work done. Write the second.
+   claims identified, 39 resolved and 37 supported" is a claim about the work
+   done. Write the second.
 
 ## 2. The scope rule
 
@@ -86,8 +94,8 @@ and a statement like it had to be retracted mid-audit once.
 
 1. **Enumerate the claims first** (§12 step 2).
 2. **Prioritise** (order below).
-3. **Report coverage explicitly** — what was checked, what was not, and why
-   the gap matters.
+3. **Report coverage explicitly** — identified, resolved, supported (§1a),
+   what was not attempted, and why the gap matters.
 
 **What makes a gap worth reporting.** A gap is material if a reasonable buyer,
 knowing it, **would change the price, the structure of the deal, or the
@@ -244,8 +252,8 @@ no verdict was reached. Not a finding.
 |---|---|---|
 | `[unverifiable]` | Attempted; the materials could not settle it | Coverage statement (§16), with the reason |
 
-A claim you never attempted is neither of these. It is simply outside the
-checked set, and the coverage statement accounts for it by number.
+A claim you never attempted is neither of these. It is `unattempted` (§1a),
+and the coverage statement accounts for it by number.
 
 **Observation types — things that are not claim tests at all.** Findings, but
 not verdicts on any claim.
@@ -307,7 +315,7 @@ to match.
 
 | Conclusion | Meaning |
 |---|---|
-| **Clear** | No `[delta]` and no `[partial]` findings, and no caveats of note. Of the claims examined, all hold. |
+| **Clear** | No `[delta]` and no `[partial]` findings, and no caveats of note. Every resolved claim is supported. |
 | **Clear with caveats** | No `[delta]` or `[partial]` findings. Documentation drift, maintenance debt or operational notes a buyer should know, which do not bear on valuation. |
 | **Conditional** | Material findings, each localised and remediable — a fix of known shape, or a claim about a non-critical feature. |
 | **Material** | Material findings that bear on valuation or risk profile. |
@@ -328,8 +336,8 @@ explicitly". Three uses of the register these very lines forbid.
 **And `Clear` stated a conclusion §1a forbids.** It read "The system does what
 it says", which §1a names as the example of a sentence claiming more than the
 work performed: *"'The system does what it says' is a claim about everything.
-'Of the 43 claims examined, 39 hold' is a claim about the work done. Write the
-second."* Now it says the second.
+'Of the 43 claims identified, 39 resolved and 37 supported' is a claim about the
+work done. Write the second."* Now it says the second.
 The Gap Map's closing line may offer a judgement — "the gaps are addressable
 within the existing integration timeline" — if it is labelled as professional
 judgement rather than written as an instruction.
@@ -455,8 +463,9 @@ the operational detail; this section is the method.
 4. **Work the priority order straight through.** Do not pause for
    confirmation; there is no channel to the client mid-engagement. Findings
    are reported in the deliverable, where the client can act on them.
-5. **Stop when what remains is low-risk** — when the claims still unchecked
-   are low-priority ones, and those checked so far have held consistently.
+5. **Stop when what remains is low-risk** — when the identified claims still
+   unattempted are low-priority ones, and those resolved so far have been
+   supported consistently.
    Say in the coverage statement where you stopped and why.
 6. **Write the report.** Apply §7 to any findings that were revised.
 6b. **Check the report against its own citations.** Every finding must carry
@@ -567,7 +576,7 @@ protects client confidentiality but would also throw away everything learned
 §10's defence against a negligence claim is that *"the citation trail
 demonstrates the work was systematic"* — and the citation trail in the report
 covers only what was reported. On a fifty-claim surface producing a dozen
-findings, the other thirty-eight were examined, held, and left no trace. A
+findings, the other thirty-eight were resolved, supported, and left no trace. A
 negligence claim asks about those. Discarding the world destroyed the only
 evidence they happened.
 
@@ -642,13 +651,14 @@ path is tested end to end" is the finding they are paying for — and a list of
 caveats alone misrepresents an audit that mostly passed. Where the
 conclusion is Material or Systemically inconsistent the balance inverts on its own.
 
-**The coverage line** says how many claims were checked individually out of
-how many were identified, and why the rest is or is not low-risk. The Gap Map
+**The coverage line** gives resolved out of identified, supported out of
+resolved (§1a), and why the rest is or is not low-risk. The Gap Map
 is the document most likely to be read *instead of* the report, so silence
 about coverage does its damage here first.
 
 If the conclusion is **Clear** with no caveats, the Gap Map is two lines:
-"no gaps found, N of N claims verified, report attached."
+"no gaps found, N of N identified claims resolved and supported, report
+attached."
 
 **No logo, no pricing, no "book a call".** The report link is the only call to
 action. Anything more turns a professional document into a brochure.
@@ -685,7 +695,7 @@ carries the count and nothing else, then the enumeration.
 
 **`=== REPORT ===`**
 
-**Length follows from the claim surface, not from a target.** Every examined
+**Length follows from the claim surface, not from a target.** Every resolved
 claim gets a finding (§4, §5), so a large surface makes a long report and that
 is correct. There is no word ceiling: no assurance standard bounds report
 length, and a report that omits required content to hit a number has failed at
@@ -706,8 +716,9 @@ findings to prose shrinks the surface anyone can review it against.
 - Findings worst first, each in §5's format, carrying its §6 verdict, the
   claim it tests, the document making that claim, and the document that
   settles it.
-- A coverage statement: what was not checked, and why that matters (§4); the
-  **consistency rate** (§4) — the proportion of checked claims that hold;
+- A coverage statement in §1a's vocabulary — identified, resolved, supported —
+  what was not attempted and why that matters (§4), and the **consistency
+  rate**, supported over resolved;
   every `[unverifiable]` claim with the reason, and any `[unclaimed]`; and the
   addendum, if §12 step 2 produced one.
 - What the client should ask the seller before closing.
