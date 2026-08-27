@@ -41,8 +41,11 @@ TOP_P: float = 0.95
 # PER-MODEL TEMPERATURE. Settled 2026-08-24. Sources in docs/model-settings.md.
 #
 # Keys are matched against the served / configured model id: exact first, then
-# unique case-insensitive substring. `Qwen3.8` is a substring key because the
-# local server reports `Qwen/Qwen3.8-27B` while models declare `model: ""`.
+# unique case-insensitive substring. `Qwen3.8-27B` is a substring key because
+# the local server reports `Qwen/Qwen3.8-27B` while models declare
+# `model: ""`. It is spelled out in full rather than as `Qwen3.8`, which would
+# also match every cloud sibling of that family and hand each one a
+# temperature nobody chose.
 # ---------------------------------------------------------------------------
 MODEL_TEMPERATURE: Dict[str, float] = {
     # Cloud, closed.
@@ -50,7 +53,18 @@ MODEL_TEMPERATURE: Dict[str, float] = {
     "gpt-5.6-terra": 0.1,      # the pinned grader; NOT exempt from TOP_P
     "grok-4.6": 0.5,           # xAI publishes no agentic recommendation
     # Local.
-    "Qwen3.8": 0.25,           # Qwen3.8-27B on the local server
+    #
+    # NARROWED 2026-08-26 from the bare `Qwen3.8`. That key matched every
+    # cloud sibling — qwen3.8-flash, qwen3.8-max — which then resolved to this
+    # 0.25 and never raised. A temperature nobody chose, arriving through a
+    # coincidence of spelling, is the exact failure this module exists to
+    # prevent, and a matching key does not trip the guard the way a missing
+    # one does. Qwen's own card recommends 1.0 for thinking mode, so it was
+    # not a near miss either.
+    #
+    # Still a substring, so it covers both the id the local server reports
+    # and the OpenRouter spelling of the same weights (`qwen/qwen3.8-27b`).
+    "Qwen3.8-27B": 0.25,
     "gemma-4-31B": 0.25,
     # OSS cloud, at their publishers' agentic recommendation.
     #

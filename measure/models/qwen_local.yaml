@@ -1,7 +1,11 @@
 # Qwen3.8-27B on the local vLLM — the incumbent, and what Jill runs on.
 # Zero marginal cost. NOTE: the live agent shares this server, so a local
 # run contends with her; wall clock here is not comparable to a cloud model's.
-expects_served_model: "Qwen3.8"
+# Narrowed from "Qwen3.8" on 2026-08-26. The match is a substring against
+# the served id, so this still accepts `Qwen/Qwen3.8-27B` — and it now also
+# catches the box serving a different member of the family, which the loose
+# form would have passed.
+expects_served_model: "Qwen3.8-27B"
 
 llm_config:
   server: local

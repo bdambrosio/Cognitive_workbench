@@ -33,7 +33,11 @@
 # The effort LEVEL may be inert. On at least one other local model in this
 # project low/medium/high proved binary — thinking on or off, no dial. If
 # that holds here, `medium` reads as `on`.
-expects_served_model: "Qwen3.8"
+# Narrowed from "Qwen3.8" on 2026-08-26. The match is a substring against
+# the served id, so this still accepts `Qwen/Qwen3.8-27B` — and it now also
+# catches the box serving a different member of the family, which the loose
+# form would have passed.
+expects_served_model: "Qwen3.8-27B"
 
 llm_config:
   server: local
