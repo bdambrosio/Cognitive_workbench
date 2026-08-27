@@ -14,6 +14,13 @@ boundary exactly as a change to the instrument does. Three campaigns were
 discarded on 2026-08-24 for instrument drift; the same rule applies here, and
 for the same reason — a bar that moves is not a bar.
 
+## Numbering
+
+Delivery was inserted as Q1 on 2026-08-27 and the rest shifted. Anything
+written before that date numbers them one lower: the old Q1 (admissibility) is
+now Q2, the old Q2 (review verdict) is Q3, the old Q3 (mechanical criteria) is
+Q4. Q0 is unchanged.
+
 ## Which instrument these criteria apply to
 
 **The instrument changed on 2026-08-27** — METHOD §16 went to four
@@ -90,7 +97,34 @@ A run is **VOID** and is re-run rather than scored if any of:
 A void run is replaced. Qualification needs three valid runs, not three
 attempts.
 
-## Q1 — admissible, 3 of 3
+**Non-delivery is not on this list and must not be added to it.** A model that
+did not produce the deliverable has returned a result; see Q1.
+
+## Q1 — delivered, 3 of 3
+
+**Every run must deliver every block METHOD §16 requires. A run that ends
+`no_deliverable` fails qualification.**
+
+This is assessed before admissibility, because **the citations of a report that
+does not exist cannot be judged.** Until 2026-08-27 there was no such outcome:
+a run that never produced a report went to the review layer anyway, the review
+had nothing it could place, and the result came back INADMISSIBLE. That is a
+delivery failure wearing a citation failure's name, and it disqualified
+GLM-5.3-Flash for a defect it does not have.
+
+**It is not a void.** Q0 voids *our* failures — the answer key opened, a retest
+that could not run, an instrument that moved — and a void run is replaced. A
+model that was told which block was missing, on every leg, up to the leg cap,
+and still did not produce it has returned a result. Replacing that run would be
+discarding the finding.
+
+**It is the most severe failure available**, which is why one occurrence is
+enough. On the block instrument non-delivery means the model failed to emit a
+named, copyable token after being asked for it by name, repeatedly. Nothing
+milder than the leg cap produces this outcome; a model that simply forgot once
+and delivered when told is recorded in `blocks_prompted` and passes.
+
+## Q2 — admissible, 3 of 3
 
 **Every run must be ADMISSIBLE. One INADMISSIBLE run disqualifies the model for
 this workflow.**
@@ -111,11 +145,12 @@ and quality are orthogonal: `w1_qwen_1` cleared the gate and then failed the
 review on substance, which is the demonstration that this criterion measures
 something of its own.
 
-Qwen3.8-27B is out on this criterion: two of its three runs on the current
-method are inadmissible, and the ordinal-versus-line defect recurs at a 48%
-rate.
+Qwen3.8-27B was ruled out on this criterion on the b2 instrument — two of three
+runs inadmissible, the ordinal-versus-line defect recurring at a 48% rate.
+Unlike GLM's, that is a citation defect and not a delivery one, so the block
+instrument does not address it. Being re-run on b3 to find out.
 
-## Q2 — review verdict, PASS in at least 2 of 3
+## Q3 — review verdict, PASS in at least 2 of 3
 
 **At least two of the three runs must return PASS.**
 
@@ -134,7 +169,7 @@ confirm is a fail that does not stand, and does not count toward FAIL.
 Two clean runs and one FAIL is a qualifying result, and what the FAIL was is
 the input to the next decision.
 
-## Q3 — the mechanical criteria, read one at a time
+## Q4 — the mechanical criteria, read one at a time
 
 `score.py` prints eight criteria and a conjunction verdict.
 
