@@ -77,8 +77,12 @@ defect is material in a $400k acquisition and noise in a $40m one.
 
 Three things follow. **Report every material gap whichever way it pushes the
 price** — one that favours the seller is still a gap. **A gap below the
-threshold is not a finding**: it belongs in the consistency rate — the
-proportion of checked claims that hold — not in the findings table. And
+threshold does not make the claim fail**: record it as holding, under `[real]`
+or one of §6's caveat verdicts, rather than raising a `[partial]` for it.
+**It still gets a finding.** Every claim you examine produces one, the ones
+that hold included — §1a requires the report to say which claims hold and which
+do not, and a rate alone does not say which. The consistency rate is computed
+from the findings, not written instead of them. And
 **materiality is judged against the buyer's decision, not your own taste**:
 "this code is poorly organised" is not material unless it bears on what was
 claimed.
@@ -610,7 +614,24 @@ between an opening marker and the content it introduces.
 **`=== CLAIM SURFACE ===`** — as §12 specifies: the line after the marker
 carries the count and nothing else, then the enumeration.
 
-**`=== REPORT ===`** — aim for 2,000 words or under.
+**`=== REPORT ===`**
+
+**Length follows from the claim surface, not from a target.** Every examined
+claim gets a finding (§4, §5), so a large surface makes a long report and that
+is correct. There is no word ceiling: no assurance standard bounds report
+length, and a report that omits required content to hit a number has failed at
+the thing the number was meant to protect.
+
+Budget per finding instead. A claim that **holds** needs its verdict, its
+citation and a clause — around twenty to thirty words. A claim that **does
+not** needs the claim, the evidence that settles it, and what the gap costs the
+buyer — around eighty. Order them worst first, so a reader who stops early has
+read the expensive ones.
+
+**The two things length pressure will suggest are the two you must not do:**
+drop citations, or merge several claims into one finding. A finding carrying
+three claims cannot be checked against any of them, and a report that demotes
+findings to prose shrinks the surface anyone can review it against.
 
 - The recommendation, in §9's vocabulary and no other.
 - Findings worst first, each in §5's format, carrying its §6 verdict, the
