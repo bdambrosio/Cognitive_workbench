@@ -177,6 +177,28 @@ evidence is missing from the index is the error this method exists to stop.
 what the finding says it says. This is the check the audit cannot perform on
 itself, and the reason for this method.
 
+**A `[derived]` finding has no claim, and this question does not apply to it.**
+METHOD §6 makes a finding one of two things: a resolved claim carrying one of
+the five claim verdicts, or a `[derived]` finding — a consequence computed from
+two or more figures the seller stated separately. It cites no claim because
+there is none to cite. Asking whether its cited lines support a claim it never
+made would rule it unsupported by construction, which is the error the paragraph
+above exists to stop, in a different form.
+
+Check a `[derived]` finding on its own two obligations instead, both of which
+METHOD §5's second shape requires:
+
+- **Does each Basis line say what the finding quotes it as saying?** Same
+  reading as above, applied to each figure rather than to a claim.
+- **Does the derivation follow from those figures as written?** The arithmetic
+  is on the page precisely so it can be checked — *"arithmetic left implicit is
+  an opinion with a citation attached."* A step you cannot follow is an
+  exception; a step you can follow and disagree with is `[overstated]` or
+  `[understated]` as usual.
+
+You are not asked whether the consequence matters to the buyer. That is
+materiality, it is METHOD §4's judgement and the auditor's, and §10 reserves it.
+
 **Does the verdict match the gap?** METHOD §6 defines the vocabulary. A gap
 described as a corner case carrying `[delta]` is overstated; a claim shown to
 be false carrying `[partial]` is understated. Both are exceptions.
