@@ -35,6 +35,7 @@ numbers are trusted.**
 | `deepseek-ai/DeepSeek-V4-Flash-0731` | 1.0 | publisher, for agentic scenarios |
 | `nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B` | 1.0 | publisher (NVIDIA examples run 1.0 / 0.95) |
 | `nvidia/nemotron-3-super-120b-a12b` | 1.0 | Bruce, 2026-08-24, same publisher as Ultra |
+| `minimax/minimax-m3` | 1.0 | publisher, 2026-08-26 — the MiniMax-M3 card gives 1.0 / top_p 0.95 as general guidance for best performance, not a benchmark config. Confirmed by Bruce. Their top_p equals our global, so nothing per-model is recorded for it |
 
 Keys match the served or configured model id: exact first, then unique
 case-insensitive substring. `Qwen3.8` is a substring key because the local

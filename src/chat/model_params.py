@@ -63,6 +63,10 @@ MODEL_TEMPERATURE: Dict[str, float] = {
     "DeepSeek-V4-Flash": 1.0,
     "nemotron-3-ultra": 1.0,
     "nemotron-3-super": 1.0,
+    # MiniMax publishes 1.0 / top_p 0.95 as general guidance rather than as a
+    # benchmark config. top_p is not recorded here — theirs happens to equal
+    # the global, and TOP_P stays a single value with no per-model override.
+    "minimax-m3": 1.0,
 }
 
 # Retired deliberately, so a stale config naming one fails with a reason
