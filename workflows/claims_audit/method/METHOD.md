@@ -9,7 +9,7 @@ they do not own, in acquisitions under $5M. The operation is:
 
 What this audit does not do is in §11.
 
-## 1a. Level of assurance
+## 1a. Level of assurance, and the coverage vocabulary
 
 This is a **limited assurance** engagement. The audit examines part of the
 target's claims, not all of them: §4 sets the order of work, §12 sets where it
@@ -26,7 +26,14 @@ Two rules follow.
    report and in the Gap Map. A conclusion without that number gives the
    reader nothing to rely on.
 
-**The four claim-state quantities used in coverage reporting.** Wherever the
+2. **Never write a sentence that implies you resolved more than you did.**
+   "The system does what it says" is a claim about everything. "Coverage: 39
+   of 43 identified claims resolved; 37 of 39 resolved claims supported" is a
+   claim about the work done. Write the second.
+
+### The four claim-state quantities
+
+Wherever the
 report states a count or a fraction of claims, use these words and no others —
 "checked", "examined" and "verified" each blur `attempted` and `resolved`, and
 a coverage figure whose denominator is unstated is the failure §1a exists to
@@ -49,13 +56,9 @@ for the other. `attempted` sits in neither rate and is still required — it is
 what separates "we could not settle it" from "we never looked", and
 `[unverifiable]` is exactly `attempted` minus `resolved`.
 
-The canonical form: **"Coverage: 39 of 43 identified claims resolved; 37 of 39
-resolved claims supported."**
-
-2. **Never write a sentence that implies you resolved more than you did.**
-   "The system does what it says" is a claim about everything. "Of the 43
-   claims identified, 39 resolved and 37 supported" is a claim about the work
-   done. Write the second.
+**The canonical form, and rule 2's second sentence is the same one:**
+**"Coverage: 39 of 43 identified claims resolved; 37 of 39 resolved claims
+supported."**
 
 ## 2. The scope rule
 
@@ -80,8 +83,8 @@ report the state of the claims, not the action the buyer should take.
 ## 3. Scope adapts to the target; the method does not
 
 Which claims exist differs by target: a hardware specification asserts
-different things from a SaaS listing. The operation in §2 and the priority
-order in §4 do not change.
+different things from a SaaS listing. The operation in §1, the scope rule in
+§2 and the priority order in §4 do not change.
 
 Where a target has little to report on some subject — no meaningful security
 surface, no external dependencies — **say so as a property of the target
@@ -147,8 +150,11 @@ business-ending or trivial, and it takes the tier its failure earns.
    they set the consistency rate (§1a), which is the best available signal
    about the claims nobody had time to check.
 
-**Those four levels are the tiers**, and a finding's tier is the tier of the
-claim it tests. They were re-cast onto a single consequence axis on 2026-08-27:
+**Those four levels are the tiers.** A **claim finding** takes the tier of the
+claim it tests. A **derived finding** takes the highest tier among the figures
+it rests on, and rises above them when the consequence is more severe than
+either input — §5 states it there too, because that is where a derived finding
+is written. They were re-cast onto a single consequence axis on 2026-08-27:
 tiers 2 and 3 had named subject matter — "architectural invariants",
 "operational parameters" — while 1 and 4 named severity, so the section claimed
 one axis and used two, and a business-ending architectural claim had no correct
@@ -173,11 +179,17 @@ Gap: <None, or the specific gap>
 that settles it, each with line numbers. Without both, a reader cannot check
 the finding and the practice cannot defend it.
 
-**That is the obligation for a claim finding.** A derived finding has no claim
-to cite, so its obligation takes the other shape below: every Basis line cited,
-and the derivation written out. The requirement underneath both is the same — a
-reader must be able to reach every fact the finding rests on — and neither
-shape is an exemption from it.
+**The citation obligation takes three shapes, and the requirement underneath
+them is one.** A reader must be able to reach every fact the finding rests on.
+None of the three is an exemption from that.
+
+- **A claim finding** cites both halves, as above.
+- **A claim finding whose evidence is an absence** cites the claim normally,
+  and its Evidence field carries the two searches required below. There is no
+  settling line to cite, because the point is that no such line exists — the
+  searches are the evidence, and they must be written down as run.
+- **A derived finding** has no claim to cite. Its obligation is every Basis
+  line cited and the derivation written out (the second shape below).
 
 **Quote figures from the source line, never from a summary.** Tools that read
 on your behalf answer in prose, and prose carries qualitative facts reliably
@@ -197,8 +209,9 @@ the search, and you must show two, because each fails where the other holds:
 
 A documented search proves diligence, not absence. Searching for the wrong
 word and recording it carefully is worse than not searching, because it reads
-as thorough. Where the two searches do not settle it, the verdict is
-`[unverifiable]`, not `[delta]`.
+as thorough. Where the two searches do not settle it, the claim is
+`[unverifiable]` — an examination status and not a verdict (§6) — and never
+`[delta]`.
 
 ### The second shape: a derived finding
 
@@ -246,8 +259,8 @@ date and what happens on it. The report as a whole carries an **as-of date for
 the materials**: a data room is a snapshot, and every conclusion in the report
 is a conclusion about that snapshot.
 
-**Priority.** A derived finding takes the §4 priority of the facts it rests
-on, and rises above them when the consequence is more severe than either
+**Tier.** A derived finding takes the highest §4 tier among the figures it
+rests on, and rises above them when the consequence is more severe than either
 input.
 
 ## 6. Verdict vocabulary
@@ -325,13 +338,20 @@ evidence could change a finding, the citations were decoration.
 ## 8. The reader
 
 **Write for the person who decides.** They read the Gap Map in about thirty
-seconds and open the report only if it earns the time. They will not read
-forty cited findings: they read the conclusion, then drill into one or two
-if it makes them curious.
+seconds and open the report only if it earns the time.
 
-So the report opens with the §9 conclusion and its coverage, and closes
-with a paragraph a non-specialist can read and explain back to a colleague.
-Tier everything in between to that reader.
+**The two documents are read differently, and that is why there are two.** The
+Gap Map is read straight through. The report is not: §4 requires a finding for
+every resolved claim, so on a large surface it runs to hundreds, and nobody
+reads it end to end. It is a **reference document** — the reader arrives at the
+conclusion, reads down the worst findings while they still matter, and drills
+to a specific claim when they want to check one. Length is therefore not a cost
+to the reader, and ordering is: a finding they never reach must be one they did
+not need.
+
+So the report opens with the §9 conclusion and its coverage, orders findings
+worst first (§16), and closes with a paragraph a non-specialist can read and
+explain back to a colleague.
 
 ## 9. Report-level conclusion
 
@@ -343,7 +363,7 @@ to match.
 | Conclusion | Meaning |
 |---|---|
 | **Clear** | **No material findings of any kind.** Every resolved claim is supported, and no caveats of note. |
-| **Clear with caveats** | **No material findings of any kind.** No `[delta]` or `[partial]`; documentation drift, maintenance debt or operational notes a buyer should know, which do not bear on valuation. |
+| **Clear with caveats** | **No material findings of any kind.** Documentation drift, maintenance debt or operational notes a buyer should know, which do not bear on valuation. |
 | **Conditional** | Material findings, each localised and remediable — a fix of known shape, or a claim about a non-critical feature. |
 | **Material** | Material findings that bear on valuation or risk profile. |
 | **Systemically inconsistent** | The claims do not describe the target: material findings across independent claims, or a claim source contradicted throughout. |
@@ -353,8 +373,10 @@ seller claims 30-day retention, the materials show 7." Whether 7 days is
 acceptable is the buyer's call. The audit does not say "you should walk."
 
 **Keep the two vocabularies apart, and note that this one did not.** The five
-terms above describe the state of the claims. *Proceed, negotiate, walk* is the
-buyer's action vocabulary, and using it would put the audit in the business of
+terms above describe what the audit found — the state of the claims and of any
+derived finding, since a `[derived]` finding describes no claim and can still
+decide the conclusion. *Proceed, negotiate, walk* is the buyer's action
+vocabulary, and using it would put the audit in the business of
 advising on the deal (§2). Until 2026-08-27 **Walk** was one of the five terms
 — the forbidden word used as a conclusion — while **Conditional** read "Proceed
 if the seller will fix them" and **Material** read "the buyer must price this in
@@ -376,9 +398,11 @@ it says", which §1a names as the example of a sentence claiming more than the
 work performed: *"'The system does what it says' is a claim about everything.
 'Of the 43 claims identified, 39 resolved and 37 supported' is a claim about the
 work done. Write the second."* Now it says the second.
-The Gap Map's closing line may offer a judgement — "the gaps are addressable
-within the existing integration timeline" — if it is labelled as professional
-judgement rather than written as an instruction.
+
+**One narrow exception, and it is the Gap Map's alone.** Its closing line may
+offer a judgement — "the gaps are addressable within the existing integration
+timeline" — if it is labelled as professional judgement rather than written as
+an instruction. Nothing in the report block carries that licence.
 
 ## 10. Liability posture
 
@@ -405,7 +429,7 @@ materiality threshold, applied **regardless of which way a gap pushes the
 price**; and §12 step 6b, which verifies the finished report against its own
 citations.
 
-A finding that survives all four is not advocacy. A finding that would not
+A finding that survives all four of those is not advocacy. A finding that would not
 have been written for a seller-side client should not be written for a
 buyer-side one.
 
@@ -502,15 +526,17 @@ the operational detail; this section is the method.
    confirmation; there is no channel to the client mid-engagement. Findings
    are reported in the deliverable, where the client can act on them.
 5. **Stop when what remains is low-risk** — when the identified claims still
-   unattempted are low-priority ones, and those resolved so far have been
+   unattempted are in §4's lowest tiers, and those resolved so far have been
    supported consistently.
    Say in the coverage statement where you stopped and why.
 6. **Write the report.** Apply §7 to any findings that were revised.
-6b. **Check the report against its own citations.** Every **claim finding**
-   must carry both halves — the document making the claim, and the document or
-   file settling it. Every **derived finding** must carry a cited Basis line
-   for each figure it rests on, and its derivation written out (§5's second
-   shape). In both cases every reference must resolve to a line that is really
+6b. **Check the report against its own citations**, in §5's three shapes.
+   Every **claim finding** must carry both halves — the document making the
+   claim, and the document or file settling it. A **claim finding resting on an
+   absence** must carry its claim citation and both searches, and has no
+   settling line by construction. Every **derived finding** must carry a cited
+   Basis line for each figure it rests on, and its derivation written out. In
+   every case each reference that is made must resolve to a line that is really
    in the materials. A finding whose citation does not resolve does not ship (see
    §5). This catches a citation pointing at nothing. It will not catch one
    pointing convincingly at the wrong line.
@@ -541,7 +567,10 @@ the review happens after the run and before delivery.
 
 **What to check, in about two minutes:**
 
-- Does the surface cover every document in which the seller makes claims?
+- Did the engagement name the right claim sources? A document in which the
+  seller asserts things and which was not named is a **scoping error to raise
+  with the client**, not a defect in the surface — the auditor enumerated what
+  it was given, correctly (§12 step 1).
 - Have all designated claim-source documents been enumerated, and have
   evidence-only documents been excluded from the claim surface? §12 step 1
   settles which is which, so only one answer is correct — this checks that it
@@ -666,8 +695,8 @@ date, and a security obligation, and those belong in the engagement letter
 before the next paying engagement — not here.
 
 **The mechanism** for method learning is step 7 of §12: the final turn of every
-audit proposes edits to this file, technique only. Bruce reviews and merges; the world is
-then discarded. Learning is routed through a human review gate, which is where
+audit proposes edits to this file, technique only. The practice reviews and
+merges; the world is then discarded. Learning is routed through a human review gate, which is where
 a confidentiality check belongs, and it lands somewhere versioned and
 diffable. This is what real firms do — a methodology manual updated after
 engagements, not analysts carrying client details.
@@ -687,7 +716,8 @@ for proper nouns.
   letter — a clause to add *before* the first paying client.
 - **Method learning can make the method worse** by over-fitting to recent
   targets. Guard by re-running `measure/fixtures/dataroom/` after a method
-  change and checking whether tier recall moved; keep at least one fixture in
+  change and checking whether recall against its answer key moved; keep at
+  least one fixture in
   a different domain from recent real targets.
 
 ## 15. The Gap Map
@@ -753,41 +783,44 @@ between an opening marker and the content it introduces.
 **`=== CLAIM SURFACE ===`** — as §12 specifies: the line after the marker
 carries the count and nothing else, then the enumeration.
 
-**`=== REPORT ===`**
+**`=== REPORT ===`** — four parts, in this order:
+
+1. **The conclusion**, in §9's vocabulary and no other.
+2. **The findings, worst first**, each in §5's format:
+   - a **claim finding** carries its §6 verdict, the claim it tests, and both
+     citations — the document making the claim and the document that settles
+     it;
+   - a **claim finding resting on an absence** carries its claim citation and
+     the two searches, and no settling citation, because none exists;
+   - a **derived finding** carries `[derived]`, a cited Basis line per figure,
+     and its derivation (§5's second shape).
+3. **A coverage statement**, in §1a's vocabulary. Identified, resolved and
+   supported; the consistency rate, supported over resolved; what was not
+   attempted and why that matters (§4); every `[unverifiable]` claim with its
+   reason; any `[unclaimed]`; and the addendum, if §12 step 2 produced one.
+4. **What the client should ask the seller before closing.**
+
+No covering note, no account of what you did this leg, no preamble. Anything
+written inside the block ahead of the conclusion *is* the report: it is what
+the client reads first, and it displaces the finding that should have been
+there.
 
 **Length follows from the claim surface, not from a target.** Every resolved
 claim gets a finding (§4, §5), so a large surface makes a long report and that
-is correct. There is no word ceiling: no assurance standard bounds report
-length, and a report that omits required content to hit a number has failed at
-the thing the number was meant to protect.
+is correct — §8 explains why that costs the reader nothing. There is no word
+ceiling: no assurance standard bounds report length, and a report that omits
+required content to hit a number has failed at the thing the number was meant
+to protect.
 
-Budget per finding instead. A claim that **holds** needs its verdict, its
-citation and a clause — around twenty to thirty words. A claim that **does
-not** needs the claim, the evidence that settles it, and what the gap costs the
-buyer — around eighty. Order them worst first, so a reader who stops early has
-read the expensive ones.
+Budget per finding instead. A claim that is **supported** needs its verdict,
+its citations and a clause — around twenty to thirty words. A claim that is
+**not** needs the claim, the evidence that settles it, and what the gap costs
+the buyer — around eighty.
 
 **The two things length pressure will suggest are the two you must not do:**
 drop citations, or merge several claims into one finding. A finding carrying
 three claims cannot be checked against any of them, and a report that demotes
 findings to prose shrinks the surface anyone can review it against.
-
-- The conclusion, in §9's vocabulary and no other.
-- Findings worst first, each in §5's format. A **claim finding** carries its
-  §6 verdict, the claim it tests, the document making that claim, and the
-  document that settles it. A **derived finding** carries `[derived]`, a cited
-  Basis line per figure, and its derivation (§5's second shape).
-- A coverage statement in §1a's vocabulary — identified, resolved, supported —
-  what was not attempted and why that matters (§4), and the **consistency
-  rate**, supported over resolved;
-  every `[unverifiable]` claim with the reason, and any `[unclaimed]`; and the
-  addendum, if §12 step 2 produced one.
-- What the client should ask the seller before closing.
-
-No covering note, no account of what you did this leg, no preamble. Anything
-written inside the block ahead of the conclusion *is* the report: it is
-what the client reads first, and it displaces the finding that should have been
-there.
 
 **`=== LIMITATIONS ===`** — three lines, always present:
 
