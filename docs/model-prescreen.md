@@ -148,6 +148,12 @@ surface on leg 1, which is the criterion every failure in campaign m1 failed.
 Detail in `measure/fixtures/dataroom/RESULTS.md`. That is one run; three decide
 qualification — see [model-qualification.md](model-qualification.md).
 
+**And three runs DISQUALIFIED it.** `b2_glm_2` came back INADMISSIBLE and
+`b2_glm_3` ADMISSIBLE 15 of 15 PASS, so admissibility ran 2 of 3 against Q1's
+required 3 of 3. **Gate 3 passed a model that qualification rejected**, which
+is the measured cost of grading a single run: run 1 was the good draw. Read
+gate 3 as a screen that removes candidates, never as evidence one is usable.
+
 Reference, same family: `z-ai/glm-5.3` (the full model, $1.40/$4.40) on its
 first-party `z-ai/fp8` **failed gate 1 in a way worth recording** — it accepted
 `response_format: json_schema` and returned a markdown-fenced ```` ```json ````

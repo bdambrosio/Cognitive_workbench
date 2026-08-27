@@ -13,12 +13,63 @@ lessons in it and not as evidence about models.
 |---|---|---|---|---|
 | `b2_grok_1` | grok-4.6 | 35 refs, 0 past EOF, 19 quotes contiguous, 0 evidence fields pointing nowhere | ADMISSIBLE · 10 of 10 · **PASS** | 321s |
 | `b2_glm_1` | GLM-5.3-Flash `modal/fp8` | 50 refs, 0 past EOF, 35 of 36 quotes contiguous, 0 evidence fields pointing nowhere | ADMISSIBLE · 11 of 11 · **PASS** | 422s |
+| `b2_glm_2` | GLM-5.3-Flash `modal/fp8` | 21 refs, **4 past EOF**, 0 quotes, limitations statement absent | **INADMISSIBLE** | 302s |
+| `b2_glm_3` | GLM-5.3-Flash `modal/fp8` | 50 refs, 0 past EOF, 43 of 44 quotes contiguous | ADMISSIBLE · 15 of 15 · **PASS** | 545s |
 | `b2_deepseek_or` | DeepSeek-V4-Flash `baidu/fp8` | — | five `[unsupported]`, closed without a rerun | — |
 
 Qualification is decided over three runs, not one — `docs/model-qualification.md`.
 Each row above is one run.
 
-### `b2_glm_1` — GLM-5.3-Flash clears gate 3, 2026-08-27
+### GLM-5.3-Flash — DISQUALIFIED on Q1, 2026-08-27
+
+Three runs, one instrument, no instrument edits between them. **Admissible 2 of
+3, and `docs/model-qualification.md` Q1 requires 3 of 3.** Q2 is met (PASS in 2
+of 3) and Q3 is met (no single mechanical criterion fails twice). Q1 alone
+decides it.
+
+| | run 1 | run 2 | run 3 |
+|---|---|---|---|
+| legs | 3 (yield, respond, respond) | 2 (respond, respond) | 2 (respond, respond) |
+| iterations | 11 | 5 | 6 |
+| report | 1,645 words | **455 words, not a report** | 1,974 words |
+| claim surface | closed, n=35 | closed, n=28 | closed, n=23 |
+| limitations | present | **absent** | present |
+| references | 50, 0 past EOF | 21, **4 past EOF** | 50, 0 past EOF |
+| quotes | 36 | **0** | 44 |
+| review | ADMISSIBLE 11/11 PASS | **INADMISSIBLE** | ADMISSIBLE 15/15 PASS |
+| 429s absorbed | 2 | 0 | 0 |
+
+**Run 2 did not produce a report.** Its `report.md` is the claim-enumeration
+turn, ending "I'll work the priority order straight through and derive the
+supporting calculations now". The model ended that turn with `respond` rather
+than `yield`, so the runner took the enumeration as the report and asked for
+the Gap Map. No 429s occurred in that run, so the route is not the cause.
+
+**Claim-surface enumeration is unstable: 35, 28, 23 on identical input.** grok
+is 31/32/34. This is the same instability recorded as unexplained for qwen
+(40, 70, 32).
+
+### Two instrument problems this campaign exposed
+
+**1. Q1's stated justification is wrong, and the gate may still be right.**
+`docs/model-prescreen.md` and `model-qualification.md` both argue that
+admissibility can carry a zero-tolerance gate because it is "the only review
+signal that holds still". The evidence for that was three reviews **of one
+report** returning INADMISSIBLE 3 of 3 — *reviewer-side* stability. GLM went
+ADMISSIBLE, INADMISSIBLE, ADMISSIBLE on three runs, so *run-to-run*
+admissibility is not stable, and the two quantities were conflated. The gate
+may still be correct on substance — a third of delivered reports being
+uncheckable is not shippable — but it needs that argument, not this one.
+
+**2. "The model never delivered" is being laundered as an admissibility
+verdict.** Run 2 failed because there was no report, not because its citation
+scheme was ambiguous. The review layer is the only thing that noticed, so the
+failure arrives labelled INADMISSIBLE. Collapsing the two means the
+admissibility rate cannot be read as a statement about citation quality.
+Whether a non-delivery should be its own named outcome is open; it does not
+change GLM's result either way.
+
+### `b2_glm_1` — the run that cleared gate 3, 2026-08-27
 
 First run of the pre-screen's third gate for this model, and it passed on both
 instruments. Reviewer `grok-4.6`, which is not the model under test.
