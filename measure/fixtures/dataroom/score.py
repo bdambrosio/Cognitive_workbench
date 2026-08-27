@@ -298,8 +298,11 @@ def claim_surface(world: str, agent: str) -> Dict[str, Any]:
 # for zero uses across three engagements. A finding wearing a label outside this
 # set is not using the method's vocabulary — the same failure §9's check catches
 # at report level, one level down, where nothing was watching.
+# §6, all three of its vocabularies — five claim verdicts, one examination
+# status, two observation types. `non-delta` was renamed `unclaimed` on
+# 2026-08-27: it reads as the negation of `delta` and means there was no claim.
 _VERDICTS = {"real", "real, minor caveat", "real, operational caveat",
-             "partial", "delta", "unverifiable", "non-delta", "derived"}
+             "partial", "delta", "unverifiable", "unclaimed", "derived"}
 
 # §5's heading shape: **Finding N: <title> — [verdict]**. Tolerant of the dash
 # an model chooses and of bold markers, because those vary and the verdict does
@@ -468,7 +471,14 @@ def trace_facts(world: str, agent: str) -> Dict[str, Any]:
 # matched as "Clear". This is a CONFORMANCE check on a closed vocabulary the
 # method defines — not classification of free text, which is what the
 # no-keyword-matching rule exists to prevent.
-_REC_VOCAB = ["Clear with caveats", "Conditional", "Material", "Walk", "Clear"]
+# §9's closed vocabulary. `Walk` was replaced by `Systemically inconsistent`
+# on 2026-08-27: §9 forbids the buyer's action vocabulary — "proceed, negotiate,
+# walk" — and then used one of those three words as a conclusion.
+#
+# LONGEST FIRST STILL MATTERS: "Clear with caveats" must be tried before
+# "Clear", which is why order is load-bearing here and not alphabetical.
+_REC_VOCAB = ["Systemically inconsistent", "Clear with caveats", "Conditional",
+              "Material", "Clear"]
 
 
 # A term counts only where it stands as a verdict — the clause ENDS on it.
@@ -558,7 +568,7 @@ def recommendation_of(report: str) -> Optional[str]:
                 hits.append((tm.start(), -len(term), term))
         return min(hits)[2] if hits else None
 
-    for m in re.finditer(r"recommendation\b", report, re.I):
+    for m in re.finditer(r"\b(?:recommendation|conclusion)\b", report, re.I):
         found = _in(report[m.end():m.end() + 120])
         if found:
             return found

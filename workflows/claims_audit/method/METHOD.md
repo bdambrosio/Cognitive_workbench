@@ -5,7 +5,7 @@
 A one-shot technical due-diligence engagement for a buyer evaluating a target
 they do not own, in acquisitions under $5M. The operation is:
 
-> stated claims vs. observed implementation, with citations.
+> stated claims vs. observed evidence, with citations.
 
 What this audit does not do is in §11.
 
@@ -21,10 +21,29 @@ about the rest.
 
 Two rules follow.
 
-1. **State the coverage wherever you state the recommendation.** The §9
-   recommendation and the number of claims it rests on appear together, in the
-   report and in the Gap Map. A recommendation without that number gives the
+1. **State the coverage wherever you state the conclusion.** The §9
+   conclusion and the number of claims it rests on appear together, in the
+   report and in the Gap Map. A conclusion without that number gives the
    reader nothing to rely on.
+
+**The four quantities every fraction in the report divides by.** Use these
+words and no others: a coverage figure whose denominator is unstated is the
+failure §1a exists to prevent.
+
+| term | meaning |
+|---|---|
+| **identified** | claims enumerated from the claim sources and frozen in the claim surface (§12 step 2) |
+| **attempted** | identified claims you tried to settle |
+| **resolved** | attempted claims that reached one of §6's five claim verdicts |
+| **supported** | resolved claims whose verdict is `[real]` or a caveat form |
+
+An attempted claim that did not resolve is `[unverifiable]`. An identified claim
+never attempted is unchecked, and is accounted for by number in the coverage
+statement.
+
+**Coverage is resolved over identified. The consistency rate is supported over
+resolved.** Different denominators, different figures: state both, and never let
+one stand in for the other.
 
 2. **Never write a sentence that implies you examined more than you did.**
    "The system does what it says" is a claim about everything. "Of the 43
@@ -47,7 +66,7 @@ uptime and test coverage.
 
 **Do not opine on what the target should do.** How the system ought to be
 built, or the deal structured, is the buyer's judgement and is not what was
-bought. This applies to the §9 recommendation as much as to any finding:
+bought. This applies to the §9 conclusion as much as to any finding:
 report the state of the claims, not the action the buyer should take.
 
 ## 3. Scope adapts to the target; the method does not
@@ -77,12 +96,19 @@ defect is material in a $400k acquisition and noise in a $40m one.
 
 Three things follow. **Report every material gap whichever way it pushes the
 price** — one that favours the seller is still a gap. **A gap below the
-threshold does not make the claim fail**: record it as holding, under `[real]`
-or one of §6's caveat verdicts, rather than raising a `[partial]` for it.
-**It still gets a finding.** Every claim you examine produces one, the ones
+threshold does not make the claim fail**: record it under `[real, minor
+caveat]` — the verdict exists for a discrepancy that does not change the
+decision — rather than raising a `[partial]`. Reserve bare `[real]` for a claim
+the materials bear out with nothing to note. Materiality decides whether a
+discrepancy is worth the buyer's attention; it does not decide whether the
+claim was accurate, and the verdict must not say it was.
+
+**It still gets a finding.** Every claim you *resolve* produces one, the ones
 that hold included — §1a requires the report to say which claims hold and which
-do not, and a rate alone does not say which. The consistency rate is computed
-from the findings, not written instead of them. And
+do not, and a rate alone does not say which. A claim you attempted and could
+not settle is `[unverifiable]`, which is not a finding (§6) and belongs in the
+coverage statement. The consistency rate is computed from the findings, not
+written instead of them. And
 **materiality is judged against the buyer's decision, not your own taste**:
 "this code is poorly organised" is not material unless it bears on what was
 claimed.
@@ -98,7 +124,7 @@ claimed.
 3. **Operational parameters** — retry intervals, timeouts, monitoring,
    retention windows, thresholds affecting day-to-day operation.
 4. **Low-impact claims** — individually minor; collectively they set the
-   consistency rate, which is the best available signal about the claims
+   consistency rate (§1a), which is the best available signal about the claims
    nobody had time to check.
 
 **Those four levels are the tiers**, and a finding's tier is the tier of the
@@ -175,9 +201,9 @@ Four rules:
 2. **Write the arithmetic out.** "30-day retention from a 2026-07-30 last-good
    backup exhausts on 2026-08-29" is checkable in one line. Arithmetic left
    implicit is an opinion with a citation attached.
-3. **No recommendation inside the finding.** State the consequence and stop.
+3. **No conclusion inside the finding.** State the consequence and stop.
    What the buyer should do is the buyer's judgement (§2); the report's
-   recommendation is §9's job.
+   conclusion is §9's job.
 4. **Name what it escalates.** A derived finding often sharpens an ordinary
    one — the same backup failure, now with a date on it. Say which, so the
    report reads as one finding intensified rather than two counted. If it
@@ -196,16 +222,38 @@ input.
 
 ## 6. Verdict vocabulary
 
+Three vocabularies, and they answer different questions. Reading them as one
+table is what made `[derived]` look like a verdict on a claim and
+`[unverifiable]` look like a finding.
+
+**Claim verdicts — how a stated claim stood up.** These five, and only these,
+are verdicts. Every one produces a finding.
+
 | Verdict | Meaning | Buyer impact |
 |---|---|---|
-| `[real]` | Claim holds; the materials bear it out | None |
-| `[real, minor caveat]` | Holds; note does not change the decision | Awareness |
+| `[real]` | Claim holds; the materials bear it out, with nothing to note | None |
+| `[real, minor caveat]` | Holds; a discrepancy that does not change the decision | Awareness |
 | `[real, operational caveat]` | Holds today; operational context qualifies it | Awareness + operational planning |
 | `[partial]` | Mostly true, with a specific citable gap | **Material** — a gap to price |
 | `[delta]` | Claim is false; the materials show otherwise | **Material** — a broken promise, and possibly a pattern |
-| `[unverifiable]` | Could not be verified from available materials | Not a finding — goes in the coverage statement (§16) with the reason |
-| `[non-delta]` | Nothing to verify — the materials cover something the seller made no claim about | Not a finding — goes in the coverage statement (§16) |
-| `[derived]` | Not a claim test — a consequence computed from two or more stated figures (§5's second shape) | **As severe as the consequence.** Frequently material |
+
+**Examination status — what happened when you tried.** Not a verdict, because
+no verdict was reached. Not a finding.
+
+| Status | Meaning | Where it goes |
+|---|---|---|
+| `[unverifiable]` | Attempted; the materials could not settle it | Coverage statement (§16), with the reason |
+
+A claim you never attempted is neither of these. It is simply outside the
+checked set, and the coverage statement accounts for it by number.
+
+**Observation types — things that are not claim tests at all.** Findings, but
+not verdicts on any claim.
+
+| Type | Meaning | Buyer impact |
+|---|---|---|
+| `[derived]` | A consequence computed from two or more stated figures (§5's second shape) | **As severe as the consequence.** Frequently material |
+| `[unclaimed]` | The materials cover something the seller made no claim about | Noted in the coverage statement (§16); rarely material |
 
 **`[partial]` vs `[delta]` is a real distinction.** `[partial]` is "the claim
 is 80% true and here is the 20% that is not, with a citation to the corner
@@ -214,11 +262,15 @@ materials show Y, here are both citations." A buyer treats them differently: `[p
 known limitation to price in; `[delta]` is a broken promise that may indicate
 a pattern.
 
-**`[derived]` is not a verdict on a claim, and that is the point.** The other
-eight say how a stated claim stood up. `[derived]` says the seller's own
-figures, taken together, entail something neither document states. It carries
-no claim source because there is no claim — which is why it needs §5's second
-shape rather than a row in the format above.
+**`[derived]` is not a verdict on a claim, and that is the point.** The five
+claim verdicts say how a stated claim stood up. `[derived]` says the seller's
+own figures, taken together, entail something neither document states. It
+carries no claim source because there is no claim — which is why it needs §5's
+second shape rather than the format above.
+
+**`[unclaimed]` was called `[non-delta]` until 2026-08-27, and the name was
+actively misleading**: it reads as the negation of `[delta]` — "the claim is
+not false" — when it means there was no claim in the first place.
 
 **`[unverifiable]` must never be reported as `[delta]`.** "I could not find
 it" is not the same as "it is not there." The first belongs in the coverage
@@ -239,30 +291,45 @@ evidence could change a finding, the citations were decoration.
 
 **Write for the person who decides.** They read the Gap Map in about thirty
 seconds and open the report only if it earns the time. They will not read
-forty cited findings: they read the recommendation, then drill into one or two
+forty cited findings: they read the conclusion, then drill into one or two
 if it makes them curious.
 
-So the report opens with the §9 recommendation and its coverage, and closes
+So the report opens with the §9 conclusion and its coverage, and closes
 with a paragraph a non-specialist can read and explain back to a colleague.
 Tier everything in between to that reader.
 
-## 9. Report-level recommendation
+## 9. Report-level conclusion
 
-| Recommendation | Meaning |
+§1a already calls this the report's **conclusion**, and that is the word this
+document uses. It was headed "recommendation" until 2026-08-27, which put an
+advisory name on a statement about evidence — and the definitions had drifted
+to match.
+
+| Conclusion | Meaning |
 |---|---|
-| **Clear** | No `[delta]` and no `[partial]` findings, and no caveats of note. The system does what it says. |
-| **Clear with caveats** | No `[delta]` or `[partial]` findings. Documentation drift, maintenance debt or operational notes a buyer should know, which do not change the fundamental valuation. |
-| **Conditional** | Material findings, but addressable — fixable in a sprint or two, or the feature is non-critical. Proceed if the seller will fix them or the buyer accepts the gap. |
-| **Material** | Material findings that significantly change valuation or risk profile. The buyer must price this in explicitly. |
-| **Walk** | Claims are systematically false, or the target is not what the seller described. |
+| **Clear** | No `[delta]` and no `[partial]` findings, and no caveats of note. Of the claims examined, all hold. |
+| **Clear with caveats** | No `[delta]` or `[partial]` findings. Documentation drift, maintenance debt or operational notes a buyer should know, which do not bear on valuation. |
+| **Conditional** | Material findings, each localised and remediable — a fix of known shape, or a claim about a non-critical feature. |
+| **Material** | Material findings that bear on valuation or risk profile. |
+| **Systemically inconsistent** | The claims do not describe the target: material findings across independent claims, or a claim source contradicted throughout. |
 
-**The audit recommends; the buyer decides.** The audit says "Conditional: the
+**The audit concludes; the buyer decides.** The audit says "Conditional: the
 seller claims 30-day retention, the materials show 7." Whether 7 days is
 acceptable is the buyer's call. The audit does not say "you should walk."
 
-**Keep the two vocabularies apart.** The five terms above describe the state
-of the claims. *Proceed, negotiate, walk* is the buyer's action vocabulary,
-and using it would put the audit in the business of advising on the deal (§2).
+**Keep the two vocabularies apart, and note that this one did not.** The five
+terms above describe the state of the claims. *Proceed, negotiate, walk* is the
+buyer's action vocabulary, and using it would put the audit in the business of
+advising on the deal (§2). Until 2026-08-27 **Walk** was one of the five terms
+— the forbidden word used as a conclusion — while **Conditional** read "Proceed
+if the seller will fix them" and **Material** read "the buyer must price this in
+explicitly". Three uses of the register these very lines forbid.
+
+**And `Clear` stated a conclusion §1a forbids.** It read "The system does what
+it says", which §1a names as the example of a sentence claiming more than the
+work performed: *"'The system does what it says' is a claim about everything.
+'Of the 43 claims examined, 39 hold' is a claim about the work done. Write the
+second."* Now it says the second.
 The Gap Map's closing line may offer a judgement — "the gaps are addressable
 within the existing integration timeline" — if it is labelled as professional
 judgement rather than written as an instruction.
@@ -426,14 +493,16 @@ the review happens after the run and before delivery.
 **What to check, in about two minutes:**
 
 - Does the surface cover every document in which the seller makes claims?
-- Are evidence documents counted as claims, or excluded — and does the report
-  say which? Both are defensible; silence is not.
+- Have all designated claim-source documents been enumerated, and have
+  evidence-only documents been excluded from the claim surface? §12 step 1
+  settles which is which, so only one answer is correct — this checks that it
+  was followed, not which convention was chosen.
 - Is the grain consistent across documents, or fine in one and coarse in
   another?
 - Does the total match the per-document counts below it?
 
 **If the surface is wrong, every coverage figure is wrong.** §1a forbids
-stating a recommendation without the coverage it rests on, so correcting this
+stating a conclusion without the coverage it rests on, so correcting this
 after delivery means reissuing under §7.
 
 **Why a review step and not a tighter rule.** Measured 2026-08-25: three models
@@ -557,7 +626,7 @@ for proper nouns.
 **One page for the person who decides**, read in about thirty seconds (§8):
 
 - Target name and a one-line description
-- The §9 recommendation
+- The §9 conclusion
 - The three to five items that matter most
 - The coverage line
 - One line: "Full report with citations available on request."
@@ -567,18 +636,18 @@ for proper nouns.
 Each key item is a one-line claim and a short note. No line citations; those
 are in the report.
 
-**When the recommendation is Clear or Clear with caveats, include what holds,
+**When the conclusion is Clear or Clear with caveats, include what holds,
 not only the caveats.** The buyer needs to see *what* is clear — "the payment
 path is tested end to end" is the finding they are paying for — and a list of
 caveats alone misrepresents an audit that mostly passed. Where the
-recommendation is Material or Walk the balance inverts on its own.
+conclusion is Material or Systemically inconsistent the balance inverts on its own.
 
 **The coverage line** says how many claims were checked individually out of
 how many were identified, and why the rest is or is not low-risk. The Gap Map
 is the document most likely to be read *instead of* the report, so silence
 about coverage does its damage here first.
 
-If the recommendation is **Clear** with no caveats, the Gap Map is two lines:
+If the conclusion is **Clear** with no caveats, the Gap Map is two lines:
 "no gaps found, N of N claims verified, report attached."
 
 **No logo, no pricing, no "book a call".** The report link is the only call to
@@ -633,18 +702,18 @@ drop citations, or merge several claims into one finding. A finding carrying
 three claims cannot be checked against any of them, and a report that demotes
 findings to prose shrinks the surface anyone can review it against.
 
-- The recommendation, in §9's vocabulary and no other.
+- The conclusion, in §9's vocabulary and no other.
 - Findings worst first, each in §5's format, carrying its §6 verdict, the
   claim it tests, the document making that claim, and the document that
   settles it.
 - A coverage statement: what was not checked, and why that matters (§4); the
   **consistency rate** (§4) — the proportion of checked claims that hold;
-  every `[unverifiable]` claim with the reason, and any `[non-delta]`; and the
+  every `[unverifiable]` claim with the reason, and any `[unclaimed]`; and the
   addendum, if §12 step 2 produced one.
 - What the client should ask the seller before closing.
 
 No covering note, no account of what you did this leg, no preamble. Anything
-written inside the block ahead of the recommendation *is* the report: it is
+written inside the block ahead of the conclusion *is* the report: it is
 what the client reads first, and it displaces the finding that should have been
 there.
 
@@ -659,8 +728,10 @@ The second is the one most often left out and the one that matters most. Every
 finding interprets a claim without its author present to say what was meant,
 and a reader who does not know that will over-read the report.
 
-It is a block of its own and it is still part of the report — the client
-receives one document with these lines in it. Separate block, same document.
+It is a block of its own and it belongs to the same delivered document as the
+report block — the client receives one deliverable with these lines in it.
+**Throughout this document, "the report" is the `=== REPORT ===` block and
+"the deliverable" is all four blocks together.**
 
 **`=== GAP MAP ===`** — as §15 specifies, and nothing else. Do not restate the
 report, do not introduce it, do not append a note about it.
@@ -715,8 +786,9 @@ facts do not carry between engagements (§14).
 
 One card, about 680 px wide. Scan order top to bottom: target identity,
 verdict band, key items, coverage, report link. The verdict band is the §9
-recommendation, colour-coded, immediately under the header, green through red
-across Clear to Walk, and it is the only place the recommendation appears.
+conclusion, colour-coded, immediately under the header, green through red
+across Clear to Systemically inconsistent, and it is the only place the
+conclusion appears.
 
 Open: whether the colour coding survives email-thumbnail scale, PDF export,
 and the landing page it shares a visual system with. None of these block
@@ -736,7 +808,7 @@ live in `workflows/claims_audit/method/gap-analysis.md`, not here.
 
 Drafted 2026-08-22 by Claude from Jill's statements in `jill_chat` turns
 3019–3045; **reviewed and corrected by Jill the same day** (turn 3047). Her
-corrections, the verdict vocabulary, the recommendation taxonomy, the priority
+corrections, the verdict vocabulary, the conclusion taxonomy, the priority
 order, the correction protocol and the run sequence are hers.
 
 This file is the single durable source for the method: it lives in git so it
