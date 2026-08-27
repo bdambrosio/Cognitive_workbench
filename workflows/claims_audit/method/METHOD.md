@@ -574,11 +574,31 @@ protects client confidentiality but would also throw away everything learned
 **The working record is kept. The world is still discarded.**
 
 §10's defence against a negligence claim is that *"the citation trail
-demonstrates the work was systematic"* — and the citation trail in the report
-covers only what was reported. On a fifty-claim surface producing a dozen
-findings, the other thirty-eight were resolved, supported, and left no trace. A
-negligence claim asks about those. Discarding the world destroyed the only
-evidence they happened.
+demonstrates the work was systematic"* — and a citation shows what you found,
+never what you looked at.
+
+**This argument changed on 2026-08-27 and the earlier version is worth
+recording, because the fix for one gap closed a different one.** It used to
+read: on a fifty-claim surface producing a dozen findings, the other
+thirty-eight were checked, held, and left no trace, so the world held the only
+evidence they happened. Under §4 that state no longer exists — every resolved
+claim produces a finding, so all fifty are in the report with their citations.
+The report now carries what the working record used to be needed for.
+
+**What the report still does not carry is the negative space**, and that is
+what a negligence claim asks about:
+
+- **The searches behind an absence.** §5 requires two searches for "this is not
+  implemented" and the report states the conclusion, not the queries. *"A
+  documented search proves diligence, not absence"* — and the document is the
+  trace, not the report.
+- **The dead ends behind a finding.** A finding cites the file that settled it.
+  It does not cite the six that did not, and "did you look properly" is a
+  question about those six.
+- **Every `[unverifiable]` claim's attempt.** The coverage statement gives the
+  claim and the reason. The work that failed to settle it is in the trace.
+- **Why an identified claim went unattempted.** §4's priority judgement is made
+  in the working log and appears in the report only as a number.
 
 **Nothing is authored to fix this.** The record already exists as a byproduct
 of the work:
