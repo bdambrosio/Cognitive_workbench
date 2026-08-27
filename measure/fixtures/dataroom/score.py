@@ -200,6 +200,10 @@ def marker_re(mark: str) -> "re.Pattern":
     return re.compile(r"\s+".join(re.escape(t) for t in mark.split()))
 
 
+# Any block marker, opener or closer — the lines §16 requires and that carry no
+# report content.
+_ANY_MARKER = re.compile(r"^={2,}\s*(?:END\s+)?[A-Z][A-Z ]*\s*={2,}$")
+
 _GAP_RE = marker_re(GAP_MARK)
 _LIMITS_RE = marker_re(LIMITS_MARK)
 _SURFACE_RE = marker_re(SURFACE_MARK)
@@ -577,7 +581,14 @@ def recommendation_of(report: str) -> Optional[str]:
     # BEGIN the report costs nothing a conformant report needs and removes the
     # whole class: a §9 term in a sentence is prose, a §9 term opening the
     # document is the verdict.
-    head = next((ln for ln in report.splitlines() if ln.strip()), "")
+    # SKIP THE BLOCK MARKERS. §16 opens the report with `=== REPORT ===` since
+    # 2026-08-27, and report.md keeps it. Taking the first non-blank line then
+    # found the marker, and grok's `**Material** — of 22 claims examined`
+    # scored as stating no recommendation. That is the fifth locator bug in
+    # this function and the first caused by the harness rather than by a
+    # model's formatting.
+    head = next((ln for ln in report.splitlines()
+                 if ln.strip() and not _ANY_MARKER.match(ln.strip())), "")
     head = head.lstrip("#*_> \t")
     found = _in(head)
     return found if found and head.lower().startswith(found.lower()) else None
