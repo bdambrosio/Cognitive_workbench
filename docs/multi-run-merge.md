@@ -88,17 +88,33 @@ one document", which is exact. Paraphrase, truncation and reordering vanish once
 both sides are located, and the only threshold left is how much interval overlap
 counts as the same evidence.
 
-**Source identity is not finding identity, so use it as a BLOCKING KEY.** In the
-current corpus doc4's Backups section supports at least two distinct findings —
-"failures recorded for the last 21 days" and "no alerting configured for backup
-failures". Overlapping quotes, different findings; merging them loses one. The
-converse also occurs: two runs supporting the same gap from different evidence
-read as distinct. Overlap should therefore generate candidate pairs cheaply and
-mechanically, leaving a small, well-posed same-or-different question with both
-quotes in hand — not decide the merge outright.
+**The source quote DEFINES claim identity.** (Bruce, 2026-08-27, correcting an
+earlier draft of this note.) §2 defines a claim as *an assertion the seller
+makes to the buyer*, and an assertion is a specific span of text — so two
+findings resting on different source quotes are different claims however
+similar they read, and merging on anything but the span would invent a second
+notion of sameness the method does not have.
 
-**Tune toward under-merging.** False-distinct is cheap: redundancy the reader
-can see. False-merge is expensive: a finding silently disappears.
+An earlier draft argued that source identity was only a blocking key, on the
+grounds that doc4's Backups section supports two distinct findings. It does —
+but they quote *different spans*, "Failures recorded for the last 21 days" and
+"Alerting: None configured for backup failures", so span identity separates them
+correctly. The counterexample was wrong and the judgement step it motivated is
+not needed.
+
+Two cases resolve without judgement:
+
+- **Same gap, different quotes → two claims.** Two independent pieces of
+  evidence for one gap are two assertions, and keeping both is also the cheap
+  direction: redundancy a reader can see, rather than a finding that disappears.
+- **Identical quote, different gaps → one claim carrying two verdicts.** That
+  surfaces a disagreement between runs instead of hiding one, which is what a
+  merge should do.
+
+**The one real parameter is PARTIAL overlap** — where one run quotes a superset
+of another's span, or the two overlap at one end. Strict identity calls those
+different; a threshold calls them the same. That is what the calibrated
+percentage governs, and it is the only place it is needed.
 
 **Near-exact where it matters most.** For the claim surface the unit of merge
 *is* a source assertion, so interval overlap approaches identity — and that is
