@@ -56,6 +56,11 @@ Named explicitly so a stale config fails with a reason instead of a bare
 
 ## Adding a model
 
+0. Run the pre-screen first — [model-prescreen.md](model-prescreen.md). Three
+   gates: does the endpoint accept our real `json_schema` payload, how many
+   completion tokens does it spend on a one-line action, and does one fixture
+   run come back admissible. A model that fails those is not worth a
+   temperature conversation.
 1. Search for the publisher's recommended temperature for **agentic / tool-use**
    work — not the general chat default, which is usually different.
 2. If no recommendation exists, say so. Do not pick one.
