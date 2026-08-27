@@ -141,6 +141,13 @@ Every endpoint reports the artifact `z-ai/glm-5.3-flash-20260826`, so today the
 provider pin fixes the weights on its own. That will not hold: the
 DeepSeek-V4-Flash id served three different artifacts on one day.
 
+**Gate 3: PASS, 2026-08-27.** `b2_glm_1` — ADMISSIBLE, supported 11 of 11,
+PASS, 422s over 3 legs, 50 line references all resolving and none past
+end-of-file, 0 evidence fields pointing nowhere. It also closed the claim
+surface on leg 1, which is the criterion every failure in campaign m1 failed.
+Detail in `measure/fixtures/dataroom/RESULTS.md`. That is one run; three decide
+qualification — see [model-qualification.md](model-qualification.md).
+
 Reference, same family: `z-ai/glm-5.3` (the full model, $1.40/$4.40) on its
 first-party `z-ai/fp8` **failed gate 1 in a way worth recording** — it accepted
 `response_format: json_schema` and returned a markdown-fenced ```` ```json ````

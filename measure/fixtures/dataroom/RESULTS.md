@@ -3,6 +3,52 @@
 Started 2026-08-23, on the workflow harness. Everything before it was
 discarded, deliberately — see "Why every earlier run was discarded".
 
+## The board — campaign b2, current
+
+Runs on the workflow instrument with the review layer. Everything before b2 was
+deleted on 2026-08-26; the m1 table below is retained for the instrument
+lessons in it and not as evidence about models.
+
+| run | model | mechanical | review | wall |
+|---|---|---|---|---|
+| `b2_grok_1` | grok-4.6 | 35 refs, 0 past EOF, 19 quotes contiguous, 0 evidence fields pointing nowhere | ADMISSIBLE · 10 of 10 · **PASS** | 321s |
+| `b2_glm_1` | GLM-5.3-Flash `modal/fp8` | 50 refs, 0 past EOF, 35 of 36 quotes contiguous, 0 evidence fields pointing nowhere | ADMISSIBLE · 11 of 11 · **PASS** | 422s |
+| `b2_deepseek_or` | DeepSeek-V4-Flash `baidu/fp8` | — | five `[unsupported]`, closed without a rerun | — |
+
+Qualification is decided over three runs, not one — `docs/model-qualification.md`.
+Each row above is one run.
+
+### `b2_glm_1` — GLM-5.3-Flash clears gate 3, 2026-08-27
+
+First run of the pre-screen's third gate for this model, and it passed on both
+instruments. Reviewer `grok-4.6`, which is not the model under test.
+
+```
+turns 3   iterations 11        claim surface  closed leg 1 of 3, n=35
+corpus docs opened  9/9         limitations    present
+report length  1,645 words      Gap Map        present, 280 words
+finding verdicts  11, 4 distinct §6 verdicts
+subagent calls  5   returned NO answer: 0 (0%)
+```
+
+Three things worth carrying:
+
+- **It closed the claim surface on leg 1.** That criterion was all three
+  failures in campaign m1 and no other criterion failed more than once across
+  those nine runs.
+- **Subagent no-answer 0%**, on 5 calls — the grok/qwen pattern rather than
+  luna's 19-31%.
+- **Two upstream 429s during the run**, both absorbed by the backend's retry
+  ladder at 1 of 4. The route is pinned to Modal with fallbacks off and Modal
+  is the lowest-uptime servable endpoint for this model, so this is the
+  expected failure mode and it is worth watching across runs 2 and 3.
+
+One observation with no conclusion attached: the in-turn claim grader truncated
+and salvaged 27 claims from 7,973 characters of output, against
+`react_max_tokens` 16,384. That is the production self-grader running on the
+model under test, so it says something about verbosity and nothing about the
+audit.
+
 ## Scored runs — campaign m1, 2026-08-25
 
 Nine runs, three per model, interleaved by round. Instrument frozen at
