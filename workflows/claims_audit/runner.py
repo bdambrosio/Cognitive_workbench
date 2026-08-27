@@ -501,9 +501,14 @@ def main() -> int:
                                            encoding="utf-8")
         else:
             logger.warning("no REPORT block in the engagement — no report.md")
-        gap = blocks.content(whole, "GAP MAP")
+        # A SPAN, LIKE report.md. Writing this one stripped and the report one
+        # whole made the two files disagree about the same fact: run_meta
+        # recorded `GAP MAP` closed and conformance.json recorded it open,
+        # because conformance looked for the closer in a file the runner had
+        # just removed it from. Both deliverables are faithful copies.
+        gap = blocks.span(whole, "GAP MAP")
         if gap:
-            (out / "gap_map.md").write_text(gap.strip() + "\n", encoding="utf-8")
+            (out / "gap_map.md").write_text(gap.rstrip() + "\n", encoding="utf-8")
         else:
             logger.warning("no GAP MAP block in the engagement — no gap_map.md")
 
