@@ -23,24 +23,26 @@ Q4. Q0 is unchanged.
 
 ## Which instrument these criteria apply to
 
-**The instrument changed on 2026-08-27** — METHOD §16 went to four
+**The instrument changed twice on 2026-08-27** — METHOD §16 went to four
 self-delimiting blocks and the runner stopped reading a turn boundary as
-delivery. Every run on the `b2` board predates that and is historical: `b2`
-results and `b3` results are not comparable, by the same rule that discarded
-three campaigns for drift on 2026-08-24.
+delivery, and then §4 and §6 were reconciled so that every examined claim
+produces a finding, with §16's word target replaced by a per-finding budget.
 
-Two consequences for what follows.
-
-**A model disqualified on `b2` is not thereby disqualified.** GLM-5.3-Flash
-failed Q1 on a run where no report was ever delivered, and the review layer —
-the only thing that noticed — labelled that INADMISSIBLE. On the block
-instrument the same behaviour is a named missing block and a prompt, so the
-question it was disqualified on can no longer be asked the same way.
+**Every run made before those changes was deleted, and no model currently holds
+a qualification result.** The board is empty by construction, not by oversight:
+report length, finding count, the review's enumerated surface and its supported
+ratio all move under the §4 amendment, so nothing measured before it can be
+compared with anything measured after.
 
 **`blocks_prompted` is new and has no baseline.** It counts how many times the
 runner had to name a block that had not arrived. It gates nothing, and it will
-not until its variance is known — three runs on one model is the minimum, and
-`b3_grok_1` is the first.
+not until its variance is known.
+
+**One lesson from the deleted runs is load-bearing here and is kept.** A model
+disqualified on one instrument is not thereby disqualified: a delivery failure
+the harness could not distinguish from a completion claim was reported as an
+admissibility failure, and the model was rejected for a defect it did not have.
+Q1 exists because of that.
 
 ## The unit of qualification
 

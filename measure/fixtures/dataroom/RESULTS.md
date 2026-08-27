@@ -3,280 +3,40 @@
 Started 2026-08-23, on the workflow harness. Everything before it was
 discarded, deliberately — see "Why every earlier run was discarded".
 
-## The board — campaign b3, current
+## The board is empty — 2026-08-27
 
-The block instrument (METHOD §16, 2026-08-27). Everything on the b2 board below
-ran on the turn-based instrument and is not comparable to this.
+**Every run was deleted when METHOD §4 and §16 were amended**, late on
+2026-08-27. Campaigns b2, b3 and the `cm_glm_1` ChatterMate run all predate the
+amendment and are not comparable to anything run after it. Fourteen run
+directories and forty scenario worlds removed; the delivered ChatterMate
+engagement under `engagements/chattermate/delivered/` is a client artifact, not
+a run, and was kept.
 
-| run | model | legs | prompts | review | threshold (maj. of 3) |
-|---|---|---|---|---|---|
-| `b3_grok_1` | grok-4.6 | 2 | **0** | ADMISSIBLE · 17/17 · PASS | PASS |
-| `b3_glm_1` | GLM-5.3-Flash | 2 | REPORT ×1 | ADMISSIBLE · 12/12 · PASS | FAIL — leads with a top-3 finding |
-| `b3_glm_2` | GLM-5.3-Flash | 1 | **0** | ADMISSIBLE · 11/11 · PASS | PASS |
-| `b3_glm_3` | GLM-5.3-Flash | 3 | REPORT ×1, GAP MAP ×1 | ADMISSIBLE · 10/10 · PASS | FAIL — no unsupported claims |
+**What changed and why it invalidates them.** §4 and §6 contradicted each other
+on whether a claim that holds is a finding. Resolved to §6's reading: every
+examined claim now produces a finding, so a report that recorded forty held
+claims as a consistency rate and five gaps as findings is a different artifact
+from one that records forty-five findings. §16's 2,000-word target went with
+it, replaced by a per-finding budget. Report length, finding count, the review's
+enumerated surface and its supported ratio all move.
 
-**Qwen3.8-27B DISQUALIFIED on Q3** (review PASS in at least 2 of 3), local
-SGLang, temperature 0.25, top_p 0.95.
+**The rule this follows is the one that discarded three campaigns on
+2026-08-24**: comparisons within one instrument are clean, across instruments
+they are not. It has now cost a full day's runs twice, which is the price of
+the rule rather than an argument against it.
 
-| run | legs | prompts | review |
-|---|---|---|---|
-| `b3_qwen_1` | 1 | 0 | ADMISSIBLE · 21 of 24 · **FAIL** |
-| `b3_qwen_2` | — | — | **VOID** — llm_error, 300s client read timeout at iter 7 |
-| `b3_qwen_3` | 3 | LIMITATIONS ×1, GAP MAP ×1 | ADMISSIBLE · 32 of 47 · **FAIL** |
+**Verdicts withdrawn.** No model currently holds a qualification result.
+GLM-5.3-Flash's and Qwen3.8-27B's results are gone with the runs that produced
+them, and grok has no baseline on the current method. The next campaign starts
+from nothing.
 
-Two FAILs make PASS-in-2-of-3 unreachable, so the verdict does not depend on
-replacing the void run. The replacement was queued and never ran.
-
-**This is the counterweight to GLM's reversal: the b2 board was not uniformly
-artifact.** GLM's disqualification turned on a delivery misreading and did not
-survive the instrument change. Qwen's did. Delivery was never its problem — it
-delivered in one leg unprompted on run 1 — and it fails on what it was ruled
-out for: it cannot reliably say where its findings come from.
-
-**The defect changes form every run, which is why it was hard to name.**
-
-| | b2 | `b3_qwen_1` | `b3_qwen_3` |
-|---|---|---|---|
-| line references | ordinals dressed as line numbers | **0** | 128 in the report, 59 parsed, all resolving, 0 past EOF |
-| evidence fields pointing nowhere | — | 20 of 47 | 10 of 93 |
-| failure | INADMISSIBLE | 4 `[uncited]`, 1 standing | 9 `[uncited]`, 2 `[unsupported]` standing 2 of 2 |
-
-Run 3 cited lines **correctly** and still failed. So the ordinal defect is not
-the disease; it was one presentation of it.
-
-**Qwen enumerates far more and holds less of it.** 47 findings against grok's 17
-and GLM's 10-12, with 15 of 47 not surviving the check.
-
-**The retest discriminates rather than rubber-stamping.** It overturned one
-`[unsupported]` in run 1 (1 of 2, did not stand) and confirmed two in run 3
-(2 of 2, stood).
-
-**The void, and why it is a void.** `b3_qwen_2` died at `backend.py`'s
-`_HTTP_TIMEOUT_S = 300` on iteration 7 after 570s, with the server healthy
-before and after. One iteration exceeded 300s against a ~39s average for run 1.
-The plausible mechanism is qwen's one-leg style producing a very long
-generation at a near-greedy 0.25 — `qwen_reasoning.yaml` warns that temperature
-"invites repetition in exactly the long generations" this produces — but the
-call died, so there is no partial output and this is a hypothesis. Q0 voids it
-because the turn crashed; the model did not decline to deliver.
-
-**GLM-5.3-Flash QUALIFIES** — Q1 admissible 3 of 3, Q2 review PASS 3 of 3, Q3
-no single mechanical criterion failing twice. It was disqualified on the b2
-instrument the same day, and the reversal is the instrument, not the model.
-
-`b3_grok_1` is a re-baseline and **its review is not independent** — grok
-reviewed grok, which the criteria forbid. It stands as an instrument check and
-not as a qualification data point. Who reviews grok's runs is unsettled.
-
-### What the block instrument showed that the old one could not
-
-**GLM never uses `yield`.** Every leg of all three runs ended in `respond`. The
-old runner read that as a completion claim, which GLM was not making — it
-simply does not use the other signal. `b2_glm_2`'s INADMISSIBLE and the
-disqualification that followed rest entirely on that misreading. grok yields
-mid-work and responds when finished, so the same runner read grok correctly and
-GLM wrongly.
-
-**The failure is recoverable, and nothing was telling the model.** `b3_glm_1`
-leg 1 is `b2_glm_2` happening again: claim surface closed, turn ended, no
-report. Told which block was missing, GLM delivered a 1,630-word report with 37
-references, all resolving, none past end-of-file.
-
-**`blocks_prompted` discriminates on its first outing** — grok 0, GLM 1/0/2.
-
-### Three things this campaign did not settle
-
-**The claim surface is half grok's, and nothing gates it.** GLM enumerated 20,
-25 and 22 claims where grok enumerated 51 on the same nine documents. §12a is
-explicit that if the surface is wrong every coverage figure is wrong, because
-it is the denominator. A model that identifies half the claims reports better
-coverage of a smaller problem, and no criterion in `docs/model-qualification.md`
-touches this.
-
-**`b3_glm_2` carried ZERO line references and passed every check.** 0 `docN:NN`
-references in the whole report; it cited by section name with verbatim quotes —
-42 of them, 37 contiguous, 0 evidence fields pointing nowhere. It is genuinely
-checkable, so this is a §5 conformance failure and not an evidence failure. But
-**the admissibility gate is built to catch WRONG references and structurally
-cannot see ABSENT ones**: with 0 references, `line_refs_exceeding_file_length`
-is trivially 0. `refs 0` and `refs 45, 0 past EOF` print identically as clean.
-Recommended and NOT applied: record `line_refs` in `conformance.json`.
-
-**Wall clock.** GLM 621/370/401s against grok's 233s.
-
-## The board — campaign b2, superseded 2026-08-27
-
-Runs on the workflow instrument with the review layer. Everything before b2 was
-deleted on 2026-08-26; the m1 table below is retained for the instrument
-lessons in it and not as evidence about models.
-
-| run | model | mechanical | review | wall |
-|---|---|---|---|---|
-| `b2_grok_1` | grok-4.6 | 35 refs, 0 past EOF, 19 quotes contiguous, 0 evidence fields pointing nowhere | ADMISSIBLE · 10 of 10 · **PASS** | 321s |
-| `b2_glm_1` | GLM-5.3-Flash `modal/fp8` | 50 refs, 0 past EOF, 35 of 36 quotes contiguous, 0 evidence fields pointing nowhere | ADMISSIBLE · 11 of 11 · **PASS** | 422s |
-| `b2_glm_2` | GLM-5.3-Flash `modal/fp8` | 21 refs, **4 past EOF**, 0 quotes, limitations statement absent | **INADMISSIBLE** | 302s |
-| `b2_glm_3` | GLM-5.3-Flash `modal/fp8` | 50 refs, 0 past EOF, 43 of 44 quotes contiguous | ADMISSIBLE · 15 of 15 · **PASS** | 545s |
-| `b2_deepseek_or` | DeepSeek-V4-Flash `baidu/fp8` | — | five `[unsupported]`, closed without a rerun | — |
-
-Qualification is decided over three runs, not one — `docs/model-qualification.md`.
-Each row above is one run.
-
-### GLM-5.3-Flash — DISQUALIFIED on Q1, 2026-08-27
-
-Three runs, one instrument, no instrument edits between them. **Admissible 2 of
-3, and `docs/model-qualification.md` Q1 requires 3 of 3.** Q2 is met (PASS in 2
-of 3) and Q3 is met (no single mechanical criterion fails twice). Q1 alone
-decides it.
-
-| | run 1 | run 2 | run 3 |
-|---|---|---|---|
-| legs | 3 (yield, respond, respond) | 2 (respond, respond) | 2 (respond, respond) |
-| iterations | 11 | 5 | 6 |
-| report | 1,645 words | **455 words, not a report** | 1,974 words |
-| claim surface | closed, n=35 | closed, n=28 | closed, n=23 |
-| limitations | present | **absent** | present |
-| references | 50, 0 past EOF | 21, **4 past EOF** | 50, 0 past EOF |
-| quotes | 36 | **0** | 44 |
-| review | ADMISSIBLE 11/11 PASS | **INADMISSIBLE** | ADMISSIBLE 15/15 PASS |
-| 429s absorbed | 2 | 0 | 0 |
-
-**Run 2 did not produce a report.** Its `report.md` is the claim-enumeration
-turn, ending "I'll work the priority order straight through and derive the
-supporting calculations now". The model ended that turn with `respond` rather
-than `yield`, so the runner took the enumeration as the report and asked for
-the Gap Map. No 429s occurred in that run, so the route is not the cause.
-
-**Claim-surface enumeration is unstable: 35, 28, 23 on identical input.** grok
-is 31/32/34. This is the same instability recorded as unexplained for qwen
-(40, 70, 32).
-
-### Two instrument problems this campaign exposed
-
-**1. Q1's stated justification is wrong, and the gate may still be right.**
-`docs/model-prescreen.md` and `model-qualification.md` both argue that
-admissibility can carry a zero-tolerance gate because it is "the only review
-signal that holds still". The evidence for that was three reviews **of one
-report** returning INADMISSIBLE 3 of 3 — *reviewer-side* stability. GLM went
-ADMISSIBLE, INADMISSIBLE, ADMISSIBLE on three runs, so *run-to-run*
-admissibility is not stable, and the two quantities were conflated. The gate
-may still be correct on substance — a third of delivered reports being
-uncheckable is not shippable — but it needs that argument, not this one.
-
-**2. "The model never delivered" is being laundered as an admissibility
-verdict.** Run 2 failed because there was no report, not because its citation
-scheme was ambiguous. The review layer is the only thing that noticed, so the
-failure arrives labelled INADMISSIBLE. Collapsing the two means the
-admissibility rate cannot be read as a statement about citation quality.
-Whether a non-delivery should be its own named outcome is open; it does not
-change GLM's result either way.
-
-### `b2_glm_1` — the run that cleared gate 3, 2026-08-27
-
-First run of the pre-screen's third gate for this model, and it passed on both
-instruments. Reviewer `grok-4.6`, which is not the model under test.
-
-```
-turns 3   iterations 11        claim surface  closed leg 1 of 3, n=35
-corpus docs opened  9/9         limitations    present
-report length  1,645 words      Gap Map        present, 280 words
-finding verdicts  11, 4 distinct §6 verdicts
-subagent calls  5   returned NO answer: 0 (0%)
-```
-
-Three things worth carrying:
-
-- **It closed the claim surface on leg 1.** That criterion was all three
-  failures in campaign m1 and no other criterion failed more than once across
-  those nine runs.
-- **Subagent no-answer 0%**, on 5 calls — the grok/qwen pattern rather than
-  luna's 19-31%.
-- **Two upstream 429s during the run**, both absorbed by the backend's retry
-  ladder at 1 of 4. The route is pinned to Modal with fallbacks off and Modal
-  is the lowest-uptime servable endpoint for this model, so this is the
-  expected failure mode and it is worth watching across runs 2 and 3.
-
-One observation with no conclusion attached: the in-turn claim grader truncated
-and salvaged 27 claims from 7,973 characters of output, against
-`react_max_tokens` 16,384. That is the production self-grader running on the
-model under test, so it says something about verbosity and nothing about the
-audit.
-
-## Scored runs — campaign m1, 2026-08-25
-
-Nine runs, three per model, interleaved by round. Instrument frozen at
-`bc4ae148` (METHOD.md, run.py, audit.yaml); scorer at `3b1d6e07`. Every run
-completed with `error=None`. No retries were needed.
-
-| run | T1 | T2 | T3 | unsup | findings | verdicts | surface | subagent no-ans | leads | threshold |
-|---|---|---|---|---|---|---|---|---|---|---|
-| grok 1 | 3/3 | 2/2 | 4 | 0 | 12 | 6 | 32 | 0% | F2 | PASS |
-| grok 2 | 3/3 | 2/2 | 5 | 0 | 16 | 7 | 31 | 0% | P2 | PASS |
-| grok 3 | 3/3 | 2/2 | 5 | 0 | 12 | 6 | 34 | 0% | P2 | PASS |
-| qwen 1 | 3/3 | 1/2 | 5 | 0 | 29 | 6 | 40 | 0% | P2 | PASS |
-| qwen 2 | 3/3 | 1/2 | 5 | 0 | 15 | 3 | not closed | 0% | P2 | **FAIL** |
-| qwen 3 | 3/3 | 1/2 | 4 | 1 | 16 | 6 | not closed | 0% | P2 | **FAIL** |
-| luna 1 | 3/3 | 1/2 | 3 | 0 | 8 | 3 | 62 | 19% | P2 | PASS |
-| luna 2 | 2/3 | 2/2 | 4 | 0 | 11 | 4 | not closed | 31% | P2 | **FAIL** |
-| luna 3 | 3/3 | 1/2 | 3 | 0 | 8 | 3 | 90 | 20% | P2 | PASS |
-
-**grok 3/3 PASS · qwen 1/3 · luna 2/3.**
-
-### The threshold does discriminate. Yesterday's saturation was an n=1 artifact
-
-On 2026-08-24 all three models passed all eight criteria once each, and this file
-recorded that the threshold had stopped discriminating. At n=3 it separates the
-models cleanly. One run per model was not enough to see it, which is the reason the
-scorer prints "n=1 is anecdote" after every run.
-
-### Every failure is the claim surface, and the marker is simply absent
-
-All three FAILs are the same criterion, and no other criterion failed more than
-once across nine runs. In all three the marker appears **nowhere** in the trace
-— not truncated, not echoed from a tool, not present without a count. The model
-did not enumerate.
-
-**Both of qwen's failures are single-leg runs**, and its one two-leg run closed
-the surface. An model that compresses the whole engagement into one turn appears
-to skip enumeration and go straight to verification. Two observations is not a
-finding, and luna 2 is a counterexample at three legs, so leg count is not the
-whole mechanism.
-
-This is now the most interesting open question in the suite. It is also the
-criterion that took the most work to build, and it is the only one earning its
-place in the threshold.
-
-### What replicated
-
-- **luna's subagent no-answer rate: 19%, 31%, 20%.** Predicted 25-36%. Real,
-  model-specific, and slightly below the band. Both other models are 0% across all
-  six of their runs.
-- **grok's stability.** Tier 2 2/2 on all three runs, claim surface 31/32/34,
-  zero subagent failures, threshold PASS every time. No other model is stable on
-  any of those axes.
-- **Report thickness tracks the model.** luna 8, 11, 8 findings with 3-4 distinct
-  verdicts; grok 12-16 with 6-7; qwen 15-29 with 3-6.
-- **Placement is saturated.** Eight of nine runs lead with P2, the key's
-  top-ranked finding. This column no longer discriminates and should be
-  reported, not gated.
-
-### One genuine miss
-
-luna 2 is the only run in nine to drop a must-find item (2/3), and one of only
-two to register anything as `unsupported`.
-
-### Trust the mechanical columns
-
-Tier 2 and Tier 3 are grader-sampled, and Tier 2 was observed flipping on
-identical text earlier the same day. The claim-surface, subagent and
-verdict-conformance columns are read straight off the trace and are the ones to
-argue from.
-
-### The retry estimate was pessimistic
-
-This file predicted roughly one run in four would need a retry, from six
-enumeration runs that produced two failures. Nine scored runs needed none. The
-failures were in the claims-only harness and against repository-sized targets,
-not the fixture. Keep the warning for real targets; drop it for fixture runs.
+**Lessons kept, and where.** The findings from those runs are behaviour of
+models and of the instrument, not scores, so they survive the runs:
+`docs/held-claims-are-unreviewed.md`, `docs/derived-findings-and-uncited-evidence.md`,
+`docs/multi-run-merge.md`, `docs/model-prescreen.md`, and
+`docs/Workflow/essay-01-a-method-is-not-a-script-v2.md`. Each cites numbers
+from runs that no longer exist; treat those as illustrations of a mechanism,
+never as current measurements.
 
 ## Instrument drift — the check that has to run before every campaign
 

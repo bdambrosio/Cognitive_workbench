@@ -141,32 +141,18 @@ Every endpoint reports the artifact `z-ai/glm-5.3-flash-20260826`, so today the
 provider pin fixes the weights on its own. That will not hold: the
 DeepSeek-V4-Flash id served three different artifacts on one day.
 
-**Gate 3: PASS, 2026-08-27.** `b2_glm_1` — ADMISSIBLE, supported 11 of 11,
-PASS, 422s over 3 legs, 50 line references all resolving and none past
-end-of-file, 0 evidence fields pointing nowhere. It also closed the claim
-surface on leg 1, which is the criterion every failure in campaign m1 failed.
-Detail in `measure/fixtures/dataroom/RESULTS.md`. That is one run; three decide
-qualification — see [model-qualification.md](model-qualification.md).
+**Gate 3 result WITHDRAWN 2026-08-27**, with every run on the board, when
+METHOD §4 and §16 were amended — see `measure/fixtures/dataroom/RESULTS.md`,
+"The board is empty". GLM-5.3-Flash passed gate 3 and then a three-run
+qualification on the superseded instrument; neither result stands, and it needs
+re-screening on the current method.
 
-**And then the instrument was wrong.** On the block instrument (§16,
-2026-08-27) GLM-5.3-Flash ran 3 of 3 ADMISSIBLE, 3 of 3 review PASS, and
-QUALIFIED. What disqualified it below was a runner that read its `respond` as a
-completion claim it never made. The paragraph that follows is kept because the
-lesson about gate 3 survives the reversal intact — it is a screen that removes
-candidates and never evidence that one is usable.
-
-**On the superseded turn-based instrument, three runs DISQUALIFIED it.** `b2_glm_2` came back INADMISSIBLE and
-`b2_glm_3` ADMISSIBLE 15 of 15 PASS, so admissibility ran 2 of 3 against Q1's
-required 3 of 3. **Gate 3 passed a model that qualification rejected**, which
-is the measured cost of grading a single run: run 1 was the good draw. Read
-gate 3 as a screen that removes candidates, never as evidence one is usable.
-
-Reference, same family: `z-ai/glm-5.3` (the full model, $1.40/$4.40) on its
-first-party `z-ai/fp8` **failed gate 1 in a way worth recording** — it accepted
-`response_format: json_schema` and returned a markdown-fenced ```` ```json ````
-block instead of raw JSON. Structured output accepted but not honoured. Our
-fence-stripping utility would survive it; nothing in the endpoints API predicts
-it.
+**The lesson from that sequence survives its runs, and it is the reason gate 3
+exists in the form it does.** On the turn-based instrument gate 3 passed
+GLM-5.3-Flash and a three-run campaign then rejected it; on the block instrument
+the same model passed both. One run cannot distinguish a model from a harness
+defect. **Read gate 3 as a screen that removes candidates, never as evidence
+that one is usable.**
 
 ### DeepSeek V4 Flash 0731 (`deepseek/deepseek-v4-flash-0731`)
 
