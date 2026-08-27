@@ -122,6 +122,35 @@ not finish properly", and they have different fixes.
 - **Acceptance failure** — completion is claimed without the artifact.
   Example on record: the 2026-08-22 run above.
 
+## What the runner can check, and what it cannot
+
+**The runner checks that a named token was emitted. It does not check that the
+artifact is any good.** The test is whether the thing being required is
+copyable by the model at generation time: `=== GAP MAP ===` is, and "this
+report is a report" is not.
+
+Case, 2026-08-26. A model completed four legs and delivered a `report.md` whose
+entire content was `<the entire report>`. `error: None`. The runner accepted
+it, and this was recorded at the time as a hole in the runner. **That record
+was wrong on three counts.**
+
+- **It was caught.** Pre-screen gate 3 grades a run on the review's
+  admissibility verdict. The review refused the report and the model was
+  eliminated. The layer that owns the check performed it.
+- **A runner check would have recovered nothing.** The placeholder was the
+  final turn's deliverable. Refusing it forces another leg; it does not abort
+  the 33 minutes already spent.
+- **It would have contaminated the measurement.** Gate 3 asks whether a model
+  produces a checkable report unaided. A runner that loops until the reply
+  looks like a report measures the retry loop.
+
+The cost of the alternative is measured. `score.py`'s §9 criterion checks a
+**closed five-term vocabulary** — the easiest content check available — and
+still produced four missed reports on four spellings, then read
+`Recommendation: Clear the backup failures` as a verdict, then a regex slip
+that turned 13 correct rows into false negatives. Every one was found by
+re-scoring real runs and none was visible in the diff.
+
 ## Settled applications
 
 **The security audit is a workflow, and it is standalone.** It is an offline
