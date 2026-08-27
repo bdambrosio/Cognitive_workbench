@@ -97,9 +97,10 @@ claimed.
    consistency rate, which is the best available signal about the claims
    nobody had time to check.
 
-The tiers are set by consequence to the buyer, not by subsystem. If a tier is
-empty for a target, say so in the coverage statement rather than silently
-running a three-tier order. The order exists so that an audit cut short by
+**Those four levels are the tiers**, and a finding's tier is the tier of the
+claim it tests. The tiers are set by consequence to the buyer, not by
+subsystem. If a tier is empty for a target, say so in the coverage statement
+rather than silently running a three-tier order. The order exists so that an audit cut short by
 budget, time or access has resolved the most expensive unknowns first.
 
 ## 5. Finding format
@@ -198,8 +199,8 @@ input.
 | `[real, operational caveat]` | Holds today; operational context qualifies it | Awareness + operational planning |
 | `[partial]` | Mostly true, with a specific citable gap | **Material** — a gap to price |
 | `[delta]` | Claim is false; the materials show otherwise | **Material** — a broken promise, and possibly a pattern |
-| `[unverifiable]` | Could not be verified from available materials | Not a finding — goes in Remaining Claims with the reason |
-| `[non-delta]` | Nothing to verify — the materials cover something the seller made no claim about | Not a finding — noted for completeness |
+| `[unverifiable]` | Could not be verified from available materials | Not a finding — goes in the coverage statement (§16) with the reason |
+| `[non-delta]` | Nothing to verify — the materials cover something the seller made no claim about | Not a finding — goes in the coverage statement (§16) |
 | `[derived]` | Not a claim test — a consequence computed from two or more stated figures (§5's second shape) | **As severe as the consequence.** Frequently material |
 
 **`[partial]` vs `[delta]` is a real distinction.** `[partial]` is "the claim
@@ -216,8 +217,8 @@ no claim source because there is no claim — which is why it needs §5's second
 shape rather than a row in the format above.
 
 **`[unverifiable]` must never be reported as `[delta]`.** "I could not find
-it" is not the same as "it is not there." The first belongs in Remaining
-Claims; only the second is a finding.
+it" is not the same as "it is not there." The first belongs in the coverage
+statement; only the second is a finding.
 
 Use the narrowest verdict that fits.
 
@@ -351,8 +352,8 @@ the operational detail; this section is the method.
 
    If the engagement names no claim sources, say which documents you treated
    as claim sources and why, before the marker in step 2. A claim found later
-   in a document that was not a claim source goes in an **addendum** with its
-   own count, never into the frozen total.
+   in a document that was not a claim source goes in an addendum (step 2),
+   never into the claim surface.
 
 2. **Enumerate claims, then CLOSE the surface.** Read the claim sources named
    in step 1, and end enumeration by stating the count after a line reading
@@ -368,15 +369,17 @@ the operational detail; this section is the method.
    exactly `=== END CLAIM SURFACE ===`. It is one of the four delivery blocks;
    §16 has the full set and the rules they share.
 
-   **What counts as one claim.** A claim is a statement in the materials that
-   asserts something about the target that could be checked and found true or
-   false. Count one claim per such statement. Do not merge two statements 
-   about the same subject. Do not split one statement into parts. Count every such statement
-   whatever its priority. report per-document count below the totalfor each document.
+   **What counts as one claim.** A claim is what §2 defines: an assertion the
+   seller makes to the buyer, and one that could be checked and found true or
+   false. Count one claim per such assertion. Do not merge two assertions
+   about the same subject. Do not split one assertion into parts. Count every
+   one whatever its priority. Below the total, give a per-document count.
 
-   From that point the surface is **frozen**: every coverage figure in the
-   report divides by this count. A claim met later that was missed here goes
-   in an **addendum** with its own count, never into the original population.
+   From that point the **claim surface** is frozen: every coverage figure in
+   the report divides by this count, and it is the only name this document
+   uses for it. A claim met later that was missed here goes in an
+   **addendum** — a separately counted list, stated after the coverage
+   statement — and never into the claim surface itself.
 3. **Prioritise** in §4's order.
 4. **Work the priority order straight through.** Do not pause for
    confirmation; there is no channel to the client mid-engagement. Findings
@@ -613,7 +616,10 @@ carries the count and nothing else, then the enumeration.
 - Findings worst first, each in §5's format, carrying its §6 verdict, the
   claim it tests, the document making that claim, and the document that
   settles it.
-- A coverage statement: what was not checked, and why that matters (§4).
+- A coverage statement: what was not checked, and why that matters (§4); the
+  **consistency rate** (§4) — the proportion of checked claims that hold;
+  every `[unverifiable]` claim with the reason, and any `[non-delta]`; and the
+  addendum, if §12 step 2 produced one.
 - What the client should ask the seller before closing.
 
 No covering note, no account of what you did this leg, no preamble. Anything
