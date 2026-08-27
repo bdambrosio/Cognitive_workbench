@@ -122,25 +122,40 @@ they test no claim. It summarises the findings; it never replaces them. And
 "this code is poorly organised" is not material unless it bears on what was
 claimed.
 
-**Priority order.** Within what is material, verify in this order:
+**Priority order.** Verify in this order. **Every identified claim is in one of
+these tiers** — the order is not a filter, and it cannot be one, because
+materiality is a property of a gap and you do not know a claim's gap until you
+have checked it.
 
-1. **Claims whose failure ends the business** — data that cannot be recovered,
-   money that cannot be collected, a dependency that can withdraw. In a
-   physical product this is safety-critical mechanism; in a SaaS business it
-   is recoverability, payment integrity and single points of control.
-2. **Architectural invariants** — do the stated boundaries hold? Isolation,
-   redundancy, failover, tier separation, shared state.
-3. **Operational parameters** — retry intervals, timeouts, monitoring,
-   retention windows, thresholds affecting day-to-day operation.
-4. **Low-impact claims** — individually minor; collectively they set the
-   consistency rate (§1a), which is the best available signal about the claims
-   nobody had time to check.
+Each tier is defined by **what it would cost the buyer if the claim turned out
+false**. The subject matter after each dash is an example of where such claims
+are usually found, never the definition — an architectural claim can be
+business-ending or trivial, and it takes the tier its failure earns.
+
+1. **Failure ends the business** — data that cannot be recovered, money that
+   cannot be collected, a dependency that can withdraw. Usually recoverability,
+   payment integrity and single points of control; in a physical product,
+   safety-critical mechanism.
+2. **Failure changes what is being bought** — the target is not the shape the
+   seller described, so the buyer is acquiring a different asset at the agreed
+   price. Usually the stated boundaries: isolation, redundancy, failover, tier
+   separation, shared state.
+3. **Failure costs money or time to put right, and the deal survives it** —
+   priced in, not walked away from. Usually operational parameters: retry
+   intervals, timeouts, monitoring, retention windows, thresholds.
+4. **Failure changes nothing on its own** — individually minor; collectively
+   they set the consistency rate (§1a), which is the best available signal
+   about the claims nobody had time to check.
 
 **Those four levels are the tiers**, and a finding's tier is the tier of the
-claim it tests. The tiers are set by consequence to the buyer, not by
-subsystem. If a tier is empty for a target, say so in the coverage statement
-rather than silently running a three-tier order. The order exists so that an audit cut short by
-budget, time or access has resolved the most expensive unknowns first.
+claim it tests. They were re-cast onto a single consequence axis on 2026-08-27:
+tiers 2 and 3 had named subject matter — "architectural invariants",
+"operational parameters" — while 1 and 4 named severity, so the section claimed
+one axis and used two, and a business-ending architectural claim had no correct
+tier. If a tier is empty for a target, say so in the coverage statement rather
+than silently running a three-tier order. The order exists so that an audit cut
+short by budget, time or access has resolved the most expensive unknowns
+first.
 
 ## 5. Finding format
 
@@ -327,8 +342,8 @@ to match.
 
 | Conclusion | Meaning |
 |---|---|
-| **Clear** | No `[delta]` and no `[partial]` findings, and no caveats of note. Every resolved claim is supported. |
-| **Clear with caveats** | No `[delta]` or `[partial]` findings. Documentation drift, maintenance debt or operational notes a buyer should know, which do not bear on valuation. |
+| **Clear** | **No material findings of any kind.** Every resolved claim is supported, and no caveats of note. |
+| **Clear with caveats** | **No material findings of any kind.** No `[delta]` or `[partial]`; documentation drift, maintenance debt or operational notes a buyer should know, which do not bear on valuation. |
 | **Conditional** | Material findings, each localised and remediable — a fix of known shape, or a claim about a non-critical feature. |
 | **Material** | Material findings that bear on valuation or risk profile. |
 | **Systemically inconsistent** | The claims do not describe the target: material findings across independent claims, or a claim source contradicted throughout. |
@@ -344,6 +359,17 @@ advising on the deal (§2). Until 2026-08-27 **Walk** was one of the five terms
 — the forbidden word used as a conclusion — while **Conditional** read "Proceed
 if the seller will fix them" and **Material** read "the buyer must price this in
 explicitly". Three uses of the register these very lines forbid.
+
+**"Material finding" is the boundary, and it is deliberately not "`[delta]` or
+`[partial]`".** Until 2026-08-27 the first two rows were defined by the absence
+of those two claim verdicts, which let a catastrophic `[derived]` finding sit
+inside `Clear` — every stated claim `[real]`, and the seller's own figures
+together entailing something that ends the business. That is not a corner case:
+it is §5's flagship derived finding, where a retention period in one document
+and a last-good-backup date in another fix a date after which the business
+cannot be restored, with neither claim false. The conclusion must turn on
+material findings of any kind, which is the currency §4 already defines and the
+one thing every finding type shares.
 
 **And `Clear` stated a conclusion §1a forbids.** It read "The system does what
 it says", which §1a names as the example of a sentence claiming more than the
