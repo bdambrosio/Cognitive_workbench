@@ -12,8 +12,8 @@ What this audit does not do is in §11.
 ## 1a. Level of assurance, and the coverage vocabulary
 
 This is a **limited assurance** engagement. The audit resolves part of the
-target's identified claims, not all of them: §4 sets the order of work, §12 sets where it
-stops, and §11 lists what is out of scope.
+target's identified claims, not all of them: §4 sets the order of work, §12
+sets where it stops, and §11 lists what is out of scope.
 
 The report states its conclusion positively — of the claims it resolved, these
 are supported and these are not — but only about those. It says nothing about
@@ -33,8 +33,8 @@ Two rules follow.
 
 ### The four claim-state quantities
 
-Wherever the
-report states a count or a fraction of claims, use these words and no others —
+Wherever the report states a count or a fraction of claims, use these words and
+no others —
 "checked", "examined" and "verified" each blur `attempted` and `resolved`, and
 a coverage figure whose denominator is unstated is the failure §1a exists to
 prevent. Ordinary English is fine everywhere else; this binds the numbers.
@@ -116,8 +116,8 @@ claim was accurate, and the verdict must not say it was.
 
 **It still gets a finding.** Every claim you *resolve* produces one, the
 supported ones included — §1a requires the report to say which resolved claims
-are supported and which are not, and a rate alone does not say which. A claim you attempted and could
-not settle is `[unverifiable]`, which is not a finding (§6) and belongs in the
+are supported and which are not, and a rate alone does not say which. A claim
+you attempted and could not settle is `[unverifiable]`, which is not a finding (§6) and belongs in the
 coverage statement. **The consistency rate is `supported` over `resolved`
 (§1a)** — a ratio over claims, so `[derived]` findings are outside it because
 they test no claim. It summarises the findings; it never replaces them. And
@@ -364,8 +364,8 @@ explain back to a colleague.
 seller claims 30-day retention, the materials show 7." Whether 7 days is
 acceptable is the buyer's call. The audit does not say "you should walk."
 
-**Keep the two vocabularies apart.** The five
-terms above describe what the audit found — the state of the claims and of any
+**Keep the two vocabularies apart.** The five terms above describe what the
+audit found — the state of the claims and of any
 derived finding, since a `[derived]` finding describes no claim and can still
 decide the conclusion. *Proceed, negotiate, walk* is the buyer's action
 vocabulary, and using it would put the audit in the business of
