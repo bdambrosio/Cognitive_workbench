@@ -40,6 +40,7 @@ sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "src"))
 
 from measure.trace import load_turns, load_trace                # noqa: E402
+from workflows import blocks                                   # noqa: E402
 
 logger = logging.getLogger("dataroom.score")
 
@@ -170,9 +171,12 @@ A finding may match only one id. Do not invent ids.
 Output ONLY: {{"findings": [{{"id": "...", "quote": "..."}}]}}"""
 
 
-GAP_MARK = "=== GAP MAP ==="
-LIMITS_MARK = "=== LIMITATIONS ==="
-SURFACE_MARK = "=== CLAIM SURFACE ==="
+# ONE DECLARATION, IN workflows/blocks.py. These were declared here and again
+# in claims_audit/runner.py, and specified to the agent in neither METHOD nor
+# the brief until 2026-08-27.
+GAP_MARK = blocks.open_mark("GAP MAP")
+LIMITS_MARK = blocks.open_mark("LIMITATIONS")
+SURFACE_MARK = blocks.open_mark("CLAIM SURFACE")
 
 
 def marker_re(mark: str) -> "re.Pattern":
@@ -315,39 +319,36 @@ def verdict_conformance(report: str) -> Dict[str, Any]:
             "off_vocabulary": sorted(set(v for v in found if v not in _VERDICTS))}
 
 
-# The opening of run.py's Gap Map request, verbatim. Matching THIS is safe in a
-# way matching model output is not: the harness emitted it, so it is byte-exact
-# every time. If run.py's GAP_MAP_REQUEST changes, change this with it.
-GAP_MAP_REQUEST_MARK = "The report is received. Now the Gap Map"
+# The engagement's whole emission, which is what blocks are read out of. A
+# block is taken from wherever it was emitted; nothing is inferred from which
+# leg a reply arrived in, because that inference is what filed a claim
+# enumeration as `b2_glm_2/report.md` on 2026-08-27.
+def transcript(world: str, agent: str) -> str:
+    return "\n\n".join(str(t.raw.get("raw_response") or "")
+                        for t in _turns(world, agent))
 
 
 def read_memo(world: str, agent: str) -> Optional[str]:
-    """The report, which since §16 went to two turns is not the last reply.
+    """The report: the REPORT block plus the LIMITATIONS block (§16).
 
-    THE LAST REPLY IS THE GAP MAP. A Gap Map runs ~150 words, comfortably over
-    the 400-char floor below, so taking the last substantial turn would hand
-    the grader a one-page summary to score against the answer key — silently,
-    and with recall that looks merely poor rather than wrong.
-
-    The runner ASKED for the Gap Map, so the record knows which turn it is: the
-    turn whose user_input carries the request. The report is the substantial
-    turn before it. Runs made before the two-turn change have no such turn and
-    fall through to the old rule.
+    NOTHING IS LOCATED BY THE TURN IT LANDED IN. Two earlier rules were: "the
+    last substantial reply", which handed the grader the Gap Map to score
+    against the answer key, and "the turn before the runner's Gap Map request",
+    which made the scorer depend on a sentence the runner happened to emit.
+    Blocks announce themselves, so neither is needed.
 
     The Gap Map repeats the top findings by design, so matching over both would
     count them twice and inflate recall. It is reported separately — presence,
     length and §15 elements — rather than scored.
     """
-    all_turns = _turns(world, agent)
-    gap_leg = next((i for i, t in enumerate(all_turns)
-                    if GAP_MAP_REQUEST_MARK in (t.raw.get("user_input") or "")),
-                   None)
-    if gap_leg is not None:
-        all_turns = all_turns[:gap_leg]
-    turns = [t for t in all_turns if t.produced_chars > 400]
-    if not turns:
+    whole = transcript(world, agent)
+    # THE REPORT BLOCK DECIDES, not any block. Assembling from whatever blocks
+    # happen to be present returns the three-line limitations statement as the
+    # whole report when `=== REPORT ===` is absent.
+    if not blocks.opened(whole, "REPORT"):
         return None
-    return str(turns[-1].raw.get("raw_response") or "")
+    return "\n\n".join(b for b in (blocks.span(whole, n)
+                                    for n in blocks.REPORT_BLOCKS) if b)
 
 
 def gap_map_elements(gap_map: str) -> Dict[str, bool]:
@@ -390,26 +391,8 @@ def gap_map_elements(gap_map: str) -> Dict[str, bool]:
 
 
 def read_gap_map(world: str, agent: str) -> Optional[str]:
-    """The Gap Map turn's reply, for runs delivered in two turns (§16).
-
-    Returns None for a one-turn run, where the Gap Map is inside the report's
-    reply behind the marker and split_deliverables recovers it.
-
-    Same principle as read_memo: the runner asked for this turn, so the record
-    identifies it without anything being parsed out of the model's prose.
-    """
-    for t in _turns(world, agent):
-        if GAP_MAP_REQUEST_MARK in (t.raw.get("user_input") or ""):
-            return str(t.raw.get("raw_response") or "").strip() or None
-    return None
-
-
-def split_deliverables(reply: str) -> tuple:
-    """(report, gap_map_or_None). Split on the marker the brief specifies."""
-    hit = _GAP_RE.search(reply)
-    if hit:
-        return reply[:hit.start()].rstrip(), reply[hit.end():].strip()
-    return reply, None
+    """The GAP MAP block, from wherever in the engagement it was emitted."""
+    return blocks.content(transcript(world, agent), "GAP MAP")
 
 
 _TRACE_HDR = re.compile(r'^\[(?P<label>[\w-]+)\][^\n]*?exit=(?P<exit>\w+)\s+'
@@ -679,17 +662,14 @@ def main() -> int:
         print("  This is not a zero. The run measured nothing; discard it.")
         return 2
     if not memo:
-        print("  no memo found (no reply over 400 chars)")
+        print("  no REPORT block in the engagement — nothing to score (§16)")
         return 1
 
-    # TWO TURNS OR ONE. A two-turn run (§16) has the Gap Map in its own reply;
-    # an older run has it inside the memo behind the marker. read_gap_map
-    # answers the first case from the record, split_deliverables the second.
+    # BLOCKS, NOT TURNS (§16). The Gap Map is wherever its block was emitted,
+    # and the report is the REPORT and LIMITATIONS blocks — read_memo has
+    # already assembled those, including for a pre-block run.
     gap_map = read_gap_map(args.world, args.agent)
-    report, embedded = split_deliverables(memo)
-    if gap_map is None:
-        gap_map = embedded
-    memo = report          # findings are matched over the report only
+    report = memo          # findings are matched over the report only
     wc = word_count(report)
     print(f"  turns {facts['turns']}   iterations {facts['iterations']}")
     if gap_map is None:

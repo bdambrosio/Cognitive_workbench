@@ -364,7 +364,9 @@ the operational detail; this section is the method.
    ```
 
    The line immediately after the marker carries the count and nothing else:
-   a number, then the word `claims`. 
+   a number, then the word `claims`. Close the enumeration with a line reading
+   exactly `=== END CLAIM SURFACE ===`. It is one of the four delivery blocks;
+   §16 has the full set and the rules they share.
 
    **What counts as one claim.** A claim is a statement in the materials that
    asserts something about the target that could be checked and found true or
@@ -577,14 +579,35 @@ action. Anything more turns a professional document into a brochure.
 
 ## 16. The deliverable
 
-Two documents, in two turns, in this order.
+Four blocks. Each opens and closes with a line of its own:
 
-**A turn carries its document and nothing else.** No covering note, no account
-of what you did this leg, no prose ahead of the report. Anything written before
-the report *is* the report: it is what the client reads first, and it displaces
-the finding that should have been there.
+```
+=== CLAIM SURFACE ===     …     === END CLAIM SURFACE ===
+=== REPORT ===            …     === END REPORT ===
+=== LIMITATIONS ===       …     === END LIMITATIONS ===
+=== GAP MAP ===           …     === END GAP MAP ===
+```
 
-**Turn one: the report.** Aim for 2,000 words or under.
+**Emit them in that order.** Take as many legs as the work needs — the blocks
+are what the engagement is judged on, not how you divided the work. One leg may
+carry several blocks.
+
+**The order is not presentation.** The claim surface is the denominator every
+coverage figure divides by, and a surface closed after the findings is not
+frozen: it is a count made to fit. Close it before you check anything.
+
+**Markers are how a block is delivered.** The client's process reads them.
+Until a block's opening marker appears the engagement is still running, and you
+will be told which block is missing. A closing marker says you finished writing
+rather than ran out of room. Each marker goes on its own line, and nothing goes
+between an opening marker and the content it introduces.
+
+### The blocks
+
+**`=== CLAIM SURFACE ===`** — as §12 specifies: the line after the marker
+carries the count and nothing else, then the enumeration.
+
+**`=== REPORT ===`** — aim for 2,000 words or under.
 
 - The recommendation, in §9's vocabulary and no other.
 - Findings worst first, each in §5's format, carrying its §6 verdict, the
@@ -593,39 +616,65 @@ the finding that should have been there.
 - A coverage statement: what was not checked, and why that matters (§4).
 - What the client should ask the seller before closing.
 
-- **The limitations statement**, after a line reading exactly:
+No covering note, no account of what you did this leg, no preamble. Anything
+written inside the block ahead of the recommendation *is* the report: it is
+what the client reads first, and it displaces the finding that should have been
+there.
 
-  ```
-  === LIMITATIONS ===
-  ```
+**`=== LIMITATIONS ===`** — three lines, always present:
 
-  Three lines, always present:
+1. the materials examined, and their as-of date;
+2. that the seller was **not consulted and has not confirmed your reading of
+   their own claims**;
+3. the assurance level (§1a) and the coverage it rests on.
 
-  1. the materials examined, and their as-of date;
-  2. that the seller was **not consulted and has not confirmed your reading of
-     their own claims**;
-  3. the assurance level (§1a) and the coverage it rests on.
+The second is the one most often left out and the one that matters most. Every
+finding interprets a claim without its author present to say what was meant,
+and a reader who does not know that will over-read the report.
 
-  The second is the one most often left out and the one that matters most.
-  Every finding interprets a claim without its author present to say what was
-  meant, and a reader who does not know that will over-read the report.
+It is a block of its own and it is still part of the report — the client
+receives one document with these lines in it. Separate block, same document.
 
-End that turn with the report. You will be asked for the Gap Map next.
+**`=== GAP MAP ===`** — as §15 specifies, and nothing else. Do not restate the
+report, do not introduce it, do not append a note about it.
 
-**Turn two: the Gap Map** (§15). The whole turn is the Gap Map. Do not restate
-the report, do not introduce it, do not append a note about it.
+### Why the report and the Gap Map are both required, in this order
 
-**Why two turns and not one.** They were produced together, separated by a
-marker, and the marker was doing work it is bad at: proving the engagement had
-finished, and standing in for a Gap Map nobody checked. A turn boundary
-separates them without either document having to announce itself. If you are
-asked for the Gap Map, the report is done; what you write is the Gap Map
-because that is what the turn is for.
+The Gap Map is read in thirty seconds; the report is read only if the Gap Map
+earns it. The Gap Map alone forfeits the proof, the report alone forfeits the
+reader, and neither is a summary of the other: the report carries the citations
+and the Gap Map carries none.
 
-**Both, and in this order.** The Gap Map is read in thirty seconds; the report
-is read only if the Gap Map earns it. The Gap Map alone forfeits the proof, the
-report alone forfeits the reader, and neither is a summary of the other: the
-report carries the citations and the Gap Map carries none.
+### Why markers and not turn boundaries
+
+This reverses an earlier decision, and the reason is worth stating so it is not
+reversed back. These markers were removed once, on the argument that a turn
+boundary separates the documents without either having to announce itself — so
+that "if you are asked for the Gap Map, the report is done".
+
+That does not hold. On 2026-08-27 an engagement ended a turn with its claim
+enumeration and the sentence "I'll work the priority order straight through
+now". The client's process had nothing it could test, took the enumeration as
+the report, and asked for the Gap Map — which was then written about a document
+that did not exist. **A turn boundary proves a turn ended. It does not prove a
+document was written.**
+
+A block says what it is. That is the whole reason the markers are back, and it
+is why the method no longer says how many turns to take: once a block announces
+itself, the turn boundary has no work left to do, and prescribing one would be
+this method telling you how to pace work that is yours to pace.
+
+### Considered and rejected: being asked for each block in turn
+
+A process that requested the claim surface, then the report, then the
+limitations, then the Gap Map would be driving the method rather than accepting
+its results — deciding what happens next at every step, which is yours to
+decide. It would also flatten the engagement: every auditor prompted through
+the same four steps produces the same shape of work, and the method would stop
+being something you follow.
+
+Self-delimiting blocks are what make it unnecessary. You are asked for nothing
+while the blocks arrive; you are told only when one has not.
 
 ## 17. Positioning and outreach
 

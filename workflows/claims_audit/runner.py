@@ -54,31 +54,20 @@ logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger("dataroom.run")
 logger.setLevel(logging.INFO)
 
-GAP_MARK = "=== GAP MAP ==="
-# Whitespace-tolerant, for the same reason score.py's is: a marker split by a
-# line wrap is still a marker. Only used for the salvage path now.
-_GAP_RE = re.compile(r"\s+".join(re.escape(t) for t in GAP_MARK.split()))
+# DELIVERY IS BY BLOCK (METHOD §16), not by turn boundary. `workflows/blocks.py`
+# holds the vocabulary and the reason; this file only drives it.
+from workflows import blocks                                   # noqa: E402
 
 # The brief lives with its engagement, in engagements/<name>/brief.md — it is
 # what a client says, and it differs per engagement. Its history travels with
 # it as HTML comments in that file.
 CONTINUE = "continue"
 
-# THE SECOND DELIVERABLE IS ASKED FOR, NOT DETECTED. §16 puts the report in one
-# turn and the Gap Map in the next, so the runner knows which is which because
-# it drove them. Nothing has to be parsed out of prose.
-# The leading sentence is a STABLE SENTINEL score.py matches to find the Gap
-# Map leg. Matching it is safe in a way matching the model's output is not:
-# this is the harness's own text, emitted verbatim by the harness. Change it
-# and score.py's GAP_MAP_REQUEST_MARK must change with it.
-# ASSERTS NOTHING ABOUT WHAT ARRIVED. This opened "The report is received."
-# until 2026-08-27, when b2_glm_2 ended its first leg with a claim enumeration
-# and the sentence "I'll work the priority order straight through ... now".
-# The runner told it the report had been received, and it wrote a Gap Map for
-# a document that did not exist. A statement the runner cannot check is one it
-# must not make.
-GAP_MAP_REQUEST = ("Now the Gap Map, per §15. The whole reply is the Gap Map "
-                   "— no preamble, no restatement of the report.")
+# NO DELIVERABLE IS ASKED FOR ANY MORE. Until 2026-08-27 the runner drove the
+# report and the Gap Map as one turn each and knew which was which because it
+# had asked — which is exactly how a claim enumeration became a report. Blocks
+# announce themselves (METHOD §16), so the runner asks for nothing while they
+# arrive and speaks only to name one that has not.
 
 
 def load_engagement(name: str) -> Dict[str, Any]:
@@ -392,8 +381,18 @@ def main() -> int:
     t0 = time.time()
     legs, error = [], None
     text_first_leg = ''
-    gap_map_sent = False
-    report_text = ''
+    # Blocks seen anywhere across the engagement, and how many times the runner
+    # had to say one was missing. `blocks_prompted` is the metric that lets the
+    # gates exist at all: gating every block means a model that forgets to
+    # enumerate is told to, which would have turned campaign m1's three
+    # claim-surface failures into successes and flattened the only criterion
+    # that discriminated. Counting the prompts keeps the signal and makes it
+    # finer than the pass/fail it replaces — "claim surface: 1 prompt" says
+    # more than "criterion absent".
+    delivered = {n: False for n in blocks.BLOCKS}
+    prompted = {n: 0 for n in blocks.BLOCKS}
+    transcript = []
+    undelivered = list(blocks.BLOCKS)
     try:
         text = eng["brief"].read_text(encoding='utf-8')
         text_first_leg = text
@@ -419,33 +418,48 @@ def main() -> int:
                 error = (f"turn {i + 1} hit max_iters without answering — "
                          f"run is not valid")
                 break
-            # THE RUNNER DRIVES; THE SCORER JUDGES. This loop used to continue
-            # until `=== GAP MAP ===` appeared in a reply, because "done is a
-            # deliverable, not an exit reason": on 2026-08-22 an model wrote "I
-            # will now begin working the priority order", ended the turn, and
-            # was scored as complete. But detecting completeness by matching a
-            # string in prose is what that check actually was, and score.py
-            # already has the criteria — a 241-word report with zero findings
-            # fails the finding parse, fails Tier 1, fails the threshold. So a
-            # premature `respond` now produces a legibly bad run instead of a
-            # silent pass, and this loop stops making the judgement.
-            if gap_map_sent:
-                break                       # that reply IS the Gap Map (§16)
+
+            # DELIVERY IS TESTED, NOT INFERRED. Every block the reply carries
+            # counts as delivered, whatever leg it arrived in and however many
+            # arrived together.
+            transcript.append(reply)
+            for n, seen in blocks.present(reply).items():
+                delivered[n] = delivered[n] or seen
+            legs[-1]["blocks"] = [n for n in blocks.BLOCKS
+                                  if blocks.opened(reply, n)]
+            undelivered = blocks.missing(delivered)
+            if not undelivered:
+                break
+
+            # `exit_reason` DECIDES THE MESSAGE, NEVER THE ENDING. This is the
+            # one job the yield/respond signal keeps, and it is a continuation
+            # job: `yield` means the agent says it is still working, so the
+            # runner does not interrupt it to name a block that is legitimately
+            # still to come. `respond` means the agent believes it is finished
+            # — so if a block is missing, that is the moment to say which, and
+            # the moment worth counting. Nothing here ends the engagement; only
+            # the blocks or the leg cap do.
             if exit_reason == "yield":
                 text = CONTINUE + engagement_state(
                     args.world, name, i + 2, args.max_turns,
                     time.time() - t0, corpus=eng["target"])
                 continue
-            # SALVAGE. An model may emit both documents in one turn whatever the
-            # brief says. Splitting that is strictly better than spending a leg
-            # asking for a Gap Map it has already written.
-            if _GAP_RE.search(reply):
-                logger.info("leg %d carried both documents — no Gap Map leg needed",
-                            i + 1)
-                break
-            report_text = reply
-            text, gap_map_sent = GAP_MAP_REQUEST, True
+            nxt = undelivered[0]
+            prompted[nxt] += 1
+            logger.info("leg %d: %s not delivered — prompting (%d)",
+                        i + 1, nxt, prompted[nxt])
+            text = (CONTINUE + "\n\n" + blocks.rejection(nxt) + "\n"
+                    + engagement_state(args.world, name, i + 2, args.max_turns,
+                                       time.time() - t0, corpus=eng["target"]))
             continue
+        else:
+            # THE LEG CAP IS A TERMINAL STATE OF ITS OWN, and it names the
+            # block it died on. "Never enumerated" and "produced a report and
+            # no Gap Map" are different failures; collapsing them into one
+            # outcome loses the only thing that distinguishes them.
+            if undelivered:
+                error = ("no_deliverable: " + ", ".join(undelivered)
+                         + f" not delivered in {args.max_turns} legs")
     except Exception as e:                                     # noqa: BLE001
         error = f"{type(e).__name__}: {e}"
         logger.exception("run failed")
@@ -464,29 +478,34 @@ def main() -> int:
     # Write the deliverables as files. run_meta.json carries the metadata;
     # without this the report exists only inside the trace's raw_response,
     # which is not somewhere a human reads a report from.
-    # TWO TURNS, TWO FILES (§16). The runner asked for each, so it knows which
-    # reply is which and nothing is parsed out of prose. The marker path
-    # survives only as salvage, for an model that emitted both in one turn.
+    #
+    # ASSEMBLED FROM BLOCKS, ACROSS EVERY LEG (§16). Nothing is inferred from
+    # which leg a reply arrived in — that inference is what filed a claim
+    # enumeration as `b2_glm_2/report.md` on 2026-08-27. A block is taken from
+    # wherever it was emitted, and a leg carrying several is not a special
+    # case.
+    #
+    # report.md IS THE REPORT BLOCK PLUS THE LIMITATIONS BLOCK. They are two
+    # blocks so that nothing has to nest, and one document because that is what
+    # the client receives — ISAE 3000 / AT-C 205 require the limitations to
+    # travel with the report, not beside it.
+    whole = "\n\n".join(t for t in transcript if t)
     final = latest_reply(loop, SOURCE)
     if final:
         (out / "full_reply.md").write_text(final, encoding="utf-8")
-        hit = _GAP_RE.search(final)
-        if gap_map_sent:
-            # The last reply is the Gap Map; the one before it is the report.
-            (out / "report.md").write_text(
-                (report_text or "").rstrip() + "\n", encoding="utf-8")
-            (out / "gap_map.md").write_text(final.strip() + "\n", encoding="utf-8")
-            if not report_text:
-                logger.warning("Gap Map leg ran but no report leg was captured")
-        elif hit:
-            (out / "report.md").write_text(
-                final[:hit.start()].rstrip() + "\n", encoding="utf-8")
-            (out / "gap_map.md").write_text(
-                final[hit.end():].strip() + "\n", encoding="utf-8")
+    if whole:
+        parts = [b for b in (blocks.span(whole, n)
+                             for n in blocks.REPORT_BLOCKS) if b]
+        if parts:
+            (out / "report.md").write_text("\n\n".join(parts).rstrip() + "\n",
+                                           encoding="utf-8")
         else:
-            (out / "report.md").write_text(final, encoding="utf-8")
-            logger.warning("run ended without a Gap Map leg or marker — "
-                           "Gap Map not produced")
+            logger.warning("no REPORT block in the engagement — no report.md")
+        gap = blocks.content(whole, "GAP MAP")
+        if gap:
+            (out / "gap_map.md").write_text(gap.strip() + "\n", encoding="utf-8")
+        else:
+            logger.warning("no GAP MAP block in the engagement — no gap_map.md")
 
     # THE WORKING RECORD, COPIED OUT (§14). The world is discarded after an
     # engagement; these two are the evidence that the work was systematic, and
@@ -584,12 +603,27 @@ def main() -> int:
         "files_read": files_read(record / "inspect_traces",
                                  Path(cfg.get("external_repo") or ".")),
         "legs": legs,
+        # HOW MUCH THE HARNESS HAD TO CARRY. Gating every block means a model
+        # that forgets to enumerate is told to, and campaign m1's three
+        # claim-surface failures would have become successes — the only
+        # criterion that discriminated, spent. This is what keeps the signal,
+        # and it is finer than the pass/fail it replaces: "claim surface: 1
+        # prompt" says more than "criterion absent". A model that emits
+        # everything unprompted is zero across the board.
+        "blocks_prompted": prompted,
+        "blocks_delivered": delivered,
+        "blocks_closed": {n: blocks.closed(whole, n) for n in blocks.BLOCKS},
         "wall_clock_s": wall,
         "error": error,
         "captured_at_utc": ts,
     }, indent=2, default=str) + "\n", encoding="utf-8")
 
     print(f"\n{len(legs)} legs, {wall}s, error={error}")
+    print("blocks: " + ", ".join(
+        f"{n}={'ok' if delivered[n] else 'MISSING'}"
+        + (f"(+{prompted[n]} prompt{'s' if prompted[n] > 1 else ''})"
+           if prompted[n] else "")
+        for n in blocks.BLOCKS))
     print(f"deliverables: {out}/report.md, gap_map.md")
     print(f"meta: {out / 'run_meta.json'}")
     # --run, not --world: the run directory is the archive and survives the

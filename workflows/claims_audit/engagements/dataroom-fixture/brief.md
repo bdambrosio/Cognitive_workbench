@@ -40,4 +40,5 @@ Enumerate the claim surface first and close it as the method says, then work
 the priority order straight through.
 
 Work in as many legs as you need — end a leg with `yield` and I will say
-continue. End with the report; I will ask for the Gap Map after it.
+continue. Deliver the four blocks of §16, in order; I will say continue until
+they are all in, and tell you which is missing if one is not.

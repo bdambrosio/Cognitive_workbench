@@ -13,5 +13,5 @@ Enumerate the claim surface and close it as the method says, then work the
 priority order straight through.
 
 Work in as many legs as you need — end a leg with `yield` and I will say
-continue. Produce both deliverables together in your final reply, as the
-method specifies.
+continue. Deliver the four blocks of §16, in order; I will say continue until
+they are all in, and tell you which is missing if one is not.

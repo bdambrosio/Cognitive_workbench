@@ -383,8 +383,17 @@ def conformance(run: Path) -> Dict[str, Any]:
     vc = score.verdict_conformance(report)
     rec = score.recommendation_of(report)
     el = score.gap_map_elements(gap) if gap else {}
+    # CLOSERS ARE RECORDED, NEVER GATED (METHOD §16). A closing marker says
+    # the model finished writing rather than ran out of room, which is the only
+    # mechanical evidence of truncation available here. Making it load-bearing
+    # would double the ways a delivered report gets rejected.
+    from workflows import blocks                                # noqa: E402
+    closed = {n: blocks.closed(report if n != "GAP MAP" else gap, n)
+              for n in ("REPORT", "LIMITATIONS", "GAP MAP")}
     return {
         "recommendation": rec,
+        "blocks closed": closed,
+        "blocks not closed": [n for n, ok in closed.items() if not ok],
         "§6 verdicts only": not vc["off_vocabulary"],
         "off_vocabulary": vc["off_vocabulary"],
         "limitations statement": bool(score._LIMITS_RE.search(report)),
