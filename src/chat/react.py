@@ -735,16 +735,24 @@ class ReactMixin:
                 if isinstance(obs, str) and obs.startswith('OK'):
                     did_display = True
             elif tool == 'yield':
-                # Reached only when the happy-path branch above declined:
-                # wrong context or missing args. Emit the ERROR observation
-                # and keep the loop alive.
-                if source != self.character_name:
-                    obs = ("ERROR: `yield` is only available in autonomous "
-                           "runs; finish with `respond` instead.")
-                else:
-                    obs = ("ERROR: `yield` requires a non-empty `next` field "
-                           "— the imperative instruction for the follow-up "
-                           "run.")
+                # Reached only when the happy-path branch above declined,
+                # and it declines for exactly ONE reason: an empty `next`.
+                #
+                # THIS USED TO MISDIAGNOSE, and the wrong diagnosis told the
+                # model to do the wrong thing. A `source != character_name`
+                # branch here answered an empty `next` on a user-driven turn
+                # with "`yield` is only available in autonomous runs; finish
+                # with `respond` instead" — naming a restriction that does
+                # not exist (intentional yield was made available on every
+                # turn on 2026-08-16, and the happy path above carries no
+                # source check) and instructing the model to end its turn.
+                # In a workflow run, ending the turn is what the runner reads
+                # as the engagement being finished, so a fixable formatting
+                # slip could have been converted into a delivery failure.
+                # Never observed firing; removed before it did.
+                obs = ("ERROR: `yield` requires a non-empty `next` field "
+                       "— the imperative instruction for the follow-up "
+                       "run.")
             elif (canon := self._canonical_tool_name(tool)) is not None:
                 obs = self._dispatch_discovered_tool(canon, action, log)
                 if self._pending_tool_meta is not None:

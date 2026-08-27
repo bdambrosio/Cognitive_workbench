@@ -71,9 +71,14 @@ CONTINUE = "continue"
 # Map leg. Matching it is safe in a way matching the model's output is not:
 # this is the harness's own text, emitted verbatim by the harness. Change it
 # and score.py's GAP_MAP_REQUEST_MARK must change with it.
-GAP_MAP_REQUEST = ("The report is received. Now the Gap Map, per §15. The whole "
-                   "reply is the Gap Map — no preamble, no restatement of the "
-                   "report.")
+# ASSERTS NOTHING ABOUT WHAT ARRIVED. This opened "The report is received."
+# until 2026-08-27, when b2_glm_2 ended its first leg with a claim enumeration
+# and the sentence "I'll work the priority order straight through ... now".
+# The runner told it the report had been received, and it wrote a Gap Map for
+# a document that did not exist. A statement the runner cannot check is one it
+# must not make.
+GAP_MAP_REQUEST = ("Now the Gap Map, per §15. The whole reply is the Gap Map "
+                   "— no preamble, no restatement of the report.")
 
 
 def load_engagement(name: str) -> Dict[str, Any]:
