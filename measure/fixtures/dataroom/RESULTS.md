@@ -3,8 +3,58 @@
 Started 2026-08-23, on the workflow harness. Everything before it was
 discarded, deliberately — see "Why every earlier run was discarded".
 
+## Campaign b4 — the amended METHOD and the block review, first exercise
+
+Two audits and two reviews on METHOD as amended 2026-08-27 (§4: every resolved
+claim produces a finding; §9: conclusion, not recommendation; §16: four blocks)
+and REVIEW as aligned to it. Reviewer `grok-4.6`, not the model under test.
+
+| run | audit | prompts | review | verdict |
+|---|---|---|---|---|
+| `b4_qwen_1` | 433s | 3 | 235s, 2 legs, 0 prompts | **INADMISSIBLE** |
+| `b4_glm_1` | 427s | 0 | 491s, 4 legs, 0 prompts | ADMISSIBLE · 16 of 29 · **FAIL** |
+
+**The §4 amendment did what it was for, and the cost is visible.** GLM's audit
+produced **30 findings** where its earlier audits produced 5 to 15. Thirteen of
+them came back `[uncited]` — evidence fields that name a document and then write
+prose, 13 of 47. Those claims were previously reported in a held-claims prose
+section that no reviewer enumerated; now they are findings, and the review
+caught that half of them cannot be checked. The defect was always there. The
+amendment moved it into the surface the review reads.
+
+**Qwen's ordinal defect is unchanged by the amendment.** The reviewer diagnosed
+it by §4.0's clustering rule rather than by counting broken references: doc9's
+entire citation set, 15 of 15, tops out at 42 against an 11-line file, and 42 is
+the claim count the report itself declares. Other documents in the same report
+are cited as ordinary file lines. Two coordinate systems in one report, so no
+ratio is computable and none was reported.
+
+**The block review harness worked on first exposure.** Zero prompts on both
+reviews, every closer present, and the new vocabulary used unprompted by a model
+that had never seen it — "Supported by their citations", "Exceptions by
+disposition", "Review completeness", and the `[uncited]` definition quoted back
+including its absence-finding clause.
+
+**The inadmissible three-block path ran for the first time and behaved.** Two
+legs, `REVIEW` and `LIMITATIONS` and no `REVIEW SURFACE`, the runner never
+asking for the block §4.0 forbids producing. Before the fix earlier that day it
+would have prompted to the leg cap and recorded `no_deliverable` — on precisely
+the case the admissibility gate exists for.
+
+**Still never executed: the retest.** Both reviews had zero `[unsupported]` and
+zero `[indeterminate]`, and §9 does not retest `[uncited]` or `[broken
+citation]` — a pointer is there or it is not, and a second model re-deriving a
+file fact is not a second opinion. So the second-reviewer path remains untested
+since the block rewrite.
+
+**A wart in the record, not yet fixed.** `blocks_delivered["REVIEW SURFACE"]`
+reads `true` for `b4_qwen_1`, which never emitted one: the runner sets it to
+mean "not owed". `blocks_closed` reads `false`, which is the only way to tell
+the two apart. It should be a distinct state rather than a borrowed `true`.
+
 ## The board is empty — 2026-08-27
 
+### Superseded: 
 **Every run was deleted when METHOD §4 and §16 were amended**, late on
 2026-08-27. Campaigns b2, b3 and the `cm_glm_1` ChatterMate run all predate the
 amendment and are not comparable to anything run after it. Fourteen run
