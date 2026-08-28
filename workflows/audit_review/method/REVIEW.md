@@ -219,37 +219,27 @@ finding rests on evidence the index does not carry, read the document under
 `inspect_external` and check it there. Ruling a finding unsupported because its
 evidence is missing from the index is the error this method exists to stop.
 
-**Do the cited lines support the claim?** Read what the line actually says against
-what the finding says it says. This is the check the audit cannot perform on
-itself, and the reason for this method.
+**Why the derived case differs, and it is not a technicality.** METHOD §6 makes
+a finding one of two things: a resolved claim carrying one of the five claim
+verdicts, or a `[derived]` finding — a consequence computed from two or more
+figures the seller stated separately. A derived finding cites no claim because
+there is none to cite, so asking whether its cited lines support a claim it
+never made would rule it unsupported by construction. That is the error the
+paragraph above exists to stop, in a different form.
 
-**A `[derived]` finding has no claim, and this question does not apply to it.**
-METHOD §6 makes a finding one of two things: a resolved claim carrying one of
-the five claim verdicts, or a `[derived]` finding — a consequence computed from
-two or more figures the seller stated separately. It cites no claim because
-there is none to cite. Asking whether its cited lines support a claim it never
-made would rule it unsupported by construction, which is the error the paragraph
-above exists to stop, in a different form.
+On the derivation specifically: the arithmetic is on the page precisely so it
+can be checked — *"arithmetic left implicit is an opinion with a citation
+attached."* A step you cannot follow is an exception; a step you can follow and
+disagree with is `[overstated]` or `[understated]` as usual.
 
-Check a `[derived]` finding on its own two obligations instead, both of which
-METHOD §5's second shape requires:
-
-- **Does each Basis line say what the finding quotes it as saying?** Same
-  reading as above, applied to each figure rather than to a claim.
-- **Does the derivation follow from those figures as written?** The arithmetic
-  is on the page precisely so it can be checked — *"arithmetic left implicit is
-  an opinion with a citation attached."* A step you cannot follow is an
-  exception; a step you can follow and disagree with is `[overstated]` or
-  `[understated]` as usual.
-
-You are not asked whether the consequence matters to the buyer. That is
-materiality, it is METHOD §4's judgement and the auditor's, and §10 reserves it.
-
-**Does the verdict match the gap?** METHOD §6 holds three vocabularies; the
-one that belongs on a claim finding is the five **claim verdicts** — `[real]`,
+**On a claim finding's second check**, METHOD §6 holds three vocabularies, and
+the one that belongs there is the five **claim verdicts** — `[real]`,
 `[real, minor caveat]`, `[real, operational caveat]`, `[partial]`, `[delta]`. A
 gap described as a corner case carrying `[delta]` is overstated; a claim shown
 to be false carrying `[partial]` is understated. Both are exceptions.
+
+**You are not asked whether a consequence matters to the buyer.** That is
+materiality, it is METHOD §4's judgement and the auditor's, and §10 reserves it.
 
 **`[unverifiable]` and `[unclaimed]` are not findings and do not belong on your
 surface.** METHOD §6 sends both to the report's coverage statement: the first is
