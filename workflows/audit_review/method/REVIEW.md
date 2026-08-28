@@ -2,8 +2,8 @@
 
 ## 1. What this is
 
-An independent review of a finished claims audit, against the materials that
-audit examined. The operation is:
+An independent review of a finished claims audit, against the materials the
+audit was given. The operation is:
 
 > each finding vs. the evidence it cites, with citations.
 
@@ -18,8 +18,10 @@ convincingly at the wrong line."*
 
 **Review what the report claims, against what the materials show.**
 
-**Do not audit the target.** A claim the report never made is not your finding,
-however material it looks. If the audit missed something, that is a coverage
+**Do not audit the target.** A finding the report never made is not your
+finding, however material it looks — and note that `claim` in this document
+means what METHOD §2 defines, an assertion the seller made. The report asserts
+findings about claims; it does not make claims. If the audit missed something, that is a coverage
 question (§7) and is reported as coverage, not as a new finding about the
 business.
 
@@ -28,8 +30,13 @@ verdicts or suggesting better wording. You report what does not hold.
 
 ## 3. What you have
 
-**The report and the Gap Map** — the delivered artifacts, under `inspect`.
-These are what you review.
+**The report and the Gap Map** — `report.md` and `gap_map.md`, under
+`inspect`. These are what you review. `report.md` is METHOD §16's REPORT and
+LIMITATIONS blocks; the Gap Map is its GAP MAP block.
+
+**The audit's claim surface is not among them.** METHOD §16 makes it a
+delivered block, but it is not written as a file: it is in the working record
+below, and §7 is where you go looking for it.
 
 **The record** — also under `inspect`: `working_record/`, holding the auditor's
 reasoning trace, one file per evidence request, and the brief.
@@ -115,19 +122,6 @@ the finding and the practice cannot defend it."
   checked, which is an admissibility failure exactly like the first question's.
   Stop, and say how many findings that leaves unverifiable.
 
-**Where the second question came from.** On 2026-08-26 a report with three of
-its eighteen evidence fields pointing nowhere was reviewed **ADMISSIBLE,
-supported 10 of 10, PASS**. The reviewer wrote "cited lines say what the
-findings say they say", which was true: it checked the twelve references that
-existed while a sixth of the evidence carried none. Nothing in this document
-had told it to look.
-
-**Where this rule came from.** On 2026-08-26 a report citing claim ordinals was
-read as though it cited lines. Every citation parsed; there was no syntactic
-complaint available. The review reported supported 1 of 15 and FAIL on a report
-whose findings were, 14 of 15, defensible from the materials — and never saw
-that its evidence half went uncited in a form the index could fetch at all.
-
 ## 4. The review surface, and closing it
 
 1. **Enumerate the findings.** Every finding the report states, in its order.
@@ -144,26 +138,27 @@ that its evidence half went uncited in a form the index could fetch at all.
    the full set.
 
    From that point the surface is **frozen**. It is what every coverage figure
-   in your report divides by. A finding you notice later goes in an addendum
-   with its own count, never into the original total.
+   in **your review** divides by — "the report" in this document always means
+   the audit's; yours is the review. A finding you notice later goes in an
+   addendum with its own count, never into the frozen total.
 
 3. **Check every finding.** Unlike an audit, there is no priority order and no
    stopping threshold: a report of fourteen findings gets fourteen checks, and
    a report of two hundred gets two hundred.
 
-**The surface is no longer small, and the obligation is unchanged.** METHOD §4
-gives every resolved claim a finding, so a large claim surface makes a large
-report — on a real target, hundreds. That sentence used to justify completeness
-by the surface being "small and bounded", which is no longer true. Three reasons
-that survive it:
+**The surface is not small, and the obligation is unchanged.** METHOD §4 gives
+every resolved claim a finding, so a large claim surface makes a large report —
+on a real target, hundreds. Three reasons completeness holds anyway:
 
 - **A sampled review cannot produce this review's verdict.** §9's PASS means no
   finding fails. Over a sample it means no *sampled* finding fails, and a reader
   will take the first for the second.
-- **The defect this review exists to catch is not where you would sample.** On
-  2026-08-27 the one broken citation in a report that passed sat in its
-  held-claims section — the positive assertions nobody scrutinises. Any rule
-  spending effort where failures are expected would have missed it.
+- **The defect this review exists to catch is not where you would sample.** A
+  citation that points convincingly at the wrong line is at least as likely in
+  a finding that holds as in one that fails — more likely, because a finding
+  that holds attracts less scrutiny from everyone, its author included. Any
+  rule that spent effort where failures are expected would look in the wrong
+  half.
 - **Your cost is bounded by the audit's.** Every citation is resolved for you
   before you start; a finding costs you one reading of a line against a claim,
   where the audit had to go and find that line. And §4.0 stops the review before
@@ -175,8 +170,8 @@ identifier as you enumerate — `F1`, `F2`, and so on, in the report's own order
 Every later reference uses that label. Without it "do not re-enumerate" is not
 a checkable instruction, because nothing says what was already enumerated.
 
-**Say where you are, and what you found.** You will work this across several
-turns. End each turn by yielding with:
+**When you yield, say where you are and what you found.** You may work this
+across several legs (§8 does not prescribe how many). A yield carries:
 
 - the frozen count and the label range, and that it is not to be re-enumerated
 - which labels are checked and which remain
@@ -189,7 +184,8 @@ client's process reports what has happened, never what remains.
 
 ## 5. What to check, in this order
 
-For each finding, two questions. Whether a citation resolves at all is settled
+For each finding, two questions — and what the first one asks depends on the
+kind of finding. Whether a citation resolves at all is settled
 before you start — the client's process fetches every cited line and hands you
 `citations.json`, marking any that do not exist as `[broken citation]`. Those
 are already counted; do not re-derive them, and do not assess support for a
@@ -395,14 +391,16 @@ fired because the findings could not be read. Reporting a ratio anyway is the
 failure this rule was written for: it is the number that gets quoted, and it
 will be quoted without the qualification attached to it.
 
-For an admissible report, two numbers and a verdict, stated together at the top
-of the review.
+For an admissible report: a ratio, the exceptions by verdict, and a verdict —
+stated together at the top of the review.
 
 **Supported by their citations: `N` of `M` findings.** M is the frozen count
-from §4. N is the findings that came back `[supported]`. Say it that way and not
-as a bare "supported N of M": METHOD §1a counts `supported` claims, this counts
-findings whose citations bear them out, and the two numbers travel together. Every other verdict is an exception and
-is listed.
+from §4. N is the findings that came back `[supported]`. Every other verdict is
+an exception and is listed.
+
+Say it in that form, never as a bare "supported N of M". METHOD §1a counts
+`supported` **claims**; this counts **findings** whose citations bear them out.
+The two numbers are quoted side by side and are not the same measurement.
 
 **Exceptions by verdict** — how many `[overstated]`, `[understated]`,
 `[unsupported]`, `[broken citation]`, `[indeterminate]`, `[uncited]`.
@@ -425,9 +423,7 @@ does not count toward FAIL.
 **If the retest could not be run at all, the result is INCONCLUSIVE** — report
 admissibility as you found it, list every finding you failed as found but not
 retested, and give neither PASS nor FAIL. A retest that did not happen is not
-a retest that disagreed. On 2026-08-26 a bug stopped the retest from launching
-and a report carrying five `[unsupported]` findings came back PASS, because
-nothing had stood. An infrastructure failure must not clear a report.
+a retest that disagreed.
 
 `[broken citation]` and `[uncited]` are not retested. A reference resolves or
 it does not, and a field carries a pointer or it does not. Both are settled
@@ -441,16 +437,13 @@ agreement invents one. Where the two reviewers divide, the finding is
 genuinely borderline, and the reader should be told that rather than have it
 rounded away.
 
-**Why only findings that fail.** A reviewer asserting a defect in finished
-work carries the higher standard. The measurement says the same: §9 fails a
-whole report on a *single* exception, so one wrong judgement condemns it. One
-clean report reviewed five times on 2026-08-26 came back supported 12 of 12
-four times and 11 of 12 once, and the one dissent had rebutted a finding by
-attacking a claim the audit never made. A wrong judgement the other way
-cannot do the same damage, because passing a bad report would need every real
-exception missed at once. `[overstated]` and
-`[understated]` are calibration: reported, never fatal, because a verdict one
-step off is a different problem from a finding with no support.
+**Why only findings that fail are retested.** A reviewer asserting a defect in
+finished work carries the higher standard, and §9 fails a whole report on a
+*single* exception — so one wrong judgement condemns it. A wrong judgement the
+other way cannot do the same damage, because passing a bad report would need
+every real exception missed at once. `[overstated]` and `[understated]` are
+calibration: reported, never fatal, because a verdict one step off is a
+different problem from a finding with no support.
 
 That is the whole result. There is no severity taxonomy here — this is a
 sanity check on whether the findings hold, and a check that returns a grade
@@ -466,4 +459,75 @@ hold and how.
 - It does not judge whether a finding is material to the buyer.
 - It does not assess whether the audit's method is right, only whether the
   report followed it and its findings hold.
-- It does not check anything the report did not claim.
+- It does not check anything the report did not state as a finding.
+
+## 11. Superseded rules, and the incidents behind them
+
+<!-- audience: practice -->
+
+**This section exists because the changelog was in the reviewer's prompt.**
+REVIEW.md carried no audience marker until 2026-08-27, so every paragraph below
+loaded into every review — incidents, retired justifications and all. The
+mechanism to prevent that already existed and had simply never been used here:
+`<!-- audience: practice -->` anywhere in a `##` section drops the whole section
+before the reviewer sees it. It is section-scoped, so history needs its own
+section, which is this one.
+
+Two costs, and the second is the one that bit. **Prompt budget spent on rules
+that no longer apply** — the reviewer does not need to know what this document
+used to say. And **a changelog restates the numbers it is warning about**: §9
+forbids the bare form "supported N of M" and then, forty lines later, an
+incident paragraph used it. A prompt that both forbids a form and demonstrates
+it is worse than one that does neither.
+
+### §4.0 — where the two admissibility questions came from
+
+**The second question.** On 2026-08-26 a report with three of its eighteen
+evidence fields pointing nowhere was reviewed ADMISSIBLE, 10 of 10, PASS. The
+reviewer wrote "cited lines say what the findings say they say", which was true:
+it checked the twelve references that existed while a sixth of the evidence
+carried none. Nothing in this document had told it to look.
+
+**The first question.** On 2026-08-26 a report citing claim ordinals was read as
+though it cited lines. Every citation parsed; there was no syntactic complaint
+available. The review reported 1 of 15 and FAIL on a report whose findings were,
+14 of 15, defensible from the materials — and never saw that its evidence half
+went uncited in a form the index could fetch at all.
+
+### §4 — completeness, and the justification that expired
+
+**Where the second bullet's claim comes from.** On 2026-08-27 the one broken
+citation in a report that passed review 5 of 5 sat in its held-claims section —
+`models/investigation.py:296`, in a 154-line file, supporting a positive
+assertion about versioned RCA. Nobody had checked the half of the report that
+said what held.
+
+The rule used to be argued from the surface being "small and bounded". METHOD §4
+now gives every resolved claim a finding, so a real target produces hundreds and
+that justification is false. The three reasons in §4 replaced it on 2026-08-27;
+the obligation did not change.
+
+### §9 — INCONCLUSIVE, and the retest
+
+**Why an unrunnable retest is not a pass.** On 2026-08-26 a bug stopped the
+retest from launching and a report carrying five `[unsupported]` findings came
+back PASS, because nothing had stood. An infrastructure failure must not clear a
+report — hence INCONCLUSIVE.
+
+**Why only failures are retested.** One clean report reviewed five times on
+2026-08-26 came back 12 of 12 four times and 11 of 12 once, and the one dissent
+had rebutted a finding by attacking a claim the audit never made. A reviewer's
+wrong judgement against a report condemns it on a single exception; a wrong
+judgement the other way would need every real exception missed at once.
+
+### §8 — delivery by block
+
+Until 2026-08-27 the review was delivered as two turns, and the runner took a
+turn that did not `yield` as the review whatever it contained, then told the
+reviewer "The review is received."
+
+Worse here than in the audit runner, which had the same defect: the retest is
+driven by parsing that reply, so a progress note taken as a review yields no
+`[unsupported]` verdicts, no second reviewer runs, and the result is a PASS that
+looks clean. It never fired because every review ran on a model that yields
+mid-work.
