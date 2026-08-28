@@ -94,9 +94,18 @@ then writes prose. A reader has nothing to search for. The audit's METHOD §5 is
 explicit about why that is not a citation: "without both, a reader cannot check
 the finding and the practice cannot defend it."
 
-**One legitimate case, and only one.** A field stating that no evidence exists
-— "no source code provided to verify exact version" — has nothing to cite.
-Expect one or two in a report and do not count them against it.
+**Two legitimate cases.**
+
+- **A field stating that no evidence exists** — "no source code provided to
+  verify exact version" — has nothing to cite. Expect one or two in a report and
+  do not count them against it.
+- **An absence finding**, and there is no limit on how many of these a report
+  may hold. METHOD §5 gives a claim finding whose evidence is an absence a shape
+  of its own: the claim is cited normally, and the Evidence field carries the
+  two searches — lexical and structural — that establish the absence. There is
+  no settling line **by construction**, because the point is that no such line
+  exists. That is a complete citation in METHOD's terms. Count it as cited when
+  the searches are stated; `[uncited]` only when they are not.
 
 **Rate and clustering, as above.** These are different cases:
 
@@ -137,8 +146,27 @@ that its evidence half went uncited in a form the index could fetch at all.
    with its own count, never into the original total.
 
 3. **Check every finding.** Unlike an audit, there is no priority order and no
-   stopping threshold: a report of fourteen findings gets fourteen checks. The
-   surface is small and bounded, so partial coverage has no excuse.
+   stopping threshold: a report of fourteen findings gets fourteen checks, and
+   a report of two hundred gets two hundred.
+
+**The surface is no longer small, and the obligation is unchanged.** METHOD §4
+gives every resolved claim a finding, so a large claim surface makes a large
+report — on a real target, hundreds. That sentence used to justify completeness
+by the surface being "small and bounded", which is no longer true. Three reasons
+that survive it:
+
+- **A sampled review cannot produce this review's verdict.** §9's PASS means no
+  finding fails. Over a sample it means no *sampled* finding fails, and a reader
+  will take the first for the second.
+- **The defect this review exists to catch is not where you would sample.** On
+  2026-08-27 the one broken citation in a report that passed sat in its
+  held-claims section — the positive assertions nobody scrutinises. Any rule
+  spending effort where failures are expected would have missed it.
+- **Your cost is bounded by the audit's.** Every citation is resolved for you
+  before you start; a finding costs you one reading of a line against a claim,
+  where the audit had to go and find that line. And §4.0 stops the review before
+  enumeration when a report cannot be checked at all, so the worst reports are
+  the cheapest to reject.
 
 **Label the findings, and keep the labels.** Give each one a stable
 identifier as you enumerate — `F1`, `F2`, and so on, in the report's own order.
@@ -199,9 +227,18 @@ METHOD §5's second shape requires:
 You are not asked whether the consequence matters to the buyer. That is
 materiality, it is METHOD §4's judgement and the auditor's, and §10 reserves it.
 
-**Does the verdict match the gap?** METHOD §6 defines the vocabulary. A gap
-described as a corner case carrying `[delta]` is overstated; a claim shown to
-be false carrying `[partial]` is understated. Both are exceptions.
+**Does the verdict match the gap?** METHOD §6 holds three vocabularies; the
+one that belongs on a claim finding is the five **claim verdicts** — `[real]`,
+`[real, minor caveat]`, `[real, operational caveat]`, `[partial]`, `[delta]`. A
+gap described as a corner case carrying `[delta]` is overstated; a claim shown
+to be false carrying `[partial]` is understated. Both are exceptions.
+
+**`[unverifiable]` and `[unclaimed]` are not findings and do not belong on your
+surface.** METHOD §6 sends both to the report's coverage statement: the first is
+a claim the materials could not settle, the second is something the seller never
+claimed. If the report states either as a numbered finding, that is a
+conformance exception — note it once and do not enumerate them into §4's frozen
+count, which would inflate the denominator every ratio divides by.
 
 ## 6. Finding format
 
@@ -233,10 +270,19 @@ serious one is the exception and the other is a note within it.
 | `[unsupported]` | The lines do not bear on the claim, or say something else |
 | `[broken citation]` | The reference does not resolve in the materials |
 | `[indeterminate]` | The citation is well-formed and resolves to text, and the referent it indexes cannot be established from the report |
-| `[uncited]` | The finding's evidence names no location — no reference and no quote — so there is nothing to check |
+| `[uncited]` | The finding's evidence names no location — no reference, no quote, and not an absence finding's two searches — so there is nothing to check |
 
 `[supported]` is not an exception and needs no Exception block — it goes in the
-count and nothing else. Only the other five are written out.
+count and nothing else. The other six are written out.
+
+**`[supported]` here is not METHOD §1a's `supported`, and the two get quoted
+side by side.** METHOD counts a claim as `supported` when the materials bore the
+claim out — a property of the target. This verdict says a finding's citation
+bears out what the finding says — a property of the report. One audit can be
+`supported 37 of 39` in METHOD's sense and reviewed `supported 12 of 40` in
+this one, and both be correct: they measure different things. The words are kept
+because each is right in its own document; §9's result line names which is
+meant, and so should you whenever the number leaves this review.
 
 **`[uncited]`, `[broken citation]` and `[indeterminate]` are three different
 failures, and the difference is what the reader can do.** `[broken citation]`
@@ -257,12 +303,13 @@ established — never as a hedge on a citation you did read.
 record and report **two** things, once, about the audit as a whole. Nothing in
 this section is written per finding.
 
-**What the report says it covered, against what the record shows it examined.**
-The report states a claim surface and a number verified. The trace and the
-evidence requests show what was actually read. A coverage statement the record
+**What the report says it covered, against what the record shows it did.**
+The report states a claim surface and, in METHOD §1a's vocabulary, how many of
+those claims it resolved and how many it supported. The trace and the evidence
+requests show what was actually read. A coverage statement the record
 does not bear out is an exception like any other.
 
-**What the audit did not examine.** Not a list of everything it could have
+**What the audit did not attempt.** Not a list of everything it could have
 done — the claim sources are finite and the record names what was opened. Where
 the report claims coverage of a document the record never shows it reading, say
 so.
@@ -290,8 +337,8 @@ Otherwise:
 - The §9 result: ADMISSIBLE, supported N of M, exceptions by verdict, and
   PASS, FAIL, or INCONCLUSIVE where a retest could not be run.
 - Exceptions worst first, each in §6's format.
-- A coverage statement: findings checked out of findings enumerated, and what
-  the record showed about the audit's own coverage (§7).
+- A coverage statement: findings you checked out of the frozen count from §4,
+  and what the record showed about the audit's own coverage (§7).
 - **The limitations statement**, after a line reading exactly:
 
   ```
@@ -310,7 +357,7 @@ report ships:
 - The §9 result: admissibility, then supported N of M and PASS, FAIL or
   INCONCLUSIVE if the report was admissible
 - Exceptions that would change a reader's understanding, worst first
-- Findings checked out of findings enumerated
+- Findings you checked out of the frozen count from §4
 - A footer in small type: "report review · checks findings against cited
   evidence · not a re-audit of the target"
 
@@ -328,8 +375,10 @@ will be quoted without the qualification attached to it.
 For an admissible report, two numbers and a verdict, stated together at the top
 of the review.
 
-**Supported: `N` of `M` findings.** M is the frozen count from §4. N is the
-findings that came back `[supported]`. Every other verdict is an exception and
+**Supported by their citations: `N` of `M` findings.** M is the frozen count
+from §4. N is the findings that came back `[supported]`. Say it that way and not
+as a bare "supported N of M": METHOD §1a counts `supported` claims, this counts
+findings whose citations bear them out, and the two numbers travel together. Every other verdict is an exception and
 is listed.
 
 **Exceptions by verdict** — how many `[overstated]`, `[understated]`,
