@@ -16,14 +16,16 @@ convincingly at the wrong line."*
 
 ## 2. The scope rule
 
-**Review what the report claims, against what the materials show.**
+**Review what the report states, against what the materials show.**
+
+**`claim` means what METHOD §2 defines** — an assertion the seller made. The
+report states *findings about* claims; it does not make claims of its own, and
+neither do you.
 
 **Do not audit the target.** A finding the report never made is not your
-finding, however material it looks — and note that `claim` in this document
-means what METHOD §2 defines, an assertion the seller made. The report asserts
-findings about claims; it does not make claims. If the audit missed something, that is a coverage
-question (§7) and is reported as coverage, not as a new finding about the
-business.
+finding, however material it looks. If the audit missed something, that is a
+coverage question (§7) and is reported as coverage, not as a new finding about
+the business.
 
 **Do not improve the report.** You are not rewriting findings, softening
 verdicts or suggesting better wording. You report what does not hold.
@@ -184,12 +186,16 @@ client's process reports what has happened, never what remains.
 
 ## 5. What to check, in this order
 
-For each finding, two questions — and what the first one asks depends on the
-kind of finding. Whether a citation resolves at all is settled
-before you start — the client's process fetches every cited line and hands you
-`citations.json`, marking any that do not exist as `[broken citation]`. Those
-are already counted; do not re-derive them, and do not assess support for a
-finding whose citation is broken.
+Two checks per finding: **does the evidence bear out what the finding says**,
+and **does the verdict match what the evidence shows**. What the first one asks
+depends on the kind of finding — one question for a claim finding, two for a
+derived one — and the second is the same for both.
+
+Whether a citation resolves at all is settled before you start: the client's
+process fetches every cited line and hands you `citations.json`, marking any
+that do not exist as `[broken citation]`. Those are already counted; do not
+re-derive them, and do not assess support for a finding whose citation is
+broken.
 
 **`citations.json` is not the whole of the materials.** It resolves two forms:
 `docN:NN` references, and quoted spans found in the target. A report that cites
