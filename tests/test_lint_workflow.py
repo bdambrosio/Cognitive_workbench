@@ -94,3 +94,22 @@ def test_a_dangling_reference_is_still_caught(tmp_path):
     doc.parent.mkdir(parents=True, exist_ok=True)
     doc.write_text("## 1. A\n\nSee §7, which does not exist.\n", encoding="utf-8")
     assert _problems(doc)["section references"]
+
+
+def test_a_dead_section_reference_in_runner_code_is_caught(tmp_path, monkeypatch):
+    """The class this check exists for: renaming a section is a substitution
+    across the document and a silent trap in the code, because a runner emits
+    §N to the agent at run time. Line 884 of audit_review/runner.py says
+    "See REVIEW.md §4.0." — rename §4.0 and that sentence points nowhere."""
+    fake = tmp_path / "runner.py"
+    fake.write_text('MSG = "Settle admissibility first, per REVIEW.md §99."\n',
+                    encoding="utf-8")
+    monkeypatch.setattr(lw, "REPO", tmp_path)
+    monkeypatch.setattr(lw, "DOCS", (str(REPO / lw.DOCS[0]), str(REPO / lw.DOCS[1])))
+    found = lw.check_code_refs("runner.py", str(REPO / lw.DOCS[1]))
+    assert any("§99" in f for f in found), found
+
+
+def test_runner_code_references_resolve_now():
+    for runner, doc in lw.RUNNERS.items():
+        assert not lw.check_code_refs(runner, doc), runner

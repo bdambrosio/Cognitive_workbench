@@ -45,6 +45,13 @@ from workflows import blocks                                  # noqa: E402
 DOCS = ("workflows/claims_audit/method/METHOD.md",
         "workflows/audit_review/method/REVIEW.md")
 
+# The runner that drives each document, and the document its bare §N means.
+# A runner emits text the agent reads — "See REVIEW.md §4.0." is a sentence in
+# the review's output, not a comment — so a §N there is as load-bearing as one
+# in the method, and nothing was checking it.
+RUNNERS = {"workflows/claims_audit/runner.py": DOCS[0],
+           "workflows/audit_review/runner.py": DOCS[1]}
+
 # Tokens a document retired. Naming one in the text the agent reads puts the
 # forbidden vocabulary back in the prompt, three lines from the table it was
 # removed from — which is what §9 did with `Walk` (fixed 032f056b).
@@ -201,6 +208,63 @@ def check_code_vocab() -> List[str]:
     return bad
 
 
+def _doc_sections(path: str) -> set:
+    have = set()
+    for head, _ in sections((REPO / path).read_text(encoding="utf-8")):
+        m = re.match(r"## (\d+[a-z]?(?:\.\d+)?)\.?\s", head)
+        if m:
+            have.add(m.group(1))
+    return have
+
+
+def check_code_refs(runner: str, doc: str) -> List[str]:
+    """A §N inside a runner's STRING must resolve in the document it names.
+
+    Renaming a section is a substitution across the document and a silent trap
+    in the code: `runner.py` line 884 emits "See REVIEW.md §4.0." to the
+    reviewer at run time, so renaming §4.0 without touching that string points
+    the reviewer at a section that no longer exists — the dangling-pointer
+    failure, produced by the fix for a numbering problem.
+
+    Strings are the failure. Comments are reported separately: they mislead the
+    next editor rather than the agent, which is a smaller harm and a different
+    fix.
+    """
+    import ast
+    src = (REPO / runner).read_text(encoding="utf-8")
+    known = {"METHOD": _doc_sections(DOCS[0]), "REVIEW": _doc_sections(DOCS[1])}
+    own = "METHOD" if "claims_audit" in runner else "REVIEW"
+    bad = []
+    for node in ast.walk(ast.parse(src)):
+        if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
+            continue
+        for m in re.finditer(r"(METHOD|REVIEW)?[\w.]*\s*§(\d+[a-z]?(?:\.\d+)?)",
+                             node.value):
+            doc_key = m.group(1) or own
+            ref = m.group(2)
+            if ref not in known.get(doc_key, set()):
+                bad.append(f"{runner}:{node.lineno} emits §{ref} "
+                           f"({doc_key}) — no such section")
+    return bad
+
+
+def check_code_comment_refs(runner: str) -> List[str]:
+    """Same, for comments. Advisory: rot for the next reader, not the agent."""
+    known = {"METHOD": _doc_sections(DOCS[0]), "REVIEW": _doc_sections(DOCS[1])}
+    own = "METHOD" if "claims_audit" in runner else "REVIEW"
+    out = []
+    for i, line in enumerate((REPO / runner).read_text().splitlines(), 1):
+        code, _, comment = line.partition("#")
+        if not comment or code.count('"') % 2 or code.count("'") % 2:
+            continue
+        for m in re.finditer(r"(METHOD|REVIEW)?[\w.]*\s*§(\d+[a-z]?(?:\.\d+)?)",
+                             comment):
+            if m.group(2) not in known.get(m.group(1) or own, set()):
+                out.append(f"{runner}:{i} comment cites §{m.group(2)} "
+                           f"({m.group(1) or own}) — no such section")
+    return out
+
+
 def lint(path: str) -> Dict[str, List[str]]:
     name = Path(path).name
     raw = (REPO / path).read_text(encoding="utf-8")
@@ -241,6 +305,21 @@ def main() -> int:
             print("  ----  counted lists (ADVISORY, not a failure)")
             for a in advisory:
                 print(f"          {a}")
+    print("\n=== §N inside runner code")
+    for runner, doc in RUNNERS.items():
+        strings = check_code_refs(runner, doc)
+        comments = check_code_comment_refs(runner)
+        if strings:
+            failed += len(strings)
+            for x in strings:
+                print(f"  FAIL  {x}")
+        else:
+            print(f"  ok    {runner}: every §N in a string resolves")
+        if comments:
+            print(f"  ----  {runner}: comments (ADVISORY)")
+            for c in comments:
+                print(f"          {c}")
+
     extra = check_code_vocab()
     print("\n=== METHOD vocabularies against score.py")
     if extra:

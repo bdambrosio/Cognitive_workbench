@@ -6,7 +6,7 @@
 
 WHY. METHOD §12a: "There is no independent review of the report, and that is a
 decision... Revisit it before the first engagement where a finding moves real
-money." And §12 step 6b, on the audit checking its own citations: "This catches
+money." And METHOD §12 step 6b, on the audit checking its own citations: "This catches
 a citation pointing at nothing. It will not catch one pointing convincingly at
 the wrong line." This catches that one.
 
@@ -193,7 +193,7 @@ def resolve_quotes(report: str, target: Path) -> List[Dict[str, Any]]:
     2026-08-26, a report written to a quote-only contract left 10 of 33
     evidence fields with nothing a reader could search for, against 1 of 45
     under §5 as it stands. A citation that resolves to the wrong line is a
-    different problem, and it belongs to the reviewer's judgement — §12a and
+    different problem, and it belongs to the reviewer's judgement — METHOD §12a and
     REVIEW.md §6 — not to the citation format.
     """
     if not target.is_dir():
@@ -401,11 +401,11 @@ def conformance(run: Path) -> Dict[str, Any]:
         "recommendation": rec,
         "blocks closed": closed,
         "blocks not closed": [n for n, ok in closed.items() if not ok],
-        "§6 verdicts only": not vc["off_vocabulary"],
+        "METHOD §6 verdicts only": not vc["off_vocabulary"],
         "off_vocabulary": vc["off_vocabulary"],
         "limitations statement": bool(score._LIMITS_RE.search(report)),
         "gap map present": bool(gap.strip()),
-        "§15 elements missing": [k for k, ok in el.items() if not ok],
+        "METHOD §15 elements missing": [k for k, ok in el.items() if not ok],
         "evidence fields": len(_EVIDENCE_FIELD.findall(report)),
         "evidence fields pointing nowhere": unpointed_fields(report),
         "findings": [{"n": int(n), "verdict": v.strip()}
@@ -795,8 +795,12 @@ def main() -> int:
                     confirmation = confirm_exceptions(
                         run, f"{world}_confirm", args.model, target, disputed)
                 retested = True
-                text = (SUMMARY_REQUEST + _confirmation_note(confirmation)
-                        + _state(i + 2))
+                # NO DISPUTES, NO NOTE. `confirmation` stays None when nothing
+                # was retested, and _confirmation_note reads `.get` off it —
+                # the original only called it inside `if disputed`, and moving
+                # the call out of that branch crashed the first review run.
+                note = _confirmation_note(confirmation) if confirmation else ""
+                text = SUMMARY_REQUEST + note + _state(i + 2)
                 continue
 
             if not undelivered:
