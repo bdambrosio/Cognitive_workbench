@@ -133,12 +133,34 @@ this workflow.**
 
 Zero tolerance applies here and nowhere else, for two reasons.
 
-**It is the one review signal measured to hold still.** Three precision legs on
-one report returned INADMISSIBLE three times out of three with the mechanical
-layer byte-identical; the baseline run put 0 of 35 references past end-of-file.
-Against that, the supported ratio moved 19/23, 21/23 and 23/23 on identical
-text. A gate can be absolute only where the signal is stable, and this is the
-only place that is true.
+**THE JUSTIFICATION BELOW IS DISPROVEN. The threshold is left as written
+because changing it is a decision, not a correction.**
+
+It read: admissibility is the one review signal measured to hold still — three
+precision legs on one report returned INADMISSIBLE three of three with the
+mechanical layer byte-identical, against a supported ratio that moved 19/23,
+21/23 and 23/23 on identical text.
+
+Three legs on **one report** with **one reviewer** is *reviewer-side*
+stability, and it was used here to justify zero tolerance across runs and
+across reviewers. Neither holds:
+
+- **Run to run.** GLM-5.3-Flash returned ADMISSIBLE, INADMISSIBLE, ADMISSIBLE
+  over three runs of one fixture.
+- **Reviewer to reviewer.** grok-4.6 and GLM-5.3-Flash split on one report —
+  13 of 47 evidence fields pointing nowhere, 27%, which §4.0 calls either "a
+  few fields among many" or "a substantial share" without fixing a boundary.
+  grok listed thirteen `[uncited]` exceptions and proceeded; GLM stopped.
+
+So this is the only criterion with zero tolerance and the only one whose stated
+reason is false. Two ways out when someone decides: soften it to two of three,
+or have it read `citations.json`'s `scheme` block rather than the reviewer's
+verdict — the scheme block is a file operation and does hold still, which is
+the property this criterion thought it was buying.
+
+The ambiguity is **not** a defect in REVIEW.md, which is an internal QA aid
+whose §9 says outright that the practice decides. It is a defect here, in
+consuming that aid as a mechanical gate.
 
 **What it gates is not quality.** A report whose citations cannot be placed
 cannot be checked by anyone — so what it found does not matter, and a supported
@@ -147,10 +169,11 @@ and quality are orthogonal: `w1_qwen_1` cleared the gate and then failed the
 review on substance, which is the demonstration that this criterion measures
 something of its own.
 
-Qwen3.8-27B was ruled out on this criterion on the b2 instrument — two of three
-runs inadmissible, the ordinal-versus-line defect recurring at a 48% rate.
-Unlike GLM's, that is a citation defect and not a delivery one, so the block
-instrument does not address it. Being re-run on b3 to find out.
+Qwen3.8-27B has been ruled out on this criterion on every instrument it has
+run: two of three inadmissible on b2, and INADMISSIBLE again on b4 under three
+separate reviews. Unlike GLM's, that is a citation defect rather than a
+delivery one, so neither the block instrument nor the METHOD amendment
+addresses it.
 
 ## Q3 — review verdict, PASS in at least 2 of 3
 
