@@ -62,12 +62,19 @@ logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger("audit_review")
 logger.setLevel(logging.INFO)
 
-# The second deliverable is ASKED FOR, not detected — the same rule the audit
-# runner arrived at. Its opening sentence is a stable sentinel: harness text,
-# emitted verbatim, so matching it is safe in a way matching model output is not.
-SUMMARY_REQUEST = ("The review is received. Now the review summary, per §8. "
-                   "The whole reply is the summary — no preamble, no "
-                   "restatement of the review.")
+# DELIVERY IS BY BLOCK (REVIEW.md §8), not by turn boundary. Until 2026-08-27
+# this runner had the defect workflows/blocks.py exists to remove: a turn that
+# did not `yield` was taken as the review whatever it contained, and the
+# reviewer was told "The review is received" either way. Worse than the audit's
+# version of the same bug — the retest is driven by parsing that reply, so a
+# progress note taken as a review yields zero disputed findings, no retest, and
+# a PASS that looks clean.
+from workflows import blocks                                   # noqa: E402
+
+# ASSERTS NOTHING ABOUT WHAT ARRIVED. The summary is still asked for, because
+# §9 requires the reviewer to be told the retest result before writing it — but
+# the asking no longer claims the review was received.
+SUMMARY_REQUEST = ("Now the `=== SUMMARY ===` block, per §8.")
 CONTINUE = "continue"
 
 # Report-side citation forms, from what models actually emit across 29 reports.
@@ -717,8 +724,25 @@ def main() -> int:
     logger.info("reviewing %s with %s", run.name, resolved_model)
 
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
-    t0, legs, error, summary_sent, review_text = time.time(), [], None, False, ""
+    t0, legs, error = time.time(), [], None
     confirmation: Optional[Dict[str, Any]] = None
+    # THE REVIEW BLOCKS ARE DELIVERED IN TWO PHASES, and the retest is the gate
+    # between them. REVIEW.md §9 requires the reviewer to be told the retest
+    # result BEFORE it writes the summary, so SUMMARY cannot be accepted from a
+    # leg that ran before the retest — that is the one ordering this runner
+    # enforces, and it is enforced on the block, never on the turn.
+    PHASE1 = ("REVIEW SURFACE", "REVIEW", "LIMITATIONS")
+    delivered = {n: False for n in blocks.REVIEW_BLOCKS}
+    prompted = {n: 0 for n in blocks.REVIEW_BLOCKS}
+    transcript, post_retest = [], []
+    retested = False
+    undelivered = list(blocks.REVIEW_BLOCKS)
+
+    def _state(nxt_leg: int) -> str:
+        return (f"\n\n[review state, recorded by the client's process — leg "
+                f"{nxt_leg} of {args.max_turns}, "
+                f"{(time.time() - t0) / 60:.0f} min elapsed.]")
+
     try:
         text = BRIEF
         for i in range(args.max_turns):
@@ -726,32 +750,59 @@ def main() -> int:
             reply = latest_reply(loop, SOURCE)
             exit_reason = last_exit_reason(world, name)
             legs.append({"leg": i + 1, "exit_reason": exit_reason,
-                         "reply_chars": len(reply)})
-            logger.info("leg %d: exit=%s chars=%d", i + 1, exit_reason, len(reply))
+                         "reply_chars": len(reply),
+                         "blocks": [n for n in blocks.REVIEW_BLOCKS
+                                    if blocks.opened(reply, n)]})
+            logger.info("leg %d: exit=%s chars=%d blocks=%s", i + 1, exit_reason,
+                        len(reply), legs[-1]["blocks"])
             if exit_reason in ("llm_error", "crashed"):
                 error = f"turn {i + 1} ended {exit_reason} — review is not valid"
                 break
-            if summary_sent:
-                break
-            if exit_reason == "yield":
-                text = (CONTINUE + f"\n\n[review state, recorded by the client's "
-                        f"process — leg {i + 2} of {args.max_turns}, "
-                        f"{(time.time() - t0) / 60:.0f} min elapsed.]")
+            transcript.append(reply)
+            if retested:
+                post_retest.append(reply)
+            for n, seen in blocks.present(reply, blocks.REVIEW_BLOCKS).items():
+                # A SUMMARY emitted before the retest is not a summary of a
+                # result the reviewer had; it is re-asked for after.
+                if n == "SUMMARY" and not retested:
+                    continue
+                delivered[n] = delivered[n] or seen
+            undelivered = blocks.missing(delivered, blocks.REVIEW_BLOCKS)
+
+            if all(delivered[n] for n in PHASE1) and not retested:
+                whole = "\n\n".join(t for t in transcript if t)
+                review_text = blocks.content(whole, "REVIEW",
+                                             blocks.REVIEW_BLOCKS) or ""
+                disputed = judgement_exceptions(review_text)
+                if disputed:
+                    logger.info("%d finding(s) failed on judgement — retesting",
+                                len(disputed))
+                    confirmation = confirm_exceptions(
+                        run, f"{world}_confirm", args.model, target, disputed)
+                retested = True
+                text = (SUMMARY_REQUEST + _confirmation_note(confirmation)
+                        + _state(i + 2))
                 continue
-            review_text, summary_sent = reply, True
-            # Blind second opinion on judgement-based disputes, BEFORE
-            # review.md is written and before the summary is asked for, so
-            # the confirming reviewer cannot reach the first verdict and the
-            # summary can state the outcome. See confirm_exceptions.
-            disputed = judgement_exceptions(review_text)
-            if disputed:
-                logger.info("%d finding(s) failed on judgement — retesting",
-                            len(disputed))
-                confirmation = confirm_exceptions(
-                    run, f"{world}_confirm", args.model, target, disputed)
-                text = SUMMARY_REQUEST + _confirmation_note(confirmation)
-            else:
-                text = SUMMARY_REQUEST
+
+            if not undelivered:
+                break
+
+            # exit_reason decides the MESSAGE, never the ending: `yield` means
+            # the reviewer says it is still working, so it is not interrupted to
+            # name a block legitimately still to come.
+            if exit_reason == "yield":
+                text = CONTINUE + _state(i + 2)
+                continue
+            nxt = undelivered[0]
+            prompted[nxt] += 1
+            logger.info("leg %d: %s not delivered — prompting (%d)",
+                        i + 1, nxt, prompted[nxt])
+            text = (CONTINUE + "\n\n"
+                    + blocks.rejection(nxt, "REVIEW.md §8") + _state(i + 2))
+        else:
+            if undelivered:
+                error = ("no_deliverable: " + ", ".join(undelivered)
+                         + f" not delivered in {args.max_turns} legs")
     except Exception as e:                                     # noqa: BLE001
         error = f"{type(e).__name__}: {e}"
         logger.exception("review failed")
@@ -761,14 +812,28 @@ def main() -> int:
         except Exception as e:                                 # noqa: BLE001
             logger.warning("executor shutdown failed: %s", e)
 
-    final = latest_reply(loop, SOURCE)
-    if summary_sent:
-        (out / "review.md").write_text((review_text or "").rstrip() + "\n",
+    # ASSEMBLED FROM BLOCKS, ACROSS EVERY LEG (REVIEW.md §8). Nothing is inferred
+    # from which leg a reply arrived in — that inference is what filed a progress
+    # note as a review and then found nothing to retest.
+    #
+    # review.md is the REVIEW block plus the LIMITATIONS block: two blocks so
+    # nothing has to nest, one document because that is what a reader receives.
+    # SUMMARY is read from the POST-RETEST legs only, so a summary written
+    # before the reviewer knew the retest result cannot become the deliverable.
+    whole = "\n\n".join(t for t in transcript if t)
+    after = "\n\n".join(t for t in post_retest if t)
+    parts = [b for b in (blocks.span(whole, n, blocks.REVIEW_BLOCKS)
+                         for n in ("REVIEW", "LIMITATIONS")) if b]
+    if parts:
+        (out / "review.md").write_text("\n\n".join(parts).rstrip() + "\n",
                                        encoding="utf-8")
-        (out / "summary.md").write_text(final.strip() + "\n", encoding="utf-8")
-    elif final:
-        (out / "review.md").write_text(final, encoding="utf-8")
-        logger.warning("no summary leg — review summary not produced")
+    else:
+        logger.warning("no REVIEW block in the engagement — no review.md")
+    summary = blocks.span(after, "SUMMARY", blocks.REVIEW_BLOCKS)
+    if summary:
+        (out / "summary.md").write_text(summary.rstrip() + "\n", encoding="utf-8")
+    else:
+        logger.warning("no SUMMARY block after the retest — summary not produced")
 
     (out / "review_meta.json").write_text(json.dumps({
         "reviewed_run": run.name,
@@ -784,6 +849,10 @@ def main() -> int:
         "scheme": cites["scheme"],
         "findings_parsed": len(conf["findings"]),
         "confirmation": confirmation,
+        "blocks_prompted": prompted,
+        "blocks_delivered": delivered,
+        "blocks_closed": {n: blocks.closed(whole, n)
+                          for n in blocks.REVIEW_BLOCKS},
         "legs": legs,
         "wall_clock_s": round(time.time() - t0, 1),
         "error": error,

@@ -34,6 +34,17 @@ from typing import Dict, List, Optional, Tuple
 # findings is not frozen, it is a count made to fit.
 BLOCKS: Tuple[str, ...] = ("CLAIM SURFACE", "REPORT", "LIMITATIONS", "GAP MAP")
 
+# The review's four, mirroring the audit's: a frozen surface, the document, its
+# limitations, and the one-page read. Same shapes, same rules, because the
+# review runner had the defect this module was written to remove — it read a
+# turn that did not yield as the review, and told the reviewer "The review is
+# received" whatever the turn contained.
+REVIEW_BLOCKS: Tuple[str, ...] = ("REVIEW SURFACE", "REVIEW", "LIMITATIONS",
+                                  "SUMMARY")
+
+# Every block name this module knows, for the marker regexes below.
+_ALL: Tuple[str, ...] = tuple(dict.fromkeys(BLOCKS + REVIEW_BLOCKS))
+
 # What `report.md` is assembled from, in this order. LIMITATIONS is a separate
 # block and still part of the report — the client receives one document with
 # those lines in it. Separate block, same document.
@@ -55,8 +66,8 @@ def marker_re(mark: str) -> re.Pattern:
 
 # An opener never matches inside its own closer: `=== END REPORT ===` puts
 # `END` where `REPORT` would have to be, so `===\s+REPORT\s+===` cannot match.
-_OPEN = {n: marker_re(open_mark(n)) for n in BLOCKS}
-_CLOSE = {n: marker_re(close_mark(n)) for n in BLOCKS}
+_OPEN = {n: marker_re(open_mark(n)) for n in _ALL}
+_CLOSE = {n: marker_re(close_mark(n)) for n in _ALL}
 
 
 def opened(text: str, name: str) -> bool:
@@ -71,7 +82,8 @@ def closed(text: str, name: str) -> bool:
     return bool(_CLOSE[name].search(text or ""))
 
 
-def content(text: str, name: str) -> Optional[str]:
+def content(text: str, name: str,
+            blocks: Tuple[str, ...] = BLOCKS) -> Optional[str]:
     """The block's body, or None if its opener is absent.
 
     Runs from the opener to its closer, or — when the closer is missing — to
@@ -86,12 +98,13 @@ def content(text: str, name: str) -> Optional[str]:
     end = _CLOSE[name].search(body)
     if end:
         return body[:end.start()].strip()
-    nxt = [m.start() for other in BLOCKS if other != name
+    nxt = [m.start() for other in blocks if other != name
            for m in [_OPEN[other].search(body)] if m]
     return (body[:min(nxt)] if nxt else body).strip()
 
 
-def span(text: str, name: str) -> Optional[str]:
+def span(text: str, name: str,
+         blocks: Tuple[str, ...] = BLOCKS) -> Optional[str]:
     """The block INCLUDING its markers, or None if the opener is absent.
 
     `report.md` is assembled from spans rather than stripped bodies so the file
@@ -100,20 +113,22 @@ def span(text: str, name: str) -> Optional[str]:
     markers on the way out would have made the limitations criterion fail on
     reports that satisfied it.
     """
-    body = content(text, name)
+    body = content(text, name, blocks)
     if body is None:
         return None
     tail = f"\n{close_mark(name)}" if closed(text, name) else ""
     return f"{open_mark(name)}\n{body}{tail}"
 
 
-def present(text: str) -> Dict[str, bool]:
-    return {n: opened(text, n) for n in BLOCKS}
+def present(text: str,
+            blocks: Tuple[str, ...] = BLOCKS) -> Dict[str, bool]:
+    return {n: opened(text, n) for n in blocks}
 
 
-def missing(delivered: Dict[str, bool]) -> List[str]:
+def missing(delivered: Dict[str, bool],
+            blocks: Tuple[str, ...] = BLOCKS) -> List[str]:
     """Undelivered blocks, in emission order."""
-    return [n for n in BLOCKS if not delivered.get(n)]
+    return [n for n in blocks if not delivered.get(n)]
 
 
 def rejection(name: str, section: str = "METHOD §16") -> str:

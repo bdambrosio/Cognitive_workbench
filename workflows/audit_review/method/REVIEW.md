@@ -139,7 +139,9 @@ that its evidence half went uncited in a form the index could fetch at all.
    ```
 
    The line after the marker carries the count and nothing else: a number, then
-   the word `findings`. List them after.
+   the word `findings`. List them after, and close with a line reading exactly
+   `=== END REVIEW SURFACE ===`. It is one of the four delivery blocks; §8 has
+   the full set.
 
    From that point the surface is **frozen**. It is what every coverage figure
    in your report divides by. A finding you notice later goes in an addendum
@@ -321,45 +323,66 @@ a churn problem they missed" is you auditing the target.
 
 ## 8. The deliverable
 
-Two documents, in two turns, in this order. A turn carries its document and
-nothing else.
+Four blocks. Each opens and closes with a line of its own:
 
-**Turn one: the review.**
+```
+=== REVIEW SURFACE ===    …    === END REVIEW SURFACE ===
+=== REVIEW ===            …    === END REVIEW ===
+=== LIMITATIONS ===       …    === END LIMITATIONS ===
+=== SUMMARY ===           …    === END SUMMARY ===
+```
 
-**If the report is inadmissible (§4.0), turn one is the admissibility statement
-and nothing else:** the §9 result line, which references cannot be resolved and
-why, what the report would have to state to make them resolvable, and the
-limitations statement. No exceptions, no coverage figure, no ratio. Turn two is
-still the summary.
+**Emit them in that order.** Take as many legs as the work needs — the blocks
+are what the review is judged on, not how you divided the work.
+
+**`=== SUMMARY ===` comes after you are told the retest result** (§9), and not
+before. The other three can arrive in any number of legs, together or apart;
+the summary states an outcome you do not yet know until the client's process
+hands it to you.
+
+**Markers are how a block is delivered.** The client's process reads them.
+Until a block's opening marker appears the review is still running, and you will
+be told which block is missing. A closing marker says you finished writing
+rather than ran out of room.
+
+### The blocks
+
+**`=== REVIEW SURFACE ===`** — as §4 specifies: the count, then the findings
+listed with their labels.
+
+**`=== REVIEW ===`** — the review proper.
+
+**If the report is inadmissible (§4.0), this block is the admissibility
+statement and nothing else:** the §9 result line, which references cannot be
+resolved and why, and what the report would have to state to make them
+resolvable. No exceptions, no coverage figure, no ratio. `LIMITATIONS` and
+`SUMMARY` still follow.
 
 Otherwise:
 
-- The §9 result: ADMISSIBLE, supported N of M, exceptions by verdict, and
-  PASS, FAIL, or INCONCLUSIVE where a retest could not be run.
-- Exceptions worst first, each in §6's format.
-- A coverage statement: findings you checked out of the frozen count from §4,
-  and what the record showed about the audit's own coverage (§7).
-- **The limitations statement**, after a line reading exactly:
+1. **The §9 result** — ADMISSIBLE, supported by their citations N of M,
+   exceptions by verdict, and PASS, FAIL, or INCONCLUSIVE where a retest could
+   not be run.
+2. **Exceptions worst first**, each in §6's format.
+3. **A coverage statement** — findings you checked out of the frozen count from
+   §4, and what the record showed about the audit's own coverage (§7).
 
-  ```
-  === LIMITATIONS ===
-  ```
+**`=== LIMITATIONS ===`** — three lines, always present: the report and
+materials you read, with the materials' as-of date; that the auditor was not
+consulted and has not responded to these exceptions; and that this review checks
+findings against cited evidence and does not re-audit the target.
 
-  Three lines, always present: the report and materials examined, with the
-  materials' as-of date; that the auditor was not consulted and has not
-  responded to these exceptions; and that this review checks findings against
-  cited evidence and does not re-audit the target.
-
-**Turn two: the review summary.** One page, for whoever decides whether the
-report ships:
+**`=== SUMMARY ===`** — one page, for whoever decides whether the report ships:
 
 - The report reviewed, and the engagement it came from
-- The §9 result: admissibility, then supported N of M and PASS, FAIL or
-  INCONCLUSIVE if the report was admissible
+- The §9 result: admissibility, then supported by their citations N of M and
+  PASS, FAIL or INCONCLUSIVE if the report was admissible
 - Exceptions that would change a reader's understanding, worst first
 - Findings you checked out of the frozen count from §4
 - A footer in small type: "report review · checks findings against cited
   evidence · not a re-audit of the target"
+
+Do not restate the review here, and do not introduce it.
 
 ## 9. The result
 

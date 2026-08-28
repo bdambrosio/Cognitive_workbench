@@ -326,6 +326,8 @@ def test_every_name_the_runner_uses_at_run_time_resolves():
                 local.add(node.arg)
             elif isinstance(node, ast.ExceptHandler) and node.name:
                 local.add(node.name)          # `except X as e` binds a str
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                local.add(node.name)          # a nested `def` binds its name
         for node in ast.walk(fn):
             if not (isinstance(node, ast.Name)
                     and isinstance(node.ctx, ast.Load)):
