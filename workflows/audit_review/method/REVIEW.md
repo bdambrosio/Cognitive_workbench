@@ -219,6 +219,21 @@ finding rests on evidence the index does not carry, read the document under
 `inspect_external` and check it there. Ruling a finding unsupported because its
 evidence is missing from the index is the error this method exists to stop.
 
+**Fields that point nowhere.** The paragraph above does not apply: nothing was
+cited for the index to miss. `conformance.json` enumerates them. Read the
+document each names, look for text supporting what the finding states, and
+record `[uncited]` either way — the report failed to cite it, and the report is
+what you review.
+
+- **Found.** Quote it in the Exception block with its line.
+- **Not found, or not plainly supporting.** Say where you looked.
+
+**Choose not-found when close.** A quote you record becomes the citation the
+repaired report carries; a wrong one is worse than a missing one.
+
+**Stop at the document the field names.** Widening the search is auditing the
+target (§2).
+
 **Why the derived case differs, and it is not a technicality.** METHOD §6 makes
 a finding one of two things: a resolved claim carrying one of the five claim
 verdicts, or a `[derived]` finding — a consequence computed from two or more
