@@ -731,7 +731,15 @@ def main() -> int:
     # result BEFORE it writes the summary, so SUMMARY cannot be accepted from a
     # leg that ran before the retest — that is the one ordering this runner
     # enforces, and it is enforced on the block, never on the turn.
-    PHASE1 = ("REVIEW SURFACE", "REVIEW", "LIMITATIONS")
+    # AN INADMISSIBLE REPORT HAS THREE BLOCKS. REVIEW.md §4.0 forbids
+    # enumerating the findings of a report whose citation scheme cannot be
+    # established, so no REVIEW SURFACE exists to deliver. Demanding one would
+    # prompt to the leg cap and record no_deliverable — on exactly the case the
+    # admissibility gate exists for. `INADMISSIBLE` is a copyable token §9
+    # requires on its own line, so this reads a fact rather than judging one.
+    PHASE1_FULL = ("REVIEW SURFACE", "REVIEW", "LIMITATIONS")
+    PHASE1_INADMISSIBLE = ("REVIEW", "LIMITATIONS")
+    phase1 = PHASE1_FULL
     delivered = {n: False for n in blocks.REVIEW_BLOCKS}
     prompted = {n: 0 for n in blocks.REVIEW_BLOCKS}
     transcript, post_retest = [], []
@@ -767,9 +775,16 @@ def main() -> int:
                 if n == "SUMMARY" and not retested:
                     continue
                 delivered[n] = delivered[n] or seen
+            if delivered["REVIEW"] and phase1 is PHASE1_FULL:
+                body = blocks.content("\n\n".join(t for t in transcript if t),
+                                      "REVIEW", blocks.REVIEW_BLOCKS) or ""
+                if re.search(r"\bINADMISSIBLE\b", body):
+                    phase1 = PHASE1_INADMISSIBLE
+                    delivered["REVIEW SURFACE"] = True   # not owed, not missing
+                    logger.info("review is INADMISSIBLE — no REVIEW SURFACE owed")
             undelivered = blocks.missing(delivered, blocks.REVIEW_BLOCKS)
 
-            if all(delivered[n] for n in PHASE1) and not retested:
+            if all(delivered[n] for n in phase1) and not retested:
                 whole = "\n\n".join(t for t in transcript if t)
                 review_text = blocks.content(whole, "REVIEW",
                                              blocks.REVIEW_BLOCKS) or ""
