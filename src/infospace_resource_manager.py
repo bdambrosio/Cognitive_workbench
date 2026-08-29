@@ -1017,6 +1017,13 @@ class InfospaceResourceManager:
                           # dropped at create_note time and that guard never
                           # fired: zero notes on disk carried it.
                           'system_spawned',
+                          # The live continuation of a yielded leg. Marks the
+                          # ONE concern carrying the remainder so the next
+                          # yield can retire it: system_spawned alone cannot
+                          # be used for that, because claim-verification
+                          # concerns share it and retiring one would cancel
+                          # an audit the agent owes itself.
+                          'yield_continuation',
                           # Fire-time triage cache + per-concern WIP
                           # (running summary of autonomous-fire findings,
                           # kept on the root concern of a successor chain).

@@ -2309,6 +2309,31 @@ class ConcernsMixin:
         # remainder was 118 characters, which was luck. The turn's input is
         # no longer taken here at all — it reaches the next leg through the
         # working log, which is where it belongs.
+        # ONE LIVE CONTINUATION AT A TIME. The autonomous route already does
+        # this — _create_successor_concern retires a one-shot parent via
+        # 'superseded', after five same-depth children were observed on one
+        # parent (2026-07-17). This route could not: it starts at depth 0 with
+        # no parent, so there was nothing to walk to, and every yielding leg
+        # left another rootless concern behind. On the ChatterMate GLM run of
+        # 2026-08-29 four legs yielded and all four concerns stayed active,
+        # each holding a remainder the next one had already replaced.
+        #
+        # Superseded, not deleted: the sweep tombstones satisfied one-shots to
+        # the graveyard after the grace period, and going through `satisfied`
+        # keeps that trail rather than dropping the record on the floor.
+        #
+        # MATCHED ON `yield_continuation`, NOT ON system_spawned. Claim
+        # verification (claims.py) spawns system_spawned one-shots too, and
+        # retiring one of those would be the agent cancelling an audit of its
+        # own claims — the thing the system_spawned guard exists to prevent.
+        for prev_id, prev_note, _a in self._iter_active_agent_concerns():
+            if not (prev_note.get('properties') or {}).get('yield_continuation'):
+                continue
+            if self._satisfy_agent_concern(prev_id, via='superseded'):
+                logger.info(
+                    f"[{self.character_name}] superseded prior yield "
+                    f"continuation {prev_id} — its remainder is replaced by "
+                    f"the one spawned now")
         succ_text = f"continue work I yielded mid-turn: {next_slice}"
         new_id = self._add_agent_concern(
             text=succ_text, entity=self._turn_counterpart(),
@@ -2338,6 +2363,10 @@ class ConcernsMixin:
                 # survived only by winning the race. It closes on
                 # satisfaction, not on reflection's read of the room.
                 'system_spawned': True,
+                # The live continuation. Retired by the NEXT yield; see the
+                # supersession loop above for why this needs its own flag
+                # rather than reusing system_spawned.
+                'yield_continuation': True,
             },
         )
         if not new_id:

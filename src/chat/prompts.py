@@ -340,6 +340,7 @@ class PromptsMixin:
         # by tag. instruction-bearing concerns fire when activation
         # crosses threshold.
         if agent_concerns:
+            fires = bool(getattr(self, '_autonomy_enabled', False))
             ac_lines: List[str] = []
             for _nid, text, activation, props in agent_concerns:
                 tags = []
@@ -352,9 +353,25 @@ class PromptsMixin:
                 instr = (props.get('instruction') or '').strip()
                 rhythm = props.get('rhythm_hours')
                 if instr and rhythm:
+                    # WHOLE WHEN NOTHING FIRES. With autonomy on, a fire
+                    # passes the instruction complete as the turn's input and
+                    # this line is only an awareness summary, so 120 chars is
+                    # right for a list of up to five. With autonomy off no
+                    # fire ever comes, and this line is the ONLY place the
+                    # instruction reaches the agent — clipping it there
+                    # discards the remainder the yield was taken to preserve.
+                    # Measured on the ChatterMate GLM run 2026-08-29: 9,864
+                    # characters of stored remainder across four concerns,
+                    # 480 of them visible, and every window cut mid-word in a
+                    # preamble the four shared.
+                    #
+                    # Affordable only because a yield now supersedes the
+                    # previous continuation, so there is one live remainder
+                    # rather than a stack of replaced ones.
+                    body = instr if not fires else instr[:120]
                     ac_lines.append(
                         f"    fires every ~{rhythm}h when activation crosses "
-                        f"{_AGENT_CONCERN_FIRE_THRESHOLD:.2f}: {instr[:120]}")
+                        f"{_AGENT_CONCERN_FIRE_THRESHOLD:.2f}: {body}")
                 elif not instr:
                     ac_lines.append(
                         "    standing concern, no instruction (won't fire)")
