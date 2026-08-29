@@ -406,31 +406,80 @@ def concern_delta(before: list, after: list) -> dict:
     return out
 
 
-def log_leg(path: Path, leg: int, sent: str, exit_reason: str,
-            before: list, after: list) -> None:
-    """Append one leg's record, and say the same thing compactly to the log."""
-    delta = concern_delta(before, after)
+def resource_snapshot(loop) -> dict:
+    """id -> a one-line description of every resource in the agent's world.
+
+    Concerns are notes too, so they appear here as well as in the concern
+    snapshot; the point of this one is everything ELSE that arrives — the
+    memories a reflection pass would have written, notes a tool created.
+    """
+    out = {}
+    for r in loop.resource_manager.get_resource_list():
+        props = r.get("properties") or {}
+        rid = r.get("name") or r.get("id") or ""
+        body = " ".join(str(props.get("content", "") or "").split())
+        out[rid] = f"{props.get('kind', r.get('type', '?'))}: {body[:100]}"
+    return out
+
+
+def log_outgoing(leg: int, reason: str, text: str) -> None:
+    """The whole message, verbatim, before the agent sees it.
+
+    NOT CLIPPED. The runner's message is the entire input side of a leg, and
+    a summary of it cannot answer the question it is logged to answer — which
+    is what the agent was actually told. The 80-char clip in run_meta's `legs`
+    is why the block-rejection text sat unnoticed at the head of a
+    continuation concern for as long as it did.
+    """
+    logger.info("%s\n=== LEG %d  RUNNER -> AGENT  (%s) ===\n%s\n=== end leg "
+                "%d message (%d chars) ===", "", leg, reason, text, leg,
+                len(text))
+
+
+def log_incoming(path: Path, leg: int, sent: str, reason: str,
+                 exit_reason: str, reply_chars: int,
+                 c_before: list, c_after: list,
+                 r_before: dict, r_after: dict) -> None:
+    """What the leg did: how it ended, and what changed in the agent's world."""
+    delta = concern_delta(c_before, c_after)
+    new_res = [k for k in r_after if k not in r_before]
+    gone_res = [k for k in r_before if k not in r_after]
     with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps({"leg": leg, "sent": sent,
-                            "exit_reason": exit_reason, "before": before,
-                            "after": after, "delta": delta},
+        f.write(json.dumps({"leg": leg, "reason": reason, "sent": sent,
+                            "exit_reason": exit_reason,
+                            "reply_chars": reply_chars,
+                            "before": c_before, "after": c_after,
+                            "delta": delta,
+                            "resources_created": {k: r_after[k] for k in new_res},
+                            "resources_deleted": {k: r_before[k] for k in gone_res}},
                            ensure_ascii=False, default=str) + "\n")
-    logger.info("leg %d sent: %s", leg, " ".join(sent.split())[:160])
-    logger.info("leg %d concerns: %d in -> %d out | +%d -%d "
-                "status:%d activation:%d instruction:%d",
-                leg, len(before), len(after), len(delta["created"]),
+    logger.info("=== LEG %d  AGENT -> RUNNER  exit=%s, %d chars ===",
+                leg, exit_reason, reply_chars)
+    logger.info("  concerns: %d -> %d | +%d -%d status:%d activation:%d "
+                "instruction:%d      resources: %d -> %d",
+                len(c_before), len(c_after), len(delta["created"]),
                 len(delta["deleted"]), len(delta["status_changed"]),
                 len(delta["activation_changed"]),
-                len(delta["instruction_changed"]))
+                len(delta["instruction_changed"]),
+                len(r_before), len(r_after))
     for c in delta["created"]:
-        logger.info("  + %s %s [%s] act=%s sys=%s parent=%s | %s",
+        logger.info("  + concern %s %s [%s] act=%s sys=%s parent=%s | %s",
                     c["id"], c["kind"], c["status"], c["activation"],
                     c["system_spawned"], c["successor_of"],
                     " ".join((c["text"] or "").split())[:90])
+        if c.get("instruction"):
+            logger.info("      instruction (%d chars): %s",
+                        len(c["instruction"]), c["instruction"])
     for nid, was, now in delta["status_changed"]:
-        logger.info("  ~ %s status %s -> %s", nid, was, now)
+        logger.info("  ~ concern %s status %s -> %s", nid, was, now)
+    for nid, was, now in delta["activation_changed"]:
+        logger.info("  ~ concern %s activation %s -> %s", nid, was, now)
     for nid in delta["instruction_changed"]:
-        logger.info("  ~ %s instruction rewritten", nid)
+        logger.info("  ~ concern %s instruction rewritten", nid)
+    for k in new_res:
+        logger.info("  + note %s %s", k, r_after[k])
+    for k in gone_res:
+        logger.info("  - note %s %s", k, r_before[k])
 
 
 def main() -> int:
@@ -507,6 +556,36 @@ def main() -> int:
     logger.info("resolved model=%s temperature=%s top_p=%s",
                 resolved_model, resolved_temperature, TOP_P)
 
+    # EVERYTHING THE RUNNER DECIDES, ONCE, IN ONE PLACE. The runner drives the
+    # agent with text and nothing else: no concern is injected, no note is
+    # written on its behalf, no state object is handed over. What it does set
+    # is this configuration, at construction, and then it only ever sends chat
+    # messages. Logging it here is what makes the per-leg messages below the
+    # whole story rather than most of it.
+    _chat = cfg.get("chat") or {}
+    logger.info(
+        "\n=== ENGAGEMENT CONFIGURATION (set once, at construction) ===\n"
+        "  world             %s\n"
+        "  agent             %s\n"
+        "  target            %s          (inspect_external is bound here)\n"
+        "  inspect geofence  %s\n"
+        "  workflow document %s          (loaded verbatim into the system prompt)\n"
+        "  brief             %s\n"
+        "  claim sources     %s\n"
+        "  autonomy_enabled  %s          (nothing fires on its own; legs are driven here)\n"
+        "  workflow_mode     %s\n"
+        "  suppressed        %s\n"
+        "  omitted tools     %d\n"
+        "  max legs          %d\n"
+        "  react_max_tokens  %s\n"
+        "=== end configuration; everything after this is a chat message ===",
+        args.world, name, cfg.get("external_repo"), cfg.get("inspect_repo"),
+        cfg.get("workflow"), eng["brief"], ", ".join(eng["claim_sources"] or []),
+        cfg.get("autonomy_enabled"), cfg.get("workflow_mode"),
+        "; ".join(getattr(loop, "workflow_suppressed", []) or ["(none)"]),
+        len(_chat.get("omitted_tools") or []), args.max_turns,
+        _chat.get("react_max_tokens"))
+
     t0 = time.time()
     legs, error = [], None
     text_first_leg = ''
@@ -525,17 +604,21 @@ def main() -> int:
     try:
         text = eng["brief"].read_text(encoding='utf-8')
         text_first_leg = text
+        sent_reason = "opening brief"
         for i in range(args.max_turns):
+            log_outgoing(i + 1, sent_reason, text)
             concerns_before = concern_snapshot(loop)
+            resources_before = resource_snapshot(loop)
             loop._process_user_turn(source=SOURCE, text=text, close=False)
             reply = latest_reply(loop, SOURCE)
             exit_reason = last_exit_reason(args.world, name)
-            # After the turn returns, before anything else looks at the reply.
-            # The yield spawn is synchronous inside the turn, so the concern
-            # set is final here; post-turn work on the executor touches
-            # claims and the trace, not concerns.
-            log_leg(concern_log, i + 1, text, exit_reason,
-                    concerns_before, concern_snapshot(loop))
+            # Snapshotted the moment the turn returns. The yield spawn is
+            # synchronous inside the turn, so the concern set is final here;
+            # post-turn work on the executor touches claims and the trace,
+            # not concerns.
+            log_incoming(concern_log, i + 1, text, sent_reason, exit_reason,
+                         len(reply), concerns_before, concern_snapshot(loop),
+                         resources_before, resource_snapshot(loop))
             legs.append({"leg": i + 1, "sent": text[:80],
                          "exit_reason": exit_reason,
                          "reply_chars": len(reply)})
@@ -579,6 +662,7 @@ def main() -> int:
                 text = CONTINUE + engagement_state(
                     args.world, name, i + 2, args.max_turns,
                     time.time() - t0, claim_sources=eng["claim_sources"])
+                sent_reason = "agent yielded — continue, no block named"
                 continue
             nxt = undelivered[0]
             prompted[nxt] += 1
@@ -587,6 +671,8 @@ def main() -> int:
             text = (CONTINUE + "\n\n" + blocks.rejection(nxt) + "\n"
                     + engagement_state(args.world, name, i + 2, args.max_turns,
                                        time.time() - t0, claim_sources=eng["claim_sources"]))
+            sent_reason = (f"agent responded but {nxt} not delivered "
+                           f"— prompt #{prompted[nxt]}")
             continue
         else:
             # THE LEG CAP IS A TERMINAL STATE OF ITS OWN, and it names the
