@@ -306,6 +306,40 @@ def scheme(citations: List[Dict[str, Any]],
     }
 
 
+def _locate(tok: str, by_rel: Dict[str, Path],
+            by_base: Dict[str, List[Path]]) -> Tuple[Optional[Path], Optional[str]]:
+    """The file a citation names. Returns (file, note); file is None on failure
+    and the note says why. A note beside a file is an ambiguity worth recording,
+    not a failure.
+
+    HONOUR THE PATH WHEN THE REPORT GIVES ONE. `backend/app/tools/x.py:355` says
+    which x.py it means, and reading only the basename discards the one piece of
+    disambiguation the auditor supplied.
+
+    A bare name matching several files is read as the shallowest, which is what
+    a bare `README.md` conventionally means in a repository, and the ambiguity
+    is recorded on the citation either way. Resolving it by whichever candidate
+    happens to contain the cited line would be worse than the bug: a check that
+    cannot fail.
+    """
+    if tok in by_rel:
+        return by_rel[tok], None
+    if "/" in tok:
+        hits = [f for rel, f in by_rel.items() if rel.endswith("/" + tok)]
+        if len(hits) == 1:
+            return hits[0], None
+        if len(hits) > 1:
+            return None, f"{len(hits)} files match the path {tok}"
+    cands = by_base.get(tok.rsplit("/", 1)[-1], [])
+    if len(cands) == 1:
+        return cands[0], None
+    if len(cands) > 1:
+        best = min(cands, key=lambda p: (len(p.parts), str(p)))
+        return best, (f"{len(cands)} files share this name; read as "
+                      f"the shallowest")
+    return None, "no such document in the materials"
+
+
 def resolve_citations(report: str, target: Path) -> Dict[str, Any]:
     """Every citation in the report, fetched from the materials.
 
@@ -320,33 +354,58 @@ def resolve_citations(report: str, target: Path) -> Dict[str, Any]:
     overlap.py: a document reference is `docN` or something with a file
     extension, so "12:30" and "Active customers: 120" are not citations.
     """
-    files = {f.name: f for f in target.rglob("*") if f.is_file()} \
-        if target.is_dir() else {}
+    # INDEXED BY PATH, NOT BY BASENAME. Keying on `f.name` let one file win
+    # per basename and threw away the path the report gave, so a citation was
+    # resolved against whichever same-named file rglob happened to reach last.
+    # On the ChatterMate engagement that was not an edge case: the engagement
+    # names TWO claim sources called README.md — the root one at 625 lines and
+    # backend/app/knowledge/README.md at 149 — and every reference into the
+    # root README past line 149 came back "exceeds file length". Fourteen of
+    # cm_glm_2's twenty over-length marks, and three of cm_glm_1's eleven, were
+    # this and nothing else. The reviewer then spends its judgement clearing
+    # the index's own noise, and a reviewer that does not do that work grades
+    # against a corrupted signal.
+    by_rel: Dict[str, Path] = {}
+    by_base: Dict[str, List[Path]] = {}
+    if target.is_dir():
+        for f in target.rglob("*"):
+            if f.is_file():
+                by_rel[f.relative_to(target).as_posix()] = f
+                by_base.setdefault(f.name, []).append(f)
     by_docn = {}
-    for name, f in files.items():
+    for name, cands in by_base.items():
         m = _DOCN.match(name)
         if m:
-            by_docn.setdefault(f"doc{m.group(1)}", f)
+            by_docn.setdefault(f"doc{m.group(1)}", cands[0])
 
     out: List[Dict[str, Any]] = []
     seen = set()
     for m in _CITE.finditer(report):
         tok, lo, hi = m.group(1), int(m.group(2)), m.group(3)
-        base = tok.rsplit("/", 1)[-1]
+        norm = tok.strip().lstrip("./")
+        base = norm.rsplit("/", 1)[-1]
         dm = _DOCN.match(base)
         if not (dm or _LOOKS_LIKE_A_FILE.search(base)):
             continue
-        key = (base, lo, hi)
+        key = (norm, lo, hi)
         if key in seen:
             continue
         seen.add(key)
-        f = by_docn.get(f"doc{dm.group(1)}") if dm else files.get(base)
+        note = None
+        if dm:
+            f = by_docn.get(f"doc{dm.group(1)}")
+            if f is None:
+                note = "no such document in the materials"
+        else:
+            f, note = _locate(norm, by_rel, by_base)
         rec: Dict[str, Any] = {"cited": m.group(0).strip(), "document": base,
                                "line": lo, "through": int(hi) if hi else lo}
         if f is None:
             rec["resolved"] = False
-            rec["why"] = "no such document in the materials"
+            rec["why"] = note or "no such document in the materials"
         else:
+            if note:
+                rec["ambiguous"] = note
             lines = f.read_text(errors="replace").splitlines()
             hi_i = min(rec["through"], lo + 40)
             if lo < 1 or lo > len(lines):
@@ -354,7 +413,7 @@ def resolve_citations(report: str, target: Path) -> Dict[str, Any]:
                 rec["why"] = f"{f.name} has {len(lines)} lines"
             else:
                 rec["resolved"] = True
-                rec["document"] = f.name
+                rec["document"] = f.relative_to(target).as_posix()
                 rec["text"] = "\n".join(
                     f"{n}: {lines[n-1]}" for n in range(lo, min(hi_i, len(lines)) + 1))
         out.append(rec)

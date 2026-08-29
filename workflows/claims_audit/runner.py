@@ -99,6 +99,11 @@ def load_engagement(name: str) -> Dict[str, Any]:
             "retention": cfg.get("retention")}
 
 
+# The `"file"` fields an inspect_external trace records, which is the same
+# record files_read() reads to build the manifest.
+_re_ledger = re.compile(r'"file":\s*"([^"]+)"')
+
+
 def engagement_state(world: str, agent: str, leg: int, max_legs: int,
                      elapsed_s: float,
                      claim_sources: Optional[List[str]] = None) -> str:
@@ -139,7 +144,23 @@ def engagement_state(world: str, agent: str, leg: int, max_legs: int,
             except OSError as e:
                 logger.warning("ledger: unreadable trace %s (%s)", t, e)
                 continue
-            seen.update(d for d in docs if d in body)
+            # THE PATH THE TRACE RECORDED, NOT A SUBSTRING OF IT. `d in body`
+            # credits a claim source whenever its name appears anywhere, and a
+            # declared source is a substring of any deeper path ending the same
+            # way. The ChatterMate engagement names both `README.md` and
+            # `backend/app/knowledge/README.md`, so opening the second credited
+            # both, and the ledger reported two of four sources opened on one
+            # read. That is the saturating fraction the note below warns
+            # about, manufactured by the runner rather than earned.
+            #
+            # Matching the `"file"` fields is what files_read() already trusts
+            # to build the content-hash manifest, so the ledger and the
+            # manifest now answer from the same record. It can undercount if a
+            # source is reached by some path that records no file field —
+            # which is the safe direction here, because this fraction's only
+            # failure mode that matters is reading as finished.
+            seen.update(d for d in docs
+                        if d in set(_re_ledger.findall(body)))
             opened += 1
     head = (f"\n\n[engagement state, recorded by the client's process — "
             f"leg {leg} of {max_legs}, {elapsed_s / 60:.0f} min elapsed")

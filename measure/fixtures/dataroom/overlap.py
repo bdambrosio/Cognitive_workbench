@@ -75,7 +75,16 @@ def doc_key(token: str) -> str:
 
     One model writes `doc1`, another `doc1_seller_listing_description.md`, and
     treating those as different documents reports zero agreement between models
-    that agree completely. Outside the fixture the basename is the identity.
+    that agree completely.
+
+    THE BASENAME IS THE IDENTITY ONLY BECAUSE THIS CORPUS HAS NO DUPLICATES —
+    a fixture property, checked, not a general one. A real target can name two
+    claim sources with one basename: ChatterMate declares both `README.md` and
+    `backend/app/knowledge/README.md`, and collapsing those to one key would
+    merge two documents and report agreement between models citing different
+    files. Before using this outside the fixture, key on the path relative to
+    the corpus root and fall back to the basename only when it is unique — the
+    shape `workflows/audit_review/runner.py::_locate` uses.
     """
     base = token.rsplit("/", 1)[-1]
     m = _DOCN.match(base)
