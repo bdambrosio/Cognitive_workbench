@@ -771,13 +771,21 @@ def test_user_yield_spawns_fresh_concern(loop):
     _mute_indexer(loop)
     loop.backend = StubBackend(["must not be consulted"])
     nxt = "Extract the plates, craft the drill, place it at (-54, -31)."
-    nid = loop._spawn_concern_from_user_yield(
-        "restore the burner drill you deleted", nxt)
+    nid = loop._spawn_concern_from_user_yield(nxt)
     assert nid
     assert loop.backend.calls == 0  # verbatim, no synthesizer
     props = loop.resource_manager.get_resource(nid)["properties"]
     assert props["instruction"] == nxt
     assert "successor_of" not in props  # fresh root, not a successor
+
+    # TITLED BY THE PLAN, IN FULL, AND NOT BY THE TURN THAT PRECEDED IT.
+    # The title used to be the turn's input clipped to 140 characters, so a
+    # workflow leg carried the runner's own block rejection into the next leg
+    # as its most salient concern while the agent's remainder ranked below it
+    # (the ChatterMate audit, 2026-08-29). The concern names what it intends
+    # to do, and a plan clipped mid-sentence is a plan with its tail cut off.
+    assert nxt in props["content"], props["content"]
+    assert "restore the burner drill" not in props["content"], props["content"]
     # Primed AT threshold so the next tick fires it — verified live
     # 2026-08-16: spawn 16:29:11, triage fire 16:29:14.
     assert props["activation"] == pytest.approx(_AGENT_CONCERN_FIRE_THRESHOLD)
@@ -799,7 +807,7 @@ def test_reflection_cannot_abandon_a_yield_continuation(loop):
     _mute_indexer(loop)
 
     for nid, label in (
-            (loop._spawn_concern_from_user_yield('the ask', 'the remainder'),
+            (loop._spawn_concern_from_user_yield('the remainder'),
              'user-turn yield'),
             (loop._create_successor_concern(make_concern(loop), 'more work'),
              'autonomous successor')):
@@ -816,8 +824,8 @@ def test_reflection_cannot_abandon_a_yield_continuation(loop):
 
 def test_user_yield_empty_next_spawns_nothing(loop):
     _mute_indexer(loop)
-    assert loop._spawn_concern_from_user_yield("some ask", "   ") is None
-    assert loop._spawn_concern_from_user_yield("some ask", None) is None
+    assert loop._spawn_concern_from_user_yield("   ") is None
+    assert loop._spawn_concern_from_user_yield(None) is None
 
 
 def test_synthesize_remainder_complete_verdict(loop):
@@ -837,7 +845,7 @@ def test_user_max_iters_synthesizes_then_spawns(loop):
         "proceed with the smelting line", [("ACTION 12", "cut off")])
     assert verdict == 'remainder'
     assert nxt == "Place the belt at the drop tile."
-    nid = loop._spawn_concern_from_user_yield("proceed with the smelting line", nxt)
+    nid = loop._spawn_concern_from_user_yield(nxt)
     assert nid
     props = loop.resource_manager.get_resource(nid)["properties"]
     assert props["instruction"] == nxt

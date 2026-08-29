@@ -92,12 +92,16 @@ def load_engagement(name: str) -> Dict[str, Any]:
     if not brief.is_file():
         raise SystemExit(f"engagement '{name}' has no brief.md")
     return {"name": name, "dir": d, "target": target.resolve(),
+            # Declared by the engagement, never inferred: the documents in
+            # which the target asserts things about itself.
+            "claim_sources": list(cfg.get("claim_sources") or []),
             "brief": brief, "runs": d / "runs",
             "retention": cfg.get("retention")}
 
 
 def engagement_state(world: str, agent: str, leg: int, max_legs: int,
-                     elapsed_s: float, corpus: Optional[Path] = None) -> str:
+                     elapsed_s: float,
+                     claim_sources: Optional[List[str]] = None) -> str:
     """A ledger of what has happened, appended to each `continue`.
 
     WHY THE RUNNER CARRIES THIS. The agent's own record of its work decays by
@@ -113,17 +117,21 @@ def engagement_state(world: str, agent: str, leg: int, max_legs: int,
     to the thing being measured. "9 of 9 documents opened" is a ledger entry;
     "you still owe me a Gap Map" is the answer sheet.
 
-    Nothing here is interpreted. Filenames are matched against the corpus
-    listing — a directory comparison, not a judgement about what the agent
-    meant or intended.
+    Nothing here is interpreted. Filenames are matched against the
+    engagement's declared claim sources — a string comparison, not a
+    judgement about what the agent meant or intended.
     """
-    # Fixture-only. A real target has a claim surface, not a document list,
-    # and counting *.md in a 1,100-file repository would report progress
-    # against a denominator that means nothing.
-    docs = sorted(f.name for f in corpus.glob("*.md")) \
-        if corpus and corpus.is_dir() else []
+    # THE ENGAGEMENT DECLARES THE SET; THE RUNNER DOES NOT GUESS IT. This
+    # globbed `*.md` in the target until 2026-08-29, which is only meaningful
+    # when the target IS a document corpus. On ChatterMate — 1,141 files — it
+    # found three markdown files in the root and reported "3 of 3 documents
+    # opened so far", a completion signal on the leg where the agent was
+    # deciding whether to keep working. Wrong numerator and wrong denominator,
+    # agreeing by coincidence: CONTRIBUTING.md is not a claim source and
+    # llms.txt is not matched by the glob.
+    docs = sorted(claim_sources or [])
     traces = REPO / "scenarios" / world / agent / "inspect_traces"
-    seen = set()
+    seen, opened = set(), 0
     if traces.is_dir():
         for t in traces.glob("inspect_external_*.txt"):
             try:
@@ -132,11 +140,20 @@ def engagement_state(world: str, agent: str, leg: int, max_legs: int,
                 logger.warning("ledger: unreadable trace %s (%s)", t, e)
                 continue
             seen.update(d for d in docs if d in body)
+            opened += 1
     head = (f"\n\n[engagement state, recorded by the client's process — "
             f"leg {leg} of {max_legs}, {elapsed_s / 60:.0f} min elapsed")
+    # A FRACTION THAT SATURATES READS AS "FINISHED", so the claim-source
+    # fraction — which is small, and which an agent completes early and
+    # correctly — is followed by a count that only grows. "3 of 3 claim
+    # sources opened" on its own is what the agent saw before it stopped
+    # auditing at 24 of 86 claims; "and 37 files opened" says the work is
+    # still moving. Both are things that happened, which is the line this
+    # ledger holds: state, never gaps.
     if docs:
-        return head + (f". Data room: {len(seen)} of {len(docs)} documents "
-                       f"opened so far.]")
+        head += (f". Claim sources: {len(seen)} of {len(docs)} opened")
+    if opened:
+        head += f". {opened} file reads so far"
     return head + ".]"
 
 
@@ -442,7 +459,7 @@ def main() -> int:
             if exit_reason == "yield":
                 text = CONTINUE + engagement_state(
                     args.world, name, i + 2, args.max_turns,
-                    time.time() - t0, corpus=eng["target"])
+                    time.time() - t0, claim_sources=eng["claim_sources"])
                 continue
             nxt = undelivered[0]
             prompted[nxt] += 1
@@ -450,7 +467,7 @@ def main() -> int:
                         i + 1, nxt, prompted[nxt])
             text = (CONTINUE + "\n\n" + blocks.rejection(nxt) + "\n"
                     + engagement_state(args.world, name, i + 2, args.max_turns,
-                                       time.time() - t0, corpus=eng["target"]))
+                                       time.time() - t0, claim_sources=eng["claim_sources"]))
             continue
         else:
             # THE LEG CAP IS A TERMINAL STATE OF ITS OWN, and it names the

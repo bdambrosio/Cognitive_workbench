@@ -330,12 +330,10 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # lowers it to 4096 so a runaway tool arg truncates before the HTTP
         # read timeout, letting the parse-retry recover.
         self.react_max_tokens = int((character_config.get('chat') or {}).get('react_max_tokens', 8192))
-        # Action emissions cut off mid-JSON by the token ceiling, over
-        # the life of this loop. Surfaced in run_meta/review_meta: a run
-        # that hit the ceiling repeatedly is degraded, and until this
-        # existed it looked identical in the record to one that never
-        # did — the fact lived only in a log nobody keeps.
-        self.finish_length_events = 0
+        # Truncated completions are counted on the BACKEND, not here: the
+        # subagents share that object and have no reference to this loop, so a
+        # counter here missed every subagent truncation. Read it through the
+        # property below.
         # ACTION-EMISSION TEMPERATURE. 0.7 is right for a companion, where
         # sampling diversity is the personality. It is not obviously right
         # for an agent executing a procedure, which wants the most likely
@@ -969,6 +967,14 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             logger.warning(
                 f"[{self.character_name}] substrate marker write failed: {e}")
         return "; ".join(parts)
+
+    @property
+    def finish_length_events(self) -> int:
+        """Completions the token ceiling cut off, from every caller on this
+        backend. Surfaced in run_meta/review_meta: a run that hit the ceiling
+        repeatedly is degraded, and without this it looks identical in the
+        record to one that never did."""
+        return getattr(self.backend, 'finish_length_events', 0)
 
     def _record_empty_response(self, cot_profile: Optional[str],
                                max_tokens: int) -> None:
@@ -2244,7 +2250,7 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
                 else:
                     verdict, next_slice = self._synthesize_remainder(text, log)
                     next_slice = next_slice if verdict == 'remainder' else ''
-                succ_id = self._spawn_concern_from_user_yield(text, next_slice)
+                succ_id = self._spawn_concern_from_user_yield(next_slice)
                 if succ_id:
                     self._write_autonomy_event({
                         'event': 'successor_spawned',

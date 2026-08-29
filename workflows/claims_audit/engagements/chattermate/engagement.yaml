@@ -10,6 +10,38 @@
 
 target: targets/chattermate
 
+# THE CLAIM SOURCES, as data rather than as prose. These are the documents in
+# which the project asserts things about itself; every other file in the
+# repository, including the source code, is evidence. brief.md says the same
+# thing in words and must stay in step with this list — a brief that names a
+# different set than the engagement is a contradiction the agent resolves at
+# runtime, silently.
+#
+# WHY THIS IS A KEY AND NOT JUST A SENTENCE. The runner's progress ledger
+# needs a set it can count. Until 2026-08-29 it globbed `*.md` in the target
+# root, which on this repository found three files — README.md,
+# CONTRIBUTING.md and HELP_CENTER_INFRA.md — and reported "3 of 3 documents
+# opened so far" on a 1,141-file target. Wrong numerator and wrong
+# denominator, agreeing by coincidence: it counted CONTRIBUTING.md, which is
+# not a claim source, and could not see llms.txt at all.
+#
+# backend/app/knowledge/README.md was added 2026-08-29. It is product prose in
+# a code directory — "Enhanced Website Knowledge Base", "Key Features",
+# "High-Performance Configuration" — and the only genuine omission a scan of
+# the repository's 16 documentation files turned up.
+#
+# KEEP THIS LIST SMALL AND ARGUED. Widening it to every document in the tree
+# is how a claim surface inflates: LICENSE, docker-compose.yml and
+# .env.example are where claims are CHECKED, not made, and counting them makes
+# the coverage ratio worse without telling a buyer anything. Three models given
+# the same nine fixture documents enumerated 62, 67 and 273 claims before the
+# sources were named per engagement.
+claim_sources:
+  - README.md
+  - llms.txt
+  - HELP_CENTER_INFRA.md
+  - backend/app/knowledge/README.md
+
 # Runs land in runs/ beside this file. Retention is an engagement fact, not a
 # harness default: a real client's run holds verbatim client material and
 # carries a destruction date under the engagement letter (METHOD §14).

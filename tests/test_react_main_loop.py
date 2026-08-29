@@ -65,9 +65,15 @@ class _Backend:
         self.replies = list(replies)
         self.calls = []
         self.last_finish_reason = finish_reason
+        self.finish_length_events = 0
+
+    def _note_finish(self):
+        if self.last_finish_reason in ('length', 'max_tokens'):
+            self.finish_length_events += 1
 
     def chat(self, messages, **kwargs):
         self.calls.append(kwargs)
+        self._note_finish()
         idx = min(len(self.calls) - 1, len(self.replies) - 1)
         return self.replies[idx]
 
@@ -79,7 +85,6 @@ class Host(ReactMixin):
         self.backend = _Backend(replies, finish_reason)
         self.character_name = 'Tester'
         self.react_max_tokens = 8192
-        self.finish_length_events = 0
         self._reasoning_effort = None
         self._affect = _Affect()
         self._canvas = _Canvas()
@@ -257,8 +262,15 @@ def test_truncation_is_distinguished_from_malformed_output():
     assert action_budgets[0] == 8192, action_budgets
     assert set(action_budgets[1:]) == {16384}, action_budgets
 
-    # And the run says so in its own record rather than only in a log.
-    assert host.finish_length_events == len(action_budgets)
+    # And the run says so in its own record rather than only in a log. The
+    # count lives on the BACKEND, which every caller shares — the subagents,
+    # which hold no reference to the loop, and the fallback synthesis below.
+    # A counter on the loop recorded 0 for a run whose `inspect_external`
+    # subagent truncated twice, and missed the fallback call here.
+    #
+    # Four, not three: the three action emissions plus the fallback synthesis,
+    # which this backend also truncates. Every truncated completion counts.
+    assert host.backend.finish_length_events == len(host.backend.calls) == 4
 
 
 # --------------------------------------------------------------------

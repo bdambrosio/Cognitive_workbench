@@ -10,6 +10,14 @@
 
 target: measure/fixtures/dataroom/corpus
 
+# THE CLAIM SOURCES, as data rather than as prose — brief.md says the same in
+# words and must stay in step. §2 defines a claim as something the SELLER
+# asserts, which makes doc3-doc8 evidence rather than claim sources.
+claim_sources:
+  - doc1_seller_listing_description.md
+  - doc2_tech_stack_description_as_provided_by_se.md
+  - doc9_seller_s_technical_claims_verbatim.md
+
 # Runs land in runs/ beside this file. Retention is an engagement fact, not a
 # harness default: a real client's run holds verbatim client material and
 # carries a destruction date under the engagement letter (METHOD §14).

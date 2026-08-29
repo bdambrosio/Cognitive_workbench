@@ -138,6 +138,13 @@ class _ChatBackend:
         # stop_reason='max_tokens') apart from genuinely malformed output
         # when an emission fails to parse. Set on every chat() return path.
         self.last_finish_reason: Optional[str] = None
+        # EVERY truncated completion on this backend, from any caller. It lives
+        # here rather than on the loop because the subagents share this object
+        # and do not hold a reference to the loop: counting in the ReAct loop
+        # recorded 0 for the ChatterMate run while its `inspect_external`
+        # subagent truncated twice, which is exactly the invisibility the
+        # counter exists to remove.
+        self.finish_length_events: int = 0
         # Chars on the reasoning channel of the most recent emission, or None
         # if the engine reported none. Field name differs by engine: vLLM
         # returns `reasoning`, SGLang returns `reasoning_content` — checking
@@ -317,6 +324,11 @@ class _ChatBackend:
     # "engine_overloaded, limit_source: upstream_provider_shared_pool".
     # Retrying is right here and clamping is not: nothing is wrong with the
     # request.
+    def _note_finish(self) -> None:
+        """Count a completion the token ceiling cut off."""
+        if self.last_finish_reason in ('length', 'max_tokens'):
+            self.finish_length_events += 1
+
     _TRANSIENT_STATUS = (429, 500, 502, 503, 504)
     _TRANSIENT_MAX_RETRIES = 4
     _TRANSIENT_BASE_SLEEP_S = 2.0
@@ -508,6 +520,7 @@ class _ChatBackend:
             resp.raise_for_status()
             data = resp.json()
             self.last_finish_reason = data.get('stop_reason')
+            self._note_finish()
             blocks = data.get('content') or []
             text = ''.join(
                 b.get('text', '') for b in blocks
@@ -669,6 +682,7 @@ class _ChatBackend:
         # client-side <think> stripping or grammar-related contortions.
         choice = choices[0]
         self.last_finish_reason = choice.get('finish_reason')
+        self._note_finish()
         _m = choice.get('message') or {}
         _r = _m.get('reasoning_content') or _m.get('reasoning')
         self.last_reasoning_chars = len(_r) if isinstance(_r, str) and _r else None

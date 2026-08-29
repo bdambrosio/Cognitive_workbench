@@ -6,10 +6,10 @@ frontend, roughly 1,100 tracked files.
 I am the buyer's side. My client operates an e-commerce business and is
 considering acquiring this product and its team. Audit it.
 
-The claim sources are README.md, llms.txt and HELP_CENTER_INFRA.md. Those are
-the documents in which the project asserts things about itself. Every other
-file in the repository, including the source code and its comments, is
-evidence.
+The claim sources are README.md, llms.txt, HELP_CENTER_INFRA.md and
+backend/app/knowledge/README.md. Those are the documents in which the project
+asserts things about itself. Every other file in the repository, including the
+source code and its comments, is evidence.
 
 Enumerate the claim surface and close it as the method says, then work the
 priority order straight through.

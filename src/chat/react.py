@@ -597,7 +597,7 @@ class ReactMixin:
                 # and steer the retry accordingly.
                 truncated = self.backend.last_finish_reason in ('length', 'max_tokens')
                 if truncated:
-                    self.finish_length_events += 1
+                    # Counted on the backend, not here — see chat_loop.
                     if budget == self.react_max_tokens:
                         budget *= 2
                         logger.warning(

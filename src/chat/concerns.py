@@ -2277,8 +2277,7 @@ class ConcernsMixin:
             f"for {peer} (depth {depth + 1}): {undelivered[:100]!r}")
         return new_id
 
-    def _spawn_concern_from_user_yield(self, turn_text: str,
-                                       next_slice: str) -> Optional[str]:
+    def _spawn_concern_from_user_yield(self, next_slice: str) -> Optional[str]:
         """User-turn intentional yield: a ReAct loop serving a USER (or
         sensor) turn ended with `yield`, carrying the remainder verbatim.
         There is no parent concern, so create a fresh agent_concern —
@@ -2289,9 +2288,28 @@ class ConcernsMixin:
         next_slice = (next_slice or '').strip()
         if not next_slice:
             return None
-        turn_text = ' '.join((turn_text or '').split())
-        succ_text = (f"continue work I yielded mid-turn: {turn_text[:140]}"
-                     if turn_text else "continue work I yielded mid-turn")
+        # TITLED BY THE PLAN, NOT BY THE PROMPT THAT PRECEDED IT. This read
+        # the turn's INPUT, clipped to 140 chars, until 2026-08-29. In a
+        # workflow leg that input is the runner's own message, so on the
+        # ChatterMate audit the concern carried into the next leg was titled
+        # with the runner's block rejection ("that turn carried no
+        # `=== REPORT ===` line") at activation 0.85, while the agent's actual
+        # remainder — finish the handoff probe, the operational tiers and the
+        # external-liveness checks — sat under it at 0.15. The audit wrote its
+        # report on the next leg and stopped at 24 of 86 claims.
+        #
+        # A concern is named by what it intends to do. Naming it after what
+        # was last said to the agent lets any text the harness injects become
+        # the agent's most salient intention, which is the acceptance layer
+        # reaching into the continuation layer through the only channel a
+        # runner has.
+        #
+        # NOT TRUNCATED. `next_slice` is a plan, and a plan clipped at 140
+        # characters is a plan with its tail cut off — the ChatterMate
+        # remainder was 118 characters, which was luck. The turn's input is
+        # no longer taken here at all — it reaches the next leg through the
+        # working log, which is where it belongs.
+        succ_text = f"continue work I yielded mid-turn: {next_slice}"
         new_id = self._add_agent_concern(
             text=succ_text, entity=self._turn_counterpart(),
             provenance='inferred',
