@@ -334,7 +334,7 @@ def test_the_summary_is_told_what_the_retest_found():
          "agreeing": 2, "of": 2, "accepted_as_failed": True}]})
     assert "Finding 9" in note and "1 of 2" in note and "DOES NOT STAND" in note
     assert "Finding 7" in note and "2 of 2" in note and "STANDS" in note
-    assert "do not delete it" in note
+    assert "Do not delete a fail that does not stand" in note
     # There is no grade to report: §9 stopped returning one 2026-08-29. Every
     # exception carries a standing instead, and a fail that does not stand is
     # reported rather than dropped.
