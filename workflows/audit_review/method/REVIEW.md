@@ -479,9 +479,19 @@ admissibility as you found it, list every finding you failed as found but not
 retested, and give none of PASS, WARN or FAIL. A retest that did not happen is not
 a retest that disagreed.
 
-`[uncited]` is not retested, and not for symmetry: where a finding cites
-nothing there is no reference for a second reviewer to open. It is fatal on
-sight.
+`[uncited]` is not retested, and not for symmetry: it means what §6 says it
+means — **no reference at all**, a field that names a document or a section and
+then writes prose, so there is nowhere for a second reviewer to look. Nothing
+to open is not the same as nothing found.
+
+**It does not mean the finding has no support.** A finding whose evidence is
+distributed across the target, or composed from several places, is cited when
+it says where those places are. An absence finding carries the two searches
+instead of a settling line and is **complete** in METHOD's terms — §5 above,
+and there is no limit on how many of those a report may hold. Composed or
+distributed support is a signal that a reader must go and look, never a defect
+in the report. Only an evidence field pointing nowhere at all is `[uncited]`,
+and only that is fatal on sight.
 
 `[broken citation]` was excluded on the same reasoning until 2026-08-29, and
 the reasoning was wrong in one respect — it set severity by how a defect was
