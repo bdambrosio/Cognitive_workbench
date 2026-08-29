@@ -1,143 +1,213 @@
-# Concerns: How an Autonomous Agent Decides What Matters
+# Concerns: how the agent decides what to act on
 
-*(Rewritten 2026-07-19 against `src/chat/concerns.py`. The previous
-version described the OODA-era model — three fixed character concerns,
-activation-monitor thresholds, concern→task triage — deleted 2026-05-02.
-For the motivating essay see
-[what-agents-care-about.md](what-agents-care-about.md).)*
+*Re-derived from `src/chat/concerns.py`, `chat_loop.py`, `reflection.py`,
+`claims.py`, `prompts.py` and `zenoh_io.py` on 2026-08-29. Every number and
+every path below was read out of the code, not recalled. The previous version
+(2026-07-19) had drifted: it listed a `derived` category that no longer exists,
+named three creation paths where there are six, and predated the deletion
+lifecycle entirely. For the motivating essay see
+[what-agents-care-about.md](what-agents-care-about.md).*
 
-## The Problem
+## Two layers, one asymmetry
 
-An agent sitting idle has no reason to act, and an agent that only
-reacts has no persistent model of what's important. Concerns give the
-agent both: a durable model of what the user cares about, and standing
-evaluative pressure toward its own work that accumulates until it fires
-as autonomous action.
+Two note collections per character:
 
-## Two Layers, One Asymmetry
+- **`user_concerns`** — a model of the user. Each carries `strength` ∈ [0,1].
+  **Strength decays**; conversation about the topic bumps it back up. Silence
+  implies disinterest.
+- **`agent_concerns`** — what the agent may act on. Each carries `activation`
+  ∈ [0,1]. **Activation grows** with wall-clock time; a fire knocks it down.
+  Silence implies untended work.
 
-Everything lives in two note collections per character
-(`src/chat/concerns.py`):
-
-- **`user_concerns`** — a model of the user, maintained by observation.
-  Each carries `strength` ∈ [0,1]. **Strength decays**; conversation
-  about the topic bumps it back up. Silence implies disinterest.
-- **`agent_concerns`** — what the agent itself wants to act on. Each
-  carries `activation` ∈ [0,1]. **Activation grows** with wall-clock
-  time; servicing it (an autonomous fire) knocks it back down. Silence
-  implies untended work.
-
-The asymmetry — strength decays, activation grows — is the design's
-center: user models are recall-driven, agent action is pressure-driven.
-
-Both collections share the status vocabulary `active` / `satisfied` /
-`abandoned`. `satisfied` stays recallable and can revive through
-recurrence (a new candidate whose similarity to an existing note exceeds
-0.8 refreshes it rather than duplicating); `abandoned` blocks revival —
-it records a deliberate drop decision.
+Strength decays, activation grows: user models are recall-driven, agent action
+is pressure-driven. Both share the status vocabulary `active` / `satisfied` /
+`abandoned`.
 
 ## User-concern dynamics
 
-Applied at user-turn entry (`_decay_user_concerns_per_turn`,
+At user-turn entry (`_decay_user_concerns_per_turn`,
 `_bump_user_concerns_on_input`):
 
-- decay 0.05 strength per user turn; prune below 0.10
-- input with embedding similarity ≥ 0.5 bumps +0.15, capped at 3
-  concerns per turn (uncapped bumping once sustained a 34-concern
-  population that decay could never win against)
-- unbumped for 14 days → swept `active` → `satisfied`
-- top 5 by strength are surfaced in the prompt
+- decay **0.05** per user turn; prune below **0.10**
+- input with embedding similarity **≥ 0.5** bumps **+0.15**, at most **3**
+  concerns per turn (uncapped bumping once sustained a 34-concern population
+  decay could not win against)
+- unbumped for **14 days** → `active` → `satisfied`
+- top **5** by strength reach the prompt
 
-Creation, development, and closure ride the post-turn reflection call
-(`src/chat/reflection.py`): reflection can capture new user concerns,
-update existing ones, and close ones the conversation resolved.
+Creation, update and closure ride the post-turn reflection call.
 
-**Heat coupling** bridges the two layers: a user concern bumped *across*
-strength 0.70 applies an evidence bump to any active agent concern
-carrying `user_model_reviewer` (the "review what the user has been
-tracking" seed) — so the review fires ahead of its rhythm while the heat
-is real, and the judgment of whether anything warrants action stays in
-the reviewer's instruction at fire time.
+**Heat coupling.** A user concern bumped *across* strength **0.70** applies an
+evidence bump to any active agent concern flagged `user_model_reviewer`, so the
+review fires ahead of its rhythm while the heat is real.
 
-## Agent-concern dynamics
+## When an agent concern fires
 
-An agent concern fires autonomously when **all** hold:
+All five must hold:
 
-1. `activation` ≥ 0.70,
-2. it has a non-null `instruction` (what a fire should actually do),
-3. status is `active`,
-4. the launcher ran with `--autonomy` (off by default), and
-5. fire-time triage doesn't defer (below).
+1. `activation` **≥ 0.70**
+2. a non-null `instruction`
+3. status `active`
+4. the launcher ran with `--autonomy`
+5. fire-time triage returns `fire`
 
-**Growth.** Activation grows per tick proportional to *elapsed
-wall-clock time*, scaled so a concern with `rhythm_hours: 24` climbs
-from the post-service floor back to threshold in 24 hours. Rhythms snap
-to buckets (1, 2, 4, 8, 12, 24, 168h; default 168). Changing tick
-frequency does not change firing rhythm.
+**Growth** is proportional to elapsed wall-clock time, scaled so a concern at
+`rhythm_hours: 24` climbs from the post-service floor to threshold in 24 hours.
+Rhythms snap to **1, 2, 4, 8, 12, 24, 168**; the default is **168**. Changing
+tick frequency does not change firing rhythm.
 
-**Service.** A completed fire decrements activation: −0.60 when the fire
-ran to a natural finish (`respond`), −0.25 when it hit the iteration cap
-(`max_iters`) — partial service leaves pressure in place.
+**Service** decrements on a completed fire: **−0.60** on `respond`, **−0.60**
+on `yield` (the successor carries the remainder, so the parent must not re-fire
+the same work), **−0.25** on `max_iters` — partial service leaves pressure in
+place. A `one_shot` that exits `respond` is additionally marked `satisfied`:
+the loop running to completion *is* the completion, and without this they
+regrow and re-fire a finished instruction forever.
 
-**Evidence bumps.** Non-autonomous input semantically matching an active
-agent concern (similarity ≥ 0.5) raises its activation — accumulating
-evidence pulls a fire forward ahead of rhythm. A bump also clears any
-cached triage defer: new evidence reopens the question.
+**Evidence bumps.** Non-autonomous input matching an active agent concern
+(similarity **≥ 0.50**) raises activation **+0.15** and clears any cached
+triage defer. Concerns flagged `polled` are skipped: their material arrives on
+a clock, so talking about the topic is not evidence that new material exists.
 
-**Fire-time triage.** At threshold, a cheap triage step asks whether
-acting *now* is warranted. A `defer` verdict is cached and suppresses
-re-triage for `rhythm/8` hours (clamped 1–24h) so a weekly concern
-deferred once isn't re-asked hourly.
+**Fire-time triage.** At threshold, one LLM call asks whether acting *now* is
+warranted. A `defer` verdict is cached and suppresses re-triage for
+`rhythm/8` hours, clamped to **[1, 24]**.
 
-**Categories and lifetimes.** `one_shot` (default lifetime 0.5 d),
-`derived` (2 d), `durable` (120 d). A staleness sweep retires expired
-concerns `active` → `satisfied`. Concerns are created three ways:
-seeded from the scenario, derived by reflection from conversation, or
-spawned as successors by yield (below).
+**Per-tick dispatch cap: 2.** The rest stay due and surface next tick.
 
-**Seeds.** The scenario YAML's `concerns:` block seeds durable agent
-concerns (`seed=True`) — see
-[configuration.md](configuration.md) for the fields (`text`, `name`,
-`category`, `rhythm_hours`, `instruction`, `domain`,
-`user_model_reviewer`, `wip_reviewer`, `self_extension`). Seeds are
-architectural baseline: they are **never closed** — not by reflection,
-not by the sweep. `domain` tags (e.g. `factorio`) are stamped onto fire
-records so analyses can stratify (chat-only vs all-life composites).
+## What the autonomy flag does, exactly
 
-**Closure.** Reflection can retire non-seed agent concerns the user
-agreed to drop — status `abandoned`, blocking recurrence revival. The
-`wip_reviewer` seed runs the escalate-or-retire loop over stalled work.
+`_handle_tick` returns early when `--autonomy` is off. Above that return:
+the **stale sweep**, which is housekeeping and always runs. Below it:
+**growth** and **firing**.
 
-## WIP: continuity across fires
+`_bump_agent_concerns_on_input` is **not** in `_handle_tick` and is not gated.
+So with autonomy off, activation still rises on every user turn and nothing
+ever fires — the number moves and has no effect. This is the normal condition
+for a workflow run.
 
-Each agent concern carries a work-in-progress summary (cap 1500 chars,
-rewritten — not appended — after each completed fire) with a NEXT: line,
-so consecutive fires don't start cold. This is the greedy planning
-model: no upfront plan, always "most valuable next improvement."
+## Categories and lifetimes
 
-## Yield: multi-turn work without a planner
+Two categories, not three. `derived` was retired.
 
-A fire (or a user turn) that can't finish in one ReAct loop can
-**yield**: the remainder is captured into a successor agent concern that
-carries the work forward on its own pressure. Auditability comes from
-yield points, not plan artifacts (see
-the retired harness roadmap, §2).
+| category | default cadence | lifetime |
+|---|---|---|
+| `one_shot` | 1 h | 0.5 d |
+| `durable` | 24 h | 120 d |
 
-## Fire-outcome capture
+The stale sweep retires an `active` non-seed concern whose last activity
+(fire, bump, creation) exceeds its lifetime, with a floor of `2 × rhythm/24`
+days so a never-fired concern outlives its own rhythm.
 
-Each autonomous fire registers a pending record awaiting outcome
-judgment ([fire-outcome-capture.md](fire-outcome-capture.md), Phase 1
-live). Pending fires are surfaced once in the next user turn's prompt
-(fire digest, ≤3 items) so the user gets a reaction opportunity;
-judgment rides reflection stage 6 (`helped` / `neutral` / `hindered` /
-`ignored`, ≤3 per reflection), with runtime-resolved `unobserved` /
-`unobservable` when the window (3 user turns or 7 days) closes first.
+## The six ways a concern is created
+
+| path | fires when | notes |
+|---|---|---|
+| `_seed_concerns_from_config` | launch | scenario `concerns:` block, `seed=True` |
+| `reflection.py` stage 4 | post-turn | the only path that *asks a model* what to create; suppressed under `workflow_mode` |
+| `_spawn_concern_from_user_yield` | a **user** turn exits `yield`/`max_iters` | depth 0, no parent |
+| `_create_successor_concern` | an **autonomous fire** exits `yield`/`max_iters` | depth +1, retires a one-shot parent as `superseded` |
+| `_maybe_spawn_suspect_verification` (`claims.py`) | post-turn claim grading | **autonomy-gated**; `system_spawned` |
+| `_spawn_concern_from_hop_exhaustion` (`zenoh_io.py`) | a peer exchange runs out of hops | needs peer tools |
+
+A grep that finds one of these and stops will describe the system wrongly. That
+has happened.
+
+## Flags, and what each one prevents
+
+- **`seed`** — architectural baseline. Never closed by reflection, never swept,
+  never deleted.
+- **`system_spawned`** — machine-scheduled work. Reflection may not close it;
+  closing a claim-verification concern would be the agent cancelling an audit
+  of its own claims. Was silently dropped by `create_note`'s allowlist for its
+  whole life until 2026-08-16, so the guard never fired.
+- **`yield_continuation`** — *the* live continuation from a user-turn yield.
+  Spawning a new one retires the previous **of the same `entity`**. Not set by
+  `_create_successor_concern`, so an autonomous successor is never retired this
+  way. Whether one counterpart may hold several live continuations is unsettled.
+- **`polled`** — skipped by evidence bumps (see above).
+- **`user_model_reviewer`**, **`wip_reviewer`**, **`self_extension`** — the
+  seeds heat coupling, the stalled-work loop, and capability-gap recording
+  target by flag rather than by name.
+- **`successor_of` / `successor_depth`** — the chain, capped at
+  **`_CONCERN_SUCCESSOR_MAX_DEPTH = 2`**. At the cap no successor is created
+  and a one-shot parent is retired `depth_cap`, so an autonomous chain stops
+  after three links. Runner-driven work never reaches it: that path is always
+  depth 0.
+
+## Closure and deletion
+
+**Satisfied** (`_satisfy_agent_concern`), with the reason recorded: `completed`,
+`superseded`, `depth_cap`, `synth_complete`, `stale_sweep`.
+**Abandoned** — a deliberate drop, only from reflection, refused for seeds and
+`system_spawned`.
+
+`_delete_dead_agent_concerns` then tombstones each dead concern **verbatim to
+`<memory>/concerns_graveyard.jsonl` before deleting it** — an unwritable
+graveyard blocks the delete. What counts as dead:
+
+- `abandoned` → deleted
+- `satisfied` **one-shot** → deleted; its instruction is a snapshot of a
+  finished intention and must not revive
+- `satisfied` **durable** → **kept**, as the recurrence-revival pool
+- `seed` → never
+
+Two schedules. **At startup, grace 0**: whatever was already dead when the
+process began is discarded, so the collection a person opens holds only
+concerns that can still do something. **On tick, grace 7 days**: a concern that
+dies *during* a session stays for that session.
+
+**Recurrence.** A new candidate whose similarity to an existing concern exceeds
+**0.8** refreshes it rather than duplicating — unless the caller passes
+`skip_recurrence`, which every continuation path does: two requests about one
+topic are two debts, and merging them forgives the older.
+
+## What reaches the prompt
+
+Top **5** agent concerns by activation, each rendered with its activation,
+`rank i/N`, and `last evidence <date>` where one exists, closing with
+`Showing 5 of 13 active. Highest not shown: 0.42`. A top-K list without its
+denominator reads as "these are my concerns" when it means "these five of
+thirteen".
+
+The instruction is shown at **120 characters when firing is on** — a fire
+delivers it whole as the turn's input, so the line is only an awareness
+summary — and **whole when firing is off**, where no fire will ever come and
+this line is the only place it reaches the agent.
+
+**No growth/bump split is reported**, because none is recorded: both writers do
+`activation = min(1.0, a + x)` in place, and a saturated concern is not
+decomposable by arithmetic either. Reporting one would need new per-concern
+state.
+
+## WIP, and the delivery log
+
+Each concern carries a work-in-progress summary (**1500** chars, **rewritten**
+by an LLM after each fire, not appended) so consecutive fires don't start cold.
+
+`_record_surfaced` is separate and **append-only**: what this concern actually
+said, to whom. WIP is a summariser and it ate exactly this — "I sent Bruce the
+HarnessX paper" compressed to "Harness focus: HarnessX", which reads as scope
+rather than as something already said, and the paper went out three more times.
+
+**Both are written only on autonomous fires.** In a workflow run neither is
+ever populated.
+
+## Under `workflow_mode`
+
+`src/chat/workflow.py` suppresses **discourse**, **orientation** and
+**reflection**. It does **not** suppress concern creation: a `yield` carries
+its remainder into the next leg as a concern, and an audit runs on yields.
+Reflection is suppressed because it authors continuations *without* being told
+`exit_reason`, so it cannot tell a leg that yielded from one that stopped, and
+its concern competed with the yield's own.
 
 ## Observability
 
-- `/concerns` in the CLI: current populations with strengths/activations
-  (see [commands.md](commands.md) for the management subcommands)
-- `autonomy.jsonl`: append-only event log (fires, satisfactions,
-  abandonments, triage decisions)
-- the Resource Browser (:3001) shows both collections with inline
-  management
+- `/concerns` in the CLI — populations with strengths and activations
+- `<memory>/autonomy.jsonl` — append-only: fires, deferrals, successor spawns,
+  capability gaps, deletions
+- `<memory>/concerns_graveyard.jsonl` — every deleted concern, verbatim
+- the Resource Browser (:3001), and `src/world_viewer.py` for a world with no
+  live agent behind it
+- a workflow run's `concern_log.jsonl` — per leg, the full set before and
+  after, with the delta

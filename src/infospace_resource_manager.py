@@ -1002,6 +1002,19 @@ class InfospaceResourceManager:
                           # Designates the agent_concern that reviews the
                           # user model (heat-coupling bump target).
                           'user_model_reviewer',
+                          # Designates the agent_concern whose fires review
+                          # stalled work (the escalate-or-retire loop), and the
+                          # tag fire records carry so analyses can stratify by
+                          # domain. Missing here until 2026-08-29: both were
+                          # dropped at create_note time and only repaired on a
+                          # later boot by _seed_concerns_from_config's adopt
+                          # path, which writes props directly. So a fresh world
+                          # ran its first session with a wip_reviewer seed that
+                          # was not one. Same defect as system_spawned in
+                          # 2026-08-16 — and this time the drop warning fired
+                          # and nobody was reading it.
+                          'wip_reviewer',
+                          'domain',
                           # Designates the agent_concern that proposes new
                           # tools to close capability gaps (self-extension).
                           'self_extension',
