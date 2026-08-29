@@ -1,0 +1,692 @@
+{
+  "citations": [
+    {
+      "cited": "backend/app/models/workflow.py:41",
+      "document": "workflow.py",
+      "line": 41,
+      "through": 41,
+      "resolved": true,
+      "text": "41: "
+    },
+    {
+      "cited": "backend/app/api/workflow.py:86",
+      "document": "workflow.py",
+      "line": 86,
+      "through": 86,
+      "resolved": true,
+      "text": "86: class WorkflowResponse(WorkflowBase):"
+    },
+    {
+      "cited": "backend/app/agents/ticket_investigator.py:55",
+      "document": "ticket_investigator.py",
+      "line": 55,
+      "through": 55,
+      "resolved": true,
+      "text": "55: DEFAULT_AUTO_RESOLVE_CONFIDENCE = 0.85"
+    },
+    {
+      "cited": "sql_guardrails.py:252-257",
+      "document": "sql_guardrails.py",
+      "line": 252,
+      "through": 257,
+      "resolved": true,
+      "text": "252:     if not isinstance(statement, exp.Select):\n253:         return SqlValidationResult(\n254:             ok=False,\n255:             reason=\"Only plain SELECT statements are allowed \"\n256:             \"(wrap set operations like UNION in a subquery)\",\n257:         )"
+    },
+    {
+      "cited": "db_connector_service.py:177-193",
+      "document": "db_connector_service.py",
+      "line": 177,
+      "through": 193,
+      "resolved": true,
+      "text": "177:         with conn.cursor() as cursor:\n178:             cursor.execute(\"SET SESSION TRANSACTION READ ONLY\")\n179:             # max_execution_time bounds SELECTs server-side (milliseconds).\n180:             cursor.execute(f\"SET SESSION max_execution_time = {int(config.statement_timeout_ms)}\")\n181:         return conn\n182:     import psycopg\n183:     return psycopg.connect(\n184:         host=host,\n185:         port=port,\n186:         dbname=config.database,\n187:         user=config.username,\n188:         password=config.password,\n189:         connect_timeout=CONNECT_TIMEOUT_SECONDS,\n190:         options=(\n191:             f\"-c statement_timeout={int(config.statement_timeout_ms)} \"\n192:             \"-c default_transaction_read_only=on\"\n193:         ),"
+    },
+    {
+      "cited": "workers/ticket_investigator.py:356-360",
+      "document": "ticket_investigator.py",
+      "line": 356,
+      "through": 360,
+      "resolved": true,
+      "text": "356:             DBConnectorConfig.from_model(c) for c in connectors if c.allowed_tables\n357:         ]\n358:         if not configs:\n359:             return None\n360:         return GuardrailedDBTools(configs, ticket_id=ticket.id, run_id=run.id)"
+    },
+    {
+      "cited": "backend/app/agents/ticket_investigator.py:111-113",
+      "document": "ticket_investigator.py",
+      "line": 111,
+      "through": 113,
+      "resolved": true,
+      "text": "111:     email = CustomerRepository.display_email(customer.email)\n112:     if email:\n113:         bits.append(f\"email: {email}\")"
+    },
+    {
+      "cited": "workers/ticket_investigator.py:380-385",
+      "document": "ticket_investigator.py",
+      "line": 380,
+      "through": 385,
+      "resolved": true,
+      "text": "380:         tool_ids = settings_row.investigation_mcp_tool_ids or []\n381:         if tool_ids:\n382:             recorder.record_phase(\"Connecting investigation connectors\")\n383:             mcp_tools = await manager.initialize_mcp_tools_by_ids(\n384:                 str(ticket.organization_id), tool_ids\n385:             )"
+    },
+    {
+      "cited": "backend/app/workers/faq_processor.py:136-147",
+      "document": "faq_processor.py",
+      "line": 136,
+      "through": 147,
+      "resolved": true,
+      "text": "136: def reap_orphaned_jobs() -> None:\n137:     \"\"\"Fail jobs left in `processing` by a previous crash/kill. Runs once at\n138:     startup: this worker is the only writer of `processing`, so on a fresh boot\n139:     any such row is orphaned \u2014 otherwise it hangs the enqueue guard (one active\n140:     job per type) and the UI's active-job polling forever.\"\"\"\n141:     try:\n142:         with SessionLocal() as db:\n143:             reaped = FAQGenerationJobRepository(db).fail_orphaned_processing(\n144:                 \"Worker restarted before the job finished \u2014 please try again.\"\n145:             )\n146:         if reaped:\n147:             logger.warning(f\"Reaped {reaped} orphaned FAQ job(s) left in 'processing' on startup\")"
+    },
+    {
+      "cited": "workers/ticket_investigator.py:628-633",
+      "document": "ticket_investigator.py",
+      "line": 628,
+      "through": 633,
+      "resolved": true,
+      "text": "628: def reap_orphaned_runs() -> None:\n629:     try:\n630:         with SessionLocal() as db:\n631:             reaped = InvestigationRepository(db).reap_orphaned_runs()\n632:         if reaped:\n633:             logger.warning(f\"Reaped {reaped} orphaned investigation run(s) on startup\")"
+    },
+    {
+      "cited": "knowledge_processor.py:247-248",
+      "document": "knowledge_processor.py",
+      "line": 247,
+      "through": 248,
+      "resolved": true,
+      "text": "247:             # Sleep for 60 seconds before next run\n248:             await asyncio.sleep(60)"
+    },
+    {
+      "cited": "backend/app/models/workflow_node.py:26-37",
+      "document": "workflow_node.py",
+      "line": 26,
+      "through": 37,
+      "resolved": true,
+      "text": "26: \n27: logger = get_logger(__name__)\n28: \n29: \n30: def sanitize_utf8_text(text: str) -> str:\n31:     \"\"\"\n32:     Sanitize text to remove invalid UTF-8 characters and surrogates\n33:     \"\"\"\n34:     if not text:\n35:         return text\n36:     \n37:     # Remove surrogate characters (like \\udcac, \\udd16)"
+    },
+    {
+      "cited": "backend/app/models/workflow.py:39",
+      "document": "workflow.py",
+      "line": 39,
+      "through": 39,
+      "resolved": true,
+      "text": "39: class WorkflowCreate(WorkflowBase):"
+    },
+    {
+      "cited": "api/workflow.py:84",
+      "document": "workflow.py",
+      "line": 84,
+      "through": 84,
+      "resolved": true,
+      "text": "84: "
+    },
+    {
+      "cited": "backend/app/utils/agno_utils.py:31-144",
+      "document": "agno_utils.py",
+      "line": 31,
+      "through": 144,
+      "resolved": true,
+      "text": "31: def create_model(model_type: str, api_key: str, model_name: str, max_tokens: int = 1000, response_format: Optional[Dict[str, Any]] = None) -> Any:\n32:     \"\"\"\n33:     Create and return the specified model based on model_type.\n34:     \n35:     Args:\n36:         model_type: The type of model (OPENAI, GROQ, etc.)\n37:         api_key: The API key\n38:         model_name: The name/ID of the model\n39:         max_tokens: Maximum tokens for model output\n40:         response_format: Optional response format specification\n41:         \n42:     Returns:\n43:         The initialized model object\n44:         \n45:     Raises:\n46:         HTTPException: If the model type is not supported\n47:     \"\"\"\n48:     model_type = model_type.upper()\n49:     \n50:     try:\n51:         if model_type == 'OPENAI' or model_type == 'CHATTERMATE': # own model for enterprise customers\n52:             if response_format:\n53:                 return OpenAIChat(api_key=api_key, id=model_name, max_tokens=max_tokens, response_format=response_format)\n54:             else:\n55:                 return OpenAIChat(api_key=api_key, id=model_name, max_tokens=max_tokens)\n56:         elif model_type == 'ANTHROPIC':\n57:             from agno.models.anthropic import Claude\n58:             return Claude(api_key=api_key, id=model_name, max_tokens=max_tokens)\n59:         elif model_type == 'DEEPSEEK':\n60:             from agno.models.deepseek import DeepSeek\n61:             return DeepSeek(api_key=api_key, id=model_name, max_tokens=max_tokens)\n62:         elif model_type == 'GOOGLE':\n63:             from agno.models.google import Gemini\n64:             # Gemini's agno model exposes max_output_tokens, not max_tokens.\n65:             return Gemini(api_key=api_key, id=model_name, max_output_tokens=max_tokens)\n66:         elif model_type == 'GOOGLEVERTEX':\n67:             from agno.models.vertexai import Gemini\n68:             return Gemini(api_key=api_key, id=model_name, max_tokens=max_tokens)\n69:         elif model_type == 'GROQ':\n70:             from agno.models.groq import Groq\n71:             "
+    },
+    {
+      "cited": "agno_utils.py:53-136",
+      "document": "agno_utils.py",
+      "line": 53,
+      "through": 136,
+      "resolved": true,
+      "text": "53:                 return OpenAIChat(api_key=api_key, id=model_name, max_tokens=max_tokens, response_format=response_format)\n54:             else:\n55:                 return OpenAIChat(api_key=api_key, id=model_name, max_tokens=max_tokens)\n56:         elif model_type == 'ANTHROPIC':\n57:             from agno.models.anthropic import Claude\n58:             return Claude(api_key=api_key, id=model_name, max_tokens=max_tokens)\n59:         elif model_type == 'DEEPSEEK':\n60:             from agno.models.deepseek import DeepSeek\n61:             return DeepSeek(api_key=api_key, id=model_name, max_tokens=max_tokens)\n62:         elif model_type == 'GOOGLE':\n63:             from agno.models.google import Gemini\n64:             # Gemini's agno model exposes max_output_tokens, not max_tokens.\n65:             return Gemini(api_key=api_key, id=model_name, max_output_tokens=max_tokens)\n66:         elif model_type == 'GOOGLEVERTEX':\n67:             from agno.models.vertexai import Gemini\n68:             return Gemini(api_key=api_key, id=model_name, max_tokens=max_tokens)\n69:         elif model_type == 'GROQ':\n70:             from agno.models.groq import Groq\n71:             \n72:             # Create a patched Groq model that handles the response_format + tools conflict\n73:             class PatchedGroq(Groq):\n74:                 def __post_init__(self):\n75:                     \"\"\"Set supports_native_structured_outputs after initialization\"\"\"\n76:                     super().__post_init__() if hasattr(super(), '__post_init__') else None\n77:                     # Override to indicate Groq supports structured outputs via response_format\n78:                     object.__setattr__(self, 'supports_native_structured_outputs', True)\n79:                 \n80:                 def get_request_params(self, response_format=None, tools=None, tool_choice=None):\n81:                     \"\"\"\n82:                     Override get_request_params to handle the conflict between response_format and tools.\n83:                     Groq API doesn't allow JSON response_format when tools are present.\n84:                     \"\"\"\n85:                     # Get the base parameters from parent class\n86:                     base_params = {\n87:                         \"frequency_penalty\": self.frequency_penalty,\n88:                         \"logit_bias\": self.logit_bias,\n89:                         \"logprobs\": self.logprobs,\n90:                         \"max_tokens\": self.max_tokens,\n91:                         \"presence_penalty\": self.presence_penalty,\n92:                         \"seed\": self.seed,\n93:                         \"stop\": self.stop,"
+    },
+    {
+      "cited": "backend/app/utils/business_hours.py:51-72",
+      "document": "business_hours.py",
+      "line": 51,
+      "through": 72,
+      "resolved": true,
+      "text": "51: def is_within_business_hours(organization) -> bool:\n52:     \"\"\"Whether the organization is open right now, in its own timezone.\n53: \n54:     Pure and cheap \u2014 no database work and no model call \u2014 so it can answer the\n55:     widget's \"are you around?\" on every page load, not just when the AI is\n56:     deciding whether to hand a chat over.\n57: \n58:     Note: hours are compared as minutes-of-day, so a window that wraps midnight\n59:     (22:00-02:00) never matches. That is the behaviour this was extracted from;\n60:     changing it would change when the AI offers a transfer.\n61:     \"\"\"\n62:     business_hours = getattr(organization, 'business_hours', None) or DEFAULT_BUSINESS_HOURS\n63: \n64:     now = datetime.now(organization_timezone(organization))\n65:     today = business_hours.get(now.strftime('%A').lower(), {\n66:         'start': _DEFAULT_START,\n67:         'end': _DEFAULT_END,\n68:         'enabled': False,\n69:     })\n70: \n71:     if not today.get('enabled', False):\n72:         return False"
+    },
+    {
+      "cited": "backend/app/agents/transfer_agent.py:237-239",
+      "document": "transfer_agent.py",
+      "line": 237,
+      "through": 239,
+      "resolved": true,
+      "text": "237:             for user in db_group.users:\n238:                 if user.is_online and user.is_active:\n239:                     available_users.append(user)"
+    },
+    {
+      "cited": "backend/app/agents/chat_agent.py:591-601",
+      "document": "chat_agent.py",
+      "line": 591,
+      "through": 601,
+      "resolved": true,
+      "text": "591:             if self.transfer_to_human:\n592:                 system_message += \"\"\"\n593:                 You have the ability to transfer this conversation to a human agent if needed. You should transfer the conversation if:\n594:                 1. You are unable to answer the customer's question or solve their problem\n595:                 2. The customer explicitly asks to speak to a human\n596:                 3. The customer is expressing frustration with your responses\n597:                 4. The customer's request requires human judgment or decision-making\n598:                 5. The customer's issue is complex and would benefit from human expertise\n599:                 6. The customer needs to perform an action that you cannot assist with\n600:                 \n601:                 To transfer to a human, set transfer_to_human to true in your response and provide a transfer_reason and transfer_description."
+    },
+    {
+      "cited": "chat_agent.py:512-517",
+      "document": "chat_agent.py",
+      "line": 512,
+      "through": 517,
+      "resolved": true,
+      "text": "512:                 self.shopify_tools = ShopifyTools(\n513:                     agent_id=self.agent_id,\n514:                     org_id=self.org_id,\n515:                     session_id=self.session_id\n516:                 )\n517:                 self.tools.append(self.shopify_tools)"
+    },
+    {
+      "cited": "shopify_toolkit.py:503",
+      "document": "shopify_toolkit.py",
+      "line": 503,
+      "through": 503,
+      "resolved": true,
+      "text": "503:     def search_orders(self, query: str = None, customer_email: str = None, order_number: str = None, limit: int = 10) -> str:"
+    },
+    {
+      "cited": "backend/app/api/widget.py:349-361",
+      "document": "widget.py",
+      "line": 349,
+      "through": 361,
+      "resolved": false,
+      "why": "widget.py has 95 lines"
+    },
+    {
+      "cited": "file_upload_service.py:121-132",
+      "document": "file_upload_service.py",
+      "line": 121,
+      "through": 132,
+      "resolved": true,
+      "text": "121:     def validate_magic_bytes(file_content: bytes, claimed_content_type: str) -> tuple[bool, Optional[str]]:\n122:         \"\"\"\n123:         Validate file content against magic byte signatures to prevent MIME type spoofing.\n124:         \n125:         Args:\n126:             file_content: The raw binary content of the file\n127:             claimed_content_type: The MIME type claimed by the client\n128:             \n129:         Returns:\n130:             (is_valid, error_message)\n131:         \"\"\"\n132:         if claimed_content_type not in MAGIC_BYTES:"
+    },
+    {
+      "cited": "api/tickets.py:303",
+      "document": "tickets.py",
+      "line": 303,
+      "through": 303,
+      "resolved": true,
+      "text": "303: async def create_ticket("
+    },
+    {
+      "cited": "api/ticket_webhooks.py:82-96",
+      "document": "ticket_webhooks.py",
+      "line": 82,
+      "through": 96,
+      "resolved": true,
+      "text": "82: @router.post(\"/alerts/{org_id}/{secret}\", status_code=202)\n83: async def alert_intake(\n84:     org_id: UUID,\n85:     secret: str,\n86:     payload: dict = Body(...),\n87:     db: Session = Depends(get_db),\n88: ):\n89:     settings_row = TicketSettingsRepository(db).get(org_id)\n90:     # Uniform 404 for unknown org / disabled intake / wrong secret \u2014 the\n91:     # endpoint must not confirm which part failed.\n92:     if (\n93:         settings_row is None\n94:         or not settings_row.alert_webhook_enabled\n95:         or not settings_row.alert_webhook_secret\n96:         or not py_secrets.compare_digest(settings_row.alert_webhook_secret, secret)"
+    },
+    {
+      "cited": "workers/ticket_investigator.py:58-93",
+      "document": "ticket_investigator.py",
+      "line": 58,
+      "through": 93,
+      "resolved": true,
+      "text": "58: async def _build_triage_context(db, service: TicketService, ticket: Ticket):\n59:     \"\"\"Transcript of the linked conversation + similar past resolved tickets.\"\"\"\n60:     transcript = None\n61:     session_record = service._primary_session(ticket)\n62:     if session_record is not None:\n63:         try:\n64:             transcript = await service.build_session_transcript(\n65:                 session_record.session_id, max_messages=15, line_chars=400\n66:             )\n67:         except Exception as e:\n68:             logger.error(f\"Transcript build failed for {ticket.display_number}: {e}\")\n69: \n70:     similar = []\n71:     embedding = ticket.embedding\n72:     if embedding is None:\n73:         # CPU-bound local model \u2014 keep it off the worker's event loop so\n74:         # concurrent runs aren't serialized behind inference.\n75:         embedding = await asyncio.to_thread(\n76:             embed_ticket_text, ticket.title, ticket.description\n77:         )\n78:     if embedding is not None:\n79:         for other, score in service.repo.find_similar(\n80:             ticket.organization_id, list(embedding), limit=5,\n81:             exclude_ticket_id=ticket.id, min_similarity=0.70,\n82:         ):\n83:             resolution = other.resolution_summary or other.resolution_outcome or \"unresolved\"\n84:             # These tickets belong to OTHER customers. They're here for the\n85:             # shape of the failure and its fix, so identifiers in their titles\n86:             # are pure downside \u2014 strip them before they reach the model that\n87:             # also writes this ticket's customer-facing summary.\n88:             similar.append(\n89:                 redact_reference_text(\n90:                     f\"{other.display_number} [{other.status}] {other.title} \u2014 resolution: {resolution}\"\n91:                 )\n92:             )\n93:     return transcript, similar"
+    },
+    {
+      "cited": "repositories/ticket.py:255-299",
+      "document": "ticket.py",
+      "line": 255,
+      "through": 299,
+      "resolved": true,
+      "text": "255:     description: Optional[str] = None\n256:     status: TicketStatus\n257:     priority: TicketPriority\n258:     severity: Optional[int] = None\n259:     source: TicketSource\n260:     intent: Optional[str] = None\n261:     triage_confidence: Optional[float] = None\n262:     ai_summary: Optional[str] = None\n263:     tags: Optional[List[str]] = None\n264:     assignee_user_id: Optional[UUID] = None\n265:     group_id: Optional[UUID] = None\n266:     agent_id: Optional[UUID] = None\n267:     duplicate_of_ticket_id: Optional[UUID] = None\n268:     resolution_outcome: Optional[ResolutionOutcome] = None\n269:     resolution_summary: Optional[str] = None\n270:     customer_resolution_message: Optional[str] = None\n271:     first_response_at: Optional[datetime] = None\n272:     resolved_at: Optional[datetime] = None\n273:     closed_at: Optional[datetime] = None\n274:     confirmation_requested_at: Optional[datetime] = None\n275:     reopened_count: int = 0\n276:     csat_requested_at: Optional[datetime] = None\n277:     csat_score: Optional[int] = None\n278:     csat_responded_at: Optional[datetime] = None\n279:     external_ref_type: Optional[str] = None\n280:     external_ref_id: Optional[str] = None\n281:     external_ref_url: Optional[str] = None\n282:     created_by_user_id: Optional[UUID] = None\n283:     created_at: Optional[datetime] = None\n284:     updated_at: Optional[datetime] = None\n285:     # Derived UI fields.\n286:     ai_state: Optional[str] = None\n287:     sla_due_at: Optional[datetime] = None\n288:     assignee: Optional[TicketUserOut] = None\n289:     customer: Optional[TicketCustomerOut] = None\n290: \n291: \n292: class TicketListItem(BaseModel):\n293:     \"\"\"Slim row for the list view.\"\"\"\n294:     model_config = ConfigDict(from_attributes=True)\n295:     id: UUID"
+    },
+    {
+      "cited": "models/investigation.py:186-225",
+      "document": "investigation.py",
+      "line": 186,
+      "through": 225,
+      "resolved": false,
+      "why": "investigation.py has 154 lines"
+    },
+    {
+      "cited": "models/investigation.py:278-326",
+      "document": "investigation.py",
+      "line": 278,
+      "through": 326,
+      "resolved": false,
+      "why": "investigation.py has 154 lines"
+    },
+    {
+      "cited": "ticket_privacy.py:66-102",
+      "document": "ticket_privacy.py",
+      "line": 66,
+      "through": 102,
+      "resolved": true,
+      "text": "66: def scrub_outbound(text: Optional[str], owner_identifiers: Iterable[Optional[str]] = ()) -> Optional[str]:\n67:     \"\"\"Strip third-party identifiers from a message bound for the customer.\n68: \n69:     The recipient's own email/phone survive \u2014 telling someone their own address\n70:     is not a leak, and blanking it makes legitimate summaries read as broken.\n71:     Everything else that looks like an identifier is redacted, because in a\n72:     ticket summary it can only have come from another customer's record.\n73:     \"\"\"\n74:     if not text:\n75:         return text\n76: \n77:     owners = _owner_keys(owner_identifiers)\n78:     scrubbed = text\n79: \n80:     for pii_type in ALWAYS_REDACT:\n81:         pattern = PIIDetector.PATTERNS.get(pii_type)\n82:         if pattern:\n83:             scrubbed = re.sub(pattern, THIRD_PARTY_MARKER, scrubbed)\n84: \n85:     for pii_type in OWNER_ONLY:\n86:         pattern = PIIDetector.PATTERNS.get(pii_type)\n87:         if not pattern:\n88:             continue\n89: \n90:         def _replace(match: re.Match) -> str:\n91:             value = match.group()\n92:             if value.lower() in owners or (_digits(value) and _digits(value) in owners):\n93:                 return value\n94:             return THIRD_PARTY_MARKER\n95: \n96:         scrubbed = re.sub(pattern, _replace, scrubbed)\n97: \n98:     if scrubbed != text:\n99:         logger.warning(\n100:             \"Redacted third-party identifiers from an outbound ticket message\"\n101:         )\n102:     return scrubbed"
+    },
+    {
+      "cited": "guardrailed_db_toolkit.py:131-159",
+      "document": "guardrailed_db_toolkit.py",
+      "line": 131,
+      "through": 159,
+      "resolved": true,
+      "text": "131:     def _audit(\n132:         self,\n133:         config: DBConnectorConfig,\n134:         raw_sql: str,\n135:         outcome: str,\n136:         validated_sql: Optional[str] = None,\n137:         block_reason: Optional[str] = None,\n138:         row_count: Optional[int] = None,\n139:         duration_ms: Optional[int] = None,\n140:     ) -> None:\n141:         try:\n142:             with SessionLocal() as db:\n143:                 db.add(\n144:                     DBConnectorAuditLog(\n145:                         connector_id=config.id,\n146:                         organization_id=config.organization_id,\n147:                         ticket_id=self.ticket_id,\n148:                         run_id=self.run_id,\n149:                         raw_sql=raw_sql[:10000],\n150:                         validated_sql=validated_sql,\n151:                         outcome=outcome,\n152:                         block_reason=block_reason,\n153:                         row_count=row_count,\n154:                         duration_ms=duration_ms,\n155:                     )\n156:                 )\n157:                 db.commit()\n158:         except Exception as e:\n159:             logger.error(f\"DB connector audit write failed: {e}\")"
+    },
+    {
+      "cited": "models/ticket_db_connector.py:111-148",
+      "document": "ticket_db_connector.py",
+      "line": 111,
+      "through": 148,
+      "resolved": true,
+      "text": "111:     # Nothing is queryable unless explicitly listed (\"schema.table\").\n112:     allowed_tables: List[str] = Field(default_factory=list, max_length=500)\n113:     masked_columns: List[str] = Field(default_factory=list, max_length=500)\n114:     row_scope: Dict[str, str] = Field(\n115:         default_factory=dict, description=ROW_SCOPE_DESCRIPTION\n116:     )\n117:     row_scope_key: str = Field(\n118:         default=\"email\", pattern=f\"^({'|'.join(ROW_SCOPE_KEYS)})$\"\n119:     )\n120:     max_rows: int = Field(default=100, ge=1, le=1000)\n121:     statement_timeout_ms: int = Field(default=5000, ge=100, le=30000)\n122: \n123:     @field_validator(\"row_scope\")\n124:     @classmethod\n125:     def _check_row_scope(cls, value):\n126:         return validate_row_scope(value) or {}\n127: \n128: \n129: class DBConnectorUpdate(BaseModel):\n130:     name: Optional[str] = Field(default=None, min_length=1, max_length=200)\n131:     host: Optional[str] = Field(default=None, min_length=1, max_length=500)\n132:     port: Optional[int] = Field(default=None, ge=1, le=65535)\n133:     database: Optional[str] = Field(default=None, min_length=1, max_length=200)\n134:     username: Optional[str] = Field(default=None, min_length=1, max_length=200)\n135:     # Omit to keep the stored password.\n136:     password: Optional[str] = Field(default=None, min_length=1, max_length=500)\n137:     enabled: Optional[bool] = None\n138:     allowed_tables: Optional[List[str]] = Field(default=None, max_length=500)\n139:     masked_columns: Optional[List[str]] = Field(default=None, max_length=500)\n140:     row_scope: Optional[Dict[str, str]] = Field(\n141:         default=None, description=ROW_SCOPE_DESCRIPTION\n142:     )\n143:     row_scope_key: Optional[str] = Field(\n144:         default=None, pattern=f\"^({'|'.join(ROW_SCOPE_KEYS)})$\"\n145:     )\n146:     max_rows: Optional[int] = Field(default=None, ge=1, le=1000)\n147:     statement_timeout_ms: Optional[int] = Field(default=None, ge=100, le=30000)\n148:     # SSH tunnel \u2014 omit a secret to keep the stored one."
+    },
+    {
+      "cited": "api/jira.py:168-216",
+      "document": "jira.py",
+      "line": 168,
+      "through": 216,
+      "resolved": false,
+      "why": "jira.py has 32 lines"
+    },
+    {
+      "cited": "services/ticket_jira.py:72-134",
+      "document": "ticket_jira.py",
+      "line": 72,
+      "through": 134,
+      "resolved": true,
+      "text": "72: async def maybe_escalate_to_jira(db, service, ticket: Ticket, settings_row) -> bool:\n73:     \"\"\"Escalate when policy matches and the org has Jira connected. Failures\n74:     are logged, never raised \u2014 escalation must not break ticket flows.\"\"\"\n75:     if not should_escalate(ticket, settings_row):\n76:         return False\n77:     try:\n78:         token = (\n79:             db.query(JiraToken)\n80:             .filter(JiraToken.organization_id == ticket.organization_id)\n81:             .first()\n82:         )\n83:         if token is None:\n84:             return False\n85:         config = _find_project_config(db, ticket)\n86:         if config is None:\n87:             logger.info(\n88:                 f\"{ticket.display_number}: Jira escalation enabled but no agent \"\n89:                 \"has a Jira project configured\"\n90:             )\n91:             return False\n92: \n93:         from app.api.jira import CreateJiraIssueModel\n94:         from app.services.jira import JiraService\n95: \n96:         description_parts = [\n97:             f\"Escalated from ChatterMate ticket {ticket.display_number} \"\n98:             f\"(priority: {ticket.priority}, severity: {ticket.severity or 'n/a'}).\",\n99:         ]\n100:         if ticket.ai_summary:\n101:             description_parts.append(f\"AI summary: {ticket.ai_summary}\")\n102:         if ticket.description:\n103:             description_parts.append(ticket.description[:4000])\n104: \n105:         organization = db.query(Organization).filter(\n106:             Organization.id == ticket.organization_id\n107:         ).first()\n108:         result = await JiraService().create_issue(\n109:             organization,\n110:             db,\n111:             CreateJiraIssueModel(\n112:                 projectKey=config.project_key,"
+    },
+    {
+      "cited": "api/webhooks/__init__.py:19-34",
+      "document": "__init__.py",
+      "line": 19,
+      "through": 34,
+      "resolved": false,
+      "why": "__init__.py has 0 lines"
+    },
+    {
+      "cited": "ticket_jira.py:66",
+      "document": "ticket_jira.py",
+      "line": 66,
+      "through": 66,
+      "resolved": true,
+      "text": "66:     if ticket.external_ref_id:  # already escalated \u2014 one-way, never re-synced"
+    },
+    {
+      "cited": "api/channels/slack.py:85-121",
+      "document": "slack.py",
+      "line": 85,
+      "through": 121,
+      "resolved": true,
+      "text": "85:     # delete() reports failure by returning False rather than raising.\n86:     if account_repo.delete(account):\n87:         logger.info(f\"Removed Slack account for team {team_id} after lifecycle event\")\n88:     else:\n89:         logger.error(f\"Failed to remove Slack account for team {team_id}\")\n90: \n91: \n92: def _dispatch_app_surface_event(event: dict, team_id: str,\n93:                                 account_repo: ChannelAccountRepository,\n94:                                 background_tasks: BackgroundTasks) -> None:\n95:     \"\"\"Fan an App Home / Assistant event out to the right background handler.\n96: \n97:     The Home tab publishes agent cards; the Messages tab and the Assistant\n98:     sidebar both send a welcome \u2014 this is what lets the app keep the Messages\n99:     tab enabled under the Marketplace guidelines.\n100:     \"\"\"\n101:     if not team_id:\n102:         return\n103:     account = account_repo.get_by_external_id(ChannelType.SLACK.value, team_id)\n104:     if account is None or not account.is_active:\n105:         logger.info(f\"Slack app-surface event for inactive/unknown team {team_id}\")\n106:         return\n107: \n108:     event_type = event.get(\"type\")\n109:     if event_type == APP_HOME_OPENED:\n110:         user = event.get(\"user\", \"\")\n111:         if event.get(\"tab\", \"messages\") == \"home\":\n112:             background_tasks.add_task(publish_agent_home, account.id, user)\n113:         else:  # Messages tab (or unspecified) \u2014 welcome on first open.\n114:             background_tasks.add_task(deliver_home_welcome, account.id, user, event.get(\"channel\", \"\"))\n115:     elif event_type == ASSISTANT_THREAD_STARTED:\n116:         thread = event.get(\"assistant_thread\") or {}\n117:         background_tasks.add_task(handle_assistant_thread_started, account.id,\n118:                                   thread.get(\"channel_id\", \"\"), thread.get(\"thread_ts\", \"\"))\n119:     # assistant_thread_context_changed: nothing to do \u2014 prompts are set on start.\n120: \n121: "
+    },
+    {
+      "cited": "channels/slack.py:308",
+      "document": "slack.py",
+      "line": 308,
+      "through": 308,
+      "resolved": false,
+      "why": "slack.py has 175 lines"
+    },
+    {
+      "cited": "core/security.py:32",
+      "document": "security.py",
+      "line": 32,
+      "through": 32,
+      "resolved": true,
+      "text": "32: CONVERSATION_SECRET_KEY = settings.CONVERSATION_SECRET_KEY"
+    },
+    {
+      "cited": "api/token.py:150-151",
+      "document": "token.py",
+      "line": 150,
+      "through": 151,
+      "resolved": true,
+      "text": "150: @router.post(\"/generate-token\", response_model=GenerateTokenResponse, status_code=status.HTTP_201_CREATED)\n151: async def generate_widget_token("
+    },
+    {
+      "cited": "models/permission.py:52-86",
+      "document": "permission.py",
+      "line": 52,
+      "through": 86,
+      "resolved": true,
+      "text": "52:     @classmethod\n53:     def default_permissions(cls):\n54:         return [\n55:             (\"view_all\", \"Can view all resources\"),\n56:             (\"manage_users\", \"Can manage users\"),\n57:             (\"manage_roles\", \"Can manage roles\"),\n58:             (\"manage_agents\", \"Can manage chat agents\"),\n59:             (\"view_agents\", \"Can view chat agents\"),\n60:             (\"view_analytics\", \"Can view analytics\"),\n61:             (\"view_assigned_chats\", \"Can view assigned chats only\"),\n62:             (\"manage_assigned_chats\", \"Can manage assigned chats\"),\n63:             # The unclaimed queue: AI-handled sessions nobody has taken yet.\n64:             # Separate from view_assigned_chats so widening an agent's inbox to\n65:             # the queue never silently exposes another agent's conversations.\n66:             (\"view_unassigned_chats\", \"Can view unassigned AI chats\"),\n67:             (\"manage_knowledge\", \"Can manage knowledge base\"),\n68:             (\"view_knowledge\", \"Can view knowledge base\"),\n69:             (\"manage_ai_config\", \"Can manage AI configuration\"),\n70:             (\"view_ai_config\", \"Can view AI configuration\"),\n71:             (\"view_all_chats\", \"Can view all chat history\"),\n72:             (\"manage_all_chats\", \"Can manage all chat sessions\"),\n73:             # The people directory, decoupled from chat visibility: an agent can\n74:             # look up who they are talking to without being able to read every\n75:             # other agent's conversations.\n76:             (\"view_people\", \"Can view the people directory\"),\n77:             (\"manage_organization\", \"Can manage organization settings\"),\n78:             (\"view_organization\", \"Can view organization details\"),\n79:             (\"manage_subscription\", \"Can manage subscription plans and billing\"),\n80:             (\"view_subscription\", \"Can view subscription details\"),\n81:             (\"view_tickets\", \"Can view tickets\"),\n82:             (\"manage_tickets\", \"Can manage tickets\"),\n83:             (\"approve_ticket_actions\", \"Can approve AI-proposed ticket resolutions\"),\n84:             (\"manage_ticket_connectors\", \"Can manage ticket investigation connectors\"),\n85:             (\"super_admin\", \"Has all permissions\")\n86:         ]"
+    },
+    {
+      "cited": "core/auth.py:90-101",
+      "document": "auth.py",
+      "line": 90,
+      "through": 101,
+      "resolved": true,
+      "text": "90: def require_permissions(*required_permissions: str):\n91:     \"\"\"Dependency to check user permissions\"\"\"\n92:     async def permission_checker(\n93:         current_user: User = Depends(get_current_user)\n94:     ) -> User:\n95:         if not check_permissions(current_user, list(required_permissions)):\n96:             raise HTTPException(\n97:                 status_code=status.HTTP_403_FORBIDDEN,\n98:                 detail=\"Not enough permissions\"\n99:             )\n100:         return current_user\n101:     return permission_checker"
+    },
+    {
+      "cited": "api/agent.py:143",
+      "document": "agent.py",
+      "line": 143,
+      "through": 143,
+      "resolved": true,
+      "text": "143:     active_workflow_id: Optional[UUID] = None"
+    },
+    {
+      "cited": "channels/registry.py:46-53",
+      "document": "registry.py",
+      "line": 46,
+      "through": 53,
+      "resolved": true,
+      "text": "46:     from app.crm import hubspot  # noqa: F401\n47:     from app.crm import pipedrive  # noqa: F401"
+    },
+    {
+      "cited": "channels/email.py:156-163",
+      "document": "email.py",
+      "line": 156,
+      "through": 163,
+      "resolved": false,
+      "why": "email.py has 78 lines"
+    },
+    {
+      "cited": "services/channel_chat.py:367-398",
+      "document": "channel_chat.py",
+      "line": 367,
+      "through": 398,
+      "resolved": true,
+      "text": "367:     conversation = conv_repo.get_active(account.id, inbound.external_conversation_id)\n368:     if conversation is not None:\n369:         session_record = session_repo.get_session(conversation.session_id)\n370:         if not _agent_changed(session_record, agent_id):\n371:             conv_repo.touch_inbound(conversation)\n372:             return session_record, conversation, False\n373:         # Retire the thread so the newly configured agent starts clean. Closing\n374:         # the session is what makes get_active skip it, so the create below\n375:         # opens a fresh conversation for the same platform thread.\n376:         logger.info(\n377:             f\"Agent changed for {account.channel_type} account {account.id}; \"\n378:             f\"starting a new session for conversation {inbound.external_conversation_id}\")\n379:         session_repo.close_session(conversation.session_id)\n380: \n381:     session_id = str(uuid.uuid4())\n382:     session_record = session_repo.create_session(\n383:         session_id=session_id,\n384:         agent_id=str(agent_id),\n385:         customer_id=customer_id,\n386:         organization_id=org_id,\n387:         channel=account.channel_type,\n388:     )\n389:     conversation = conv_repo.create(\n390:         channel_account_id=account.id,\n391:         channel_type=account.channel_type,\n392:         external_conversation_id=inbound.external_conversation_id,\n393:         external_user_id=inbound.external_user_id,\n394:         session_id=uuid.UUID(session_id),\n395:         organization_id=account.organization_id,\n396:         agent_id=agent_id,\n397:         customer_id=uuid.UUID(customer_id),\n398:     )"
+    },
+    {
+      "cited": "email.py:179-202",
+      "document": "email.py",
+      "line": 179,
+      "through": 202,
+      "resolved": false,
+      "why": "email.py has 78 lines"
+    },
+    {
+      "cited": "channels/sms/adapter.py:22",
+      "document": "adapter.py",
+      "line": 22,
+      "through": 22,
+      "resolved": true,
+      "text": "22: from app.models.channels import ChannelAccount, ChannelConversation, ChannelType"
+    },
+    {
+      "cited": "workers/crm_sync.py:98",
+      "document": "crm_sync.py",
+      "line": 98,
+      "through": 98,
+      "resolved": true,
+      "text": "98:             CrmProvider.PIPEDRIVE.value, cutoff)"
+    },
+    {
+      "cited": "app/crm/hubspot.py:51-82",
+      "document": "hubspot.py",
+      "line": 51,
+      "through": 82,
+      "resolved": true,
+      "text": "51:     provider = CrmProvider.HUBSPOT.value\n52: \n53:     def get_authorize_url(self, state: str, redirect_uri: str) -> str:\n54:         return f\"{AUTHORIZE_URL}?\" + urlencode({\n55:             \"client_id\": settings.HUBSPOT_CLIENT_ID,\n56:             \"redirect_uri\": redirect_uri,\n57:             \"scope\": SCOPES,\n58:             \"state\": state,\n59:         })\n60: \n61:     async def exchange_code(self, code: str, redirect_uri: str) -> OAuthTokens:\n62:         tokens = await self._token_request({\n63:             \"grant_type\": \"authorization_code\",\n64:             \"client_id\": settings.HUBSPOT_CLIENT_ID,\n65:             \"client_secret\": settings.HUBSPOT_CLIENT_SECRET,\n66:             \"redirect_uri\": redirect_uri,\n67:             \"code\": code,\n68:         })\n69:         # Token introspection carries the portal identity (hub_id/domain).\n70:         response = await get_http_client().get(\n71:             f\"{API_BASE}/oauth/v1/access-tokens/{tokens.access_token}\")\n72:         if response.status_code == 200:\n73:             info = response.json()\n74:             tokens.external_account_id = str(info.get(\"hub_id\", \"\"))\n75:             tokens.display_name = info.get(\"hub_domain\")\n76:         return tokens\n77: \n78:     async def refresh_tokens(self, tokens: OAuthTokens) -> OAuthTokens:\n79:         refreshed = await self._token_request({\n80:             \"grant_type\": \"refresh_token\",\n81:             \"client_id\": settings.HUBSPOT_CLIENT_ID,\n82:             \"client_secret\": settings.HUBSPOT_CLIENT_SECRET,"
+    },
+    {
+      "cited": "ticket_investigator.py:49-50",
+      "document": "ticket_investigator.py",
+      "line": 49,
+      "through": 50,
+      "resolved": true,
+      "text": "49: RUN_POLL_INTERVAL_SECONDS = 15\n50: LIFECYCLE_POLL_INTERVAL_SECONDS = 300"
+    },
+    {
+      "cited": "faq_processor.py:36",
+      "document": "faq_processor.py",
+      "line": 36,
+      "through": 36,
+      "resolved": true,
+      "text": "36: POLL_INTERVAL_SECONDS = 60"
+    },
+    {
+      "cited": "api/knowledge.py:495-508",
+      "document": "knowledge.py",
+      "line": 495,
+      "through": 508,
+      "resolved": true,
+      "text": "495:             }\n496: \n497:         # Queue PDF URLs with user_id\n498:         for url in request.pdf_urls:\n499:             queue_item = KnowledgeQueue(\n500:                 organization_id=request.org_id,\n501:                 agent_id=agent_uuid,\n502:                 user_id=current_user.id,\n503:                 source_type='pdf_url',\n504:                 source=url,\n505:                 status=QueueStatus.PENDING,\n506:                 queue_metadata={\"max_links\": plan_sub_pages}\n507:             )\n508:             queued_items.append(queue_repo.create(queue_item))"
+    },
+    {
+      "cited": "knowledge_processor.py:205-206",
+      "document": "knowledge_processor.py",
+      "line": 205,
+      "through": 206,
+      "resolved": true,
+      "text": "205:             queue_repo = KnowledgeQueueRepository(db)\n206:             pending_items = queue_repo.get_pending()"
+    },
+    {
+      "cited": "services/ticket_events.py:44-53",
+      "document": "ticket_events.py",
+      "line": 44,
+      "through": 53,
+      "resolved": true,
+      "text": "44:         await sio.emit(\n45:             \"ticket_update\",\n46:             {\n47:                 \"ticket_id\": str(ticket_id),\n48:                 \"kind\": kind,\n49:                 \"payload\": payload or {},\n50:             },\n51:             room=org_ticket_room(organization_id),\n52:             namespace=\"/agent\",\n53:         )"
+    },
+    {
+      "cited": "api/tickets.py:574-610",
+      "document": "tickets.py",
+      "line": 574,
+      "through": 610,
+      "resolved": true,
+      "text": "574: @router.get(\"/{ticket_id}/investigation\", response_model=InvestigationDetailResponse)\n575: async def get_investigation(\n576:     ticket_id: UUID,\n577:     run_id: Optional[UUID] = None,\n578:     current_user: User = Depends(view_tickets),\n579:     db: Session = Depends(get_db),\n580: ):\n581:     \"\"\"Glass-box payload: the latest (or requested) investigation run with its\n582:     hypotheses, evidence events and the ticket's current RCA document.\"\"\"\n583:     check_ticketing_access(db, current_user.organization_id)\n584:     service = _service(db)\n585:     ticket = _get_ticket_or_404(db, ticket_id, current_user)\n586: \n587:     run = None\n588:     if run_id is not None:\n589:         run = service.run_repo.get_by_id(run_id)\n590:         # The run must belong to this ticket \u2014 run_id alone is not an\n591:         # authorization boundary.\n592:         if run is None or run.ticket_id != ticket.id:\n593:             raise HTTPException(status_code=404, detail=\"Run not found\")\n594:     else:\n595:         run = service.run_repo.latest_run_of_type(\n596:             ticket.id, InvestigationRunType.INVESTIGATION.value\n597:         )\n598: \n599:     rca = service.run_repo.latest_rca(ticket.id)\n600:     return InvestigationDetailResponse(\n601:         run=InvestigationRunOut.model_validate(run) if run else None,\n602:         hypotheses=[\n603:             HypothesisOut.model_validate(h) for h in service.run_repo.list_hypotheses(run.id)\n604:         ] if run else [],\n605:         events=[\n606:             InvestigationEventOut.model_validate(e) for e in service.run_repo.list_events(run.id)\n607:         ] if run else [],\n608:         rca=_rca_out(rca),\n609:         proposal=_proposal_out(service.latest_proposal(ticket.id)),\n610:     )"
+    },
+    {
+      "cited": "README.md:600-608",
+      "document": "README.md",
+      "line": 600,
+      "through": 608,
+      "resolved": false,
+      "why": "README.md has 150 lines"
+    },
+    {
+      "cited": "tools/mcp_manager.py:42-66",
+      "document": "mcp_manager.py",
+      "line": 42,
+      "through": 66,
+      "resolved": true,
+      "text": "42:     async def initialize_mcp_tools_by_ids(\n43:         self, org_id: str, tool_ids: List[int]\n44:     ) -> List[MCPTools]:\n45:         \"\"\"\n46:         Initialize a specific set of the organization's MCP tools by id \u2014\n47:         used by the ticket investigation worker, whose connector selection\n48:         (organization_ticket_settings.investigation_mcp_tool_ids) is\n49:         deliberately separate from the chat-facing agent associations.\n50:         \"\"\"\n51:         if not org_id or not tool_ids:\n52:             return []\n53:         try:\n54:             with SessionLocal() as db:\n55:                 configs = MCPToolRepository(db).get_by_ids(org_id, tool_ids)\n56:         except Exception as e:\n57:             logger.error(f\"Failed to load MCP tools {tool_ids} for org {org_id}: {e}\")\n58:             return []\n59:         found_ids = {config.id for config in configs}\n60:         for missing_id in tool_ids:\n61:             if missing_id not in found_ids:\n62:                 self.failed_tools.append({\n63:                     \"name\": f\"Tool #{missing_id}\",\n64:                     \"error\": \"Configured tool no longer exists or is disabled\",\n65:                 })\n66:         return await self._initialize_from_configs(configs)"
+    },
+    {
+      "cited": "README.md:246",
+      "document": "README.md",
+      "line": 246,
+      "through": 246,
+      "resolved": false,
+      "why": "README.md has 150 lines"
+    },
+    {
+      "cited": "llms.txt:9-11",
+      "document": "llms.txt",
+      "line": 9,
+      "through": 11,
+      "resolved": true,
+      "text": "9: Use the **ChatterMate CLI** (the `chattermate` command, installed with `pip install chattermate-cli`)\n10: to sign up and manage everything from the terminal. It is the account/config CLI \u2014 distinct from the\n11: self-host Docker tool (`npm install -g chattermate-deploy`)."
+    },
+    {
+      "cited": "backend/app/api/widget.py:48-54",
+      "document": "widget.py",
+      "line": 48,
+      "through": 54,
+      "resolved": true,
+      "text": "48:     quick_actions: Optional[List[str]] = None\n49:     show_citations: Optional[bool] = None\n50:     collect_email: Optional[bool] = None\n51:     show_ai_disclaimer: Optional[bool] = None\n52:     allow_new_chat: Optional[bool] = None\n53:     # Free-form extras (avatar_style, widget_display placement defaults, ...)\n54:     customization_metadata: Optional[dict] = None"
+    },
+    {
+      "cited": "llms.txt:25",
+      "document": "llms.txt",
+      "line": 25,
+      "through": 25,
+      "resolved": true,
+      "text": "25: # <script>window.chattermateId='YOUR_WIDGET_ID';</script>"
+    },
+    {
+      "cited": "README.md:266",
+      "document": "README.md",
+      "line": 266,
+      "through": 266,
+      "resolved": false,
+      "why": "README.md has 150 lines"
+    },
+    {
+      "cited": "backend/app/core/help_center_host.py:105-149",
+      "document": "help_center_host.py",
+      "line": 105,
+      "through": 149,
+      "resolved": true,
+      "text": "105: def _host_from_scope(scope) -> str:\n106:     for name, value in scope.get(\"headers\") or []:\n107:         if name == b\"host\":\n108:             return normalize_host(value.decode(\"latin-1\"))\n109:     return \"\"\n110: \n111: \n112: def is_help_center_host(host: str) -> bool:\n113:     if not host:\n114:         return False\n115:     if slug_for_host(host) is not None:\n116:         return True\n117:     return _domain_cache.contains(host)\n118: \n119: \n120: class HelpCenterHostMiddleware:\n121:     \"\"\"Pure-ASGI dispatcher installed inside the socketio wrapper: help-center\n122:     hosts go to the public app, everything else to the main FastAPI app.\"\"\"\n123: \n124:     def __init__(self, app, public_app):\n125:         self.app = app\n126:         self.public_app = public_app\n127: \n128:     async def __call__(self, scope, receive, send):\n129:         if scope[\"type\"] == \"http\":\n130:             # Path dispatch (self-host default): /help/{slug}/... on the main\n131:             # origin. Gated to path mode so cloud never serves the /help/ form.\n132:             if settings.HELP_CENTER_PUBLIC_MODE == \"path\":\n133:                 match = _HELP_PATH_RE.match(scope.get(\"path\", \"\"))\n134:                 if match:\n135:                     slug = match.group(1)\n136:                     # Drop a trailing slash from the remainder ourselves: letting\n137:                     # Starlette's redirect_slashes handle it would 307 to a\n138:                     # Location built from the rewritten (prefix-stripped) path,\n139:                     # sending the visitor to the origin root without /help/{slug}.\n140:                     remainder = (match.group(2) or \"\").rstrip(\"/\") or \"/\"\n141:                     scope[\"help_center\"] = {\"slug\": slug, \"base_path\": f\"/help/{slug}\"}\n142:                     scope[\"path\"] = remainder\n143:                     scope[\"raw_path\"] = remainder.encode(\"latin-1\")\n144:                     await self.public_app(scope, receive, send)\n145:                     return"
+    },
+    {
+      "cited": "HELP_CENTER_INFRA.md:3-4",
+      "document": "HELP_CENTER_INFRA.md",
+      "line": 3,
+      "through": 4,
+      "resolved": true,
+      "text": "3: The public help center is served by the backend itself (host-dispatched SSR \u2014\n4: see `backend/app/core/help_center_host.py`). This runbook covers the"
+    },
+    {
+      "cited": "config.py:215",
+      "document": "config.py",
+      "line": 215,
+      "through": 215,
+      "resolved": true,
+      "text": "215:     HELP_CENTER_BASE_DOMAIN: str = os.getenv(\"HELP_CENTER_BASE_DOMAIN\", \"chattermate.help\")"
+    },
+    {
+      "cited": "config.py:220-222",
+      "document": "config.py",
+      "line": 220,
+      "through": 222,
+      "resolved": true,
+      "text": "220:     HELP_CENTER_TARGET_IPS: frozenset = frozenset(\n221:         ip.strip() for ip in os.getenv(\"HELP_CENTER_TARGET_IPS\", \"\").split(\",\") if ip.strip()\n222:     )"
+    },
+    {
+      "cited": "services/domain_verification.py:63",
+      "document": "domain_verification.py",
+      "line": 63,
+      "through": 63,
+      "resolved": true,
+      "text": "63:     return f\"cm-verify={row.domain_verification_token}\""
+    },
+    {
+      "cited": "enhanced_website_reader.py:227-259",
+      "document": "enhanced_website_reader.py",
+      "line": 227,
+      "through": 259,
+      "resolved": true,
+      "text": "227:         # Strategy 1: Try to find main content by role=\"main\" attribute (semantic HTML)\n228:         logger.debug(f\"Trying Strategy 1: role='main' attribute\")\n229:         main_role_element = soup.find(attrs={'role': 'main'})\n230:         if main_role_element:\n231:             logger.debug(f\"  Found element with role='main'\")\n232:             content = self._get_clean_text(main_role_element, include_links=True, base_url=self._current_url)\n233:             if len(content) >= self.min_content_length:\n234:                 logger.info(f\"\u2713 Content extracted using role='main' strategy ({len(content)} chars)\")\n235:                 return content\n236:             else:\n237:                 logger.debug(f\"  role='main' element too short: {len(content)} chars\")\n238:         \n239:         # Strategy 2: Try to find main content by common content tags\n240:         logger.debug(f\"Trying Strategy 2: Common content tags\")\n241:         for tag in self.common_content_tags:\n242:             elements = soup.find_all(tag)\n243:             logger.debug(f\"  Found {len(elements)} '{tag}' elements\")\n244:             for element in elements:\n245:                 content = self._get_clean_text(element, include_links=True, base_url=self._current_url)\n246:                 if len(content) >= self.min_content_length:\n247:                     logger.info(f\"\u2713 Content extracted using tag strategy: {tag} ({len(content)} chars)\")\n248:                     return content\n249:                 elif content:\n250:                     logger.debug(f\"  '{tag}' element too short: {len(content)} chars (min: {self.min_content_length})\")\n251:                     \n252:         # Strategy 3: Try to find main content by common class names\n253:         logger.debug(f\"Trying Strategy 3: Common class names\")\n254:         for class_name in self.common_content_classes:\n255:             elements = soup.find_all(class_=re.compile(class_name, re.IGNORECASE))\n256:             if elements:\n257:                 logger.debug(f\"  Found {len(elements)} elements with class matching '{class_name}'\")\n258:             for element in elements:\n259:                 content = self._get_clean_text(element, include_links=True, base_url=self._current_url)"
+    },
+    {
+      "cited": "enhanced_website_kb.py:64-111",
+      "document": "enhanced_website_kb.py",
+      "line": 64,
+      "through": 111,
+      "resolved": true,
+      "text": "64:     _embedding_queue = None\n65:     _embedding_executor = None\n66:     _embedding_results = None\n67:     _embedding_lock = None\n68:     \n69:     @property\n70:     def queue_item(self):\n71:         return self._queue_item\n72:         \n73:     @queue_item.setter\n74:     def queue_item(self, value):\n75:         self._queue_item = value\n76:         \n77:     @property\n78:     def queue_repo(self):\n79:         return self._queue_repo\n80:         \n81:     @queue_repo.setter\n82:     def queue_repo(self, value):\n83:         self._queue_repo = value\n84: \n85:     @model_validator(mode=\"after\")\n86:     def set_reader(self) -> \"EnhancedWebsiteKnowledgeBase\":\n87:         \"\"\"Set the reader if not provided\"\"\"\n88:         if self.reader is None:\n89:             logger.info(f\"Initializing default EnhancedWebsiteReader with max_depth={self.max_depth}, max_links={self.max_links}, max_workers={self.max_workers}\")\n90:             self.reader = EnhancedWebsiteReader(\n91:                 max_depth=self.max_depth,\n92:                 max_links=self.max_links,\n93:                 min_content_length=self.min_content_length,\n94:                 timeout=self.timeout,\n95:                 max_retries=self.max_retries,\n96:                 max_workers=self.max_workers,\n97:                 crawl_scope=self.crawl_scope,\n98:                 verify_ssl=False  # Disable SSL verification to handle self-signed/invalid certificates\n99:             )\n100:         else:\n101:             logger.info(f\"Using custom reader: {type(self.reader).__name__}\")\n102:         return self\n103: \n104:     def _init_embedding_system(self):"
+    }
+  ],
+  "total": 70,
+  "broken": 11,
+  "quotes": [
+    {
+      "quote": "Auto translation with configurable default language per workflow.",
+      "resolved": false,
+      "how": "miss",
+      "segments": 1,
+      "segments_found": 0,
+      "documents": [],
+      "missing": [
+        "auto translation with configurable default language per workflow"
+      ]
+    },
+    {
+      "quote": "Outbound ticket webhooks exist to drive external automations.",
+      "resolved": false,
+      "how": "miss",
+      "segments": 1,
+      "segments_found": 0,
+      "documents": [],
+      "missing": [
+        "outbound ticket webhooks exist to drive external automations"
+      ]
+    },
+    {
+      "quote": "Alert-webhook intake: Grafana/Datadog/CloudWatch (or any) alerts POST here",
+      "resolved": true,
+      "how": "contiguous",
+      "segments": 2,
+      "segments_found": 2,
+      "documents": [
+        "ticket_webhooks.py"
+      ]
+    },
+    {
+      "quote": "Nothing is ever written to the customer's database by the AI.",
+      "resolved": false,
+      "how": "miss",
+      "segments": 1,
+      "segments_found": 0,
+      "documents": [],
+      "missing": [
+        "nothing is ever written to the customer s database by the ai"
+      ]
+    },
+    {
+      "quote": "fail stuck 'processing' jobs on startup",
+      "resolved": false,
+      "how": "miss",
+      "segments": 1,
+      "segments_found": 0,
+      "documents": [],
+      "missing": [
+        "fail stuck processing jobs on startup"
+      ]
+    },
+    {
+      "quote": "drag-and-drop nodes (Start, AI Response, Human Transfer, Condition, End), branching logic, real-time preview, version save/restore.",
+      "resolved": false,
+      "how": "miss",
+      "segments": 1,
+      "segments_found": 0,
+      "documents": [],
+      "missing": [
+        "drag and drop nodes start ai response human transfer condition end branching logic real time preview version save restore"
+      ]
+    }
+  ],
+  "scheme": {
+    "line_refs": 70,
+    "line_refs_resolving": 59,
+    "line_refs_exceeding_file_length": 11,
+    "by_document": {
+      "api/jira.py": {
+        "refs": 1,
+        "exceeding": 1,
+        "max_cited": 168,
+        "file_lines": "jira.py has 32 lines"
+      },
+      "api/webhooks/__init__.py": {
+        "refs": 1,
+        "exceeding": 1,
+        "max_cited": 19,
+        "file_lines": "__init__.py has 0 lines"
+      },
+      "backend/app/api/widget.py": {
+        "refs": 2,
+        "exceeding": 1,
+        "max_cited": 349,
+        "file_lines": "widget.py has 95 lines"
+      },
+      "channels/email.py": {
+        "refs": 1,
+        "exceeding": 1,
+        "max_cited": 156,
+        "file_lines": "email.py has 78 lines"
+      },
+      "channels/slack.py": {
+        "refs": 1,
+        "exceeding": 1,
+        "max_cited": 308,
+        "file_lines": "slack.py has 175 lines"
+      },
+      "email.py": {
+        "refs": 1,
+        "exceeding": 1,
+        "max_cited": 179,
+        "file_lines": "email.py has 78 lines"
+      },
+      "models/investigation.py": {
+        "refs": 2,
+        "exceeding": 2,
+        "max_cited": 278,
+        "file_lines": "investigation.py has 154 lines"
+      },
+      "readme.md": {
+        "refs": 3,
+        "exceeding": 3,
+        "max_cited": 600,
+        "file_lines": "README.md has 150 lines"
+      }
+    },
+    "quotes": 6,
+    "quotes_resolving": 1,
+    "quotes_contiguous": 1,
+    "consistent_with_line_numbering": false
+  }
+}

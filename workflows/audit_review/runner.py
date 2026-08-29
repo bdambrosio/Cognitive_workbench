@@ -47,7 +47,11 @@ the line SUPPORTS the claim, and that is exactly where a weak reviewer costs
 more than a self-interested one.
 
 The independence that does still bind is the paragraph above: never let a
-reviewer see an earlier review of the same run.
+reviewer see an earlier review of the same run. Renaming the old directory does
+NOT satisfy that — `inspect` is bound to the whole run directory, so any name
+inside it is still reachable, and the refusal above says so. Move it out of the
+run directory entirely; engagements/<name>/reviews_superseded/ is where the
+ChatterMate ones went.
 
 NOT A RE-AUDIT. The subject is the report, not the business — REVIEW.md §2, §10.
 """
