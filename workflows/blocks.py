@@ -60,8 +60,34 @@ def close_mark(name: str) -> str:
 
 
 def marker_re(mark: str) -> re.Pattern:
-    """Tolerant of any whitespace between the marker's tokens."""
-    return re.compile(r"\s+".join(re.escape(t) for t in mark.split()))
+    """A marker AT THE START OF A LINE, tolerant of whitespace between tokens.
+
+    ANCHORED, BECAUSE A MENTION IS NOT AN EMISSION. This module's opening line
+    already specifies "each opens with `=== NAME ===` on its own line"; the
+    pattern searched anywhere until 2026-08-29, so prose naming a block counted
+    as delivering it. The `cs2_flashnext_med` run yielded with the status line
+    "next I'll emit === REPORT === (Material conclusion, findings worst-first
+    with both citations) then === LIMITATIONS === then === GAP MAP ===", which
+    marked three blocks delivered and ended the engagement. `report.md` was
+    fifteen words, cut from the middle of that sentence.
+
+    The agent was doing as it was told. `tools.py` asks a yield's `text` for "a
+    brief status line ... so they hear where things stand", and METHOD §16
+    makes those same strings the proof of delivery — so naming a step it still
+    owes and taking that step are the same characters. Nothing the agent can
+    write resolves that; the reader has to. A marker in the middle of a
+    sentence is commentary, a marker opening a line is a block.
+
+    Not a complete guard: blocks listed one per line still read as delivered.
+    That is why the runner also refuses to end an engagement on a yield.
+
+    The whitespace tolerance is unchanged and load-bearing — on 2026-08-25 a
+    model emitted `===\nLIMITATIONS ===`, a line wrap inside the literal, and
+    exact matching reported the requirement absent. The anchor binds the first
+    `===` to the line start and leaves the wrap inside the marker matchable.
+    """
+    return re.compile(r"(?m)^[ \t]*"
+                      + r"\s+".join(re.escape(t) for t in mark.split()))
 
 
 # An opener never matches inside its own closer: `=== END REPORT ===` puts

@@ -196,8 +196,18 @@ def marker_re(mark: str) -> "re.Pattern":
     A pattern rather than normalising the whole text, because claim_surface
     splits on the marker's POSITION and normalising would move every offset
     after it.
+
+    ANCHORED TO THE START OF A LINE since 2026-08-29, matching
+    `workflows/blocks.py`. The scorer and the runner must agree on what counts
+    as an emitted block or a run is graded against a delivery record it does
+    not share; on `cs2_flashnext_med` an unanchored search read three markers
+    out of a sentence describing what the agent would write next. A marker
+    mid-sentence is commentary. The whitespace tolerance above is unaffected —
+    the anchor binds the first `===` to the line start and the wrap inside the
+    marker still matches.
     """
-    return re.compile(r"\s+".join(re.escape(t) for t in mark.split()))
+    return re.compile(r"(?m)^[ \t]*"
+                      + r"\s+".join(re.escape(t) for t in mark.split()))
 
 
 # Any block marker, opener or closer — the lines §16 requires and that carry no

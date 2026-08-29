@@ -82,3 +82,33 @@ def test_the_rejection_states_what_was_observed():
     assert "=== GAP MAP ===" in msg
     assert "METHOD §16" in msg
     assert "no report received" not in msg.lower()
+
+
+def test_a_marker_named_mid_sentence_is_not_a_delivery():
+    # cs2_flashnext_med, 2026-08-29. The agent yielded with a status line
+    # saying what it was about to write. The unanchored pattern read three
+    # deliveries out of it and the runner ended the engagement; report.md was
+    # fifteen words, cut from the middle of this sentence.
+    status_line = (
+        "I'm yielding to the report leg; next I'll emit === REPORT === "
+        "(Material conclusion, findings worst-first with both citations) then "
+        "=== LIMITATIONS === then === GAP MAP ===.")
+    seen = blocks.present(status_line)
+    assert not seen["REPORT"]
+    assert not seen["LIMITATIONS"]
+    assert not seen["GAP MAP"]
+
+
+def test_a_real_emission_on_the_same_turn_still_counts():
+    # The same run's first leg closed the claim surface AND yielded. Delivery
+    # is decided by the block, never by how the turn ended, so the anchor must
+    # not be confused with "ignore yields".
+    reply = ("Enumerated from the three claim sources.\n\n"
+             "=== CLAIM SURFACE ===\n36 claims\n=== END CLAIM SURFACE ===\n\n"
+             "Next I'll work the priority order.")
+    assert blocks.opened(reply, "CLAIM SURFACE")
+    assert blocks.content(reply, "CLAIM SURFACE") == "36 claims"
+
+
+def test_an_indented_marker_still_opens_a_block():
+    assert blocks.opened("  === GAP MAP ===\nrow\n", "GAP MAP")

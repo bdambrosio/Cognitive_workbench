@@ -599,6 +599,8 @@ def main() -> int:
     # more than "criterion absent".
     delivered = {n: False for n in blocks.BLOCKS}
     prompted = {n: 0 for n in blocks.BLOCKS}
+    # Spent when every block looks delivered but the agent yielded anyway.
+    grace_leg_spent = False
     transcript = []
     undelivered = list(blocks.BLOCKS)
     try:
@@ -647,8 +649,33 @@ def main() -> int:
             legs[-1]["blocks"] = [n for n in blocks.BLOCKS
                                   if blocks.opened(reply, n)]
             undelivered = blocks.missing(delivered)
-            if not undelivered:
+            # A YIELD IS A NOT-DONE SIGNAL, AND BELIEVING IT IS FREE. That
+            # `respond` does not prove delivery is why this runner stopped
+            # reading turn boundaries; the converse is not symmetric.
+            # Believing "I am finished" can end a run with nothing written.
+            # Believing "I am not finished" costs one leg. So the agent's own
+            # signal is trusted in the cheap direction only, and a yield does
+            # not end the engagement even when every block looks delivered.
+            #
+            # Observed 2026-08-29 on cs2_flashnext_med: a yield whose status
+            # line named the three blocks it was about to write marked all
+            # three delivered and broke this loop, and report.md was fifteen
+            # words. Anchoring the marker stops that sentence from counting;
+            # this stops the next spelling of it from ending a run, because a
+            # model listing blocks it still owes is almost always yielding.
+            #
+            # ONE GRACE LEG, NOT UNBOUNDED. A model that always yields would
+            # otherwise run to the cap and be filed no_deliverable having
+            # delivered everything. The alternative — telling it "all four
+            # received, respond if you are done" — is barred: engagement_state
+            # carries what happened, never the stopping rule, and handing that
+            # over feeds the metric to the thing being measured.
+            if not undelivered and (exit_reason != "yield" or grace_leg_spent):
                 break
+            if not undelivered:
+                grace_leg_spent = True
+                logger.info("leg %d: every block delivered but the agent "
+                            "yielded — granting one further leg", i + 1)
 
             # `exit_reason` DECIDES THE MESSAGE, NEVER THE ENDING. This is the
             # one job the yield/respond signal keeps, and it is a continuation
