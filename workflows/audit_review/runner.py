@@ -32,6 +32,23 @@ mechanical form.
 ONE REVIEW PER RUN. The runner refuses if <run>/review/ exists: a reviewer whose
 `inspect` can see a previous review is not independent of it.
 
+CHOOSE THE REVIEWER FOR QUALITY, NOT FOR DISTANCE FROM THE AUDITOR. A model
+reviewing its own report is not disqualified. Bruce's call, 2026-08-29: the
+intra-model effect on review quality is much smaller than the difference
+between a strong reviewer and a weak one, so GLM reviewing GLM is still a
+GLM-quality review and is worth more than a weaker model's independent one.
+Run the best available reviewer and say which it was.
+
+Two things make that cheaper than it sounds. The citation and conformance
+checks above run BEFORE the reviewer and are file operations, so the half of a
+review most exposed to self-favour — whether a cited line really exists — is
+decided by neither model. What remains exposed is the judgement half, whether
+the line SUPPORTS the claim, and that is exactly where a weak reviewer costs
+more than a self-interested one.
+
+The independence that does still bind is the paragraph above: never let a
+reviewer see an earlier review of the same run.
+
 NOT A RE-AUDIT. The subject is the report, not the business — REVIEW.md §2, §10.
 """
 
