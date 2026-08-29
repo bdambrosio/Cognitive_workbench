@@ -776,6 +776,8 @@ def main() -> int:
     transcript, post_retest = [], []
     retested = False
     undelivered = list(blocks.REVIEW_BLOCKS)
+    # Spent when every block looks delivered but the reviewer yielded anyway.
+    grace_leg_spent = False
 
     def _state(nxt_leg: int) -> str:
         return (f"\n\n[review state, recorded by the client's process — leg "
@@ -850,8 +852,23 @@ def main() -> int:
                 text = SUMMARY_REQUEST + note + _state(i + 2)
                 continue
 
-            if not undelivered:
+            # A YIELD IS A NOT-DONE SIGNAL, AND BELIEVING IT IS FREE. Same
+            # rule as the audit runner, for the same reason: `respond` does not
+            # prove delivery, but the converse is not symmetric. Believing "I
+            # am finished" can end a review with nothing written; believing "I
+            # am not finished" costs one leg.
+            #
+            # This runner is the more exposed of the two. A reviewer describing
+            # the blocks it still owes has to name them, and REVIEW.md §8 makes
+            # those names the proof of delivery — the collision that ended
+            # cs2_flashnext_med on the audit side. One grace leg bounds a
+            # reviewer that only ever yields.
+            if not undelivered and (exit_reason != "yield" or grace_leg_spent):
                 break
+            if not undelivered:
+                grace_leg_spent = True
+                logger.info("leg %d: every block delivered but the reviewer "
+                            "yielded — granting one further leg", i + 1)
 
             # exit_reason decides the MESSAGE, never the ending: `yield` means
             # the reviewer says it is still working, so it is not interrupted to

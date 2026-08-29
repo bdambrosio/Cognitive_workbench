@@ -42,8 +42,20 @@ def close_mark(name: str) -> str:
 
 
 def marker_re(mark: str) -> re.Pattern:
-    """Tolerant of any whitespace between the marker's tokens."""
-    return re.compile(r"\s+".join(re.escape(t) for t in mark.split()))
+    """A marker AT THE START OF A LINE, tolerant of whitespace between tokens.
+
+    ANCHORED 2026-08-29, tracking `workflows/blocks.py`. The header above says
+    this file must be reconciled and not diverged, and an unanchored copy would
+    be exactly that. There it cost a run: prose naming three blocks it was
+    about to write counted as delivering them, and the engagement ended with a
+    fifteen-word report. A marker mid-sentence is commentary; one opening a
+    line is a block.
+
+    The whitespace tolerance is unchanged — the anchor binds the first `===` to
+    the line start and a wrap inside the marker still matches.
+    """
+    return re.compile(r"(?m)^[ \t]*"
+                      + r"\s+".join(re.escape(t) for t in mark.split()))
 
 
 # An opener never matches inside its own closer: `=== END REPORT ===` puts
