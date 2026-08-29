@@ -379,6 +379,22 @@ def concern_snapshot(loop) -> list:
     return rows
 
 
+def live_count(rows: list) -> int:
+    """How many of these concerns are still live.
+
+    A snapshot carries every state, because _all_concerns_split applies no
+    status filter — the resource browser shows satisfied and abandoned notes
+    too. A raw length therefore counts retired concerns alongside live ones,
+    which read as accumulation on the very run that first retired one
+    (cm_glm_2, leg 2: one superseded, one spawned, printed as "1 -> 2").
+
+    Two spellings mean live: _serialize_concern maps a user_concern's status
+    into the browser's vocabulary ('open'/'closed') and leaves an
+    agent_concern's alone ('active'/'satisfied').
+    """
+    return sum(1 for r in rows if r.get("status") in ("active", "open"))
+
+
 def concern_delta(before: list, after: list) -> dict:
     """What one leg did to the concern set. This is the line worth reading."""
     b = {r["concern_id"]: r for r in before}
@@ -455,8 +471,10 @@ def log_incoming(path: Path, leg: int, sent: str, reason: str,
                            ensure_ascii=False, default=str) + "\n")
     logger.info("=== LEG %d  AGENT -> RUNNER  exit=%s, %d chars ===",
                 leg, exit_reason, reply_chars)
-    logger.info("  concerns: %d -> %d | +%d -%d status:%d activation:%d "
-                "instruction:%d      resources: %d -> %d",
+    logger.info("  concerns: live %d -> %d (total %d -> %d) | +%d -%d "
+                "status:%d activation:%d instruction:%d      "
+                "resources: %d -> %d",
+                live_count(c_before), live_count(c_after),
                 len(c_before), len(c_after), len(delta["created"]),
                 len(delta["deleted"]), len(delta["status_changed"]),
                 len(delta["activation_changed"]),
