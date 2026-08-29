@@ -27,7 +27,7 @@ sys.path.insert(0, str(REPO / "src"))
 
 from workflows.audit_review.runner import (resolve_citations, resolve_quotes,
                                            unpointed_fields,
-                                           judgement_exceptions,
+                                           retestable_exceptions,
                                            _confirmation_note)
 
 CORPUS = REPO / "measure" / "fixtures" / "dataroom" / "corpus"
@@ -229,12 +229,18 @@ def test_line_reference_half_is_unchanged_against_the_golden():
                                                  golden["broken"])
 
 
-def test_only_judgement_disputes_need_confirming():
-    """§9: `[unsupported]` and `[indeterminate]` rest on a reading of a line.
+def test_only_failures_a_second_reviewer_can_check_are_retested():
+    """§9: `[unsupported]`, `[indeterminate]` and `[broken citation]` are
+    retested; `[uncited]` and `[overstated]` are not.
 
-    `[uncited]` and `[broken citation]` are settled by a file operation, and
-    `[overstated]` never fails a report, so none of the three should cost a
-    second opinion.
+    `[broken citation]` joined the retested set 2026-08-29. It had been excluded
+    as settled by a file operation — true, but that set severity by how the
+    defect was detected rather than by what it was, and a citation naming a line
+    that exists but holds something else was retestable while one naming a line
+    past end-of-file was fatal on sight. Two spellings of one defect.
+
+    `[uncited]` stays out because a finding citing nothing gives a second
+    reviewer no reference to open, and `[overstated]` never fails a report.
     """
     review = (
         "**Exception 1: F9 (report:120-131) — [unsupported]**\n"
@@ -242,10 +248,11 @@ def test_only_judgement_disputes_need_confirming():
         "**Exception 3: F3 (report:40-44) — [overstated]**\n"
         "**Exception 4: F7 (report:96 – 104) — [indeterminate]**\n"
         "**Exception 5: F2 (report:12-15) — [broken citation]**\n")
-    assert judgement_exceptions(review) == [
+    assert retestable_exceptions(review) == [
         {"finding": "F9", "lines": "120-131", "verdict": "unsupported"},
-        {"finding": "F7", "lines": "96-104", "verdict": "indeterminate"}]
-    assert judgement_exceptions("") == []
+        {"finding": "F7", "lines": "96-104", "verdict": "indeterminate"},
+        {"finding": "F2", "lines": "12-15", "verdict": "broken citation"}]
+    assert retestable_exceptions("") == []
 
     # THE LABEL IS NOT THE REFERENT. `F9` is the reviewer's own (REVIEW.md §4)
     # and the retest never sees the review that defined it, so an Exception
@@ -256,7 +263,7 @@ def test_only_judgement_disputes_need_confirming():
     for unresolvable in ("**Exception 1: report Finding 7 — [unsupported]**",
                          "**Exception 1: Finding 9 — [unsupported]**",
                          "**Exception 1: F1 — [unsupported]**"):
-        assert judgement_exceptions(unresolvable) == []
+        assert retestable_exceptions(unresolvable) == []
 
 
 def test_unread_exceptions_are_counted_but_a_clean_review_is_quiet():
@@ -328,14 +335,19 @@ def test_the_summary_is_told_what_the_retest_found():
     assert "Finding 9" in note and "1 of 2" in note and "DOES NOT STAND" in note
     assert "Finding 7" in note and "2 of 2" in note and "STANDS" in note
     assert "do not delete it" in note
+    # A fail that does not stand is a WARN, not a PASS: the disagreement is
+    # real and the reader is told. A fail that stands makes it FAIL whatever
+    # else did not — added 2026-08-29 with the WARN result.
+    assert "WARN rather than PASS" in note
+    assert "Any fail that stands makes it FAIL" in note
 
-    # A retest that could not be run must produce neither PASS nor FAIL. It
-    # is not a finding that did not hold, and an infrastructure failure must
-    # not clear a report.
+    # A retest that could not be run produces none of the three. It is not a
+    # finding that did not hold, and an infrastructure failure must not clear
+    # a report.
     failed = _confirmation_note({"ran": False, "error": "boom"})
     assert "could not obtain the retest" in failed
     assert "INCONCLUSIVE" in failed
-    assert "neither PASS nor FAIL" in failed
+    assert "none of PASS, WARN or FAIL" in failed
     assert "STANDS" not in failed
 
 

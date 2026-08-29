@@ -601,16 +601,28 @@ def _norm_lines(text: str) -> str:
 # reference resolves or it does not, conformance.json says a field carries a
 # pointer or it does not — so re-asking a model would spend money to
 # re-derive a fact it cannot change.
-_JUDGEMENT_VERDICTS = ("unsupported", "indeterminate")
+# Every disposition that fails a report and can be checked a second time.
+#
+# `broken citation` joined these 2026-08-29. It was excluded because a file
+# operation settles it and asking a model to re-derive a fact is not a second
+# opinion — sound as far as it went, but it set severity by how the defect was
+# detected rather than by what it was. A citation naming line 697 when the code
+# is at 1226 is exactly as useless to a reader as one naming a line past the end
+# of the file; the first was `[unsupported]`, retestable and survivable, and the
+# second was fatal on sight. Two spellings of one defect, two verdicts.
+#
+# `uncited` stays out, and not for symmetry: there is no reference to check. A
+# field carries a pointer or it does not, and a retest has nothing to open.
+_RETESTABLE_VERDICTS = ("unsupported", "indeterminate", "broken citation")
 
 
-def judgement_exceptions(review_text: str) -> List[Dict[str, str]]:
-    """Findings a review disputed on judgement rather than on a file fact."""
+def retestable_exceptions(review_text: str) -> List[Dict[str, str]]:
+    """Findings a review failed that a second reviewer can check."""
     out, seen = [], set()
     for m in _EXCEPTION.finditer(review_text or ""):
         v = m.group("verdict").strip().lower()
         lines = _norm_lines(m.group("lines"))
-        if v in _JUDGEMENT_VERDICTS and lines not in seen:
+        if v in _RETESTABLE_VERDICTS and lines not in seen:
             seen.add(lines)
             out.append({"finding": m.group("label"), "lines": lines,
                         "verdict": v})
@@ -625,8 +637,16 @@ Check these findings, and only these, each named by the report lines it
 occupies: {findings}.
 
 For each one, read what the report claims and what its citations actually
-say — `review/citations.json` has every cited line already fetched — and give
-it a verdict from REVIEW.md §6. Judge each finding on the evidence in front
+say, and give it a verdict from REVIEW.md §6.
+
+`review/citations.json` holds every cited line already fetched, and it is a
+convenience for reading them — not the authority on whether a citation
+resolves. Where what is in question is the citation itself, open the cited file
+through `inspect_external` and check the coordinate there. Confirming an index
+from itself is not a second opinion: on 2026-08-29 that index resolved a bare
+`README.md` to a 149-line file when the one cited was 625 lines, and marked
+fourteen sound references broken. A reviewer reading only the index would have
+agreed with all fourteen. Judge each finding on the evidence in front
 of you. You have not been told what anyone else concluded, and you should not
 try to infer it: a second opinion that guesses at the first is not one.
 
@@ -747,7 +767,8 @@ def _confirmation_note(c: Dict[str, Any]) -> str:
         return ("\n\n[The client's process could not obtain the retest. Per "
                 "§9 the result is INCONCLUSIVE: report ADMISSIBLE or "
                 "INADMISSIBLE as you found it, list every finding you failed "
-                "as found but not retested, and give neither PASS nor FAIL. "
+                "as found but not retested, and give none of PASS, WARN "
+                "or FAIL. "
                 "A retest that could not be run is not a finding that did "
                 "not hold.]")
     lines = []
@@ -761,10 +782,13 @@ def _confirmation_note(c: Dict[str, Any]) -> str:
     return ("\n\n[The retest, obtained by the client's process from a reviewer "
             "who was not told your verdicts and did not see your review:\n"
             + "\n".join(lines) +
-            "\n\nApply §9. A finding you failed on judgement stands only where "
-            "the retest reached the same verdict on it. Report a finding "
-            "whose fail does not stand as found but not upheld, and give the "
-            "tally — do not delete it, and do not restate it as agreement.]")
+            "\n\nApply §9. A finding you failed stands only where the retest "
+            "reached the same disposition on it. Report a finding whose fail "
+            "does not stand as found but not upheld, and give the tally — do "
+            "not delete it, and do not restate it as agreement. Where every "
+            "fail you found was retested and none stood, the result is WARN "
+            "rather than PASS. Any fail that stands makes it FAIL, whatever "
+            "else did not stand.]")
 
 
 def main() -> int:
@@ -901,7 +925,7 @@ def main() -> int:
                 whole = "\n\n".join(t for t in transcript if t)
                 review_text = blocks.content(whole, "REVIEW",
                                              blocks.REVIEW_BLOCKS) or ""
-                disputed = judgement_exceptions(review_text)
+                disputed = retestable_exceptions(review_text)
                 # A review with no judgement fails needs no retest, which is
                 # the healthy majority — do NOT warn on that. Warn only when
                 # the review wrote Exception blocks this parser could not

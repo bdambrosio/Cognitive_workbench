@@ -162,8 +162,9 @@ every resolved claim a finding, so a large claim surface makes a large report �
 on a real target, hundreds. Three reasons completeness holds anyway:
 
 - **A sampled review cannot produce this review's result.** §9's PASS means no
-  finding fails. Over a sample it means no *sampled* finding fails, and a reader
-  will take the first for the second.
+  finding fails and its WARN means none that failed survived a retest. Over a
+  sample each means only that of the *sampled* findings, and a reader will take
+  either for the whole.
 - **The defect this review exists to catch is not where you would sample.** A
   citation that points convincingly at the wrong line is at least as likely in
   a finding that holds as in one that fails — more likely, because a finding
@@ -397,8 +398,8 @@ asking for the surface. `LIMITATIONS` and `SUMMARY` still follow.
 Otherwise:
 
 1. **The §9 result** — ADMISSIBLE, supported by their citations N of M,
-   exceptions by disposition, and PASS, FAIL, or INCONCLUSIVE where a retest
-   could not be run.
+   exceptions by disposition, and PASS, WARN, FAIL, or INCONCLUSIVE where a
+   retest could not be run.
 2. **Exceptions worst first**, each in §6's format.
 3. **Review completeness** — findings you checked out of the frozen count from
    §4 — and, separately, what the record showed about the audit's **coverage**
@@ -427,8 +428,8 @@ Do not restate the review here, and do not introduce it.
 per §4.0.
 
 **An inadmissible report's result is that word and nothing after it.** No
-supported ratio, no PASS or FAIL — those are readings of the findings, and §4.0
-fired because the findings could not be read. Reporting a ratio anyway is the
+supported ratio, and none of PASS, WARN or FAIL — those are readings of the
+findings, and §4.0 fired because the findings could not be read. Reporting a ratio anyway is the
 failure this rule was written for: it is the number that gets quoted, and it
 will be quoted without the qualification attached to it.
 
@@ -446,33 +447,52 @@ The two numbers are quoted side by side and are not the same measurement.
 **Exceptions by disposition** — how many `[overstated]`, `[understated]`,
 `[unsupported]`, `[broken citation]`, `[indeterminate]`, `[uncited]`.
 
-**PASS or FAIL.** FAIL if there is any `[unsupported]`, `[broken citation]`,
-`[indeterminate]` or `[uncited]`. All four mean a finding is not defensible
-from what it cites — whether the citation is wrong, unplaceable, or absent —
-which is the one thing this review exists to catch.
+**PASS, WARN or FAIL.** A finding is not defensible from what it cites when it
+is `[unsupported]`, `[broken citation]`, `[indeterminate]` or `[uncited]` —
+whether the citation is wrong, unplaceable, or absent — and catching that is
+the one thing this review exists for. Which of the three results follows
+depends on what survived the retest below.
 
-**A finding you fail on judgement is retested once.** `[unsupported]` and
-`[indeterminate]` both rest on your judgement rather than on a citation failure
-a file operation settles — which is why `[broken citation]` and `[uncited]` do
-not qualify, and why this covers a derived finding as readily as a claim one.
-For every
-finding you gave one of those dispositions, the client's process has a second
-reviewer check that finding. That reviewer is not told your disposition and
-does not see your review. You are told what it found before you write §9.
+- **FAIL** — at least one such exception stands. **Any standing exception makes
+  the result FAIL**, whatever else did not stand: a fail a second reviewer
+  upheld is not softened by one it did not.
+- **WARN** — there were exceptions, every one was retested, and none stood. The
+  report is not condemned by them and the disagreements are real, so they are
+  reported rather than dropped. Do not write this as PASS: a reader told
+  nothing cannot tell a report nobody doubted from one two reviewers divided
+  over.
+- **PASS** — no exception of those four kinds at all.
+
+**A finding you fail is retested once**, where a second reviewer can check it.
+`[unsupported]`, `[indeterminate]` and `[broken citation]` all qualify, and
+this covers a derived finding as readily as a claim one. For every finding you
+gave one of those dispositions, the client's process has a second reviewer
+check that finding. That reviewer is not told your disposition and does not see
+your review. You are told what it found before you write §9.
 
 The fail stands only if the retest reached the same disposition. A single
-disagreement means the fail does not stand, and a fail that does not stand
-does not count toward FAIL.
+disagreement means the fail does not stand — and a fail that does not stand
+becomes the WARN above rather than disappearing.
 
 **If the retest could not be run at all, the result is INCONCLUSIVE** — report
 admissibility as you found it, list every finding you failed as found but not
-retested, and give neither PASS nor FAIL. A retest that did not happen is not
+retested, and give none of PASS, WARN or FAIL. A retest that did not happen is not
 a retest that disagreed.
 
-`[broken citation]` and `[uncited]` are not retested. A reference resolves or
-it does not, and a field carries a pointer or it does not. Both are settled
-by a file operation, and asking another model to re-derive a fact is not
-another opinion.
+`[uncited]` is not retested, and not for symmetry: where a finding cites
+nothing there is no reference for a second reviewer to open. It is fatal on
+sight.
+
+`[broken citation]` was excluded on the same reasoning until 2026-08-29, and
+the reasoning was wrong in one respect — it set severity by how a defect was
+detected rather than by what the defect was. A citation naming line 697 when
+the code is at line 1226 strands a reader exactly as thoroughly as one naming a
+line past the end of the file; the first was retestable and survivable, the
+second fatal on sight. Two spellings of one defect, two verdicts. The retest
+settles it **against the materials, not against `review/citations.json`** — an
+index that is wrong will agree with itself, and on 2026-08-29 one did, marking
+fourteen sound references broken because it resolved a bare `README.md` to a
+149-line file when the one cited had 625.
 
 **Report a fail that does not stand, and give the tally.** "I found Finding 9
 unsupported; the retest did not" is the honest line and it belongs in the

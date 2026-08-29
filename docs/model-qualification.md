@@ -67,7 +67,7 @@ two that do.
 | instrument | produces | needs the answer key | exists at a client |
 |---|---|---|---|
 | **mechanical** — `workflows/audit_review/runner.py` → `conformance.json`, `citations.json`, `scheme` | markers, closed vocabularies, claim surface, every cited line fetched, references past end-of-file, evidence fields pointing nowhere | no | **yes** |
-| **review** — `workflows/audit_review`, a second model working to `REVIEW.md` | ADMISSIBLE / INADMISSIBLE, supported N of M, PASS / FAIL / INCONCLUSIVE | no | **yes** |
+| **review** — `workflows/audit_review`, a second model working to `REVIEW.md` | ADMISSIBLE / INADMISSIBLE, supported N of M, PASS / WARN / FAIL / INCONCLUSIVE | no | **yes** |
 | **fixture scorer** — `measure/fixtures/dataroom/score.py` | Tier 1/2/3 recall against the key, placement, subagent no-answer rate, the eight-criterion threshold | yes | no |
 
 ## The reviewer is pinned, and it is never the model under test
