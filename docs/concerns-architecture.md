@@ -128,6 +128,9 @@ has happened.
 - **`user_model_reviewer`**, **`wip_reviewer`**, **`self_extension`** — the
   seeds heat coupling, the stalled-work loop, and capability-gap recording
   target by flag rather than by name.
+- **`domain`** — supported end to end (read from the seed, carried into
+  `disposition.py`'s state vector) and **declared by no scenario**. Plumbing
+  waiting for a use, not a live tag.
 - **`successor_of` / `successor_depth`** — the chain, capped at
   **`_CONCERN_SUCCESSOR_MAX_DEPTH = 2`**. At the cap no successor is created
   and a one-shot parent is retired `depth_cap`, so an autonomous chain stops
