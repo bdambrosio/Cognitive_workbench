@@ -130,20 +130,45 @@ def load_engagement(name: str) -> Dict[str, Any]:
 # shell). A fourth copy of those tables is how `marker_re` got to three.
 from chat.subagents.security import (                          # noqa: E402
     _SYSTEM_STATE_COMMANDS, _HOST_STATE_COMMANDS, _SUDO_HOST_COMMANDS,
-    _SYSTEM_STATE_TIMEOUT, _HOST_STATE_TIMEOUT, _FIND_TIMEOUT)
+    _SYSTEM_STATE_TIMEOUT, _HOST_STATE_TIMEOUT, _FIND_TIMEOUT,
+    _JOURNAL_GREP_CATEGORIES)
 
-# Per-probe budgets that differ from their table's default. `suid` walks the
-# whole filesystem; security.py gives it _FIND_TIMEOUT for that reason, and a
-# table that flattened every host probe to one budget timed it out at 15s on
-# the first smoke test.
-_PROBE_TIMEOUT_OVERRIDE = {"suid": _FIND_TIMEOUT}
+# PER-PROBE HANDLING THE TABLES DO NOT CARRY. security.py applies these at each
+# call site; a table keyed only by name flattens them, and both of these were
+# found by running rather than by reading.
+#
+# `suid` walks the whole filesystem. Flattened to the 15s host-state default it
+# timed out immediately; at security.py's _FIND_TIMEOUT of 90s it timed out on
+# the first COLD run and finished in 38s warm. 90 is therefore a budget that
+# fails exactly when a run starts a session, which is when this runner starts.
+# 300 covers the cold case with margin and costs nothing when the walk is quick,
+# and a budget that produces a false blind spot is worse than a slow probe.
+_SUID_TIMEOUT = 300.0
+_PROBE_TIMEOUT_OVERRIDE = {"suid": _SUID_TIMEOUT}
 
-# name -> (argv, timeout, needs a granted elevation)
-PROBES: Dict[str, Tuple[list, float, bool]] = {
-    **{k: (v, _SYSTEM_STATE_TIMEOUT, False) for k, v in _SYSTEM_STATE_COMMANDS.items()},
-    **{k: (v, _PROBE_TIMEOUT_OVERRIDE.get(k, _HOST_STATE_TIMEOUT), False)
+# A NON-ZERO EXIT IS NOT ALWAYS A FAILURE, and treating it as one discards good
+# output. `find` exits 1 when it meets a directory it may not read, which is
+# normal unprivileged behaviour and does not stop it listing every setuid binary
+# it did reach. `journalctl -g` adopts grep's semantics, where 1 means "no
+# matching entries" — an answer, not an error. On the first real run `suid` was
+# recorded `not run — exited 1` while holding a complete result.
+_PROBE_OK_RETURNCODES = {"suid": (0, 1),
+                         **{c: (0, 1) for c in _JOURNAL_GREP_CATEGORIES}}
+
+# name -> (argv, timeout, needs a granted elevation, exit codes that are an answer)
+def _probe_row(name: str, argv: list, default_timeout: float,
+               elevated: bool) -> Tuple[list, float, bool, tuple]:
+    return (argv, _PROBE_TIMEOUT_OVERRIDE.get(name, default_timeout), elevated,
+            _PROBE_OK_RETURNCODES.get(name, (0,)))
+
+
+PROBES: Dict[str, Tuple[list, float, bool, tuple]] = {
+    **{k: _probe_row(k, v, _SYSTEM_STATE_TIMEOUT, False)
+       for k, v in _SYSTEM_STATE_COMMANDS.items()},
+    **{k: _probe_row(k, v, _HOST_STATE_TIMEOUT, False)
        for k, v in _HOST_STATE_COMMANDS.items()},
-    **{k: (v, _HOST_STATE_TIMEOUT, True) for k, v in _SUDO_HOST_COMMANDS.items()},
+    **{k: _probe_row(k, v, _HOST_STATE_TIMEOUT, True)
+       for k, v in _SUDO_HOST_COMMANDS.items()},
 }
 
 # METHOD §12's four outcomes. `not run` is recorded for a probe the engagement
@@ -176,7 +201,7 @@ def run_probe_set(collection: Path, authorised: List[str]) -> Dict[str, Any]:
     collection.mkdir(parents=True, exist_ok=True)
     outcomes: Dict[str, Any] = {}
     for name in sorted(PROBES):
-        argv, timeout, needs_grant = PROBES[name]
+        argv, timeout, needs_grant, ok_rcs = PROBES[name]
         path = collection / f"{name}.txt"
         if name not in authorised:
             outcomes[name] = {"outcome": OUTCOME_NOT_RUN,
@@ -206,7 +231,7 @@ def run_probe_set(collection: Path, authorised: List[str]) -> Dict[str, Any]:
             logger.warning("probe %s could not launch: %s", name, e)
             outcomes[name] = rec
             continue
-        if proc.returncode != 0 and needs_grant:
+        if proc.returncode not in ok_rcs and needs_grant:
             rec["outcome"] = OUTCOME_UNAUTHORISED
             rec["why"] = (f"`sudo -n` exited {proc.returncode}; the grant this "
                           f"probe needs was not given")
@@ -216,7 +241,7 @@ def run_probe_set(collection: Path, authorised: List[str]) -> Dict[str, Any]:
             logger.warning("probe %s UNAUTHORISED (rc=%d)", name, proc.returncode)
             outcomes[name] = rec
             continue
-        if proc.returncode != 0:
+        if proc.returncode not in ok_rcs:
             rec["outcome"] = OUTCOME_NOT_RUN
             rec["why"] = f"exited {proc.returncode}"
             path.write_text(f"# {name}: exited {proc.returncode}.\n"
