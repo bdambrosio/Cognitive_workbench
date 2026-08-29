@@ -311,8 +311,9 @@ class MemoriesMixin:
     def _recall(self, query: str, k: int = 3, threshold: float = 0.5
                 ) -> List[Tuple[str, str, str, Optional[str], Optional[str]]]:
         """Semantic search over the memories Collection. Returns ranked
-        (text, category, polarity, note_id, created_at) tuples, highest
-        score first. Category is read from the source note's properties;
+        (text, category, polarity, note_id, created_at, telemetry) tuples,
+        highest score first. `telemetry` carries the arithmetic that chose
+        this hit — see the comment at the return. Category is read from the source note's properties;
         pre-taxonomy memories without a category default to 'fact'.
         Polarity is 'positive' or 'negative'; pre-J memories without a
         polarity default to 'positive'. note_id/created_at are None when
@@ -378,10 +379,41 @@ class MemoriesMixin:
                 base_score = float(r.get('score') or 0.0)
                 adj = self._recency_adjust(base_score, created_at)
                 scored.append((adj, doc.strip(), cat, pol, note_id or None,
-                               created_at))
+                               created_at, base_score))
             scored.sort(key=lambda x: x[0], reverse=True)
-            return [(text, cat, pol, nid, ca)
-                    for _adj, text, cat, pol, nid, ca in scored[:k]]
+            # TELEMETRY, AND ONLY WHAT WAS COMPUTED. Two components exist here
+            # and two are reported: the embedding score FAISS returned, and the
+            # multiplicative age factor _recency_adjust applied. There is no
+            # concern boost and no preference weighting — category and polarity
+            # are read for display grouping and never enter the ranking — so
+            # neither is reported. A telemetry line naming a component the code
+            # does not compute is a confident, checkable-looking claim about a
+            # calculation that never ran.
+            #
+            # `runner_up` is the best candidate that did NOT make the cut, and
+            # it is free: the losers are already ranked here and were simply
+            # discarded. It is the best ABOVE-THRESHOLD loser, since FAISS
+            # filtered at `threshold` before returning — when nothing else
+            # cleared, there is no runner-up and the field says so rather than
+            # being omitted, which would read as "no competition" instead of
+            # "nothing else qualified".
+            total = len(scored)
+            runner_up = None
+            if total > k:
+                r_adj, _t, _c, _p, r_nid, _ca, r_emb = scored[k]
+                runner_up = {'note_id': r_nid, 'final': round(r_adj, 4),
+                             'emb': round(r_emb, 4), 'rank': k + 1}
+            out = []
+            for i, (adj, text, cat, pol, nid, ca, emb) in enumerate(scored[:k], 1):
+                factor = (adj / emb) if emb else 1.0
+                out.append((text, cat, pol, nid, ca, {
+                    'emb': round(emb, 4),
+                    'age_factor': round(factor, 4),
+                    'final': round(adj, 4),
+                    'rank': i, 'of': total,
+                    'runner_up': runner_up,
+                }))
+            return out
         except Exception as e:
             logger.warning(f"[{self.character_name}] _recall failed: {e}")
             return []

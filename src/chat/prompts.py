@@ -341,15 +341,42 @@ class PromptsMixin:
         # crosses threshold.
         if agent_concerns:
             fires = bool(getattr(self, '_autonomy_enabled', False))
+            # EXPOSE THE COMPETITION, NOT JUST THE WINNERS. This block is a
+            # top-K cut by activation, and a list shown without its denominator
+            # reads as "these are my concerns" when it means "these five out of
+            # thirteen". Rank and total are free — the full active list is
+            # already sorted upstream.
+            #
+            # WHAT IS NOT REPORTED, AND WHY. Activation is a single running
+            # scalar: _grow_agent_concerns_per_tick and
+            # _apply_agent_concern_evidence_bump both do `activation = min(1.0,
+            # a + x)` in place, so no record survives of how much came from
+            # elapsed time and how much from evidence — and once a concern
+            # saturates at 1.0 it is not recoverable by arithmetic either.
+            # Reporting a growth/bump split would mean inventing it, so what is
+            # shown instead is `last_bumped_at`, which is stored and does say
+            # whether evidence has touched this concern recently.
+            try:
+                _all_active = self._iter_active_agent_concerns()
+                total_active = len(_all_active)
+                below = sorted((a for _n, _nt, a in _all_active),
+                               reverse=True)[len(agent_concerns):]
+            except Exception:
+                total_active, below = len(agent_concerns), []
             ac_lines: List[str] = []
-            for _nid, text, activation, props in agent_concerns:
+            for _rank, (_nid, text, activation, props) in enumerate(agent_concerns, 1):
                 tags = []
                 if props.get('seed'):
                     tags.append('seed')
                 if props.get('successor_of'):
                     tags.append(f"successor d{props.get('successor_depth', 1)}")
+                bumped = str(props.get('last_bumped_at') or '')[:10]
+                if bumped:
+                    tags.append(f"last evidence {bumped}")
                 tag_str = f", {','.join(tags)}" if tags else ''
-                ac_lines.append(f"- [{activation:.2f}{tag_str}] {text}")
+                ac_lines.append(
+                    f"- [{activation:.2f}, rank {_rank}/{total_active}"
+                    f"{tag_str}] {text}")
                 instr = (props.get('instruction') or '').strip()
                 rhythm = props.get('rhythm_hours')
                 if instr and rhythm:
@@ -399,6 +426,9 @@ class PromptsMixin:
                 "attend to without driving action.\n"
                 f"{autonomy_line}\n\n"
                 + "\n".join(ac_lines)
+                + (f"\n\nShowing {len(agent_concerns)} of {total_active} "
+                   f"active. Highest not shown: {below[0]:.2f}."
+                   if below else "")
             )
         # Fire digest: pending autonomous fires being surfaced this turn
         # (set at user-turn entry in _process_user_turn; empty on
@@ -430,7 +460,10 @@ class PromptsMixin:
             # are prefixed `[avoid] ` so the model treats them as boundaries
             # rather than positive facts.
             grouped: Dict[str, List[str]] = {c: [] for c in _MEMORY_CATEGORIES}
-            for text, cat, pol, note_id, created_at in recall:
+            runner_up = None
+            for text, cat, pol, note_id, created_at, *_tel in recall:
+                tel = _tel[0] if _tel else None
+                runner_up = (tel or {}).get('runner_up') or runner_up
                 if cat not in grouped:
                     cat = 'fact'
                 marker = '[avoid] ' if pol == 'negative' else ''
@@ -442,7 +475,20 @@ class PromptsMixin:
                 if note_id:
                     day = str(created_at or '')[:10]
                     tag = f"[{note_id} · {day}] " if day else f"[{note_id}] "
-                grouped[cat].append(f"{tag}{marker}{text}")
+                # WHY THIS ONE. Raw arithmetic, not a sentence about it: the
+                # score FAISS returned, the multiplicative age factor, the
+                # product that did the sorting, and where it placed among the
+                # candidates that cleared threshold. A model asked to narrate
+                # its own retrieval would produce a second claim needing its
+                # own verifier; these numbers are checkable against the
+                # computation. There is no concern or preference term because
+                # the ranking has none — see memories.py:_recall.
+                why = ''
+                if tel:
+                    why = (f"  [emb {tel['emb']:.2f} ×{tel['age_factor']:.2f}"
+                           f" = {tel['final']:.2f} · rank {tel['rank']}"
+                           f"/{tel['of']}]")
+                grouped[cat].append(f"{tag}{marker}{text}{why}")
 
             body_lines: List[str] = []
             for cat in self._CATEGORY_RENDER_ORDER:
@@ -470,7 +516,24 @@ class PromptsMixin:
                     "tag is each memory's id and write date — use the date "
                     "to judge staleness; never echo the raw Note_N id in "
                     "conversation.\n\n"
+                    "Each line carries the arithmetic that selected it: the "
+                    "embedding score, the age factor multiplied into it, the "
+                    "product, and its rank among the candidates that cleared "
+                    "the similarity threshold. Nothing else enters the "
+                    "ranking — a memory is not promoted for being a "
+                    "preference or for matching a concern.\n\n"
                     + "\n".join(body_lines)
+                    # THE MARGIN, AND WHETHER IT IS REAL. The best candidate
+                    # that did not make the cut. A winner shown alone cannot
+                    # be told from a winner that beat nothing; this says how
+                    # close the decision was and gives the id to go and read.
+                    # Absent when nothing else cleared threshold, which is
+                    # itself the answer — there was no competition.
+                    + (f"\n\nClosest not shown: {runner_up['note_id']} at "
+                       f"{runner_up['final']:.2f} (rank {runner_up['rank']} "
+                       f"of {recall[0][5]['of']})."
+                       if runner_up and recall and len(recall[0]) > 5
+                       and recall[0][5] else "")
                 )
         # Same counterpart as the companion block above — keyed on
         # `source` this was empty on every autonomous fire.
