@@ -598,6 +598,32 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         self._substrate_line = self._compute_substrate_line()
         self._embodiment_line = self._compute_embodiment_line()
         self._init_agent_concerns()
+        # DEAD CONCERNS DO NOT SURVIVE A RESTART. They cost nothing in the
+        # prompt — every consumer goes through _iter_active_agent_concerns,
+        # which filters on status — but the collection is what a person opens
+        # in the resource browser, and a queue of things that can never fire
+        # again is noise there. Bruce, 2026-08-29: the reason is his attention
+        # and the risk of a dormant object having an effect nobody looked for,
+        # which this project has been caught by more than once.
+        #
+        # Grace 0, and only here. A concern satisfied DURING a session stays
+        # for that session — the tick sweep keeps its seven days, so nothing
+        # vanishes underneath a run that is still using it. What goes is what
+        # was already dead when the process started.
+        #
+        # Disposition is unchanged (_dead_concern_disposition): abandoned
+        # concerns and satisfied one-shots go, seeds never do, and satisfied
+        # DURABLES stay because they are the recurrence-revival pool. Each is
+        # written verbatim to concerns_graveyard.jsonl before deletion.
+        try:
+            _dead = self._delete_dead_agent_concerns(grace_days=0)
+            if _dead:
+                logger.info("[%s] startup: discarded %d dead agent "
+                            "concern(s) to the graveyard", character_name,
+                            len(_dead))
+        except Exception as e:                                 # noqa: BLE001
+            logger.warning("[%s] startup dead-concern sweep failed: %s",
+                           character_name, e)
         self._init_user_concerns()
         self._init_agent_threads()
         self._seed_concerns_from_config(character_config)

@@ -1039,7 +1039,8 @@ class ConcernsMixin:
             return 'completed_one_shot'
         return None
 
-    def _delete_dead_agent_concerns(self, dry_run: bool = False
+    def _delete_dead_agent_concerns(self, dry_run: bool = False,
+                                    grace_days: Optional[float] = None
                                     ) -> List[Tuple[str, str, str]]:
         """Tombstone-then-delete dead agent_concerns past the grace
         period. Each note is appended verbatim to
@@ -1050,7 +1051,12 @@ class ConcernsMixin:
         (note_id, reason, text) per deletion; dry_run collects the list
         without touching anything (the supervised batch runner's
         preview). autonomy.jsonl gets a concern_deleted event per real
-        deletion, so history survives the note."""
+        deletion, so history survives the note.
+
+        `grace_days` overrides the default. Startup passes 0: a dead
+        concern is kept for the session it died in and discarded at the
+        next boot, so the collection a person opens in the resource
+        browser holds only concerns that can still do something."""
         if not self._agent_concerns_collection_id:
             return []
         coll = self.resource_manager.get_resource(
@@ -1076,7 +1082,9 @@ class ConcernsMixin:
                     f"[{self.character_name}] dead concern {nid} has no "
                     f"parseable timestamp — kept (cannot age)")
                 continue
-            if (now - anchor) < timedelta(days=_DEAD_CONCERN_GRACE_DAYS):
+            grace = (_DEAD_CONCERN_GRACE_DAYS if grace_days is None
+                     else grace_days)
+            if (now - anchor) < timedelta(days=grace):
                 continue
             text = str(props.get('content', '') or '')
             if not dry_run:
