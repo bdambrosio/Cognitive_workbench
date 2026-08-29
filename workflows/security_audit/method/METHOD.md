@@ -79,6 +79,19 @@ The report says what is exposed and what it permits.
 **An attack surface element is one distinct way for something outside the trust
 boundary to interact with an in-scope host.**
 
+**Outside the trust boundary is anything that is not the operator or acting for
+them.** Unauthenticated peers on the local network and beyond, a device someone
+plugs in, any account other than the operator's — service accounts included —
+and remote content the host fetches and acts on are all outside it. The
+operator is inside, which is §2's third limit stated as a boundary rather than
+as a prohibition: that a system's own operator can alter it is not a finding,
+because altering it is what an operator is for.
+
+The engagement may move this line, and the brief says so when it does; a
+boundary the brief does not state is this one. Where an element's side of it is
+genuinely unclear, enumerate the element and record the case in the LIMITATIONS
+block rather than deciding silently.
+
 That is the test, and it is deliberately mechanical. Enumerate an element for
 each of these the collection shows:
 
@@ -86,8 +99,6 @@ each of these the collection shows:
 - a published container port, and the container that publishes it
 - a service or unit that starts on boot and accepts input
 - an account that can authenticate, local or remote, including service accounts
-- a means of privilege escalation an account holds — sudo rules, group
-  membership, setuid binaries
 - a physical or wireless interface — USB, Bluetooth, Wi-Fi, an unfiltered
   Ethernet port
 - a browser profile's installed extensions, taken together per profile
@@ -99,9 +110,17 @@ each of these the collection shows:
 **One element is one way in, not one machine and not one weakness class.** A
 service listening on two ports is two elements. One port serving three virtual
 hosts is one element unless the collection shows them reaching different
-services. A single account is one element however many groups it belongs to.
-Where the rule genuinely does not settle a case, record the case in the
-LIMITATIONS block rather than deciding silently.
+services. A single account is one element however many groups it belongs to and
+however many sudo rules it holds. Where the rule genuinely does not settle a
+case, record the case in the LIMITATIONS block rather than deciding silently.
+
+**Privilege escalation is a path, not an element.** Sudo rules, group
+membership and setuid binaries are not ways in from outside the boundary; they
+are what an attacker already inside it can become. §4 works them in their own
+right and §6 carries them in a finding's `Path`. Enumerating them as elements
+would put one account on the frozen surface more than once and inflate the
+denominator every coverage statement divides by — which would leave two audits
+of the same host with coverage figures that cannot be compared.
 
 **Label the elements, and keep the labels.** Give each a stable identifier as
 you enumerate — `S1`, `S2`, and so on, in the order the collection presents
@@ -267,6 +286,13 @@ One of these, and nothing else:
   elements examined. This is the strongest statement this method permits, and
   its second clause is not optional.
 
+**A grant that was never given cannot be read as a clean result.** Where a
+probe that the authentication, privilege or credential work depends on returned
+**unauthorised** (§12), `Hardened for what was examined` requires a LIMITATIONS
+sentence naming what the conclusion therefore does not cover. Without it the
+conclusion reads as strength that was never tested: §12's audit that reports
+"clean" while the walk that would have found dirt never finished.
+
 The conclusion is a statement about the examined subset, at the collection's
 timestamp. §1a governs how it must be written.
 
@@ -371,8 +397,9 @@ Four blocks, each self-delimiting, each opened and closed by its own marker.
 - `ATTACK SURFACE` — the frozen enumeration, labelled, with citations.
 - `REPORT` — the findings in §6's format, in §4's order, and §10's conclusion.
 - `LIMITATIONS` — what bounded this audit: the collection's timestamp and
-  coverage, hosts named but not examined, and any §3 cases the element rule did
-  not settle.
+  coverage, hosts named but not examined, any §3 case the trust boundary or the
+  element rule did not settle, and §10's sentence where a withheld grant leaves
+  part of the conclusion uncovered.
 - `GAP MAP` — §14.
 
 A turn boundary does not prove a document was written. The block markers do.
