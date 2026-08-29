@@ -359,10 +359,10 @@ def test_attributor_sees_the_harness_provenance_it_was_told(tmp_path):
         "raw_response": "Yes, you definitely look like a crow.",
         "working_log": "$step1 OK: Bruce (the human) - 0.8 m away",
         "active_concerns": ["[agent 1.00] Track what the user wants"],
-        "substrate": ("running commit 51f86f04; 1 commit(s) since my last "
+        "substrate_line": ("running commit 51f86f04; 1 commit(s) since my last "
                       "session: world: creature avatars - Bruce a crow, "
                       "Jill a kitten, Sentinel an owl"),
-        "embodiment": "body: the shared world",
+        "embodiment_line": "body: the shared world",
         "recall_hits": [],
     }
     seen = {}

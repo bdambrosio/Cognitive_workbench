@@ -56,6 +56,12 @@ class Recorder(_ChatBackend):
         object.__setattr__(self, 'base_url', 'http://127.0.0.1:5000')
         self.reasoning_effort = baseline
         self.bodies = []
+        # chat() reads this before building the body; the stub predates it.
+        # Set explicitly rather than left to a default, because a temperature
+        # a test invents is exactly what model_params exists to prevent — this
+        # says "already resolved", it does not choose one.
+        self.model = 'Qwen3.8-27B'
+        self._resolved_temperature = 0.25
 
     def _effective(self, per_call):
         """Mirror of the resolution in chat(), which is what we assert on."""

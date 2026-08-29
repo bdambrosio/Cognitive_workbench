@@ -22,7 +22,13 @@ from chat.backend import _ChatBackend  # noqa: E402
 
 
 def _backend(window, cloud=False):
-    b = _ChatBackend(server='local', model='', base_url='http://x:5000')
+    # NAMED, NOT EMPTY. `model=''` asks the backend to resolve what the server
+    # is serving, which now means an HTTP call to base_url — unreachable here
+    # by design — and the temperature gate then has nothing to look up. Both
+    # postdate this test. The window is still injected below; only the identity
+    # is real.
+    b = _ChatBackend(server='local', model='Qwen3.8-27B',
+                     base_url='http://x:5000')
     b._server_max_model_len = window   # skip the /v1/models fetch
     b.is_cloud = cloud
     return b

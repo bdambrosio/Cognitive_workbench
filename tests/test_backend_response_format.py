@@ -57,7 +57,14 @@ def _send(captured, backend, **kw):
 
 
 def _local():
-    return _ChatBackend(server='local', model='m',
+    # A CONFIGURED MODEL, NOT A PLACEHOLDER. This read `model='m'` until
+    # 2026-08-29. src/chat/model_params.py raises UnknownModel for a model with
+    # no recommended temperature — deliberately, so a run cannot inherit a
+    # default — and it fires before the request body exists, so every
+    # assertion here was passing on `None` rather than on a response_format.
+    # `_cloud()` already used a real name, which is why only the local tests
+    # went red.
+    return _ChatBackend(server='local', model='Qwen3.8-27B',
                         base_url='http://127.0.0.1:5000')
 
 
