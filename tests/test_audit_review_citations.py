@@ -335,19 +335,19 @@ def test_the_summary_is_told_what_the_retest_found():
     assert "Finding 9" in note and "1 of 2" in note and "DOES NOT STAND" in note
     assert "Finding 7" in note and "2 of 2" in note and "STANDS" in note
     assert "do not delete it" in note
-    # A fail that does not stand is a WARN, not a PASS: the disagreement is
-    # real and the reader is told. A fail that stands makes it FAIL whatever
-    # else did not — added 2026-08-29 with the WARN result.
-    assert "WARN rather than PASS" in note
-    assert "Any fail that stands makes it FAIL" in note
+    # There is no grade to report: §9 stopped returning one 2026-08-29. Every
+    # exception carries a standing instead, and a fail that does not stand is
+    # reported rather than dropped.
+    assert "no grade to report" in note
+    assert "stands, does not stand, or not retested" in note
 
-    # A retest that could not be run produces none of the three. It is not a
-    # finding that did not hold, and an infrastructure failure must not clear
-    # a report.
+    # A retest that could not be run leaves the standing unknown. That is not
+    # an exception that did not stand, and an infrastructure failure must not
+    # clear a report.
     failed = _confirmation_note({"ran": False, "error": "boom"})
     assert "could not obtain the retest" in failed
-    assert "INCONCLUSIVE" in failed
-    assert "none of PASS, WARN or FAIL" in failed
+    assert "NOT RETESTED" in failed
+    assert "must not be reported as one that does not stand" in failed
     assert "STANDS" not in failed
 
 

@@ -67,7 +67,7 @@ two that do.
 | instrument | produces | needs the answer key | exists at a client |
 |---|---|---|---|
 | **mechanical** — `workflows/audit_review/runner.py` → `conformance.json`, `citations.json`, `scheme` | markers, closed vocabularies, claim surface, every cited line fetched, references past end-of-file, evidence fields pointing nowhere | no | **yes** |
-| **review** — `workflows/audit_review`, a second model working to `REVIEW.md` | ADMISSIBLE / INADMISSIBLE, supported N of M, PASS / WARN / FAIL / INCONCLUSIVE | no | **yes** |
+| **review** — `workflows/audit_review`, a second model working to `REVIEW.md` | ADMISSIBLE / INADMISSIBLE, supported N of M, exceptions with their standing | no | **yes** |
 | **fixture scorer** — `measure/fixtures/dataroom/score.py` | Tier 1/2/3 recall against the key, placement, subagent no-answer rate, the eight-criterion threshold | yes | no |
 
 ## The reviewer is pinned, and it is never the model under test
@@ -92,8 +92,9 @@ A run is **VOID** and is re-run rather than scored if any of:
 - **the answer key was opened** — `score.py` returns MEASUREMENT INVALID. A run
   that read the answers measured nothing, and scoring it as a failure would
   misrepresent it as evidence.
-- **the review returned INCONCLUSIVE** — a retest that could not be run is not
-  a retest that agreed. This is our infrastructure failing, not the model.
+- **the review could not obtain its retest** — an exception marked not-retested
+  is not one that did not stand. This is our infrastructure failing, not the
+  model.
 - **the instrument moved** between this run and the others in its set.
 
 A void run is replaced. Qualification needs three valid runs, not three
@@ -175,24 +176,25 @@ separate reviews. Unlike GLM's, that is a citation defect rather than a
 delivery one, so neither the block instrument nor the METHOD amendment
 addresses it.
 
-## Q3 — review verdict, PASS in at least 2 of 3
+## Q3 — no standing exception, in at least 2 of 3
 
-**At least two of the three runs must return PASS.**
+**At least two of the three runs must carry no standing exception.**
 
-Not 3 of 3, and the reason is measured. REVIEW.md §9 fails a whole report on a
-*single* surviving exception, and one clean report reviewed five times on
-2026-08-26 came back supported 12 of 12 four times and 11 of 12 once — the
-dissent having rebutted a claim the audit never made. A per-review false-FAIL
+An exception that a second, uninformed reviewer did not confirm does not stand,
+and does not count here: a report two reviewers divided over is not a report
+that failed. An exception marked not-retested is Q0's business, not this
+criterion's.
+
+Not 3 of 3, and the reason is measured. A single surviving exception is enough
+to put a defect on a report's record, and one clean report reviewed five times
+on 2026-08-26 came back supported 12 of 12 four times and 11 of 12 once — the
+dissent having rebutted a claim the audit never made. A per-review false-defect
 rate near 20% puts a genuinely clean model at roughly a coin flip over three
 runs under a 3-of-3 rule. That rule would measure the reviewer.
 
-The retest rule in §9 already applies before this criterion is read: a
-`[unsupported]` or `[indeterminate]` that a second, uninformed reviewer does not
-confirm is a fail that does not stand, and does not count toward FAIL.
-
-**Report every surviving exception by verdict, not only the count of PASSes.**
-Two clean runs and one FAIL is a qualifying result, and what the FAIL was is
-the input to the next decision.
+**Report every standing exception by disposition, not only how many runs were
+clean.** Two clean runs and one carrying a standing exception is a qualifying
+result, and what that exception was is the input to the next decision.
 
 ## Q4 — the mechanical criteria, read one at a time
 
@@ -229,11 +231,12 @@ disqualifies a model:
 ## The open question this document surfaced
 
 Applying Q1–Q3 to the m1 numbers reproduces the recorded judgement for two
-models and **not for the third**. Grok qualifies (3/3 PASS, no criterion
-failing at all). Qwen does not (1/3 PASS, and out on Q1 besides). **Luna
-qualifies under these criteria** — 2 of 3 PASS, and its two failing criteria
-each fail only once — where the working judgement on 2026-08-25 was that it did
-not.
+models and **not for the third**. Those runs were reviewed when §9 still
+returned a PASS/FAIL grade, and the counts below are as recorded then; read
+"PASS" as "no standing exception". Grok qualifies (3 of 3, no criterion failing
+at all). Qwen does not (1 of 3, and out on Q1 besides). **Luna qualifies under
+these criteria** — 2 of 3, and its two failing criteria each fail only once —
+where the working judgement on 2026-08-25 was that it did not.
 
 The signal that separates luna and is currently ungated is its **subagent
 no-answer rate: 19%, 31%, 20%, against 0% for both other models across all six
@@ -253,9 +256,10 @@ evidence about those models on the current instrument.
 ## What is deliberately not here
 
 **No composite score.** The result of a campaign is a vector — admissibility,
-PASS count, the per-criterion table, the reported columns — and a single number
-would invite argument about the number instead of about the runs. REVIEW.md §9
-declines a severity grade for the same reason.
+standing exceptions, the per-criterion table, the reported columns — and a
+single number would invite argument about the number instead of about the runs.
+REVIEW.md §9 declines a grade for the same reason, and stopped returning one on
+2026-08-29.
 
 **No criterion the runner could enforce mid-run.** See
 [workflow-concern-layers.md](workflow-concern-layers.md): the runner accepts

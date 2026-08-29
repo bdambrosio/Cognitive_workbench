@@ -89,7 +89,7 @@ logger.setLevel(logging.INFO)
 # reviewer was told "The review is received" either way. Worse than the audit's
 # version of the same bug — the retest is driven by parsing that reply, so a
 # progress note taken as a review yields zero disputed findings, no retest, and
-# a PASS that looks clean.
+# a clean-looking result with no exceptions in it.
 from workflows import blocks                                   # noqa: E402
 
 # ASSERTS NOTHING ABOUT WHAT ARRIVED. The summary is still asked for, because
@@ -596,8 +596,8 @@ def _norm_lines(text: str) -> str:
     """One spelling for a line range, so it can be a dict key."""
     return re.sub(r"\s*[-–]\s*", "-", (text or "").strip())
 
-# The two FAIL verdicts that rest on judgement. `[broken citation]` and
-# `[uncited]` are decided by a file operation — citations.json says a
+# Superseded 2026-08-29; see _RETESTABLE_VERDICTS below. `[broken citation]` and
+# `[uncited]` were decided by a file operation — citations.json says a
 # reference resolves or it does not, conformance.json says a field carries a
 # pointer or it does not — so re-asking a model would spend money to
 # re-derive a fact it cannot change.
@@ -678,8 +678,9 @@ def confirm_exceptions(run: Path, world: str, model_path: Optional[Path],
     only if the retest reaches the same verdict. A single disagreement
     ignores the fail, and the disagreement is reported.
 
-    WHY IT APPLIES ONLY TO FINDINGS THAT FAIL. §9 fails a whole report on a
-    single exception, so one wrong judgement condemns the report. Measured on
+    WHY IT APPLIES ONLY TO FINDINGS THAT FAIL. A reviewer asserting a defect in
+    finished work carries the higher standard: one wrong exception puts a defect
+    on the record against a report that does not carry it. Measured on
     2026-08-26: one clean report was reviewed five times and came back
     supported 12 of 12 four times and 11 of 12 once, and the one dissent had
     rebutted a finding by attacking a claim the audit never made. A wrong
@@ -765,12 +766,11 @@ def _confirmation_note(c: Dict[str, Any]) -> str:
     """
     if not c.get("ran"):
         return ("\n\n[The client's process could not obtain the retest. Per "
-                "§9 the result is INCONCLUSIVE: report ADMISSIBLE or "
-                "INADMISSIBLE as you found it, list every finding you failed "
-                "as found but not retested, and give none of PASS, WARN "
-                "or FAIL. "
-                "A retest that could not be run is not a finding that did "
-                "not hold.]")
+                "§9: report ADMISSIBLE or INADMISSIBLE as you found it, and "
+                "mark every exception NOT RETESTED, naming the reason. A "
+                "retest that could not be run is not a finding that did not "
+                "hold, and an exception whose standing is unknown must not be "
+                "reported as one that does not stand.]")
     lines = []
     for r in c["results"]:
         others = ", ".join(f"[{v}]" if v else "[no verdict returned]"
@@ -783,12 +783,11 @@ def _confirmation_note(c: Dict[str, Any]) -> str:
             "who was not told your verdicts and did not see your review:\n"
             + "\n".join(lines) +
             "\n\nApply §9. A finding you failed stands only where the retest "
-            "reached the same disposition on it. Report a finding whose fail "
-            "does not stand as found but not upheld, and give the tally — do "
-            "not delete it, and do not restate it as agreement. Where every "
-            "fail you found was retested and none stood, the result is WARN "
-            "rather than PASS. Any fail that stands makes it FAIL, whatever "
-            "else did not stand.]")
+            "reached the same disposition on it. Report every exception with "
+            "its standing — stands, does not stand, or not retested — and "
+            "give the tally. Do not delete a fail that does not stand, and do "
+            "not restate it as agreement. There is no grade to report: the "
+            "exceptions and their standings are the result.]")
 
 
 def main() -> int:
@@ -930,15 +929,15 @@ def main() -> int:
                 # the healthy majority — do NOT warn on that. Warn only when
                 # the review wrote Exception blocks this parser could not
                 # read, which is a spec/parser mismatch and is otherwise
-                # silent: the retest does not run and §9 returns INCONCLUSIVE
-                # with nothing naming the cause. That silence is how it went
-                # unnoticed for a whole campaign.
+                # silent: the retest does not run and the exception is
+                # reported not-retested with nothing naming the cause. That
+                # silence is how it went unnoticed for a whole campaign.
                 unread = unparsed_exceptions(review_text)
                 if unread:
                     logger.warning(
                         "%d Exception block(s) did not match the §6 format "
-                        "and were not read. Any judgement fail among them is "
-                        "not retested, and §9 will return INCONCLUSIVE. Fix "
+                        "and were not read. Any fail among them is not "
+                        "retested and will be reported as such. Fix "
                         "the parser or the format — do not widen one to fit "
                         "the other without checking the referent resolves.",
                         unread)
