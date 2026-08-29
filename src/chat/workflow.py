@@ -88,11 +88,24 @@ def load_workflow(path: Path) -> str:
 # engagement with no relationship yet — plus two extra LLM calls per turn for
 # the updates.
 #
-# NOT IN THIS LIST, deliberately: concerns. `autonomy_enabled=False` already
-# gates concern FIRING; concern CREATION is how a `yield` carries its
-# remainder to the next leg, and an audit runs on yields. Suppressing them
-# would not produce a leaner audit, it would produce one that cannot continue
-# itself.
+# NOT IN THIS LIST, deliberately: the yield continuation path.
+# `autonomy_enabled=False` already gates concern FIRING, and
+# `_spawn_concern_from_user_yield` is how a `yield` carries its remainder to
+# the next leg. An audit runs on yields, so suppressing that would not produce
+# a leaner audit, it would produce one that cannot continue itself.
+#
+# Reflection, which is in this list, ALSO authors agent_concerns — that is not
+# a contradiction of the line above, it is the distinction it turns on. The
+# yield path writes a remainder the agent stated at a boundary it chose.
+# Reflection writes a guess: it receives four turns of dialogue and never
+# `exit_reason`, so it cannot tell a leg that yielded from one that stopped,
+# and its own stage-4 rule — that a yield makes a reflection concern
+# unnecessary — is unactionable for want of that one field. Measured on the
+# ChatterMate run 2026-08-29: two active agent_concerns, the yield's and
+# reflection's, describing the same work; reflection's was frozen at leg 1's
+# understanding ("execute the Tier 1 audit") and still in the prompt at leg 5,
+# long after Tier 1 finished. Nothing retires it inside a run — a one-shot's
+# stale sweep needs 12 hours against a 33-minute engagement.
 #
 # The membership of this list is a judgement, and judgements rot quietly — a
 # subsystem added later is silently not covered. That is why applying it
@@ -102,6 +115,8 @@ _SUPPRESSED = [
      'discourse state + the per-turn companion model update'),
     ('orientation_enabled', 'orientation',
      'the per-turn orientation block'),
+    ('reflection_enabled',   'reflection',
+     'the post-turn reflection call — memories, user_concerns, agent_concerns'),
 ]
 
 

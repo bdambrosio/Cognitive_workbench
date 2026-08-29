@@ -129,7 +129,9 @@ class ZenohMixin:
             f"(in=cognitive/{self.character_name}/sense_data, "
             f"out=cognitive/{self.character_name}/action, "
             f"backend={self.backend.server}@{self.backend.base_url}, "
-            f"discourse={self.discourse_enabled}, orientation={self.orientation_enabled})"
+            f"discourse={self.discourse_enabled}, "
+            f"orientation={self.orientation_enabled}, "
+            f"reflection={self.reflection_enabled})"
         )
 
     def _on_sense_data(self, sample) -> None:

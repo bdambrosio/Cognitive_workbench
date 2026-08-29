@@ -329,6 +329,110 @@ def latest_reply(loop, source: str) -> str:
     return ""
 
 
+# ---------------------------------------------------------------------------
+# Concern visibility. Written per leg so a run can be watched while it runs.
+#
+# WHY THE RUNNER AND NOT concerns.py. Everything below is available at a leg
+# boundary, and in a runner-driven run a leg boundary is not merely convenient
+# — it is complete. Concerns are created only at the yield point at the end of
+# a turn (chat_loop's `elif not autonomous` branch, which runs before the
+# post-turn executor is handed anything), and nothing closes, supersedes or
+# sweeps one inside a run: a one_shot's stale sweep needs 12 hours against an
+# engagement measured in minutes. There are no mid-turn events to miss.
+# Instrumenting the machinery instead would edit a dozen sites and change the
+# thing being measured.
+# ---------------------------------------------------------------------------
+
+# Fields carried per concern. The browser serializer emits every one of these
+# twice under legacy aliases; a log is read by a person, so it takes one.
+_CONCERN_FIELDS = ("concern_id", "kind", "status", "activation", "strength",
+                   "category", "provenance", "rhythm_hours", "created_at",
+                   "last_fired_at", "last_bumped_at")
+
+
+def concern_snapshot(loop) -> list:
+    """Every concern in both collections, as of now.
+
+    Built on ChatLoop._all_concerns_split — the resource browser's own
+    serializer — so this log and the browser can never disagree about what a
+    concern is. Three properties the browser has no use for are read back off
+    the note: `system_spawned` decides whether anything is permitted to close
+    the concern, and `successor_of` / `successor_depth` say whether it belongs
+    to a chain. Those are the questions this log exists to answer.
+    """
+    user, agent = loop._all_concerns_split()
+    rows = []
+    for c in list(user) + list(agent):
+        nid = c.get("concern_id")
+        props = ((loop.resource_manager.get_resource(nid) or {}).get(
+            "properties") or {})
+        row = {k: c.get(k) for k in _CONCERN_FIELDS}
+        row["text"] = c.get("concern_description")
+        # FULL, not clipped. A plan clipped at N characters is a plan with its
+        # tail cut off, and comparing successive instructions is how a claim
+        # that silently left the plan gets found.
+        row["instruction"] = c.get("instruction")
+        row["system_spawned"] = bool(props.get("system_spawned"))
+        row["successor_of"] = props.get("successor_of")
+        row["successor_depth"] = props.get("successor_depth")
+        rows.append(row)
+    return rows
+
+
+def concern_delta(before: list, after: list) -> dict:
+    """What one leg did to the concern set. This is the line worth reading."""
+    b = {r["concern_id"]: r for r in before}
+    a = {r["concern_id"]: r for r in after}
+    out = {"created": [], "deleted": sorted(set(b) - set(a)),
+           "status_changed": [], "activation_changed": [],
+           "instruction_changed": []}
+    for nid, row in a.items():
+        if nid not in b:
+            out["created"].append(
+                {"id": nid, "kind": row["kind"], "status": row["status"],
+                 "activation": row["activation"],
+                 "system_spawned": row["system_spawned"],
+                 "successor_of": row["successor_of"],
+                 "text": row["text"]})
+            continue
+        prev = b[nid]
+        if prev["status"] != row["status"]:
+            out["status_changed"].append([nid, prev["status"], row["status"]])
+        if prev["activation"] != row["activation"]:
+            out["activation_changed"].append(
+                [nid, prev["activation"], row["activation"]])
+        if (prev["instruction"] or "") != (row["instruction"] or ""):
+            out["instruction_changed"].append(nid)
+    return out
+
+
+def log_leg(path: Path, leg: int, sent: str, exit_reason: str,
+            before: list, after: list) -> None:
+    """Append one leg's record, and say the same thing compactly to the log."""
+    delta = concern_delta(before, after)
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps({"leg": leg, "sent": sent,
+                            "exit_reason": exit_reason, "before": before,
+                            "after": after, "delta": delta},
+                           ensure_ascii=False, default=str) + "\n")
+    logger.info("leg %d sent: %s", leg, " ".join(sent.split())[:160])
+    logger.info("leg %d concerns: %d in -> %d out | +%d -%d "
+                "status:%d activation:%d instruction:%d",
+                leg, len(before), len(after), len(delta["created"]),
+                len(delta["deleted"]), len(delta["status_changed"]),
+                len(delta["activation_changed"]),
+                len(delta["instruction_changed"]))
+    for c in delta["created"]:
+        logger.info("  + %s %s [%s] act=%s sys=%s parent=%s | %s",
+                    c["id"], c["kind"], c["status"], c["activation"],
+                    c["system_spawned"], c["successor_of"],
+                    " ".join((c["text"] or "").split())[:90])
+    for nid, was, now in delta["status_changed"]:
+        logger.info("  ~ %s status %s -> %s", nid, was, now)
+    for nid in delta["instruction_changed"]:
+        logger.info("  ~ %s instruction rewritten", nid)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=__doc__,
@@ -363,6 +467,14 @@ def main() -> int:
     # RUNS BELONG TO THE ENGAGEMENT, not to the workflow and not to a fixture.
     out = eng["runs"] / f"{ts}_{args.world}"
     out.mkdir(parents=True, exist_ok=True)
+    # A run you can follow while it runs. This logger had no file handler, so
+    # watching a run meant redirecting stdout and losing it if you forgot.
+    # Attached to this logger only — never basicConfig(force=True), which
+    # closes whatever handlers the host process already installed.
+    _fh = logging.FileHandler(out / "run.log", encoding="utf-8")
+    _fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    logger.addHandler(_fh)
+    concern_log = out / "concern_log.jsonl"
 
     arm_doc = (yaml.safe_load(Path(args.model).read_text(encoding="utf-8"))
                if args.model else {})
@@ -414,9 +526,16 @@ def main() -> int:
         text = eng["brief"].read_text(encoding='utf-8')
         text_first_leg = text
         for i in range(args.max_turns):
+            concerns_before = concern_snapshot(loop)
             loop._process_user_turn(source=SOURCE, text=text, close=False)
             reply = latest_reply(loop, SOURCE)
             exit_reason = last_exit_reason(args.world, name)
+            # After the turn returns, before anything else looks at the reply.
+            # The yield spawn is synchronous inside the turn, so the concern
+            # set is final here; post-turn work on the executor touches
+            # claims and the trace, not concerns.
+            log_leg(concern_log, i + 1, text, exit_reason,
+                    concerns_before, concern_snapshot(loop))
             legs.append({"leg": i + 1, "sent": text[:80],
                          "exit_reason": exit_reason,
                          "reply_chars": len(reply)})
@@ -602,6 +721,14 @@ def main() -> int:
         "world": args.world,
         "model_config": str(args.model) if args.model else "(scenario default)",
         "workflow_mode": bool(cfg.get("workflow_mode")),
+        # WHAT workflow_mode MEANT ON THE DAY. The boolean above is a name for
+        # the membership of workflow.py's _SUPPRESSED list, and that
+        # membership changes — reflection joined it 2026-08-29. Two rows both
+        # reading `workflow_mode: true` are the same configuration only if
+        # this list also matches. Read off the loop, which is the object the
+        # suppression was applied to: recomputing it here would be the second
+        # source that drifts.
+        "workflow_suppressed": loop.workflow_suppressed,
         "react_temperature": (cfg.get("chat") or {}).get(
             "react_temperature", 0.7),
         "react_max_tokens": (cfg.get("chat") or {}).get(

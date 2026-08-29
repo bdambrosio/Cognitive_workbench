@@ -400,6 +400,20 @@ class ReflectionMixin:
         `sensor:factorio-telemetry`, among them standing instructions the
         user had given).
         """
+        # Off in workflow mode (src/chat/workflow.py). An engagement runs in
+        # a world that is retired unread when it ends, so nothing this call
+        # writes is ever read by a later session; within the run its three
+        # writing stages duplicate channels that already carry the same
+        # content authoritatively — the method document and the brief for
+        # memories, and the yielded concern's instruction for the semantic
+        # remainder. Stage 4 is the one that does harm: it authors an
+        # agent_concern that cannot fire (autonomy off), cannot be revised
+        # (the WIP rewrite is autonomous-only) and cannot be superseded (that
+        # runs on the autonomous successor path), so it persists as a frozen
+        # directive alongside the live one. Default True; getattr so a test
+        # stub without the attribute behaves as before.
+        if not getattr(self, 'reflection_enabled', True):
+            return ([], [], [])
         if not self._memories_collection_id:
             return ([], [], [])
         entity = entity or source
