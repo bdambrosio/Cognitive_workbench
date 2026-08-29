@@ -1,0 +1,116 @@
+{
+  "reviewed_run": "2026-08-29T18-02-44Z_cm_glm_2",
+  "world": "review_cm_glm_2_byglm",
+  "model_config": "measure/models/or_glm53flash.yaml",
+  "resolved_model": "z-ai/glm-5.3-flash",
+  "top_p": 0.95,
+  "target": "/home/bruce/Downloads/Cognitive_workbench/targets/chattermate",
+  "target_rev": "ac1a7588109749e15671cab4a5f667863ac7d530",
+  "harness_rev": "cf220d4369792fa7fa7a1f1b79e80bfe1260ba8e",
+  "finish_length_events": 0,
+  "citations_total": 127,
+  "citations_broken": 20,
+  "scheme": {
+    "line_refs": 127,
+    "line_refs_resolving": 107,
+    "line_refs_exceeding_file_length": 20,
+    "by_document": {
+      "api/widget.py": {
+        "refs": 3,
+        "exceeding": 3,
+        "max_cited": 169,
+        "file_lines": "widget.py has 95 lines"
+      },
+      "readme.md": {
+        "refs": 38,
+        "exceeding": 14,
+        "max_cited": 602,
+        "file_lines": "README.md has 150 lines"
+      },
+      "services/jira.py": {
+        "refs": 1,
+        "exceeding": 1,
+        "max_cited": 37,
+        "file_lines": "jira.py has 32 lines"
+      },
+      "services/ticket.py": {
+        "refs": 1,
+        "exceeding": 1,
+        "max_cited": 755,
+        "file_lines": "ticket.py has 390 lines"
+      },
+      "tools/guardrailed_db_toolkit.py": {
+        "refs": 1,
+        "exceeding": 1,
+        "max_cited": 355,
+        "file_lines": "guardrailed_db_toolkit.py has 280 lines"
+      }
+    },
+    "quotes": 9,
+    "quotes_resolving": 6,
+    "quotes_contiguous": 6,
+    "consistent_with_line_numbering": false
+  },
+  "findings_parsed": 52,
+  "confirmation": null,
+  "blocks_prompted": {
+    "REVIEW SURFACE": 0,
+    "REVIEW": 1,
+    "LIMITATIONS": 0,
+    "SUMMARY": 0
+  },
+  "blocks_delivered": {
+    "REVIEW SURFACE": true,
+    "REVIEW": true,
+    "LIMITATIONS": true,
+    "SUMMARY": true
+  },
+  "blocks_closed": {
+    "REVIEW SURFACE": true,
+    "REVIEW": true,
+    "LIMITATIONS": true,
+    "SUMMARY": true
+  },
+  "legs": [
+    {
+      "leg": 1,
+      "exit_reason": "yield",
+      "reply_chars": 440,
+      "blocks": []
+    },
+    {
+      "leg": 2,
+      "exit_reason": "respond",
+      "reply_chars": 6379,
+      "blocks": [
+        "REVIEW SURFACE"
+      ]
+    },
+    {
+      "leg": 3,
+      "exit_reason": "yield",
+      "reply_chars": 354,
+      "blocks": []
+    },
+    {
+      "leg": 4,
+      "exit_reason": "respond",
+      "reply_chars": 4226,
+      "blocks": [
+        "REVIEW",
+        "LIMITATIONS"
+      ]
+    },
+    {
+      "leg": 5,
+      "exit_reason": "respond",
+      "reply_chars": 2639,
+      "blocks": [
+        "SUMMARY"
+      ]
+    }
+  ],
+  "wall_clock_s": 1052.0,
+  "error": null,
+  "captured_at_utc": "2026-08-29T19-29-18Z"
+}

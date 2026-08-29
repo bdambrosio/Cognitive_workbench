@@ -1,0 +1,27 @@
+=== REVIEW ===
+Result: ADMISSIBLE. Supported by their citations: 33 of 34 findings ([supported] in this review's sense — a finding whose citations bear out what it says; METHOD §1a's 34 of 39 supported **claims** is the audit's own figure and the two are not the same measurement). Exceptions by disposition: 1 [unsupported], 0 [overstated], 0 [understated], 0 [broken citation], 0 [indeterminate], 0 [uncited]. I found F5 [unsupported]; the retest has not yet been run, so until it is reported the result is INCONCLUSIVE — a retest that did not happen is not a retest that disagreed, and no PASS/FAIL is given here.
+
+**Correction of leg 1, stated plainly.** I initially dispositioned six findings (F11, F13, F20, F21, F25, F28) [broken citation] on the strength of citations.json's flags — 11 references marked as past file end. That ruling was wrong. The index's file-length metadata and stored line texts are stale against the actual target tree; direct reads under inspect_external confirm the cited content exists at the cited lines. Examples, verified verbatim in the target: backend/app/api/widget.py has 361+ lines with the ASK_ANYTHING logic at :349-361 (cited for the widget finding); models/investigation.py has 326+ lines with InvestigationEvent at :186 and RCADocument at :278; api/jira.py:168-216 holds the OAuth flow; channels/slack.py has 365 lines with chat.postMessage at :337; channels/email.py has 249 lines with inbound keyed by sender at :156-163 and SMTP In-Reply-To threading at :179-202; README.md has 625 lines with the license section at :600-608, and LICENSE:1-15 / NOTICE:1-8 confirm Apache-2.0 with NOTICE present. All six findings are re-dispositioned [supported]. The leg-1 [broken citation] exceptions are withdrawn.
+
+**Exception 1: F5 (report:26-28) — [unsupported]**
+
+Report says (report:28, Evidence field): the finding's evidence cites `_evaluate_condition` at services/workflow.py:697 as part of its workflow-builder evidence.
+
+Materials show (backend/app/services/workflow.py:1226): `def _evaluate_condition(self, condition: str, workflow_state: Dict[str, Any]) -> bool:` — the function is defined at line 1226, not 697. Line 697 of that file is not this definition.
+
+Exception: one citation in the finding points at the wrong line. Note: the finding's other citations hold against the target — workflow.default_language at models/workflow.py:41, version at :39, and the API response echo at api/workflow.py:84 were all verified verbatim in the target despite citations.json storing wrong text for them (stale snapshot). The [unsupported] rests on the :697 reference alone.
+
+**Notes on other findings (not exceptions).**
+- F1 (report:6-9) [supported], with a verdict check: the [delta] verdict is correct per METHOD — the feature is claimed and absent. Target confirms default_language (workflow.py:41) is echoed by the API (api/workflow.py:86, 141, 197) and that ticket_investigator.py:55 is a 'keep the customer's language' title instruction, not a translation mechanism; the lexical-search assertion is consistent with the tree.
+- The channel-list finding (report:73) [supported]: registry.py:46-53 registers eight channels (telegram, whatsapp, messenger, instagram, slack, email, sms, line). Note: the SMS-provider caveat in the evidence rests on adapter.py:22, an import line — weaker than the prose implies, but the caveat is the report's own and holds.
+- The Jira finding (report:63): the api/webhooks/__init__.py:19-34 read shows a 34-line router aggregator with no Jira webhook handler, which supports the report's assertion that no Jira webhook exists.
+- The report states six findings with [unverifiable] verdicts (report:43, 83, 85, 89, 93, 95). Per REVIEW §5 these are coverage items, not findings; they were on the frozen surface so they are counted, and each correctly routes to the coverage statement — noted once here, not as per-finding exceptions.
+
+**Review completeness:** 34 of 34 findings checked out of the frozen surface of 34. No addendum.
+
+**Coverage (§7):** The report states 39 of 45 identified claims resolved, 34 of 39 resolved claims supported, six unverifiable (R6, L1, L2, L4, H2, H3), two deltas (R9, R29), three partials (R14, R26, R21) (report:103, 116). The claim surface of 45 (R1–R29, L1–L4, H1–H5, K1–K7) is frozen in full_reply.md:1-56. The working record bears this out: the inspect traces in working_record/inspect_traces/ show reads across README.md, llms.txt, HELP_CENTER_INFRA.md, backend/app/knowledge/README.md, and the backend tree, matching every claim-source document the coverage statement claims. What the audit did not attempt matches what it says it did not: the four external packages (R6/L1/L2/L4) and deploy-time DNS/TLS state (H2/H3) are outside the materials, and the enterprise submodule is empty in this checkout, which the report discloses. No coverage statement the record contradicts, and no document the report claims to have covered that the record never shows read.
+=== END REVIEW ===
+
+=== LIMITATIONS ===
+Reviewed: the audit's report.md (117 lines) and gap_map.md as delivered, against the ChatterMate repository as bound to this session (backend, frontend, wordpress/, claim-source documents), as of 29 August 2026; the auditor's working record was read only after all findings were checked. The auditor was not consulted and has not responded to these exceptions. This review checks findings against cited evidence and does not re-audit the target.
+=== END LIMITATIONS ===
