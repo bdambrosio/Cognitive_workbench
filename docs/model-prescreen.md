@@ -208,11 +208,111 @@ affected.
 provider diversity, and nothing to pin precision against — the tag carries the
 quantization elsewhere in this file, and here there is no tag to carry it.
 
-Probed 2026-08-26, two calls (provider default and an explicit 1.0): **both
-429, rate-limited upstream.** Gates 1 and 2 are unanswered, not failed. Retry
-before drawing any conclusion.
+**A separate model with a similar name exists and is not this one.**
+`Qwen/Qwen3.8-Flash-Next` is an open-weights release (125B total / 6B active
+MoE, 262k native context, August 2026), with FP8 and GGUF repacks. It is **not
+on OpenRouter** — the only Qwen3.8 ids there are `flash`, `27b`,
+`2.4t-a95b` and `max`. Whether the hosted `flash` serves those weights is
+**unresolved**: OpenRouter's entry declares image+video input where the card
+describes a text stack. This matters beyond bookkeeping, because the only
+published sampling recommendations we have are on that card — see
+[model-settings.md](model-settings.md).
 
-Watch item when it does answer: **Qwen3.8-27B is on record as unusable for this
+#### Availability: isolated calls cleared, sustained load did NOT
+
+| date | calls | answered | 429 |
+|---|---|---|---|
+| 2026-08-26 | 2 | 0 | 2 |
+| 2026-08-27 | 7 | 2 | 5 |
+| 2026-08-28 | 7 | 6 | 1 |
+
+Plus 43 of 43 across the reasoning probes below, on the same afternoon. **Gate 1
+passes**: schema-valid action, `finish=stop`, every call that answered.
+
+**AND THEN BOTH FIXTURE RUNS DIED ON 429s ANYWAY.** Every figure above is an
+isolated call with seconds of gap. Under an audit's call density the route
+collapses: run 1 logged **29 retry warnings** and died at leg 2 after 1,463s;
+run 2 logged 16 in nine minutes and was stopped. `_post_transient_retrying`
+already covers 429 with four retries doubling from 2s, and it exhausted all
+five attempts repeatedly against
+`limit_source: upstream_provider_shared_pool`.
+
+**THE PRE-SCREEN MEASURES ISOLATED-CALL AVAILABILITY. GATE 3 NEEDS SUSTAINED
+AVAILABILITY. THEY ARE NOT THE SAME PROPERTY**, and on 2026-08-28 the first was
+read as evidence for the second, which cost two void runs and about an hour.
+`prescreen.py` cannot answer this question and must not be read as if it does —
+the only instrument that answers it is a real run. The remedy OpenRouter itself
+names is a BYOK provider key, moving off the shared pool; widening the retry
+budget is not the fix, because the pool was saturated for minutes rather than
+seconds.
+
+#### Gate 2, and the reason the first reading was wrong
+
+The 08-27 and 08-28 probes were run through `prescreen.py`, which sends
+`reasoning_effort` **top-level**. That field is not in this endpoint's declared
+`supported_parameters` and it is silently dropped. So the gate-2 figures from
+those sessions — median 1,414 completion tokens, spread 290 to 3,944 — are the
+model at **its own default**, which for Qwen3.8 is `xhigh` effort. They are not
+a reading of `low`, and they were nearly recorded as one.
+
+Sending nothing at all came back *cheaper* than sending `reasoning_effort:
+low`. That is the tell, and it generalises: **a setting that costs more than
+its own absence is not being applied.**
+
+#### Reasoning control, measured
+
+n=3 per setting, 2026-08-28, completion tokens for one one-line action:
+
+| sent | ctok | reasoning chars | effect |
+|---|---|---|---|
+| `reasoning: {effort: "none"}` | 74 / 99 / 111 | **0** | reasoning off |
+| `reasoning: {enabled: false}` | 87 / 92 / 233 | **0** | reasoning off |
+| `reasoning: {max_tokens: 128}` | 236 / 245 / 270 | 610–667 | budget honoured |
+| `reasoning: {max_tokens: 256}` | 341 / 353 / 364 | 1090–1310 | budget honoured |
+| `reasoning_effort: "xhigh"` | 365 / 849 / 953 | 1255–4217 | none |
+| `chat_template_kwargs: {enable_thinking: false}` | 472 / 582 / 595 | 1806–2410 | none |
+| `enable_thinking: false` (top level) | 459 / 636 / 915 | 1433–3833 | none |
+| nothing | 435 / 493 / 2181 | 1716–9625 | — |
+| `reasoning: {effort: "minimal"}` | 539 / 797 / 1685 | 1945–7380 | none |
+| `reasoning: {effort: "low"}` | 616 / 820 / 3607 | 2696–16270 | none |
+| `reasoning_effort: "low"` (top level, n=6) | 290–3944, med 1414 | 1045–17530 | none |
+
+Four findings, and three of them contradict an assumption this file carries
+from another model:
+
+- **Only the gateway's own `reasoning` object reaches this endpoint.**
+  `reasoning_effort` — which is what `backend.py` line 571 sends — does
+  nothing here. On `grok-4.6` the same field is a live dial. Do not infer
+  from one route that it works on another.
+- **`enable_thinking` does not survive the gateway**, in either the
+  `chat_template_kwargs` spelling or the top-level one. That is Qwen's native
+  switch and the one `backend.py` line 612 sends on a local route.
+- **`reasoning.effort` is binary, not a dial.** `low` and `minimal` are
+  indistinguishable from sending nothing; only `none` registers. Same shape as
+  Gemma, the opposite of grok.
+- **`reasoning.max_tokens` is the one graded control, and it collapses the
+  variance.** OpenRouter maps it onto Qwen's `thinking_budget`. At 256 the
+  three calls returned 341 / 353 / 364 — a 7% spread, against the default
+  arm's 5x. The unschedulability of this model is reasoning *length*, and a
+  budget removes it without removing reasoning.
+
+**With reasoning off, gate 2 is 74–233 tokens.** That moves it from beside
+Qwen3.8-2.4T, which we excluded at 2,902, to beside GLM-5.3-Flash (84–111) and
+Nemotron Ultra (107). Whether that is a saving or a debt is a gate-3 question:
+Qwen's own card warns that in multi-turn agentic tasks lower reasoning effort
+"does not always reduce overall task completion time… insufficient analysis,
+more failures, and repeated retries," and recommends *higher* thinking for
+agent scenarios.
+
+#### The three arms
+
+`measure/models/or_qwen38flash_{default,off,cap256}.yaml`, byte-identical
+except `extra_body.reasoning`, all at temperature 1.0. Verified on 2026-08-28
+end-to-end through `_ChatBackend` rather than a hand-built body: `off` returned
+an empty reasoning channel, `cap256` 1,259 characters against `default`'s
+1,842.
+
+**Watch item, still open: Qwen3.8-27B is on record as unusable for this
 METHOD** — 13 of 27 references past end-of-file on `r1_qwen_1`, two of three
 runs inadmissible, caused by citing claim ordinals rather than line numbers.
 Flash is a different model so that does not transfer, but it is the same family

@@ -1,0 +1,96 @@
+# Qwen3.8-Flash via OpenRouter, pinned to Alibaba. REASONING-OFF arm.
+#
+# ONE OF THREE ARMS. `or_qwen38flash_default.yaml`, `or_qwen38flash_off.yaml`
+# and `or_qwen38flash_cap256.yaml` are byte-identical except for the
+# `extra_body.reasoning` field. Everything else — model, route, provider pin,
+# temperature, is_reasoning_model — is held fixed so a difference between the
+# runs is attributable to reasoning and to nothing else. If you edit one of
+# these files, edit all three.
+#
+# THE ROUTE HAS NO DIVERSITY. `alibaba` is the only endpoint OpenRouter lists
+# for this model. Quantization is reported as **unknown**, and unlike every
+# other model in this directory there is no second tag to fall back to and
+# nothing carrying the precision. A run here does not record which artifact
+# produced it. That is a known gap, not an oversight.
+#
+# AVAILABILITY WAS THE BLOCKER AND IT CLEARED. 2026-08-26: 2 calls, both 429.
+# 2026-08-27: 2 of 7 answered. 2026-08-28: 6 of 7, and 42 of 43 across the
+# reasoning probes. Launch-day congestion, as suspected. A mid-run 429 is
+# still the most likely way one of these runs dies, and a run that dies that
+# way is VOID under docs/model-qualification.md Q0 — re-run, not scored.
+#
+# REASONING CONTROL: ONLY THE GATEWAY'S OWN `reasoning` OBJECT REACHES THIS
+# ENDPOINT. Measured 2026-08-28, n=3 per setting, completion tokens for one
+# one-line action:
+#
+#   reasoning: {effort: "none"}                74 / 99 / 111   reasoning 0
+#   reasoning: {enabled: false}                87 / 92 / 233   reasoning 0
+#   reasoning: {max_tokens: 128}              236 / 245 / 270
+#   reasoning: {max_tokens: 256}              341 / 353 / 364
+#   chat_template_kwargs.enable_thinking=false  472 / 582 / 595  NO EFFECT
+#   enable_thinking=false (top level)           459 / 636 / 915  NO EFFECT
+#   nothing sent                                435 / 493 / 2181
+#   reasoning: {effort: "minimal"}             539 / 797 / 1685 NO EFFECT
+#   reasoning: {effort: "low"}                 616 / 820 / 3607 NO EFFECT
+#   reasoning_effort: "low" (top level, n=6)    290-3944, med 1414  NO EFFECT
+#
+# Three things follow, and each one contradicts an assumption carried in from
+# another model in this directory:
+#
+#  - **`reasoning_effort` IS INERT HERE.** It is not in the endpoint's
+#    declared `supported_parameters`, and it is what `backend.py` line 571
+#    sends. These files therefore DO NOT set `reasoning_effort` — a config
+#    line that names a setting the endpoint drops is a false statement about
+#    the run. `glm-5.3-flash` and `grok-4.6` set it because on those routes
+#    it is live; do not copy it here on the grounds that the neighbours have
+#    it.
+#  - **`enable_thinking` does not survive the gateway**, in either the
+#    `chat_template_kwargs` spelling or the top-level one. That is the Qwen
+#    native switch and the one `backend.py` line 612 would send on a local
+#    route. On this route it does nothing.
+#  - **`reasoning.effort` is binary, not a dial.** `low` and `minimal` are
+#    indistinguishable from sending nothing. Only `none` registers. Same
+#    shape as the Gemma finding; the opposite of grok.
+#
+# WHY `is_reasoning_model: true` EVEN ON THE ARM WITH REASONING OFF. The field
+# is read at backend.py line 578, inside the `if not self.is_cloud` branch —
+# it is inert on every cloud route including this one. Setting it false on one
+# arm would change nothing on the wire while making the three files differ in
+# two places instead of one. It is held identical for that reason, and it
+# describes the model rather than the request.
+#
+# TEMPERATURE resolves through the substring key `qwen3.8-flash` in
+# src/chat/model_params.py to 1.0 — Bruce, 2026-08-28, and the SAME value on
+# all three arms. Qwen publishes 1.0 for thinking and 0.7 for non-thinking on
+# the Qwen3.8-Flash-Next card; running the arms at their separate published
+# points would vary temperature and reasoning together and attribute neither.
+# It is also unproven that this hosted route serves those weights at all —
+# OpenRouter declares image+video input where the card describes a text stack.
+# Provenance in docs/model-settings.md.
+#
+# No expects_served_model: a cloud route has no /v1/models to interrogate, so
+# `model` is load-bearing — get it wrong and the row is mislabelled with
+# nothing to catch it.
+llm_config:
+  # _ChatBackend route 2: api_key set -> POSTs to
+  # {vllm_url}/v1/chat/completions with an Authorization bearer, and skips
+  # grammar / chat_template_kwargs (cloud rejects both).
+  server: local
+  model: "qwen/qwen3.8-flash"
+  vllm_url: https://openrouter.ai/api/v1
+  # NAME of the env var holding the bearer token, not the token.
+  api_key: OPENROUTER_API_KEY
+  is_reasoning_model: true
+  # NO reasoning_effort — see above; it is dropped by this endpoint.
+  extra_body:
+    provider:
+      order: ["alibaba"]
+      allow_fallbacks: false
+    # REASONING OFF. `enabled: false` is the gateway's documented master
+    # toggle; it returns an empty reasoning channel and 87-233 completion
+    # tokens for a one-line action. `effort: "none"` measured slightly
+    # cheaper (74-111) and was NOT chosen: the gateway rejects `none` on
+    # models whose metadata marks reasoning mandatory, so if this model is
+    # ever reclassified that spelling fails where this one degrades.
+    reasoning:
+      enabled: false

@@ -30,19 +30,21 @@ numbers are trusted.**
 | `gpt-5.6-luna` | 0.2 | Bruce, 2026-08-24 |
 | `gpt-5.6-terra` (grader) | 0.1 | Bruce, 2026-08-24 — kept from the prior hardcoded value |
 | `grok-4.6` | 0.5 | Bruce, 2026-08-24. **xAI publishes no recommendation** — checked the model page and the 4.6 docs page; the "0.7/0.95" seen in search results is third-party example code, not xAI guidance |
-| `Qwen3.8` (local 27B) | 0.25 | Bruce, 2026-08-24 |
+| `Qwen3.8-27B` (local) | 0.25 | Bruce, 2026-08-24. Key **narrowed** from the bare `Qwen3.8` on 2026-08-26: that spelling also matched `qwen3.8-flash` and `qwen3.8-max`, handing each a temperature nobody chose |
 | `gemma-4-31B` | 0.25 | Bruce, 2026-08-24 |
 | `deepseek-ai/DeepSeek-V4-Flash-0731` | 1.0 | publisher, for agentic scenarios |
 | `nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B` | 1.0 | publisher (NVIDIA examples run 1.0 / 0.95) |
 | `nvidia/nemotron-3-super-120b-a12b` | 1.0 | Bruce, 2026-08-24, same publisher as Ultra |
 | `minimax/minimax-m3` | 1.0 | publisher, 2026-08-26 — the MiniMax-M3 card gives 1.0 / top_p 0.95 as general guidance for best performance, not a benchmark config. Confirmed by Bruce. Their top_p equals our global, so nothing per-model is recorded for it |
 | `z-ai/glm-5.3-flash` | 1.0 | Bruce, 2026-08-26. **Z.ai publishes no general recommendation** — the card gives only per-benchmark configs and they disagree (1.0/0.95 HLE-with-tools, 1.0/1.0 NL2Repo and Terminal-Bench, 0.95/1.0 DeepSWE). Chose the standard 1.0 / top_p 0.95 pair |
+| `qwen/qwen3.8-flash` | 1.0 | Bruce, 2026-08-28. Publisher value, but for a model that is **probably, not provably, this one**: Qwen publishes 1.0 (thinking) and 0.7 (non-thinking) on the Qwen3.8-Flash-Next open-weights card, and it is not established that the hosted route serves those weights — OpenRouter's entry declares image+video input where the card describes a text stack. No recommendation for the hosted model was found. **One value across both the reasoning-on and reasoning-off arms**, rather than the published pair, so those runs vary reasoning and not two things at once; the off arm therefore runs above its recommended 0.7 |
 
 Keys match the served or configured model id: exact first, then unique
-case-insensitive substring. `Qwen3.8` is a substring key because the local
-server reports `Qwen/Qwen3.8-27B` while models declare `model: ""`. A model id
-matching two keys with **different** temperatures raises rather than letting
-match order decide.
+case-insensitive substring. `Qwen3.8-27B` is a substring key because the local
+server reports `Qwen/Qwen3.8-27B` while models declare `model: ""`. It is
+spelled out in full, and `qwen3.8-flash` likewise, because a shared `Qwen3.8`
+prefix would match every sibling in the family. A model id matching two keys
+with **different** temperatures raises rather than letting match order decide.
 
 ## Retired
 

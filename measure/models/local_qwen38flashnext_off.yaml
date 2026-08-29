@@ -1,0 +1,57 @@
+# Qwen3.8-Flash-Next (local vLLM, NVFP4) with THINKING OFF.
+#
+# IDENTICAL TO `local_qwen38flashnext.yaml` EXCEPT the reasoning control. That
+# file is the canonical record for this route — the effort ladder, the
+# parameters vLLM silently ignores, the 400 on `high`, the server flags and the
+# temperature provenance are documented there. Read it first, and change all
+# four local files together.
+#
+# WHY THE SWITCH IS IN `extra_body` AND NOT A NORMAL FIELD. There is no way to
+# say "off" through the ordinary config path, and the two obvious spellings
+# both fail:
+#
+#   reasoning_effort: none   -> _ChatBackend.__init__ (backend.py:88) accepts
+#                               only low|medium|high and RAISES.
+#   enable_thinking: false   -> not a field chat_loop.py reads; it is a per
+#                               -call argument no audit call site passes.
+#
+# `extra_body` is merged into the request body by setdefault (backend.py:544),
+# and the local branch's own `chat_template_kwargs` assignment fires only when
+# `enable_thinking is False or reasoning_effort == 'none'` — neither of which a
+# yaml can trigger. So the value below survives to the wire. Verified by call,
+# not by reading: zero characters on the reasoning channel.
+#
+# MEASURED, n=3, completion tokens for one one-line action (2026-08-28):
+#
+#   enable_thinking false   108 / 112 / 115   reasoning 0 chars
+#   reasoning_effort low    191 / 205 / 301   reasoning  503-990
+#   reasoning_effort medium 332 / 365 / 382   reasoning 1141-1289
+#
+# WHAT THIS IS FOR, AND WHAT IT IS NOT FOR. This is a REVIEWER config. As an
+# AUDITOR the prior is against it: citation integrity improved monotonically
+# with effort — 6 broken references in 160 at low, 0 in 179 at medium — and
+# off sits below low on that gradient. The audit's deliverable is citations.
+#
+# The reviewer's task is more mechanical (resolve a citation, compare it to a
+# quote), reasoning cannot consume the token budget when there is none, and
+# the two settings already tried gave OPPOSITE admissibility verdicts on the
+# same report — low ADMISSIBLE/FAIL, medium INADMISSIBLE at §4.0. This run
+# exists to cross-check that instability, not because off is expected to win.
+#
+# TEMPERATURE. Resolves to 1.0 through `qwen3.8-flash-next`, which is Qwen's
+# THINKING-mode value. Their non-thinking recommendation is 0.7. This file is
+# therefore at the wrong published operating point for the mode it selects,
+# deliberately: changing temperature and reasoning together would vary two
+# things at once and attribute neither. If this setting is ever adopted rather
+# than probed, the temperature needs its own decision — see
+# docs/model-settings.md.
+expects_served_model: "Qwen3.8-Flash-Next"
+llm_config:
+  server: local
+  model: "primitive-ai/Qwen3.8-Flash-Next-NVFP4"
+  vllm_url: http://127.0.0.1:5000
+  is_reasoning_model: true
+  # NO reasoning_effort — see above.
+  extra_body:
+    chat_template_kwargs:
+      enable_thinking: false

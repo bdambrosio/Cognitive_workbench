@@ -1,0 +1,95 @@
+# Qwen3.8-Flash-Next, served locally by vLLM as primitive-ai's NVFP4 repack.
+#
+# THE ROUTE. `vllm/vllm-openai:qwen38-flash-next` in Docker on a single RTX PRO
+# 6000 Blackwell (97.9 GB), container port 8000 published on host 5000.
+# 91.8 GB of 97.9 resident at --gpu-memory-utilization 0.92, so roughly 6 GB of
+# headroom. The second GPU (5060 Ti) is not used. Throughput sat at 85-88 tok/s
+# across every setting probed on 2026-08-28 — the steadiest of any candidate on
+# record here.
+#
+# THIS IS NOT THE SAME MODEL AS `qwen/qwen3.8-flash` ON OPENROUTER, and the two
+# must not be compared. Different weights, different quantization, and the
+# hosted route's identity is unresolved (see docs/model-prescreen.md). What
+# they share is a name.
+#
+# REASONING: THE DEFAULT IS UNSAFE AND MUST BE SET EXPLICITLY. Completion
+# tokens for one one-line action, n=3 unless noted, measured 2026-08-28:
+#
+#   chat_template_kwargs {enable_thinking: false}   108 / 112 / 115   reasoning 0
+#   reasoning_effort none (n=1)                      98               reasoning 0
+#   reasoning_effort low                            191 / 205 / 301
+#   reasoning_effort medium                         332 / 365 / 382
+#   reasoning_effort xhigh (n=1)                    377
+#   NOTHING SENT (server default = xhigh)           692 / 739 / 7976
+#
+# The default is not merely expensive, it is unbounded: one of three calls
+# spent 7,976 completion tokens and 90.7 seconds on a one-line answer. This
+# architecture makes 35-187 calls per run. **A config for this server that does
+# not set the dial is a config that can burn a run**, and `backend.py`'s
+# reasoning-effort comment does not protect you here — it reasons that omitting
+# the field is safe because the server was launched with enable_thinking=false,
+# and THIS server was launched the other way.
+#
+# `low` is chosen over off. Off is cheaper (108-115) but Qwen's own card warns
+# that in multi-turn agentic work lower effort "does not always reduce overall
+# task completion time... insufficient analysis, more failures, and repeated
+# retries". low keeps reasoning on at a bounded cost. It also matches grok,
+# luna, glm and both DeepInfra models, so the campaign varies backend and not
+# effort.
+#
+# `reasoning_effort: high` IS REJECTED BY THIS SERVER with a 400: "Supported
+# types are xhigh (default), medium, and low." Our own validator
+# (backend.py:88) allows low|medium|high and does NOT allow xhigh, so the two
+# vocabularies overlap only at low and medium. Do not write `high` here, and
+# `xhigh` cannot be written at all — _ChatBackend raises before the request is
+# built.
+#
+# WHAT STEERS OUTPUT, AND WHAT SILENTLY DOES NOT. `response_format` json_schema
+# carrying REACT_ACTION_SCHEMA is honoured — schema-valid on every probe, clean
+# tool names, finish=stop. `reasoning_effort` is honoured. Everything else our
+# local path might send is INERT on vLLM:
+#
+#   - `grammar` (the cot_profile GBNF) is ignored. Proved by sending an
+#     impossible grammar, `root ::= "ZZZZZZZZ"`, and getting back normal JSON.
+#     The audit path passes cot_profile='none' anyway, so nothing is sent, but
+#     any call site that OMITS cot_profile hands over a grammar that is
+#     silently discarded rather than applied.
+#   - `chat_template_kwargs {thinking_budget: N}` does nothing. The gateway
+#     route honours a thinking budget; this one does not. The dial here is the
+#     effort ladder.
+#   - An OpenRouter-style `reasoning: {...}` object does nothing — that is a
+#     gateway field, not a vLLM one.
+#
+# UNKNOWN PARAMETERS RETURN 200. Verified by sending
+# `this_param_does_not_exist_xyz`. Known parameters are validated (`high`
+# 400s), unknown ones are swallowed. So a setting that is not taking effect
+# will not announce itself, and the only proof a knob works is a measured
+# change in output.
+#
+# THE SERVER-SIDE FLAGS MATTER AND ARE ALREADY RIGHT. `--reasoning-parser
+# qwen3` is what puts thinking on the `reasoning_content` channel and keeps
+# `content` as clean JSON; without it the think block lands in content and
+# every action fails to parse. `--tool-call-parser qwen3_coder` is set and is
+# irrelevant to us — this harness does not use OpenAI tool-calling, it uses
+# response_format plus its own ReAct loop.
+#
+# TEMPERATURE resolves through the substring key `qwen3.8-flash-next` in
+# src/chat/model_params.py to 1.0 — Bruce, 2026-08-28. Qwen's published
+# thinking-mode value for exactly these weights, which makes it the one row in
+# that table whose publisher recommendation is not borrowed from a
+# near-neighbour. It is the THINKING value; a config that turns thinking off is
+# at the wrong operating point (Qwen publishes 0.7 for that) and needs its own
+# decision.
+expects_served_model: "Qwen3.8-Flash-Next"
+llm_config:
+  # _ChatBackend route 3: no api_key -> local OpenAI-compatible path, which
+  # sends response_format, and would send grammar / chat_template_kwargs if a
+  # call asked for them.
+  server: local
+  # Spelled out rather than "" so a row can name its own backend even if the
+  # /v1/models check is ever skipped. expects_served_model is the guard that
+  # catches the box being switched under us.
+  model: "primitive-ai/Qwen3.8-Flash-Next-NVFP4"
+  vllm_url: http://127.0.0.1:5000
+  is_reasoning_model: true
+  reasoning_effort: low

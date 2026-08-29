@@ -92,6 +92,50 @@ MODEL_TEMPERATURE: Dict[str, float] = {
     # different values raise. Adding the full GLM-5.3 later means keeping both
     # keys spelled out.
     "glm-5.3-flash": 1.0,
+    # Qwen3.8-Flash on OpenRouter (`qwen/qwen3.8-flash`). Bruce confirmed 1.0
+    # on 2026-08-28, for BOTH the reasoning-on and reasoning-off arms.
+    #
+    # PROVENANCE IS WEAKER THAN THE OTHER OSS ROWS AND THE DIFFERENCE MATTERS.
+    # Qwen publishes 1.0 (thinking) and 0.7 (non-thinking) on the
+    # Qwen3.8-Flash-Next open-weights card. It is NOT established that the
+    # hosted route serves those weights: OpenRouter's entry declares
+    # image+video input and the card describes a text stack, and no
+    # recommendation for the hosted model was found. So 1.0 is the publisher's
+    # number for a model that is probably, not provably, this one.
+    #
+    # WHY ONE VALUE ACROSS BOTH ARMS rather than the published pair. The arms
+    # exist to measure what turning reasoning off costs. Running them at 1.0
+    # and 0.7 would vary two things at once and attribute nothing. The
+    # reasoning-off arm therefore runs above its recommended 0.7, and that is
+    # a deliberate trade recorded in docs/model-settings.md.
+    #
+    # The key must stay `qwen3.8-flash` and not shorten to `qwen3.8`: that
+    # would also match Qwen3.8-27B and qwen3.8-max, which is the exact
+    # coincidence-of-spelling failure the 2026-08-26 narrowing above fixed.
+    # NARROWED 2026-08-28 from the bare `qwen3.8-flash`, which is a substring
+    # of the local `primitive-ai/Qwen3.8-Flash-Next-NVFP4` below and silently
+    # captured it. Both wanted 1.0, so nothing raised — which is the worse
+    # failure: it would have worked by accident until the day the two models
+    # wanted different values. Spelled with the `qwen/` prefix so it matches
+    # the OpenRouter id and nothing else.
+    "qwen/qwen3.8-flash": 1.0,
+    # Qwen3.8-Flash-Next, run locally in vLLM as primitive-ai's NVFP4 repack.
+    # Bruce confirmed 1.0 on 2026-08-28.
+    #
+    # THIS IS THE ONE ROW WHOSE PUBLISHER RECOMMENDATION ACTUALLY APPLIES TO
+    # THE MODEL IT NAMES. Qwen's Qwen3.8-Flash-Next card publishes 1.0 /
+    # top_p 0.95 / top_k 20 for thinking mode, and these are those weights.
+    # The hosted `qwen/qwen3.8-flash` row borrows the same card without it
+    # being established that the two serve the same artifact; this one does
+    # not have to borrow. The quantization is a third party's, the weights
+    # are Qwen's.
+    #
+    # 1.0 is the THINKING-mode value, which is the mode we run: the audit
+    # yaml sets reasoning_effort low, not off. Qwen publishes 0.7 for
+    # non-thinking, so a config that ever turns thinking off is at the wrong
+    # operating point and needs its own conversation, not a silent reuse of
+    # this number.
+    "qwen3.8-flash-next": 1.0,
 }
 
 # Retired deliberately, so a stale config naming one fails with a reason

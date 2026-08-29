@@ -1,0 +1,34 @@
+# Qwen3.8-Flash-Next (local vLLM, NVFP4) at reasoning_effort: medium.
+#
+# IDENTICAL TO `local_qwen38flashnext.yaml` EXCEPT `reasoning_effort`. That
+# file is the canonical record for this route — the reasoning ladder, the
+# parameters vLLM silently ignores, the 400 on `high`, the server-side flags,
+# and the temperature provenance are all documented there and are NOT repeated
+# here. Read it first. If you change anything below other than
+# reasoning_effort, change it in both files.
+#
+# WHY THIS FILE EXISTS. Three runs at `low` passed the mechanical screen 3/3
+# but their claim surfaces were 22 / 32 / 21 — a 1.5x spread at identical
+# settings, on the same nine documents. Must-finds were 3/3 and unsupported
+# claims 0 in every run, so what moved was enumeration and derived findings,
+# not coverage of the things that matter most. Qwen's card claims higher
+# effort helps multi-turn agentic work; this condition tests that where it
+# would show.
+#
+# WHAT THREE RUNS CAN AND CANNOT SETTLE. They can detect an obvious change in
+# spread and give three more admissibility verdicts. They CANNOT certify a
+# modest tightening: comparing dispersion between two samples of three is weak,
+# and a medium spread of, say, 24-29 against low's 21-32 would not be
+# distinguishable from luck. Report the numbers; do not upgrade them.
+#
+# Per-call cost at medium is 332 / 365 / 382 completion tokens against low's
+# 191 / 205 / 301. Wall clock will NOT scale with that: the three low runs ran
+# 513 / 716 / 578s and the fastest-per-call run was not the fastest run. Leg
+# count and call count dominate.
+expects_served_model: "Qwen3.8-Flash-Next"
+llm_config:
+  server: local
+  model: "primitive-ai/Qwen3.8-Flash-Next-NVFP4"
+  vllm_url: http://127.0.0.1:5000
+  is_reasoning_model: true
+  reasoning_effort: medium

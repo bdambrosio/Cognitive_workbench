@@ -1,0 +1,50 @@
+# Qwen3.8-Flash-Next (local vLLM, NVFP4) at the SERVER DEFAULT — i.e. xhigh.
+#
+# IDENTICAL TO `local_qwen38flashnext.yaml` EXCEPT that reasoning_effort is
+# OMITTED. That file is the canonical record for this route; read it first and
+# change all three together.
+#
+# THIS FILE DELIBERATELY BREAKS THE RULE THE LOW FILE STATES. That file says a
+# config for this server which does not set the dial is a config that can burn
+# a run, and it is right. The omission here is the experiment, not an oversight.
+#
+# WHY OMITTING IS HOW WE REACH xhigh. The server enumerates its supported set
+# in a 400: "Unexpected reasoning effort high. Supported types are xhigh
+# (default), medium, and low." There is no `high`. And `xhigh` cannot be
+# written into an llm_config at all — _ChatBackend's validator (backend.py:88)
+# accepts only low|medium|high and raises before the request is built. So the
+# only way to reach the top rung without changing shared sampling machinery is
+# to send nothing and let the server default apply.
+#
+# THAT THE TWO ARE THE SAME THING IS MEASURED, NOT ASSUMED. n=5 each,
+# completion tokens for one one-line action, 2026-08-28:
+#
+#   nothing sent   385 / 445 / 474 / 904 / 3181   median 474   worst call 35.8s
+#   xhigh          350 / 384 / 471 / 753 /  843   median 471   worst call  9.5s
+#   medium         358 / 373 / 430 / 442 /  483   median 430   worst call  5.5s
+#
+# Medians 474 and 471 is why this file exists in this form. It is n=5, so it
+# rules out a large difference and not a small one — if a run here behaves
+# oddly, "the default is not exactly xhigh" is a live explanation and not a
+# stretch.
+#
+# WHAT TO EXPECT, AND WHAT WOULD END THE EXPERIMENT. The default's cost is
+# barely above medium at the median and far worse in the tail: the widest
+# single call measured on this server was 7,976 completion tokens over 90.7
+# seconds, at this setting. Over 35-187 calls per run that tail is the risk.
+# A run that takes far longer than medium's 530-609s, or that trips the react
+# token budget, is the answer — no further runs needed.
+#
+# n=1 IS A SCOUT, NOT A COMPARISON. Medium's claim surface ran 22/26/28 across
+# three runs and low's ran 21/22/32. A single default run landing anywhere in
+# 21-32 tells you nothing at all about where its distribution sits. This run
+# can detect an obvious failure or an obvious runaway. It cannot rank this
+# setting against medium, and a good result here is a reason for three more
+# runs, not a conclusion.
+expects_served_model: "Qwen3.8-Flash-Next"
+llm_config:
+  server: local
+  model: "primitive-ai/Qwen3.8-Flash-Next-NVFP4"
+  vllm_url: http://127.0.0.1:5000
+  is_reasoning_model: true
+  # NO reasoning_effort — see above. This is the experiment.
