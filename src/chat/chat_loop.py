@@ -330,6 +330,12 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         # lowers it to 4096 so a runaway tool arg truncates before the HTTP
         # read timeout, letting the parse-retry recover.
         self.react_max_tokens = int((character_config.get('chat') or {}).get('react_max_tokens', 8192))
+        # Action emissions cut off mid-JSON by the token ceiling, over
+        # the life of this loop. Surfaced in run_meta/review_meta: a run
+        # that hit the ceiling repeatedly is degraded, and until this
+        # existed it looked identical in the record to one that never
+        # did — the fact lived only in a log nobody keeps.
+        self.finish_length_events = 0
         # ACTION-EMISSION TEMPERATURE. 0.7 is right for a companion, where
         # sampling diversity is the personality. It is not obviously right
         # for an agent executing a procedure, which wants the most likely

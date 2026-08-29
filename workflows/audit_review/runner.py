@@ -484,10 +484,37 @@ after it.
 """
 
 
-# Exceptions in a finished review, as §6 writes them.
+# Exceptions in a finished review, as §6 writes them:
+#   **Exception 1: F1 (report:42-48) — [unsupported]**
+# The label is the reviewer's own (REVIEW.md §4) and means nothing to the
+# retest, which does not see this review. The report line range is the referent
+# that carries, which is why §6 puts it on this line.
 _EXCEPTION = re.compile(
-    r"^\s*\**\s*Exception\s+\d+\s*:\s*report\s+Finding\s+(\d+)[^\n\[]*\[([^\]]+)\]",
+    r"^\s*\**\s*Exception\s+\d+\s*:\s*"
+    r"(?P<label>F\d+)\s*\(\s*report\s*:\s*"
+    r"(?P<lines>\d+(?:\s*[-–]\s*\d+)?)\s*\)"
+    r"[^\n\[]*\[(?P<verdict>[^\]]+)\]",
     re.M | re.I)
+
+
+# Any line that opens an Exception block, whatever shape the rest is in.
+# Paired with `_EXCEPTION` above to detect format drift: a review that wrote
+# exceptions the strict pattern did not understand is a parser/spec mismatch,
+# and it is silent otherwise — the retest simply does not run and §9 returns
+# INCONCLUSIVE with nothing naming the cause.
+_EXCEPTION_ANY = re.compile(r"^\s*\**\s*Exception\s+\d+\s*:", re.M | re.I)
+
+
+def unparsed_exceptions(review_text: str) -> int:
+    """Exception blocks the strict §6 pattern could not read. 0 is healthy."""
+    text = review_text or ""
+    return max(0, len(_EXCEPTION_ANY.findall(text))
+               - len(_EXCEPTION.findall(text)))
+
+
+def _norm_lines(text: str) -> str:
+    """One spelling for a line range, so it can be a dict key."""
+    return re.sub(r"\s*[-–]\s*", "-", (text or "").strip())
 
 # The two FAIL verdicts that rest on judgement. `[broken citation]` and
 # `[uncited]` are decided by a file operation — citations.json says a
@@ -500,11 +527,13 @@ _JUDGEMENT_VERDICTS = ("unsupported", "indeterminate")
 def judgement_exceptions(review_text: str) -> List[Dict[str, str]]:
     """Findings a review disputed on judgement rather than on a file fact."""
     out, seen = [], set()
-    for finding, verdict in _EXCEPTION.findall(review_text or ""):
-        v = verdict.strip().lower()
-        if v in _JUDGEMENT_VERDICTS and finding not in seen:
-            seen.add(finding)
-            out.append({"finding": finding, "verdict": v})
+    for m in _EXCEPTION.finditer(review_text or ""):
+        v = m.group("verdict").strip().lower()
+        lines = _norm_lines(m.group("lines"))
+        if v in _JUDGEMENT_VERDICTS and lines not in seen:
+            seen.add(lines)
+            out.append({"finding": m.group("label"), "lines": lines,
+                        "verdict": v})
     return out
 
 
@@ -512,7 +541,8 @@ CONFIRM_BRIEF = """A colleague is reviewing the claims audit in this run directo
 asked for a second opinion on specific findings, before anything is
 reported.
 
-Check these findings, and only these: {findings}.
+Check these findings, and only these, each named by the report lines it
+occupies: {findings}.
 
 For each one, read what the report claims and what its citations actually
 say — `review/citations.json` has every cited line already fetched — and give
@@ -527,7 +557,7 @@ rather than a claim about the target.
 
 Answer with one line per finding and nothing else:
 
-    Finding <N>: [verdict] — <one sentence, citing the line that settles it>
+    report:<lines>: [verdict] — <one sentence, citing the line that settles it>
 """
 
 
@@ -567,7 +597,7 @@ def confirm_exceptions(run: Path, world: str, model_path: Optional[Path],
     it. It confirms; it does not overrule. A finding whose fail does not
     stand stays in the review as recorded, with its tally.
     """
-    names = ", ".join(f"Finding {d['finding']}" for d in disputed)
+    names = ", ".join(f"report:{d['lines']}" for d in disputed)
     from chat.chat_loop import ChatLoop                        # noqa: E402
     # Imported here as well as in main(): main()'s import is local to it, and
     # a NameError raised inside the retest reads as "could not obtain the
@@ -599,14 +629,15 @@ def confirm_exceptions(run: Path, world: str, model_path: Optional[Path],
                 logger.warning("confirm executor shutdown failed: %s", e)
         replies.append(reply)
         verdicts = {}
-        for m in re.finditer(r"Finding\s+(\d+)\s*:\s*\[([^\]]+)\]",
-                             reply or "", re.I):
-            verdicts[m.group(1)] = m.group(2).strip().lower()
+        for m in re.finditer(
+                r"report\s*:\s*(\d+(?:\s*[-–]\s*\d+)?)\s*:\s*\[([^\]]+)\]",
+                reply or "", re.I):
+            verdicts[_norm_lines(m.group(1))] = m.group(2).strip().lower()
         opinions.append(verdicts)
 
     results = []
     for d in disputed:
-        others = [o.get(d["finding"]) for o in opinions]
+        others = [o.get(d["lines"]) for o in opinions]
         agreeing = 1 + sum(1 for v in others if v == d["verdict"])
         results.append({**d, "other_verdicts": others,
                         "agreeing": agreeing,
@@ -789,6 +820,22 @@ def main() -> int:
                 review_text = blocks.content(whole, "REVIEW",
                                              blocks.REVIEW_BLOCKS) or ""
                 disputed = judgement_exceptions(review_text)
+                # A review with no judgement fails needs no retest, which is
+                # the healthy majority — do NOT warn on that. Warn only when
+                # the review wrote Exception blocks this parser could not
+                # read, which is a spec/parser mismatch and is otherwise
+                # silent: the retest does not run and §9 returns INCONCLUSIVE
+                # with nothing naming the cause. That silence is how it went
+                # unnoticed for a whole campaign.
+                unread = unparsed_exceptions(review_text)
+                if unread:
+                    logger.warning(
+                        "%d Exception block(s) did not match the §6 format "
+                        "and were not read. Any judgement fail among them is "
+                        "not retested, and §9 will return INCONCLUSIVE. Fix "
+                        "the parser or the format — do not widen one to fit "
+                        "the other without checking the referent resolves.",
+                        unread)
                 if disputed:
                     logger.info("%d finding(s) failed on judgement — retesting",
                                 len(disputed))
@@ -863,6 +910,10 @@ def main() -> int:
         "target": str(target),
         "target_rev": meta.get("target_rev"),
         "harness_rev": git_rev(REPO),
+        # Action emissions the token ceiling cut off. Reviews carry the
+        # report AND the working record, so they meet the ceiling where
+        # audits do not.
+        "finish_length_events": getattr(loop, "finish_length_events", None),
         "citations_total": cites["total"],
         "citations_broken": cites["broken"],
         "scheme": cites["scheme"],

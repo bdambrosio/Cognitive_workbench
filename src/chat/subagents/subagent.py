@@ -163,6 +163,15 @@ class Subagent:
         exit_reason = 'max_iters'
         consecutive_unparseable = 0
         last_unparseable_truncated = False
+        # BUDGET FOR ONE ACTION EMISSION, raised once when the model is cut
+        # off mid-emission. Mirrors the main ReAct loop: the corrective note
+        # below steers a model that overran a payload field, and cannot steer
+        # one whose reasoning consumed the whole budget and left nothing for
+        # the action. Retrying that at the same ceiling spends an attempt to
+        # hit the same wall — measured 2026-08-28, three consecutive
+        # `finish=length` emissions here exhausting the retry budget in ~3
+        # minutes for no progress. Reset on any emission that parses.
+        budget = self.max_tokens
         for i in range(self.max_iters):
             messages = [
                 {'role': 'system', 'content': sys_prompt},
@@ -170,7 +179,7 @@ class Subagent:
             ]
             try:
                 raw = self.llm_backend.chat(
-                    messages, max_tokens=self.max_tokens,
+                    messages, max_tokens=budget,
                     temperature=self.temperature,
                     reasoning_effort=self.reasoning_effort,
                     response_schema=self.response_schema)
@@ -193,6 +202,11 @@ class Subagent:
                                     None) in ('length', 'max_tokens')
                 consecutive_unparseable += 1
                 last_unparseable_truncated = truncated
+                if truncated and budget == self.max_tokens:
+                    budget *= 2
+                    logger.warning(
+                        f"{self.label}: cut off at {self.max_tokens} tokens; "
+                        f"retrying at {budget}")
                 logger.warning(
                     f"{self.label}: unparseable emission at iter {i+1} "
                     f"({consecutive_unparseable}/"
@@ -205,6 +219,7 @@ class Subagent:
                 log_lines.append("NOTE: " + unparseable_action_note(truncated))
                 continue
             consecutive_unparseable = 0
+            budget = self.max_tokens
 
             tool = action.get('tool')
             if tool is None:

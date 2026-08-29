@@ -518,6 +518,16 @@ class ReactMixin:
             # tool turn. Each attempt rebuilds usr_msg so the corrective NOTE
             # appended by the previous attempt is in view.
             action = None
+            # Budget for this iteration. A truncated attempt is retried
+            # at DOUBLE, mirroring the claim-attribution pass: re-sending
+            # the same budget into the same wall is not a retry. The
+            # steering note tells a model that overran its `thought` to
+            # be briefer; it cannot tell a model to reason less, and the
+            # failure this addresses is reasoning consuming the whole
+            # budget and leaving nothing for the action. Doubling once is
+            # the cap. A ceiling only permits longer output, never forces
+            # it, so the common path is unchanged.
+            budget = self.react_max_tokens
             for fmt_attempt in range(REACT_MAX_FORMAT_RETRIES + 1):
                 pre_log_len = len(log)
                 usr_msg = user_prefix_str + log_appendage_str + trailer
@@ -552,7 +562,7 @@ class ReactMixin:
                 self._emit_status('thinking…')
                 self._affect.set_waiting_for_llm(True)
                 try:
-                    raw = self.backend.chat(prompt, max_tokens=self.react_max_tokens,
+                    raw = self.backend.chat(prompt, max_tokens=budget,
                                             # None -> the model's configured
                                             # temperature. NOT a literal: this
                                             # is the main action-emission call
@@ -586,6 +596,14 @@ class ReactMixin:
                 # before the JSON closed) from genuinely malformed output,
                 # and steer the retry accordingly.
                 truncated = self.backend.last_finish_reason in ('length', 'max_tokens')
+                if truncated:
+                    self.finish_length_events += 1
+                    if budget == self.react_max_tokens:
+                        budget *= 2
+                        logger.warning(
+                            f"[{self.character_name}] ReAct iter {i+1}: cut off "
+                            f"at {self.react_max_tokens} tokens; retrying at "
+                            f"{budget}")
                 logger.warning(
                     f"[{self.character_name}] ReAct iter {i+1} fmt-retry "
                     f"{fmt_attempt + 1}/{REACT_MAX_FORMAT_RETRIES}: unparseable "

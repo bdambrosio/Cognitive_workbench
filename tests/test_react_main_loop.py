@@ -79,6 +79,7 @@ class Host(ReactMixin):
         self.backend = _Backend(replies, finish_reason)
         self.character_name = 'Tester'
         self.react_max_tokens = 8192
+        self.finish_length_events = 0
         self._reasoning_effort = None
         self._affect = _Affect()
         self._canvas = _Canvas()
@@ -244,6 +245,20 @@ def test_truncation_is_distinguished_from_malformed_output():
     notes = [c for lbl, c in log if lbl == 'NOTE']
     assert notes, 'expected a corrective NOTE in the working log'
     assert any('token limit' in n for n in notes), notes
+
+    # A TRUNCATED ATTEMPT IS RETRIED AT DOUBLE, NOT AT THE SAME WALL.
+    # The corrective note tells a model that overran its `thought` to be
+    # briefer. It cannot tell a model to reason less, and reasoning consuming
+    # the whole budget is what produced empty content with finish=length on
+    # 2026-08-28. Re-sending the same ceiling into the same wall is not a
+    # retry. Doubling is capped at one step, so the budget never runs away.
+    action_budgets = [c.get('max_tokens') for c in host.backend.calls
+                      if c.get('max_tokens') in (8192, 16384)]
+    assert action_budgets[0] == 8192, action_budgets
+    assert set(action_budgets[1:]) == {16384}, action_budgets
+
+    # And the run says so in its own record rather than only in a log.
+    assert host.finish_length_events == len(action_budgets)
 
 
 # --------------------------------------------------------------------

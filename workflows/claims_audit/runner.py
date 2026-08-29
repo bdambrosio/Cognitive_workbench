@@ -619,6 +619,9 @@ def main() -> int:
         "blocks_delivered": delivered,
         "blocks_closed": {n: blocks.closed(whole, n) for n in blocks.BLOCKS},
         "wall_clock_s": wall,
+        # Action emissions the token ceiling cut off. Non-zero means the
+        # run was retried into shape rather than produced cleanly.
+        "finish_length_events": getattr(loop, "finish_length_events", None),
         "error": error,
         "captured_at_utc": ts,
     }, indent=2, default=str) + "\n", encoding="utf-8")

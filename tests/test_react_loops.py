@@ -155,6 +155,44 @@ def test_truncated_emission_is_told_it_was_too_long(run, mod, label,
     assert not any('not valid JSON' in p for p in retries)
     assert 'too large to emit' in out
 
+    # AND IT IS RETRIED AT DOUBLE, NOT AT THE SAME CEILING. The advice above
+    # steers a model that overran a payload field; it cannot steer one whose
+    # reasoning consumed the whole budget and left nothing for the action —
+    # that returns EMPTY content with finish=length, and re-sending the same
+    # ceiling spends an attempt to hit the same wall. Measured live on
+    # 2026-08-28: three consecutive truncated emissions here exhausted the
+    # retry budget in ~3 minutes for no progress. Doubling is capped at one
+    # step, so the budget cannot run away.
+    budgets = [c.get('max_tokens') for c in backend.calls]
+    assert budgets[0] == Subagent.max_tokens, budgets
+    assert set(budgets[1:]) == {Subagent.max_tokens * 2}, budgets
+
+
+@pytest.mark.parametrize('run,mod,label', RUNNERS)
+def test_a_parsed_emission_resets_the_raised_budget(run, mod, label, tmp_path):
+    """The raise is for one emission, not for the rest of the run.
+
+    Without the reset a single truncation would leave every later call at
+    double for the life of the loop — a ceiling raised by an accident of
+    timing rather than by need.
+    """
+
+    class OneTruncation(FakeBackend):
+        last_finish_reason = 'length'
+
+        def chat(self, messages, **kwargs):
+            out = super().chat(messages, **kwargs)
+            # Only the first emission is truncated; the rest are clean.
+            self.last_finish_reason = 'length' if len(self.calls) == 1 else 'stop'
+            return out
+
+    backend = OneTruncation(['{"tool": "respond", "text": "301|  ',
+                             _respond('recovered')])
+    run(backend, tmp_path)
+    budgets = [c.get('max_tokens') for c in backend.calls]
+    assert budgets[0] == Subagent.max_tokens, budgets
+    assert budgets[1] == Subagent.max_tokens * 2, budgets
+
 
 @pytest.mark.parametrize('run,mod,label', RUNNERS)
 def test_unparseable_counter_resets_on_success(run, mod, label, tmp_path):

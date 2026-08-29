@@ -181,6 +181,10 @@ identifier as you enumerate — `F1`, `F2`, and so on, in the report's own order
 Every later reference uses that label. Without it "do not re-enumerate" is not
 a checkable instruction, because nothing says what was already enumerated.
 
+**The label is yours, and it identifies a finding only inside this review.** It
+is not the report's name for the finding. §6's format therefore also carries
+the report line range.
+
 **When you yield, say where you are and what you found.** You may work this
 across several legs (§8 does not prescribe how many). A yield carries:
 
@@ -266,7 +270,7 @@ count, which would inflate the denominator every ratio divides by.
 ## 6. Finding format
 
 ```
-**Exception N: <report Finding M> — [disposition]**
+**Exception N: F<M> (report:<lines>) — [disposition]**
 
 Report says (report:lines): <what the finding states, verbatim>
 
@@ -274,6 +278,10 @@ Materials show (<document:lines>): <what the cited lines actually say, verbatim>
 
 Exception: <the specific mismatch>
 ```
+
+**The report line range appears twice on purpose.** The second reviewer does
+not see this review (§9), so the first line of an Exception block must identify
+its own subject.
 
 **Quote both sides verbatim.** A paraphrase of a paraphrase is how a review
 becomes an opinion. If the finding says "no alerting configured" and the line

@@ -237,15 +237,59 @@ def test_only_judgement_disputes_need_confirming():
     second opinion.
     """
     review = (
-        "**Exception 1: report Finding 9 — [unsupported]**\n"
-        "**Exception 2: report Finding 5 — [uncited]**\n"
-        "**Exception 3: report Finding 3 — [overstated]**\n"
-        "**Exception 4: report Finding 7 — [indeterminate]**\n"
-        "**Exception 5: report Finding 2 — [broken citation]**\n")
+        "**Exception 1: F9 (report:120-131) — [unsupported]**\n"
+        "**Exception 2: F5 (report:88) — [uncited]**\n"
+        "**Exception 3: F3 (report:40-44) — [overstated]**\n"
+        "**Exception 4: F7 (report:96 – 104) — [indeterminate]**\n"
+        "**Exception 5: F2 (report:12-15) — [broken citation]**\n")
     assert judgement_exceptions(review) == [
-        {"finding": "9", "verdict": "unsupported"},
-        {"finding": "7", "verdict": "indeterminate"}]
+        {"finding": "F9", "lines": "120-131", "verdict": "unsupported"},
+        {"finding": "F7", "lines": "96-104", "verdict": "indeterminate"}]
     assert judgement_exceptions("") == []
+
+    # THE LABEL IS NOT THE REFERENT. `F9` is the reviewer's own (REVIEW.md §4)
+    # and the retest never sees the review that defined it, so an Exception
+    # line carrying only a label is not actionable and must not be treated as
+    # if it were. Every one of these was emitted by a real reviewer before
+    # §6 required the range; each would have sent the retest after a finding
+    # it could not identify.
+    for unresolvable in ("**Exception 1: report Finding 7 — [unsupported]**",
+                         "**Exception 1: Finding 9 — [unsupported]**",
+                         "**Exception 1: F1 — [unsupported]**"):
+        assert judgement_exceptions(unresolvable) == []
+
+
+def test_unread_exceptions_are_counted_but_a_clean_review_is_quiet():
+    """The alarm fires on format drift, never on a healthy review.
+
+    The first version of this warned whenever no judgement fails were parsed
+    — which is the normal case, since `[broken citation]` and `[uncited]` are
+    retest-exempt by design. It would have fired on 11 of the 17 reviews on
+    disk, all of them fine. The condition that actually means something is
+    narrower: the review wrote Exception blocks and the strict §6 pattern
+    read none of them.
+    """
+    from workflows.audit_review.runner import unparsed_exceptions
+
+    # Healthy: nothing written, nothing unread.
+    assert unparsed_exceptions("Supported by their citations: 28 of 28.") == 0
+
+    # Healthy: written in the §6 format and read.
+    assert unparsed_exceptions(
+        "**Exception 1: F1 (report:42-48) — [unsupported]**\n"
+        "**Exception 2: F2 (report:51-60) — [broken citation]**") == 0
+
+    # Drift: every one of these was emitted by a real reviewer, and none
+    # carries a referent the retest could resolve.
+    assert unparsed_exceptions(
+        "**Exception 1: report Finding 7 — [uncited]**\n"
+        "**Exception 2: Finding 9 — [unsupported]**\n"
+        "**Exception 3: F1 — [unsupported]**") == 3
+
+    # Mixed: only the unreadable one counts.
+    assert unparsed_exceptions(
+        "**Exception 1: F1 (report:42-48) — [unsupported]**\n"
+        "**Exception 2: F2 — [unsupported]**") == 1
 
 
 def test_a_failed_finding_stands_only_if_the_retest_agrees():
