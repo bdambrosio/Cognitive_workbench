@@ -2334,8 +2334,25 @@ class ConcernsMixin:
         # verification (claims.py) spawns system_spawned one-shots too, and
         # retiring one of those would be the agent cancelling an audit of its
         # own claims — the thing the system_spawned guard exists to prevent.
+        #
+        # The flag marks a depth-0 continuation spawned HERE, and nothing else.
+        # `_create_successor_concern` deliberately does not set it, so an
+        # autonomous successor is never retired by a later user-turn yield.
+        #
+        # SCOPED TO THE COUNTERPART. Added unscoped 2026-08-29 and corrected the
+        # same day: an engagement has one thread of work by construction, and a
+        # conversational agent does not. `_turn_counterpart` stamps `entity` as
+        # `User` or a co-resident peer, so an unscoped sweep let a yield in a
+        # turn with one counterpart retire the unfinished continuation of a turn
+        # with another. Same-entity is the narrow rule; whether one counterpart
+        # can hold several live continuations at once is a real question and is
+        # not answered here.
+        mine = entity_for_spawn = self._turn_counterpart()
         for prev_id, prev_note, _a in self._iter_active_agent_concerns():
-            if not (prev_note.get('properties') or {}).get('yield_continuation'):
+            prev_props = prev_note.get('properties') or {}
+            if not prev_props.get('yield_continuation'):
+                continue
+            if str(prev_props.get('entity') or '') != mine:
                 continue
             if self._satisfy_agent_concern(prev_id, via='superseded'):
                 logger.info(
@@ -2344,7 +2361,7 @@ class ConcernsMixin:
                     f"the one spawned now")
         succ_text = f"continue work I yielded mid-turn: {next_slice}"
         new_id = self._add_agent_concern(
-            text=succ_text, entity=self._turn_counterpart(),
+            text=succ_text, entity=entity_for_spawn,
             provenance='inferred',
             seed=False, name='',
             rhythm_hours=1, rhythm_source='urgency',
