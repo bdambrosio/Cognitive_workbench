@@ -2,8 +2,11 @@
 #
 # PROBED 2026-08-27 with the real payload (json_schema carrying
 # REACT_ACTION_SCHEMA + reasoning_effort, max_tokens 16384). Gates 1 and 2 pass
-# on this route. Gate 3 — one fixture run graded on admissibility — is not run
-# yet. See docs/model-prescreen.md.
+# on this route. Gate 3: this model PASSED it, and the result was WITHDRAWN on
+# 2026-08-27 with every run on the board when METHOD §4 and §16 were amended.
+# "Not run" and "withdrawn" are different facts and this line said the first
+# one. No model holds a gate-3 result on the current instrument.
+# See docs/model-prescreen.md.
 #
 # WHY MODAL AND NOT THE FIRST PARTY. The first-party endpoint does not serve
 # this model to us. Every endpoint probed today, in the order the listing gives
