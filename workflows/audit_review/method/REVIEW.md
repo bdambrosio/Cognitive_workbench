@@ -20,7 +20,7 @@ convincingly at the wrong line."*
 
 **`claim` means what METHOD §2 defines** — an assertion the seller made. The
 report states *findings about* claims; it does not make claims of its own, and
-neither do you.
+neither do you. **"The report" always means the audit's**, never this review.
 
 **Do not audit the target.** A finding the report never made is not your
 finding, however material it looks. If the audit missed something, that is a
@@ -149,32 +149,19 @@ the review that you did.
    From that point the surface is **frozen**. It is what every **review
    completeness** figure divides by. `coverage` is METHOD §1a's quantity —
    resolved over identified claims, the audit's — and this is yours: findings
-   reviewed over findings enumerated. Two documents, two measurements, and
-   "the report" in this document always means the audit's. A finding you notice later goes in an
-   addendum with its own count, never into the frozen total.
+   reviewed over findings enumerated. Two documents, two measurements. A finding
+   you notice later goes in an addendum with its own count, never into the
+   frozen total.
 
 3. **Check every finding.** Unlike an audit, there is no priority order and no
    stopping threshold: a report of fourteen findings gets fourteen checks, and
    a report of two hundred gets two hundred.
 
-**The surface is not small, and the obligation is unchanged.** METHOD §4 gives
-every resolved claim a finding, so a large claim surface makes a large report —
-on a real target, hundreds. Three reasons completeness holds anyway:
-
-- **A sampled review cannot produce this review's result.** §9 reports the
-  exceptions a report carries. Over a sample it reports the exceptions among
-  the *sampled* findings, and a reader will take that for the whole.
-- **The defect this review exists to catch is not where you would sample.** A
-  citation that points convincingly at the wrong line is at least as likely in
-  a finding that holds as in one that fails — more likely, because a finding
-  that holds attracts less scrutiny from everyone, its author included. Any
-  rule that spent effort where failures are expected would look in the wrong
-  half.
-- **Your cost is bounded by the audit's.** Every citation is resolved for you
-  before you start; a finding costs you one reading of a line against a claim,
-  where the audit had to go and find that line. And §4.0 stops the review before
-  enumeration when a report cannot be checked at all, so the worst reports are
-  the cheapest to reject.
+**A large surface does not license sampling.** METHOD §4 gives every resolved
+claim a finding, so a real target produces hundreds. Check them all: a sampled
+review reports only the exceptions among the sampled findings, and a citation
+pointing convincingly at the wrong line is at least as likely in a finding that
+holds as in one that fails.
 
 **Label the findings, and keep the labels.** Give each one a stable
 identifier as you enumerate — `F1`, `F2`, and so on, in the report's own order.
@@ -214,19 +201,14 @@ process fetches every cited line and hands you `citations.json`, marking any
 that do not exist as `[broken citation]`. Do not assess support for a finding
 whose citation is broken.
 
-**The index is a convenience, not an authority.** Where it marks a citation
-broken and the document plainly holds what the finding cites, open the document
-under `inspect_external` and record what you find there. An index that resolves
-a name to the wrong file marks sound references broken, and a reviewer reading
-only the index will agree with it.
-
-**`citations.json` is not the whole of the materials.** It resolves two forms:
-`docN:NN` references, and quoted spans found in the target. A report that cites
-an evidence document by section rather than by line produces no entry for it,
-and **that absence is a property of the index, not of the document.** Where a
-finding rests on evidence the index does not carry, read the document under
-`inspect_external` and check it there. Ruling a finding unsupported because its
-evidence is missing from the index is the error this method exists to stop.
+**The index is a convenience, not an authority, and it is not the whole of the
+materials.** It resolves two forms — `docN:NN` references and quoted spans found
+in the target — so a report citing a document by section produces no entry, and
+an index that resolves a name to the wrong file marks sound references broken.
+Either way, **the gap is a property of the index, not of the document**: read the
+document under `inspect_external` and record what you find there. Ruling a
+finding unsupported because its evidence is missing from the index, or broken
+because the index says so, is the error this method exists to stop.
 
 **Fields that point nowhere.** The paragraph above does not apply: nothing was
 cited for the index to miss. `conformance.json` enumerates them. Read the
@@ -243,16 +225,14 @@ repaired report carries; a wrong one is worse than a missing one.
 **Stop at the document the field names.** Widening the search is auditing the
 target (§2).
 
-**Why the derived case differs, and it is not a technicality.** METHOD §6 makes
-a finding one of two things: a resolved claim carrying one of the five claim
-verdicts, or a `[derived]` finding — a consequence computed from two or more
-figures the seller stated separately. A derived finding cites no claim because
-there is none to cite, so asking whether its cited lines support a claim it
-never made would rule it unsupported by construction. That is the error the
-paragraph above exists to stop, in a different form.
+**Why the derived case differs.** METHOD §6 makes a finding one of two things:
+a resolved claim carrying one of the five claim verdicts, or a `[derived]`
+finding — a consequence computed from two or more figures the seller stated
+separately. A derived finding cites no claim because there is none to cite, so
+asking whether its cited lines support a claim it never made would rule it
+unsupported by construction.
 
-On the derivation specifically: the arithmetic is on the page precisely so it
-can be checked — *"arithmetic left implicit is an opinion with a citation
+The arithmetic is on the page so that it can be checked — *"arithmetic left implicit is an opinion with a citation
 attached."* A step you cannot follow is an exception; a step you can follow and
 disagree with is `[overstated]` or `[understated]` as usual.
 
@@ -319,8 +299,8 @@ claim out — a property of the target. This disposition says a finding's
 citation bears out what the finding says — a property of the report. One audit can be
 `supported 37 of 39` in METHOD's sense and reviewed `supported 12 of 40` in
 this one, and both be correct: they measure different things. The words are kept
-because each is right in its own document; §9's result line names which is
-meant, and so should you whenever the number leaves this review.
+because each is right in its own document; §9 names which is meant, and so
+should you whenever the number leaves this review.
 
 **`[uncited]`, `[broken citation]` and `[indeterminate]` are three different
 failures, and the difference is what the reader can do.** `[broken citation]`
@@ -433,12 +413,10 @@ per §4.0.
 
 **An inadmissible report's result is that word and nothing after it.** No
 supported ratio and no exceptions — those are readings of the findings, and
-§4.0 fired because the findings could not be read. Reporting a ratio anyway is the
-failure this rule was written for: it is the number that gets quoted, and it
-will be quoted without the qualification attached to it.
+§4.0 fired because the findings could not be read.
 
-For an admissible report: a ratio, the exceptions by disposition, and the
-result — stated together at the top of the review.
+For an admissible report: the ratio and the exceptions by disposition, stated
+together at the top of the review.
 
 **Supported by their citations: `N` of `M` findings.** M is the frozen count
 from §4. N is the findings that came back `[supported]`. Every other
@@ -451,8 +429,9 @@ The two numbers are quoted side by side and are not the same measurement.
 **Exceptions by disposition** — how many `[overstated]`, `[understated]`,
 `[unsupported]`, `[broken citation]`, `[indeterminate]`, `[uncited]`.
 
-**The result is the exceptions and whether each one stands. There is no grade.**
-A finding is not defensible from what it cites when it is `[unsupported]`,
+**The result is the exceptions and whether each one stands. There is no grade**
+— a check that returns one invites argument about the grade instead of about the
+findings. A finding is not defensible from what it cites when it is `[unsupported]`,
 `[broken citation]`, `[indeterminate]` or `[uncited]` — whether the citation is
 wrong, unplaceable, or absent — and catching that is the one thing this review
 exists for.
@@ -466,10 +445,6 @@ Give each exception one of three standings:
 - **not retested** — the disposition does not qualify (`[uncited]`), or the
   retest could not be obtained. Say which.
 
-A reader wanting one number has `supported N of M` and the count of standing
-exceptions. A reader deciding whether the report ships needs to know which
-findings those are.
-
 **A finding you fail is retested once**, where a second reviewer can check it.
 `[unsupported]`, `[indeterminate]` and `[broken citation]` all qualify, and
 this covers a derived finding as readily as a claim one. For every finding you
@@ -477,46 +452,17 @@ gave one of those dispositions, the client's process has a second reviewer
 check that finding. That reviewer is not told your disposition and does not see
 your review. You are told what it found before you write §9.
 
-The fail stands only if the retest reached the same disposition. A single
-disagreement means the fail does not stand, and it is reported as such rather
-than dropped.
-
 **If the retest could not be run at all**, report admissibility as you found it
 and mark every exception **not retested**, naming the reason. A retest that did
 not happen is not a retest that disagreed, and an exception whose standing is
 unknown must not be reported as one that does not stand.
 
-`[uncited]` is not retested, and not for symmetry: it means what §6 says it
-means — **no reference at all**, a field that names a document or a section and
-then writes prose, so there is nowhere for a second reviewer to look. Nothing
-to open is not the same as nothing found.
+`[uncited]` is not retested: as §6 defines it there is no reference for a
+second reviewer to open.
 
-**It does not mean the finding has no support.** A finding whose evidence is
-distributed across the target, or composed from several places, is cited when
-it says where those places are. An absence finding carries the two searches
-instead of a settling line and is **complete** in METHOD's terms — §5 above,
-and there is no limit on how many of those a report may hold. Composed or
-distributed support is a signal that a reader must go and look, never a defect
-in the report. Only an evidence field pointing nowhere at all is `[uncited]`,
-and only that is an exception on its own.
-
-`[broken citation]` was excluded on the same reasoning until 2026-08-29, and
-the reasoning was wrong in one respect — it set severity by how a defect was
-detected rather than by what the defect was. A citation naming line 697 when
-the code is at line 1226 strands a reader exactly as thoroughly as one naming a
-line past the end of the file; the first was
-retested and the second was not. Two spellings of one defect, two treatments. The retest
-settles it **against the materials, not against `review/citations.json`** — an
-index that is wrong will agree with itself, and on 2026-08-29 one did, marking
-fourteen sound references broken because it resolved a bare `README.md` to a
-149-line file when the one cited had 625.
-
-**Report a fail that does not stand, and give the tally.** "I found Finding 9
-unsupported; the retest did not" is the honest line and it belongs in the
-review. Dropping the finding hides a real disagreement; restating it as
-agreement invents one. Where the two reviewers divide, the finding is
-genuinely borderline, and the reader should be told that rather than have it
-rounded away.
+**A retested `[broken citation]` is settled against the materials, not against
+`review/citations.json`.** An index that resolves a name to the wrong file marks
+sound references broken, and it will agree with itself.
 
 **Why only findings that fail are retested.** A reviewer asserting a defect in
 finished work carries the higher standard: one wrong exception puts a defect on
@@ -525,10 +471,6 @@ way cannot do the same damage, because it would take missing every real
 exception at once. `[overstated]` and `[understated]` are calibration —
 reported, never counted as a failure, because a verdict one step off is a
 different problem from a finding with no support.
-
-That is the whole result. There is no grade and no severity taxonomy: a check
-that returns a grade invites argument about the grade instead of about the
-findings.
 
 **The review reports; the practice decides.** You do not withdraw a report, ask
 the auditor to redo it, or contact the client. You say which findings do not
@@ -541,85 +483,3 @@ hold and how.
 - It does not assess whether the audit's method is right, only whether the
   report followed it and its findings hold.
 - It does not check anything the report did not state as a finding.
-
-## 11. Superseded rules, and the incidents behind them
-
-<!-- audience: practice -->
-
-**This section exists because the changelog was in the reviewer's prompt.**
-REVIEW.md carried no audience marker until 2026-08-27, so every paragraph below
-loaded into every review — incidents, retired justifications and all. The
-mechanism to prevent that already existed and had simply never been used here:
-`<!-- audience: practice -->` anywhere in a `##` section drops the whole section
-before the reviewer sees it. It is section-scoped, so history needs its own
-section, which is this one.
-
-Two costs, and the second is the one that bit. **Prompt budget spent on rules
-that no longer apply** — the reviewer does not need to know what this document
-used to say. And **a changelog restates the numbers it is warning about**: §9
-forbids the bare form "supported N of M" and then, forty lines later, an
-incident paragraph used it. A prompt that both forbids a form and demonstrates
-it is worse than one that does neither.
-
-### §4.0 — where the two admissibility questions came from
-
-**The second question.** On 2026-08-26 a report with three of its eighteen
-evidence fields pointing nowhere was reviewed ADMISSIBLE, 10 of 10, PASS. The
-reviewer wrote "cited lines say what the findings say they say", which was true:
-it checked the twelve references that existed while a sixth of the evidence
-carried none. Nothing in this document had told it to look.
-
-**The first question.** On 2026-08-26 a report citing claim ordinals was read as
-though it cited lines. Every citation parsed; there was no syntactic complaint
-available. The review reported 1 of 15 and FAIL on a report whose findings were,
-14 of 15, defensible from the materials — and never saw that its evidence half
-went uncited in a form the index could fetch at all.
-
-### §4 — completeness, and the justification that expired
-
-**Where the second bullet's claim comes from.** On 2026-08-27 the one broken
-citation in a report that passed review 5 of 5 sat in its held-claims section —
-`models/investigation.py:296`, in a 154-line file, supporting a positive
-assertion about versioned RCA. Nobody had checked the half of the report that
-said what held.
-
-The rule used to be argued from the surface being "small and bounded". METHOD §4
-now gives every resolved claim a finding, so a real target produces hundreds and
-that justification is false. The three reasons in §4 replaced it on 2026-08-27;
-the obligation did not change.
-
-### §9 — the retest, and why the result carries no grade
-
-**Why an unrunnable retest is not a clean result.** On 2026-08-26 a bug stopped
-the retest from launching and a report carrying five `[unsupported]` findings
-came back PASS, because nothing had stood. An infrastructure failure must not
-clear a report — hence an exception whose standing is unknown is reported as
-**not retested**, never as one that does not stand.
-
-**Why the result is no longer a grade.** Until 2026-08-29 §9 returned PASS,
-FAIL, and briefly WARN. Two ChatterMate reports each carried exactly one
-wrong-line citation; one was labelled PASS and the other FAIL, because one
-coordinate fell past its file's end and was therefore settled by a file
-operation while the other was not. The reports also went the other way on the
-mechanical evidence — the one that passed resolved 1 of 6 quoted spans, the one
-that failed resolved 6 of 9. The grade ordered them backwards, and the
-exceptions ordered them correctly. It was also a pure function of the
-exceptions, so it carried nothing they did not.
-
-**Why only failures are retested.** One clean report reviewed five times on
-2026-08-26 came back 12 of 12 four times and 11 of 12 once, and the one dissent
-had rebutted a finding by attacking a claim the audit never made. A reviewer's
-wrong judgement against a report condemns it on a single exception; a wrong
-judgement the other way would need every real exception missed at once.
-
-### §8 — delivery by block
-
-Until 2026-08-27 the review was delivered as two turns, and the runner took a
-turn that did not `yield` as the review whatever it contained, then told the
-reviewer "The review is received."
-
-Worse here than in the audit runner, which had the same defect: the retest is
-driven by parsing that reply, so a progress note taken as a review yields no
-`[unsupported]` verdicts, no second reviewer runs, and the result is a PASS that
-looks clean. It never fired because every review ran on a model that yields
-mid-work.
