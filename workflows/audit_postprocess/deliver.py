@@ -136,6 +136,35 @@ def review_signal(run: Path, unresolved: List[Dict[str, Any]]) -> Dict[str, Any]
     }
 
 
+def parked_notes(surface: str) -> List[str]:
+    """Prose an auditor left in the claim surface that is not a claim.
+
+    STRUCTURAL, NOT SEMANTIC. A claim surface is a count line and numbered
+    claims; anything else in it is something the auditor wrote and had nowhere
+    to put. No word matching is involved — the test is "is this line a numbered
+    claim or the count", which is the shape §12 step 2 specifies.
+
+    On the ChatterMate medium run this is where a real observation ended up:
+    the seller's knowledge README states max_depth 3 / max_links 10 in its
+    example and 5 / 25 in its options table, "to be tested, not yet a finding".
+    It is the last line of the last appendix, where no client will reach it.
+    """
+    out = []
+    for line in (surface or "").splitlines():
+        s = line.strip()
+        if (not s or re.match(r"^\d+\.", s) or re.match(r"^\d+ claims\b", s)
+                or s.startswith("===") or re.match(r"^[^:]{1,60}\(\d+ claims?\)", s)):
+            continue
+        # METHOD §12 step 2 mandates a per-document count below the total, so
+        # that line belongs to the surface too. Recognised by shape — two or
+        # more `<filename> <count>` pairs — not by the words in it.
+        if len(re.findall(r"[\w./-]+\.\w{1,5}\s+\d+", s)) >= 2:
+            continue
+        if len(s) > 80:                      # a sentence, not a list header
+            out.append(s)
+    return out
+
+
 def audit(run: Path) -> Dict[str, Any]:
     """Every mechanical check, with no judgement in any of them."""
     report = (run / "report.md").read_text(errors="replace") \
@@ -168,6 +197,7 @@ def audit(run: Path) -> Dict[str, Any]:
                                       if f["n"] not in with_claim],
         "inventory_entries": inv,
         "claim_surface_recovered": bool(claim_surface(run)),
+        "parked_notes": parked_notes(claim_surface(run)),
         "review": review_signal(run, unresolved),
         "blocks_closed": {n: blocks.closed(report if n != "GAP MAP" else gap, n)
                           for n in ("REPORT", "LIMITATIONS", "GAP MAP")},
@@ -249,9 +279,19 @@ def assemble(run: Path) -> str:
         (moved if is_inventory(text) else keep).append((heading, text))
 
     # The conclusion sits above the first heading, so it is in no contents list
-    # and does not look like the thing the document exists to say.
+    # and does not look like the thing the document exists to say. Where the
+    # auditor already opened with `**Conclusion: X.**` the label moves INTO the
+    # heading rather than being printed twice — the verdict ends up more
+    # prominent, not less, and the sentence after it is untouched. Strictly
+    # matched, and left alone if it does not match.
     if keep and not keep[0][0]:
-        keep[0] = ("## Conclusion", keep[0][1])
+        lead = keep[0][1]
+        m = re.match(r"\s*\*\*Conclusion:\s*([^.*]{2,40})\.?\*\*\s*", lead)
+        if m:
+            keep[0] = (f"## Conclusion — {m.group(1).strip()}",
+                       "\n" + lead[m.end():].lstrip())
+        else:
+            keep[0] = ("## Conclusion", lead)
 
     out = [header(run), "".join(h + "\n" + t for h, t in keep).rstrip()]
 
@@ -279,7 +319,10 @@ def assemble(run: Path) -> str:
                    "before verification began. The claim numbers used above, "
                    "and in the coverage statement, index this list.\n")
         out.append(_strip_markers(surface).strip())
-    return "\n".join(out) + "\n"
+    # Sections are split at their headings, so each body already begins with
+    # the newline that ended the heading line — which printed two blank lines
+    # under every `##`. Layout only; no character of content moves.
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip() + "\n"
 
 
 def editor_notes(run: Path, a: Dict[str, Any]) -> str:
@@ -328,6 +371,14 @@ def editor_notes(run: Path, a: Dict[str, Any]) -> str:
         L += ["", "## 1b. Independent review", "",
               "No review has been run on this audit. Every citation flag above "
               "is unexamined."]
+    if a["parked_notes"]:
+        L += ["", "## 1c. Observations parked in an appendix", "",
+              "The auditor wrote these into the claim surface rather than as "
+              "findings, so they sit at the end of the last appendix where a "
+              "client will not reach them. Decide whether each belongs in the "
+              "body — this script will not promote an observation into a "
+              "finding.", ""]
+        L += [f"- {n}" for n in a["parked_notes"]]
     L += ["", "## 2. Consequence ordering", "",
           "The audit orders findings by verdict class, which is not the same as "
           "consequence to this buyer — and consequence to this buyer is not "
