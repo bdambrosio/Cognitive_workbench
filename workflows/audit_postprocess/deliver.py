@@ -72,6 +72,44 @@ _FINDING_TITLE = re.compile(
     r"(.*?)\s*[—-]\s*\[([^\]]+)\]", re.M)
 _H2 = re.compile(r"^## .*$", re.M)
 
+# WHAT THE BRACKETS MEAN, for a reader who has never seen METHOD. Every finding
+# header ends in a verdict — `— [delta]` — and until 2026-08-30 nothing in the
+# deliverable said what one was. The delivery agent cannot supply this: it is
+# given the report, the gap map and the check files, not METHOD, so it has no
+# definitions to gloss from and would be guessing.
+#
+# Wording condensed from METHOD §6's verdict table for a buyer rather than an
+# auditor. lint_workflow checks the KEYS here against that table, so a verdict
+# added or retired there fails the lint rather than drifting silently. The
+# wording is ours; the set is METHOD's.
+VERDICT_GLOSS = (
+    ("[real]", "the materials bear the claim out"),
+    ("[real, minor caveat]", "the claim holds, with a discrepancy that does "
+                             "not affect the decision"),
+    ("[real, operational caveat]", "the claim holds today, but how the system "
+                                   "is operated qualifies it"),
+    ("[partial]", "the claim is substantially true and has a specific, cited "
+                  "gap"),
+    ("[delta]", "the claim is not true — the claim source says one thing and "
+                "the materials show another"),
+    ("[unverifiable]", "the audit tried and the supplied materials could not "
+                       "settle it"),
+)
+
+
+def how_to_read() -> str:
+    """A short note placed before the findings. Fixed text, not generated."""
+    lines = ["## How to read a finding", "",
+             "Each finding names the seller's claim, the evidence that settles "
+             "it, and the gap between them. The reference after each piece of "
+             "evidence is a file and line number in the materials examined, so "
+             "any finding can be checked.",
+             "",
+             "The bracket at the end of a finding's title is the audit's "
+             "verdict on that claim:", ""]
+    lines += [f"- `{k}` — {v}" for k, v in VERDICT_GLOSS]
+    return "\n".join(lines) + "\n"
+
 
 def sections(body: str) -> List[Tuple[str, str]]:
     """The report split at its `##` headings, in order, heading text kept."""
@@ -262,7 +300,35 @@ def header(run: Path) -> str:
             f"Materials as of {when}. Limited assurance; see Limitations.\n")
 
 
-def assemble(run: Path) -> str:
+def finding_groups(run: Path) -> List[Dict[str, Any]]:
+    """The report's finding sections, keyed, for the agent's SECTION NOTES.
+
+    A key is positional (`group1`, `group2`) rather than derived from the
+    heading, because the heading is the thing the agent replaces. A referent
+    that changes when the agent writes is not a referent.
+    """
+    report = (run / "report.md").read_text(errors="replace")
+    body = blocks.content(report, "REPORT", blocks.REVIEW_BLOCKS) or report
+    titles = {int(n): ti.strip() for n, ti, _ in _FINDING_TITLE.findall(report)}
+    out, i = [], 0
+    for heading, text in sections(body):
+        if is_inventory(text) or not heading:
+            continue
+        found = [{"n": int(n), "verdict": v.strip(), "title": titles.get(int(n), "")}
+                 for n, v in _FINDING.findall(text)]
+        # A finding group carries findings. The unverifiable section carries
+        # none in §5's format but opens its line with a claim, which is the
+        # shape that separates it from the coverage statement — where a verdict
+        # appears mid-sentence and no line begins with one.
+        if not found and not re.search(r"(?m)^\s*\**\s*Claim\s+\d+", text):
+            continue
+        i += 1
+        out.append({"key": f"group{i}", "heading": heading.lstrip("# ").strip(),
+                    "findings": found})
+    return out
+
+
+def assemble(run: Path, written: Optional[Dict[str, Any]] = None) -> str:
     """The report with its inventory moved to an appendix. Nothing reworded.
 
     The only structural change: a section that is an inventory by shape moves
@@ -274,9 +340,24 @@ def assemble(run: Path) -> str:
     body = blocks.content(report, "REPORT", blocks.REVIEW_BLOCKS) or report
     limits = blocks.span(report, "LIMITATIONS", blocks.BLOCKS) or ""
 
+    written = written or {}
+    gap = (run / "gap_map.md").read_text(errors="replace") \
+        if (run / "gap_map.md").is_file() else ""
+
     keep, moved = [], []
     for heading, text in sections(body):
         (moved if is_inventory(text) else keep).append((heading, text))
+
+    # The agent's headings replace the audit's, in the order the groups were
+    # keyed. Only the heading and the introduction are the agent's; the
+    # findings under them are untouched.
+    notes = written.get("sections") or {}
+    if notes:
+        groups = finding_groups(run)
+        by_heading = {g["heading"]: notes.get(g["key"]) for g in groups}
+        keep = [(("## " + n[0] if (n := by_heading.get(h.lstrip("# ").strip()))
+                  else h), (("\n" + n[1] + "\n" if n and n[1] else "") + txt))
+                for h, txt in keep]
 
     # The conclusion sits above the first heading, so it is in no contents list
     # and does not look like the thing the document exists to say. Where the
@@ -293,12 +374,24 @@ def assemble(run: Path) -> str:
         else:
             keep[0] = ("## Conclusion", lead)
 
-    out = [header(run), "".join(h + "\n" + t for h, t in keep).rstrip()]
+    out = [header(run)]
+    # The gap map is the executive summary (DELIVERY.md §7), copied whole.
+    if gap:
+        out.append("\n\n## Summary\n")
+        out.append(_strip_markers(gap).strip())
+    if written.get("cover"):
+        out.append("\n\n## About this audit\n")
+        out.append(written["cover"].strip())
+    out.append("\n\n" + "".join(h + "\n" + t for h, t in keep[:1]).rstrip())
+    out.append("\n\n" + how_to_read().rstrip())
+    out.append("".join("\n\n" + h + "\n" + t for h, t in keep[1:]).rstrip())
 
     # LIMITATIONS TRAVELS WITH THE REPORT, NOT AFTER THE APPENDICES. blocks.py
     # keeps them separate blocks so nothing has to nest, and says why they are
     # one document: ISAE 3000 / AT-C 205 require the limitations to travel with
     # the report. A reader stops at the appendices.
+    if written.get("coverage"):
+        out = [_swap_coverage(s, written["coverage"]) for s in out]
     if limits:
         out.append("\n\n## Limitations\n")
         out.append(_strip_markers(limits).strip())
@@ -323,6 +416,21 @@ def assemble(run: Path) -> str:
     # the newline that ended the heading line — which printed two blank lines
     # under every `##`. Layout only; no character of content moves.
     return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip() + "\n"
+
+
+def _swap_coverage(chunk: str, prose: str) -> str:
+    """Replace the audit's coverage paragraph with the agent's version of it.
+
+    The figures are the audit's either way — DELIVERY.md forbids recalculating
+    — so this swaps presentation, not facts. Matched on the heading the audit
+    wrote; left alone if that heading is not in this chunk.
+    """
+    m = re.search(r"(?m)^## Coverage[^\n]*\n", chunk)
+    if not m:
+        return chunk
+    end = re.search(r"(?m)^## ", chunk[m.end():])
+    tail = chunk[m.end() + end.start():] if end else ""
+    return chunk[:m.start()] + "## Coverage\n\n" + prose.strip() + "\n\n" + tail
 
 
 def editor_notes(run: Path, a: Dict[str, Any]) -> str:

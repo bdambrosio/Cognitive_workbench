@@ -155,3 +155,61 @@ def test_a_report_with_no_inventory_is_returned_intact(tmp_path):
     out = assemble(tmp_path)
     assert "## Appendix" not in out
     assert sorted(_FINDING.findall(out)) == sorted(_FINDING.findall(trimmed))
+
+
+def test_section_note_keys_survive_the_shapes_a_model_reaches_for():
+    """Bolded keys and blank lines between entries are what models actually
+    emit. An entry with a heading and no passage is legal — some groups need
+    only a label."""
+    from workflows.audit_postprocess.runner import parse_section_notes
+    notes = parse_section_notes(
+        "group1: Claims the evidence contradicts\n"
+        "Three claims describe features that are not there.\n"
+        "\n"
+        "**group2**: Claims with a material gap\n"
+        "Two are substantially true.\n"
+        "group3: One claim that could not be settled\n")
+    assert notes["group1"][0] == "Claims the evidence contradicts"
+    assert "features that are not there" in notes["group1"][1]
+    assert notes["group2"][0] == "Claims with a material gap"
+    assert notes["group3"] == ("One claim that could not be settled", "")
+
+
+def test_the_agents_headings_replace_the_audits_and_findings_are_untouched(tmp_path):
+    """The agent supplies a heading and an introduction per group. Everything
+    under them is the auditor's text and must arrive unchanged."""
+    run = _run(tmp_path)
+    from workflows.audit_postprocess.deliver import finding_groups
+    groups = finding_groups(run)
+    assert groups, "the fixture report should have at least one finding group"
+    key = groups[0]["key"]
+    out = assemble(run, {"cover": "A covering line.",
+                         "coverage": "Six of seven claims resolved.",
+                         "sections": {key: ("Claims the evidence contradicts",
+                                            "An introduction.")}})
+    assert "## Claims the evidence contradicts" in out
+    assert groups[0]["heading"] not in out          # the audit's heading is gone
+    assert "An introduction." in out
+    assert sorted(_FINDING.findall(out)) == sorted(_FINDING.findall(REPORT))
+    assert "Evidence: chat_agent.py:898 — single session_id." in out
+
+
+def test_a_group_key_the_brief_never_issued_cannot_rename_a_section(tmp_path):
+    """A key the runner did not issue is dropped there; assemble must also not
+    act on one, so a stray key cannot retitle a section by coincidence."""
+    run = _run(tmp_path)
+    out = assemble(run, {"sections": {"group99": ("Invented", "Nope.")}})
+    assert "Invented" not in out and "Nope." not in out
+
+
+def test_without_agent_prose_the_document_is_still_delivered(tmp_path):
+    """A failed prose run degrades the deliverable; it does not lose it."""
+    run = _run(tmp_path)
+    assert assemble(run, {}) == assemble(run)
+    assert "Conclusion" in assemble(run, {})
+
+
+def test_the_verdict_glossary_reaches_the_reader(tmp_path):
+    out = assemble(_run(tmp_path))
+    assert "## How to read a finding" in out
+    assert "`[delta]`" in out and "the claim is not true" in out

@@ -197,6 +197,33 @@ def check_block_vocab(name: str, raw: str) -> List[str]:
     return bad
 
 
+def check_delivery_gloss() -> List[str]:
+    """The client-facing glossary must name exactly METHOD's verdict set.
+
+    The delivery script explains `[delta]` and its siblings to a reader who has
+    never seen METHOD, because the delivery agent is not given METHOD and
+    cannot. That makes the glossary a second place the closed vocabulary lives,
+    and a second place it can drift — the failure this file already guards for
+    score.py. Same check, same reason: a verdict added or retired in §6 must
+    fail here rather than leave a buyer reading an undefined bracket.
+
+    The WORDING is the delivery script's own, pitched at a buyer. Only the set
+    of keys is checked.
+    """
+    sys.path.insert(0, str(REPO / "workflows" / "audit_postprocess"))
+    import deliver                                             # noqa: E402
+    raw = (REPO / METHOD_DOC).read_text(encoding="utf-8")
+    in_method = set(re.findall(r"\|\s*`(\[[^`\]]+\])`\s*\|", raw))
+    # §6 also tables `[unclaimed]` and `[derived]`, which are not verdicts on a
+    # seller claim and never appear in a finding title's bracket.
+    in_method -= {"[unclaimed]", "[derived]"}
+    glossed = {k for k, _ in deliver.VERDICT_GLOSS}
+    return ([f"verdict {v!r} is in METHOD but not glossed for the client"
+             for v in sorted(in_method - glossed)]
+            + [f"glossary explains {v!r}, which METHOD does not define"
+               for v in sorted(glossed - in_method)])
+
+
 def check_code_vocab() -> List[str]:
     """Closed vocabularies in METHOD must equal the sets score.py enforces.
 
@@ -330,6 +357,14 @@ def main() -> int:
                 print(f"          {c}")
 
     extra = check_code_vocab()
+    print("\n=== the client-facing verdict glossary against METHOD §6")
+    for p_ in check_delivery_gloss():
+        failed += 1
+        print(f"  FAIL  {p_}")
+    else:
+        if not check_delivery_gloss():
+            print("  ok    every verdict a finding can carry is explained")
+
     print("\n=== METHOD vocabularies against score.py")
     if extra:
         failed += len(extra)

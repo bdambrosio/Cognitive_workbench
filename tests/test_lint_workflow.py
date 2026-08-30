@@ -118,3 +118,21 @@ def test_a_dead_section_reference_in_runner_code_is_caught(tmp_path, monkeypatch
 def test_runner_code_references_resolve_now():
     for runner, doc in lw.RUNNERS.items():
         assert not lw.check_code_refs(runner, doc), runner
+
+
+def test_a_verdict_missing_from_the_client_glossary_is_caught(monkeypatch):
+    """The delivery script explains `[delta]` and its siblings to a reader who
+    has never seen METHOD. That makes the glossary a second home for a closed
+    vocabulary, and a second place it can drift. Drop one and the lint must
+    fail, or a buyer reads an undefined bracket."""
+    import sys
+    sys.path.insert(0, str(REPO / "workflows" / "audit_postprocess"))
+    import deliver
+    short = tuple(g for g in deliver.VERDICT_GLOSS if g[0] != "[delta]")
+    monkeypatch.setattr(deliver, "VERDICT_GLOSS", short)
+    found = lw.check_delivery_gloss()
+    assert any("[delta]" in f for f in found), found
+
+
+def test_the_client_glossary_matches_method_now():
+    assert not lw.check_delivery_gloss()

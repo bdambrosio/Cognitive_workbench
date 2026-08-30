@@ -320,36 +320,10 @@ def build_config(world: str, model_path: Optional[Path],
     return name, cfg
 
 
-def last_exit_reason(world: str, agent: str) -> Optional[str]:
-    """Read it off the trace, not the loop. `exit_reason` is a local inside
-    _process_user_turn and is never stored on the object — getattr for it
-    returns None, which reads as "not a yield" and would end every run after
-    one leg."""
-    p = (REPO / "scenarios" / world / agent / "memory" /
-         "reasoning_trace.jsonl")
-    if not p.exists():
-        return None
-    last = None
-    for line in p.open(errors="replace"):
-        line = line.strip()
-        if line:
-            last = line
-    if not last:
-        return None
-    try:
-        return json.loads(last).get("exit_reason")
-    except json.JSONDecodeError:
-        return None
-
-
-def latest_reply(loop, source: str) -> str:
-    turns = loop.store.get_recent_turns(source, limit=4, scope="all")
-    for t in reversed(turns):
-        if str(t.get("name", "")) != source:
-            return str(t.get("text", ""))
-    return ""
-
-
+# Both live in workflows/turns.py since 2026-08-30, when a third runner
+# needed them. Imported rather than retyped.
+from workflows.turns import (                                  # noqa: E402
+    last_exit_reason, latest_reply)
 # ---------------------------------------------------------------------------
 # Concern visibility. Written per leg so a run can be watched while it runs.
 #

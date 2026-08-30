@@ -398,7 +398,7 @@ def confirm_exceptions(run: Path, world: str, model_path: Optional[Path],
     # a NameError raised inside the retest reads as "could not obtain the
     # retest", which silently turns every failed finding into one that does
     # not stand. Cost one review on 2026-08-26 before it was noticed.
-    from workflows.claims_audit.runner import latest_reply     # noqa: E402
+    from workflows.turns import latest_reply                   # noqa: E402
     t0, opinions, replies, models = time.time(), [], [], []
 
     for n in range(1, CONFIRMING_REVIEWERS + 1):
@@ -546,7 +546,9 @@ def main() -> int:
     from chat.chat_loop import ChatLoop                        # noqa: E402
     from chat.model_params import TOP_P                        # noqa: E402
     from workflows.claims_audit.runner import (                # noqa: E402
-        latest_reply, last_exit_reason, git_rev)
+        git_rev)
+    from workflows.turns import (                              # noqa: E402
+        latest_reply, last_exit_reason)
     loop = ChatLoop(character_name=name, character_config=cfg)
     resolved_model = loop.backend.resolved_model()
     logger.info("reviewing %s with %s", run.name, resolved_model)

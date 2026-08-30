@@ -119,7 +119,7 @@ Cover, in whatever order reads best:
 - how many resolved claims were supported
 - any claim that could not be settled, and why
 - anything the audit did not count as a claim and did not test
-- where the reader can see the full list of claims (Appendix B)
+- where the reader can see the full list of claims (Appendix B, which lists the claims as the audit froze them — it does not say how each was resolved)
 
 The audit's version is usually one long paragraph carrying ten facts. Break it up.
 
