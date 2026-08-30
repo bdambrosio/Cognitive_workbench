@@ -22,9 +22,13 @@ WHY THE ORDER INTERLEAVES. Providers are sampled inside each repeat rather than
 in blocks, so an upstream condition that drifts over the minutes the grid runs
 lands on both arms instead of on whichever went second.
 
-SEQUENTIAL, ONE CALL AT A TIME. The 429 on this model names the model, not the
-endpoint — the throttle is upstream of the provider split — so parallel calls
-here contend with each other and with any run in flight on the same id.
+SEQUENTIAL, ONE CALL AT A TIME, because two runs on one provider compete for
+one budget. Note that the 429 text NAMES THE MODEL — "z-ai/glm-5.3-flash is
+temporarily rate-limited upstream" — but does not behave that way: on
+2026-08-30 Fireworks returned 429 on 11 of 12 calls while Modal answered 12 of
+12, alternating call by call over the same minutes. The message is model-wide
+and the throttle observed was provider-specific. Only interleaved sampling
+shows that; in blocks it reads as the route going bad halfway through.
 
 Usage:
     export OPENROUTER_API_KEY=...
@@ -48,7 +52,7 @@ OUT = Path(__file__).resolve().parent / "provider_effort_grid.jsonl"
 
 # None sends no `reasoning_effort` at all, which is the row where the
 # over-thinking shows: measured 1623/1838/2367 completion tokens against
-# 60/117/216 at `low` on modal/fp8 (or_glm53flash_high.yaml, 2026-08-28).
+# 60/117/216 at `low` on modal/fp8 (or_glm53flash.yaml, 2026-08-28).
 EFFORTS = (None, "low", "medium", "high")
 
 

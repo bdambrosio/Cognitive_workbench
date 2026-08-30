@@ -74,6 +74,30 @@
 # not a measured optimum, and three runs per arm would be needed to make it
 # one.
 #
+# THE EFFORT LADDER ON THIS ROUTE, measured 2026-08-28, n=3, completion tokens
+# for one one-line action. Folded in from or_glm53flash_high.yaml, which is
+# removed now that medium is the single instructed level:
+#
+#   nothing sent            1623 / 1838 / 2367   reasoning 6826-10044 chars
+#   reasoning_effort high    195 /  233 /  256   reasoning  331- 637
+#   reasoning_effort medium  101 /  108 /  139   reasoning    0- 136
+#   reasoning_effort low      60 /  117 /  216   reasoning    0- 408
+#
+# Sending nothing produces ~20x the reasoning of `low`, so the field is not
+# optional on this route. Low and medium overlap at n=3 on THIS probe — but the
+# probe is a 141-token one-line action with no cross-document work and no
+# sustained attention, which is most of what an audit leg is, so it does not
+# settle whether the rung is inert on the real workload. The ChatterMate
+# comparison above, on the real workload, separates them.
+#
+# `reasoning.enabled: false` is a 400 here: "Reasoning is mandatory for this
+# endpoint and cannot be disabled." There is no off switch on this route.
+#
+# TOP-LEVEL `reasoning_effort` IS HONOURED, which is what backend.py sends, so
+# this route needs no code change. That is NOT true of every route on this
+# gateway — the Qwen3.8-Flash endpoint silently drops the same field. Same
+# gateway, same field, different provider: measure, do not infer.
+#
 # No expects_served_model: a cloud route has no /v1/models to interrogate, so
 # `model` is load-bearing — get it wrong and the row is mislabelled with
 # nothing to catch it.
