@@ -1,172 +1,111 @@
 # Technical claims audit — method
 
-## 1. What this is
+## 1. Purpose
 
-A one-shot technical due-diligence engagement for a buyer evaluating a target
-they do not own, in acquisitions under $5M. The operation is:
+This is a one-shot, limited technical due-diligence engagement for a buyer evaluating a target they do not own, in acquisitions under $5M.
 
-> stated claims vs. observed evidence, with citations.
+The basic task is straightforward:
 
-What this audit does not do is in §11.
+> Compare the seller's stated claims with the available evidence, and cite the evidence used.
 
-## 1a. Level of assurance, and the coverage vocabulary
+Section 11 describes what is outside the scope of this audit.
 
-This is a **limited assurance** engagement. The audit resolves part of the
-target's identified claims, not all of them: §4 sets the order of work, §12
-sets where it stops, and §11 lists what is out of scope.
+## 1a. Level of assurance and coverage terminology
 
-The report states its conclusion positively — of the claims it resolved, these
-are supported and these are not — but only about those. It says nothing about
-the rest.
+This is a **limited assurance** engagement. The audit may resolve only part of the target's identified claims. Section 4 defines the order in which claims are addressed, Section 12 defines when the work may stop, and Section 11 defines exclusions.
 
-Two rules follow.
+The report may state which resolved claims are supported and which are not. It must not imply a conclusion about claims that were not resolved.
 
-1. **State the coverage wherever you state the conclusion.** The §9
-   conclusion and the number of claims it rests on appear together, in the
-   report and in the Gap Map. A conclusion without that number gives the
-   reader nothing to rely on.
+Two rules apply:
 
-2. **Never write a sentence that implies you resolved more than you did.**
-   "The system does what it says" is a claim about everything. "Coverage: 39
-   of 43 identified claims resolved; 37 of 39 resolved claims supported" is a
-   claim about the work done. Write the second.
+1. **State coverage whenever the report states its conclusion.** The report and Gap Map must show how many identified claims were resolved and how many resolved claims were supported.
+2. **Do not imply broader coverage than the work supports.** For example, avoid “the system does what it says.” Use a bounded statement such as: “Coverage: 39 of 43 identified claims resolved; 37 of 39 resolved claims supported.”
 
-### The four claim-state quantities
+### Claim-state quantities
 
-Wherever the report states a count or a fraction of claims, use these words and
-no others —
-"checked", "examined" and "verified" each blur `attempted` and `resolved`, and
-a coverage figure whose denominator is unstated is the failure §1a exists to
-prevent. Ordinary English is fine everywhere else; this binds the numbers.
+When reporting claim counts or rates, use the following terms consistently. Terms such as *checked*, *examined*, and *verified* should not be used for quantitative coverage because they do not distinguish between an attempted claim and one that reached a verdict.
 
-| term | meaning |
+| Term | Meaning |
 |---|---|
-| **identified** | claims enumerated from the claim sources and frozen in the claim surface (§12 step 2) |
-| **attempted** | identified claims you tried to settle |
-| **resolved** | attempted claims that reached one of §6's five claim verdicts |
-| **supported** | resolved claims whose verdict is `[real]` or a caveat form |
+| **identified** | Claims enumerated from the designated claim sources and frozen in the claim surface (Section 12, step 2) |
+| **attempted** | Identified claims for which the audit tried to reach a determination |
+| **resolved** | Attempted claims that reached one of the five claim verdicts in Section 6 |
+| **supported** | Resolved claims whose verdict is `[real]`, `[real, minor caveat]`, or `[real, operational caveat]` |
 
-An attempted claim that did not resolve is `[unverifiable]`. An identified
-claim never attempted is *unattempted*, and is accounted for by number in the
-coverage statement.
+An attempted claim that cannot be resolved is `[unverifiable]`. An identified claim that was never attempted is *unattempted* and is reported numerically in the coverage statement.
 
-**Coverage is resolved over identified. The consistency rate is supported over
-resolved.** Two rates, two denominators: state both, and never let one stand in
-for the other. `attempted` sits in neither rate and is still required — it is
-what separates "we could not settle it" from "we never looked", and
-`[unverifiable]` is exactly `attempted` minus `resolved`.
+**Coverage = resolved / identified.**  
+**Consistency rate = supported / resolved.**
 
-**The canonical form, and rule 2's second sentence is the same one:**
-**"Coverage: 39 of 43 identified claims resolved; 37 of 39 resolved claims
-supported."**
+`attempted` is not the denominator of either rate, but it remains important because it distinguishes “we tried and could not settle this claim” from “we did not examine this claim.” In count terms, `[unverifiable]` claims are attempted claims that did not resolve.
 
-## 2. The scope rule
+Canonical form:
 
-**Audit what the seller asserts about the target, against what the materials
-show.**
+> Coverage: 39 of 43 identified claims resolved; 37 of 39 resolved claims supported.
 
-A claim is an assertion the seller makes to the buyer — in the listing, the
-technical description, the specifications, the marketing. The engagement names
-which documents carry those assertions (§12 step 1). Everything else provided,
-including source code and its comments, is evidence: it is what a claim is
-tested against, not a claim in its own right.
+## 2. Scope rule
 
-Claims about the business count as much as claims about the software. Revenue,
-customer counts, contracts and dependencies are claims, as much as backups,
-uptime and test coverage.
+**Evaluate what the seller asserts about the target against what the supplied materials show.**
 
-**Do not opine on what the target should do.** How the system ought to be
-built, or the deal structured, is the buyer's judgement and is not what was
-bought. This applies to the §9 conclusion as much as to any finding:
-report the state of the claims, not the action the buyer should take.
+A claim is an assertion the seller makes to the buyer in designated claim sources such as a listing, technical description, specification, or marketing document. The engagement identifies which documents are claim sources (Section 12, step 1).
 
-## 3. Scope adapts to the target; the method does not
+Other supplied materials, including source code and code comments, are evidence. They are used to test claims but are not automatically treated as seller claims.
 
-Which claims exist differs by target: a hardware specification asserts
-different things from a SaaS listing. The operation in §1, the scope rule in
-§2 and the priority order in §4 do not change.
+Business claims are in scope as well as technical claims. Revenue, customer counts, contracts, and external dependencies can be evaluated in the same way as claims about backups, uptime, architecture, or test coverage.
 
-Where a target has little to report on some subject — no meaningful security
-surface, no external dependencies — **say so as a property of the target
-rather than padding the report, and state it precisely.** "No telemetry path;
-one user-initiated outbound call sends user-typed text off-network" is
-precise. "No data exfiltration path" is broader than the evidence supports,
-and a statement like it had to be retracted mid-audit once.
+The audit does **not** recommend how the target should be built or how the transaction should be structured. It reports the state of the claims and the consequences of any gaps. Decisions about remediation, pricing, negotiation, or whether to proceed remain with the buyer.
 
-## 4. Materiality and priority order
+## 3. Scope varies by target; the method does not
 
-1. **Enumerate the claims first** (§12 step 2).
-2. **Prioritise** (order below).
-3. **Report coverage explicitly** — identified, resolved, supported (§1a),
-   what was not attempted, and why the gap matters.
+The claims will differ by target. A hardware specification raises different questions from a SaaS listing, but the comparison method in Section 1, the scope rule in Section 2, and the priority order in Section 4 remain the same.
 
-**What makes a gap worth reporting.** A gap is material if a reasonable buyer,
-knowing it, **would change the price, the structure of the deal, or the
-decision to close.** The threshold is relative to the transaction: the same
-defect is material in a $400k acquisition and noise in a $40m one.
+Where a subject has little relevance to a target, state that directly and precisely rather than expanding the report artificially. For example:
 
-Five things follow. **Report every material gap whichever way it pushes the
-price** — one that favours the seller is still a gap. **A gap below the
-threshold does not make the claim fail**: record it under `[real, minor
-caveat]` — the verdict exists for a discrepancy that does not change the
-decision — rather than raising a `[partial]`. Reserve bare `[real]` for a claim
-the materials bear out with nothing to note. Materiality decides whether a
-discrepancy is worth the buyer's attention; it does not decide whether the
-claim was accurate, and the verdict must not say it was.
+> No telemetry path was found. One user-initiated outbound call sends user-entered text off-network.
 
-**It still gets a finding.** Every claim you *resolve* produces one, the
-supported ones included — §1a requires the report to say which resolved claims
-are supported and which are not, and a rate alone does not say which. A claim
-you attempted and could not settle is `[unverifiable]`, which is not a finding (§6) and belongs in the
-coverage statement. **The consistency rate is `supported` over `resolved`
-(§1a)** — a ratio over claims, so `[derived]` findings are outside it because
-they test no claim. It summarises the findings; it never replaces them. And
-**materiality is judged against the buyer's decision, not your own taste**:
-"this code is poorly organised" is not material unless it bears on what was
-claimed.
+This is preferable to a broader statement such as “no data exfiltration path,” which may extend beyond the evidence.
 
-**Priority order.** Verify in this order. **Every identified claim is in one of
-these tiers** — the order is not a filter, and it cannot be one, because
-materiality is a property of a gap and you do not know a claim's gap until you
-have checked it.
+## 4. Materiality and priority
 
-Each tier is defined by **what it would cost the buyer if the claim turned out
-false**. The subject matter after each dash is an example of where such claims
-are usually found, never the definition — an architectural claim can be
-business-ending or trivial, and it takes the tier its failure earns.
+The sequence is:
 
-1. **Failure ends the business** — data that cannot be recovered, money that
-   cannot be collected, a dependency that can withdraw. Usually recoverability,
-   payment integrity and single points of control; in a physical product,
-   safety-critical mechanism.
-2. **Failure changes what is being bought** — the target is not the shape the
-   seller described, so the buyer is acquiring a different asset at the agreed
-   price. Usually the stated boundaries: isolation, redundancy, failover, tier
-   separation, shared state.
-3. **Failure imposes a bounded remediation cost in money or time** — it can
-   be put right without changing what is being bought. Usually operational
-   parameters: retry intervals, timeouts, monitoring, retention windows,
-   thresholds.
-4. **Failure changes nothing on its own** — individually minor. They are
-   verified last, so they are also the claims most often left unattempted, and
-   the ones you did resolve are the best available evidence about the ones you
-   did not. (The consistency rate is over *all* resolved claims, not this tier
-   — §1a.)
+1. Enumerate the claims (Section 12, step 2).
+2. Prioritize them using the order below.
+3. Report coverage explicitly: identified, attempted where relevant, resolved, supported, what was not attempted, and why the remaining uncertainty matters.
 
-**Those four levels are the tiers.** A **claim finding** takes the tier of the
-claim it tests. A **derived finding** takes the highest tier among the figures
-it rests on, and rises above them when the consequence is more severe than
-either input — §5 states it there too, because that is where a derived finding
-is written.
+### Materiality
 
-If a tier is empty for a target, say so in the coverage statement rather than
-silently running a three-tier order. The order exists so that an audit cut
-short by budget, time or access has resolved the most expensive unknowns
-first.
+A gap is material if a reasonable buyer, knowing about it, could change the price, the structure of the transaction, or the decision to close. Materiality is relative to the transaction. The same defect may matter in a $400k acquisition and be immaterial in a $40M transaction.
+
+Several rules follow:
+
+- Report material gaps whether they favor the buyer or the seller.
+- A discrepancy below the materiality threshold does not automatically make the claim unsupported. Use `[real, minor caveat]` for a claim that holds but has a non-material discrepancy.
+- Use `[real]` when the evidence supports the claim without a caveat worth reporting.
+- Materiality determines whether a discrepancy matters to the buyer's decision. It does not change whether the original claim was accurate.
+- Every resolved claim produces a finding, including supported claims. A rate alone does not identify which claims were supported.
+- An attempted claim that cannot be settled is `[unverifiable]`. It is reported in the coverage statement, not as a finding.
+- `[derived]` findings are not included in the consistency rate because they do not test a seller claim.
+- Materiality is judged against the buyer's decision, not against the auditor's preferences. For example, poor code organization is not material unless it bears on a claim or creates a decision-relevant consequence.
+
+### Priority order
+
+Every identified claim is assigned to one of four tiers. The tier is based on the consequence if the claim is false, not on the technical subject matter of the claim. The priority order is an order of work, not a filter: every identified claim belongs to a tier. A claim cannot be excluded because it appears unimportant before it is examined; the significance of any gap is not known until the claim is tested.
+
+1. **Failure could make the business nonviable.** Examples include unrecoverable data, inability to collect money, withdrawal of a critical dependency, or failure of a safety-critical mechanism.
+2. **Failure changes the nature of the asset being acquired.** Examples include claims about isolation, redundancy, failover, tier separation, or shared state where the actual architecture differs materially from the description.
+3. **Failure creates a bounded remediation cost in time or money.** Examples include incorrect retry intervals, timeouts, monitoring behavior, retention periods, or thresholds that can be corrected without changing the nature of the asset.
+4. **Failure is individually minor.** These claims are addressed last and are the most likely to remain unattempted if the engagement stops early.
+
+A claim finding takes the tier assigned to the claim. A derived finding takes at least the highest tier of the facts on which it depends and may be assigned a higher tier if the derived consequence is more severe.
+
+If a tier contains no claims, state that in the coverage statement. The purpose of the priority order is to ensure that, if the audit stops because of time, budget, or access constraints, the highest-consequence uncertainties have been addressed first.
 
 ## 5. Finding format
 
-```
+Use the following form for a finding that resolves a seller claim:
+
+```text
 **Finding N: <short title> — [claim verdict]**
 
 Claim (<document:lines>): <the stated claim>
@@ -176,775 +115,485 @@ Evidence: <document or file:lines> — <what the materials show>
 Gap: <None, or the specific gap>
 ```
 
-**Cite both halves**: the document making the claim, and the document or file
-that settles it, each with line numbers. Without both, a reader cannot check
-the finding and the practice cannot defend it.
+Cite both the source of the claim and the evidence used to resolve it. A reader should be able to inspect both sides of the comparison.
 
-**The citation obligation takes three shapes, and the requirement underneath
-them is one.** A reader must be able to reach every fact the finding rests on.
-None of the three is an exemption from that.
+There are three evidence patterns:
 
-- **A claim finding** cites both halves, as above.
-- **A claim finding whose evidence is an absence** cites the claim normally,
-  and its Evidence field carries the two searches required below. There is no
-  settling line to cite, because the point is that no such line exists — the
-  searches are the evidence, and they must be written down as run.
-- **A derived finding** has no claim to cite. Its obligation is every Basis
-  line cited and the derivation written out (the second shape below).
+- **Ordinary claim finding:** cite the claim source and the evidence that resolves it.
+- **Claim finding based on absence:** cite the claim source and record the searches used to establish whether the claimed implementation or evidence exists. There may be no line citation for the absent item.
+- **Derived finding:** cite every source figure used in the derivation and show the derivation explicitly.
 
-**Quote figures from the source line, never from a summary.** Tools that read
-on your behalf answer in prose, and prose carries qualitative facts reliably
-and numbers unreliably. A summary that has dropped the second of two figures
-reads exactly like one that has not. For any claim resting on a number, date
-or threshold, get the source line and quote it.
+### Numeric and date evidence
 
-**An absence needs the search, not the conclusion.** "This is not implemented"
-cannot cite a line, because the point is that no line exists. Its evidence is
-the search, and you must show two, because each fails where the other holds:
+For claims that depend on a number, date, threshold, or other exact value, quote or cite the source line rather than relying on a summary produced by a tool or intermediary. Summaries are useful for navigation but are not sufficient evidence for exact quantitative claims.
 
-- **Lexical, in the claim's own words.** The claim supplies the terms and the
-  implementer probably used them too. A claim about detecting frustration is
-  searched as `frustrat`, not as whatever you would have named the module.
-- **Structural.** List the directory or document the thing would be in. A
-  listing cannot be defeated by a synonym; a search can.
+### Evidence of absence
 
-A documented search proves diligence, not absence. Searching for the wrong
-word and recording it carefully is worse than not searching, because it reads
-as thorough. Where the two searches do not settle it, the claim is
-`[unverifiable]` — an examination status and not a verdict (§6) — and never
-`[delta]`.
+A statement such as “this is not implemented” cannot normally be supported by a single source line. Use two complementary checks:
 
-### The second shape: a derived finding
+- **Lexical search:** search using terms taken from the claim itself, including reasonable stems or variants.
+- **Structural search:** inspect the directory, module, document set, or other location where the implementation or evidence would reasonably appear.
 
-Some of the most material things in a data room are stated by nobody. They
-follow by arithmetic from two figures the seller supplied separately — a
-retention period in one document, a last-good-backup date in another, each
-innocuous alone, together fixing a date after which the business cannot be
-restored.
+Record the searches actually performed. A search establishes diligence, not absolute absence. If the searches do not settle the question, classify the claim as `[unverifiable]`, not `[delta]`.
 
-Such a finding has no claim to cite, so it takes a different shape:
+### Derived findings
 
-```
+Some material conclusions are not directly stated by the seller but follow from two or more seller-supplied facts. For example, a retention period in one document and the date of the last usable backup in another may together determine when recovery becomes impossible.
+
+Use this format:
+
+```text
 **Finding N: <short title> — [derived]**
 
-Basis: <document:lines> — <the first stated figure, verbatim>
-       <document:lines> — <the second, verbatim>
+Basis: <document:lines> — <first source figure, verbatim>
+       <document:lines> — <second source figure, verbatim>
 
-Derivation: <the arithmetic, written out so a reader can check it>
+Derivation: <the arithmetic or logical derivation>
 
-Consequence: <what follows, and why a buyer cares>
+Consequence: <what follows and why it matters to the buyer>
 
 Escalates: <Finding N, or None>
 ```
 
-Four rules:
+Rules for derived findings:
 
-1. **Use only the target's own figures**, quoted verbatim. Deriving an expiry
-   date from the seller's stated retention terms is still auditing what they
-   told you. Deriving that the market will turn against them is not.
-2. **Write the arithmetic out.** "30-day retention from a 2026-07-30 last-good
-   backup exhausts on 2026-08-29" is checkable in one line. Arithmetic left
-   implicit is an opinion with a citation attached.
-3. **No conclusion inside the finding.** State the consequence and stop.
-   What the buyer should do is the buyer's judgement (§2); the report's
-   conclusion is §9's job.
-4. **Name what it escalates.** A derived finding often sharpens an ordinary
-   one — the same backup failure, now with a date on it. Say which, so the
-   report reads as one finding intensified rather than two counted. If it
-   escalates nothing, say None.
+1. Use only facts supplied in the target materials. Do not derive market forecasts or other external conclusions and present them as part of this audit method.
+2. Show the arithmetic or other derivation explicitly so the reader can reproduce it.
+3. State the consequence, but do not turn the finding into a recommendation about the transaction.
+4. If the derived finding strengthens or sharpens an existing finding, identify that relationship under `Escalates` rather than presenting the two as unrelated issues.
 
-**A derived finding that resolves to a date carries that date as its own
-expiry.** "The last recoverable backup ages out on 2026-08-29" is true when
-written, serious a week later, and meaningless a month after that. State the
-date and what happens on it. The deliverable carries an **as-of date for
-the materials**: a data room is a snapshot, and every conclusion in the report
-is a conclusion about that snapshot.
+A time-dependent derived finding must state the relevant date and what changes on that date. The deliverable also carries an as-of date for the materials, because the conclusions apply to the supplied snapshot.
 
-**Tier.** A derived finding takes the highest §4 tier among the figures it
-rests on, and rises above them when the consequence is more severe than either
-input.
+A derived finding takes the highest relevant priority tier of the facts on which it depends and may be raised if the derived consequence is more severe.
 
-## 6. Verdicts, statuses and observation types
+## 6. Verdicts, statuses, and observation types
 
-Three vocabularies, and they answer different questions. Reading them as one
-table is what made `[derived]` look like a verdict on a claim and
-`[unverifiable]` look like a finding.
+Three vocabularies are used for different purposes.
 
-**Claim verdicts — how a stated claim stood up.** These five, and only these,
-are verdicts. Every one produces a finding.
+### Claim verdicts
+
+These describe how a stated seller claim compares with the evidence. Every resolved claim receives exactly one of these verdicts and produces a finding.
 
 | Verdict | Meaning | Buyer impact |
 |---|---|---|
-| `[real]` | Claim holds; the materials bear it out, with nothing to note | None |
-| `[real, minor caveat]` | Holds; a discrepancy that does not change the decision | Awareness |
-| `[real, operational caveat]` | Holds today; operational context qualifies it | Awareness + operational planning |
-| `[partial]` | Mostly true, with a specific citable gap | **Material** — a gap to price |
-| `[delta]` | Claim is false; the materials show otherwise | **Material** — a broken promise, and possibly a pattern |
+| `[real]` | The evidence supports the claim without a reportable caveat | None |
+| `[real, minor caveat]` | The claim holds, with a discrepancy that does not materially affect the decision | Awareness |
+| `[real, operational caveat]` | The claim holds under current conditions, but operating context qualifies it | Awareness and operational planning |
+| `[partial]` | The claim is substantially true but has a specific, citable material gap | Material; bounded gap to evaluate or price |
+| `[delta]` | The claim is false; the claim source says one thing and the evidence shows another | Material; broken claim and possible pattern |
 
-**Examination status — what happened when you tried.** Not a verdict, because
-no verdict was reached. Not a finding.
+### Examination status
 
-| Status | Meaning | Where it goes |
+This describes an attempted claim for which no verdict could be reached. It is not a claim verdict and does not produce a finding.
+
+| Status | Meaning | Where reported |
 |---|---|---|
-| `[unverifiable]` | Attempted; the materials could not settle it | Coverage statement (§16), with the reason |
+| `[unverifiable]` | The claim was attempted, but the supplied materials could not settle it | Coverage statement, with the reason |
 
-A claim you never attempted is neither of these. It is `unattempted` (§1a),
-and the coverage statement accounts for it by number.
+A claim that was never attempted is *unattempted* and is accounted for numerically in the coverage statement.
 
-**Neither a claim verdict nor an examination status.** Both label something
-the seller did not claim. One produces a finding and one does not, and that is
-the distinction to keep.
+### Other observation types
+
+These describe observations that are not seller-claim verdicts.
 
 | Type | Meaning | Finding? |
 |---|---|---|
-| `[derived]` | A consequence computed from two or more stated figures (§5's second shape) | **Yes** — as severe as the consequence, and frequently material |
-| `[unclaimed]` | The materials cover something the seller made no claim about | **No** — noted in the coverage statement (§16); rarely material |
+| `[derived]` | A consequence derived from two or more facts stated in the materials | Yes |
+| `[unclaimed]` | The materials contain relevant information about something the seller did not claim | No; note in the coverage statement |
 
-**So a finding is one of two things**: a resolved claim carrying one of the five
-claim verdicts, or a `[derived]` finding. Nothing else is a finding, and the
-report contains nothing else in §5's format.
+A finding is therefore either:
 
-**`[partial]` vs `[delta]` is a real distinction.** `[partial]` is "the claim
-is 80% true and here is the 20% that is not, with a citation to the corner
-case." `[delta]` is "the claim is false; the seller says X, the
-materials show Y, here are both citations." A buyer treats them differently: `[partial]` is a
-known limitation to price in; `[delta]` is a broken promise that may indicate
-a pattern.
+- a resolved claim with one of the five claim verdicts; or
+- a `[derived]` finding.
 
-**`[derived]` is not a verdict on a claim, and that is the point.** The five
-claim verdicts say how a stated claim stood up. `[derived]` says the seller's
-own figures, taken together, entail something neither document states. It
-carries no claim source because there is no claim — which is why it needs §5's
-second shape rather than the format above.
+`[partial]` and `[delta]` should remain distinct. `[partial]` means the claim substantially holds but has a material limitation. `[delta]` means the claim itself is contradicted by the evidence.
 
-**`[unverifiable]` must never be reported as `[delta]`.** "I could not find
-it" is not the same as "it is not there." The first belongs in the coverage
-statement; only the second is a finding.
+`[derived]` is not a verdict on a seller claim. It records a consequence that follows from facts the seller supplied separately.
 
-Use the narrowest claim verdict that fits.
+`[unverifiable]` must not be reported as `[delta]`. Failure to find supporting evidence is not equivalent to evidence that the claim is false.
+
+Use the narrowest verdict that fits the evidence.
 
 ## 7. Correction protocol
 
-**The auditor corrects their own findings when subsequent evidence
-contradicts them. Corrections are noted in the report with a one-line
-explanation of what changed and why.**
+If later evidence contradicts a finding, revise the finding and record a one-line explanation of what changed and why.
 
-An auditor who never corrects has a citation trail that proves nothing: if no
-evidence could change a finding, the citations were decoration.
+The citation trail should represent an evidence-based process in which findings can change when the evidence changes.
 
-## 8. The reader
+## 8. Reader and document structure
 
-**Write for the person who decides.** They read the Gap Map in about thirty
-seconds and open the report only if it earns the time.
+Write for the person making the transaction decision. The Gap Map should be understandable in about thirty seconds. The full report is a reference document for readers who need the supporting detail.
 
-**The two documents are read differently, and that is why there are two.** The
-Gap Map is read straight through. The report is not: §4 requires a finding for
-every resolved claim, so on a large surface it runs to hundreds, and nobody
-reads it end to end. It is a **reference document** — the reader arrives at the
-conclusion, reads down the worst findings while they still matter, and drills
-to a specific claim when they want to check one. Length is therefore not a cost
-to the reader, and ordering is: a finding they never reach must be one they did
-not need.
+The two documents serve different purposes:
 
-So the report opens with the §9 conclusion and its coverage, orders findings
-worst first (§16), and closes with a paragraph a non-specialist can read and
-explain back to a colleague.
+- The **Gap Map** is read from beginning to end and presents the conclusion, the most important findings, and coverage.
+- The **report** may contain a finding for every resolved claim and can therefore be long. It should be organized so a reader can begin with the conclusion, review the highest-consequence findings, and then locate any specific claim and its evidence.
+
+The report therefore opens with the conclusion and coverage, orders findings from most to least significant, and closes with a concise explanation that a non-specialist can understand and repeat accurately.
 
 ## 9. Report-level conclusion
 
+Use one of the following report-level conclusions:
+
 | Conclusion | Meaning |
 |---|---|
-| **Clear** | **No material findings of any kind.** Every resolved claim is supported, and no caveats of note. |
-| **Clear with caveats** | **No material findings of any kind.** Documentation drift, maintenance debt or operational notes a buyer should know, which do not bear on valuation. |
-| **Conditional** | Material findings, but all are localised and remediable — each has a correction of known scope and does not change what is being bought. |
-| **Material** | Material findings whose consequence is not bounded to a localised remediation, and which materially change valuation or risk profile. |
-| **Systemically inconsistent** | The claims do not describe the target: material findings across independent claims, or a claim source contradicted throughout. |
+| **Clear** | No material findings of any kind. Every resolved claim is supported, with no caveat of note. |
+| **Clear with caveats** | No material findings. There may be documentation drift, maintenance debt, or operational qualifications that a buyer should know but that do not materially affect valuation. |
+| **Conditional** | Material findings exist, but they are localized and have bounded, identifiable remediation. They do not change the nature of the asset being acquired. |
+| **Material** | Material findings have consequences that are not limited to a localized remediation and materially change valuation or risk. |
+| **Systemically inconsistent** | The seller's claims do not provide a reliable description of the target, because material contradictions occur across independent claims or throughout a claim source. |
 
-**The audit concludes; the buyer decides.** The audit says "Conditional: the
-seller claims 30-day retention, the materials show 7." Whether 7 days is
-acceptable is the buyer's call. The audit does not say "you should walk."
+The audit states the evidence-based conclusion. The buyer decides what action to take.
 
-**Keep the two vocabularies apart.** The five terms above describe what the
-audit found — the state of the claims and of any
-derived finding, since a `[derived]` finding describes no claim and can still
-decide the conclusion. *Proceed, negotiate, walk* is the buyer's action
-vocabulary, and using it would put the audit in the business of
-advising on the deal (§2).
+For example:
 
-**One narrow exception, and it is the Gap Map's alone.** Its closing line may
-offer a judgement — "the gaps are addressable within the existing integration
-timeline" — if it is labelled as professional judgement rather than written as
-an instruction. Nothing in the report block carries that licence.
+> Conditional: the seller claims 30-day retention; the materials show 7 days.
 
-## 10. Liability posture
+Whether seven days is acceptable is a transaction decision and is not part of the audit conclusion.
+
+Keep the audit conclusion vocabulary separate from buyer actions such as *proceed*, *negotiate*, or *walk away*.
+
+The Gap Map may include a clearly labeled professional judgment such as “the gaps appear addressable within the existing integration timeline.” This exception applies only to the Gap Map. The full report must stop at findings, consequences, and the report-level conclusion and must not direct the buyer's action.
+
+## 10. Liability and professional posture
 
 <!-- audience: practice -->
 
-**Category: expert due-diligence, not legal advice.** The distinction is
-functional, not semantic. Legal advice is "the law requires X, your rights
-are Y, you should do Z." Expert due-diligence is "here is what I observed,
-here is the gap between claim and implementation, here is my professional
-assessment of what that gap means for the value of the asset." The legal and
-business judgement stays with the client.
+This service is technical due diligence, not legal advice. It reports what was observed, how that compares with the seller's claims, and the technical or business consequence of any gap. Legal conclusions and transaction decisions remain with the client and their advisers.
 
-Same category as a financial auditor reporting material misstatements, a
-structural engineer certifying an undersized wall, or a pen-test firm
-reporting an exploitable endpoint.
+The closest professional analogies are other evidence-based review services in which a specialist evaluates supplied material against stated criteria and documents material discrepancies.
 
-**Independence, and which way the incentive runs.** The buyer engages the
-auditor, and the buyer benefits from findings: every delta is leverage on
-price. That is a self-interest threat in the direction of **over-reporting**,
-and naming it is the first safeguard. The others are already load-bearing
-elsewhere: §5's citation requirement, which an invented delta cannot satisfy;
-§6's rule that `[unverifiable]` is never reported as `[delta]`; §4's
-materiality threshold, applied **regardless of which way a gap pushes the
-price**; and §12 step 6b, which verifies the finished report against its own
-citations.
+### Independence
 
-A finding that survives all four of those is not advocacy. A finding that would not
-have been written for a seller-side client should not be written for a
-buyer-side one.
+The buyer engages the auditor, and adverse findings may benefit the buyer in negotiation. That creates an incentive risk toward over-reporting. The method addresses that risk through several controls:
 
-**Vector 1 — client sues for sloppy work.** The real risk, and the same one
-every audit firm carries. Managed by four things:
+- every claim finding must be supported by the required citations;
+- `[unverifiable]` cannot be converted into `[delta]` merely because evidence was not found;
+- materiality is applied regardless of whether a gap favors buyer or seller; and
+- the completed report is checked against its citations before delivery.
 
-1. **Scope definition in the engagement letter** — "based on the materials
-   provided; we did not have access to production systems, live databases, or
-   the source repository." If the defect was in production but not in the
-   materials, it is not in scope.
-2. **Professional standard, not perfection** — what a reasonable auditor
-   would find from the same materials. The citation trail demonstrates the
-   work was systematic; the correction protocol (§7) demonstrates it was
-   honest.
-3. **Limitation of liability clause** — caps damages, excludes
-   consequential. This makes the risk finite rather than existential.
-4. **E&O / professional liability insurance**, in place *before* the first
-   engagement, covering professional negligence in technical due-diligence.
+A finding should be written the same way whether the engagement is buyer-side or seller-side.
 
-**Vector 2 — the target sues for defamation.** Structurally weak, and the
-report format is what defeats it:
+### Risk of a client claim for negligent work
 
-- **Truth is an absolute defence.** Every finding cites its source.
-- **Not a public statement.** A confidential deliverable to one client under
-  NDA, for a specific transaction. Many jurisdictions recognise a qualified
-  privilege for exactly this. The target is not the audience.
-- **Opinion vs. fact.** "The architecture is a single point of failure" is a
-  technical opinion resting on observable facts. "The seller is a fraud" is an
-  accusation. Stay in the first register.
-- **Tortious interference** requires a reasonable expectation of a concluded
-  contract; in early diligence the target is in negotiations and the client is
-  free to walk for any reason.
+The main professional risk is incomplete or careless analysis. Controls include:
 
-**Jurisdiction is unresolved and outside what anyone here can settle.**
-Defamation law, qualified privilege and the standard for reckless disregard
-vary by state and country. **This section is a working posture, not legal
-advice, and needs a lawyer's review before the first paying engagement.**
+1. **Clear scope in the engagement letter.** State which materials and systems were and were not available. A defect outside the supplied or accessible material is outside the evidence base of the engagement.
+2. **A reasonable professional standard rather than a promise of perfection.** The citation trail should show a systematic process, and the correction protocol should show that findings are revisable when the evidence changes.
+3. **A limitation-of-liability provision** appropriate to the engagement and reviewed by counsel.
+4. **Professional liability / E&O insurance** covering technical due-diligence work before accepting paid engagements.
+
+### Risk of a claim by the target
+
+The report should remain factual, technical, confidential, and limited to the evidence. Avoid personal accusations or statements about motive.
+
+Relevant legal questions—including defamation, privilege, tortious interference, and standards for negligent or reckless statements—vary by jurisdiction. This section is a working business posture only and requires review by qualified counsel before paid engagements begin.
 
 ## 11. What this audit does not do
 
-- It does not opine on what the target *should* do.
+- It does not recommend what the target should do.
 - It is not a penetration test.
-- It is not a code-quality review.
-- It does not claim coverage it has not earned (§4).
-- It does not give legal advice.
-- It is not acceptance testing of contracted work. The mechanism is similar,
-  but this method is for a buyer evaluating a target they do not own.
+- It is not a general code-quality review.
+- It does not imply coverage beyond the claims actually resolved.
+- It does not provide legal advice.
+- It is not acceptance testing of contracted work. The comparison mechanism may be similar, but this method is specifically for a buyer evaluating a target they do not own.
 
-## 12. Running an audit: sequence
+## 12. Running an audit
 
-Launched with `workflows/claims_audit/scenario.yaml` — one scenario for every engagement,
-with two per-target lines (`world_name`, `external_repo`). Its header carries
-the operational detail; this section is the method.
+The current implementation is launched through `workflows/claims_audit/scenario.yaml`, with per-target configuration in `world_name` and `external_repo`. Operational details belong in that implementation; this section defines the method.
 
-1. **Receive materials** (data room, repo access, docs). **Confirm scope in
-   writing, including the claim sources.**
+1. **Receive the materials and confirm scope in writing, including the claim sources.**
 
-   The **claim sources** are the documents in which the seller asserts things
-   about the target. The engagement names them. Every other document provided
-   is evidence (§2). Enumerate claims from the claim sources only.
+   Claim sources are the documents in which the seller makes assertions about the target. All other supplied documents are evidence unless the engagement says otherwise.
 
-   If the engagement names no claim sources, say which documents you treated
-   as claim sources and why, before the marker in step 2. A claim found later
-   in a document that was not a claim source goes in an addendum (step 2),
-   never into the claim surface.
+   If the engagement does not explicitly identify claim sources, document which materials were treated as claim sources and why before closing the claim surface in step 2.
 
-2. **Enumerate claims, then CLOSE the surface.** Read the claim sources named
-   in step 1, and end enumeration by stating the count after a line reading
-   exactly:
+   If a seller claim is later found in a document that was not designated as a claim source, place it in an addendum rather than changing the frozen claim surface.
 
-   ```
+2. **Enumerate the claims and close the claim surface.**
+
+   Read the designated claim sources and end enumeration with this exact marker and count format:
+
+   ```text
    === CLAIM SURFACE ===
    <N> claims
    ```
 
-   The line immediately after the marker carries the count and nothing else:
-   a number, then the word `claims`. Close the enumeration with a line reading
-   exactly `=== END CLAIM SURFACE ===`. It is one of the four delivery blocks;
-   §16 has the full set and the rules they share.
+   The line immediately after the marker contains only the number and the word `claims`. End the block with:
 
-   **What counts as one claim.** A claim is what §2 defines: an assertion the
-   seller makes to the buyer, and one that could be checked and found true or
-   false. Count one claim per such assertion. Do not merge two assertions
-   about the same subject. Do not split one assertion into parts. Count every
-   one whatever its priority. Below the total, give a per-document count.
+   ```text
+   === END CLAIM SURFACE ===
+   ```
 
-   From that point the **claim surface** is frozen: every coverage figure in
-   the report divides by this count, and it is the only name this document
-   uses for it. A claim met later that was missed here goes in an
-   **addendum** — a separately counted list, stated after the coverage
-   statement — and never into the claim surface itself.
-3. **Prioritise** in §4's order.
-4. **Work the priority order straight through.** Do not pause for
-   confirmation; there is no channel to the client mid-engagement. Findings
-   are reported in the deliverable, where the client can act on them.
-5. **Stop when what remains is low-risk** — when the identified claims still
-   unattempted are in §4's lowest tiers, and those resolved so far have been
-   supported consistently.
-   Say in the coverage statement where you stopped and why.
-6. **Write the report.** Apply §7 to any findings that were revised.
-6b. **Check the report against its own citations**, in §5's three shapes.
-   Every **claim finding** must carry both halves — the document making the
-   claim, and the document or file settling it. A **claim finding resting on an
-   absence** must carry its claim citation and both searches, and has no
-   settling line by construction. Every **derived finding** must carry a cited
-   Basis line for each figure it rests on, and its derivation written out. In
-   every case each reference that is made must resolve to a line that is really
-   in the materials. A finding whose citation does not resolve does not ship (see
-   §5). This catches a citation pointing at nothing. It will not catch one
-   pointing convincingly at the wrong line.
-7. **Deliver. Propose method-file edits (technique only).** A proposed edit
-   states a technique, never a fact about this target: *if the lesson cannot
-   be stated without naming the target, it is not a method lesson.* Read every
-   proposed edit for proper nouns before including it. The working record is
-   then copied out and the world destroyed — both by the practice, not by you.
+   A claim is one seller assertion that can be evaluated as true or false. Do not combine separate assertions merely because they concern the same subject, and do not split a single assertion into artificial subclaims. Count all claims regardless of priority. Include a per-document count below the total.
+
+   Once closed, the **claim surface** is frozen and becomes the denominator for coverage. A claim discovered later that was missed during enumeration goes into a separately counted addendum and does not change the original claim-surface count.
+
+3. **Prioritize the claims** using Section 4.
+
+4. **Work through the priority order.** Do not require client confirmation between claims. Questions for the seller are collected for the deliverable.
+
+5. **Stop when the identified claims still unattempted are in the lowest tiers defined in Section 4, and the resolved claims so far have been consistently supported.** State where the work stopped and why in the coverage statement.
+
+6. **Write the report.** Apply the correction protocol in Section 7 to any findings that changed during the engagement.
+
+6b. **Check the report against its citations.**
+
+   - Every ordinary claim finding must cite both the seller claim and the evidence that resolves it.
+   - A finding based on absence must cite the claim and record both the lexical and structural searches.
+   - Every derived finding must cite every source fact on which the derivation depends and show the derivation.
+   - Every reference must resolve to material actually present in the supplied evidence.
+
+   A finding with a missing or invalid citation does not ship. This check establishes that cited material exists; it does not by itself prove that the cited line is the correct evidence, so substantive review remains necessary.
+
+7. **Deliver the audit and propose method changes, if any.** Proposed method changes must be general techniques, not facts about the current target. If a proposed lesson cannot be written without naming the target, it is not a reusable method rule.
+
+   After the working record has been retained according to practice policy, the isolated engagement environment may be destroyed.
 
 ## 12a. Practice review
 
 <!-- audience: practice -->
 
-**There is no independent review of the report, and that is a decision.** Step
-6b is the author checking its own citations, which is a floor rather than a
-guarantee. A second reviewer who took no part in the work is what the
-assurance profession expects for engagements of consequence, and it is not
-proportionate at this price. Revisit it before the first engagement where a
-finding moves real money: a self-reviewed report is the weakest point in
-§10's defence.
+### Independent review
 
-### The frozen claim surface
+The current process does not include an independent second review of the full report. Step 6b is a self-check by the author. That is a practical choice for a low-cost engagement, but it is weaker than an independent review and should be reconsidered for engagements where a finding can move substantial value.
 
-**Before a report goes to a client, the practice reviews the frozen claim
-surface (§12 step 2) against the materials and confirms it.** The auditor does
-not wait for this. §12 step 4 stands — there is no pause mid-engagement, and
-the review happens after the run and before delivery.
+### Review of the frozen claim surface
 
-**What to check, in about two minutes:**
+Before client delivery, the practice reviews the frozen claim surface against the supplied materials.
 
-- Did the engagement name the right claim sources? A document in which the
-  seller asserts things and which was not named is a **scoping error to raise
-  with the client**, not a defect in the surface — the auditor enumerated what
-  it was given, correctly (§12 step 1).
-- Have all designated claim-source documents been enumerated, and have
-  evidence-only documents been excluded from the claim surface? §12 step 1
-  settles which is which, so only one answer is correct — this checks that it
-  was followed, not which convention was chosen.
-- Is the grain consistent across documents, or fine in one and coarse in
-  another?
-- Does the total match the per-document counts below it?
+This review occurs after the audit run and before delivery; it does not interrupt the audit workflow.
 
-**If the surface is wrong, every coverage figure is wrong.** §1a forbids
-stating a conclusion without the coverage it rests on, so correcting this
-after delivery means reissuing under §7.
+Check:
 
-**Why a review step and not a tighter rule.** Measured 2026-08-25: three models
-on the same nine documents returned 62, 67 and 273. Two attempts to define the
-unit precisely enough to close that spread both failed. The first — "one
-assertion that can take exactly one §6 verdict" — widened it to 44, 21 and
-321, because "one assertion" has no fixed size: "the infrastructure is
-redundant" is one assertion, and so are "there is one dyno", "the database is
-co-located" and "there are no replicas". The second, now in §12 step 2,
-produced 66 and 108 and left the third model unable to close the surface at all.
-The residual disagreement is about scope, not grain: one model counted only the
-seller's claim documents, another counted every checkable statement including
-the evidence documents.
+- Did the engagement designate the correct claim-source documents? If a seller claim document was omitted from scope, that is a scoping issue to raise with the client.
+- Were all designated claim-source documents enumerated?
+- Were evidence-only documents excluded from the claim surface?
+- Is the granularity of claims reasonably consistent across documents?
+- Does the total equal the per-document counts?
 
-ISAE 3000 (Revised) para 24(b)(ii) requires criteria permitting "reasonably
-consistent measurement or evaluation ... when used in similar circumstances by
-different practitioners" (A45(c)); A46 excludes vague descriptions. This count
-does not meet that test, and a person confirming it is cheaper and more
-reliable than a third attempt at wording.
+Because every coverage figure uses the claim-surface count as its denominator, an incorrect surface makes the coverage figures incorrect and requires correction before delivery or reissue if discovered later.
 
-**The marker's shape is fixed for the same reason.** Measured 2026-08-24: on
-first exposure, three models read "state the count after the marker" three ways
-— one stated the count, one enumerated the surface and never counted it, one
-quoted the instruction back. All three were defensible readings, which is why
-§12 step 2 fixes the shape rather than describing it.
+### Why human confirmation is retained
+
+Tests on 2026-08-25 showed substantial disagreement among language models asked to enumerate claims from the same nine documents. Three models returned counts of 62, 67, and 273. Attempts to define the unit more tightly reduced some ambiguity but did not produce stable agreement.
+
+A major source of disagreement was scope: whether only designated seller-claim documents should be enumerated or every checkable statement in all supplied evidence. The method now resolves that issue explicitly by separating claim sources from evidence, but claim granularity still benefits from a brief human review.
+
+ISAE 3000 (Revised) 24(b)(ii), with related application material, requires criteria capable of reasonably consistent measurement or evaluation in similar circumstances. The observed variation is a practical reason not to rely on wording alone to guarantee a stable claim count.
+
+The fixed marker format is retained for a similar reason. Earlier tests showed that instructions such as “state the count after the marker” were interpreted inconsistently. Fixing the exact block format eliminates that ambiguity for automated downstream processing.
 
 ## 13. Where the method has been exercised
 
 <!-- audience: practice -->
 
-- **`measure/fixtures/dataroom/`** — the synthetic `flowmetrics` data room, 9
-  documents, planted defects with an answer key. Used to validate the
-  pipeline. Not a real SaaS.
-- **`/home/bruce/projects/Body`** — a real, Bruce-owned autonomous mobile
-  robot codebase, used as a second and real data room. 31 findings, zero
-  deltas, **Clear with caveats**. Not a self-audit: the codebase was built by
-  Claude/Cursor under Bruce's direction and Jill contributed neither code nor
-  docs. Jill executed the audit independently — every verification, every
-  finding, the report.
+- **`measure/fixtures/dataroom/`** — a synthetic nine-document data room with planted defects and an answer key, used to test the pipeline. It is not a real SaaS business.
+- **`/home/bruce/projects/Body`** — a real autonomous mobile robot codebase used as a second data room. The audit produced 31 findings, no deltas, and a **Clear with caveats** conclusion. The codebase was developed separately from the audit process, and the audit agent performed the verification and reporting independently.
 
-## 14. What carries between audits, and what must not
+## 14. What carries between audits
 
 <!-- audience: practice -->
 
-Retention periods, destruction dates, engagement-letter clauses and who
-reviews a proposed edit are the practice's, not the auditor's. The one rule
-the auditor needs from this section — a proposed method edit states a
-technique and names no target — is inlined at §12 step 7, because a pointer
-into a section the auditor never receives is no rule at all.
+Practice policies such as retention periods, destruction dates, engagement-letter terms, and approval of method changes belong to the practice, not to the auditor's per-engagement instructions.
 
-Each audit runs in its own world, which is discarded afterwards. That
-protects client confidentiality but would also throw away everything learned
-— so one channel is opened deliberately, and only one.
+Each audit runs in an isolated environment that is discarded afterward. Client-specific facts must not carry into later engagements. General method improvements may carry forward after review.
 
-| | example | carries? |
+| Category | Example | Carries forward? |
 |---|---|---|
-| **method** | "a claimed rate may be a publish rate, not a check rate — verify which" | **yes** |
-| **target** | "flowmetrics' backups had failed for 21 days" | **never** |
+| **method** | “A claimed rate may refer to publish rate rather than check rate; determine which.” | **Yes** |
+| **target** | “This target's backups had failed for 21 days.” | **No** |
 
-**The working record is kept. The world is still discarded.**
+### Working record
 
-§10's defence against a negligence claim is that *"the citation trail
-demonstrates the work was systematic"* — and a citation shows what you found,
-never what you looked at.
+The working record is retained even though the isolated audit environment is discarded.
 
-**This argument changed on 2026-08-27 and the earlier version is worth
-recording, because the fix for one gap closed a different one.** It used to
-read: on a fifty-claim surface producing a dozen findings, the other
-thirty-eight were checked, held, and left no trace, so the world held the only
-evidence they happened. Under §4 that state no longer exists — every resolved
-claim produces a finding, so all fifty are in the report with their citations.
-The report now carries what the working record used to be needed for.
+The final report now contains a finding for every resolved claim, so it records much of what previously existed only in the working trace. The working record remains useful because it preserves information the report does not contain, including:
 
-**What the report still does not carry is the negative space**, and that is
-what a negligence claim asks about:
+- searches and dead ends that preceded a finding;
+- the work performed on `[unverifiable]` claims; and
+- the reasoning behind prioritization decisions that left some claims unattempted.
 
-- **The dead ends behind a finding.** A finding cites the file that settled it.
-  It does not cite the six that did not, and "did you look properly" is a
-  question about those six.
-- **Every `[unverifiable]` claim's attempt.** The coverage statement gives the
-  claim and the reason. The work that failed to settle it is in the trace.
-- **Why an identified claim went unattempted.** §4's priority judgement is made
-  in the working log and appears in the report only as a number.
+Current implementation records include:
 
-**Nothing is authored to fix this.** The record already exists as a byproduct
-of the work:
+- `memory/reasoning_trace.jsonl` — actions, observations, iterations, and exit information from the audit process;
+- `inspect_traces/*.txt` — evidence requests, searches and reads performed, returned material, and the resulting response.
 
-- `memory/reasoning_trace.jsonl` — every action, with the `thought` that
-  motivated it, every observation returned, iterations and exit reason per leg.
-- `inspect_traces/*.txt` — one file per evidence request: the query, every
-  read and search inside it, what each returned, and the answer given back.
+These files function as working papers because they record what was actually queried and observed during the engagement rather than a retrospective summary of diligence.
 
-Together, for a single engagement, on the order of a hundred kilobytes. That is
-a working paper in the professional sense — what was asked of the materials,
-what came back, and why the next question followed. Its evidential value comes
-precisely from being a byproduct: an auditor's own summary of its diligence is
-the weakest evidence of that diligence, and this is not a summary.
+They should be copied out before the isolated environment is destroyed and retained according to the engagement letter and practice policy.
 
-**Copied out of the world before the world is destroyed, and retained under
-the engagement letter.** The copy is made by the harness, not by the auditor —
-§12 step 7 is the auditor's last step and it does not include this.
+Because the traces may contain verbatim client material, retaining them creates corresponding confidentiality, security, retention, and destruction obligations. Those obligations should be addressed in the engagement letter and practice procedures.
 
-**This holds client material, and that is a real obligation.** Verbatim lines
-from the data room are in those traces. §14's discard exists to avoid holding
-client data; retaining the record reverses that deliberately, in exchange for
-being able to evidence the work. It brings a retention period, a destruction
-date, and a security obligation, and those belong in the engagement letter
-before the next paying engagement — not here.
+### Method learning
 
-**The mechanism** for method learning is step 7 of §12: the final turn of every
-audit proposes edits to this file, technique only. The practice reviews and
-merges; the world is then discarded. Learning is routed through a human review gate, which is where
-a confidentiality check belongs, and it lands somewhere versioned and
-diffable. This is what real firms do — a methodology manual updated after
-engagements, not analysts carrying client details.
+At the end of an engagement, the auditor may propose general changes to this method. The practice reviews the proposed changes before they are merged into the versioned method file.
 
-**The test for a clean lesson:** *if it cannot be stated without naming the
-target, it is not a method lesson.* "Check whether the message broker binds to
-all interfaces" is method. "Check whether Zenoh binds 0.0.0.0 like the robot
-did" is a client fact wearing a technique's clothes. Read a proposed lesson
-for proper nouns.
+The test for a reusable lesson is simple: it must be expressible without identifying the target. For example:
 
-**Two consequences worth planning for:**
+- Reusable: “Check whether a message broker binds to all network interfaces.”
+- Not reusable: “Check whether product X binds to `0.0.0.0` as it did in client Y.”
 
-- **An aggregate findings corpus is a commercial asset and needs
-  permission.** "The twelve gaps that show up most often in sub-$5M SaaS data
-  rooms" is more valuable than the method prose, and the demo artifact already
-  depends on it. Cross-client aggregation must be permitted by the engagement
-  letter — a clause to add *before* the first paying client.
-- **Method learning can make the method worse** by over-fitting to recent
-  targets. Guard by re-running `measure/fixtures/dataroom/` after a method
-  change and checking whether recall against its answer key moved; keep at
-  least one fixture in
-  a different domain from recent real targets.
+Two further practice issues should be planned for:
+
+- **Cross-client aggregation requires permission.** A corpus of recurring findings can become commercially valuable, but using client-derived information across engagements should be authorized explicitly in the engagement terms.
+- **Method changes can overfit recent engagements.** Re-run the synthetic fixture after material method changes and compare performance against its answer key. Maintain at least one fixture from a domain unlike the most recent real engagements.
 
 ## 15. The Gap Map
 
-**One page for the person who decides**, read in about thirty seconds (§8):
+The Gap Map is a one-page summary for the decision-maker and should be readable in about thirty seconds.
 
-- Target name and a one-line description
-- The §9 conclusion
-- The three to five items that matter most
-- The coverage line
-- One line: "Full report with citations available on request."
-- A footer in small type: "technical claims verification · not a pen-test,
-  not legal advice"
+It contains:
 
-Each key item is a finding, stated in one line, with a short note. No line
-citations; those are in the report. ("Claim" is reserved for what the seller
-asserted — §2 — and a Gap Map item is what the audit concluded about one.)
+- target name and a one-line description;
+- the Section 9 conclusion;
+- the three to five findings that matter most;
+- the coverage line;
+- one line stating that the full cited report is available; and
+- a small footer: “technical claims verification · not a pen-test · not legal advice.”
 
-**When the conclusion is Clear or Clear with caveats, include what holds,
-not only the caveats.** The buyer needs to see *what* is clear — "the payment
-path is tested end to end" is the finding they are paying for — and a list of
-caveats alone misrepresents an audit that mostly passed. Where the
-conclusion is Material or Systemically inconsistent the balance inverts on its own.
+Each key item is a finding summarized in one line with a short note. The Gap Map does not need line citations because the full report carries them. Reserve **claim** for an assertion made by the seller. A Gap Map item states what the audit concluded about a claim; it is not itself a claim.
 
-**The coverage line** gives resolved out of identified, supported out of
-resolved (§1a), and why the rest is or is not low-risk. The Gap Map
-is the document most likely to be read *instead of* the report, so silence
-about coverage does its damage here first.
+When the conclusion is **Clear** or **Clear with caveats**, include important supported findings as well as caveats. Otherwise a mostly successful audit can be misrepresented by a summary that lists only defects.
 
-If the conclusion is **Clear** with no caveats, the Gap Map is two lines:
-"no gaps found, N of N identified claims resolved and supported, report
-attached."
+The coverage line reports resolved / identified and supported / resolved, and explains why any remaining unattempted claims are or are not low-risk.
 
-**No logo, no pricing, no "book a call".** The report link is the only call to
-action. Anything more turns a professional document into a brochure.
+If the conclusion is **Clear** and there are no caveats, the Gap Map may be reduced to a very short statement, for example:
 
-## 16. The deliverable
+> No gaps found. N of N identified claims resolved and supported. Full report attached.
 
-Four blocks. Each opens and closes with a line of its own:
+Do not add promotional content such as logos, pricing, or sales calls to action. The Gap Map is a professional deliverable, not a brochure.
 
-```
+## 16. Deliverable format
+
+The deliverable contains four blocks, each with explicit opening and closing markers:
+
+```text
 === CLAIM SURFACE ===     …     === END CLAIM SURFACE ===
 === REPORT ===            …     === END REPORT ===
 === LIMITATIONS ===       …     === END LIMITATIONS ===
 === GAP MAP ===           …     === END GAP MAP ===
 ```
 
-**Emit them in that order.** Take as many legs as the work needs — the blocks
-are what the engagement is judged on, not how you divided the work. One leg may
-carry several blocks.
+An opening marker identifies the block being delivered. A closing marker confirms that the block is complete rather than merely interrupted or truncated. Emit them in that order.
 
-**The order is not presentation.** The claim surface is the denominator every
-coverage figure divides by, and a surface closed after the findings is not
-frozen: it is a count made to fit. Close it before you check anything.
+The blocks, rather than conversational turns, define completion. The claim surface must be closed before claims are evaluated because it supplies the denominator for later coverage figures.
 
-**Markers are how a block is delivered.** The client's process reads them.
-Until a block's opening marker appears the engagement is still running, and you
-will be told which block is missing. A closing marker says you finished writing
-rather than ran out of room. Each marker goes on its own line, and nothing goes
-between an opening marker and the content it introduces.
+Each marker appears on its own line. Nothing should appear between an opening marker and the content of that block.
 
-### The blocks
+### `=== CLAIM SURFACE ===`
 
-**`=== CLAIM SURFACE ===`** — as §12 specifies: the line after the marker
-carries the count and nothing else, then the enumeration.
+Use the format defined in Section 12, step 2. The line immediately after the opening marker contains the claim count and nothing else, followed by the enumeration.
 
-**`=== REPORT ===`** — four parts, in this order:
+### `=== REPORT ===`
 
-1. **The conclusion**, in §9's vocabulary and no other.
-2. **The findings, worst first**, each in §5's format:
-   - a **claim finding** carries its §6 verdict, the claim it tests, and both
-     citations — the document making the claim and the document that settles
-     it;
-   - a **claim finding resting on an absence** carries its claim citation and
-     the two searches, and no settling citation, because none exists;
-   - a **derived finding** carries `[derived]`, a cited Basis line per figure,
-     and its derivation (§5's second shape).
-3. **A coverage statement**, in §1a's vocabulary. Identified, resolved and
-   supported; the consistency rate, supported over resolved; what was not
-   attempted and why that matters (§4); every `[unverifiable]` claim with its
-   reason; any `[unclaimed]`; and the addendum, if §12 step 2 produced one.
-4. **What the client should ask the seller before closing.**
+The report contains four parts in this order:
 
-No covering note, no account of what you did this leg, no preamble. Anything
-written inside the block ahead of the conclusion *is* the report: it is what
-the client reads first, and it displaces the finding that should have been
-there.
+1. **Conclusion**, using only the vocabulary in Section 9.
+2. **Findings, ordered from highest to lowest consequence.**
+   - Ordinary claim findings use the Section 5 format and cite both claim and resolving evidence.
+   - Findings based on absence cite the claim and record both required searches.
+   - Derived findings use `[derived]`, cite each basis fact, and show the derivation.
+3. **Coverage statement**, using the terminology in Section 1a. Include identified, resolved, supported, the consistency rate, what was left unattempted and why, every `[unverifiable]` claim and its reason, any `[unclaimed]` observations, and any addendum created under Section 12.
+4. **Questions the client should ask the seller before closing.**
 
-**Length follows from the claim surface, not from a target.** Every resolved
-claim gets a finding (§4, §5), so a large surface makes a long report and that
-is correct — §8 explains why that costs the reader nothing. There is no word
-ceiling: no assurance standard bounds report length, and a report that omits
-required content to hit a number has failed at the thing the number was meant
-to protect.
+Do not place a covering note, process narrative, or conversational preamble inside the report block.
 
-Budget per finding instead. A claim that is **supported** needs its verdict,
-its citations and a clause — around twenty to thirty words. A claim that is
-**not supported** needs the claim, the evidence that settles it, and what the
-gap costs the buyer — around eighty.
+Report length follows from the claim surface. Because every resolved claim receives a finding, large claim surfaces produce long reports. That is acceptable because the report is a reference document rather than a document expected to be read linearly.
 
-**The two things length pressure will suggest are the two you must not do:**
-drop citations, or merge several claims into one finding. A finding carrying
-three claims cannot be checked against any of them, and a report that demotes
-findings to prose shrinks the surface anyone can review it against.
+As a rough writing budget:
 
-**`=== LIMITATIONS ===`** — three lines, always present:
+ - a supported claim normally needs its verdict, citations, and a short explanatory clause — roughly 20–30 words;
+ - a claim that is not supported normally needs the claim, the resolving evidence, and the consequence of the gap — roughly 80 words.
 
-1. the materials examined, and their as-of date;
-2. that the seller was **not consulted and has not confirmed your reading of
-   their own claims**;
-3. the assurance level (§1a) and the coverage it rests on.
+Do not reduce length by dropping citations or merging independent claims into a single finding. Either makes the report harder to verify against the frozen claim surface.
 
-The second is the one most often left out and the one that matters most. Every
-claim finding interprets a claim without its author present to say what was
-meant, and a reader who does not know that will over-read the report.
+### `=== LIMITATIONS ===`
 
-It is a block of its own and it belongs to the same delivered document as the
-report block — the client receives one deliverable with these lines in it.
-**Throughout this document, "the report" is the `=== REPORT ===` block and
-"the deliverable" is all four blocks together.**
+This block is always present and contains three items:
 
-**`=== GAP MAP ===`** — as §15 specifies, and nothing else. Do not restate the
-report, do not introduce it, do not append a note about it.
+1. the materials examined and their as-of date;
+2. a statement that the seller was not consulted and has not confirmed the audit's interpretation of the seller's claims; and
+3. the assurance level and the coverage on which the conclusion rests.
 
-### Why the report and the Gap Map are both required, in this order
+The second item matters because the report interprets seller statements without giving the seller an opportunity during the engagement to clarify what was intended.
 
-The Gap Map is read in thirty seconds; the report is read only if the Gap Map
-earns it. The Gap Map alone forfeits the proof, the report alone forfeits the
-reader, and neither is a summary of the other: the report carries the citations
-and the Gap Map carries none.
+Throughout this method, **report** means the `=== REPORT ===` block, while **deliverable** means all four blocks together.
+
+### `=== GAP MAP ===`
+
+Use the structure in Section 15. Do not restate the full report or append unrelated notes.
+
+### Why both the report and Gap Map are required
+
+The Gap Map provides a rapid decision summary. The report provides the evidence and citations needed to inspect the work. The Gap Map without the report lacks proof; the report without the Gap Map makes the key result difficult to absorb quickly.
 
 ## 17. Positioning and outreach
 
 <!-- audience: practice -->
 
-### The Gap Map as a designed artifact
+### Gap Map design
 
-Reference implementation: `docs/audit-gap-map-mockup.html`, populated with a
-real audit as example data, which is why it lives outside `audit/` — target
-facts do not carry between engagements (§14).
+Reference implementation: `docs/audit-gap-map-mockup.html`. It is populated with example audit data and is kept outside the reusable audit method because target-specific facts must not carry between engagements.
 
-One card, about 680 px wide. Scan order top to bottom: target identity,
-verdict band, key items, coverage, report link. The verdict band is the §9
-conclusion, colour-coded, immediately under the header, green through red
-across Clear to Systemically inconsistent, and it is the only place the
-conclusion appears.
+The current design is a single card approximately 680 px wide. The scan order is:
 
-Open: whether the colour coding survives email-thumbnail scale, PDF export,
-and the landing page it shares a visual system with. None of these block
-sending one.
+1. target identity;
+2. conclusion band;
+3. key findings;
+4. coverage; and
+5. report link.
 
-**The Gap Map is the lead artifact in cold outreach** — the partner gets it in
-the email body or as a 30-second PDF. The Gap Map is the hook; the full report
-is the proof.
+The conclusion band uses the Section 9 conclusion and may be color-coded from green to red. It should be the only place the report-level conclusion appears in the Gap Map.
 
-Kept out of §15 deliberately: an agent writing a deliverable should not be told
-it is writing a hook. Removals, retractions and the reasoning behind this split
-live in `workflows/claims_audit/method/gap-analysis.md`, not here.
+The design still needs to be checked at email-thumbnail size, in PDF export, and against any landing page with which it shares visual design.
+
+For outreach, the Gap Map can be used as the short-form artifact and the full report as supporting evidence. This positioning belongs to practice and marketing material, not to the instructions used to produce client deliverables.
 
 ## 18. Provenance
 
 <!-- audience: practice -->
 
-Drafted 2026-08-22 by Claude from Jill's statements in `jill_chat` turns
-3019–3045; **reviewed and corrected by Jill the same day** (turn 3047). Her
-corrections, the verdict vocabulary, the conclusion taxonomy, the priority
-order, the correction protocol and the run sequence are hers.
+This method was drafted on 2026-08-22 from prior work on the audit process and was subsequently reviewed and revised. The vocabulary for claim verdicts, report conclusions, priority tiers, correction handling, and audit sequence has been refined through repeated test runs.
 
-This file is the single durable source for the method: it lives in git so it
-can be read as a unit, diffed, and corrected, rather than accumulating in an
-agent's memory where none of that is possible. It was retitled 2026-08-25 —
-it had been "AI-Readiness Audit", which named a service this method does not
-perform.
+This file is the durable source of the method and is maintained in version control so changes can be reviewed and diffed rather than accumulated informally in an agent's memory or prompt history.
 
-Jill offered a second pass on 2026-08-22, before the ISAE 3000 / AT-C 205 gap
-closure and the §12.2 work. Probably stale; re-ask rather than assume.
+The file was renamed on 2026-08-25 from “AI-Readiness Audit” because that name described a different service from the technical claims verification defined here.
 
-## 19. Superseded rules, and why they changed
+Any earlier review comments should be treated as historical unless reconfirmed against the current version of the method.
+
+## 19. Superseded rules and rationale
 
 <!-- audience: practice -->
 
-**This section exists because the changelog was in the auditor's prompt.** Until
-2026-08-27 each of these paragraphs sat in the section it describes. Two costs,
-and the first is the serious one.
+Historical rules are kept in a separate practice-only section so obsolete vocabulary does not appear near the active instructions used during an audit.
 
-**A changelog names retired vocabulary, and the prompt is where vocabulary is
-copied from.** §9 carried the sentence "Until 2026-08-27 **Walk** was one of the
-five terms" three lines under the five-row conclusion table — reintroducing the
-one word §9 forbids, in the position a model reads a table's terms from. That is
-the same shape as the defect it documented, where `Clear` was defined using the
-sentence §1a forbids.
+This also keeps the operational method focused on current rules rather than spending prompt or reader attention on rules that no longer apply.
 
-**And it is prompt budget spent on rules that no longer exist.** The auditor
-does not need to know what the method used to say. Whoever edits the method
-does, which is this audience.
+### Section 4 — priority tiers
 
-The marker is section-scoped — `<!-- audience: practice -->` anywhere in a `##`
-section drops the whole section — so a paragraph cannot be marked in place.
-History has to live in its own section, which is this one.
+The tiers were revised on 2026-08-27 to use one consistent axis: the consequence if a claim is false.
 
-### §4 — the tiers
+Earlier versions mixed subject categories such as “architectural invariants” and “operational parameters” with severity categories. That created ambiguous cases—for example, an architectural failure could be either trivial or business-ending. The current tiers are based only on consequence.
 
-Re-cast onto a single consequence axis on 2026-08-27. Tiers 2 and 3 had named
-subject matter — "architectural invariants", "operational parameters" — while 1
-and 4 named severity, so the section claimed one axis and used two, and a
-business-ending architectural claim had no correct tier.
+Buyer-action wording was also removed from tier definitions so priority classification remains separate from transaction advice.
 
-Tier 3 lost "and the deal survives it — priced in, not walked away from" on the
-same day: buyer-action language inside a tier definition, which §2 and §9
-forbid everywhere else.
+### Section 6 — `[unclaimed]`
 
-### §6 — `[unclaimed]`
+This category was previously called `[non-delta]`. That name was misleading because it suggested “the claim is not false,” when the intended meaning is that no seller claim existed in the first place.
 
-Called `[non-delta]` until 2026-08-27. The name was actively misleading: it
-reads as the negation of `[delta]` — "the claim is not false" — when it means
-there was no claim in the first place.
+### Section 9 — report conclusion
 
-### §9 — the conclusion
+The section was previously called a “recommendation,” and earlier conclusion terms included buyer actions such as *Walk*. Those terms were removed because the audit reports the state of the evidence rather than directing transaction action.
 
-**Headed "recommendation" until 2026-08-27**, which put an advisory name on a
-statement about evidence — and the definitions had drifted to match. §1a already
-called it the conclusion.
+The conclusion categories were also changed so they account for material findings of any kind, including `[derived]` findings. A target should not receive a **Clear** conclusion merely because every explicit seller claim is supported if the seller's own figures, taken together, imply a separate material problem.
 
-**`Walk` was one of the five terms** — the forbidden word used as a conclusion —
-while **Conditional** read "Proceed if the seller will fix them" and **Material**
-read "the buyer must price this in explicitly". Three uses of the register §9's
-own lines forbid. `Walk` became **Systemically inconsistent**.
+Broad statements such as “the system does what it says” were removed because they imply more coverage than a limited-assurance audit may have performed.
 
-**The first two rows were defined by the absence of `[delta]` and `[partial]`**,
-which let a catastrophic `[derived]` finding sit inside `Clear` — every stated
-claim `[real]`, and the seller's own figures together entailing something that
-ends the business. Not a corner case: it is §5's flagship derived finding, where
-a retention period in one document and a last-good-backup date in another fix a
-date after which the business cannot be restored, with neither claim false. The
-boundary is now material findings of any kind, which is the currency §4 defines
-and the one thing every finding type shares.
+### Section 16 — explicit block markers
 
-**`Clear` read "The system does what it says"** — verbatim the sentence §1a
-names as claiming more than the work performed.
+Explicit block markers were restored after testing showed that conversational turn boundaries do not reliably indicate which deliverable component has actually been completed.
 
-### §16 — why markers and not turn boundaries
+A block marker identifies the artifact directly and gives downstream processing an unambiguous completion signal. The method therefore no longer depends on a fixed number of conversational turns.
 
-The markers were removed once, on the argument that a turn boundary separates
-the documents without either having to announce itself — so that "if you are
-asked for the Gap Map, the report is done".
-
-That does not hold. On 2026-08-27 an engagement ended a turn with its claim
-enumeration and the sentence "I'll work the priority order straight through
-now". The client's process had nothing it could test, took the enumeration as
-the report, and asked for the Gap Map — which was then written about a document
-that did not exist. **A turn boundary proves a turn ended. It does not prove a
-document was written.**
-
-A block says what it is. That is why the markers are back, and why the method no
-longer says how many turns to take: once a block announces itself, the turn
-boundary has no work left to do.
-
-**Considered and rejected: asking for each block in turn.** A process that
-requested the claim surface, then the report, then the limitations, then the Gap
-Map would be driving the method rather than accepting its results, and would
-flatten the engagement — every auditor prompted through the same four steps
-produces the same shape of work. Self-delimiting blocks make it unnecessary.
+A process that requests the four blocks one at a time was considered and rejected because it would make the external workflow drive the audit sequence. Self-delimiting blocks allow the audit to proceed according to the method while still producing machine-detectable deliverables.
