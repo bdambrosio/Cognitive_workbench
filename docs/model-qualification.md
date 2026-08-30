@@ -37,6 +37,27 @@ real run. Everything below is that third gate, expanded, and performed by hand.
 **Three valid runs of one model on the dataroom fixture, on one instrument
 revision.** Where more than one model is under test, interleave by round.
 
+**ONE RUN AT A TIME PER ROUTE. Never run two jobs concurrently against the same
+model id.** A hosted model's rate limit is attached to the model, not to the
+endpoint — OpenRouter's 429 for GLM-5.3-Flash reads *"z-ai/glm-5.3-flash is
+temporarily rate-limited"*, and `measure/models/or_glm53flash.yaml` pins
+`modal/fp8` precisely because it was the only route answering 3 of 3 while the
+rest returned 429. Two runs of one model therefore compete for one budget, and
+a run served under self-inflicted rate limiting is not a sample of the model.
+
+Cost of ignoring this, 2026-08-29: three concurrent ChatterMate runs of
+GLM-5.3-Flash took 3, 2 and 1 rate-limit responses respectively, with retries in
+all three. The run that took the most also produced the outlier result, and
+whether that is cause or coincidence can no longer be established — which is
+the point. The set was discarded as a measurement.
+
+Concurrency across *different* routes is fine and worth having: a local-GPU
+review alongside a hosted audit shares nothing. What must not be shared is a
+model id. Note also that "hosted model" does not mean "no local resource" —
+every ChatLoop loads a CUDA embedder for its semantic index, so concurrent runs
+contend for GPU memory even when the LLM is remote, and three of them exhausted
+a card that vLLM had 91 GB of.
+
 Three is the floor, not a target. At n=1 the m1 campaign looked saturated —
 three models, eight of eight criteria each — and at n=3 it separated them. Two
 conclusions in this project have been retracted for treating a single run as a
