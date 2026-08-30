@@ -29,8 +29,15 @@
 # gateway, same field, different provider: measure, do not infer.
 #
 # TEMPERATURE is unchanged at 1.0 via the `glm-5.3-flash` key. Only the
-# reasoning effort differs from the low file, so a difference between reviews
-# is attributable to effort and nothing else.
+# reasoning effort differs from the default file, so a difference between
+# reviews is attributable to effort and nothing else.
+#
+# THE DEFAULT IS NOW `medium`, NOT `low` (2026-08-30). The table above was
+# measured when it was low; the rungs it reports are unchanged, but the
+# baseline this file is a step away from has moved. On the audit side high
+# was rejected as a default the same day — 4.7x the wall clock and twelve
+# finish_reason=length events against one. This file remains for the REVIEW
+# role, where high is the only setting measured to move the reviewer.
 llm_config:
   server: local
   model: "z-ai/glm-5.3-flash"

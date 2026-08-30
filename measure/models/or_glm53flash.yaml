@@ -52,12 +52,27 @@
 # id served three different artifacts on 2026-08-26 — so record the resolved
 # name from a run's first response rather than assuming this one.
 #
-# REASONING IS EFFECTIVELY SILENT AT `low`. Four of the five successful probes
-# returned zero characters on the reasoning channel and the fifth returned 21.
-# `low` is set to match grok, luna and both DeepInfra models, so the campaign
-# varies the backend and not the effort. Whether the dial does anything on this
-# model at higher settings is UNTESTED — on Gemma the level is inert and on
-# grok it is live, so it needs checking rather than assuming.
+# MEDIUM IS THE DEFAULT FOR THIS ROUTE, chosen 2026-08-30 by Bruce after the
+# three-arm ChatterMate comparison. It was `low` until then, to match grok,
+# luna and both DeepInfra models so a campaign varied the backend and not the
+# effort — that is no longer the reason this file exists.
+#
+#   effort   claims  coverage  legs  wall     finish_length  cost
+#   low          42    42/42      6  20 min       1          $0.22
+#   medium       48    47/48      5  36 min       1          $0.38
+#   high         79    72/79      8  94 min      12          $0.65
+#
+# The dial is continuous in work and discontinuous in truncation: medium sits
+# between low and high on claims, wall clock and files read, while its
+# finish_length count matches low and high's does not. `high` costs 4.7x the
+# wall clock, takes twelve truncations, and reached the same conclusion.
+#
+# WHAT THIS COMPARISON DOES NOT ESTABLISH. n=1 per arm. The `low` arm's own
+# enumeration spread on this engagement is 31-58 claims, so 42 vs 48 is inside
+# known noise and is not evidence of an effort effect. Only high's truncation
+# count sits outside the low arm's range (1,1,1,3,3,3,4). Medium is a default,
+# not a measured optimum, and three runs per arm would be needed to make it
+# one.
 #
 # No expects_served_model: a cloud route has no /v1/models to interrogate, so
 # `model` is load-bearing — get it wrong and the row is mislabelled with
@@ -78,7 +93,7 @@ llm_config:
   # NAME of the env var holding the bearer token, not the token.
   api_key: OPENROUTER_API_KEY
   is_reasoning_model: true
-  reasoning_effort: low
+  reasoning_effort: medium
   extra_body:
     provider:
       order: ["modal/fp8"]
