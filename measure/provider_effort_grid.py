@@ -100,7 +100,68 @@ def summarise(rows: list[dict], tags: list[str]) -> None:
     print(f"Rows appended to {OUT}")
 
 
+def accounting(model: str, tag: str) -> None:
+    """Does `completion_tokens` bill the reasoning channel, or only the answer?
+
+    IT DECIDES WHETHER THE CAP CAN TRUNCATE A REPORT. `backend.py`'s
+    `_clamp_max_tokens` skips its window arithmetic on cloud routes because
+    "cloud providers meter reasoning separately and max_tokens caps visible
+    output only". That sentence is an assumption, and on 2026-08-30 a
+    ChatterMate run at `high` returned twelve finish_reason=length events
+    against one at `low` on the same 16,384 budget — which is what it would
+    look like if reasoning were billed against the cap after all.
+
+    Two independent readings, because either alone can be explained away:
+
+      ARITHMETIC — at a generous budget, compare `completion_tokens` against
+      the reasoning and content lengths. If ctok tracks (reasoning+content)/k
+      for a plausible k, the reasoning is billed. If it tracks content alone,
+      it is not.
+
+      SQUEEZE — ask the same question under a budget far smaller than the
+      reasoning alone requires. If reasoning is billed, the budget is spent
+      thinking and the answer comes back EMPTY with finish=length. If it is
+      not billed, a short answer arrives intact however long the reasoning ran.
+
+    The squeeze is the one that matters operationally: an empty answer is the
+    failure mode a truncated report leg would actually take.
+    """
+    print(f"\n=== reasoning accounting: {model} @ {tag} ===")
+    print("\nARITHMETIC (budget 16384, effort high — the audit's own setting)")
+    print(f"{'ctok':>7} {'reason ch':>10} {'answer ch':>10} "
+          f"{'(r+a)/ctok':>11} {'a/ctok':>8}  finish")
+    for _ in range(3):
+        r = probe(model, tag, effort="high", max_tokens=16384)
+        if r.get("status") != "ok":
+            print(f"  {r['status']}: {str(r.get('err'))[:80]}")
+            continue
+        ct, rc, ac = r["completion_tok"], r["reasoning_chars"], r["content_chars"]
+        both = (rc + ac) / ct if ct else 0
+        ans = ac / ct if ct else 0
+        print(f"{ct:>7} {rc:>10} {ac:>10} {both:>11.2f} {ans:>8.2f}  {r['finish']}")
+    print("  A plausible chars-per-token (~3-5) in the (r+a)/ctok column means "
+          "the reasoning is billed;\n  a plausible value in the a/ctok column "
+          "instead means it is not.")
+
+    print("\nSQUEEZE (budget 200, effort high — far under the reasoning alone)")
+    print(f"{'ctok':>7} {'reason ch':>10} {'answer ch':>10}  finish")
+    for _ in range(3):
+        r = probe(model, tag, effort="high", max_tokens=200)
+        if r.get("status") != "ok":
+            print(f"  {r['status']}: {str(r.get('err'))[:80]}")
+            continue
+        print(f"{r['completion_tok']:>7} {r['reasoning_chars']:>10} "
+              f"{r['content_chars']:>10}  {r['finish']}")
+    print("  An EMPTY answer with finish=length means the cap consumed the "
+          "reasoning.\n  A complete short answer means the cap bounds the "
+          "visible output only.")
+
+
 def main() -> int:
+    if len(sys.argv) > 1 and sys.argv[1] == "--accounting":
+        accounting(sys.argv[2] if len(sys.argv) > 2 else "z-ai/glm-5.3-flash",
+                   sys.argv[3] if len(sys.argv) > 3 else "modal/fp8")
+        return 0
     model = sys.argv[1] if len(sys.argv) > 1 else "z-ai/glm-5.3-flash"
     # A FLAG IS NOT A MODEL ID. `--help` was accepted as one and fired all 24
     # calls before anything checked it. They 400'd, so that cost nothing — but

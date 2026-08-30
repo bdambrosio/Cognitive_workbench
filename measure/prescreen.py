@@ -161,6 +161,12 @@ def probe(model: str, tag: str, effort: str | None = "low",
             "prompt_tok": usage.get("prompt_tokens"),
             "completion_tok": ctok,
             "reasoning_chars": len(reasoning),
+            # Needed to settle whether `completion_tokens` bills the reasoning
+            # channel or only the visible answer: with both lengths and the
+            # token count, the chars-per-token arithmetic decides it.
+            # backend.py's clamp skips this arithmetic on cloud routes on the
+            # assumption that it does NOT — an assumption never measured.
+            "content_chars": len(content),
             "tok_s": round(ctok / dt, 1) if ctok and dt else None,
             "schema_valid": valid, "tool": tool,
             "provider": d.get("provider"),
