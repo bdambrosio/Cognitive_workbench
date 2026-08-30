@@ -69,12 +69,33 @@ def test_every_inventory_entry_survives_assembly(tmp_path):
 
 def test_the_parts_a_client_reads_all_survive(tmp_path):
     out = assemble(_run(tmp_path))
-    for probe in ("Conclusion: Material", "Coverage: 6 of 7",
+    for probe in ("Coverage: 6 of 7",
                   "Questions the client should ask",
                   "Materials examined: the repository as bound to this session",
                   "Is the CLI planned or deprecated?",
                   "Evidence: chat_agent.py:898 — single session_id."):
         assert probe in out, probe
+
+
+def test_the_conclusion_is_stated_once_and_keeps_its_verdict(tmp_path):
+    """The label moves into the heading rather than being printed twice. The
+    VERDICT must survive that move, and the sentence after it must be intact."""
+    out = assemble(_run(tmp_path))
+    assert "## Conclusion — Material" in out
+    assert out.count("Material") >= 1
+    assert "Three claims are contradicted." in out
+    assert "**Conclusion: Material.**" not in out      # not said twice
+
+
+def test_a_conclusion_that_does_not_match_the_pattern_is_left_alone(tmp_path):
+    """Unrecognised shapes keep their text verbatim under a plain heading."""
+    (tmp_path / "report.md").write_text(
+        REPORT.replace("**Conclusion: Material.** Three claims are contradicted.",
+                       "The audit concludes that three claims are contradicted."))
+    (tmp_path / "gap_map.md").write_text("x")
+    out = assemble(tmp_path)
+    assert "## Conclusion\n" in out
+    assert "The audit concludes that three claims are contradicted." in out
 
 
 def test_delivery_markers_never_reach_the_client(tmp_path):
