@@ -333,19 +333,60 @@ class _ChatBackend:
     _TRANSIENT_MAX_RETRIES = 4
     _TRANSIENT_BASE_SLEEP_S = 2.0
 
+    # A CONNECTION THAT NEVER ANSWERED IS A TRANSIENT UPSTREAM FAILURE TOO, and
+    # until 2026-08-30 it was the one class this helper did not cover. A read
+    # timeout raises before `resp` is assigned, so the status loop below never
+    # saw it and the exception ran all the way to react.py's degraded-reply
+    # handler. One OpenRouter read timeout on leg 3 voided an 18-minute
+    # ChatterMate run that had already closed a 47-claim surface.
+    #
+    # SMALLER BUDGET THAN THE STATUS RETRIES, because these are not free. A
+    # status arrives at once and costs only the backoff; every transport
+    # attempt can burn the full _HTTP_TIMEOUT_S before it fails. At four the
+    # worst case passes twenty minutes inside a single leg.
+    _TRANSPORT_MAX_RETRIES = 2
+
     def _post_transient_retrying(self, url: str, headers: Dict[str, str],
                                  body: Dict[str, Any]):
-        """POST, retrying transient upstream errors with backoff.
+        """POST, retrying transient upstream failures with backoff.
 
-        Honours the gateway's own `retry_after_seconds` when it sends one,
-        since it knows more than a fixed schedule does; otherwise doubles
-        from a 2s base. Returns the final response either way — the caller
-        still decides what a persistent failure means.
+        Two kinds, with separate budgets: a transient STATUS, where the gateway
+        answered unhappily, and a transport failure, where no answer arrived at
+        all. Honours the gateway's own `retry_after_seconds` when it sends one,
+        since it knows more than a fixed schedule does; otherwise doubles from
+        a 2s base.
+
+        Returns the final response for a status failure — the caller still
+        decides what a persistent one means — and re-raises the last transport
+        exception once its budget is spent, which is the path react.py turns
+        into a degraded reply.
         """
         import time as _time
+
+        # ONE BUDGET FOR THE WHOLE CALL, not one per status attempt: the two
+        # loops would otherwise multiply into eight possible timeouts.
+        transport_left = self._TRANSPORT_MAX_RETRIES
+
+        def _post():
+            nonlocal transport_left
+            while True:
+                try:
+                    return requests.post(url, headers=headers, json=body,
+                                         timeout=_HTTP_TIMEOUT_S)
+                except (requests.exceptions.Timeout,
+                        requests.exceptions.ConnectionError) as e:
+                    if transport_left <= 0:
+                        raise
+                    transport_left -= 1
+                    logger.warning(
+                        "_ChatBackend: %s %s; transport retry %d/%d",
+                        self.model or self.base_url, type(e).__name__,
+                        self._TRANSPORT_MAX_RETRIES - transport_left,
+                        self._TRANSPORT_MAX_RETRIES)
+                    _time.sleep(self._TRANSIENT_BASE_SLEEP_S)
+
         delay = self._TRANSIENT_BASE_SLEEP_S
-        resp = requests.post(url, headers=headers, json=body,
-                             timeout=_HTTP_TIMEOUT_S)
+        resp = _post()
         for attempt in range(self._TRANSIENT_MAX_RETRIES):
             if resp.ok or resp.status_code not in self._TRANSIENT_STATUS:
                 return resp
@@ -363,8 +404,7 @@ class _ChatBackend:
                 attempt + 1, self._TRANSIENT_MAX_RETRIES, wait)
             _time.sleep(wait)
             delay *= 2
-            resp = requests.post(url, headers=headers, json=body,
-                                 timeout=_HTTP_TIMEOUT_S)
+            resp = _post()
         return resp
 
     def _post_adapting(self, url: str, headers: Dict[str, str],
