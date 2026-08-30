@@ -396,9 +396,19 @@ class PromptsMixin:
                     # previous continuation, so there is one live remainder
                     # rather than a stack of replaced ones.
                     body = instr if not fires else instr[:120]
-                    ac_lines.append(
-                        f"    fires every ~{rhythm}h when activation crosses "
-                        f"{_AGENT_CONCERN_FIRE_THRESHOLD:.2f}: {body}")
+                    # The schedule is real only when firing is on. Stating it
+                    # unconditionally contradicted the autonomy line two lines
+                    # below, in the same block: "fires every ~1h" above
+                    # "nothing fires by itself".
+                    if fires:
+                        ac_lines.append(
+                            f"    fires every ~{rhythm}h when activation "
+                            f"crosses {_AGENT_CONCERN_FIRE_THRESHOLD:.2f}: "
+                            f"{body}")
+                    else:
+                        ac_lines.append(
+                            f"    held instruction, nothing will run it this "
+                            f"session: {body}")
                 elif not instr:
                     ac_lines.append(
                         "    standing concern, no instruction (won't fire)")
@@ -414,14 +424,20 @@ class PromptsMixin:
             else:
                 autonomy_line = (
                     "Autonomous firing is OFF this session (the launcher's "
-                    "--autonomy flag is not set). Activation still grows and "
-                    "is shown here, but nothing fires by itself — these shape "
-                    "what I attend to on turns I am given, and I say so "
-                    "plainly if asked whether I will act on one unprompted.")
+                    "--autonomy flag is not set). Nothing fires by itself, and "
+                    "activation no longer grows with elapsed time either — "
+                    "only new evidence in a turn moves it. These shape what I "
+                    "attend to on turns I am given, and I say so plainly if "
+                    "asked whether I will act on one unprompted.")
+            # The growth clause holds only when firing is on. With autonomy
+            # off `autonomy_line` states what actually moves activation, and
+            # asserting both put a contradiction in adjacent sentences.
+            mechanism = ("Pressure-driven: activation grows over wall-clock "
+                         "time at each concern's rhythm; firing decrements "
+                         "it. " if fires else "")
             parts.append(
                 f"## My active concerns (agent_concerns, ranked by activation)\n"
-                "Pressure-driven: activation grows over wall-clock time at "
-                "each concern's rhythm; firing decrements it. Concerns "
+                f"{mechanism}Concerns "
                 "without an instruction don't fire — they shape what I "
                 "attend to without driving action.\n"
                 f"{autonomy_line}\n\n"
