@@ -96,6 +96,46 @@ def is_inventory(text: str) -> bool:
     return len(_INVENTORY.findall(text)) >= 3 and not _FINDING.search(text)
 
 
+# An Exception block opener, loose. The strict §6 pattern and the meaning of
+# each disposition belong to audit_review; delivery only needs to know whether
+# a reviewer raised anything and whether it touched a citation we flag, so it
+# reads the review as text rather than re-implementing that parser.
+_EXCEPTION_ANY = re.compile(r"(?m)^\s*\**\s*Exception\s+\d+\s*:")
+_INADMISSIBLE = re.compile(r"(?m)^\s*\**\s*(?:Result\s*:\s*)?INADMISSIBLE\b")
+
+
+def review_signal(run: Path, unresolved: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """What an independent review, if one ran, says about processing this run.
+
+    NOT CONTENT FOR THE CLIENT. A review is internal QA; "independently
+    reviewed" in a deliverable is a marketing claim that would have to be true
+    and defensible every time. This reads it to decide how to PROCESS.
+
+    The decision it actually changes is the citation worklist. Delivery flags
+    every citation the index could not resolve and tells the editor to check
+    each against the materials. If a reviewer — who is instructed by REVIEW.md
+    §4.0 to do exactly that check, against the documents rather than the index —
+    already examined one, the editor's job on it is different. And if the review
+    never mentions any of them, that is worth knowing too: on the ChatterMate
+    medium run the index found three and the review reported none, without
+    saying whether it had looked.
+    """
+    rev = run / "review"
+    text = (rev / "review.md").read_text(errors="replace") \
+        if (rev / "review.md").is_file() else ""
+    if not text:
+        return {"ran": False}
+    return {
+        "ran": True,
+        "inadmissible": bool(_INADMISSIBLE.search(text)),
+        "exceptions_raised": len(_EXCEPTION_ANY.findall(text)),
+        # Substring presence of the exact citation token we flagged — a factual
+        # text search, not a judgement about what the reviewer concluded.
+        "flagged_citations_mentioned": [c.get("cited") for c in unresolved
+                                        if str(c.get("cited")) in text],
+    }
+
+
 def audit(run: Path) -> Dict[str, Any]:
     """Every mechanical check, with no judgement in any of them."""
     report = (run / "report.md").read_text(errors="replace") \
@@ -128,6 +168,7 @@ def audit(run: Path) -> Dict[str, Any]:
                                       if f["n"] not in with_claim],
         "inventory_entries": inv,
         "claim_surface_recovered": bool(claim_surface(run)),
+        "review": review_signal(run, unresolved),
         "blocks_closed": {n: blocks.closed(report if n != "GAP MAP" else gap, n)
                           for n in ("REPORT", "LIMITATIONS", "GAP MAP")},
     }
@@ -162,6 +203,35 @@ def claim_surface(run: Path) -> str:
     return ""
 
 
+def _strip_markers(text: str) -> str:
+    """Delivery markers out of a client's document.
+
+    `=== LIMITATIONS ===` is protocol between the agent and the runner. It means
+    something to blocks.py and nothing to a buyer, and four of them were sitting
+    in the document a client reads.
+    """
+    return re.sub(r"(?m)^[ \t]*===[^\n]*===[ \t]*$\n?", "", text)
+
+
+def header(run: Path) -> str:
+    """Title, target and date. Every professional document identifies itself.
+
+    Facts from run_meta only — nothing about the engagement is invented here.
+    """
+    meta = json.loads((run / "run_meta.json").read_text()) \
+        if (run / "run_meta.json").is_file() else {}
+    # The gap map opens with the target's name in bold — the auditor's own
+    # naming, which beats a directory name ("chattermate" for ChatterMate).
+    gap = (run / "gap_map.md").read_text(errors="replace") \
+        if (run / "gap_map.md").is_file() else ""
+    named = re.match(r"\s*(?:===[^\n]*===\s*)?\*\*([^*\n]{2,60})\*\*", gap)
+    target = (named.group(1).strip() if named
+              else Path(meta.get("external_repo") or "").name or "the target")
+    when = (meta.get("captured_at_utc") or "")[:10] or "undated"
+    return (f"# Technical claims audit — {target}\n\n"
+            f"Materials as of {when}. Limited assurance; see Limitations.\n")
+
+
 def assemble(run: Path) -> str:
     """The report with its inventory moved to an appendix. Nothing reworded.
 
@@ -178,9 +248,23 @@ def assemble(run: Path) -> str:
     for heading, text in sections(body):
         (moved if is_inventory(text) else keep).append((heading, text))
 
-    out = ["".join(h + "\n" + t for h, t in keep).rstrip()]
+    # The conclusion sits above the first heading, so it is in no contents list
+    # and does not look like the thing the document exists to say.
+    if keep and not keep[0][0]:
+        keep[0] = ("## Conclusion", keep[0][1])
+
+    out = [header(run), "".join(h + "\n" + t for h, t in keep).rstrip()]
+
+    # LIMITATIONS TRAVELS WITH THE REPORT, NOT AFTER THE APPENDICES. blocks.py
+    # keeps them separate blocks so nothing has to nest, and says why they are
+    # one document: ISAE 3000 / AT-C 205 require the limitations to travel with
+    # the report. A reader stops at the appendices.
+    if limits:
+        out.append("\n\n## Limitations\n")
+        out.append(_strip_markers(limits).strip())
+
     if moved:
-        out.append("\n\n## Appendix — supported claims, with citations\n")
+        out.append("\n\n## Appendix A — supported claims, with citations\n")
         out.append("Every remaining resolved claim, with the evidence that "
                    "resolves it. These are listed rather than written up "
                    "because none of them is a gap.\n")
@@ -190,13 +274,11 @@ def assemble(run: Path) -> str:
         out.append("".join("#" + h + "\n" + t for h, t in moved).rstrip())
     surface = claim_surface(run)
     if surface:
-        out.append("\n\n## Appendix — the claim surface\n")
+        out.append("\n\n## Appendix B — the claim surface\n")
         out.append("Every assertion identified in the claim sources and frozen "
                    "before verification began. The claim numbers used above, "
                    "and in the coverage statement, index this list.\n")
-        out.append(surface.strip())
-    if limits:
-        out.append("\n\n" + limits.strip())
+        out.append(_strip_markers(surface).strip())
     return "\n".join(out) + "\n"
 
 
@@ -222,8 +304,30 @@ def editor_notes(run: Path, a: Dict[str, Any]) -> str:
               "only `docN:NN` references and quoted spans, and it can resolve a "
               "name to the wrong file, so **check each against the materials "
               "before acting**. This script does not repair citations.", ""]
+        seen = set(a["review"].get("flagged_citations_mentioned") or [])
         for c in a["citations_unresolved"]:
-            L.append(f"- `{c.get('cited')}` — {c.get('why', 'did not resolve')}")
+            note = ("an independent review examined this one — read its finding "
+                    "before deciding" if c.get("cited") in seen else
+                    "not mentioned by any review" if a["review"].get("ran") else
+                    "no review has been run on this audit")
+            L.append(f"- `{c.get('cited')}` — {c.get('why','did not resolve')} "
+                     f"({note})")
+    r = a["review"]
+    if r.get("ran"):
+        L += ["", "## 1b. What the independent review said", "",
+              (f"**INADMISSIBLE — the reviewer could not establish what the "
+               f"report's citations refer to. Do not deliver.**" if r["inadmissible"]
+               else f"Admissible; {r['exceptions_raised']} exception block(s) "
+                    f"raised. A finding a reviewer says does not hold should not "
+                    f"ship as though it does — check the review before signing "
+                    f"off." if r["exceptions_raised"]
+               else "Admissible, no exceptions raised. Note that a review "
+                    "finding nothing is the least discriminating outcome "
+                    "available, not a guarantee.")]
+    else:
+        L += ["", "## 1b. Independent review", "",
+              "No review has been run on this audit. Every citation flag above "
+              "is unexamined."]
     L += ["", "## 2. Consequence ordering", "",
           "The audit orders findings by verdict class, which is not the same as "
           "consequence to this buyer — and consequence to this buyer is not "

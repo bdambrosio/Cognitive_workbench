@@ -763,6 +763,25 @@ def main() -> int:
 
     wall = round(time.time() - t0, 1)
 
+    # Resolved against the target the run actually read, before the metadata is
+    # written. Never raises: a citation check that fails must not lose a report.
+    citation_check = None
+    try:
+        from workflows.citations import resolve_citations
+        _tgt = Path(cfg.get("external_repo") or "")
+        if _tgt.is_dir():
+            _rows = (resolve_citations(
+                blocks.content(whole, "REPORT", blocks.BLOCKS) or "",
+                _tgt).get("citations") or [])
+            _bad = [c.get("cited") for c in _rows
+                    if str(c.get("resolved")).lower() == "false"]
+            citation_check = {"total": len(_rows), "unresolved": _bad}
+            if _bad:
+                logger.warning("%d of %d citations did not resolve: %s",
+                               len(_bad), len(_rows), ", ".join(map(str, _bad)))
+    except Exception as e:                                     # noqa: BLE001
+        logger.warning("citation check skipped (%s: %s)", type(e).__name__, e)
+
     # Write the deliverables as files. run_meta.json carries the metadata;
     # without this the report exists only inside the trace's raw_response,
     # which is not somewhere a human reads a report from.
@@ -918,6 +937,16 @@ def main() -> int:
         # Action emissions the token ceiling cut off. Non-zero means the
         # run was retried into shape rather than produced cleanly.
         "finish_length_events": getattr(loop, "finish_length_events", None),
+        # WHETHER THE REPORT'S CITATIONS RESOLVE, decided here by a file
+        # operation rather than left to whoever reads it next. METHOD §12 step
+        # 6b says "a finding with a missing or invalid citation does not ship",
+        # and on 2026-08-30 three shipped naming lines past the end of their
+        # files — the agent's own check missed them and an independent review
+        # reported none. This does not gate the run: a report is still written,
+        # because a truncated citation is not a reason to throw away the work.
+        # It records the fact, so a run carrying bad citations is visibly not
+        # clean in the one file everything downstream reads.
+        "citations_unresolved": citation_check,
         "error": error,
         "captured_at_utc": ts,
     }, indent=2, default=str) + "\n", encoding="utf-8")

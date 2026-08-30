@@ -70,10 +70,34 @@ def test_every_inventory_entry_survives_assembly(tmp_path):
 def test_the_parts_a_client_reads_all_survive(tmp_path):
     out = assemble(_run(tmp_path))
     for probe in ("Conclusion: Material", "Coverage: 6 of 7",
-                  "Questions the client should ask", "=== LIMITATIONS ===",
+                  "Questions the client should ask",
+                  "Materials examined: the repository as bound to this session",
                   "Is the CLI planned or deprecated?",
                   "Evidence: chat_agent.py:898 — single session_id."):
         assert probe in out, probe
+
+
+def test_delivery_markers_never_reach_the_client(tmp_path):
+    """`=== LIMITATIONS ===` is protocol between the agent and the runner. It
+    means something to blocks.py and nothing to a buyer. The limitations TEXT
+    must survive; the marker must not."""
+    out = assemble(_run(tmp_path))
+    assert not re.search(r"(?m)^\s*===", out)
+    assert "## Limitations" in out
+    assert "Materials examined: the repository as bound to this session" in out
+
+
+def test_limitations_travel_with_the_report_not_after_the_appendices(tmp_path):
+    """ISAE 3000 / AT-C 205, and the reason blocks.py assembles report.md from
+    REPORT + LIMITATIONS: a reader stops at the appendices."""
+    out = assemble(_run(tmp_path))
+    assert out.index("## Limitations") < out.index("## Appendix A")
+
+
+def test_the_document_identifies_itself(tmp_path):
+    out = assemble(_run(tmp_path))
+    assert out.startswith("# Technical claims audit")
+    assert out.index("## Conclusion") < out.index("## Findings")
 
 
 def test_the_inventory_moves_below_the_narrative(tmp_path):
