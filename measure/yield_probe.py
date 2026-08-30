@@ -2,7 +2,7 @@
 """Does the instruction stack change whether a turn yields or responds?
 
     python3 measure/yield_probe.py --cell bare --n 20
-    python3 measure/yield_probe.py --cell full --n 20 --model measure/models/local_qwen38flashnext_med.yaml
+    python3 measure/yield_probe.py --cell full --n 20 --model measure/models/local_qwen38flashnext.yaml
 
 WHY. On five ChatterMate runs, coverage was close to a step function of one
 decision in the first turn: the four that yielded resolved 83-96% of their claim
@@ -165,7 +165,7 @@ def main() -> int:
                          "model-qualification.md interleaves models by round.")
     ap.add_argument("--n", type=int, default=20)
     ap.add_argument("--model", type=Path,
-                    default=REPO / "measure/models/local_qwen38flashnext_med.yaml")
+                    default=REPO / "measure/models/local_qwen38flashnext.yaml")
     ap.add_argument("--tag", default="",
                     help="suffix for the world names and the output file")
     ap.add_argument("--keep-worlds", action="store_true",

@@ -30,12 +30,39 @@
 # the field is safe because the server was launched with enable_thinking=false,
 # and THIS server was launched the other way.
 #
-# `low` is chosen over off. Off is cheaper (108-115) but Qwen's own card warns
-# that in multi-turn agentic work lower effort "does not always reduce overall
-# task completion time... insufficient analysis, more failures, and repeated
-# retries". low keeps reasoning on at a bounded cost. It also matches grok,
-# luna, glm and both DeepInfra models, so the campaign varies backend and not
-# effort.
+# MEDIUM IS THE DEFAULT FOR THIS ROUTE, chosen 2026-08-30 by Bruce. Every local
+# run on the board — claims_audit, audit_review and security_audit alike — has
+# used medium since 2026-08-28. This file said `low` and nothing used it, which
+# is the trap of a default-named config that is not the default.
+#
+# REASONING STAYS ON, the older half of the decision. Off is cheaper (108-115
+# completion tokens against low's 191-301) but Qwen's own card warns that in
+# multi-turn agentic work lower effort "does not always reduce overall task
+# completion time... insufficient analysis, more failures, and repeated
+# retries".
+#
+# WHY MEDIUM RATHER THAN LOW. Three fixture runs at `low` passed the mechanical
+# screen 3/3 but their claim surfaces were 22 / 32 / 21 — a 1.5x spread at
+# identical settings on the same nine documents. Must-finds were 3/3 and
+# unsupported claims 0 in every run, so what moved was enumeration and derived
+# findings, not coverage of the things that matter most. Qwen's card claims
+# higher effort helps multi-turn agentic work, and medium is where that would
+# show.
+#
+# WHAT THAT DOES AND DOES NOT SETTLE. Three runs can detect an obvious change
+# in spread. They CANNOT certify a modest tightening: comparing dispersion
+# between two samples of three is weak, and a medium spread of, say, 24-29
+# against low's 21-32 would not be distinguishable from luck. Report the
+# numbers; do not upgrade them.
+#
+# COST. Per call, medium is 332 / 365 / 382 completion tokens against low's
+# 191 / 205 / 301. Wall clock does NOT scale with that: the three low runs ran
+# 513 / 716 / 578s and the fastest-per-call run was not the fastest run. Leg
+# count and call count dominate.
+#
+# The old reason this file said `low` — matching grok, luna, glm and both
+# DeepInfra models so a campaign varied backend and not effort — no longer
+# holds: GLM moved to medium the same day.
 #
 # `reasoning_effort: high` IS REJECTED BY THIS SERVER with a 400: "Supported
 # types are xhigh (default), medium, and low." Our own validator
@@ -92,4 +119,4 @@ llm_config:
   model: "primitive-ai/Qwen3.8-Flash-Next-NVFP4"
   vllm_url: http://127.0.0.1:5000
   is_reasoning_model: true
-  reasoning_effort: low
+  reasoning_effort: medium
