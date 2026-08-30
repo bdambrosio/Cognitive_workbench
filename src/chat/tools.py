@@ -439,7 +439,9 @@ class ToolsMixin:
             "(names, ids, paths, values found so far). `text` posts a brief status "
             "line to the conversation — ALWAYS include it when answering a user turn, so they "
             "hear where things stand; on autonomous runs omit it to stay silent. Exits the "
-            "loop. Use `respond` when the work is DONE — `yield` only when real work remains."))
+            "loop. Use `respond` when the work is DONE. Work remaining is not by itself a "
+            "reason to `yield`: while you can still make progress in this run, keep "
+            "working. `yield` is for when you cannot."))
 
         omitted = set(self._omitted_tools or [])
         if omitted:

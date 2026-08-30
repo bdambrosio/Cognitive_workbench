@@ -1,0 +1,15 @@
+{"cell": "bare", "world": "yp_bare_1", "model": "primitive-ai/Qwen3.8-Flash-Next-NVFP4", "wall_s": 491.5, "exit_reason": "respond", "iters": 3, "sample": 1, "harness_rev": "da0133fe", "tree_dirty": false}
+{"cell": "full", "world": "yp_full_1", "model": "primitive-ai/Qwen3.8-Flash-Next-NVFP4", "wall_s": 201.0, "exit_reason": "respond", "iters": 6, "sample": 1, "harness_rev": "da0133fe", "tree_dirty": false}
+{"cell": "bare", "world": "yp_bare_2", "model": "primitive-ai/Qwen3.8-Flash-Next-NVFP4", "wall_s": 181.4, "exit_reason": "respond", "iters": 3, "sample": 2, "harness_rev": "da0133fe", "tree_dirty": false}
+{"cell": "full", "world": "yp_full_2", "model": "primitive-ai/Qwen3.8-Flash-Next-NVFP4", "wall_s": 180.6, "exit_reason": "respond", "iters": 5, "sample": 2, "harness_rev": "da0133fe", "tree_dirty": false}
+{"cell": "bare", "world": "yp_bare_3", "model": "primitive-ai/Qwen3.8-Flash-Next-NVFP4", "wall_s": 391.2, "exit_reason": "respond", "iters": 6, "sample": 3, "harness_rev": "da0133fe", "tree_dirty": false}
+{"cell": "full", "world": "yp_full_3", "model": "primitive-ai/Qwen3.8-Flash-Next-NVFP4", "wall_s": 227.4, "exit_reason": "respond", "iters": 6, "sample": 3, "harness_rev": "da0133fe", "tree_dirty": false}
+{"cell": "bare", "world": "yp_bare_4", "model": "primitive-ai/Qwen3.8-Flash-Next-NVFP4", "wall_s": 173.1, "exit_reason": "respond", "iters": 4, "sample": 4, "harness_rev": "da0133fe", "tree_dirty": false}
+{"cell": "full", "world": "yp_full_4", "model": "primitive-ai/Qwen3.8-Flash-Next-NVFP4", "wall_s": 155.0, "exit_reason": "respond", "iters": 5, "sample": 4, "harness_rev": "da0133fe", "tree_dirty": false}
+{"cell": "bare", "world": "yp_bare_5", "model": "primitive-ai/Qwen3.8-Flash-Next-NVFP4", "wall_s": 191.9, "exit_reason": "respond", "iters": 11, "sample": 5, "harness_rev": "da0133fe", "tree_dirty": false}
+{"cell": "full", "world": "yp_full_5", "model": "primitive-ai/Qwen3.8-Flash-Next-NVFP4", "wall_s": 244.8, "exit_reason": "respond", "iters": 4, "sample": 5, "harness_rev": "da0133fe", "tree_dirty": false}
+{"cell": "bare", "world": "yp_bare_6", "model": "primitive-ai/Qwen3.8-Flash-Next-NVFP4", "wall_s": 211.5, "exit_reason": "respond", "iters": 12, "sample": 6, "harness_rev": "da0133fe", "tree_dirty": false}
+{"cell": "full", "world": "yp_full_6", "model": "primitive-ai/Qwen3.8-Flash-Next-NVFP4", "wall_s": 150.3, "exit_reason": "respond", "iters": 4, "sample": 6, "harness_rev": "da0133fe", "tree_dirty": false}
+{"cell": "bare", "world": "yp_bare_7", "model": "primitive-ai/Qwen3.8-Flash-Next-NVFP4", "wall_s": 377.0, "exit_reason": "respond", "iters": 3, "sample": 7, "harness_rev": "da0133fe", "tree_dirty": false}
+{"cell": "full", "world": "yp_full_7", "model": "primitive-ai/Qwen3.8-Flash-Next-NVFP4", "wall_s": 180.3, "exit_reason": "respond", "iters": 12, "sample": 7, "harness_rev": "da0133fe", "tree_dirty": false}
+{"cell": "bare", "world": "yp_bare_8", "model": "primitive-ai/Qwen3.8-Flash-Next-NVFP4", "wall_s": 408.1, "exit_reason": "respond", "iters": 4, "sample": 8, "harness_rev": "da0133fe", "tree_dirty": false}
