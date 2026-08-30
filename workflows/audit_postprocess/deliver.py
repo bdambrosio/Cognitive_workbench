@@ -127,9 +127,39 @@ def audit(run: Path) -> Dict[str, Any]:
         "findings_without_claim_id": [f["n"] for f in findings
                                       if f["n"] not in with_claim],
         "inventory_entries": inv,
+        "claim_surface_recovered": bool(claim_surface(run)),
         "blocks_closed": {n: blocks.closed(report if n != "GAP MAP" else gap, n)
                           for n in ("REPORT", "LIMITATIONS", "GAP MAP")},
     }
+
+
+def claim_surface(run: Path) -> str:
+    """The frozen claim surface, recovered from the working record.
+
+    THE CLIENT CANNOT READ A CLAIM NUMBER IT WAS NEVER GIVEN. METHOD §16 makes
+    `CLAIM SURFACE` one of four delivered blocks, but claims_audit/runner.py
+    never writes it to a file — it survives only inside the reasoning trace. So
+    a report reaches the client saying "three claims are [delta] (22, 8, 34)",
+    and its appendix lists entries numbered by claim, against a surface that is
+    not in the envelope. Every one of those numbers indexes nothing.
+
+    Recovering it here delivers what §16 already specifies, without touching the
+    audit. It is also the context a coverage statement needs to be read at all:
+    "47 of 48 resolved" means little until you can see what the 48 were.
+    """
+    trace = run / "working_record" / "reasoning_trace.jsonl"
+    if not trace.is_file():
+        return ""
+    for line in trace.read_text(errors="replace").splitlines():
+        try:
+            reply = json.loads(line).get("raw_response") or ""
+        except ValueError:
+            continue
+        # Anchored by blocks.opened: a leg that MENTIONS the marker mid-sentence
+        # is not the leg that emitted it.
+        if blocks.opened(reply, "CLAIM SURFACE"):
+            return blocks.span(reply, "CLAIM SURFACE", blocks.BLOCKS) or ""
+    return ""
 
 
 def assemble(run: Path) -> str:
@@ -158,6 +188,13 @@ def assemble(run: Path) -> str:
         # rather than sitting beside it. Heading depth is layout; the heading
         # text and everything below it are untouched.
         out.append("".join("#" + h + "\n" + t for h, t in moved).rstrip())
+    surface = claim_surface(run)
+    if surface:
+        out.append("\n\n## Appendix — the claim surface\n")
+        out.append("Every assertion identified in the claim sources and frozen "
+                   "before verification began. The claim numbers used above, "
+                   "and in the coverage statement, index this list.\n")
+        out.append(surface.strip())
     if limits:
         out.append("\n\n" + limits.strip())
     return "\n".join(out) + "\n"
@@ -195,18 +232,19 @@ def editor_notes(run: Path, a: Dict[str, Any]) -> str:
           "differ from the order the verdicts imply.", ""]
     for f in a["findings"]:
         L.append(f"- Finding {f['n']} — [{f['verdict']}] — {f['title']}")
-    L += ["", "## 3. Identifiers", ""]
-    if a["findings_without_claim_id"]:
-        L.append("These findings name no claim id, so a reader cannot join them "
-                 "to the coverage statement's claim numbers: "
-                 + ", ".join(f"Finding {n}" for n in a["findings_without_claim_id"])
-                 + ". (METHOD §5 is due to carry the claim id on the header; "
-                   "until it does, add them by hand or leave them.)")
+    L += ["", "## 3. Claim numbers", ""]
+    if a["claim_surface_recovered"]:
+        L.append("The claim surface is appended to the deliverable, so every "
+                 "claim number in the coverage statement and the supported "
+                 "appendix resolves. Nothing to do.")
     else:
-        L.append("Every finding carries its claim id.")
-    L += ["", f"The appendix holds {len(a['inventory_entries'])} supported "
-              "claims moved out of the body; they carry claim numbers and no "
-              "finding numbers, which is expected.",
+        L.append("**The claim surface could not be recovered from the working "
+                 "record, so no claim number in this report resolves for the "
+                 "reader.** The coverage statement cites claims by number and "
+                 "the supported appendix is keyed by them. Recover it before "
+                 "delivery, or strike the numbers.")
+    L += ["", f"The supported appendix holds {len(a['inventory_entries'])} "
+              "entries, keyed by claim number rather than finding number.",
           "", "## 4. Structure", "",
           f"- report as delivered: {a['report_chars']:,} characters",
           f"- narrative findings: {len(a['findings'])}",
