@@ -2,11 +2,13 @@
 
 ## 1. Purpose
 
-A finished audit produces evidence. Your job is to make it a document a client can read.
+A finished audit produces findings. Your job is to turn them into a document a client can read.
+
+Two things are named throughout. **The report** is what the audit wrote. **The deliverable** is the document the client receives, which contains the report and your writing.
 
 You write the connecting prose. You do not write the findings, and you do not change them.
 
-The audit's own words are already correct and already checkable against the code they cite. What the document lacks is the writing between those parts: an opening, a short passage before each group of findings, and a coverage statement in sentences rather than figures.
+The audit's own words are already correct and already checkable against the materials they cite. What the report lacks is the writing between those parts: an opening, a short passage before each group of findings, and a coverage statement in sentences rather than figures.
 
 ## 2. What you are given
 
@@ -17,7 +19,7 @@ Under `inspect`, the audit's run directory:
 - `delivery/checks.json` — the mechanical results: every finding with its number, verdict and title; the citations that did not resolve; observations the auditor left in an appendix
 - `delivery/editor_notes.md` — what a person still has to decide
 
-You do not have the target. You cannot open the code the report cites, and you do not need to: you are not checking the findings, only introducing them.
+You do not have the target. You cannot open the materials the report cites, and you do not need to: you are not checking the findings, only introducing them.
 
 ## 3. What you write
 
@@ -27,13 +29,15 @@ Three pieces, described in Section 6.
 2. **A short passage before each group of findings.** What the group contains and why it is grouped that way.
 3. **The coverage statement, rewritten.** The same facts as the audit's version, in sentences a reader can follow.
 
-That is all. Everything else in the delivered document is copied from the audit without change.
+That is all. Everything else in the deliverable is copied from the audit without change.
 
 ## 4. What you must not do
 
 **Do not rewrite a finding.** Each finding's claim, evidence, gap and verdict are copied exactly as the auditor wrote them. You never emit a finding, so you cannot alter one. Do not restate a finding's content in your own words anywhere else either — refer to it by number and title.
 
-**Do not add a claim about the target.** This is the most important rule here. Every statement in the report can be checked against a cited line. Your passages carry no citations, so anything you assert in them cannot be checked. Write only what the findings already establish.
+**Do not assert anything the findings have not established.** This is the most important rule here. Every statement in the report can be checked against a cited line. Your passages carry no citations, so anything you assert in them cannot be checked.
+
+A note on one word: **claim** means an assertion the *seller* made about the target. That is the only thing it means, here and in the report. You do not make claims and neither does the report — it states findings about the seller's claims.
 
 Examples of what this forbids:
 
@@ -42,7 +46,7 @@ Examples of what this forbids:
 - "These gaps are easily fixed." A judgement about effort, which the audit does not make.
 - "The seller was probably not deliberately misleading." A statement about motive.
 
-**Do not rank the findings by importance.** How much a gap matters depends on the buyer's plans, which you do not know. The audit does not rank them and neither do you. Present them in the order you are given.
+**Do not rank the findings by consequence.** How much a gap matters depends on the buyer's plans, which you do not know. The audit does not rank them and neither do you. Present them in the order you are given.
 
 **Do not soften or sharpen.** If a finding says a feature does not exist, say that. Do not write "appears to be incomplete". Do not write "seriously misrepresented" either.
 
@@ -87,7 +91,7 @@ Do not repeat the summary. The reader has just read it.
 
 ### `=== SECTION NOTES ===`
 
-One entry per group of findings. The groups, and their keys, are listed in the message that starts your work. Write each entry on two lines:
+One entry per group of findings. The groups, and their keys, are listed in the brief that starts your work. Write each entry on two lines:
 
 ```text
 <key>: <a heading for the group>
@@ -98,7 +102,7 @@ For example, for a group of findings whose claims are contradicted by the eviden
 
 ```text
 material: Claims the evidence contradicts
-Three of the seller's claims describe features that are not in the code. Each is an absent feature described as present, rather than a defect in something that exists.
+Three of the seller's claims describe features that are not in the materials. Each is an absent feature described as present, rather than a defect in something that exists.
 ```
 
 The heading replaces the audit's own heading for that group, so it must be accurate about what the group contains. Count the findings in the group and get the number right.
@@ -119,7 +123,7 @@ Cover, in whatever order reads best:
 
 The audit's version is usually one long paragraph carrying ten facts. Break it up.
 
-## 7. What the document looks like when it is assembled
+## 7. What the deliverable looks like when it is assembled
 
 You do not assemble it. The client's process does, in this order:
 
@@ -134,4 +138,4 @@ You do not assemble it. The client's process does, in this order:
 9. Appendix A, the supported claims, copied
 10. Appendix B, the claim surface, copied
 
-Your three blocks are the only new writing in the document. Everything numbered above that says "copied" is the auditor's text, and it reaches the client unchanged.
+Your three blocks are the only new writing in the deliverable. Everything numbered above that says "copied" is the auditor's text, and it reaches the client unchanged.
