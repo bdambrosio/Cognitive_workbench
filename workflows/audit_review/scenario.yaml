@@ -175,7 +175,16 @@ characters:
       # says which ceiling produced it — and note that on a LOCAL server
       # backend._clamp_max_tokens may lower it to fit the context window,
       # which now logs at WARNING so the run log shows it.
-      react_max_tokens: 16384
+      #
+      # 16384 -> 32768 on 2026-08-30. MEASURED, not guessed: `completion_tokens`
+      # on this route bills the reasoning channel AND the visible answer, so the
+      # report leg's ~7,500 visible tokens share one budget with reasoning that
+      # grows with effort. A ChatterMate run at `high` took twelve
+      # finish_reason=length events against one at `low` on the same ceiling.
+      # Nothing is spent by reserving more — max_tokens is an upper bound, not
+      # an allocation — and the ceiling is now far below both windows in play
+      # (local 262,144, measured headroom 223,905; this cloud route 1,310,720).
+      react_max_tokens: 32768
 
       # Solo engagement, so the peer tools go too. The rest is venture.yaml's
       # list: game embodiment, the head/camera body tools, and the

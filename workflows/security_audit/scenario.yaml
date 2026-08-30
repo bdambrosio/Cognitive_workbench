@@ -162,7 +162,13 @@ characters:
         schedule: 1m
 
     chat:
-      react_max_tokens: 16384
+      # Emission ceiling for one ReAct action; the last leg carries the whole
+      # report in `respond.text`. 16384 -> 32768 on 2026-08-30, for the reason
+      # recorded in workflows/claims_audit/scenario.yaml: completion_tokens
+      # bills the reasoning channel alongside the visible answer, so the report
+      # leg shares one budget with reasoning that grows with effort. Change the
+      # three workflows together.
+      react_max_tokens: 32768
       omitted_tools:
         - agent-say
         - agent-activity
