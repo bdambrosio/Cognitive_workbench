@@ -616,6 +616,16 @@ def _norm_lines(text: str) -> str:
 _RETESTABLE_VERDICTS = ("unsupported", "indeterminate", "broken citation")
 
 
+# A MENTION IS NOT AN EMISSION, the same rule `blocks.marker_re` is anchored
+# for. This searched the whole REVIEW body until 2026-08-30, so an ADMISSIBLE
+# review that discussed the criterion, or quoted §8 back, flipped the run onto
+# the three-block path and the REVIEW SURFACE it still owed was marked not
+# owed. REVIEW.md §8 tells the reviewer to OPEN the block with the token, so
+# that is what is matched: the first non-blank line, optionally decorated.
+_OPENS_INADMISSIBLE = re.compile(r"\s*\**\s*(?:Result\s*:\s*)?INADMISSIBLE\b",
+                                 re.I)
+
+
 def retestable_exceptions(review_text: str) -> List[Dict[str, str]]:
     """Findings a review failed that a second reviewer can check."""
     out, seen = [], set()
@@ -637,7 +647,7 @@ Check these findings, and only these, each named by the report lines it
 occupies: {findings}.
 
 For each one, read what the report claims and what its citations actually
-say, and give it a verdict from REVIEW.md §6.
+say, and give it a disposition from REVIEW.md §6.
 
 `review/citations.json` holds every cited line already fetched, and it is a
 convenience for reading them — not the authority on whether a citation
@@ -773,20 +783,20 @@ def _confirmation_note(c: Dict[str, Any]) -> str:
                 "reported as one that does not stand.]")
     lines = []
     for r in c["results"]:
-        others = ", ".join(f"[{v}]" if v else "[no verdict returned]"
+        others = ", ".join(f"[{v}]" if v else "[no disposition returned]"
                            for v in r["other_verdicts"])
         lines.append(
             f"  Finding {r['finding']}: you found [{r['verdict']}]; the "
             f"retest found {others} — {r['agreeing']} of {r['of']} — "
             + ("STANDS" if r["accepted_as_failed"] else "DOES NOT STAND"))
     return ("\n\n[The retest, obtained by the client's process from a reviewer "
-            "who was not told your verdicts and did not see your review:\n"
+            "who was not told your dispositions and did not see your review:\n"
             + "\n".join(lines) +
-            "\n\nApply §9. A finding you failed stands only where the retest "
-            "reached the same disposition on it. Report every exception with "
-            "its standing — stands, does not stand, or not retested — and "
-            "give the tally. Do not delete a fail that does not stand, and do "
-            "not restate it as agreement. There is no grade to report: the "
+            "\n\nApply §9. An exception stands only where the retest reached "
+            "the same disposition on it. Report every exception with its "
+            "standing — stands, does not stand, or not retested — and give "
+            "the tally. Do not delete an exception that does not stand, and "
+            "do not restate it as agreement. There is no grade to report: the "
             "exceptions and their standings are the result.]")
 
 
@@ -914,7 +924,7 @@ def main() -> int:
             if delivered["REVIEW"] and phase1 is PHASE1_FULL:
                 body = blocks.content("\n\n".join(t for t in transcript if t),
                                       "REVIEW", blocks.REVIEW_BLOCKS) or ""
-                if re.search(r"\bINADMISSIBLE\b", body):
+                if _OPENS_INADMISSIBLE.match(body):
                     phase1 = PHASE1_INADMISSIBLE
                     delivered["REVIEW SURFACE"] = True   # not owed, not missing
                     logger.info("review is INADMISSIBLE — no REVIEW SURFACE owed")

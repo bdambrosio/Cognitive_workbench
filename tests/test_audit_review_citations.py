@@ -322,8 +322,13 @@ def test_a_failed_finding_stands_only_if_the_retest_agrees():
 def test_the_summary_is_told_what_the_retest_found():
     """The runner reports the tally. §9 carries the rule.
 
-    A fail that stands and one that does not must be distinguishable, and one
-    that does not stand must survive into the review rather than vanish.
+    An exception that stands and one that does not must be distinguishable, and
+    one that does not stand must survive into the review rather than vanish.
+
+    The note says "disposition", never "verdict" or "fail". REVIEW.md §6
+    reserves `verdict` for what the AUDIT concluded about a claim, and this
+    note is the last thing the reviewer reads before writing §9 — the two
+    wordings disagreeing there is what the reservation exists to prevent.
     """
     note = _confirmation_note({"ran": True, "results": [
         {"finding": "9", "verdict": "unsupported",
@@ -334,12 +339,14 @@ def test_the_summary_is_told_what_the_retest_found():
          "agreeing": 2, "of": 2, "accepted_as_failed": True}]})
     assert "Finding 9" in note and "1 of 2" in note and "DOES NOT STAND" in note
     assert "Finding 7" in note and "2 of 2" in note and "STANDS" in note
-    assert "Do not delete a fail that does not stand" in note
+    assert "Do not delete an exception that does not stand" in note
     # There is no grade to report: §9 stopped returning one 2026-08-29. Every
-    # exception carries a standing instead, and a fail that does not stand is
+    # exception carries a standing instead, and one that does not stand is
     # reported rather than dropped.
     assert "no grade to report" in note
     assert "stands, does not stand, or not retested" in note
+    # §6's reservation, enforced where it is easiest to lose.
+    assert "verdict" not in note and "fail" not in note
 
     # A retest that could not be run leaves the standing unknown. That is not
     # an exception that did not stand, and an infrastructure failure must not
