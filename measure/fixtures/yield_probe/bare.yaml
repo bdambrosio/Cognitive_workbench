@@ -1,0 +1,59 @@
+# Yield-decision probe — bare cell.
+#
+# ONE VARIABLE. The `bare` and `full` scenarios are byte-identical except for
+# the instruction text marked below. Everything else — model, tools, budgets,
+# suppression flags — is held. `diff` them before trusting a result.
+#
+# WHY IT LOOKS LIKE A BENCHMARK SCENARIO. Forked from
+# scenarios/jill-benchmark-hle.yaml because that is the minimal chat scenario
+# in the tree: discourse and orientation off, benchmark_mode on, no concerns.
+# benchmark_mode matters here — it runs post-turn work inline, so a sample is
+# settled when the call returns and its trace row is complete before the next
+# sample starts.
+
+world_config:
+  world_name: "yield_probe"          # probe overrides per sample
+
+llm_config:
+  sgl_model_path: null
+  reasoning_parser: null
+
+setting: |
+  Cognitive Workbench, chat-mode session. Each turn drives a reflective
+  ReAct loop with tool use. No continuous OODA and no scheduled task
+  pipeline.
+
+characters:
+  Jill:
+    mode: chat
+
+    external_repo: measure/fixtures/dataroom/corpus
+
+    llm_config:
+      server: local
+      model: ""
+      vllm_url: http://127.0.0.1:5000
+      is_reasoning_model: true
+      reasoning_effort: medium
+
+    discourse:
+      enabled: false
+    orientation:
+      enabled: false
+    chat:
+      benchmark_mode: true
+      react_max_tokens: 8192
+
+    # ---- THE VARIABLE (bare): no yield instruction beyond the core catalog ----
+    # Nothing here mentions yielding, legs, or working straight through. The
+    # only yield guidance the model sees is src/chat/tools.py's tool entry and
+    # src/chat/react.py's budget nudge.
+    character: |
+      Jill is spare and exact. She prefers grounded specifics over
+      narrative, and says which of what she reports she verified and
+      which she is inferring.
+
+    capabilities: |
+      `inspect_external` reads the document set bound to this session.
+
+    concerns: []
