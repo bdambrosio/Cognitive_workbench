@@ -172,7 +172,17 @@ def main() -> int:
     if (out / "written.json").is_file():
         raise SystemExit(f"{out}: already carries an agent-written delivery. "
                          "Move it aside to write another.")
-    world = args.world or f"delivery_{run.name[:24]}"
+    # A FRESH WORLD PER INVOCATION. Derived from the run id alone until
+    # 2026-08-30, which meant every delivery of the same audit reused one
+    # world: ChatLoop restored the previous session, the agent saw its own
+    # earlier brief and answer in history, and reproduced that answer word for
+    # word. Two runs four minutes apart produced byte-identical prose while the
+    # method document had changed between them — the edit never had a chance.
+    # The audit and review runners avoid this by taking a unique --world from
+    # the operator; this one defaults to a unique name instead of trusting that.
+    stamp = datetime.datetime.now(
+        datetime.timezone.utc).strftime("%H%M%S")
+    world = args.world or f"delivery_{run.name[:20]}_{stamp}"
 
     # EVERY MECHANICAL FACT FIRST. The agent reads these; it does not produce
     # them, and it cannot check a citation because it has no materials.
