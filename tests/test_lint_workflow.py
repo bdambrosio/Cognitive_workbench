@@ -104,9 +104,14 @@ def test_a_dead_section_reference_in_runner_code_is_caught(tmp_path, monkeypatch
     fake = tmp_path / "runner.py"
     fake.write_text('MSG = "Settle admissibility first, per REVIEW.md §99."\n',
                     encoding="utf-8")
+    # The documents are named rather than indexed since 2026-08-30, when a third
+    # was added and positional lookup repointed every cross-check.
+    method_abs = str(REPO / lw.METHOD_DOC)
+    review_abs = str(REPO / lw.REVIEW_DOC)
     monkeypatch.setattr(lw, "REPO", tmp_path)
-    monkeypatch.setattr(lw, "DOCS", (str(REPO / lw.DOCS[0]), str(REPO / lw.DOCS[1])))
-    found = lw.check_code_refs("runner.py", str(REPO / lw.DOCS[1]))
+    monkeypatch.setattr(lw, "METHOD_DOC", method_abs)
+    monkeypatch.setattr(lw, "REVIEW_DOC", review_abs)
+    found = lw.check_code_refs("runner.py", review_abs)
     assert any("§99" in f for f in found), found
 
 

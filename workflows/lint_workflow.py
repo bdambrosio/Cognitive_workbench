@@ -42,15 +42,23 @@ sys.path.insert(0, str(REPO / "src"))
 from chat.workflow import load_workflow, PRACTICE_MARKER      # noqa: E402
 from workflows import blocks                                  # noqa: E402
 
-DOCS = ("workflows/claims_audit/method/METHOD.md",
-        "workflows/audit_review/method/REVIEW.md")
+# NAMED, NOT INDEXED. These were METHOD_DOC and REVIEW_DOC until 2026-08-30, when a
+# third document was added at the front and every cross-check below silently
+# repointed — the runner-reference check started resolving §12 against DELIVERY
+# and failed eight references that were correct. The tests caught it. A tuple
+# position is not a name.
+METHOD_DOC = "workflows/claims_audit/method/METHOD.md"
+REVIEW_DOC = "workflows/audit_review/method/REVIEW.md"
+DELIVERY_DOC = "workflows/audit_postprocess/method/DELIVERY.md"
+
+DOCS = (METHOD_DOC, REVIEW_DOC, DELIVERY_DOC)
 
 # The runner that drives each document, and the document its bare §N means.
 # A runner emits text the agent reads — "See REVIEW.md §4.0." is a sentence in
 # the review's output, not a comment — so a §N there is as load-bearing as one
 # in the method, and nothing was checking it.
-RUNNERS = {"workflows/claims_audit/runner.py": DOCS[0],
-           "workflows/audit_review/runner.py": DOCS[1]}
+RUNNERS = {"workflows/claims_audit/runner.py": METHOD_DOC,
+           "workflows/audit_review/runner.py": REVIEW_DOC}
 
 # Tokens a document retired. Naming one in the text the agent reads puts the
 # forbidden vocabulary back in the prompt, three lines from the table it was
@@ -176,6 +184,7 @@ def check_block_vocab(name: str, raw: str) -> List[str]:
     declared = set(re.findall(r"===\s*(?!END\b)([A-Z][A-Z ]*?)\s*===", raw))
     declared = {d.strip() for d in declared if d.strip()}
     expected = (set(blocks.BLOCKS) if "claims_audit" in name
+                else set(blocks.DELIVERY_BLOCKS) if "audit_postprocess" in name
                 else set(blocks.REVIEW_BLOCKS))
     bad = []
     for missing in sorted(expected - declared):
@@ -197,7 +206,7 @@ def check_code_vocab() -> List[str]:
     """
     sys.path.insert(0, str(REPO / "measure" / "fixtures" / "dataroom"))
     import score                                              # noqa: E402
-    raw = (REPO / DOCS[0]).read_text(encoding="utf-8")
+    raw = (REPO / METHOD_DOC).read_text(encoding="utf-8")
     bad = []
     for term in score._REC_VOCAB:
         if f"**{term}**" not in raw:
@@ -232,7 +241,7 @@ def check_code_refs(runner: str, doc: str) -> List[str]:
     """
     import ast
     src = (REPO / runner).read_text(encoding="utf-8")
-    known = {"METHOD": _doc_sections(DOCS[0]), "REVIEW": _doc_sections(DOCS[1])}
+    known = {"METHOD": _doc_sections(METHOD_DOC), "REVIEW": _doc_sections(REVIEW_DOC)}
     own = "METHOD" if "claims_audit" in runner else "REVIEW"
     bad = []
     for node in ast.walk(ast.parse(src)):
@@ -250,7 +259,7 @@ def check_code_refs(runner: str, doc: str) -> List[str]:
 
 def check_code_comment_refs(runner: str) -> List[str]:
     """Same, for comments. Advisory: rot for the next reader, not the agent."""
-    known = {"METHOD": _doc_sections(DOCS[0]), "REVIEW": _doc_sections(DOCS[1])}
+    known = {"METHOD": _doc_sections(METHOD_DOC), "REVIEW": _doc_sections(REVIEW_DOC)}
     own = "METHOD" if "claims_audit" in runner else "REVIEW"
     out = []
     for i, line in enumerate((REPO / runner).read_text().splitlines(), 1):
