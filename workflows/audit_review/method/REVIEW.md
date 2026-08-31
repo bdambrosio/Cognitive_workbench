@@ -24,6 +24,8 @@ The audit's own method states the gap this review fills. METHOD §12 step 6b: *"
 
 **The report and the Gap Map** — `report.md` and `gap_map.md`, under `inspect`. These are what you review. `report.md` holds METHOD §16's REPORT, COVERAGE and LIMITATIONS blocks; the Gap Map is its GAP MAP block. An older audit run may carry no COVERAGE block and state its coverage inside the report instead; both shapes appear on the board.
 
+**One line in each file is not the auditor's.** `report.md` carries a line beginning `Coverage:` between the REPORT and COVERAGE blocks, and the Gap Map ends with the same line. The client's process computes both from METHOD §16's verdict ledger and places them there. Where a figure written into the report disagrees with that line, the line is the arithmetic.
+
 **The audit's claim surface is not among these files.** METHOD §16 makes it a delivered block, but it is not written to a file of its own. It is in `working_record/reasoning_trace.jsonl`, with the rest of the auditor's legs, and §7 is when you read it.
 
 **The working record** — also under `inspect`: `working_record/`, holding the auditor's reasoning trace, one file per evidence request, and the brief.
@@ -73,6 +75,8 @@ If you cannot, stop. A supported ratio computed over citations read in the wrong
 ## 4. The review surface, and closing it
 
 1. **Enumerate the findings.** Every finding the report states, in the report's order.
+
+   A claim the report gives the examination status `[unverifiable]`, and an `[unclaimed]` observation, are not findings (METHOD §6), however the report numbered them. Leave them off the surface and record one conformance exception: enumerating them inflates the denominator of every ratio.
 
 2. **Close the surface** by stating the count after a line reading exactly:
 
@@ -143,7 +147,7 @@ The arithmetic is written out so that it can be checked. A step you cannot follo
 
 **You are not asked whether a consequence matters to the buyer.** That is materiality. It is METHOD §4's judgement and the auditor's, and §10 reserves it.
 
-**`[unverifiable]`, `[unattempted]` and `[unclaimed]` are not findings and do not belong on your surface.** METHOD §6 reports all three in the coverage block: the first is a claim the materials could not settle, the second one the work never reached, the third something the seller never claimed. If the report states any of them as a numbered finding, record one conformance exception and do not enumerate them into §4's frozen count, which would inflate the denominator of every ratio.
+**`[unverifiable]` and `[unclaimed]` are not findings and are not checked as ones.** METHOD §6 reports both in the coverage block: the first is a claim the materials could not settle, the second something the seller never claimed. §4 step 1 says what to do with one the report numbered as a finding.
 
 ## 6. Finding format
 
