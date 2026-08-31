@@ -18,8 +18,8 @@ The report may state which resolved claims are supported and which are not. It m
 
 Two rules apply:
 
-1. **State coverage whenever the report states its conclusion.** The report and Gap Map must show how many identified claims were resolved and how many resolved claims were supported.
-2. **Do not imply broader coverage than the work supports.** For example, avoid “the system does what it says.” Use a bounded statement such as: “Coverage: 39 of 43 identified claims resolved; 37 of 39 resolved claims supported.”
+1. **Coverage travels with the conclusion.** Wherever the deliverable states its conclusion, it states how many identified claims were resolved and how many resolved claims were supported. You do not write those figures: they are arithmetic over the verdict ledger in Section 16, and the client's process computes them and places them in the report and the Gap Map. What you owe is a ledger that accounts for every claim in the frozen surface exactly once.
+2. **Do not imply broader coverage than the work supports.** For example, avoid “the system does what it says.” The figures the process emits are bounded by construction: “Coverage: 39 of 43 identified claims resolved; 37 of 39 resolved claims supported.” Do not write around them with a wider claim.
 
 ### Claim-state quantities
 
@@ -32,14 +32,14 @@ When reporting claim counts or rates, use the following terms consistently. Term
 | **resolved** | Attempted claims that reached one of the five claim verdicts in Section 6 |
 | **supported** | Resolved claims whose verdict is `[real]`, `[real, minor caveat]`, or `[real, operational caveat]` |
 
-An attempted claim that cannot be resolved is `[unverifiable]`. An identified claim that was never attempted is *unattempted* and is reported numerically in the coverage statement.
+An attempted claim that cannot be resolved is `[unverifiable]`. An identified claim that was never attempted is *unattempted* and is included in the coverage figures.
 
 **Coverage = resolved / identified.**  
 **Consistency rate = supported / resolved.**
 
 `attempted` is not the denominator of either rate, but it remains important because it distinguishes “we tried and could not settle this claim” from “we did not examine this claim.” In count terms, `[unverifiable]` claims are attempted claims that did not resolve.
 
-Canonical form:
+Canonical form — the shape the client's process emits from the ledger, not a sentence you write:
 
 > Coverage: 39 of 43 identified claims resolved; 37 of 39 resolved claims supported.
 
@@ -194,7 +194,7 @@ This describes an attempted claim for which no verdict could be reached. It is n
 |---|---|---|
 | `[unverifiable]` | The claim was attempted, but the supplied materials could not settle it | Coverage statement, with the reason |
 
-A claim that was never attempted is *unattempted* and is accounted for numerically in the coverage statement.
+A claim that was never attempted is *unattempted* and is accounted for in the coverage figures.
 
 ### Other observation types
 
@@ -452,7 +452,7 @@ It contains:
 - target name and a one-line description;
 - the Section 9 conclusion;
 - the three to five findings that matter most;
-- the coverage line;
+- the coverage line, which the client's process supplies;
 - one line stating that the full cited report is available; and
 - a small footer: “technical claims verification · not a pen-test · not legal advice.”
 
@@ -460,7 +460,7 @@ Each key item is a finding summarized in one line with a short note. The Gap Map
 
 When the conclusion is **Clear** or **Clear with caveats**, include important supported findings as well as caveats. Otherwise a mostly successful audit can be misrepresented by a summary that lists only defects.
 
-The coverage line reports resolved / identified and supported / resolved, and explains why any remaining unattempted claims are or are not low-risk.
+The coverage line reports resolved / identified and supported / resolved. The client's process computes it from the Section 16 ledger and places it in the Gap Map, so do not write the figures yourself. Where unattempted claims remain, explain in your own words why they are or are not low-risk — that is judgement, and it is yours.
 
 If the conclusion is **Clear** and there are no caveats, the Gap Map may be reduced to a very short statement, for example:
 

@@ -893,6 +893,11 @@ def main() -> int:
     if whole:
         parts = [b for b in (blocks.span(whole, n)
                              for n in blocks.REPORT_BLOCKS) if b]
+        # Same for the report: §1a says coverage travels with the conclusion,
+        # and the figures are the process's to emit.
+        if coverage_check and coverage_check.get("ok"):
+            from workflows.coverage import statement as _stmt2
+            parts.insert(1, _stmt2(coverage_check["figures"]))
         if parts:
             (out / "report.md").write_text("\n\n".join(parts).rstrip() + "\n",
                                            encoding="utf-8")
@@ -905,7 +910,17 @@ def main() -> int:
         # just removed it from. Both deliverables are faithful copies.
         gap = blocks.span(whole, "GAP MAP")
         if gap:
-            (out / "gap_map.md").write_text(gap.rstrip() + "\n", encoding="utf-8")
+            # THE COVERAGE LINE IS PLACED HERE, NOT WRITTEN BY THE AGENT.
+            # METHOD §1a and §15 both promise it and §16 forbids the agent to
+            # compute it, so something has to supply it — this is that
+            # something. Appended rather than spliced: the Gap Map is the
+            # agent's document and nothing already in it moves.
+            _line = ""
+            if coverage_check and coverage_check.get("ok"):
+                from workflows.coverage import statement as _stmt
+                _line = "\n\n" + _stmt(coverage_check["figures"]) + "\n"
+            (out / "gap_map.md").write_text(gap.rstrip() + _line + "\n",
+                                            encoding="utf-8")
         else:
             logger.warning("no GAP MAP block in the engagement — no gap_map.md")
 
