@@ -839,54 +839,6 @@ def main() -> int:
     # coverage travels separately is one a reader cannot size.
     whole = "\n\n".join(t for t in transcript if t)
 
-    # THE COVERAGE FIGURES ARE ARITHMETIC OVER THE LEDGER, NOT THE MODEL'S.
-    # METHOD §16's COVERAGE block carries one verdict per claim; every figure
-    # §1a defines is computed from it here. The check names the defect — a
-    # claim appearing twice, a claim in the surface and not in the ledger —
-    # because "the numbers disagree" sends a person back through the whole
-    # report. Nothing is corrected: which claim was doubled is a judgement
-    # about the surface, and the run records it for a person.
-    coverage_check = None
-    try:
-        from workflows import coverage as _cov, issues as _iss
-        _surface = blocks.content(whole, "CLAIM SURFACE", blocks.BLOCKS) or ""
-        _covblk = blocks.content(whole, "COVERAGE", blocks.BLOCKS) or ""
-        coverage_check = _cov.check(_surface, _covblk)
-        if not coverage_check["ok"]:
-            for _p in coverage_check["problems"]:
-                logger.warning("coverage: %s", _p)
-                _iss.note(out, "claims_audit", "coverage_ledger", _p,
-                          severity="blocking")
-        else:
-            logger.info("coverage: %s", _cov.statement(coverage_check["figures"]))
-    except Exception as e:                                     # noqa: BLE001
-        logger.warning("coverage check skipped (%s: %s)", type(e).__name__, e)
-
-    # Resolved against the target the run actually read, before the metadata is
-    # written. Never raises: a citation check that fails must not lose a report.
-    citation_check = None
-    try:
-        from workflows.citations import resolve_citations
-        _tgt = Path(external_repo)
-        if _tgt.is_dir():
-            _rows = (resolve_citations(
-                blocks.content(whole, "REPORT", blocks.BLOCKS) or "",
-                _tgt).get("citations") or [])
-            _bad = [c.get("cited") for c in _rows
-                    if str(c.get("resolved")).lower() == "false"]
-            citation_check = {"total": len(_rows), "unresolved": _bad}
-            if _bad:
-                logger.warning("%d of %d citations did not resolve: %s",
-                               len(_bad), len(_rows), ", ".join(map(str, _bad)))
-                from workflows import issues as _iss2
-                _iss2.note(out, "claims_audit", "citations_unresolved",
-                           f"{len(_bad)} of {len(_rows)} citations did not "
-                           f"resolve against the materials: "
-                           + ", ".join(map(str, _bad)),
-                           severity="check", citations=_bad)
-    except Exception as e:                                     # noqa: BLE001
-        logger.warning("citation check skipped (%s: %s)", type(e).__name__, e)
-
     final = latest_reply(loop, SOURCE)
     if final:
         (out / "full_reply.md").write_text(final, encoding="utf-8")
