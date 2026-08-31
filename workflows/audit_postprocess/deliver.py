@@ -97,7 +97,6 @@ VERDICT_GLOSS = (
                 "the materials show another"),
     ("[unverifiable]", "the audit tried and the supplied materials could not "
                        "settle it"),
-    ("[unattempted]", "the work stopped before this claim was examined"),
 )
 
 

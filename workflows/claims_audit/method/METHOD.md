@@ -10,7 +10,7 @@ Section 11 describes what is outside the scope of this audit.
 
 ## 1a. Level of assurance and coverage terminology
 
-This is a **limited assurance** engagement. The audit may resolve only part of the target's identified claims. Section 4 defines the order in which claims are addressed, Section 12 defines when the work may stop, and Section 11 defines exclusions.
+This is a **limited assurance** engagement. The audit attempts every identified claim and may still resolve only part of them, because the supplied materials cannot always settle a claim. Section 4 defines the order in which claims are addressed, Section 12 defines the sequence of work, and Section 11 defines exclusions.
 
 The report may state which resolved claims are supported and which are not. It must not imply a conclusion about claims that were not resolved.
 
@@ -36,12 +36,12 @@ When reporting claim counts or rates, use the following terms consistently. Term
 | **resolved** | Attempted claims that reached one of the five claim verdicts in Section 6 |
 | **supported** | Resolved claims whose verdict is `[real]`, `[real, minor caveat]`, or `[real, operational caveat]` |
 
-An attempted claim that cannot be resolved is `[unverifiable]`. An identified claim the work never reached is `[unattempted]`. Both are examination statuses rather than verdicts, and both are included in the coverage figures.
+An attempted claim that cannot be resolved is `[unverifiable]`. It is an examination status rather than a verdict, and it is included in the coverage figures.
 
 **Coverage = resolved / identified.**  
 **Consistency rate = supported / resolved.**
 
-`attempted` is not the denominator of either rate, but it remains important because it distinguishes “we tried and could not settle this claim” from “we did not examine this claim.” In count terms, `[unverifiable]` claims are attempted claims that did not resolve.
+Every identified claim is attempted, so `attempted` equals `identified` and is the denominator of neither rate. In count terms, `[unverifiable]` claims are attempted claims that did not resolve.
 
 Canonical form — the shape the client's process emits from the ledger, not a sentence you write:
 
@@ -75,7 +75,7 @@ The sequence is:
 
 1. Enumerate the claims (Section 12, step 2).
 2. Prioritize them using the order below.
-3. Record a verdict or examination status for every claim in Section 16's ledger, and say in the coverage block what was not attempted and why the remaining uncertainty matters.
+3. Record a verdict or examination status for every claim in Section 16's ledger, and say in the coverage block what the materials could not settle and why the remaining uncertainty matters.
 
 ### Materiality
 
@@ -99,11 +99,11 @@ Every identified claim is assigned to one of four tiers. The tier is based on th
 1. **Failure could make the business nonviable.** Examples include unrecoverable data, inability to collect money, withdrawal of a critical dependency, or failure of a safety-critical mechanism.
 2. **Failure changes the nature of the asset being acquired.** Examples include claims about isolation, redundancy, failover, tier separation, or shared state where the actual architecture differs materially from the description.
 3. **Failure creates a bounded remediation cost in time or money.** Examples include incorrect retry intervals, timeouts, monitoring behavior, retention periods, or thresholds that can be corrected without changing the nature of the asset.
-4. **Failure is individually minor.** These claims are addressed last and are the most likely to remain unattempted if the engagement stops early.
+4. **Failure is individually minor.** These claims are addressed last.
 
 A claim finding takes the tier assigned to the claim. A derived finding takes at least the highest-priority tier of the facts on which it depends and may be assigned a higher-priority tier if the derived consequence is more severe.
 
-If a tier contains no claims, state that in the coverage block. The purpose of the priority order is to ensure that, if the audit stops because of time, budget, or access constraints, the highest-consequence uncertainties have been addressed first.
+If a tier contains no claims, state that in the coverage block. The priority order settles the highest-consequence claims first and gives Section 16 the order the findings are reported in.
 
 ## 5. Finding format
 
@@ -186,14 +186,13 @@ These describe how a stated seller claim compares with the evidence. Every resol
 | `[partial]` | The claim is substantially true but has a specific, citable material gap | Material; bounded gap to evaluate or price |
 | `[delta]` | The claim is false; the claim source says one thing and the evidence shows another | Material; broken claim and possible pattern |
 
-### Examination statuses
+### Examination status
 
-These describe an identified claim that reached no verdict. Neither is a claim verdict and neither produces a finding.
+This describes an identified claim that was attempted and reached no verdict. It is not a claim verdict and does not produce a finding.
 
 | Status | Meaning | Where reported |
 |---|---|---|
 | `[unverifiable]` | The claim was attempted, but the supplied materials could not settle it | Coverage block, with the reason |
-| `[unattempted]` | The work stopped before the claim was examined (Section 12, step 5) | Coverage block, with the reason |
 
 ### Other observation types
 
@@ -336,12 +335,7 @@ The current implementation is launched through `workflows/claims_audit/scenario.
 
 4. **Work through the priority order.** Do not require client confirmation between claims. Questions for the seller are collected for the deliverable.
 
-5. **Attempt every identified claim.** Where the engagement cannot — for reasons of time, budget, or access — stop only when both of these hold:
-
-   - no Tier 1 or Tier 2 claim is left unattempted; and
-   - every remaining claim from a claim source that has already produced a `[delta]` has been attempted.
-
-   Record each claim not attempted as `[unattempted]` in the Section 16 ledger; Section 16 says what the coverage block must add.
+5. **Attempt every identified claim.** If the engagement cannot reach them all — for reasons of time, budget, or access — it does not produce a deliverable. Report that the work could not be completed, and why, rather than issuing a partial audit.
 
 6. **Write the report.** Apply the correction protocol in Section 7 to any findings that changed during the engagement.
 
@@ -418,9 +412,8 @@ The working record is retained even though the isolated audit environment is dis
 
 The final report cites the evidence behind every resolved claim, so it records much of what previously existed only in the working trace. The working record remains useful because it preserves information the report does not contain, including:
 
-- searches and dead ends that preceded a finding;
-- the work performed on `[unverifiable]` claims; and
-- the reasoning behind prioritization decisions that left some claims unattempted.
+- searches and dead ends that preceded a finding; and
+- the work performed on `[unverifiable]` claims.
 
 Current implementation records include:
 
@@ -464,7 +457,7 @@ Each key item is a finding summarized in one line with a short note. The Gap Map
 
 When the conclusion is **Clear** or **Clear with caveats**, include important supported findings as well as caveats. Otherwise a mostly successful audit can be misrepresented by a summary that lists only defects.
 
-The coverage line reports resolved / identified and supported / resolved. The client's process computes it from the Section 16 ledger and places it in the Gap Map, so do not write the figures yourself. Where unattempted claims remain, explain in your own words why they are or are not low-risk — that is judgement, and it is yours.
+The coverage line reports resolved / identified and supported / resolved. The client's process computes it from the Section 16 ledger and places it in the Gap Map, so do not write the figures yourself. Where the materials could not settle a claim, explain in your own words why the remaining uncertainty is or is not low-risk — that is judgement, and it is yours.
 
 If the conclusion is **Clear** and there are no caveats, the Gap Map may be reduced to a very short statement, for example:
 
@@ -532,14 +525,13 @@ This block contains two parts.
 <claim number>. [verdict]
 ```
 
-Use only Section 6's five claim verdicts or its two examination statuses. Every claim in the surface appears exactly once. No claim appears twice, and no line names a claim that is not in the surface.
+Use only Section 6's five claim verdicts or its examination status. Every claim in the surface appears exactly once. No claim appears twice, and no line names a claim that is not in the surface.
 
 Nothing else goes on these lines. Write the ledger in full, however long it runs.
 
 **2. What the numbers do not say.** In prose, after the ledger:
 
 - why each `[unverifiable]` claim could not be settled;
-- where the work stopped, and why any `[unattempted]` claims are or are not low-risk;
 - anything in the claim sources that was not counted as a claim, and why;
 - any `[unclaimed]` observation, per Section 6;
 - any addendum created under Section 12, step 2.
