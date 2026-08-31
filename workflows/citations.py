@@ -35,6 +35,49 @@ _LOOKS_LIKE_A_FILE = re.compile(r"\.[A-Za-z][A-Za-z0-9]{0,4}$")
 _DOCN = re.compile(r"^doc(\d)", re.I)
 _FINDING = re.compile(r"^\s*\**\s*Finding\s+(\d+)[^\n\[]*\[([^\]]+)\]", re.M | re.I)
 
+# THE SAME HEADER, WITH THE CLAIM IDS KEPT. METHOD §5 puts them there —
+# `Finding 9 (claims 2, 3, 5-7, 30)` — so a finding traces back to the frozen
+# surface. Nothing read them until 2026-08-31: `deliver.py` matched the group
+# and threw it away, so the delivery brief could say "4 findings" and never
+# "5 claims", and no stage could compare the findings against §16's ledger.
+#
+# The optional group must sit immediately after the number, or a title's own
+# parenthesis — `Finding 5: Workflow builder (drag-and-drop) — [partial]` —
+# would be read as a claim list. A derived finding names no claim and matches
+# with the group empty, which is correct rather than missing.
+_FINDING_CLAIMS = re.compile(
+    r"^\s*\**\s*Finding\s+(\d+)\s*(?:\(claims?\s+([^)]*)\))?[^\n\[]*\[([^\]]+)\]",
+    re.M | re.I)
+# `5-7` and `43–46`: a range in either dash a model reaches for.
+_CLAIM_RANGE = re.compile(r"^(\d+)\s*[-–—]\s*(\d+)$")
+
+
+def _claim_ids(text: str) -> List[int]:
+    """The claim numbers a header's `(claims …)` list names, ranges expanded.
+
+    Anything that is neither a number nor a range is dropped rather than
+    guessed at. A header this cannot read reports no claims, which surfaces as
+    an untraceable finding — a defect a person repairs — and never as a claim
+    silently credited to the wrong finding.
+    """
+    out: List[int] = []
+    for part in (text or "").split(","):
+        part = part.strip()
+        span = _CLAIM_RANGE.match(part)
+        if span:
+            lo, hi = int(span.group(1)), int(span.group(2))
+            if lo <= hi:
+                out += list(range(lo, hi + 1))
+        elif part.isdigit():
+            out.append(int(part))
+    return out
+
+
+def finding_claims(report: str) -> List[Dict[str, Any]]:
+    """Each §5 finding header: its number, the claims it names, its verdict."""
+    return [{"n": int(n), "claims": _claim_ids(ids), "verdict": v.strip().lower()}
+            for n, ids, v in _FINDING_CLAIMS.findall(report or "")]
+
 # A quote mark. Straight and curly, because a report that has been through a
 # model may carry either, and marks ALTERNATE open/close: they are paired in
 # document order, first with second, third with fourth. A regex that scans for

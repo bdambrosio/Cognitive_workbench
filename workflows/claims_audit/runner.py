@@ -530,6 +530,28 @@ def post_run_checks(out: Path, whole: str, external_repo: str) -> Dict[str, Any]
     except Exception as e:                                     # noqa: BLE001
         logger.warning("coverage check skipped (%s: %s)", type(e).__name__, e)
 
+    # WHETHER EVERY CLAIM WITH A VERDICT IS BACKED BY A FINDING THAT CITES IT.
+    # The check above proves the ledger accounts for the surface; this proves
+    # no verdict was asserted without evidence. Traceability, not ratios: a
+    # finding may bear on several claims and a claim on several findings.
+    # Reasoning in workflows/coverage.findings_check.
+    findings_check = None
+    try:
+        report_blk = blocks.content(whole, "REPORT", blocks.BLOCKS) or ""
+        covblk2 = blocks.content(whole, "COVERAGE", blocks.BLOCKS) or ""
+        findings_check = _cov.findings_check(report_blk, covblk2)
+        if not findings_check["ok"]:
+            for problem in findings_check["problems"]:
+                logger.warning("findings: %s", problem)
+                _iss.note(out, "claims_audit", "findings_ledger", problem,
+                          severity="blocking")
+        else:
+            logger.info("findings: %d claim findings for %d resolved claims",
+                        findings_check["claim_findings"],
+                        findings_check["resolved"])
+    except Exception as e:                                     # noqa: BLE001
+        logger.warning("findings check skipped (%s: %s)", type(e).__name__, e)
+
     # WHETHER THE REPORT'S CITATIONS RESOLVE, decided by a file operation.
     # METHOD §12 step 6b says a finding with an invalid citation does not ship,
     # and three shipped on 2026-08-30 past both the agent's own check and an
@@ -562,7 +584,8 @@ def post_run_checks(out: Path, whole: str, external_repo: str) -> Dict[str, Any]
     except Exception as e:                                     # noqa: BLE001
         logger.warning("citation check skipped (%s: %s)", type(e).__name__, e)
 
-    return {"coverage": coverage_check, "citations": citation_check}
+    return {"coverage": coverage_check, "citations": citation_check,
+            "findings": findings_check}
 
 def main() -> int:
     ap = argparse.ArgumentParser(
@@ -826,6 +849,7 @@ def main() -> int:
     _checks = post_run_checks(out, whole, str(cfg.get("external_repo") or ""))
     coverage_check = _checks["coverage"]
     citation_check = _checks["citations"]
+    findings_check = _checks["findings"]
 
     # Write the deliverables as files. run_meta.json carries the metadata;
     # without this the report exists only inside the trace's raw_response,
@@ -1010,6 +1034,7 @@ def main() -> int:
         # clean in the one file everything downstream reads.
         "citations_unresolved": citation_check,
         "coverage": coverage_check,
+        "findings": findings_check,
         "error": error,
         "captured_at_utc": ts,
     }, indent=2, default=str) + "\n", encoding="utf-8")
