@@ -546,9 +546,9 @@ def post_run_checks(out: Path, whole: str, external_repo: str) -> Dict[str, Any]
                 _iss.note(out, "claims_audit", "findings_ledger", problem,
                           severity="blocking")
         else:
-            logger.info("findings: %d claim findings for %d resolved claims",
+            logger.info("findings: %d findings for %d claims in the ledger",
                         findings_check["claim_findings"],
-                        findings_check["resolved"])
+                        findings_check["ledger_claims"])
     except Exception as e:                                     # noqa: BLE001
         logger.warning("findings check skipped (%s: %s)", type(e).__name__, e)
 

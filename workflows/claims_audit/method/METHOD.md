@@ -36,7 +36,7 @@ When reporting claim counts or rates, use the following terms consistently. Term
 | **resolved** | Attempted claims that reached one of the five claim verdicts in Section 6 |
 | **supported** | Resolved claims whose verdict is `[real]`, `[real, minor caveat]`, or `[real, operational caveat]` |
 
-An attempted claim that cannot be resolved is `[unverifiable]`. It is an examination status rather than a verdict, and it is included in the coverage figures.
+An attempted claim that cannot be resolved is `[unverifiable]`. It is an examination status rather than a verdict: it counts in `identified` and in neither `resolved` nor `supported`, so it lowers coverage and does not enter the consistency rate.
 
 **Coverage = resolved / identified.**  
 **Consistency rate = supported / resolved.**
@@ -75,7 +75,7 @@ The sequence is:
 
 1. Enumerate the claims (Section 12, step 2).
 2. Prioritize them using the order below.
-3. Record a verdict or examination status for every claim in Section 16's ledger, and say in the coverage block what the materials could not settle and why the remaining uncertainty matters.
+3. Give every claim a finding, and record its verdict or examination status in Section 16's ledger.
 
 ### Materiality
 
@@ -87,8 +87,8 @@ Several rules follow:
 - A discrepancy below the materiality threshold does not automatically make the claim unsupported. Use `[real, minor caveat]` for a claim that holds but has a non-material discrepancy.
 - Use `[real]` when the evidence supports the claim without a caveat worth reporting.
 - Materiality determines whether a discrepancy matters to the buyer's decision. It does not change whether the original claim was accurate.
-- A claim is resolved by adjudicating it against the findings that support or refute it. Every resolved claim, supported ones included, is named by at least one finding.
-- An attempted claim that cannot be settled is `[unverifiable]`. It is reported in the coverage block, not as a finding.
+- A claim is settled by adjudicating it against the evidence that supports or refutes it. Every claim in the frozen surface is named by exactly one finding, supported ones included.
+- An attempted claim the materials cannot settle is `[unverifiable]`. It produces a finding like any other outcome; Section 1a gives how it counts.
 - Materiality is judged against the buyer's decision, not against the auditor's preferences. For example, poor code organization is not material unless it bears on a claim or creates a decision-relevant consequence.
 
 ### Priority order
@@ -106,7 +106,7 @@ If a tier contains no claims, state that in the coverage block. The priority ord
 
 ## 5. Finding format
 
-Use the following form for a finding that bears on one or more seller claims:
+Use the following form for a finding that adjudicates one or more seller claims:
 
 ```text
 **Finding N (claim <id>): <short title> — [claim verdict]**
@@ -118,15 +118,15 @@ Evidence: <document or file:lines> — <what the materials show>
 Gap: <None, or the specific gap>
 ```
 
-`Finding N` numbers the findings in this report. `claim <id>` is the claim's number in the frozen surface, so a reader can trace a finding back to what was enumerated. Where one determination settles several claims, name them all — `(claims 8, 27)` or `(claims 10-16)` — and carry the verdict those claims received.
+`Finding N` numbers the findings in this report. `claim <id>` is the claim's number in the frozen surface, so a reader can trace a finding back to what was enumerated. Where one determination settles several claims, name them all — `(claims 8, 27)` or `(claims 10-16)` — and carry the verdict those claims received. Where the materials could not settle a claim, the bracket carries `[unverifiable]` and the finding takes the form under *Evidence of absence*.
 
-Cite both the source of the claim and the evidence used to resolve it. A reader should be able to inspect both sides of the comparison.
+Cite both the source of the claim and the evidence used to resolve it. A reader should be able to inspect both sides of the comparison. The `Evidence` field may carry one or more `Derived:` blocks, in the form under *Derived statements* below, alongside its direct citations.
 
-There are three evidence patterns:
+A finding's evidence takes one of three forms:
 
-- **Ordinary claim finding:** cite the claim source and the evidence that resolves it.
-- **Claim finding based on absence:** cite the claim source and record the searches used to establish whether the claimed implementation or evidence exists. There may be no line citation for the absent item.
-- **Derived statement:** an inference drawn from two or more cited facts, offered as evidence within a finding. Cite every source figure and show the derivation explicitly; *Derived statements* below gives the form.
+- **Direct evidence:** cite the claim source and the material that resolves it.
+- **Evidence of absence:** cite the claim source and record the searches used to establish whether the claimed implementation or evidence exists. There may be no line citation for the absent item.
+- **Derived statement:** an inference drawn from two or more cited facts. Cite every source figure and show the derivation explicitly; *Derived statements* below gives the form.
 
 ### Numeric and date evidence
 
@@ -140,6 +140,12 @@ A statement such as “this is not implemented” cannot normally be supported b
 - **Structural search:** inspect the directory, module, document set, or other location where the implementation or evidence would reasonably appear.
 
 Record the searches actually performed. A search establishes diligence, not absolute absence. If the searches do not settle the question, classify the claim as `[unverifiable]`, not `[delta]`.
+
+An `[unverifiable]` finding uses the Section 5 form. Its `Evidence` field carries the two searches. Its `Gap` field states which of these the searches established, and what would settle the claim:
+
+- **not in the materials** — the supplied documents contain nothing that would settle it either way. A framework version, where no manifest or lockfile was supplied.
+- **present but not readable** — the artifact is in the materials and cannot be interrogated as supplied. A compiled archive with no source.
+- **outside the materials** — the claim's subject was not supplied for audit. A package named in a claim source and distributed elsewhere.
 
 ### Derived statements
 
@@ -164,7 +170,7 @@ Rules for derived statements:
 
 A time-dependent derived statement must state the relevant date and what changes on that date. The deliverable also carries an as-of date for the materials, because the conclusions apply to the supplied snapshot.
 
-## 6. Verdicts, statuses, and observation types
+## 6. Verdicts, examination status, and observations
 
 Three vocabularies are used for different purposes.
 
@@ -182,7 +188,7 @@ These describe how a stated seller claim compares with the evidence. Every resol
 
 ### Examination status
 
-This describes an identified claim the audit attempted and could not settle. It is not a claim verdict, and it is excluded from `resolved` and from both rates in Section 1a.
+This describes an identified claim the audit attempted and could not settle. It is not a claim verdict; Section 1a gives how it counts.
 
 | Status | Meaning |
 |---|---|
@@ -196,11 +202,15 @@ It produces a finding like any other outcome: the claim, the searches under *Evi
 |---|---|---|
 | `[unclaimed]` | The materials contain relevant information about something the seller did not claim | Coverage block |
 
-**A finding is the statement of the verdict of adjudicating a set of cited evidence with respect to a claim.** It is the claim, the adjudication, and the evidence the adjudication rests on. Every claim carries one verdict, so every claim the audit settles has one finding.
+### What a finding is
+
+**A finding is the statement of the verdict of adjudicating a set of cited evidence with respect to a claim.** It is the claim, the adjudication, and the evidence the adjudication rests on. Every claim carries one verdict or examination status, so every claim in the frozen surface has exactly one finding.
 
 One finding may adjudicate several claims where a single determination settles them all; name them all in the header. Split a finding whose claims received different verdicts, so that each header carries one verdict.
 
 A derived statement (Section 5) is evidence a finding cites, not a finding.
+
+### Choosing between them
 
 `[partial]` and `[delta]` should remain distinct. `[partial]` means the claim substantially holds but has a material limitation. `[delta]` means the claim itself is contradicted by the evidence.
 
@@ -483,9 +493,9 @@ The report contains three parts in this order:
 
 1. **Conclusion**, using only the vocabulary in Section 9.
 2. **Findings, ordered from highest to lowest consequence.**
-   - Ordinary claim findings use the Section 5 format and cite both claim and resolving evidence.
-   - Findings based on absence cite the claim and record both required searches.
-   - Derived statements use Section 5's form inside the finding that cites them.
+   - Every finding uses the Section 5 format and cites both the claim and the evidence that resolves it.
+   - Where the evidence is an absence, it records both required searches.
+   - Where it is a derived statement, it uses Section 5's form inside the finding that cites it.
 3. **Questions the client should ask the seller before closing.**
 
 Coverage is not part of the report block. It is the `=== COVERAGE ===` block below.
@@ -499,13 +509,13 @@ As a rough writing budget:
  - a supported claim normally needs its verdict, citations, and a short explanatory clause — roughly 20–30 words;
  - a claim that is not supported normally needs the claim, the resolving evidence, and the consequence of the gap — roughly 80 words.
 
-Do not reduce length by dropping citations or by leaving a resolved claim out of the findings. Either makes the report harder to verify against the frozen claim surface.
+Do not reduce length by dropping citations or by leaving a claim out of the findings. Either makes the report harder to verify against the frozen claim surface.
 
 ### `=== COVERAGE ===`
 
 **Every identified claim carries exactly one verdict or examination status.** Coverage counts claims, never findings. If a frozen claim nevertheless contains more than one seller assertion, it still carries one verdict; where its parts differ, Section 6's `[partial]` is the verdict for a claim that is substantially true with a specific gap.
 
-This ledger is the arithmetic record the coverage figures are computed from. It does not replace the findings; Section 4 still requires every resolved claim to be named by at least one finding.
+This ledger is the arithmetic record the coverage figures are computed from. It does not replace the findings; Section 4 still requires every claim to be named by exactly one finding.
 
 This block contains two parts.
 
@@ -521,7 +531,6 @@ Nothing else goes on these lines. Write the ledger in full, however long it runs
 
 **2. What the numbers do not say.** In prose, after the ledger:
 
-- why each `[unverifiable]` claim could not be settled;
 - anything in the claim sources that was not counted as a claim, and why;
 - any `[unclaimed]` observation, per Section 6;
 - any addendum created under Section 12, step 2.

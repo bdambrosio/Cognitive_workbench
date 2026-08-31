@@ -153,8 +153,12 @@ def findings_check(report: str, coverage_block: str) -> Dict[str, Any]:
     the defect. On `cm_ledger_glm_1` claim 2 read `[real]` in its header and
     `[real, minor caveat]` in the ledger, and nothing was watching.
 
-    And the audit must not assert a verdict it never backed: claim 29 on the
-    same run carried a ledger verdict and was named by no finding at all.
+    And the audit must not assert an outcome it never backed. Claim 29 on the
+    same run carried a ledger verdict and was named by no finding at all; on
+    the 2026-08-31 fixture run claim 19 was adjudicated `[partial]` in the
+    coverage block's prose, with grounds, and given no finding either. Every
+    claim in the ledger owes one — an `[unverifiable]` claim included, since
+    METHOD \u00a76 makes it a finding like any other outcome.
 
     NAMES THE DEFECT, like `check` above. "Claim 29 has no finding" is repaired
     in one line; "the findings and the ledger disagree" is not.
@@ -162,8 +166,6 @@ def findings_check(report: str, coverage_block: str) -> Dict[str, Any]:
     from workflows.citations import finding_claims
 
     ledger = dict(parse_ledger(coverage_block))
-    resolved = {n for n, v in ledger.items() if v in RESOLVED}
-    unresolved = {n for n, v in ledger.items() if v in UNRESOLVED}
 
     # LEGACY TOLERANCE. A derivation is evidence a finding cites, not a
     # finding (§5), so nothing new carries a `[derived]` header. The 28
@@ -176,10 +178,9 @@ def findings_check(report: str, coverage_block: str) -> Dict[str, Any]:
             by_claim.setdefault(c, []).append(f["n"])
     seen = set(by_claim)
 
-    missing = sorted(resolved - seen)
+    missing = sorted(set(ledger) - seen)
     unknown = sorted(seen - set(ledger))
     untraceable = [f["n"] for f in claim_findings if not f["claims"]]
-    unresolved_as_finding = sorted(seen & unresolved)
     duplicated = sorted(c for c, fs in by_claim.items() if len(fs) > 1)
     # Every claim under one header shares that header's verdict, so the
     # comparison runs over all of them rather than only single-claim findings.
@@ -196,8 +197,8 @@ def findings_check(report: str, coverage_block: str) -> Dict[str, Any]:
         problems.append("the coverage block carries no verdict ledger, so the "
                         "findings cannot be checked against it")
     if missing:
-        problems.append(f"{len(missing)} resolved claim(s) are named by no "
-                        "finding: " + _ids(missing))
+        problems.append(f"{len(missing)} claim(s) in the ledger are named by "
+                        "no finding: " + _ids(missing))
     if duplicated:
         problems.append("claims adjudicated by more than one finding: "
                         + _ids(duplicated))
@@ -213,16 +214,12 @@ def findings_check(report: str, coverage_block: str) -> Dict[str, Any]:
     if untraceable:
         problems.append("finding(s) name no claim, so nothing they establish "
                         "reaches the surface: " + _ids(untraceable))
-    if unresolved_as_finding:
-        problems.append("[unverifiable] claims are stated as findings; METHOD "
-                        "\u00a76 reports them in the coverage block: "
-                        + _ids(unresolved_as_finding))
 
     return {"ok": not problems, "problems": problems,
-            "resolved": len(resolved), "claim_findings": len(claim_findings),
+            "ledger_claims": len(ledger),
+            "claim_findings": len(claim_findings),
             "claims_in_findings": len(seen), "missing": missing,
             "unknown": unknown, "untraceable": untraceable,
-            "unresolved_as_finding": unresolved_as_finding,
             "duplicated": duplicated, "verdict_mismatch": mismatch}
 
 
