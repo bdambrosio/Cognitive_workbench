@@ -320,21 +320,72 @@ def header(run: Path) -> str:
     # naming, which beats a directory name ("chattermate" for ChatterMate).
     gap = (run / "gap_map.md").read_text(errors="replace") \
         if (run / "gap_map.md").is_file() else ""
-    named = re.match(r"\s*(?:===[^\n]*===\s*)?\*\*([^*\n]{2,60})\*\*", gap)
-    target = (named.group(1).strip() if named
-              else Path(meta.get("external_repo") or "").name or "the target")
+    # Two shapes seen: `**ChatterMate** — open-source…` and `**Target:**
+    # flowmetrics — small SaaS…`. A bold span ending in a colon is a label, so
+    # the name is what follows it, not the label itself — which is how a
+    # deliverable came out titled "Technical claims audit — Target:".
+    named = re.match(r"\s*(?:===[^\n]*===\s*)?\*\*([^*\n]{2,60})\*\*\s*([^\n—,-]{0,60})",
+                     gap)
+    target = Path(meta.get("external_repo") or "").name or "the target"
+    if named:
+        lead, after = named.group(1).strip(), named.group(2).strip()
+        target = after or lead if lead.endswith(":") else lead
     when = (meta.get("captured_at_utc") or "")[:10] or "undated"
     return (f"# Technical claims audit — {target}\n\n"
             f"Materials as of {when}. Limited assurance; see Limitations.\n")
 
 
-def finding_groups(run: Path) -> List[Dict[str, Any]]:
-    """The report's finding sections, keyed, for the agent's SECTION NOTES.
+# Verdict classes, in the order a reader should meet them: what is not true,
+# what is true with a material gap, what could not be settled, what holds with
+# a caveat, what holds. §16 asks for highest to lowest consequence and verdict
+# is the best proxy available without asking anyone to rank.
+_GROUP_ORDER = (("delta",), ("partial",), ("unverifiable",),
+                ("real, minor caveat", "real, operational caveat"), ("real",),
+                ("derived",))
 
-    A key is positional (`group1`, `group2`) rather than derived from the
-    heading, because the heading is the thing the agent replaces. A referent
-    that changes when the agent writes is not a referent.
+
+def finding_groups(run: Path) -> List[Dict[str, Any]]:
+    """The report's findings, grouped by verdict, keyed for SECTION NOTES.
+
+    GROUPED BY VERDICT, NOT BY THE REPORT'S HEADINGS. It read `##` sections
+    until 2026-08-31, when a fixture run whose report carried no headings at
+    all produced zero groups — the agent's section notes had nothing to attach
+    to, no appendix was built, and the reorganisation silently did nothing.
+    METHOD §16 never specified markup, so the same method produced a
+    heading-structured report on one model and a flat one on another.
+
+    Depending on those headings was wrong twice over: they are unspecified, and
+    delivery REPLACES them anyway. Verdict class is deterministic, available
+    whatever the model wrote, and is the partition the headings were encoding.
+
+    A key is positional (`group1`, `group2`) rather than named after a verdict,
+    so the agent is not handed the audit's vocabulary to echo back.
     """
+    report = (run / "report.md").read_text(errors="replace")
+    body = blocks.content(report, "REPORT", blocks.REVIEW_BLOCKS) or report
+    titles = {int(n): ti.strip() for n, ti, _ in _FINDING_TITLE.findall(report)}
+    found = [{"n": int(n), "verdict": v.strip().lower(),
+              "title": titles.get(int(n), "")}
+             for n, v in _FINDING.findall(body)]
+    out, i = [], 0
+    known = {v for k in _GROUP_ORDER for v in k}
+    # A verdict outside §6 still gets a group. Nothing a report states may
+    # disappear because this file did not recognise it.
+    classes = list(_GROUP_ORDER) + [tuple(sorted({f["verdict"] for f in found}
+                                                 - known))]
+    for klass in classes:
+        members = [f for f in found if f["verdict"] in klass]
+        if not members:
+            continue
+        i += 1
+        out.append({"key": f"group{i}",
+                    "heading": ", ".join(f"[{k}]" for k in klass),
+                    "findings": members})
+    return out
+
+
+def _finding_groups_by_heading(run: Path) -> List[Dict[str, Any]]:
+    """Superseded. Kept only so the shape it produced is on the record."""
     report = (run / "report.md").read_text(errors="replace")
     body = blocks.content(report, "REPORT", blocks.REVIEW_BLOCKS) or report
     titles = {int(n): ti.strip() for n, ti, _ in _FINDING_TITLE.findall(report)}
@@ -356,6 +407,23 @@ def finding_groups(run: Path) -> List[Dict[str, Any]]:
     return out
 
 
+def _all_finding_blocks(text: str) -> List[Tuple[int, str]]:
+    """Each §5 finding block, from its header to the next one."""
+    cuts = [(int(m.group(1)), m.start()) for m in _FINDING.finditer(text)]
+    out = []
+    for i, (n, s) in enumerate(cuts):
+        e = cuts[i + 1][1] if i + 1 < len(cuts) else len(text)
+        out.append((n, text[s:e]))
+    return out
+
+
+def _finding_block(text: str, n: int) -> str:
+    for num, blk in _all_finding_blocks(text):
+        if num == n:
+            return blk
+    return ""
+
+
 def assemble(run: Path, written: Optional[Dict[str, Any]] = None) -> str:
     """The report with its inventory moved to an appendix. Nothing reworded.
 
@@ -372,52 +440,84 @@ def assemble(run: Path, written: Optional[Dict[str, Any]] = None) -> str:
     gap = (run / "gap_map.md").read_text(errors="replace") \
         if (run / "gap_map.md").is_file() else ""
 
+    # THE REPORT IS FINDINGS PLUS WHAT SURROUNDS THEM, not a set of sections.
+    # §16 gives the report three parts and specifies no markup, so one model
+    # writes `##` headings and another writes none. Findings are located by
+    # their own §5 header, which every report has by construction; whatever
+    # precedes the first is the conclusion, whatever follows the last is the
+    # questions. Nothing depends on a heading the auditor may not have written.
+    cuts = [m.start() for m in _FINDING.finditer(body)]
+    if cuts:
+        # Whatever precedes the first finding is the conclusion. A heading on
+        # its last line only labelled the findings that follow, and those are
+        # regrouped, so it goes.
+        head = re.sub(r"(?m)^#{2,3} .*$\s*\Z", "", body[:cuts[0]]).rstrip()
+        # The findings end where the next heading or inventory line begins.
+        after = body[cuts[-1]:]
+        stop = re.search(r"(?m)^#{2,3} |^\s*\d+\.\s+(?!\*)[^\n\[]{3,}?\s*[—-]\s*\[",
+                         after[1:])
+        body_findings = body[cuts[0]:cuts[-1]] + (
+            after[:1 + stop.start()] if stop else after)
+        rest = after[1 + stop.start():] if stop else ""
+    else:
+        head, body_findings, rest = body, "", ""
+
+    # The remainder still has its own sections — coverage, questions — and one
+    # of them may be the supported inventory. Split THAT, not the whole body:
+    # slicing the document at headings is what broke when a report had none.
     keep, moved = [], []
-    for heading, text in sections(body):
-        (moved if is_inventory(text) else keep).append((heading, text))
-
-    # The agent's headings replace the audit's, in the order the groups were
-    # keyed. Only the heading and the introduction are the agent's; the
-    # findings under them are untouched.
-    notes = written.get("sections") or {}
-    if notes:
-        groups = finding_groups(run)
-        by_heading = {g["heading"]: notes.get(g["key"]) for g in groups}
-        keep = [(("## " + n[0] if (n := by_heading.get(h.lstrip("# ").strip()))
-                  else h), (("\n" + n[1] + "\n" if n and n[1] else "") + txt))
-                for h, txt in keep]
-
-    # The conclusion sits above the first heading, so it is in no contents list
-    # and does not look like the thing the document exists to say. Where the
-    # auditor already opened with `**Conclusion: X.**` the label moves INTO the
-    # heading rather than being printed twice — the verdict ends up more
-    # prominent, not less, and the sentence after it is untouched. Strictly
-    # matched, and left alone if it does not match.
-    if keep and not keep[0][0]:
-        lead = keep[0][1]
-        m = re.match(r"\s*\*\*Conclusion:\s*([^.*]{2,40})\.?\*\*\s*", lead)
-        if m:
-            keep[0] = (f"## Conclusion — {m.group(1).strip()}",
-                       "\n" + lead[m.end():].lstrip())
+    for heading, text in sections(rest):
+        # A moved heading is demoted one level so it nests under the appendix
+        # rather than sitting beside it. Depth is layout; the text is untouched.
+        if is_inventory(text):
+            moved.append((("#" + heading + "\n") if heading else "") + text)
         else:
-            keep[0] = ("## Conclusion", lead)
+            keep.append((heading + "\n" if heading else "") + text)
 
+    notes = written.get("sections") or {}
+    groups = finding_groups(run) if notes else []
     out = [header(run)]
-    # The gap map is the executive summary (DELIVERY.md §7), copied whole.
     if gap:
         out.append("\n\n## Summary\n")
         out.append(_strip_markers(gap).strip())
     if written.get("cover"):
         out.append("\n\n## About this audit\n")
         out.append(written["cover"].strip())
-    out.append("\n\n" + "".join(h + "\n" + t for h, t in keep[:1]).rstrip())
+    if head.strip():
+        # The label moves INTO the heading rather than being printed twice, so
+        # the verdict is more prominent and the sentence after it is untouched.
+        m = re.match(r"\s*\*\*Conclusion:\s*([^.*]{2,40})\.?\*\*\s*", head)
+        if m:
+            out.append(f"\n\n## Conclusion — {m.group(1).strip()}\n\n"
+                       + head[m.end():].strip())
+        else:
+            out.append("\n\n## Conclusion\n\n" + head.strip())
     out.append("\n\n" + how_to_read().rstrip())
-    out.append("".join("\n\n" + h + "\n" + t for h, t in keep[1:]).rstrip())
 
-    # LIMITATIONS TRAVELS WITH THE REPORT, NOT AFTER THE APPENDICES. blocks.py
-    # keeps them separate blocks so nothing has to nest, and says why they are
-    # one document: ISAE 3000 / AT-C 205 require the limitations to travel with
-    # the report. A reader stops at the appendices.
+    if groups:
+        placed = set()
+        for g in groups:
+            n = notes.get(g["key"])
+            heading = ("## " + n[0]) if n and n[0] else f"## {g['heading']}"
+            out.append("\n\n" + heading + "\n")
+            if n and n[1]:
+                out.append(n[1].strip() + "\n")
+            for f in g["findings"]:
+                blk = _finding_block(body_findings, f["n"])
+                if blk:
+                    out.append("\n" + blk.strip() + "\n")
+                    placed.add(f["n"])
+        # Anything the grouping did not place still ships, unheaded.
+        leftover = [b for n, b in _all_finding_blocks(body_findings)
+                    if n not in placed]
+        if leftover:
+            out.append("\n\n" + "\n\n".join(b.strip() for b in leftover))
+    elif body_findings.strip():
+        out.append("\n\n" + body_findings.strip())
+    for seg in keep:
+        if seg.strip():
+            out.append("\n\n" + seg.strip())
+
     cv = coverage_of(run)
     if not cv["legacy"]:
         # The figures are computed; the agent's prose, if any, sits under them.
@@ -435,10 +535,7 @@ def assemble(run: Path, written: Optional[Dict[str, Any]] = None) -> str:
         out.append("Every remaining resolved claim, with the evidence that "
                    "resolves it. These are listed rather than written up "
                    "because none of them is a gap.\n")
-        # Demoted one level so a moved heading nests UNDER the appendix
-        # rather than sitting beside it. Heading depth is layout; the heading
-        # text and everything below it are untouched.
-        out.append("".join("#" + h + "\n" + t for h, t in moved).rstrip())
+        out.append("\n".join(seg.strip() for seg in moved).rstrip())
     surface = claim_surface(run)
     if surface:
         out.append("\n\n## Appendix B — the claim surface\n")

@@ -175,9 +175,14 @@ def test_section_note_keys_survive_the_shapes_a_model_reaches_for():
     assert notes["group3"] == ("One claim that could not be settled", "")
 
 
-def test_the_agents_headings_replace_the_audits_and_findings_are_untouched(tmp_path):
+def test_the_agents_headings_replace_the_fallback_and_findings_are_untouched(tmp_path):
     """The agent supplies a heading and an introduction per group. Everything
-    under them is the auditor's text and must arrive unchanged."""
+    under them is the auditor's text and must arrive unchanged.
+
+    Groups are formed by verdict class, not by the report's own headings —
+    METHOD §16 specifies no markup, and a fixture report carrying none produced
+    zero groups until 2026-08-31. The fallback heading is the verdict label,
+    which the agent's heading replaces."""
     run = _run(tmp_path)
     from workflows.audit_postprocess.deliver import finding_groups
     groups = finding_groups(run)
@@ -188,7 +193,8 @@ def test_the_agents_headings_replace_the_audits_and_findings_are_untouched(tmp_p
                          "sections": {key: ("Claims the evidence contradicts",
                                             "An introduction.")}})
     assert "## Claims the evidence contradicts" in out
-    assert groups[0]["heading"] not in out          # the audit's heading is gone
+    # the fallback verdict label is not used as a heading when the agent wrote one
+    assert f"## {groups[0]['heading']}" not in out
     assert "An introduction." in out
     assert sorted(_FINDING.findall(out)) == sorted(_FINDING.findall(REPORT))
     assert "Evidence: chat_agent.py:898 — single session_id." in out
