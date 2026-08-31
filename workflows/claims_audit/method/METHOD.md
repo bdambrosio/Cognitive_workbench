@@ -4,8 +4,6 @@
 
 This is a one-shot, limited technical due-diligence engagement for a buyer evaluating a target they do not own, in acquisitions under $5M.
 
-The basic task is straightforward:
-
 > Compare the seller's stated claims with the available evidence, and cite the evidence used.
 
 Section 11 describes what is outside the scope of this audit.
@@ -18,7 +16,13 @@ The report may state which resolved claims are supported and which are not. It m
 
 Two rules apply:
 
-1. **Coverage travels with the conclusion.** Wherever the deliverable states its conclusion, it states how many identified claims were resolved and how many resolved claims were supported. You do not write those figures: they are arithmetic over the verdict ledger in Section 16, and the client's process computes them and places them in the report and the Gap Map. What you owe is a ledger that accounts for every claim in the frozen surface exactly once.
+1. **You write the ledger; the process writes the figures.** What you owe is Section 16's verdict ledger: one line per claim, accounting for every claim in the frozen surface exactly once. Every coverage figure is arithmetic over it, and the client's process computes each one and places it after your report and at the end of the Gap Map. You will not see those sentences as you write; they are placed there when the document is assembled.
+
+   **Write no count or ratio of claims by verdict anywhere in the deliverable**: not in the conclusion, not in the Gap Map, not in the coverage block. Describe the shape of the result in words, and let the figures stand beneath it.
+
+   > Not: “The seller's claim sources are broadly accurate — 42 of 47 resolved claims are supported without material gap — but five claims are contradicted by the code.”
+   >
+   > Instead: “The seller's claim sources are broadly accurate. The claims contradicted by the code are concentrated in documentation of defaults, unimplemented metering, and two features described more broadly than they are built.”
 2. **Do not imply broader coverage than the work supports.** For example, avoid “the system does what it says.” The figures the process emits are bounded by construction: “Coverage: 39 of 43 identified claims resolved; 37 of 39 resolved claims supported.” Do not write around them with a wider claim.
 
 ### Claim-state quantities
@@ -32,7 +36,7 @@ When reporting claim counts or rates, use the following terms consistently. Term
 | **resolved** | Attempted claims that reached one of the five claim verdicts in Section 6 |
 | **supported** | Resolved claims whose verdict is `[real]`, `[real, minor caveat]`, or `[real, operational caveat]` |
 
-An attempted claim that cannot be resolved is `[unverifiable]`. An identified claim that was never attempted is *unattempted* and is included in the coverage figures.
+An attempted claim that cannot be resolved is `[unverifiable]`. An identified claim the work never reached is `[unattempted]`. Both are examination statuses rather than verdicts, and both are included in the coverage figures.
 
 **Coverage = resolved / identified.**  
 **Consistency rate = supported / resolved.**
@@ -71,11 +75,11 @@ The sequence is:
 
 1. Enumerate the claims (Section 12, step 2).
 2. Prioritize them using the order below.
-3. Report coverage explicitly: identified, attempted where relevant, resolved, supported, what was not attempted, and why the remaining uncertainty matters.
+3. Record a verdict or examination status for every claim in Section 16's ledger, and say in the coverage block what was not attempted and why the remaining uncertainty matters.
 
 ### Materiality
 
-A gap is material if a reasonable buyer, knowing about it, could change the price, the structure of the transaction, or the decision to close. Materiality is relative to the transaction. The same defect may matter in a $400k acquisition and be immaterial in a $40M transaction.
+A gap is material if a reasonable buyer, knowing about it, could change the price, the structure of the transaction, or the decision to close. Materiality is relative to the transaction. The same defect may matter in a $400k acquisition and be immaterial in a $4M one.
 
 Several rules follow:
 
@@ -83,8 +87,8 @@ Several rules follow:
 - A discrepancy below the materiality threshold does not automatically make the claim unsupported. Use `[real, minor caveat]` for a claim that holds but has a non-material discrepancy.
 - Use `[real]` when the evidence supports the claim without a caveat worth reporting.
 - Materiality determines whether a discrepancy matters to the buyer's decision. It does not change whether the original claim was accurate.
-- Every resolved claim produces a finding, including supported claims. A rate alone does not identify which claims were supported.
-- An attempted claim that cannot be settled is `[unverifiable]`. It is reported in the coverage statement, not as a finding.
+- A claim is resolved by adjudicating it against the findings that support or refute it. Every resolved claim, supported ones included, is named by at least one finding.
+- An attempted claim that cannot be settled is `[unverifiable]`. It is reported in the coverage block, not as a finding.
 - `[derived]` findings are not included in the consistency rate because they do not test a seller claim.
 - Materiality is judged against the buyer's decision, not against the auditor's preferences. For example, poor code organization is not material unless it bears on a claim or creates a decision-relevant consequence.
 
@@ -97,13 +101,13 @@ Every identified claim is assigned to one of four tiers. The tier is based on th
 3. **Failure creates a bounded remediation cost in time or money.** Examples include incorrect retry intervals, timeouts, monitoring behavior, retention periods, or thresholds that can be corrected without changing the nature of the asset.
 4. **Failure is individually minor.** These claims are addressed last and are the most likely to remain unattempted if the engagement stops early.
 
-A claim finding takes the tier assigned to the claim. A derived finding takes at least the highest tier of the facts on which it depends and may be assigned a higher tier if the derived consequence is more severe.
+A claim finding takes the tier assigned to the claim. A derived finding takes at least the highest-priority tier of the facts on which it depends and may be assigned a higher-priority tier if the derived consequence is more severe.
 
-If a tier contains no claims, state that in the coverage statement. The purpose of the priority order is to ensure that, if the audit stops because of time, budget, or access constraints, the highest-consequence uncertainties have been addressed first.
+If a tier contains no claims, state that in the coverage block. The purpose of the priority order is to ensure that, if the audit stops because of time, budget, or access constraints, the highest-consequence uncertainties have been addressed first.
 
 ## 5. Finding format
 
-Use the following form for a finding that resolves a seller claim:
+Use the following form for a finding that bears on one or more seller claims:
 
 ```text
 **Finding N (claim <id>): <short title> — [claim verdict]**
@@ -115,9 +119,7 @@ Evidence: <document or file:lines> — <what the materials show>
 Gap: <None, or the specific gap>
 ```
 
-`Finding N` numbers the findings in this report. `claim <id>` is the claim's number in the frozen surface, so a reader can trace a finding back to what was enumerated. Where one finding resolves several claims, name them: `(claims 12-17)`. A derived finding resolves no claim and uses the format below.
-
-The finding number and the claim number are different counts and are not expected to match. One claim may produce several findings — that is normal, and Section 16's coverage ledger, not the findings, is what records a claim's single verdict.
+`Finding N` numbers the findings in this report. `claim <id>` is the claim's number in the frozen surface, so a reader can trace a finding back to what was enumerated. Where a finding bears on several claims, name them all — `(claims 8, 27)` or `(claims 10-16)` — and carry the verdict those claims received. A derived finding names no claim and uses the format below.
 
 Cite both the source of the claim and the evidence used to resolve it. A reader should be able to inspect both sides of the comparison.
 
@@ -168,15 +170,13 @@ Rules for derived findings:
 
 A time-dependent derived finding must state the relevant date and what changes on that date. The deliverable also carries an as-of date for the materials, because the conclusions apply to the supplied snapshot.
 
-A derived finding takes the highest relevant priority tier of the facts on which it depends and may be raised if the derived consequence is more severe.
-
 ## 6. Verdicts, statuses, and observation types
 
 Three vocabularies are used for different purposes.
 
 ### Claim verdicts
 
-These describe how a stated seller claim compares with the evidence. Every resolved claim receives exactly one of these verdicts and produces a finding.
+These describe how a stated seller claim compares with the evidence. Every resolved claim receives exactly one of these verdicts.
 
 | Verdict | Meaning | Buyer impact |
 |---|---|---|
@@ -186,15 +186,14 @@ These describe how a stated seller claim compares with the evidence. Every resol
 | `[partial]` | The claim is substantially true but has a specific, citable material gap | Material; bounded gap to evaluate or price |
 | `[delta]` | The claim is false; the claim source says one thing and the evidence shows another | Material; broken claim and possible pattern |
 
-### Examination status
+### Examination statuses
 
-This describes an attempted claim for which no verdict could be reached. It is not a claim verdict and does not produce a finding.
+These describe an identified claim that reached no verdict. Neither is a claim verdict and neither produces a finding.
 
 | Status | Meaning | Where reported |
 |---|---|---|
-| `[unverifiable]` | The claim was attempted, but the supplied materials could not settle it | Coverage statement, with the reason |
-
-A claim that was never attempted is *unattempted* and is accounted for in the coverage figures.
+| `[unverifiable]` | The claim was attempted, but the supplied materials could not settle it | Coverage block, with the reason |
+| `[unattempted]` | The work stopped before the claim was examined (Section 12, step 5) | Coverage block, with the reason |
 
 ### Other observation types
 
@@ -203,12 +202,14 @@ These describe observations that are not seller-claim verdicts.
 | Type | Meaning | Finding? |
 |---|---|---|
 | `[derived]` | A consequence derived from two or more facts stated in the materials | Yes |
-| `[unclaimed]` | The materials contain relevant information about something the seller did not claim | No; note in the coverage statement |
+| `[unclaimed]` | The materials contain relevant information about something the seller did not claim | No; note in the coverage block |
 
-A finding is therefore either:
+A finding is a cited record of what the materials show:
 
-- a resolved claim with one of the five claim verdicts; or
-- a `[derived]` finding.
+- a **claim finding** bears on one or more seller claims and carries the verdict those claims received;
+- a **derived finding** bears on no seller claim and carries `[derived]`.
+
+One finding may bear on several claims, and one claim may be settled by several findings. Split a finding whose claims received different verdicts, so that each header carries one verdict.
 
 `[partial]` and `[delta]` should remain distinct. `[partial]` means the claim substantially holds but has a material limitation. `[delta]` means the claim itself is contradicted by the evidence.
 
@@ -222,8 +223,6 @@ Use the narrowest verdict that fits the evidence.
 
 If later evidence contradicts a finding, revise the finding and record a one-line explanation of what changed and why.
 
-The citation trail should represent an evidence-based process in which findings can change when the evidence changes.
-
 ## 8. Reader and document structure
 
 Write for the person making the transaction decision. The Gap Map should be understandable in about thirty seconds. The full report is a reference document for readers who need the supporting detail.
@@ -231,9 +230,9 @@ Write for the person making the transaction decision. The Gap Map should be unde
 The two documents serve different purposes:
 
 - The **Gap Map** is read from beginning to end and presents the conclusion, the most important findings, and coverage.
-- The **report** may contain a finding for every resolved claim and can therefore be long. It should be organized so a reader can begin with the conclusion, review the highest-consequence findings, and then locate any specific claim and its evidence.
+- The **report** backs every claim it resolves (Section 4) and can therefore be long. It should be organized so a reader can begin with the conclusion, review the highest-consequence findings, and then locate any specific claim and its evidence.
 
-The report therefore opens with the conclusion and coverage, orders findings from most to least significant, and closes with a concise explanation that a non-specialist can understand and repeat accurately.
+The report therefore opens with the conclusion, orders findings from most to least significant, and closes with a concise explanation that a non-specialist can understand and repeat accurately.
 
 ## 9. Report-level conclusion
 
@@ -337,7 +336,12 @@ The current implementation is launched through `workflows/claims_audit/scenario.
 
 4. **Work through the priority order.** Do not require client confirmation between claims. Questions for the seller are collected for the deliverable.
 
-5. **Stop when the identified claims still unattempted are in the lowest tiers defined in Section 4, and the resolved claims so far have been consistently supported.** State where the work stopped and why in the coverage statement.
+5. **Attempt every identified claim.** Where the engagement cannot — for reasons of time, budget, or access — stop only when both of these hold:
+
+   - no Tier 1 or Tier 2 claim is left unattempted; and
+   - every remaining claim from a claim source that has already produced a `[delta]` has been attempted.
+
+   Record each claim not attempted as `[unattempted]` in the Section 16 ledger; Section 16 says what the coverage block must add.
 
 6. **Write the report.** Apply the correction protocol in Section 7 to any findings that changed during the engagement.
 
@@ -412,7 +416,7 @@ Each audit runs in an isolated environment that is discarded afterward. Client-s
 
 The working record is retained even though the isolated audit environment is discarded.
 
-The final report now contains a finding for every resolved claim, so it records much of what previously existed only in the working trace. The working record remains useful because it preserves information the report does not contain, including:
+The final report cites the evidence behind every resolved claim, so it records much of what previously existed only in the working trace. The working record remains useful because it preserves information the report does not contain, including:
 
 - searches and dead ends that preceded a finding;
 - the work performed on `[unverifiable]` claims; and
@@ -464,7 +468,7 @@ The coverage line reports resolved / identified and supported / resolved. The cl
 
 If the conclusion is **Clear** and there are no caveats, the Gap Map may be reduced to a very short statement, for example:
 
-> No gaps found. N of N identified claims resolved and supported. Full report attached.
+> No gaps found. Full report attached.
 
 Do not add promotional content such as logos, pricing, or sales calls to action. The Gap Map is a professional deliverable, not a brochure.
 
@@ -482,7 +486,7 @@ The deliverable contains five blocks, each with explicit opening and closing mar
 
 An opening marker identifies the block being delivered. A closing marker confirms that the block is complete rather than merely interrupted or truncated. Emit them in that order.
 
-The blocks, rather than conversational turns, define completion. The claim surface must be closed before claims are evaluated because it supplies the denominator for later coverage figures. Coverage is a separate block after the report for the matching reason: it is a statement about claims, and it can only be written once every claim has a verdict.
+The blocks, rather than conversational turns, define completion. The claim surface must be closed before claims are evaluated because it supplies the denominator for later coverage figures. Coverage is a separate block after the report for the matching reason: it is a statement about claims, and it can only be written once every claim carries a verdict or a status.
 
 Each marker appears on its own line. Nothing should appear between an opening marker and the content of that block.
 
@@ -505,18 +509,20 @@ Coverage is not part of the report block. It is the `=== COVERAGE ===` block bel
 
 Do not place a covering note, process narrative, or conversational preamble inside the report block.
 
-Report length follows from the claim surface. Because every resolved claim receives a finding, large claim surfaces produce long reports. That is acceptable because the report is a reference document rather than a document expected to be read linearly.
+Report length follows from the claim surface: a large surface needs many findings and produces a long report. Organise it as a reference document rather than one read straight through.
 
 As a rough writing budget:
 
  - a supported claim normally needs its verdict, citations, and a short explanatory clause — roughly 20–30 words;
  - a claim that is not supported normally needs the claim, the resolving evidence, and the consequence of the gap — roughly 80 words.
 
-Do not reduce length by dropping citations or merging independent claims into a single finding. Either makes the report harder to verify against the frozen claim surface.
+Do not reduce length by dropping citations or by leaving a resolved claim out of the findings. Either makes the report harder to verify against the frozen claim surface.
 
 ### `=== COVERAGE ===`
 
-**A claim has exactly one verdict. A finding is a unit of reporting, and one claim may produce several findings.** Coverage counts claims, never findings. A claim that bundles more than one seller assertion is still one claim with one verdict; where its parts differ, Section 6's `[partial]` is the verdict for a claim that is substantially true with a specific gap.
+**Every identified claim carries exactly one verdict or examination status.** Coverage counts claims, never findings. If a frozen claim nevertheless contains more than one seller assertion, it still carries one verdict; where its parts differ, Section 6's `[partial]` is the verdict for a claim that is substantially true with a specific gap.
+
+This ledger is the arithmetic record the coverage figures are computed from. It does not replace the findings; Section 4 still requires every resolved claim to be named by at least one finding.
 
 This block contains two parts.
 
@@ -526,13 +532,14 @@ This block contains two parts.
 <claim number>. [verdict]
 ```
 
-Use only Section 6's five claim verdicts, or `[unverifiable]` for a claim that was attempted and could not be settled. Every claim in the surface appears exactly once. No claim appears twice, and no line names a claim that is not in the surface.
+Use only Section 6's five claim verdicts or its two examination statuses. Every claim in the surface appears exactly once. No claim appears twice, and no line names a claim that is not in the surface.
 
-Nothing else goes on these lines. Write the ledger even where it is long: it is the record of what the audit concluded about each claim, and it is the only place that record exists in one piece.
+Nothing else goes on these lines. Write the ledger in full, however long it runs.
 
 **2. What the numbers do not say.** In prose, after the ledger:
 
 - why each `[unverifiable]` claim could not be settled;
+- where the work stopped, and why any `[unattempted]` claims are or are not low-risk;
 - anything in the claim sources that was not counted as a claim, and why;
 - any `[unclaimed]` observation, per Section 6;
 - any addendum created under Section 12, step 2.
@@ -554,10 +561,6 @@ Throughout this method, **report** means the `=== REPORT ===` block, while **del
 ### `=== GAP MAP ===`
 
 Use the structure in Section 15. Do not restate the full report or append unrelated notes.
-
-### Why both the report and Gap Map are required
-
-The Gap Map provides a rapid decision summary. The report provides the evidence and citations needed to inspect the work. The Gap Map without the report lacks proof; the report without the Gap Map makes the key result difficult to absorb quickly.
 
 ## 17. Positioning and outreach
 
