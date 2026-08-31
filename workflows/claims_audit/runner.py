@@ -495,6 +495,70 @@ def log_incoming(path: Path, leg: int, sent: str, reason: str,
         logger.info("  - note %s %s", k, r_before[k])
 
 
+
+def post_run_checks(out: Path, whole: str, external_repo: str) -> Dict[str, Any]:
+    """The two file-operation checks, on the delivered blocks.
+
+    A FUNCTION WITH ARGUMENTS, NOT INLINE CODE. Both of these were inline
+    against `whole` and were placed above the line that assigns it, so every
+    run since they were added raised UnboundLocalError and skipped both —
+    silently, because each is wrapped to never lose a report. The citation
+    check had therefore never run at all. Taking what they read as parameters
+    is what makes that impossible and makes them testable without a model.
+    """
+    from workflows import coverage as _cov, issues as _iss
+
+    # THE COVERAGE FIGURES ARE ARITHMETIC OVER THE LEDGER, NOT THE MODEL'S.
+    # METHOD §16's COVERAGE block carries one verdict per claim. The check
+    # NAMES the defect — a claim appearing twice, a claim in the surface and
+    # absent from the ledger — because "the numbers disagree" sends a person
+    # back through the whole report. Nothing is corrected: which claim was
+    # doubled is a judgement about the surface.
+    coverage_check = None
+    try:
+        surface = blocks.content(whole, "CLAIM SURFACE", blocks.BLOCKS) or ""
+        covblk = blocks.content(whole, "COVERAGE", blocks.BLOCKS) or ""
+        coverage_check = _cov.check(surface, covblk)
+        if not coverage_check["ok"]:
+            for problem in coverage_check["problems"]:
+                logger.warning("coverage: %s", problem)
+                _iss.note(out, "claims_audit", "coverage_ledger", problem,
+                          severity="blocking")
+        else:
+            logger.info("coverage: %s",
+                        _cov.statement(coverage_check["figures"]))
+    except Exception as e:                                     # noqa: BLE001
+        logger.warning("coverage check skipped (%s: %s)", type(e).__name__, e)
+
+    # WHETHER THE REPORT'S CITATIONS RESOLVE, decided by a file operation.
+    # METHOD §12 step 6b says a finding with an invalid citation does not ship,
+    # and three shipped on 2026-08-30 past both the agent's own check and an
+    # independent review. This does not gate: a truncated citation is not a
+    # reason to throw away the work.
+    citation_check = None
+    try:
+        from workflows.citations import resolve_citations
+        tgt = Path(external_repo)
+        if tgt.is_dir():
+            rows = (resolve_citations(
+                blocks.content(whole, "REPORT", blocks.BLOCKS) or "",
+                tgt).get("citations") or [])
+            bad = [c.get("cited") for c in rows
+                   if str(c.get("resolved")).lower() == "false"]
+            citation_check = {"total": len(rows), "unresolved": bad}
+            if bad:
+                logger.warning("%d of %d citations did not resolve: %s",
+                               len(bad), len(rows), ", ".join(map(str, bad)))
+                _iss.note(out, "claims_audit", "citations_unresolved",
+                          f"{len(bad)} of {len(rows)} citations did not "
+                          "resolve against the materials: "
+                          + ", ".join(map(str, bad)),
+                          severity="check", citations=bad)
+    except Exception as e:                                     # noqa: BLE001
+        logger.warning("citation check skipped (%s: %s)", type(e).__name__, e)
+
+    return {"coverage": coverage_check, "citations": citation_check}
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=__doc__,
@@ -737,6 +801,44 @@ def main() -> int:
 
     wall = round(time.time() - t0, 1)
 
+    # Write the deliverables as files. run_meta.json carries the metadata;
+    # without this the report exists only inside the trace's raw_response,
+    # which is not somewhere a human reads a report from.
+    #
+    # ASSEMBLED FROM BLOCKS, ACROSS EVERY LEG (§16). Nothing is inferred from
+    # which leg a reply arrived in — that inference is what filed a claim
+    # enumeration as `b2_glm_2/report.md` on 2026-08-27. A block is taken from
+    # wherever it was emitted, and a leg carrying several is not a special
+    # case.
+    #
+    # report.md IS THE REPORT, COVERAGE AND LIMITATIONS BLOCKS. They are
+    # separate blocks so that nothing has to nest, and one document because
+    # that is what the client receives — ISAE 3000 / AT-C 205 require the
+    # limitations to travel with the report, not beside it, and a report whose
+    # coverage travels separately is one a reader cannot size.
+    whole = "\n\n".join(t for t in transcript if t)
+
+    _checks = post_run_checks(out, whole, str(cfg.get("external_repo") or ""))
+    coverage_check = _checks["coverage"]
+    citation_check = _checks["citations"]
+
+    # Write the deliverables as files. run_meta.json carries the metadata;
+    # without this the report exists only inside the trace's raw_response,
+    # which is not somewhere a human reads a report from.
+    #
+    # ASSEMBLED FROM BLOCKS, ACROSS EVERY LEG (§16). Nothing is inferred from
+    # which leg a reply arrived in — that inference is what filed a claim
+    # enumeration as `b2_glm_2/report.md` on 2026-08-27. A block is taken from
+    # wherever it was emitted, and a leg carrying several is not a special
+    # case.
+    #
+    # report.md IS THE REPORT, COVERAGE AND LIMITATIONS BLOCKS. They are
+    # separate blocks so that nothing has to nest, and one document because
+    # that is what the client receives — ISAE 3000 / AT-C 205 require the
+    # limitations to travel with the report, not beside it, and a report whose
+    # coverage travels separately is one a reader cannot size.
+    whole = "\n\n".join(t for t in transcript if t)
+
     # THE COVERAGE FIGURES ARE ARITHMETIC OVER THE LEDGER, NOT THE MODEL'S.
     # METHOD §16's COVERAGE block carries one verdict per claim; every figure
     # §1a defines is computed from it here. The check names the defect — a
@@ -765,7 +867,7 @@ def main() -> int:
     citation_check = None
     try:
         from workflows.citations import resolve_citations
-        _tgt = Path(cfg.get("external_repo") or "")
+        _tgt = Path(external_repo)
         if _tgt.is_dir():
             _rows = (resolve_citations(
                 blocks.content(whole, "REPORT", blocks.BLOCKS) or "",
@@ -785,22 +887,6 @@ def main() -> int:
     except Exception as e:                                     # noqa: BLE001
         logger.warning("citation check skipped (%s: %s)", type(e).__name__, e)
 
-    # Write the deliverables as files. run_meta.json carries the metadata;
-    # without this the report exists only inside the trace's raw_response,
-    # which is not somewhere a human reads a report from.
-    #
-    # ASSEMBLED FROM BLOCKS, ACROSS EVERY LEG (§16). Nothing is inferred from
-    # which leg a reply arrived in — that inference is what filed a claim
-    # enumeration as `b2_glm_2/report.md` on 2026-08-27. A block is taken from
-    # wherever it was emitted, and a leg carrying several is not a special
-    # case.
-    #
-    # report.md IS THE REPORT, COVERAGE AND LIMITATIONS BLOCKS. They are
-    # separate blocks so that nothing has to nest, and one document because
-    # that is what the client receives — ISAE 3000 / AT-C 205 require the
-    # limitations to travel with the report, not beside it, and a report whose
-    # coverage travels separately is one a reader cannot size.
-    whole = "\n\n".join(t for t in transcript if t)
     final = latest_reply(loop, SOURCE)
     if final:
         (out / "full_reply.md").write_text(final, encoding="utf-8")
