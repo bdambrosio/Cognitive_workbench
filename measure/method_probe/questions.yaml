@@ -359,3 +359,88 @@ questions:
       than inferring it from textual analysis, and what the reader says it
       "would do anyway" predicts the run. Weight a weak reader's answer here
       heavily: it is the one that will be running the audit.
+
+  # ---- Guards: one per confirmed defect, added BEFORE the fix -------------
+  #
+  # Each of these was a candidate from the 2026-08-31 open review, confirmed
+  # against the text. The question goes in first so the baseline records the
+  # defect, the fix is verified by the answer changing, and the defect cannot
+  # silently return. `expect` is the intended reading, which is what the fix
+  # makes the text say — so these read as failures until the fix lands.
+
+  - id: tier-raised-by-derivation
+    kind: decided
+    decision: what tier a finding takes when a derivation is more severe
+    ask: >
+      A claim is assigned Tier 2. While working the evidence you derive a
+      consequence from two cited figures that is more severe than Tier 2. What
+      tier does the finding take, and why?
+    expect: the higher tier — the claim's tier is a floor, not a ceiling
+    expect_why: >
+      §4 means "takes at least the tier assigned to the claim". As written it
+      says the finding takes the claim's tier and then that a derivation raises
+      it, which cannot both hold.
+    scoring: >
+      A reader that answers "Tier 2, the claim's tier is fixed" has taken the
+      first sentence; one that answers "Tier 1" has taken the second. Either is
+      defensible from the text, which is the defect.
+
+  - id: empty-tier-statement
+    kind: decided
+    decision: where a statement that a tier is empty goes
+    ask: >
+      Tier 4 contains no claims at all. Where do you say so, and under which
+      part of that block?
+    expect: the coverage block, in "What the numbers do not say"
+    scoring: >
+      §4 requires the statement and §16's list of what that prose carries does
+      not mention it. A reader that says "there is no slot for it" has read
+      both correctly. Found independently by two readers on 2026-08-31.
+
+  - id: report-last-part
+    kind: decided
+    decision: what the REPORT block ends with
+    ask: >
+      What is the last part of the `=== REPORT ===` block, and is anything
+      permitted after it inside that block?
+    expect: the questions for the seller; nothing after it
+    scoring: >
+      §16 gives the report three parts ending with the questions and forbids a
+      covering note. §8 says the report "closes with a concise explanation that
+      a non-specialist can understand and repeat accurately", which is a fourth
+      part §16 does not allow.
+
+  # ---- Produce, not describe: the compliance setting ----------------------
+  #
+  # `unverifiable-fields` was answered correctly by all three readers and got
+  # written wrong five times out of five in the fixture run ninety minutes
+  # later, by one of the same models. Asking a reader to NAME the fields tests
+  # recall; asking it to WRITE the finding tests what it does under generation.
+  # Comparing the two localises the defect: correct in both and wrong in a run
+  # means context or leg-drift; correct describing and wrong producing means
+  # the convention loses to the model's own naming instinct, and no harness
+  # change addresses it.
+
+  - id: produce-unverifiable-finding
+    kind: decided
+    decision: what a finding looks like when actually written
+    ask: >
+      Write the finding, complete and in the method's form, for this claim.
+
+      Claim 11, from the seller's listing at doc1:21 and restated at doc9:7:
+      "well-documented codebase".
+
+      What your searches found: a lexical search of all nine supplied documents
+      for "README", "docs", "documentation", "docstring" and "comment" returned
+      only doc3's commit-count summary. A structural inspection of the data
+      room found no code, no docs directory and no file listing of one.
+
+      Output the finding and nothing else.
+    expect: "header carries [unverifiable]; fields named Claim, Evidence, Gap"
+    scoring: >
+      The field names decide it. `Searches:` and `Classification:` is the
+      divergence the 2026-08-31 fixture run produced in all five such findings.
+      If a reader names them correctly here but not in a run, the cause is
+      context or leg-drift; if it renames them here too, the cause is
+      generation-time and §5 needs a worked example rather than a template.
+
