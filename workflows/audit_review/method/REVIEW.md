@@ -49,7 +49,7 @@ If you cannot, stop. A supported ratio computed over citations read in the wrong
 **Distinguish an isolated anomaly from a systematic one.** Treat an isolated anomaly as a citation exception; treat a repeated pattern showing the report is using a different citation coordinate system as an admissibility problem.
 
 - **Isolated.** `doc7:94` in a 45-line document, where the other seven references to that document resolve. Record it as a broken citation and continue.
-- **Systematic.** Four of seven references to a five-line document, topping out at 13, against a coverage statement reading "doc2: 13 claims". That report is citing claim ordinals. The citations are well-formed and they are not line numbers.
+- **Systematic.** Four of seven references to a five-line document, topping out at 13, against a per-document count reading "doc2: 13 claims". That report is citing claim ordinals. The citations are well-formed and they are not line numbers.
 
 **If the scheme cannot be established, stop.** State which references cannot be resolved and why, state what the report would have to say to make them resolvable, and end the review there. **Do not enumerate the findings, do not check them, and do not report a supported ratio.**
 
@@ -87,7 +87,7 @@ If you cannot, stop. A supported ratio computed over citations read in the wrong
 
 3. **Check every finding.** Unlike an audit, there is no priority order and no stopping threshold. A report of fourteen findings gets fourteen checks; a report of two hundred gets two hundred.
 
-**Do not sample.** METHOD §4 gives every resolved claim a finding, so a real target produces hundreds. Check all of them.
+**Do not sample.** Check every finding the report states, however many there are.
 
 **Label the findings, and keep the labels.** Give each one a stable identifier as you enumerate: `F1`, `F2`, and so on, in the report's order. Every later reference uses that label. Without labels, "do not re-enumerate" cannot be checked, because nothing records what was already enumerated.
 
@@ -135,7 +135,7 @@ The index rule binds here as everywhere: confirm against the documents before as
 
 **Search only the document the field names.** Widening the search is auditing the target, which §2 forbids.
 
-**Why the derived case differs.** METHOD §6 makes a finding one of two things: a resolved claim carrying one of the five claim verdicts, or a `[derived]` finding, which is a consequence computed from two or more figures the seller stated separately. A derived finding cites no claim because there is none to cite. Asking whether its cited lines support a claim it never made would rule it unsupported by construction.
+**Why the derived case differs.** METHOD §6 makes a finding one of two things: a claim finding, which bears on one or more seller claims and carries the verdict they received, or a `[derived]` finding, which is a consequence computed from two or more figures the seller stated separately. A derived finding names no claim because there is none to name. Asking whether its cited lines support a claim it never made would rule it unsupported by construction.
 
 The arithmetic is written out so that it can be checked. A step you cannot follow is an exception; a step you can follow and disagree with is `[overstated]` or `[understated]` as usual.
 
@@ -143,7 +143,7 @@ The arithmetic is written out so that it can be checked. A step you cannot follo
 
 **You are not asked whether a consequence matters to the buyer.** That is materiality. It is METHOD §4's judgement and the auditor's, and §10 reserves it.
 
-**`[unverifiable]` and `[unclaimed]` are not findings and do not belong on your surface.** METHOD §6 sends both to the report's coverage statement: the first is a claim the materials could not settle, the second is something the seller never claimed. If the report states either as a numbered finding, record one conformance exception and do not enumerate them into §4's frozen count, which would inflate the denominator of every ratio.
+**`[unverifiable]`, `[unattempted]` and `[unclaimed]` are not findings and do not belong on your surface.** METHOD §6 reports all three in the coverage block: the first is a claim the materials could not settle, the second one the work never reached, the third something the seller never claimed. If the report states any of them as a numbered finding, record one conformance exception and do not enumerate them into §4's frozen count, which would inflate the denominator of every ratio.
 
 ## 6. Finding format
 
@@ -192,7 +192,7 @@ Choose between the four citation states by what a reader can do with the referen
 
 **Once every finding has been checked** — not after each one — read the working record and report **two** things, once, about the audit as a whole. Nothing in this section is written per finding.
 
-**What the report says it covered, against what the record shows it did.** The audit froze a claim surface; §3 names the file that holds it, since it is not in the report. METHOD §16's COVERAGE block gives one verdict per claim, and the coverage figures are computed from that ledger by the client's process rather than written by the auditor — so the figures are not yours to check. What is yours to check is whether the record bears out the work the ledger claims. The trace and the evidence requests show what was actually read. A coverage statement the record does not bear out is an exception like any other.
+**What the report says it covered, against what the record shows it did.** The audit froze a claim surface; §3 names the file that holds it, since it is not in the report. METHOD §16's COVERAGE block gives one verdict or examination status per claim, and the coverage figures are computed from that ledger by the client's process rather than written by the auditor — so the figures are not yours to check. What is yours to check is whether the record bears out the work the ledger claims. The trace and the evidence requests show what was actually read. Coverage the record does not bear out is an exception like any other.
 
 **What the audit did not attempt.** Not a list of everything it could have done: the claim sources are finite and the record names what was opened. Where the report claims coverage of a document the record never shows it reading, say so.
 

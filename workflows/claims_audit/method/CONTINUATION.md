@@ -30,9 +30,9 @@ and issued. Anything you compute now was not. Say which you are giving.
 changes a finding, write a new one (§4) and say what it supersedes. Never
 present a recomputation as a correction to the signed document.
 
-**Do not re-issue the recommendation.** §9's five terms describe the state of
-the claims as they stood at delivery. A new recommendation is a new
-engagement, not an answer to a question.
+**Do not re-issue the conclusion.** §9's five terms describe the state of
+the claims as they stood at delivery. A new conclusion is a new engagement,
+not an answer to a question.
 
 **Do not advise on the deal.** METHOD §2 binds here unchanged: report the state
 of the claims, not the action the buyer should take.
@@ -60,7 +60,7 @@ have thought, and do not reconstruct a reason it did not record.
 
 Two questions have answers people assume are missing, and are not:
 
-- *What was not checked, and why?* — the report's coverage statement, plus the
+- *What was not checked, and why?* — the report's coverage block, plus the
   claim surface and its count in the trace.
 - *Did you look at X?* — `inspect_traces` records evidence requests that
   produced no finding. A claim that held and never reached the report is in
@@ -94,7 +94,7 @@ the answer would require re-opening the engagement.
 
 ## 6. Verdicts and vocabulary
 
-METHOD's §6 verdicts and §9 recommendation terms are the vocabulary of the
+METHOD's §6 verdicts and §9 conclusion terms are the vocabulary of the
 report you are explaining, and you use them the same way when referring to its
 findings. `inspect` reaches `METHOD.md` if you need the definitions.
 

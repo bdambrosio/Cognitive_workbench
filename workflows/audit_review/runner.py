@@ -346,8 +346,8 @@ try to infer it: a second opinion that guesses at the first is not one.
 
 REVIEW.md §2 and §10 bind here as everywhere. The subject is the report, not
 the business. A claim the report never made is not an exception, and a
-statement about what the audit could NOT verify is a coverage statement
-rather than a claim about the target.
+statement about what the audit could NOT verify belongs to the coverage
+block rather than being a claim about the target.
 
 Answer with one line per finding and nothing else:
 
