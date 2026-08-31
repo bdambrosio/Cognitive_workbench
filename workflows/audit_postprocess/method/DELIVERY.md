@@ -27,7 +27,7 @@ Three pieces, described in Section 6.
 
 1. **A covering passage.** What this document is, what was examined, and how to read it.
 2. **A short passage before each group of findings.** What the group contains and why it is grouped that way.
-3. **The coverage statement, rewritten.** The same facts as the audit's version, in sentences a reader can follow.
+3. **What the coverage figures do not say.** The figures themselves are computed for you; you write the part arithmetic cannot carry.
 
 That is all. Everything else in the deliverable is copied from the audit without change.
 
@@ -120,7 +120,7 @@ What you write is the part arithmetic cannot carry:
 - any claim that could not be settled, and why
 - anything in the seller's materials the audit did not count as a claim, and did not test
 - anything the audit noted that has no number attached to it
-- where the reader can see the full list of claims: Appendix B, which lists them as the audit froze them and does not say how each was resolved
+- where the reader can see the full list of claims: Appendix B, which lists every claim as the audit froze it, with the verdict it received
 
 Two or three short paragraphs. The audit's own version of this is usually one long paragraph carrying everything at once.
 
