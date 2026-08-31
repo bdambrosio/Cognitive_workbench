@@ -109,7 +109,7 @@ If a tier contains no claims, state that in the coverage block. The priority ord
 Use the following form for a finding that adjudicates one or more seller claims:
 
 ```text
-**Finding N (claim <id>): <short title> — [claim verdict]**
+**Finding N (claim <id>): <short title> — [verdict or status]**
 
 Claim (<document:lines>): <the stated claim>
 
@@ -122,7 +122,7 @@ Gap: <None, or the specific gap>
 
 Cite both the source of the claim and the evidence used to resolve it. A reader should be able to inspect both sides of the comparison. The `Evidence` field may carry one or more `Derived:` blocks, in the form under *Derived statements* below, alongside its direct citations.
 
-A finding's evidence takes one of three forms:
+Evidence takes three forms, and one finding may carry more than one:
 
 - **Direct evidence:** cite the claim source and the material that resolves it.
 - **Evidence of absence:** cite the claim source and record the searches used to establish whether the claimed implementation or evidence exists. There may be no line citation for the absent item.
@@ -141,7 +141,7 @@ A statement such as “this is not implemented” cannot normally be supported b
 
 Record the searches actually performed. A search establishes diligence, not absolute absence. If the searches do not settle the question, classify the claim as `[unverifiable]`, not `[delta]`.
 
-An `[unverifiable]` finding uses the Section 5 form. Its `Evidence` field carries the two searches. Its `Gap` field states which of these the searches established, and what would settle the claim:
+An `[unverifiable]` finding uses the form at the head of this section. Its `Evidence` field carries the two searches. Its `Gap` field states which of these the searches established, and what would settle the claim:
 
 - **not in the materials** — the supplied documents contain nothing that would settle it either way. A framework version, where no manifest or lockfile was supplied.
 - **present but not readable** — the artifact is in the materials and cannot be interrogated as supplied. A compiled archive with no source.
