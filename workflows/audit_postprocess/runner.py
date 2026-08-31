@@ -95,6 +95,31 @@ def build_config(run: Path, world: str,
     return name, cfg
 
 
+# ONE PREDICATE, TWO READERS. The brief promises these to the agent and the
+# post-check holds the deliverable to them; deriving each separately is how a
+# promise and a document drift apart.
+_APPENDIX_BLURB = {
+    "Appendix A": "Appendix A, the supported claims",
+    "Appendix B": ("Appendix B, every claim as the audit froze it with the "
+                   "verdict it received"),
+}
+
+
+def appendices_for(checks: Optional[Dict[str, Any]]) -> List[str]:
+    """Which appendices `deliver.assemble` will emit for this run.
+
+    Appendix A exists only where the report carried an inventory to move, and
+    Appendix B only where the claim surface was recovered — the two conditions
+    assemble() branches on.
+    """
+    out = []
+    if (checks or {}).get("inventory_entries"):
+        out.append("Appendix A")
+    if (checks or {}).get("claim_surface_recovered"):
+        out.append("Appendix B")
+    return out
+
+
 def _id_list(ns: List[int], cap: int = 8) -> str:
     """Claim numbers for a person to read; the count carries past the cap."""
     return (", ".join(map(str, ns)) if len(ns) <= cap
@@ -153,12 +178,7 @@ def brief(run: Path, groups: List[Dict[str, Any]],
             lines.append(f"      Finding {f['n']}{cl}: {f['title']} "
                          f"[{f['verdict']}]")
 
-    apx = []
-    if (checks or {}).get("inventory_entries"):
-        apx.append("Appendix A, the supported claims")
-    if (checks or {}).get("claim_surface_recovered"):
-        apx.append("Appendix B, every claim as the audit froze it with the "
-                   "verdict it received")
+    apx = [_APPENDIX_BLURB[k] for k in appendices_for(checks)]
     lines += [
         "",
         ("The assembled document will carry " + " and ".join(apx) + "."
@@ -300,6 +320,18 @@ def main() -> int:
     # WHAT THE AGENT DID NOT WRITE, THE SCRIPT STILL DELIVERS. A failed or
     # partial prose run degrades the document; it does not lose it.
     (out / "deliverable.md").write_text(deliver.assemble(run, written))
+
+    # AFTER THE AGENT, because it is the agent's prose being checked. The
+    # editor notes are written before the run, so they are rewritten here with
+    # the result rather than left describing a document that did not exist yet.
+    promised = deliver.promised_appendices(written,
+                                           set(appendices_for(checks)))
+    if promised:
+        checks["appendices_promised_not_emitted"] = promised
+        logger.warning("the deliverable promises %s and does not carry it",
+                       ", ".join(promised))
+        (out / "checks.json").write_text(json.dumps(checks, indent=2))
+        (out / "editor_notes.md").write_text(deliver.editor_notes(run, checks))
     (out / "run_meta.json").write_text(json.dumps({
         "captured_at_utc": datetime.datetime.now(
             datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ"),

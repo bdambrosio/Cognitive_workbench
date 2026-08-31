@@ -473,6 +473,34 @@ def _finding_block(text: str, n: int) -> str:
     return ""
 
 
+# The two appendix labels this script emits. A CLOSED SET THIS FILE OWNS, so
+# looking for them in the agent's prose is a token check over its own
+# vocabulary — the same standing as blocks.py looking for `=== REPORT ===` —
+# and not a keyword read of what the sentence means.
+_APPENDIX = re.compile(r"\bAppendix\s+([AB])\b")
+
+
+def promised_appendices(written: Dict[str, Any], emitted: set) -> List[str]:
+    """Appendices the agent's prose names that the document will not carry.
+
+    DELIVERY.md §6 tells the cover to name the appendices the brief lists and
+    to promise no others, and §7's assembly list makes Appendix A conditional
+    on the report having carried an inventory to move. On the grok fixture
+    delivery of 2026-08-31 the brief named only Appendix B, the document
+    carried only Appendix B, and the cover promised Appendix A anyway — the
+    second run to do so after that instruction was rewritten twice.
+
+    So this is not a wording defect and a third rewrite will not settle it.
+    The script already knows which appendices it is about to emit; a client
+    receiving a document that promises one it does not contain is a defect a
+    person must see, and it costs one comparison to see it.
+    """
+    prose = " ".join(str(v) for k, v in (written or {}).items() if k != "sections")
+    for _h, body in ((written or {}).get("sections") or {}).values():
+        prose += " " + str(body)
+    return sorted({f"Appendix {m}" for m in _APPENDIX.findall(prose)} - emitted)
+
+
 def assemble(run: Path, written: Optional[Dict[str, Any]] = None) -> str:
     """The report with its inventory moved to an appendix. Nothing reworded.
 
@@ -693,6 +721,13 @@ def editor_notes(run: Path, a: Dict[str, Any]) -> str:
     for f in a["findings"]:
         L.append(f"- Finding {f['n']} — [{f['verdict']}] — {f['title']}")
     L += ["", "## 3. Claim numbers", ""]
+    if a.get("appendices_promised_not_emitted"):
+        L += ["", "## 1e. The cover promises an appendix the document does not carry",
+              "",
+              "The deliverable names " + ", ".join(a["appendices_promised_not_emitted"])
+              + " in its prose and does not contain it. Either strike the "
+                "promise or supply the appendix; a client counting the "
+                "appendices will find one missing.", ""]
     if a["claim_surface_recovered"]:
         L.append("The claim surface is appended to the deliverable, so every "
                  "claim number in the coverage block and the supported "
