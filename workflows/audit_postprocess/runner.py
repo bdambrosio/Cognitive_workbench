@@ -95,11 +95,32 @@ def build_config(run: Path, world: str,
     return name, cfg
 
 
-def brief(run: Path, groups: List[Dict[str, Any]]) -> str:
+def _id_list(ns: List[int], cap: int = 8) -> str:
+    """Claim numbers for a person to read; the count carries past the cap."""
+    return (", ".join(map(str, ns)) if len(ns) <= cap
+            else ", ".join(map(str, ns[:cap])) + f", … ({len(ns)} in all)")
+
+
+def brief(run: Path, groups: List[Dict[str, Any]],
+          checks: Optional[Dict[str, Any]] = None) -> str:
     """What the agent is told. The group keys live here and nowhere else.
 
     DELIVERY.md §6 says the keys come from the brief, because a key derived
     from a heading would change when the agent replaced that heading.
+
+    BOTH COUNTS, BECAUSE THEY ARE DIFFERENT NUMBERS. A group holds findings;
+    the headings the agent writes for it say "claims"; and one finding may name
+    several claims. This stated only the finding count until 2026-08-31, so a
+    group of four findings covering five claims was introduced as "Four of the
+    seller's claims are not true as written", and a group of one finding
+    covering three as "One claim was attempted" — which the same agent's
+    coverage passage contradicted sixty lines later with "Three claims could
+    not be settled".
+
+    THE APPENDICES ARE LISTED, NOT ASSUMED. Appendix A exists only where the
+    report carried an inventory to move, and DELIVERY.md §6 told the cover to
+    promise two regardless. Both deliverables on 2026-08-31 promised an
+    appendix that was not in them.
     """
     lines = [
         "You are writing the connecting prose for the finished claims audit in "
@@ -117,11 +138,31 @@ def brief(run: Path, groups: List[Dict[str, Any]]) -> str:
     for g in groups:
         vs = ", ".join(sorted({f"[{f['verdict']}]" for f in g["findings"]})) \
             or "no numbered findings"
+        nf = len(g["findings"])
+        claims = sorted({c for f in g["findings"] for c in (f.get("claims") or [])})
+        count = f"{nf} finding{'' if nf == 1 else 's'}"
+        if claims:
+            count += (f" covering {len(claims)} "
+                      f"claim{'' if len(claims) == 1 else 's'} "
+                      f"({_id_list(claims)})")
         lines.append(f"  {g['key']} — currently headed \"{g['heading']}\" — "
-                     f"{len(g['findings'])} findings, {vs}")
+                     f"{count}, {vs}")
         for f in g["findings"]:
-            lines.append(f"      Finding {f['n']}: {f['title']} [{f['verdict']}]")
+            cl = (f" (claim{'' if len(f['claims']) == 1 else 's'} "
+                  f"{_id_list(f['claims'])})") if f.get("claims") else ""
+            lines.append(f"      Finding {f['n']}{cl}: {f['title']} "
+                         f"[{f['verdict']}]")
+
+    apx = []
+    if (checks or {}).get("inventory_entries"):
+        apx.append("Appendix A, the supported claims")
+    if (checks or {}).get("claim_surface_recovered"):
+        apx.append("Appendix B, every claim as the audit froze it with the "
+                   "verdict it received")
     lines += [
+        "",
+        ("The assembled document will carry " + " and ".join(apx) + "."
+         if apx else "The assembled document will carry no appendices."),
         "",
         "Emit the three blocks of §6. The client's process assembles the "
         "document; you write nothing else. Work in as many legs as you need — "
@@ -204,7 +245,7 @@ def main() -> int:
     transcript: List[str] = []
     error = None
     legs: List[Dict[str, Any]] = []
-    text = brief(run, groups)
+    text = brief(run, groups, checks)
     try:
         for i in range(args.max_turns):
             loop._process_user_turn(source=SOURCE, text=text, close=False)

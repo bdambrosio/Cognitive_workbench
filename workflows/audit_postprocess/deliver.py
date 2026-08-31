@@ -53,24 +53,23 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from workflows import blocks                                    # noqa: E402
-from workflows.citations import resolve_citations               # noqa: E402
+# A §5 finding header, and the claim ids it names, from the module that owns
+# both. This file kept its own copy of `_FINDING` and its own `_CLAIM_ID` until
+# 2026-08-31, defended by a comment promising they stayed byte-identical to
+# patterns nothing checked them against. Two of the three copies then drifted in
+# what they KEPT — the claim ids reached this file and were discarded, so the
+# delivery brief could say "4 findings" and never "5 claims".
+from workflows.citations import (_FINDING, finding_claims,      # noqa: E402
+                                 resolve_citations)
 from workflows import coverage as cov, issues as iss             # noqa: E402
 
-# A §5 finding header. Same shape audit_review and score.py both key on, so a
-# report that parses for them parses here.
-_FINDING = re.compile(r"^\s*\**\s*Finding\s+(\d+)[^\n\[]*\[([^\]]+)\]",
-                      re.M | re.I)
-# The claim id §5 will carry once the header change lands: `Finding 1 (claim 22)`.
-# Absent today, which is itself an editor note rather than an error.
-_CLAIM_ID = re.compile(r"^\s*\**\s*Finding\s+(\d+)\s*\(claims?\s+([^)]+)\)",
-                       re.M | re.I)
 # An inventory line: a bare ordinal, a title, a verdict, then citations. This is
 # the 35-line block that made up the bulk of the ChatterMate report body.
 _INVENTORY = re.compile(r"^\s*(\d+)\.\s+(?!\*)([^\n\[]{3,}?)\s*[—-]\s*\[([^\]]+)\]",
                         re.M)
-# The same header, with the title captured. Kept separate from `_FINDING` so
-# that pattern stays byte-identical to the one audit_review and score.py use —
-# an editor ranking findings needs titles, a parser checking verdicts does not.
+# The same header, with the title captured. Separate from the shared `_FINDING`
+# because an editor ranking findings needs titles and a parser checking verdicts
+# does not; the claim ids come from `finding_claims`, not from here.
 _FINDING_TITLE = re.compile(
     r"^\s*\**\s*Finding\s+(\d+)\s*(?:\(claims?[^)]*\))?\s*:?\s*"
     r"(.*?)\s*[—-]\s*\[([^\]]+)\]", re.M)
@@ -98,6 +97,7 @@ VERDICT_GLOSS = (
                 "the materials show another"),
     ("[unverifiable]", "the audit tried and the supplied materials could not "
                        "settle it"),
+    ("[unattempted]", "the work stopped before this claim was examined"),
 )
 
 
@@ -222,9 +222,9 @@ def audit(run: Path) -> Dict[str, Any]:
     unresolved = [c for c in rows if str(c.get("resolved")).lower() == "false"]
 
     titles = {int(n): ti.strip() for n, ti, _ in _FINDING_TITLE.findall(report)}
-    findings = [{"n": int(n), "verdict": v.strip(), "title": titles.get(int(n), "")}
-                for n, v in _FINDING.findall(report)]
-    with_claim = {int(n): c.strip() for n, c in _CLAIM_ID.findall(report)}
+    findings = [{"n": f["n"], "verdict": f["verdict"],
+                 "title": titles.get(f["n"], ""), "claims": f["claims"]}
+                for f in finding_claims(report)]
     inv = [{"n": int(n), "title": t.strip(), "verdict": v.strip()}
            for n, t, v in _INVENTORY.findall(report)]
 
@@ -236,7 +236,8 @@ def audit(run: Path) -> Dict[str, Any]:
         "citations_unresolved": unresolved,
         "findings": findings,
         "findings_without_claim_id": [f["n"] for f in findings
-                                      if f["n"] not in with_claim],
+                                      if not f["claims"]
+                                      and f["verdict"] != "derived"],
         "inventory_entries": inv,
         "claim_surface_recovered": bool(claim_surface(run)),
         "parked_notes": parked_notes(claim_surface(run)),
@@ -367,9 +368,14 @@ def finding_groups(run: Path) -> List[Dict[str, Any]]:
     report = (run / "report.md").read_text(errors="replace")
     body = blocks.content(report, "REPORT", blocks.REVIEW_BLOCKS) or report
     titles = {int(n): ti.strip() for n, ti, _ in _FINDING_TITLE.findall(report)}
-    found = [{"n": int(n), "verdict": v.strip().lower(),
-              "title": titles.get(int(n), "")}
-             for n, v in _FINDING.findall(body)]
+    # THE CLAIM IDS TRAVEL WITH THE FINDING. §5 puts them in the header and
+    # this file used to drop them, so the brief below could state a finding
+    # count and never a claim count — and the delivery agent, given four
+    # findings covering five claims, wrote "Four of the seller's claims are not
+    # true as written" under a heading beginning with the word Claims.
+    found = [{"n": f["n"], "verdict": f["verdict"],
+              "title": titles.get(f["n"], ""), "claims": f["claims"]}
+             for f in finding_claims(body)]
     out, i = [], 0
     known = {v for k in _GROUP_ORDER for v in k}
     # A verdict outside §6 still gets a group. Nothing a report states may
@@ -589,7 +595,7 @@ def assemble(run: Path, written: Optional[Dict[str, Any]] = None) -> str:
         out.append("\n\n## Appendix B — the claim surface\n")
         out.append("Every assertion identified in the claim sources and frozen "
                    "before verification began. The claim numbers used above, "
-                   "and in the coverage statement, index this list.\n")
+                   "and in the Coverage section, index this list.\n")
         out.append(_strip_markers(surface).strip())
         if cv["ledger"]:
             out.append("\n\nThe verdict each claim received:\n")
@@ -691,12 +697,12 @@ def editor_notes(run: Path, a: Dict[str, Any]) -> str:
     L += ["", "## 3. Claim numbers", ""]
     if a["claim_surface_recovered"]:
         L.append("The claim surface is appended to the deliverable, so every "
-                 "claim number in the coverage statement and the supported "
+                 "claim number in the coverage block and the supported "
                  "appendix resolves. Nothing to do.")
     else:
         L.append("**The claim surface could not be recovered from the working "
                  "record, so no claim number in this report resolves for the "
-                 "reader.** The coverage statement cites claims by number and "
+                 "reader.** The coverage block cites claims by number and "
                  "the supported appendix is keyed by them. Recover it before "
                  "delivery, or strike the numbers.")
     L += ["", f"The supported appendix holds {len(a['inventory_entries'])} "

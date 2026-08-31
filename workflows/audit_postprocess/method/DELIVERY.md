@@ -83,7 +83,7 @@ Each marker goes on its own line, with nothing between a marker and the content 
 Two to four short paragraphs, placed after the executive summary and before the findings. Cover:
 
 - what this document is, and what was examined
-- what the reader is holding: a summary, a note on how to read a finding, the findings with citations, a coverage statement, questions for the seller, and two appendices
+- what the reader is holding: a summary, a note on how to read a finding, the findings with citations, a coverage section, questions for the seller, and the appendices the brief says the document will carry — name those, and do not promise one the brief does not list
 - what the conclusion is, in one sentence, using the audit's own conclusion word
 - that every finding cites the evidence that settles it, so any of them can be checked
 
@@ -107,7 +107,9 @@ Three of the seller's claims describe features that are not in the materials. Ea
 
 **Use the keys exactly as the brief gives them.** They are `group1`, `group2` and so on. An entry under any other key is discarded, and that group reaches the client with no heading and no introduction.
 
-Your heading is the only heading that group will have, so it must be accurate about what the group contains. The brief tells you how many findings are in each; get the number right.
+Your heading is the only heading that group will have, so it must be accurate about what the group contains.
+
+**The brief gives each group two numbers, and they are not the same number.** A group holds *findings*; each finding bears on one or more of the seller's *claims*, and the brief states both counts. If your sentence counts claims — "three of the seller's claims" — use the claim count. If it counts findings, use the finding count and write the word "findings". Do not take one number and label it with the other word.
 
 ### `=== COVERAGE ===`
 
@@ -117,10 +119,10 @@ What the coverage figures do not say, in sentences a reader can follow.
 
 What you write is the part arithmetic cannot carry:
 
-- any claim that could not be settled, and why
+- any claim that could not be settled or was not attempted, and why
 - anything in the seller's materials the audit did not count as a claim, and did not test
 - anything the audit noted that has no number attached to it
-- where the reader can see the full list of claims: Appendix B, which lists every claim as the audit froze it, with the verdict it received
+- where the reader can see the full list of claims: Appendix B, which lists every claim as the audit froze it, with the verdict or status it received
 
 Two or three short paragraphs. The audit's own version of this is usually one long paragraph carrying everything at once.
 
@@ -137,7 +139,7 @@ You do not assemble it. The client's process does, in this order:
 7. the coverage figures, computed by the process, followed by your `COVERAGE`
 8. the questions for the seller, copied
 9. the limitations, copied
-10. Appendix A, the supported claims, copied
-11. Appendix B, the claim surface and the verdict each claim received, copied
+10. Appendix A, the supported claims, where the report carried them as a list
+11. Appendix B, the claim surface and the verdict or status each claim received, copied
 
 Your three blocks are the only new writing in the deliverable. Everything numbered above that says "copied" is the auditor's text, and it reaches the client unchanged.
