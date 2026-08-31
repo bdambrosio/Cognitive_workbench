@@ -737,6 +737,29 @@ def main() -> int:
 
     wall = round(time.time() - t0, 1)
 
+    # THE COVERAGE FIGURES ARE ARITHMETIC OVER THE LEDGER, NOT THE MODEL'S.
+    # METHOD §16's COVERAGE block carries one verdict per claim; every figure
+    # §1a defines is computed from it here. The check names the defect — a
+    # claim appearing twice, a claim in the surface and not in the ledger —
+    # because "the numbers disagree" sends a person back through the whole
+    # report. Nothing is corrected: which claim was doubled is a judgement
+    # about the surface, and the run records it for a person.
+    coverage_check = None
+    try:
+        from workflows import coverage as _cov, issues as _iss
+        _surface = blocks.content(whole, "CLAIM SURFACE", blocks.BLOCKS) or ""
+        _covblk = blocks.content(whole, "COVERAGE", blocks.BLOCKS) or ""
+        coverage_check = _cov.check(_surface, _covblk)
+        if not coverage_check["ok"]:
+            for _p in coverage_check["problems"]:
+                logger.warning("coverage: %s", _p)
+                _iss.note(out, "claims_audit", "coverage_ledger", _p,
+                          severity="blocking")
+        else:
+            logger.info("coverage: %s", _cov.statement(coverage_check["figures"]))
+    except Exception as e:                                     # noqa: BLE001
+        logger.warning("coverage check skipped (%s: %s)", type(e).__name__, e)
+
     # Resolved against the target the run actually read, before the metadata is
     # written. Never raises: a citation check that fails must not lose a report.
     citation_check = None
@@ -753,6 +776,12 @@ def main() -> int:
             if _bad:
                 logger.warning("%d of %d citations did not resolve: %s",
                                len(_bad), len(_rows), ", ".join(map(str, _bad)))
+                from workflows import issues as _iss2
+                _iss2.note(out, "claims_audit", "citations_unresolved",
+                           f"{len(_bad)} of {len(_rows)} citations did not "
+                           f"resolve against the materials: "
+                           + ", ".join(map(str, _bad)),
+                           severity="check", citations=_bad)
     except Exception as e:                                     # noqa: BLE001
         logger.warning("citation check skipped (%s: %s)", type(e).__name__, e)
 
@@ -766,10 +795,11 @@ def main() -> int:
     # wherever it was emitted, and a leg carrying several is not a special
     # case.
     #
-    # report.md IS THE REPORT BLOCK PLUS THE LIMITATIONS BLOCK. They are two
-    # blocks so that nothing has to nest, and one document because that is what
-    # the client receives — ISAE 3000 / AT-C 205 require the limitations to
-    # travel with the report, not beside it.
+    # report.md IS THE REPORT, COVERAGE AND LIMITATIONS BLOCKS. They are
+    # separate blocks so that nothing has to nest, and one document because
+    # that is what the client receives — ISAE 3000 / AT-C 205 require the
+    # limitations to travel with the report, not beside it, and a report whose
+    # coverage travels separately is one a reader cannot size.
     whole = "\n\n".join(t for t in transcript if t)
     final = latest_reply(loop, SOURCE)
     if final:
@@ -921,6 +951,7 @@ def main() -> int:
         # It records the fact, so a run carrying bad citations is visibly not
         # clean in the one file everything downstream reads.
         "citations_unresolved": citation_check,
+        "coverage": coverage_check,
         "error": error,
         "captured_at_utc": ts,
     }, indent=2, default=str) + "\n", encoding="utf-8")

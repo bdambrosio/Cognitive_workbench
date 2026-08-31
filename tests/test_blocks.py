@@ -17,6 +17,10 @@ FULL = """=== CLAIM SURFACE ===
 === REPORT ===
 body here
 === END REPORT ===
+=== COVERAGE ===
+1. [real]
+2. [delta]
+=== END COVERAGE ===
 === LIMITATIONS ===
 three lines
 === END LIMITATIONS ===
@@ -25,7 +29,7 @@ gm body
 === END GAP MAP ==="""
 
 
-def test_all_four_blocks_are_found_in_one_emission():
+def test_every_block_is_found_in_one_emission():
     # A leg carrying several blocks is not a special case — it was the
     # "salvage path" before, and salvage is where defects hide.
     assert blocks.present(FULL) == {n: True for n in blocks.BLOCKS}
@@ -63,7 +67,7 @@ def test_a_line_wrapped_marker_still_matches():
 def test_missing_reports_in_emission_order():
     partial = "=== REPORT ===\nx\n=== END REPORT ==="
     assert blocks.missing(blocks.present(partial)) == [
-        "CLAIM SURFACE", "LIMITATIONS", "GAP MAP"]
+        "CLAIM SURFACE", "COVERAGE", "LIMITATIONS", "GAP MAP"]
 
 
 def test_an_absent_block_is_None_not_empty():
@@ -112,3 +116,14 @@ def test_a_real_emission_on_the_same_turn_still_counts():
 
 def test_an_indented_marker_still_opens_a_block():
     assert blocks.opened("  === GAP MAP ===\nrow\n", "GAP MAP")
+
+
+def test_coverage_sits_between_the_report_and_the_limitations():
+    """Order is not presentation. The claim surface is the denominator and is
+    frozen before the work; coverage is a statement about claims and can only
+    be written once every claim has a verdict. It was inside REPORT until
+    2026-08-30, where the model computed figures over findings while claiming
+    to count claims."""
+    assert blocks.BLOCKS.index("COVERAGE") > blocks.BLOCKS.index("REPORT")
+    assert blocks.BLOCKS.index("COVERAGE") < blocks.BLOCKS.index("LIMITATIONS")
+    assert blocks.REPORT_BLOCKS == ("REPORT", "COVERAGE", "LIMITATIONS")

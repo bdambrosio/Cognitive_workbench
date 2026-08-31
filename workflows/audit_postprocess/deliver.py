@@ -51,6 +51,7 @@ if str(REPO) not in sys.path:
 
 from workflows import blocks                                    # noqa: E402
 from workflows.citations import resolve_citations               # noqa: E402
+from workflows import coverage as cov, issues as iss             # noqa: E402
 
 # A §5 finding header. Same shape audit_review and score.py both key on, so a
 # report that parses for them parses here.
@@ -237,9 +238,36 @@ def audit(run: Path) -> Dict[str, Any]:
         "claim_surface_recovered": bool(claim_surface(run)),
         "parked_notes": parked_notes(claim_surface(run)),
         "review": review_signal(run, unresolved),
+        "coverage": {k: v for k, v in coverage_of(run).items()
+                     if k in ("legacy", "check", "statement", "figures")},
         "blocks_closed": {n: blocks.closed(report if n != "GAP MAP" else gap, n)
                           for n in ("REPORT", "LIMITATIONS", "GAP MAP")},
     }
+
+
+def coverage_of(run: Path) -> Dict[str, Any]:
+    """The coverage figures, computed from the ledger — never the report's.
+
+    METHOD §16 gained a `=== COVERAGE ===` block on 2026-08-30 carrying one
+    verdict per claim, and every figure here is arithmetic over it. Runs that
+    predate the block have their coverage statement inside REPORT and no
+    ledger; for those, `ledger` is empty and the report's own sentence is left
+    to stand, because recomputing figures from findings is the mistake the
+    block exists to remove.
+    """
+    report = (run / "report.md").read_text(errors="replace") \
+        if (run / "report.md").is_file() else ""
+    block = blocks.content(report, "COVERAGE", blocks.BLOCKS) or ""
+    if not block:
+        return {"ledger": [], "legacy": True, "check": None, "prose": ""}
+    c = cov.check(claim_surface(run), block)
+    # The ledger lines are the record; the prose after them is what the numbers
+    # do not say. The client reads the prose, and the ledger goes to Appendix B.
+    prose = "\n".join(l for l in block.splitlines()
+                       if not cov._LEDGER_LINE.match(l)).strip()
+    return {"ledger": cov.parse_ledger(block), "legacy": False,
+            "check": c, "prose": prose,
+            "statement": cov.statement(c["figures"]), "figures": c["figures"]}
 
 
 def claim_surface(run: Path) -> str:
@@ -390,7 +418,13 @@ def assemble(run: Path, written: Optional[Dict[str, Any]] = None) -> str:
     # keeps them separate blocks so nothing has to nest, and says why they are
     # one document: ISAE 3000 / AT-C 205 require the limitations to travel with
     # the report. A reader stops at the appendices.
-    if written.get("coverage"):
+    cv = coverage_of(run)
+    if not cv["legacy"]:
+        # The figures are computed; the agent's prose, if any, sits under them.
+        body_text = (written.get("coverage") or cv["prose"]).strip()
+        out.append("\n\n## Coverage\n\n" + cv["statement"]
+                   + (("\n\n" + body_text) if body_text else ""))
+    elif written.get("coverage"):
         out = [_swap_coverage(s, written["coverage"]) for s in out]
     if limits:
         out.append("\n\n## Limitations\n")
@@ -412,6 +446,9 @@ def assemble(run: Path, written: Optional[Dict[str, Any]] = None) -> str:
                    "before verification began. The claim numbers used above, "
                    "and in the coverage statement, index this list.\n")
         out.append(_strip_markers(surface).strip())
+        if cv["ledger"]:
+            out.append("\n\nThe verdict each claim received:\n")
+            out.append("\n".join(f"{n}. [{v}]" for n, v in cv["ledger"]))
     # Sections are split at their headings, so each body already begins with
     # the newline that ended the heading line — which printed two blank lines
     # under every `##`. Layout only; no character of content moves.
@@ -487,6 +524,17 @@ def editor_notes(run: Path, a: Dict[str, Any]) -> str:
               "body — this script will not promote an observation into a "
               "finding.", ""]
         L += [f"- {n}" for n in a["parked_notes"]]
+    L += ["", "## 1d. Everything this run recorded for a person", "",
+          iss.render(run), ""]
+    cvk = (a.get("coverage") or {}).get("check")
+    if cvk and not cvk.get("ok"):
+        L += ["## 1e. The coverage ledger does not account for the surface", "",
+              "Every coverage figure is computed from the ledger, so a ledger "
+              "that does not cover the frozen surface exactly once makes them "
+              "wrong. This is the report's assurance figure. Do not ship it "
+              "until the ledger is repaired — and repair the ledger, not the "
+              "figures.", ""]
+        L += [f"- {p}" for p in cvk["problems"]]
     L += ["", "## 2. Consequence ordering", "",
           "The audit orders findings by verdict class, which is not the same as "
           "consequence to this buyer — and consequence to this buyer is not "

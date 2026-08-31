@@ -106,7 +106,7 @@ If a tier contains no claims, state that in the coverage statement. The purpose 
 Use the following form for a finding that resolves a seller claim:
 
 ```text
-**Finding N: <short title> — [claim verdict]**
+**Finding N (claim <id>): <short title> — [claim verdict]**
 
 Claim (<document:lines>): <the stated claim>
 
@@ -114,6 +114,10 @@ Evidence: <document or file:lines> — <what the materials show>
 
 Gap: <None, or the specific gap>
 ```
+
+`Finding N` numbers the findings in this report. `claim <id>` is the claim's number in the frozen surface, so a reader can trace a finding back to what was enumerated. Where one finding resolves several claims, name them: `(claims 12-17)`. A derived finding resolves no claim and uses the format below.
+
+The finding number and the claim number are different counts and are not expected to match. One claim may produce several findings — that is normal, and Section 16's coverage ledger, not the findings, is what records a claim's single verdict.
 
 Cite both the source of the claim and the evidence used to resolve it. A reader should be able to inspect both sides of the comparison.
 
@@ -466,18 +470,19 @@ Do not add promotional content such as logos, pricing, or sales calls to action.
 
 ## 16. Deliverable format
 
-The deliverable contains four blocks, each with explicit opening and closing markers:
+The deliverable contains five blocks, each with explicit opening and closing markers:
 
 ```text
 === CLAIM SURFACE ===     …     === END CLAIM SURFACE ===
 === REPORT ===            …     === END REPORT ===
+=== COVERAGE ===          …     === END COVERAGE ===
 === LIMITATIONS ===       …     === END LIMITATIONS ===
 === GAP MAP ===           …     === END GAP MAP ===
 ```
 
 An opening marker identifies the block being delivered. A closing marker confirms that the block is complete rather than merely interrupted or truncated. Emit them in that order.
 
-The blocks, rather than conversational turns, define completion. The claim surface must be closed before claims are evaluated because it supplies the denominator for later coverage figures.
+The blocks, rather than conversational turns, define completion. The claim surface must be closed before claims are evaluated because it supplies the denominator for later coverage figures. Coverage is a separate block after the report for the matching reason: it is a statement about claims, and it can only be written once every claim has a verdict.
 
 Each marker appears on its own line. Nothing should appear between an opening marker and the content of that block.
 
@@ -487,15 +492,16 @@ Use the format defined in Section 12, step 2. The line immediately after the ope
 
 ### `=== REPORT ===`
 
-The report contains four parts in this order:
+The report contains three parts in this order:
 
 1. **Conclusion**, using only the vocabulary in Section 9.
 2. **Findings, ordered from highest to lowest consequence.**
    - Ordinary claim findings use the Section 5 format and cite both claim and resolving evidence.
    - Findings based on absence cite the claim and record both required searches.
    - Derived findings use `[derived]`, cite each basis fact, and show the derivation.
-3. **Coverage statement**, using the terminology in Section 1a. Include identified, resolved, supported, the consistency rate, what was left unattempted and why, every `[unverifiable]` claim and its reason, any `[unclaimed]` observations, and any addendum created under Section 12.
-4. **Questions the client should ask the seller before closing.**
+3. **Questions the client should ask the seller before closing.**
+
+Coverage is not part of the report block. It is the `=== COVERAGE ===` block below.
 
 Do not place a covering note, process narrative, or conversational preamble inside the report block.
 
@@ -508,6 +514,31 @@ As a rough writing budget:
 
 Do not reduce length by dropping citations or merging independent claims into a single finding. Either makes the report harder to verify against the frozen claim surface.
 
+### `=== COVERAGE ===`
+
+**A claim has exactly one verdict. A finding is a unit of reporting, and one claim may produce several findings.** Coverage counts claims, never findings. A claim that bundles more than one seller assertion is still one claim with one verdict; where its parts differ, Section 6's `[partial]` is the verdict for a claim that is substantially true with a specific gap.
+
+This block contains two parts.
+
+**1. The verdict ledger.** Every claim in the frozen surface, in order, one per line, with the verdict or status it received:
+
+```text
+<claim number>. [verdict]
+```
+
+Use only Section 6's five claim verdicts, or `[unverifiable]` for a claim that was attempted and could not be settled. Every claim in the surface appears exactly once. No claim appears twice, and no line names a claim that is not in the surface.
+
+Nothing else goes on these lines. Write the ledger even where it is long: it is the record of what the audit concluded about each claim, and it is the only place that record exists in one piece.
+
+**2. What the numbers do not say.** In prose, after the ledger:
+
+- why each `[unverifiable]` claim could not be settled;
+- anything in the claim sources that was not counted as a claim, and why;
+- any `[unclaimed]` observation, per Section 6;
+- any addendum created under Section 12, step 2.
+
+**Do not state coverage figures.** Identified, resolved, supported and the consistency rate are arithmetic over the ledger, and the client's process computes them from it. Section 1a defines what each means; the ledger is what they are computed from.
+
 ### `=== LIMITATIONS ===`
 
 This block is always present and contains three items:
@@ -518,7 +549,7 @@ This block is always present and contains three items:
 
 The second item matters because the report interprets seller statements without giving the seller an opportunity during the engagement to clarify what was intended.
 
-Throughout this method, **report** means the `=== REPORT ===` block, while **deliverable** means all four blocks together.
+Throughout this method, **report** means the `=== REPORT ===` block, while **deliverable** means all five blocks together.
 
 ### `=== GAP MAP ===`
 

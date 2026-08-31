@@ -32,7 +32,14 @@ from typing import Dict, List, Optional, Tuple
 # In emission order. The order is not presentation: the claim surface is the
 # denominator every coverage figure divides by, so a surface closed after the
 # findings is not frozen, it is a count made to fit.
-BLOCKS: Tuple[str, ...] = ("CLAIM SURFACE", "REPORT", "LIMITATIONS", "GAP MAP")
+# COVERAGE sits after REPORT for the reason CLAIM SURFACE sits before it. The
+# surface is the denominator and must be fixed before the work it measures;
+# coverage is a statement about claims and can only be written once every claim
+# has a verdict. It carried the coverage statement inside REPORT until
+# 2026-08-30, where the model computed figures over findings while claiming to
+# count claims — and the two differ whenever one claim produces two findings.
+BLOCKS: Tuple[str, ...] = ("CLAIM SURFACE", "REPORT", "COVERAGE",
+                           "LIMITATIONS", "GAP MAP")
 
 # The review's four, mirroring the audit's: a frozen surface, the document, its
 # limitations, and the one-page read. Same shapes, same rules, because the
@@ -56,7 +63,11 @@ _ALL: Tuple[str, ...] = tuple(dict.fromkeys(BLOCKS + REVIEW_BLOCKS
 # What `report.md` is assembled from, in this order. LIMITATIONS is a separate
 # block and still part of the report — the client receives one document with
 # those lines in it. Separate block, same document.
-REPORT_BLOCKS: Tuple[str, ...] = ("REPORT", "LIMITATIONS")
+# COVERAGE joined these 2026-08-30. It is a separate block so the ledger can be
+# written after every claim has a verdict, and part of the same document
+# because a report whose coverage travels separately is a report a reader
+# cannot size.
+REPORT_BLOCKS: Tuple[str, ...] = ("REPORT", "COVERAGE", "LIMITATIONS")
 
 
 def open_mark(name: str) -> str:

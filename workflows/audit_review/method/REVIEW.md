@@ -22,7 +22,7 @@ The audit's own method states the gap this review fills. METHOD §12 step 6b: *"
 
 ## 3. What you have
 
-**The report and the Gap Map** — `report.md` and `gap_map.md`, under `inspect`. These are what you review. `report.md` holds METHOD §16's REPORT and LIMITATIONS blocks; the Gap Map is its GAP MAP block.
+**The report and the Gap Map** — `report.md` and `gap_map.md`, under `inspect`. These are what you review. `report.md` holds METHOD §16's REPORT, COVERAGE and LIMITATIONS blocks; the Gap Map is its GAP MAP block. An older audit run may carry no COVERAGE block and state its coverage inside the report instead; both shapes appear on the board.
 
 **The audit's claim surface is not among these files.** METHOD §16 makes it a delivered block, but it is not written to a file of its own. It is in `working_record/reasoning_trace.jsonl`, with the rest of the auditor's legs, and §7 is when you read it.
 
@@ -192,7 +192,7 @@ Choose between the four citation states by what a reader can do with the referen
 
 **Once every finding has been checked** — not after each one — read the working record and report **two** things, once, about the audit as a whole. Nothing in this section is written per finding.
 
-**What the report says it covered, against what the record shows it did.** The audit froze a claim surface; §3 names the file that holds it, since it is not in the report. The report states, in METHOD §1a's vocabulary, how many of those claims it resolved and how many it supported. The trace and the evidence requests show what was actually read. A coverage statement the record does not bear out is an exception like any other.
+**What the report says it covered, against what the record shows it did.** The audit froze a claim surface; §3 names the file that holds it, since it is not in the report. METHOD §16's COVERAGE block gives one verdict per claim, and the coverage figures are computed from that ledger by the client's process rather than written by the auditor — so the figures are not yours to check. What is yours to check is whether the record bears out the work the ledger claims. The trace and the evidence requests show what was actually read. A coverage statement the record does not bear out is an exception like any other.
 
 **What the audit did not attempt.** Not a list of everything it could have done: the claim sources are finite and the record names what was opened. Where the report claims coverage of a document the record never shows it reading, say so.
 
