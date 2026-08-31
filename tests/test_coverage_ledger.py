@@ -48,26 +48,6 @@ def test_a_claim_missing_from_the_ledger_is_named():
     assert not c["ok"] and c["missing"] == [2]
 
 
-def test_an_unattempted_claim_is_a_valid_ledger_status():
-    """Section 1a and Section 12 step 5 both permit the work to stop with claims
-    unexamined, while Section 16 requires every frozen claim on exactly one
-    ledger line. Before `[unattempted]` existed a run that stopped early could
-    not write a conforming ledger at all."""
-    stopped = LEDGER.replace("3. [partial]", "3. [unattempted]")
-    c = cov.check(SURFACE, stopped)
-    assert c["ok"], c["problems"]
-    f = c["figures"]
-    assert (f["resolved"], f["unattempted"], f["unverifiable"]) == (2, 1, 1)
-
-
-def test_an_unattempted_claim_owes_no_finding():
-    """It reached no verdict, so nothing is asserted about it to back."""
-    stopped = LEDGER.replace("3. [partial]", "3. [unattempted]")
-    c = cov.findings_check(REPORT.replace(
-        "**Finding 3 (claim 3): c title — [partial]**\n\n", ""), stopped)
-    assert c["ok"], c["problems"]
-
-
 def test_a_verdict_outside_method_6_is_caught():
     c = cov.check(SURFACE, LEDGER.replace("[partial]", "[mostly true]"))
     assert not c["ok"] and c["bad_verdicts"] == ["mostly true"]
@@ -122,25 +102,51 @@ def test_a_resolved_claim_named_by_no_finding_is_named():
     assert not c["ok"] and c["missing"] == [2]
 
 
-def test_one_finding_may_bear_on_several_claims():
-    """Finding 8 resolved the seven SQL-guardrail claims from one body of
-    evidence. A finding is a relevant subset of the source, and the mapping to
-    claims is many-to-many; an earlier version of this check called it a defect."""
+def test_one_finding_may_adjudicate_several_claims_that_share_a_verdict():
+    """One determination, however many claims it settles: `Finding 1 (claims
+    19, 20)` over a single body of backup evidence. Not a cardinality
+    allowance — a consequence of what a finding is."""
+    ledger = LEDGER.replace("2. [real, minor caveat]", "2. [real]")
+    merged = REPORT.replace(
+        "**Finding 1 (claim 1): a title — [real]**\n\n"
+        "**Finding 2 (claim 2): b title — [real, minor caveat]**",
+        "**Finding 1 (claims 1-2): a and b — [real]**")
+    c = cov.findings_check(merged, ledger)
+    assert c["ok"], c["problems"]
+
+
+def test_a_finding_over_claims_whose_verdicts_differ_is_caught(tmp_path=None):
+    """The defect the fixture smoke run shipped with. Finding 1 adjudicated
+    claims 19 and 20 together as [delta] while the ledger recorded claim 20 as
+    [partial]: one header carries one verdict, so the second claim's verdict was
+    misrepresented in the report body. METHOD §6 says split such a finding."""
     merged = REPORT.replace(
         "**Finding 2 (claim 2): b title — [real, minor caveat]**\n\n"
         "**Finding 3 (claim 3): c title — [partial]**",
-        "**Finding 2 (claims 2-3): b and c — [real]**")
+        "**Finding 2 (claims 2-3): b and c — [real, minor caveat]**")
     c = cov.findings_check(merged, LEDGER)
-    assert c["ok"], c["problems"]
+    assert not c["ok"]
+    assert c["verdict_mismatch"] == [(3, "real, minor caveat", "partial")]
 
 
-def test_one_claim_may_be_carried_by_several_findings():
-    """Claims 13 and 15 sat in Finding 8's range and again in Finding 9's list.
-    Two findings bearing on one claim is evidence, not duplication."""
+def test_two_findings_adjudicating_one_claim_is_a_defect():
+    """A claim has one verdict, so it has one finding. Two are either redundant
+    or contradictory, and neither is a state an audit should express."""
     twice = REPORT.replace("=== END REPORT ===",
                            "**Finding 4 (claim 3): more evidence — [partial]**\n\n=== END REPORT ===")
     c = cov.findings_check(twice, LEDGER)
-    assert c["ok"], c["problems"]
+    assert not c["ok"] and c["duplicated"] == [3]
+
+
+def test_a_header_verdict_that_contradicts_the_ledger_is_caught():
+    """Claim 2 read [real] in its header and [real, minor caveat] in the ledger
+    on cm_ledger_glm_1. The ledger line is the index of the verdict, not a
+    second copy of it, so a disagreement is a defect rather than a tie."""
+    c = cov.findings_check(
+        REPORT.replace("**Finding 2 (claim 2): b title — [real, minor caveat]**",
+                       "**Finding 2 (claim 2): b title — [real]**"), LEDGER)
+    assert not c["ok"]
+    assert c["verdict_mismatch"] == [(2, "real", "real, minor caveat")]
 
 
 def test_a_finding_naming_a_claim_outside_the_ledger_is_named():

@@ -33,16 +33,16 @@ from typing import Any, Dict, List, Optional, Tuple
 # Tolerant of decoration a model adds unbidden, strict about the shape.
 _LEDGER_LINE = re.compile(r"(?m)^\s*\**\s*(\d+)\s*\.\s*\**\s*\[([^\]]+)\]\s*\**\s*$")
 
-# METHOD §6: five verdicts a resolved claim can carry, plus the two statuses
-# for a claim that reached no verdict — attempted and unsettled, or never
-# reached at all. `[unattempted]` is a ledger status because §1a and §12 step
-# 5 both permit the work to stop with claims unexamined, while §16 requires
-# every frozen claim on exactly one ledger line: without it, a run that
-# stopped early could not write a conforming ledger at all.
+# METHOD §6: five verdicts a resolved claim can carry, plus the one status for
+# a claim that was attempted and did not resolve. There is no status for a
+# claim the work never reached: §12 step 5 requires every identified claim to
+# be attempted, and an engagement that cannot is not delivered. `unattempted`
+# below is therefore a residual that should always be zero — a ledger short of
+# the surface, which `check` reports as missing claims.
 SUPPORTED = ("real", "real, minor caveat", "real, operational caveat")
 UNSUPPORTED = ("partial", "delta")
 RESOLVED = SUPPORTED + UNSUPPORTED
-UNRESOLVED = ("unverifiable", "unattempted")
+UNRESOLVED = ("unverifiable",)
 
 
 def parse_ledger(text: str) -> List[Tuple[int, str]]:
@@ -61,13 +61,8 @@ def figures(ledger: List[Tuple[int, str]], identified: Optional[int]) -> Dict[st
     verdicts = [v for _, v in ledger]
     supported = sum(1 for v in verdicts if v in SUPPORTED)
     unsupported = sum(1 for v in verdicts if v in UNSUPPORTED)
-    unverifiable = verdicts.count("unverifiable")
+    unverifiable = sum(1 for v in verdicts if v in UNRESOLVED)
     resolved = supported + unsupported
-    # A ledger written before `[unattempted]` existed omits those claims
-    # rather than naming them, which `check` reports as missing; the residual
-    # keeps their count visible in the figures either way.
-    unattempted = (verdicts.count("unattempted")
-                   or max(0, (identified or len(ledger)) - resolved - unverifiable))
     ident = identified if identified is not None else len(ledger)
     return {
         "identified": ident,
@@ -78,7 +73,7 @@ def figures(ledger: List[Tuple[int, str]], identified: Optional[int]) -> Dict[st
         # §1a: coverage = resolved / identified, consistency = supported / resolved
         "coverage_pct": round(100 * resolved / ident, 1) if ident else None,
         "consistency_pct": round(100 * supported / resolved, 1) if resolved else None,
-        "unattempted": unattempted,
+        "unattempted": max(0, ident - resolved - unverifiable),
     }
 
 
@@ -133,18 +128,33 @@ def check(claim_surface: str, coverage_block: str) -> Dict[str, Any]:
 def findings_check(report: str, coverage_block: str) -> Dict[str, Any]:
     """Is every claim the ledger gives a verdict backed by a finding that cites it?
 
-    TRACEABILITY, NOT CARDINALITY. A finding is a relevant subset of the
-    source; a claim is a seller assertion; the mapping between them is
-    many-to-many and a verdict falls out of the match. Findings 8 covering the
-    seven SQL-guardrail claims from one body of evidence, and claims 13 and 15
-    appearing under two findings each, are both correct — an earlier version of
-    this function reported both as defects, having mistaken a report's
-    numbering for a rule about ratios.
+    WHAT A FINDING IS decides what can be wrong here. A claim finding is the
+    statement of the verdict of adjudicating a set of cited evidence with
+    respect to a claim — the verdict stated with its grounds, not an attribute
+    hung on something else. Bruce, 2026-08-31.
 
-    What is left when the ratios go is the one thing that survives any reading:
-    the audit must not assert a verdict it never backed. Claim 29 on
-    `cm_ledger_glm_1` carried `[real, minor caveat]` in the ledger and was named
-    by no finding, so nothing cited it and nothing noticed.
+    Three things follow, and they are the three checks below.
+
+    A claim has one verdict, so it has one finding: two findings adjudicating
+    one claim are either redundant or contradictory, and neither is a state an
+    audit should be able to express. Conflicting EVIDENCE is normal and belongs
+    inside one finding, where the Gap adjudicates it; conflicting FINDINGS would
+    be two adjudications of one question.
+
+    A finding may still adjudicate several claims where one determination
+    settles them all — `Finding 1 (claims 19, 20)` over a single body of backup
+    evidence. That is not a cardinality allowance but a consequence: one
+    determination, however many claims it settles. So every claim under one
+    header shares its verdict.
+
+    The ledger line is the INDEX of that verdict, not a second copy of it: one
+    line per claim so the figures compute off something that parses reliably.
+    Where the two disagree the finding is authoritative and the disagreement is
+    the defect. On `cm_ledger_glm_1` claim 2 read `[real]` in its header and
+    `[real, minor caveat]` in the ledger, and nothing was watching.
+
+    And the audit must not assert a verdict it never backed: claim 29 on the
+    same run carried a ledger verdict and was named by no finding at all.
 
     NAMES THE DEFECT, like `check` above. "Claim 29 has no finding" is repaired
     in one line; "the findings and the ledger disagree" is not.
@@ -157,12 +167,22 @@ def findings_check(report: str, coverage_block: str) -> Dict[str, Any]:
 
     # A `[derived]` finding resolves no seller claim (§6) and names none.
     claim_findings = [f for f in finding_claims(report) if f["verdict"] != "derived"]
-    seen = {c for f in claim_findings for c in f["claims"]}
+    by_claim: Dict[int, List[int]] = {}
+    for f in claim_findings:
+        for c in f["claims"]:
+            by_claim.setdefault(c, []).append(f["n"])
+    seen = set(by_claim)
 
     missing = sorted(resolved - seen)
     unknown = sorted(seen - set(ledger))
     untraceable = [f["n"] for f in claim_findings if not f["claims"]]
     unresolved_as_finding = sorted(seen & unresolved)
+    duplicated = sorted(c for c, fs in by_claim.items() if len(fs) > 1)
+    # Every claim under one header shares that header's verdict, so the
+    # comparison runs over all of them rather than only single-claim findings.
+    mismatch = sorted((c, f["verdict"], ledger[c])
+                      for f in claim_findings for c in f["claims"]
+                      if c in ledger and f["verdict"] != ledger[c])
 
     def _ids(ns, cap: int = 12) -> str:
         ns = list(ns)
@@ -175,6 +195,15 @@ def findings_check(report: str, coverage_block: str) -> Dict[str, Any]:
     if missing:
         problems.append(f"{len(missing)} resolved claim(s) are named by no "
                         "finding: " + _ids(missing))
+    if duplicated:
+        problems.append("claims adjudicated by more than one finding: "
+                        + _ids(duplicated))
+    if mismatch:
+        problems.append(
+            "a finding's verdict differs from the claim's ledger line: "
+            + "; ".join(f"claim {c} [{fv}] vs ledger [{lv}]"
+                        for c, fv, lv in mismatch[:6])
+            + (" …" if len(mismatch) > 6 else ""))
     if unknown:
         problems.append("findings name claims that are not in the ledger: "
                         + _ids(unknown))
@@ -182,15 +211,16 @@ def findings_check(report: str, coverage_block: str) -> Dict[str, Any]:
         problems.append("finding(s) name no claim, so nothing they establish "
                         "reaches the surface: " + _ids(untraceable))
     if unresolved_as_finding:
-        problems.append("claims carrying an examination status are stated as "
-                        "findings; METHOD \u00a76 reports them in the coverage "
-                        "block: " + _ids(unresolved_as_finding))
+        problems.append("[unverifiable] claims are stated as findings; METHOD "
+                        "\u00a76 reports them in the coverage block: "
+                        + _ids(unresolved_as_finding))
 
     return {"ok": not problems, "problems": problems,
             "resolved": len(resolved), "claim_findings": len(claim_findings),
             "claims_in_findings": len(seen), "missing": missing,
             "unknown": unknown, "untraceable": untraceable,
-            "unresolved_as_finding": unresolved_as_finding}
+            "unresolved_as_finding": unresolved_as_finding,
+            "duplicated": duplicated, "verdict_mismatch": mismatch}
 
 
 def statement(fig: Dict[str, Any]) -> str:
