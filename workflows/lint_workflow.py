@@ -241,6 +241,14 @@ def check_code_vocab() -> List[str]:
     for verdict in score._VERDICTS:
         if f"`[{verdict}]`" not in raw:
             bad.append(f"score.py verdict '[{verdict}]' appears nowhere in METHOD")
+    # AND THE OTHER DIRECTION. This walked score.py -> METHOD only until
+    # 2026-08-31, so `[unattempted]` was added to §6 and §12 and scored as
+    # off-vocabulary by a checker that had never heard of it. A one-way
+    # equality check is half a check.
+    for term in re.findall(r"^\| `\[([^\]]+)\]`", raw, re.M):
+        if term not in score._VERDICTS:
+            bad.append(f"METHOD \u00a76 defines '[{term}]' and score.py "
+                       "does not recognise it")
     return bad
 
 

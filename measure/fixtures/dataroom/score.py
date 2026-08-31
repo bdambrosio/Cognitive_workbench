@@ -308,11 +308,15 @@ def claim_surface(world: str, agent: str) -> Dict[str, Any]:
 # for zero uses across three engagements. A finding wearing a label outside this
 # set is not using the method's vocabulary — the same failure §9's check catches
 # at report level, one level down, where nothing was watching.
-# §6, all three of its vocabularies — five claim verdicts, one examination
-# status, two observation types. `non-delta` was renamed `unclaimed` on
+# §6, all three of its vocabularies — five claim verdicts, two examination
+# statuses, two observation types. `non-delta` was renamed `unclaimed` on
 # 2026-08-27: it reads as the negation of `delta` and means there was no claim.
+# `unattempted` was added on 2026-08-31, when §12 step 5 gained a status for
+# a claim the work never reached; without it a conformant report using that
+# status scored as off-vocabulary.
 _VERDICTS = {"real", "real, minor caveat", "real, operational caveat",
-             "partial", "delta", "unverifiable", "unclaimed", "derived"}
+             "partial", "delta", "unverifiable", "unattempted", "unclaimed",
+             "derived"}
 
 # §5's heading shape: **Finding N: <title> — [verdict]**. Tolerant of the dash
 # an model chooses and of bold markers, because those vary and the verdict does
