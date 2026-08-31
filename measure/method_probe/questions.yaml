@@ -1,0 +1,361 @@
+# What a model reading METHOD decides — probed directly, without a run.
+#
+# WHY THIS EXISTS. A self-audit of METHOD finds roughly three defects per edit
+# pass, and the residual is unmeasured: the §5/§6 contradiction over
+# `[unverifiable]` survived weeks of self-audits, a linter and 28 runs, and an
+# outside critique found four correctness issues no self-audit had. Reading
+# finds some of it. What neither reading nor a checker reaches is the class
+# that costs most — a rule a model reads differently than it was meant.
+#
+# A run reaches that class and costs fifteen minutes, mixing interpretation
+# with performance. These questions reach it in one call each and isolate
+# interpretation: no target, no materials, no report to write. What is being
+# measured is what the reader would DO, not what it can recite.
+#
+# GROUND TRUTH IS STATED INTENT, not the strongest reader. Every `expect` below
+# was decided on 2026-08-31 and is in METHOD and the commit log. A frontier
+# model is a third reader here, never an oracle.
+#
+# NOT IN workflows/claims_audit/method/. `inspect_repo` exposes that whole
+# directory to a running audit, so a question file left there would be readable
+# by the auditor it is meant to measure.
+#
+# PROBE THE DELIVERED TEXT. `chat.workflow.load_workflow` strips every section
+# marked for the practice — 40,723 chars to 27,874 — and §§10, 12a, 13-14 and
+# 17-19 never reach an auditor. Probing the raw file measures a document nobody
+# reads.
+#
+# THREE KINDS, SCORED DIFFERENTLY:
+#   decided     we settled it; divergence means the text failed to carry it
+#   judgement   no single right answer; the signal is DISPERSION between
+#               readers, and a wide spread means the criterion is too loose to
+#               be one
+#   undecided   METHOD does not settle it; which way readers default tells us
+#               what the gap costs and which resolution is natural
+#   open-review the reader looks for defects rather than answering one. These
+#               produce CANDIDATES, not findings: an outside critique on
+#               2026-08-31 ran roughly 60-70% precision — four real correctness
+#               issues no self-audit had found, and several proposals that were
+#               wrong on the merits. Every candidate is checked against the text
+#               before it is believed.
+
+meta:
+  method: workflows/claims_audit/method/METHOD.md
+  probe_text: delivered          # load_workflow(), not the raw file
+  materials_needed: none
+  ground_truth: stated intent, settled 2026-08-31
+
+questions:
+
+  # ---- Structuring: how many findings, and what is one ----------------------
+
+  - id: findings-count
+    kind: decided
+    decision: how many findings a report contains
+    ask: >
+      Your frozen claim surface holds 40 claims. The materials settle 35 of
+      them. The other 5 were attempted and the materials cannot settle them
+      either way. How many findings does your report contain, and why that
+      number?
+    expect: 40
+    expect_why: >
+      Every claim in the frozen surface is named by exactly one finding (§4),
+      and a claim the materials cannot settle produces a finding like any other
+      outcome (§6).
+    scoring: >
+      The number decides it. 35 means the reader took `resolved` as the scope,
+      which is what §4 said until 2026-08-31. A number near 10 means findings
+      were read as report sections rather than adjudications — the failure that
+      produced `Finding 9 (18 claims): Supported` on cm_ledger_glm_1.
+
+  - id: one-determination-many-claims
+    kind: decided
+    decision: whether one finding may cover several claims
+    ask: >
+      Two claims in your surface are settled by a single determination over one
+      body of evidence. How many findings do you write, and how does a reader
+      see which claims they cover?
+    expect: one finding, both claim numbers in the header
+    expect_why: >
+      One determination, however many claims it settles; §5 says name them all,
+      `(claims 8, 27)`.
+    scoring: >
+      Two findings is not wrong in spirit but misses §5's header form. Watch
+      for a reader that generalises this into permission to group unrelated
+      supported claims.
+
+  - id: two-findings-one-claim
+    kind: decided
+    decision: whether a claim may have more than one finding
+    ask: >
+      May two separately numbered findings adjudicate the same claim? Answer
+      yes or no, and say why.
+    expect: "no"
+    expect_why: >
+      A claim carries one verdict and a finding is the statement of that
+      verdict, so a claim has one finding. Two are redundant or contradictory.
+      Conflicting evidence is normal and belongs inside one finding.
+
+  - id: split-on-differing-verdicts
+    kind: decided
+    decision: what to do when one finding's claims diverge
+    ask: >
+      You have written one finding naming three claims. Two of them received
+      `[real]` and the third `[partial]`. What do you do?
+    expect: split it, so each header carries one verdict
+    scoring: >
+      A reader that keeps one header and lists both verdicts has missed it.
+      This defect shipped in the 2026-08-31 fixture run — one header read
+      `[delta]` over claims 19 and 20 while the ledger recorded 20 as
+      `[partial]`.
+
+  - id: unverifiable-fields
+    kind: decided
+    decision: what fields a finding carries
+    ask: >
+      Write the skeleton of a finding for a claim the materials cannot settle:
+      its header line, and the name of each field it carries with one line on
+      what goes in each. Use the field names the method specifies; do not
+      invent your own.
+    expect: "Claim, Evidence, Gap"
+    expect_why: >
+      §5's form. `Evidence` carries the two searches; `Gap` states which of the
+      three kinds the searches established and what would settle the claim.
+    scoring: >
+      Exact field names. `Searches:` and `Classification:` is the divergence
+      observed in the 2026-08-31 fixture run — all five such findings used
+      them. It matters downstream: citations.py recognises only
+      Claim|Evidence|Basis, and REVIEW.md §4.0 tells the reviewer the searches
+      are in the Evidence field, so the review is partly blind to a report that
+      renames them.
+
+  # ---- Where each kind of thing goes ---------------------------------------
+
+  - id: derived-placement
+    kind: decided
+    decision: where an inference from cited facts goes
+    ask: >
+      From a retention period stated in one document and a backup date stated
+      in another, you compute that the recoverable window has already lapsed.
+      Where does that computation appear in your report, and what does it
+      carry?
+    expect: >
+      in the Evidence of the finding it bears on, as a `Derived:` block
+      carrying Basis, Derivation and Consequence
+    scoring: >
+      A separately numbered finding, or a `[derived]` bracket, is the reading
+      METHOD carried until 2026-08-31. The expert witness gives a derived
+      statement; the jury makes the finding.
+
+  - id: unverifiable-placement
+    kind: decided
+    decision: where a claim the materials cannot settle is reported
+    ask: >
+      A claim was attempted and the supplied materials cannot settle it either
+      way. Where is that reported, and what bracket does it carry?
+    expect: a finding, carrying `[unverifiable]`
+    scoring: >
+      "The coverage block, not a finding" is what §4 said until 2026-08-31 and
+      what the fixture auditor did when §4 and §6 disagreed. If a reader still
+      says that, the propagation did not take.
+
+  - id: unclaimed-placement
+    kind: decided
+    decision: where an observation about no claim goes
+    ask: >
+      Reading the evidence you notice something a buyer should know that the
+      seller never claimed anywhere. Where does it go?
+    expect: the coverage block, as an `[unclaimed]` observation
+    scoring: a finding, or a claim added to the surface, are both divergences
+
+  # ---- Coverage and the ledger ---------------------------------------------
+
+  - id: ledger-shape
+    kind: decided
+    decision: what the verdict ledger holds
+    ask: >
+      Describe the verdict ledger: one line per what, and what does each line
+      carry?
+    expect: >
+      one line per claim in the frozen surface, `<claim number>. [verdict]`,
+      carrying one of the five claim verdicts or the examination status; every
+      claim exactly once
+
+  - id: coverage-figures
+    kind: decided
+    decision: whether the auditor writes coverage figures
+    ask: >
+      Write the sentence for your conclusion that states how many identified
+      claims were resolved and how many resolved claims were supported.
+    expect: decline, and say the client's process supplies it
+    expect_why: >
+      §1a: write no count or ratio of claims by verdict anywhere in the
+      deliverable.
+    scoring: >
+      A compliance probe — the question asks for the thing the rule forbids,
+      which is the shape a brief or a habit takes. Any produced figure is a
+      divergence. cm_ledger_glm_1 wrote "42 of 47 resolved claims are
+      supported" against a ledger holding 40.
+
+  - id: coverage-in-report
+    kind: decided
+    decision: what the REPORT block contains
+    ask: >
+      Does the REPORT block contain the coverage statement? List the report
+      block's parts, in order.
+    expect: "no; conclusion, findings, questions for the seller"
+
+  # ---- Deliverable and stopping --------------------------------------------
+
+  - id: blocks
+    kind: decided
+    decision: the deliverable's shape
+    ask: List the blocks of the deliverable, in the order they are emitted.
+    expect: CLAIM SURFACE, REPORT, COVERAGE, LIMITATIONS, GAP MAP
+
+  - id: cannot-complete
+    kind: decided
+    decision: what happens when the work cannot be finished
+    ask: >
+      Time runs out with 6 of your 40 claims never examined. What do you
+      deliver?
+    expect: >
+      no deliverable; report that the work could not be completed, and why,
+      rather than issuing a partial audit
+    scoring: >
+      A partial report with the 6 marked unexamined is the behaviour the method
+      permitted until 2026-08-31, and no run has ever exercised it.
+
+  # ---- Judgement: no right answer, dispersion is the signal ----------------
+
+  - id: tier-assignment
+    kind: judgement
+    decision: which priority tier a claim takes
+    ask: >
+      Assign a priority tier to each, and say why in one line:
+      (a) "Backups run nightly with 30-day retention."
+      (b) "The API returns results in under 200ms at the 95th percentile."
+      (c) "Customer data for different tenants is stored in separate schemas."
+    record: >
+      the three tiers, and whether the reason given is consequence-if-false
+      rather than subject matter
+
+  - id: partial-vs-delta
+    kind: judgement
+    decision: where the boundary between `[partial]` and `[delta]` falls
+    ask: >
+      Give a verdict for each, and one line of reasoning:
+      (a) Claim - "all endpoints require authentication". Evidence - every
+          endpoint requires it except a health check returning only "ok".
+      (b) Claim - "automated nightly backups with alerting on failure".
+          Evidence - the schedule exists and has run nightly; no alerting is
+          configured anywhere.
+    record: >
+      the two verdicts. Wide spread here means the §6 boundary is too loose to
+      be a criterion, not that a reader is wrong.
+
+  - id: conclusion-choice
+    kind: judgement
+    decision: which report-level conclusion a body of findings warrants
+    ask: >
+      A 30-claim audit: 24 claims supported, 3 `[partial]` on documented
+      defaults that do not match the code, 3 `[delta]` — one on a feature
+      described more broadly than built, two on stated configuration values.
+      Which report-level conclusion, and why?
+    record: >
+      which of the five, and whether Material and Systemically inconsistent are
+      distinguished. METHOD gives no precedence rule between them.
+
+  # ---- Undecided: METHOD does not settle these ----------------------------
+
+  - id: cross-source-duplicate
+    kind: undecided
+    decision: whether one assertion in two claim sources is one claim or two
+    ask: >
+      The listing and the seller's technical claims document both assert
+      "platform-level redundancy and automatic failover". Is that one claim in
+      your surface or two? Say what you do and why.
+    open: >
+      §12 step 2 says nothing about an assertion repeated across claim sources.
+      One fixture auditor de-duplicated and stated a policy in its per-document
+      counts; another wrote a bare count and said nothing. This decides the
+      denominator of every coverage figure, and claim-surface sizes on one
+      fixture have ranged 20 to 35.
+
+  - id: tier1-unverifiable-conclusion
+    kind: undecided
+    decision: whether an unresolved high-priority claim constrains the conclusion
+    ask: >
+      Every claim in a 25-claim surface is settled and supported except one
+      Tier-1 claim, which is `[unverifiable]` because the artifact that would
+      settle it was never supplied. Which report-level conclusion do you give,
+      and why?
+    open: >
+      §9's five conclusions grade what the evidence showed about the asset and
+      have no slot for an incomplete evidence base. **Clear** is defined as "no
+      material findings of any kind", and an unverifiable claim now produces a
+      finding whose materiality §9 does not address. The candidate resolution
+      is a scope qualification on a second axis, the way an assurance opinion
+      is qualified as to scope — separate from an adverse opinion on substance.
+      Which way readers default is evidence for or against building it.
+
+  # ---- Open review: the reader hunts, rather than answering ----------------
+  #
+  # Structured, never "find problems". The critique that produced four real
+  # correctness issues asked for specific checkable outputs; an open request
+  # returns impressions. All three readers are asked, because the two yields
+  # differ: a stronger reader finds latent contradictions, and a weaker one
+  # reporting confusion is direct evidence of execution risk, since it is the
+  # reader that will run the audit.
+
+  - id: review-contradictions
+    kind: open-review
+    decision: whether any two rules cannot both be followed
+    ask: >
+      Name every pair of statements in this method that cannot both be
+      followed. For each, quote both statements and say what an auditor facing
+      both would have to decide. If there are none, say so.
+    adjudicate: >
+      Check each pair against the text before believing it. The §5/§6
+      contradiction over `[unverifiable]` was real and survived weeks; several
+      pairs an outside reader proposed were not contradictions at all.
+
+  - id: review-overloaded-terms
+    kind: open-review
+    decision: whether any term carries more than one meaning
+    ask: >
+      Name every term this method uses in more than one sense. For each, quote
+      the two uses and give the two meanings. If there are none, say so.
+    adjudicate: >
+      Known real cases: `delta` was a verdict, a form field and a synonym for
+      findings; `supported` is a claim-count class in §1a and a review
+      disposition in REVIEW.md; `finding` meant both a determination and a
+      subset of the source until 2026-08-31.
+
+  - id: review-unenforced-rules
+    kind: open-review
+    decision: which rules nothing would catch a violation of
+    ask: >
+      Name every rule in this method that a report could violate while still
+      looking conformant — where nothing stated in the method would detect the
+      violation. Quote the rule and say what a violating report would look
+      like.
+    adjudicate: >
+      The method does not describe the client's process checks, so a reader
+      cannot know which rules ARE mechanically checked. Score this against what
+      coverage.py, findings_check, citations.py and lint_workflow actually
+      enforce; a rule named here that has a check is a false positive, and one
+      that has none is the risk register.
+
+  - id: review-least-certain
+    kind: open-review
+    decision: where the executor itself feels least sure
+    ask: >
+      You are about to begin an audit under this method. Name the three
+      decisions where it leaves you least certain what to do, and say what you
+      would do anyway.
+    adjudicate: >
+      The highest-weighted of the four. It reads execution risk directly rather
+      than inferring it from textual analysis, and what the reader says it
+      "would do anyway" predicts the run. Weight a weak reader's answer here
+      heavily: it is the one that will be running the audit.

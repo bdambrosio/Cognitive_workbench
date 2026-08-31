@@ -88,26 +88,36 @@ USER = (
 
 def probe(model: str, tag: str, effort: str | None = "low",
           max_tokens: int = 16384, timeout: int = 300,
-          url: str = URL, key_env: str = "OPENROUTER_API_KEY",
-          temperature: float | None = None) -> dict:
+          url: str = URL, key_env: str | None = "OPENROUTER_API_KEY",
+          temperature: float | None = None,
+          system: str = SYSTEM, user: str = USER,
+          schema: dict | None = REACT_ACTION_SCHEMA) -> dict:
     """One endpoint, one call. Returns a row; never raises.
 
     `tag` pins the OpenRouter provider. For a direct route (a provider's own
     API rather than the gateway) pass `url` and `key_env` and set tag to the
     provider name — there is nothing to pin, so the `provider` block is
-    dropped.
+    dropped. `key_env=None` is a local server that wants no bearer token.
+
+    TWO CALLERS SINCE 2026-08-31. The gates above send a react action under
+    `REACT_ACTION_SCHEMA`; `measure/method_probe` sends a question about
+    METHOD and wants prose, so it passes `schema=None`. The defaults are the
+    gate probe unchanged, and every row in docs/model-prescreen.md was taken
+    with them — a caller that overrides `system`, `user` or `schema` is NOT
+    producing a row comparable to that table.
     """
     direct = "openrouter.ai" not in url
     body = {
         "model": model,
-        "messages": [{"role": "system", "content": SYSTEM},
-                     {"role": "user", "content": USER}],
+        "messages": [{"role": "system", "content": system},
+                     {"role": "user", "content": user}],
         "max_tokens": max_tokens,
         "top_p": 0.95,
-        "response_format": {"type": "json_schema",
-                            "json_schema": {"name": "react_action",
-                                            "schema": REACT_ACTION_SCHEMA}},
     }
+    if schema is not None:
+        body["response_format"] = {"type": "json_schema",
+                                   "json_schema": {"name": "react_action",
+                                                   "schema": schema}}
     if not direct:
         body["provider"] = {"order": [tag], "allow_fallbacks": False}
     if effort:
@@ -116,16 +126,17 @@ def probe(model: str, tag: str, effort: str | None = "low",
     # what the comparable rows in docs/model-prescreen.md were probed at.
     if temperature is not None:
         body["temperature"] = temperature
-    key = os.environ.get(key_env)
-    if not key:
+    key = os.environ.get(key_env) if key_env else None
+    if key_env and not key:
         return {"model": model, "tag": tag, "status": "NOKEY",
                 "err": f"{key_env} not set. ~/.bashrc returns early for "
                        f"non-interactive shells; eval the export line."}
     t0 = time.time()
     try:
-        r = requests.post(url, json=body, timeout=timeout,
-                          headers={"Authorization": f"Bearer {key}",
-                                   "Content-Type": "application/json"})
+        headers = {"Content-Type": "application/json"}
+        if key:
+            headers["Authorization"] = f"Bearer {key}"
+        r = requests.post(url, json=body, timeout=timeout, headers=headers)
     except Exception as e:                                     # noqa: BLE001
         return {"model": model, "tag": tag, "status": "EXC",
                 "err": f"{type(e).__name__}: {e}"}
@@ -144,16 +155,19 @@ def probe(model: str, tag: str, effort: str | None = "low",
     reasoning = msg.get("reasoning") or msg.get("reasoning_content") or ""
     usage = d.get("usage") or {}
     ctok = usage.get("completion_tokens")
-    try:
-        parsed = json.loads(content)
-        valid = (isinstance(parsed, dict)
-                 and "thought" in parsed and "tool" in parsed)
-        tool = parsed.get("tool") if isinstance(parsed, dict) else None
-    except Exception as e:                                     # noqa: BLE001
-        valid, tool = False, None
-        if content:
-            print(f"  ({tag}: content did not parse as JSON: {e})",
-                  file=sys.stderr)
+    if schema is None:
+        valid, tool = None, None
+    else:
+        try:
+            parsed = json.loads(content)
+            valid = (isinstance(parsed, dict)
+                     and "thought" in parsed and "tool" in parsed)
+            tool = parsed.get("tool") if isinstance(parsed, dict) else None
+        except Exception as e:                                 # noqa: BLE001
+            valid, tool = False, None
+            if content:
+                print(f"  ({tag}: content did not parse as JSON: {e})",
+                      file=sys.stderr)
     return {"model": model, "tag": tag, "status": "ok",
             "temperature": temperature,
             "finish": choice.get("finish_reason"),
@@ -170,6 +184,7 @@ def probe(model: str, tag: str, effort: str | None = "low",
             "tok_s": round(ctok / dt, 1) if ctok and dt else None,
             "schema_valid": valid, "tool": tool,
             "provider": d.get("provider"),
+            "content": content if schema is None else None,
             "content_head": content[:80].replace("\n", " ")}
 
 
