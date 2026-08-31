@@ -50,6 +50,23 @@ specification, and a specification that can be read two ways will be.
 Going forward, not backward: applies to new and edited text. Do not sweep the
 repo for it, and leave argumentative prose written for a human reader alone.
 
+## Method documents are read whole
+
+`METHOD.md`, `REVIEW.md`, `DELIVERY.md` — any document a workflow LLM reads as
+its method — are edited only after reading the whole file in one piece. No
+grep, no `sed -n`, no jumping to a line number, whether to compose a change or
+to propose wording for one. Read it whole again before calling the edit done.
+
+The non-obvious half: **grep finds strings, not ideas.** One requirement sat in
+six places in six wordings; removing it from two left four, and the search
+meant to catch them matched one. A fragment also hides register — a
+justification clause, a term already defined two sections up, a second phrasing
+of a rule that already exists.
+
+No exception for a one-line change. Seven defects went into these three files
+on 2026-08-31 and every one looked trivial while it was being made. The
+workflow linter passed after all seven; it checks form, and says so.
+
 ## Sampling settings are code, not convention
 
 `top_p` is 0.95 globally; temperature is per-model. Both live in
