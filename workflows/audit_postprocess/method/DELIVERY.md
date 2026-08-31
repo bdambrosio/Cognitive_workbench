@@ -8,13 +8,13 @@ Two things are named throughout. **The report** is what the audit wrote. **The d
 
 You write the connecting prose. You do not write the findings, and you do not change them.
 
-The audit's own words are already correct and already checkable against the materials they cite. What the report lacks is the writing between those parts: an opening, a short passage before each group of findings, and a coverage statement in sentences rather than figures.
+The audit's own words are already correct and already checkable against the materials they cite. What the report lacks is the writing between them.
 
 ## 2. What you are given
 
 Under `inspect`, the audit's run directory:
 
-- `report.md` — the conclusion, the findings, the coverage statement, the questions for the seller, and the limitations
+- `report.md` — the conclusion, the findings, the questions for the seller, the coverage block, and the limitations
 - `gap_map.md` — the one-page summary, already written, which becomes the executive summary
 - `delivery/checks.json` — the mechanical results: every finding with its number, verdict and title; the citations that did not resolve; observations the auditor left in an appendix
 - `delivery/editor_notes.md` — what a person still has to decide
@@ -46,7 +46,7 @@ Examples of what this forbids:
 - "These gaps are easily fixed." A judgement about effort, which the audit does not make.
 - "The seller was probably not deliberately misleading." A statement about motive.
 
-**Do not rank the findings by consequence.** How much a gap matters depends on the buyer's plans, which you do not know. The audit does not rank them and neither do you. Present them in the order you are given.
+**Do not rank the findings by consequence.** How much a gap matters depends on the buyer's plans, which you do not know. The audit does not rank them and neither do you. The groups reach the client in the order the brief lists them; do not argue for a different one.
 
 **Do not soften or sharpen.** If a finding says a feature does not exist, say that. Do not write "appears to be incomplete". Do not write "seriously misrepresented" either.
 
@@ -83,7 +83,7 @@ Each marker goes on its own line, with nothing between a marker and the content 
 Two to four short paragraphs, placed after the executive summary and before the findings. Cover:
 
 - what this document is, and what was examined
-- what the reader is holding: a summary, the findings with citations, a coverage statement, questions for the seller, and two appendices
+- what the reader is holding: a summary, a note on how to read a finding, the findings with citations, a coverage statement, questions for the seller, and two appendices
 - what the conclusion is, in one sentence, using the audit's own conclusion word
 - that every finding cites the evidence that settles it, so any of them can be checked
 
@@ -101,27 +101,28 @@ One entry per group of findings. The groups, and their keys, are listed in the b
 For example, for a group of findings whose claims are contradicted by the evidence:
 
 ```text
-material: Claims the evidence contradicts
+group1: Claims the evidence contradicts
 Three of the seller's claims describe features that are not in the materials. Each is an absent feature described as present, rather than a defect in something that exists.
 ```
 
-The heading replaces the audit's own heading for that group, so it must be accurate about what the group contains. Count the findings in the group and get the number right.
+**Use the keys exactly as the brief gives them.** They are `group1`, `group2` and so on. An entry under any other key is discarded, and that group reaches the client with no heading and no introduction.
+
+Your heading is the only heading that group will have, so it must be accurate about what the group contains. The brief tells you how many findings are in each; get the number right.
 
 ### `=== COVERAGE ===`
 
-The audit's coverage statement rewritten so it can be read once and understood.
+What the coverage figures do not say, in sentences a reader can follow.
 
-Use exactly the figures the audit gives. Do not recalculate anything and do not round. If the audit says 47 of 48 claims were resolved and 43 of 47 were supported, those are the numbers.
+**You do not write the figures.** How many claims were identified, resolved and supported is arithmetic over the audit's verdict ledger, and the client's process computes it and places it above what you write. Do not restate those numbers, do not recalculate them, and do not describe them as approximate.
 
-Cover, in whatever order reads best:
+What you write is the part arithmetic cannot carry:
 
-- how many claims were identified, and how many were resolved
-- how many resolved claims were supported
 - any claim that could not be settled, and why
-- anything the audit did not count as a claim and did not test
-- where the reader can see the full list of claims (Appendix B, which lists the claims as the audit froze them — it does not say how each was resolved)
+- anything in the seller's materials the audit did not count as a claim, and did not test
+- anything the audit noted that has no number attached to it
+- where the reader can see the full list of claims: Appendix B, which lists them as the audit froze them and does not say how each was resolved
 
-The audit's version is usually one long paragraph carrying ten facts. Break it up.
+Two or three short paragraphs. The audit's own version of this is usually one long paragraph carrying everything at once.
 
 ## 7. What the deliverable looks like when it is assembled
 
@@ -131,11 +132,12 @@ You do not assemble it. The client's process does, in this order:
 2. the executive summary — the gap map, copied whole
 3. your `COVER`
 4. the conclusion, copied from the audit
-5. the findings, in their groups, each group headed and introduced by your `SECTION NOTES` entry, with every finding copied exactly
-6. your `COVERAGE`
-7. the questions for the seller, copied
-8. the limitations, copied
-9. Appendix A, the supported claims, copied
-10. Appendix B, the claim surface, copied
+5. a short note on how to read a finding, which the process supplies
+6. the findings, in their groups, each group headed and introduced by your `SECTION NOTES` entry, with every finding copied exactly
+7. the coverage figures, computed by the process, followed by your `COVERAGE`
+8. the questions for the seller, copied
+9. the limitations, copied
+10. Appendix A, the supported claims, copied
+11. Appendix B, the claim surface and the verdict each claim received, copied
 
 Your three blocks are the only new writing in the deliverable. Everything numbered above that says "copied" is the auditor's text, and it reaches the client unchanged.

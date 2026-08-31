@@ -408,13 +408,55 @@ def _finding_groups_by_heading(run: Path) -> List[Dict[str, Any]]:
 
 
 def _all_finding_blocks(text: str) -> List[Tuple[int, str]]:
-    """Each §5 finding block, from its header to the next one."""
+    """Each §5 finding block, from its header to the next one.
+
+    A TRAILING HEADING BELONGS TO THE NEXT GROUP, NOT THIS FINDING. Where the
+    auditor wrote `##` headings they sit BETWEEN findings, so they land at the
+    end of the preceding block — and re-emitting blocks under the delivery
+    agent's headings then interleaved both sets, leaving the audit's orphaned
+    in the body. Findings are regrouped by verdict here, so a heading that only
+    labelled the old grouping has nothing left to label.
+    """
     cuts = [(int(m.group(1)), m.start()) for m in _FINDING.finditer(text)]
     out = []
     for i, (n, s) in enumerate(cuts):
         e = cuts[i + 1][1] if i + 1 < len(cuts) else len(text)
-        out.append((n, text[s:e]))
+        seg = text[s:e]
+        # A finding ends at the first heading after its own header. What
+        # follows is somebody else's — another group's label, or a section like
+        # the unverifiable claim, which is report content and keeps its place.
+        h = re.search(r"(?m)^#{2,3} ", seg)
+        out.append((n, seg[:h.start()] if h else seg))
     return out
+
+
+def _interstitial(text: str) -> str:
+    """Report content that sits between findings and is not one.
+
+    On a heading-structured report this is where the `[unverifiable]` claim
+    lives: a section, not a §5 finding, so nothing collects it as one. It must
+    still reach the client, and it must not be swallowed into the finding above
+    it — which is what happened until the block boundary moved to the first
+    heading.
+    """
+    parts, cuts = [], [(int(m.group(1)), m.start())
+                       for m in _FINDING.finditer(text)]
+    for i, (_, s) in enumerate(cuts):
+        e = cuts[i + 1][1] if i + 1 < len(cuts) else len(text)
+        seg = text[s:e]
+        h = re.search(r"(?m)^#{2,3} ", seg)
+        if not h:
+            continue
+        tail = seg[h.start():].rstrip()
+        # A heading with nothing under it only labelled the old grouping and
+        # has nothing left to label. A heading with a body — the unverifiable
+        # claim — is content and keeps its heading.
+        body = "\n".join(tail.splitlines()[1:]).strip()
+        if body:
+            # A kept segment can end on the NEXT group's bare label, since the
+            # block runs to the following finding. Same rule at the other end.
+            parts.append(re.sub(r"(?m)\n#{2,3} .*$\s*\Z", "", tail).rstrip())
+    return "\n\n".join(p for p in parts if p.strip())
 
 
 def _finding_block(text: str, n: int) -> str:
@@ -512,6 +554,9 @@ def assemble(run: Path, written: Optional[Dict[str, Any]] = None) -> str:
                     if n not in placed]
         if leftover:
             out.append("\n\n" + "\n\n".join(b.strip() for b in leftover))
+        between = _interstitial(body_findings)
+        if between.strip():
+            out.append("\n\n" + between.strip())
     elif body_findings.strip():
         out.append("\n\n" + body_findings.strip())
     for seg in keep:
