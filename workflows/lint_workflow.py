@@ -214,9 +214,9 @@ def check_delivery_gloss() -> List[str]:
     import deliver                                             # noqa: E402
     raw = (REPO / METHOD_DOC).read_text(encoding="utf-8")
     in_method = set(re.findall(r"\|\s*`(\[[^`\]]+\])`\s*\|", raw))
-    # §6 also tables `[unclaimed]` and `[derived]`, which are not verdicts on a
-    # seller claim and never appear in a finding title's bracket.
-    in_method -= {"[unclaimed]", "[derived]"}
+    # §6 also tables `[unclaimed]`, which is not a verdict on a seller claim and
+    # never appears in a finding title's bracket.
+    in_method -= {"[unclaimed]"}
     glossed = {k for k, _ in deliver.VERDICT_GLOSS}
     return ([f"verdict {v!r} is in METHOD but not glossed for the client"
              for v in sorted(in_method - glossed)]
@@ -233,7 +233,12 @@ def check_code_vocab() -> List[str]:
     """
     sys.path.insert(0, str(REPO / "measure" / "fixtures" / "dataroom"))
     import score                                              # noqa: E402
-    raw = (REPO / METHOD_DOC).read_text(encoding="utf-8")
+    # THE DELIVERED TEXT, NOT THE FILE. score.py scores reports written by an
+    # agent that reads the delivered text, and §19 is titled "Superseded rules"
+    # — a retired token lives there by design. Reading the raw file let
+    # `[derived]`, removed from §6 on 2026-08-31, go on satisfying this check
+    # from a section no agent has ever read.
+    raw = load_workflow(REPO / METHOD_DOC)
     bad = []
     for term in score._REC_VOCAB:
         if f"**{term}**" not in raw:

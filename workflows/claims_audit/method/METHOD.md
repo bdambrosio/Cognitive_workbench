@@ -89,7 +89,6 @@ Several rules follow:
 - Materiality determines whether a discrepancy matters to the buyer's decision. It does not change whether the original claim was accurate.
 - A claim is resolved by adjudicating it against the findings that support or refute it. Every resolved claim, supported ones included, is named by at least one finding.
 - An attempted claim that cannot be settled is `[unverifiable]`. It is reported in the coverage block, not as a finding.
-- `[derived]` findings are not included in the consistency rate because they do not test a seller claim.
 - Materiality is judged against the buyer's decision, not against the auditor's preferences. For example, poor code organization is not material unless it bears on a claim or creates a decision-relevant consequence.
 
 ### Priority order
@@ -101,7 +100,7 @@ Every identified claim is assigned to one of four tiers. The tier is based on th
 3. **Failure creates a bounded remediation cost in time or money.** Examples include incorrect retry intervals, timeouts, monitoring behavior, retention periods, or thresholds that can be corrected without changing the nature of the asset.
 4. **Failure is individually minor.** These claims are addressed last.
 
-A claim finding takes the tier assigned to the claim. A derived finding takes at least the highest-priority tier of the facts on which it depends and may be assigned a higher-priority tier if the derived consequence is more severe.
+A finding takes the tier assigned to the claim it adjudicates. A derived statement carries no tier of its own; where its consequence is more severe than the claim's tier, it raises the tier of the finding that cites it.
 
 If a tier contains no claims, state that in the coverage block. The priority order settles the highest-consequence claims first and gives Section 16 the order the findings are reported in.
 
@@ -119,7 +118,7 @@ Evidence: <document or file:lines> — <what the materials show>
 Gap: <None, or the specific gap>
 ```
 
-`Finding N` numbers the findings in this report. `claim <id>` is the claim's number in the frozen surface, so a reader can trace a finding back to what was enumerated. Where a finding bears on several claims, name them all — `(claims 8, 27)` or `(claims 10-16)` — and carry the verdict those claims received. A derived finding names no claim and uses the format below.
+`Finding N` numbers the findings in this report. `claim <id>` is the claim's number in the frozen surface, so a reader can trace a finding back to what was enumerated. Where one determination settles several claims, name them all — `(claims 8, 27)` or `(claims 10-16)` — and carry the verdict those claims received.
 
 Cite both the source of the claim and the evidence used to resolve it. A reader should be able to inspect both sides of the comparison.
 
@@ -127,7 +126,7 @@ There are three evidence patterns:
 
 - **Ordinary claim finding:** cite the claim source and the evidence that resolves it.
 - **Claim finding based on absence:** cite the claim source and record the searches used to establish whether the claimed implementation or evidence exists. There may be no line citation for the absent item.
-- **Derived finding:** cite every source figure used in the derivation and show the derivation explicitly.
+- **Derived statement:** an inference drawn from two or more cited facts, offered as evidence within a finding. Cite every source figure and show the derivation explicitly; *Derived statements* below gives the form.
 
 ### Numeric and date evidence
 
@@ -142,33 +141,28 @@ A statement such as “this is not implemented” cannot normally be supported b
 
 Record the searches actually performed. A search establishes diligence, not absolute absence. If the searches do not settle the question, classify the claim as `[unverifiable]`, not `[delta]`.
 
-### Derived findings
+### Derived statements
 
-Some material conclusions are not directly stated by the seller but follow from two or more seller-supplied facts. For example, a retention period in one document and the date of the last usable backup in another may together determine when recovery becomes impossible.
+Some facts bearing on a claim are not stated by the seller but follow from two or more seller-supplied facts. For example, a retention period in one document and the date of the last usable backup in another together determine when recovery becomes impossible.
 
-Use this format:
+**A derived statement is evidence, not a finding.** It is an inference offered in support of a determination; the determination is the finding that cites it. Give it in the `Evidence` field of the finding it belongs to, in this form:
 
 ```text
-**Finding N: <short title> — [derived]**
-
-Basis: <document:lines> — <first source figure, verbatim>
-       <document:lines> — <second source figure, verbatim>
-
-Derivation: <the arithmetic or logical derivation>
-
-Consequence: <what follows and why it matters to the buyer>
-
-Escalates: <Finding N, or None>
+Derived: <short title>
+  Basis: <document:lines> — <first source figure, verbatim>
+         <document:lines> — <second source figure, verbatim>
+  Derivation: <the arithmetic or logical derivation>
+  Consequence: <what follows and why it matters to the buyer>
 ```
 
-Rules for derived findings:
+Rules for derived statements:
 
 1. Use only facts supplied in the target materials. Do not derive market forecasts or other external conclusions and present them as part of this audit method.
 2. Show the arithmetic or other derivation explicitly so the reader can reproduce it.
-3. State the consequence, but do not turn the finding into a recommendation about the transaction.
-4. If the derived finding strengthens or sharpens an existing finding, identify that relationship under `Escalates` rather than presenting the two as unrelated issues.
+3. State the consequence, but do not turn it into a recommendation about the transaction.
+4. A derivation that bears on no claim belongs to no finding. Report it as an `[unclaimed]` observation under Section 6.
 
-A time-dependent derived finding must state the relevant date and what changes on that date. The deliverable also carries an as-of date for the materials, because the conclusions apply to the supplied snapshot.
+A time-dependent derived statement must state the relevant date and what changes on that date. The deliverable also carries an as-of date for the materials, because the conclusions apply to the supplied snapshot.
 
 ## 6. Verdicts, statuses, and observation types
 
@@ -188,31 +182,27 @@ These describe how a stated seller claim compares with the evidence. Every resol
 
 ### Examination status
 
-This describes an identified claim that was attempted and reached no verdict. It is not a claim verdict and does not produce a finding.
+This describes an identified claim the audit attempted and could not settle. It is not a claim verdict, and it is excluded from `resolved` and from both rates in Section 1a.
 
-| Status | Meaning | Where reported |
+| Status | Meaning |
+|---|---|
+| `[unverifiable]` | The claim was attempted, but the supplied materials could not settle it |
+
+It produces a finding like any other outcome: the claim, the searches under *Evidence of absence*, and the determination that the materials do not reach it. What a search establishes is diligence, so say what was searched.
+
+### Observations that are not about a claim
+
+| Type | Meaning | Where reported |
 |---|---|---|
-| `[unverifiable]` | The claim was attempted, but the supplied materials could not settle it | Coverage block, with the reason |
+| `[unclaimed]` | The materials contain relevant information about something the seller did not claim | Coverage block |
 
-### Other observation types
+**A finding is the statement of the verdict of adjudicating a set of cited evidence with respect to a claim.** It is the claim, the adjudication, and the evidence the adjudication rests on. Every claim carries one verdict, so every claim the audit settles has one finding.
 
-These describe observations that are not seller-claim verdicts.
+One finding may adjudicate several claims where a single determination settles them all; name them all in the header. Split a finding whose claims received different verdicts, so that each header carries one verdict.
 
-| Type | Meaning | Finding? |
-|---|---|---|
-| `[derived]` | A consequence derived from two or more facts stated in the materials | Yes |
-| `[unclaimed]` | The materials contain relevant information about something the seller did not claim | No; note in the coverage block |
-
-A finding is a cited record of what the materials show:
-
-- a **claim finding** bears on one or more seller claims and carries the verdict those claims received;
-- a **derived finding** bears on no seller claim and carries `[derived]`.
-
-One finding may bear on several claims, and one claim may be settled by several findings. Split a finding whose claims received different verdicts, so that each header carries one verdict.
+A derived statement (Section 5) is evidence a finding cites, not a finding.
 
 `[partial]` and `[delta]` should remain distinct. `[partial]` means the claim substantially holds but has a material limitation. `[delta]` means the claim itself is contradicted by the evidence.
-
-`[derived]` is not a verdict on a seller claim. It records a consequence that follows from facts the seller supplied separately.
 
 `[unverifiable]` must not be reported as `[delta]`. Failure to find supporting evidence is not equivalent to evidence that the claim is false.
 
@@ -495,7 +485,7 @@ The report contains three parts in this order:
 2. **Findings, ordered from highest to lowest consequence.**
    - Ordinary claim findings use the Section 5 format and cite both claim and resolving evidence.
    - Findings based on absence cite the claim and record both required searches.
-   - Derived findings use `[derived]`, cite each basis fact, and show the derivation.
+   - Derived statements use Section 5's form inside the finding that cites them.
 3. **Questions the client should ask the seller before closing.**
 
 Coverage is not part of the report block. It is the `=== COVERAGE ===` block below.
@@ -612,7 +602,7 @@ This category was previously called `[non-delta]`. That name was misleading beca
 
 The section was previously called a “recommendation,” and earlier conclusion terms included buyer actions such as *Walk*. Those terms were removed because the audit reports the state of the evidence rather than directing transaction action.
 
-The conclusion categories were also changed so they account for material findings of any kind, including `[derived]` findings. A target should not receive a **Clear** conclusion merely because every explicit seller claim is supported if the seller's own figures, taken together, imply a separate material problem.
+The conclusion categories were also changed so they account for material findings of any kind. A target should not receive a **Clear** conclusion merely because every explicit seller claim is supported if the seller's own figures, taken together, imply a separate material problem — a derived statement (Section 5) raises the materiality of the finding that cites it.
 
 Broad statements such as “the system does what it says” were removed because they imply more coverage than a limited-assurance audit may have performed.
 

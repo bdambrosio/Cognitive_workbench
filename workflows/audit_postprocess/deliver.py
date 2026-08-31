@@ -343,8 +343,7 @@ def header(run: Path) -> str:
 # a caveat, what holds. §16 asks for highest to lowest consequence and verdict
 # is the best proxy available without asking anyone to rank.
 _GROUP_ORDER = (("delta",), ("partial",), ("unverifiable",),
-                ("real, minor caveat", "real, operational caveat"), ("real",),
-                ("derived",))
+                ("real, minor caveat", "real, operational caveat"), ("real",))
 
 
 def finding_groups(run: Path) -> List[Dict[str, Any]]:

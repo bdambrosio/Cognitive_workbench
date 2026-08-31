@@ -165,7 +165,10 @@ def findings_check(report: str, coverage_block: str) -> Dict[str, Any]:
     resolved = {n for n, v in ledger.items() if v in RESOLVED}
     unresolved = {n for n, v in ledger.items() if v in UNRESOLVED}
 
-    # A `[derived]` finding resolves no seller claim (§6) and names none.
+    # LEGACY TOLERANCE. A derivation is evidence a finding cites, not a
+    # finding (§5), so nothing new carries a `[derived]` header. The 28
+    # reports on disk that predate that do, and without this filter a replay
+    # would score each of them as a claim finding naming no claim.
     claim_findings = [f for f in finding_claims(report) if f["verdict"] != "derived"]
     by_claim: Dict[int, List[int]] = {}
     for f in claim_findings:

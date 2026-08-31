@@ -76,7 +76,7 @@ If you cannot, stop. A supported ratio computed over citations read in the wrong
 
 1. **Enumerate the findings.** Every finding the report states, in the report's order.
 
-   A claim the report gives the examination status `[unverifiable]`, and an `[unclaimed]` observation, are not findings (METHOD §6), however the report numbered them. Leave them off the surface and record one conformance exception: enumerating them inflates the denominator of every ratio.
+   An `[unclaimed]` observation is not a finding (METHOD §6), however the report numbered it: the seller claimed nothing for it to adjudicate. Leave it off the surface and record one conformance exception — enumerating it inflates the denominator of every ratio.
 
 2. **Close the surface** by stating the count after a line reading exactly:
 
@@ -107,12 +107,12 @@ Nothing else supplies this: the client's process reports what has happened, neve
 
 ## 5. What to check, in this order
 
-Two checks per finding. Both take a different form for a derived finding, because a derived finding carries no claim verdict to check.
+Two checks per finding:
 
-- **A claim finding.** Does the cited evidence support what the finding states, and does the audit's METHOD §6 claim verdict match the gap?
-- **A derived finding.** Does each Basis line say what the finding quotes it as saying, and does the derivation follow from those figures as written?
+- Does the cited evidence support what the finding states?
+- Does the audit's METHOD §6 verdict match the gap?
 
-In both cases, then assign a review disposition from §6.
+Then assign a review disposition from §6.
 
 **The index proposes; you confirm.** The client's process fetches every cited line before you start and hands you `review/citations.json`, which proposes `[broken citation]` for every reference that did not resolve. Per §4.0, open the document under `inspect_external` and check there before you assign that disposition: the index covers only some citation forms, and it can resolve a name to the wrong file. Once you have confirmed a citation is broken, do not assess support for that finding.
 
@@ -139,15 +139,15 @@ The index rule binds here as everywhere: confirm against the documents before as
 
 **Search only the document the field names.** Widening the search is auditing the target, which §2 forbids.
 
-**Why the derived case differs.** METHOD §6 makes a finding one of two things: a claim finding, which bears on one or more seller claims and carries the verdict they received, or a `[derived]` finding, which is a consequence computed from two or more figures the seller stated separately. A derived finding names no claim because there is none to name. Asking whether its cited lines support a claim it never made would rule it unsupported by construction.
-
-The arithmetic is written out so that it can be checked. A step you cannot follow is an exception; a step you can follow and disagree with is `[overstated]` or `[understated]` as usual.
+**A derived statement is evidence, not a finding** (METHOD §5). It sits inside a finding's evidence, carrying the facts it is drawn from, the derivation, and what follows. Check its `Basis` lines as you check any citation: do they resolve, and do they say what is quoted. **Do not re-perform the derivation.** Whether the inference is sound is the auditor's judgement, and §10 reserves it.
 
 **On a claim finding's second check**, use the five **claim verdicts** from METHOD §6 — `[real]`, `[real, minor caveat]`, `[real, operational caveat]`, `[partial]`, `[delta]`. A gap described as a corner case but carrying `[delta]` is overstated. A claim shown to be false but carrying `[partial]` is understated. Both are exceptions.
 
 **You are not asked whether a consequence matters to the buyer.** That is materiality. It is METHOD §4's judgement and the auditor's, and §10 reserves it.
 
-**`[unverifiable]` and `[unclaimed]` are not findings and are not checked as ones.** METHOD §6 reports both in the coverage block: the first is a claim the materials could not settle, the second something the seller never claimed. §4 step 1 says what to do with one the report numbered as a finding.
+**An `[unverifiable]` finding is checked like any other.** METHOD §6 gives it the same shape: the claim, the searches establishing that the materials do not reach it, and that determination. Check that both searches are stated and that its citations resolve; a search establishes diligence, not absence.
+
+**An `[unclaimed]` observation is not a finding** and is not checked as one — the seller claimed nothing for it to adjudicate. §4 step 1 says what to do with one the report numbered as a finding.
 
 ## 6. Finding format
 
@@ -269,7 +269,7 @@ Use that full form, never a bare "supported N of M" — §6 gives the reason.
 - **does not stand** — the retest disagreed. The finding is borderline; report the disagreement rather than resolving it.
 - **not retested** — the disposition does not qualify (`[uncited]`), or the retest could not be obtained. State which.
 
-**Every retest-eligible exception is retested once**, by a second reviewer — §6 names the three, and they qualify for a derived finding as readily as a claim one. For each, the client's process has a second reviewer check that finding. That reviewer is not told your disposition and does not see your review. You are told what it found before you write the summary.
+**Every retest-eligible exception is retested once**, by a second reviewer — §6 names the three. For each, the client's process has a second reviewer check that finding. That reviewer is not told your disposition and does not see your review. You are told what it found before you write the summary.
 
 `[uncited]` is not retested: by §6's definition there is no reference for a second reviewer to open.
 
