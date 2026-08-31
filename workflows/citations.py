@@ -237,7 +237,7 @@ def scheme(citations: List[Dict[str, Any]],
 
 
 def _locate(tok: str, by_rel: Dict[str, Path],
-            by_base: Dict[str, List[Path]]) -> Tuple[Optional[Path], Optional[str]]:
+            by_base: Dict[str, List[Path]]) -> Tuple[Optional[Path], Any]:
     """The file a citation names. Returns (file, note); file is None on failure
     and the note says why. A note beside a file is an ambiguity worth recording,
     not a failure.
@@ -246,11 +246,20 @@ def _locate(tok: str, by_rel: Dict[str, Path],
     which x.py it means, and reading only the basename discards the one piece of
     disambiguation the auditor supplied.
 
-    A bare name matching several files is read as the shallowest, which is what
-    a bare `README.md` conventionally means in a repository, and the ambiguity
-    is recorded on the citation either way. Resolving it by whichever candidate
-    happens to contain the cited line would be worse than the bug: a check that
-    cannot fail.
+    A BARE NAME MATCHING SEVERAL FILES IS STILL RESOLVED, with the ambiguity
+    recorded beside it. It was read as the shallowest until 2026-08-31, which
+    on ChatterMate is wrong far more often than right — `ticket.py` names four
+    files of 287, 390, 556 and 1045 lines, so a citation at line 755 was
+    measured against the 287-line one and reported past the end. Every such
+    report on that engagement was a false alarm.
+
+    The candidates are returned so the caller can choose on evidence. What it
+    must NOT do is refuse. A citation like `channels/slack.py:124-147,129,365`
+    is the auditor saying the evidence is spread through a file and must be
+    read; answering "unresolvable" reports the checker's limitation as a defect
+    in the report, which is the failure this whole module exists to avoid.
+    Unresolved is reserved for a citation pointing at nothing: no file of that
+    name, or no candidate containing the line.
     """
     if tok in by_rel:
         return by_rel[tok], None
@@ -259,15 +268,70 @@ def _locate(tok: str, by_rel: Dict[str, Path],
         if len(hits) == 1:
             return hits[0], None
         if len(hits) > 1:
-            return None, f"{len(hits)} files match the path {tok}"
+            # Several files end with this path. Same rule as a bare name: the
+            # caller chooses on evidence and records the alternatives. Refusing
+            # here rejected channels/slack.py:124-147 — a citation whose only
+            # fault was that two files share that suffix.
+            return None, hits
     cands = by_base.get(tok.rsplit("/", 1)[-1], [])
     if len(cands) == 1:
         return cands[0], None
     if len(cands) > 1:
-        best = min(cands, key=lambda p: (len(p.parts), str(p)))
-        return best, (f"{len(cands)} files share this name; read as "
-                      f"the shallowest")
+        return None, cands
     return None, "no such document in the materials"
+
+
+def _choose(cands: List[Path], lo: int, hi: int,
+            report: str, at: int) -> Tuple[Optional[Path], Any]:
+    """Pick among same-named files, on evidence, and always pick one.
+
+    Three passes, strongest first.
+
+      QUOTE. A quote written beside the citation is evidence about which file
+      was actually read, and it tests content rather than the thing being
+      checked. Only quotes near the citation count; further ones belong to
+      other citations.
+
+      LINE RANGE. Failing that, the candidates that contain the cited lines. A
+      citation is often a range across a file — "read 124-147, then 129, then
+      365" — which no short quote can stand for, and refusing those would
+      reject the auditor's work for being spread out.
+
+      SHALLOWEST. Failing both, the conventional reading of a bare name, with
+      every alternative recorded so a reader can check another.
+
+    Returns None only when no candidate contains the line, which is a citation
+    pointing at nothing.
+    """
+    window = report[max(0, at - 400):at + 400]
+    spans = [_flatten(q) for q in _quoted_spans(window)
+             if len(q) >= _MIN_QUOTE_CHARS]
+
+    def _body(c: Path) -> Optional[str]:
+        try:
+            lines = c.read_text(errors="replace").splitlines()
+        except OSError:
+            return None
+        if lo < 1 or lo > len(lines):
+            return None
+        return _flatten("\n".join(lines[lo - 1:min(hi, len(lines))]))
+
+    holds = [c for c in cands if _body(c) is not None]
+    if not holds:
+        return None, (f"{len(cands)} files share this name and none has a "
+                      f"line {lo}")
+    others = lambda pick: ", ".join(str(c) for c in holds if c is not pick)
+    if spans:
+        hit = [c for c in holds if any(s in (_body(c) or "") for s in spans)]
+        if len(hit) == 1:
+            return hit[0], (f"{len(cands)} files share this name; chosen by the "
+                            f"quote beside the citation")
+    if len(holds) == 1:
+        return holds[0], (f"{len(cands)} files share this name; only this one "
+                          f"has the cited lines")
+    best = min(holds, key=lambda p: (len(p.parts), str(p)))
+    return best, (f"{len(holds)} files share this name and contain the cited "
+                  f"lines; read as the shallowest. Also: {others(best)}")
 
 
 def resolve_citations(report: str, target: Path) -> Dict[str, Any]:
@@ -328,11 +392,15 @@ def resolve_citations(report: str, target: Path) -> Dict[str, Any]:
                 note = "no such document in the materials"
         else:
             f, note = _locate(norm, by_rel, by_base)
+            if f is None and isinstance(note, list):
+                f, note = _choose(note, lo, int(hi) if hi else lo,
+                                  report, m.start())
         rec: Dict[str, Any] = {"cited": m.group(0).strip(), "document": base,
                                "line": lo, "through": int(hi) if hi else lo}
         if f is None:
             rec["resolved"] = False
-            rec["why"] = note or "no such document in the materials"
+            rec["why"] = note if isinstance(note, str) else \
+                "no such document in the materials"
         else:
             if note:
                 rec["ambiguous"] = note
@@ -347,6 +415,12 @@ def resolve_citations(report: str, target: Path) -> Dict[str, Any]:
                 rec["text"] = "\n".join(
                     f"{n}: {lines[n-1]}" for n in range(lo, min(hi_i, len(lines)) + 1))
         out.append(rec)
+    # AMBIGUITY IS NOT A FAILURE. A name matching several files is resolved by
+    # _choose against the one holding the cited lines, and the alternatives are
+    # recorded on the citation. Someone verifying opens two files instead of
+    # one; that is a wish, not a defect, and reporting it as one dings an audit
+    # for the checker's convenience. Unresolved now means what it says: no file
+    # of that name, or no candidate containing the line.
     broken = [c for c in out if not c["resolved"]]
     quotes = resolve_quotes(report, target)
     return {"citations": out, "total": len(out), "broken": len(broken),

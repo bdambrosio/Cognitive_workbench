@@ -540,11 +540,16 @@ def post_run_checks(out: Path, whole: str, external_repo: str) -> Dict[str, Any]
         from workflows.citations import resolve_citations
         tgt = Path(external_repo)
         if tgt.is_dir():
-            rows = (resolve_citations(
-                blocks.content(whole, "REPORT", blocks.BLOCKS) or "",
-                tgt).get("citations") or [])
+            res = resolve_citations(
+                blocks.content(whole, "REPORT", blocks.BLOCKS) or "", tgt)
+            rows = res.get("citations") or []
             bad = [c.get("cited") for c in rows
                    if str(c.get("resolved")).lower() == "false"]
+            # A citation naming a file that exists several times is resolved
+            # against the one holding the lines and is NOT reported. Someone
+            # verifying opens two files instead of one; that is a wish, not a
+            # defect, and there is no version of this audit worth failing for
+            # it.
             citation_check = {"total": len(rows), "unresolved": bad}
             if bad:
                 logger.warning("%d of %d citations did not resolve: %s",

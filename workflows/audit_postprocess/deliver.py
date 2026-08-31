@@ -14,14 +14,17 @@ editor because it is not derivable from the materials at all. The audit cannot
 know whether this buyer weighs security posture above feature completeness.
 
 WHY THE CHECKS ARE THE POINT, and the reformatting is the bonus. METHOD §12
-step 6b says "a finding with a missing or invalid citation does not ship". On
-2026-08-30 a ChatterMate report shipped three citations naming lines past the
-end of their files — ticket_investigator.py:628-635 in a 398-line file,
-ticket.py:755-767 in 287, package.json:17-18 in 12. The audit's own check
-missed them and the independent review reported none. For a document whose
-whole value is "every claim is checkable against cited evidence", a citation
-that resolves to nothing is the most damaging defect available: it discredits
-the findings that are right.
+step 6b says "a finding with a missing or invalid citation does not ship", and
+nothing enforced it before delivery.
+
+WHAT THAT CHECK ACTUALLY FOUND, once it could tell two things apart: no broken
+citations at all, and a great many underspecified ones. On ChatterMate, 18 of
+79 and 23 of 94 citations name a file that exists several times in the target —
+`ticket.py` names four files of 287, 390, 556 and 1045 lines — so a reader
+cannot tell which was meant. They were read as "past the end of the file" for a
+day, and reported as shipped defects, because the resolver picked a namesake
+and the caller conflated the two categories. The independent review that said
+none were broken was right.
 
 FLAG, NEVER REPAIR. The citation index resolves `docN:NN` references and quoted
 spans and nothing else, and it can resolve a name to the wrong file — which is
