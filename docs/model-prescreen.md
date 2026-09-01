@@ -81,6 +81,41 @@ Only results a config, a rule or an exclusion currently rests on. Everything is
 | `deepseek/deepseek-v4-flash-0731` | `baidu/fp8` | five of ten endpoints 404 on `json_schema`; the two fastest on paper (coreweave ~166 tok/s, gmicloud ~117) are among them, and across endpoints that *did* accept the payload the spread collapsed to 46–69 tok/s |
 | `z-ai/glm-5.3-flash` | `modal/fp8` | the only route answering 3 of 3 with schema-valid actions. Most others return 429, and the 429 **names the model, not the endpoint** — capacity for this model, not a broken provider. The first party (`z-ai/fp8`) 404s: listed by the endpoints API, not servable |
 
+**Route re-verified 2026-09-01.** `baidu/fp8` still accepts the real payload and
+is now considerably faster than when it was chosen: 109–149 tok/s over four
+calls — 2.5–7.5 s, 270–1,120 completion tokens — against the 69 tok/s recorded
+on 2026-08-26. Same model id, same pin, so the route was re-measured rather
+than re-chosen. `open-inference/fp8` also accepts, at 25 tok/s.
+`digitalocean` is listed by the endpoints API and returns 404 on the real
+payload, which is the trap above appearing again under a new provider.
+
+**Gate 2's second categorical rejection — `tencent/hy4-preview`, 2026-09-01.**
+Its one endpoint, `tencent/fp8`, passes gate 1 in six of six calls: schema-valid
+action, correct tool, `finish_reason: stop`. It fails gate 2 by a wide margin.
+Five calls with reasoning on at `effort: low` returned 3,024 / 5,233 / 7,752 /
+8,951 / 14,558 completion tokens for the one-line action, at 50–56 tok/s
+throughout — 60 to 257 seconds a call. Throughput is not the problem; the model
+writes 12,000 to 60,000 characters of reasoning to choose one tool. At this
+architecture's 35–187 calls a run that is hours to days of wall clock, and it is
+five times the verbosity that retired `Qwen/Qwen3.8-2.4T-A95B`.
+
+**The budget control is inert; only the master toggle works.**
+`reasoning: {max_tokens: 256}` returned 13,740 completion tokens — the cap is
+accepted and ignored. `reasoning: {enabled: false}` returned **132 tokens in
+4.3 s**, still schema-valid. So the model is affordable only with reasoning off
+entirely, which is a different operating point from the one the audit runs
+(`reasoning_effort: low`, thinking on) and needs its own decision, not a silent
+substitution. Compare `measure/models/or_qwen38flash_off.yaml`, where the same
+toggle is used deliberately as one arm of a controlled pair.
+
+**Stopped at the pre-screen**, Bruce's decision 2026-09-01. The reasoning-off
+arm was not taken to gate 3: nothing currently needs a third hosted candidate,
+and a model usable only with thinking disabled answers a different question from
+the one the campaign is asking. No temperature was requested and none is
+configured, so it cannot run past this point in any case — the gate working as
+designed. Re-screen if a non-preview Hy4 ships; a preview route can change
+artifact under a pinned id.
+
 **Retired on gate 2.** `Qwen/Qwen3.8-2.4T-A95B` — 2,902 completion tokens for a
 one-line answer, against grok-4.6's 33. Recorded in `model_params.RETIRED`, so a
 config naming it fails with that reason rather than "unknown model".
