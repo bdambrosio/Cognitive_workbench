@@ -30,6 +30,7 @@ beside this file, and the §5 field check is `measure/form_grid/run.py`.
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -38,6 +39,8 @@ REPO = HERE.parents[2]
 for p in (str(REPO), str(REPO / "src"), str(REPO / "measure" / "form_grid"), str(HERE)):
     if p not in sys.path:
         sys.path.insert(0, p)
+
+from collections import Counter                                # noqa: E402
 
 from workflows import coverage, citations                      # noqa: E402
 from overlap import cited_lines                                # noqa: E402
@@ -59,6 +62,29 @@ def find_run(world: str) -> Path:
     return hits[-1]
 
 
+_ADVERSE = ("delta", "partial")
+# A finding's title and its verdict, from the §5 header.
+_HEAD = re.compile(r"(?m)^\*\*Finding [^\n]*?:\s*(.+?)\s*—\s*\[([^\]]+)\]")
+
+
+def verdicts(report: str) -> tuple:
+    """Findings by verdict, and the titles of the adverse ones.
+
+    THE COUNT THAT TRACKS THE PRODUCT. On the fixture grok wrote 33 findings and
+    GLM 14, but both wrote the SAME NINE adverse findings — the whole gap was
+    `[real]` confirmations of unremarkable claims, 19 against 4. A claim count
+    measures thoroughness in the ledger; `[delta]` and `[partial]` are the
+    problems the report exists to report.
+    """
+    kinds, adverse = Counter(), []
+    for m in _HEAD.finditer(report):
+        k = m.group(2).split(",")[0].strip().lower()
+        kinds[k] += 1
+        if k in _ADVERSE:
+            adverse.append((k, m.group(1).strip()))
+    return kinds, adverse
+
+
 def read(world: str) -> dict:
     d = find_run(world)
     report = (d / "report.md").read_text(errors="replace")
@@ -70,7 +96,9 @@ def read(world: str) -> dict:
     claim_lines = [ln for ln in report.splitlines()
                    if ln.lstrip().lstrip("*").strip().lower().startswith("claim")]
     form = form_grid.form(report, len(ledger) or len(findings))
+    kinds, adverse = verdicts(report)
     return {"world": world, "dir": d, "ledger": len(ledger),
+            "kinds": kinds, "adverse": adverse,
             "findings": len(findings), "cites": cited_lines("\n".join(claim_lines)),
             "full": form["fully_formed"], "collapse": form["collapse_at"],
             "emitted": form["findings_emitted"]}
@@ -84,6 +112,8 @@ def line(r: dict) -> str:
     return (f"{r['world']:20} ledger={r['ledger']:>3} findings={r['findings']:>3} "
             f"whole={r['full']:>3}/{r['emitted']:<3} "
             f"collapse={str(r['collapse'] or '—'):>4} "
+            f"adverse={len(r['adverse']):>3} "
+            f"real={r['kinds']['real']:>3} "
             f"cited_lines={len(r['cites']):>4}")
 
 
@@ -107,6 +137,14 @@ def main() -> int:
         print("  " + line(p))
     if ref:
         print("  " + line(ref) + "   <- reference")
+
+    print("\nADVERSE FINDINGS — the problems the report exists to report.\n"
+          "Counted across split runs these repeat: one defect asserted in two\n"
+          "claim sources is found twice, so the total is not a defect count.\n")
+    for r in [base] + parts + ([ref] if ref else []):
+        print(f"  {r['world']}:")
+        for kind, title in r["adverse"]:
+            print(f"     [{kind:7}] {title[:82]}")
 
     union = set().union(*(p["cites"] for p in parts))
     tot_ledger = sum(p["ledger"] for p in parts)
