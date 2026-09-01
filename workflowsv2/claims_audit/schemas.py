@@ -47,13 +47,11 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 # that these lists and those tables say the same thing.
 # --------------------------------------------------------------------------
 VERDICTS: Tuple[str, ...] = (
-    "real", "real_minor_caveat", "real_operational_caveat",
-    "partial", "delta", "unverifiable")
+    "real", "real_with_caveat", "partial", "contradicted", "unverifiable")
 
-#: Verdicts that require `adjudication.gap` (METHOD §13). `real` has no gap;
-#: `unverifiable` uses `unresolved_because` instead.
-GAP_REQUIRED: Tuple[str, ...] = (
-    "real_minor_caveat", "real_operational_caveat", "partial", "delta")
+#: Verdicts that require `adjudication.gap` (METHOD §13). `real` has nothing
+#: beside it; `unverifiable` uses `unresolved_because` instead.
+GAP_REQUIRED: Tuple[str, ...] = ("real_with_caveat", "partial", "contradicted")
 
 UNRESOLVED_BECAUSE: Tuple[str, ...] = (
     "not_in_the_materials", "present_but_not_readable", "outside_the_materials")
@@ -140,9 +138,9 @@ def check_surface(obj: Dict[str, Any], corpus: Path,
             if lo < 1 or hi < lo or hi > len(body):
                 problems.append(f"{w}: lines {lo}-{hi} against a "
                                 f"{len(body)}-line claim source")
-            elif q and q not in _norm(" ".join(body[lo - 1:hi])):
+            elif q and q not in _norm("\n".join(body[lo - 1:hi])):
                 where = ("elsewhere in the document"
-                         if q in _norm(" ".join(body)) else "nowhere in it")
+                         if q in _norm("\n".join(body)) else "nowhere in it")
                 problems.append(f"{w}: quote is not at lines {lo}-{hi}; it is "
                                 f"{where}")
         else:
@@ -256,10 +254,36 @@ def salvage_findings(text: str) -> Optional[Dict[str, Any]]:
 # The checks, after parsing, against the target
 # --------------------------------------------------------------------------
 
+#: Markdown decoration a quote routinely loses on the way out of a document.
+#: NOT a content filter — every one of these is presentation, and a quote that
+#: differs only by them is the same text.
+_DECORATION = re.compile(r"[*_`]+|^\s*[-*+]\s+|^\s*\d+\.\s+", re.M)
+
+
 def _norm(s: str) -> str:
-    """Whitespace-insensitive comparison. A quote copied out of a document
-    routinely differs from it by a line wrap and by nothing else."""
-    return re.sub(r"\s+", " ", (s or "")).strip()
+    """Compare quotes the way a reader would: ignoring whitespace and markdown.
+
+    WHITESPACE, because a quote copied out of a document routinely differs
+    from it by a line wrap and by nothing else.
+
+    MARKDOWN, because this check's first run reported seven of twelve findings
+    on doc9 as quoting text that "does not appear in that document at all",
+    and every one of them was a faithful quote of `*   **Dyno:** ...` written
+    down as `Dyno: ...`. The model dropped the decoration, which is what a
+    person quoting that line would also do. `repair_json_string` strips the
+    same characters out of structured output for the same reason.
+
+    The risk is the other way — normalising until a wrong quote matches — so
+    this removes presentation only: emphasis, code ticks, and list markers.
+    Nothing that carries meaning is touched.
+
+    BOTH SIDES MUST BE JOINED THE SAME WAY BEFORE THIS RUNS. The list-marker
+    patterns are line-anchored, so a quote that kept its newlines gets them
+    stripped while a source span joined with spaces does not — which reported
+    a correct citation as quoting text found "nowhere in it". Callers join
+    source lines with a newline.
+    """
+    return re.sub(r"\s+", " ", _DECORATION.sub(" ", s or "")).strip()
 
 
 def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
@@ -301,9 +325,9 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
                             f"numbers, or the range is wrong")
             return
         if isinstance(quote, str) and _norm(quote):
-            span = _norm(" ".join(body[lo - 1:hi]))
+            span = _norm("\n".join(body[lo - 1:hi]))
             if _norm(quote) not in span:
-                whole = _norm(" ".join(body))
+                whole = _norm("\n".join(body))
                 problems.append(
                     f"{where}: quote is not at {doc}:{lo}-{hi}"
                     + ("; it is elsewhere in that document"

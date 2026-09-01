@@ -64,8 +64,13 @@ RUNNERS = {"workflowsv2/claims_audit/runner.py": METHOD_DOC,
 # forbidden vocabulary back in the prompt, three lines from the table it was
 # removed from — which is what §9 did with `Walk` (fixed 032f056b).
 RETIRED = {
-    "METHOD.md": ("non-delta", "Walk", "AI-Readiness"),
-    "REVIEW.md": (),
+    # `delta` and the two caveat verdicts were retired together: `delta` for
+    # naming a difference without its direction, and the caveats because five
+    # of nine known-adverse findings drained into `real_operational_caveat`
+    # and were recorded as claims that hold.
+    "METHOD.md": ("non-delta", "Walk", "AI-Readiness", "delta",
+                  "real_minor_caveat", "real_operational_caveat"),
+    "REVIEW.md": ("delta", "real_minor_caveat", "real_operational_caveat"),
 }
 
 # Number words that introduce a counted list. "Three things follow" heading five
@@ -391,6 +396,45 @@ def check_schema_vocab(path: str, raw: str) -> List[str]:
     return bad
 
 
+def check_review_vocab(path: str, raw: str) -> List[str]:
+    """REVIEW's observations and their values against the schema it drives.
+
+    The audit's equivalent is `check_schema_vocab`; this is the same invariant
+    for a differently shaped table. §6 names the observations in its first
+    column and their values in its second, so both are read from there.
+    """
+    from workflowsv2.audit_review import schemas as rs                # noqa: E402
+    bodies = {re.match(r"## (\d+[a-z]?)\.", b.splitlines()[0]).group(1): b
+              for _, b in sections(raw)
+              if b.strip() and re.match(r"## (\d+[a-z]?)\.", b.splitlines()[0])}
+    six = bodies.get("6", "")
+    bad = []
+    if not six:
+        return ["REVIEW has no §6 to declare observations in"]
+    declared = {}
+    for line in six.splitlines():
+        m = re.match(r"^\s*\|\s*`([a-z_]+)`\s*\|([^|]*)\|", line)
+        if m:
+            declared[m.group(1)] = set(re.findall(r"`([a-z_]+)`", m.group(2)))
+    for name, values in rs.OBSERVATIONS.items():
+        if name not in declared:
+            bad.append(f"schemas.py observation {name!r} is not declared in §6")
+            continue
+        for v in values:
+            if v not in declared[name]:
+                bad.append(f"§6 does not give {name!r} the value {v!r}")
+        for v in sorted(declared[name] - set(values)):
+            bad.append(f"§6 gives {name!r} a value {v!r} schemas.py "
+                       f"does not define")
+    for extra in sorted(set(declared) - set(rs.OBSERVATIONS)):
+        bad.append(f"§6 declares observation {extra!r}, "
+                   f"which schemas.py does not define")
+    for f in rs.FIDELITY:
+        if f"`{f}`" not in raw:
+            bad.append(f"fidelity value {f!r} is never named in REVIEW")
+    return bad
+
+
 def lint(path: str) -> Dict[str, List[str]]:
     name = Path(path).name
     raw = (REPO / path).read_text(encoding="utf-8")
@@ -400,12 +444,14 @@ def lint(path: str) -> Dict[str, List[str]]:
         "retired tokens in the prompt": check_retired(name, agent),
         "dates in the prompt": check_dates(name, agent, allow),
         "section references": check_refs(name, raw, agent),
-        # claims_audit's contract is the schema; every other workflow still
-        # delivers text blocks. One key either way, so the report reads the
-        # same and a reader is told which contract was checked.
-        ("schema vocabulary" if "claims_audit" in path else "block vocabulary"):
-            (check_schema_vocab(path, raw) if "claims_audit" in path
-             else check_block_vocab(path, raw)),
+        # claims_audit and audit_review answer under schemas; audit_postprocess
+        # still delivers text blocks. One key either way, so the report reads
+        # the same and a reader is told which contract was checked.
+        **({"schema vocabulary": check_schema_vocab(path, raw)}
+           if "claims_audit" in path else
+           {"schema vocabulary": check_review_vocab(path, raw)}
+           if "audit_review" in path else
+           {"block vocabulary": check_block_vocab(path, raw)}),
     }
 
 

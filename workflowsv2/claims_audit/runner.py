@@ -567,10 +567,33 @@ def _emit(loop, system: str, user: str, schema: Dict[str, Any],
     `measure/form_grid`'s adjudicate arm holds form in.
     """
     before = set(getattr(loop.backend, "_param_drops", set()))
-    raw = loop.backend.chat(
-        [{"role": "system", "content": system},
-         {"role": "user", "content": user}],
-        max_tokens=max_tokens, response_schema=schema)
+    messages = [{"role": "system", "content": system},
+                {"role": "user", "content": user}]
+
+    # RETRY AN EMPTY COMPLETION, ONCE. The local route returns "" with
+    # finish=stop often enough that `react.py` carries its own retry for it
+    # (REACT_MAX_FORMAT_RETRIES) — and moving the emission outside that loop
+    # left the resilience behind. doc9 lost a whole run to it: phase 1 clean,
+    # 75 kB of evidence gathered, and a zero-character adjudication.
+    #
+    # An empty answer is NOT truncation: finish reads `stop`, so nothing was
+    # cut and a larger budget would not help. Retrying the identical request is
+    # the mitigation because the cause is sampling, not the prompt.
+    attempts = []
+    raw = ""
+    for attempt in range(2):
+        raw = loop.backend.chat(messages, max_tokens=max_tokens,
+                                response_schema=schema)
+        attempts.append({
+            "chars": len(raw or ""),
+            "finish": getattr(loop.backend, "last_finish_reason", None),
+            # Recorded to tell "generated nothing" from "generated into the
+            # reasoning channel and lost on the way out". backend.py already
+            # tracks this; nothing new is being measured here.
+            "reasoning_chars": getattr(loop.backend,
+                                       "last_reasoning_chars", None)})
+        if (raw or "").strip():
+            break
     dropped = sorted(set(getattr(loop.backend, "_param_drops", set())) - before)
     obj, how, err = None, None, None
     try:
@@ -585,6 +608,7 @@ def _emit(loop, system: str, user: str, schema: Dict[str, Any],
             how = "salvaged" if obj else "unparseable"
     return {"raw": raw, "obj": obj, "parse": how, "parse_error": err,
             "finish": getattr(loop.backend, "last_finish_reason", None),
+            "attempts": attempts,
             "response_format_dropped": dropped}
 
 

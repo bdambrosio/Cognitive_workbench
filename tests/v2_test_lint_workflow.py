@@ -86,11 +86,17 @@ def test_block_vocabulary_check_fires_before_blocks_were_specified(tmp_path):
 
 
 def test_cross_document_references_are_not_flagged():
-    """REVIEW cites METHOD's sections legitimately. Treating "METHOD §16" as a
-    dangling intra-document reference was this linter's own first false
-    positive, found on its first run."""
+    """REVIEW cites METHOD's sections legitimately. Treating such a reference
+    as a dangling intra-document one was this linter's own first false
+    positive, found on its first run.
+
+    The fixture was `METHOD §16`, which v2's REVIEW no longer cites because
+    §16 was the block protocol. Any cross-document reference exercises the
+    same path; this asserts at least one exists rather than naming one, so
+    the test does not break again the next time a section is renumbered."""
     agent = lw.load_workflow(REPO / lw.DOCS[1])
-    assert "METHOD §16" in agent
+    import re as _re
+    assert _re.search(r"METHOD §\d", agent), "no cross-document reference to exercise"
     assert not lw.lint(lw.DOCS[1])["section references"]
 
 

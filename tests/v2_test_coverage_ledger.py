@@ -76,7 +76,7 @@ _FROZEN = [{"id": 1, "quote": "alpha claim one", "lines": [1, 1],
 
 def _finding(cid):
     return {"claim_id": cid,
-            "adjudication": {"verdict": "delta", "gap": "g"},
+            "adjudication": {"verdict": "contradicted", "gap": "g"},
             "evidence": [{"form": "citation", "document": "ev.md",
                           "lines": [1, 1], "quote": "the evidence line",
                           "shows": "s"}]}
@@ -243,3 +243,73 @@ def test_a_finding_naming_an_unfrozen_claim_is_caught(tmp_path):
     assert not got["ok"]
     assert any("claim_id 7" in p for p in got["problems"]), got["problems"]
 
+
+
+# --- Quote normalisation: decoration is ignored, meaning is not ---------------
+#
+# The check's first run called seven of twelve findings on doc9 fabricated,
+# and every one was a faithful quote of `*   **Dyno:** ...` written down as
+# `Dyno: ...`. The risk in fixing that is the other direction — normalising
+# until a wrong quote matches — so both directions are pinned here.
+
+def _md_corpus(tmp_path):
+    d = tmp_path / "corpus"
+    d.mkdir()
+    (d / "src.md").write_text("alpha claim one\n")
+    (d / "doc4.md").write_text(
+        "**Backups:**\n"
+        "*   **Schedule:** Daily at 2:00 AM via `heroku pg:backups schedule`\n"
+        "*   **Status:** Failures recorded for the last 21 days.\n"
+        "1.  **Acme Retail**\n"
+        "    *   **Value:** $8,000/mo\n")
+    return d
+
+
+def _obj(quote, lines):
+    return {"claim_source": "src.md", "findings": [{
+        "claim_id": 1, "adjudication": {"verdict": "contradicted", "gap": "g"},
+        "evidence": [{"form": "citation", "document": "doc4.md",
+                      "lines": lines, "quote": quote, "shows": "s"}]}]}
+
+
+_ONE = [{"id": 1, "quote": "alpha claim one", "lines": [1, 1],
+         "statement": "one"}]
+
+
+def test_a_quote_stripped_of_markdown_still_matches(tmp_path):
+    corpus = _md_corpus(tmp_path)
+    got = post_run_checks(
+        _obj("Schedule: Daily at 2:00 AM via heroku pg:backups schedule",
+             [2, 2]), corpus, "src.md", _ONE, tmp_path)
+    assert got["ok"], got["problems"]
+
+
+def test_a_quote_spanning_an_ordered_list_marker_still_matches(tmp_path):
+    """The join asymmetry: line-anchored markers stripped from the quote and
+    not from a source span joined with spaces."""
+    corpus = _md_corpus(tmp_path)
+    got = post_run_checks(
+        _obj("Acme Retail\n    *   **Value:** $8,000/mo", [4, 5]),
+        corpus, "src.md", _ONE, tmp_path)
+    assert got["ok"], got["problems"]
+
+
+def test_a_quote_that_says_something_else_still_fails(tmp_path):
+    corpus = _md_corpus(tmp_path)
+    got = post_run_checks(
+        _obj("Schedule: Hourly at 2:00 AM", [2, 2]),
+        corpus, "src.md", _ONE, tmp_path)
+    assert not got["ok"]
+    assert any("quote is not at" in p for p in got["problems"]), got["problems"]
+
+
+def test_a_quote_from_the_wrong_lines_is_still_located(tmp_path):
+    """Right document, wrong line range — the message must say it is elsewhere,
+    not that it is absent, or a reader chases the wrong defect."""
+    corpus = _md_corpus(tmp_path)
+    got = post_run_checks(
+        _obj("Status: Failures recorded for the last 21 days.", [2, 2]),
+        corpus, "src.md", _ONE, tmp_path)
+    assert not got["ok"]
+    assert any("elsewhere in that document" in p for p in got["problems"]), \
+        got["problems"]

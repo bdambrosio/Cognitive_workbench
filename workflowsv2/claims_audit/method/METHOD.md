@@ -10,7 +10,7 @@ The run has two phases and produces two JSON documents. First you enumerate the 
 
 **The surface is frozen before any claim is adjudicated, and this is a control rather than a convenience.** Enumerating while adjudicating means choosing what counts as a claim with the verdicts already in view, which is choosing the sample after seeing the result. You will be given the frozen list back; you do not revise it.
 
-**The schema enforces the shape. This document says what makes a field correct.** A response can satisfy the schema and still be wrong: a quote that is not verbatim, evidence that does not bear on the claim, an `unverifiable` that should have been `delta`. Those are what this method governs.
+**The schema enforces the shape. This document says what makes a field correct.** A response can satisfy the schema and still be wrong: a quote that is not verbatim, evidence that does not bear on the claim, an `unverifiable` that should have been `contradicted`. Those are what this method governs.
 
 Two things follow from being one stage of several:
 
@@ -48,7 +48,7 @@ Four terms, and they nest:
 - **adjudication** — the verdict, together with the gap or unresolved status that verdict requires.
 - **finding** — one output record: the `claim_id` of a frozen claim, its adjudication, and the evidence used.
 
-Every frozen claim produces exactly one finding, and every finding adjudicates exactly one claim. A claim carries one verdict, so two findings on one claim are either redundant or contradictory.
+Every frozen claim produces exactly one finding, and every finding adjudicates exactly one claim. A claim carries one verdict, so two findings on one claim are either redundant or in conflict.
 
 **A finding names its claim by `claim_id` and does not restate it.** The frozen surface is what the claim says; the finding is what you concluded about it. Two copies of one assertion can disagree, and a reader would have no way to tell which was authoritative.
 
@@ -83,22 +83,25 @@ Every finding carries exactly one.
 
 | Verdict | Meaning |
 |---|---|
-| `real` | The evidence bears the claim out, with nothing to qualify it |
-| `real_minor_caveat` | The claim holds. A discrepancy exists and does not change what the claim asserts |
-| `real_operational_caveat` | The claim holds under current conditions, and operating context qualifies it |
-| `partial` | Most of the claim is borne out, and a specific, citable part of it is not |
-| `delta` | The claim is false — the claim source says one thing and the evidence shows another |
+| `real` | The evidence bears the claim out, and there is nothing a reader needs beside it |
+| `real_with_caveat` | Every part of the claim is borne out, and the evidence shows something a reader must know to read the claim correctly |
+| `partial` | A part of the assertion is not borne out, and you can name which part |
+| `contradicted` | The claim is false — the claim source says one thing and the evidence shows another |
 | `unverifiable` | The claim was attempted and the supplied materials cannot settle it |
 
-**Keep `partial` and `delta` apart.** `partial` means most of the claim is borne out and a named part of it is not. `delta` means the evidence contradicts the claim.
+**Choosing between `partial` and `real_with_caveat`.** Ask whether you can point at a part of the assertion the evidence does not bear out. If you can, the verdict is `partial`. If every part holds and there is still something to say, it is `real_with_caveat`.
+
+> "Blended MRR is $40,000", against $16,000 from the payment processor and three wire transfers of $8,000. Every part of the assertion holds; the total is $40,000. That 60% of it arrives by manual wire from three customers is not a failure of the claim, and a reader must know it. `real_with_caveat`.
+>
+> "The technology stack is scalable", against a single dyno with the database co-located on it. The platform supports scaling; this deployment does not. A part of the assertion fails and can be named. `partial`.
+
+**A caveat is not for weak evidence.** If what you have does not settle the claim, the verdict is `unverifiable` and §8 governs it. A framework version inferred from directory names, where no manifest or lockfile was supplied, is `unverifiable` — not a claim that holds with a caveat. The verdict says how the claim fared against the evidence; it does not say how confident you are.
+
+**Keep `partial` and `contradicted` apart.** `partial` means most of the claim is borne out and a named part is not. `contradicted` means the evidence says otherwise.
 
 **Do not judge whether a gap matters to the buyer.** That judgement depends on the transaction and on what every other claim source shows, and a later stage makes it. Record what the claim says, what the evidence shows, and the difference.
 
-**`unverifiable` is not `delta`.** Failing to find supporting evidence is not evidence that the claim is false. §8 governs it.
-
-**Choosing between `partial` and a caveat.** Use `partial` when part of the assertion itself is unsupported or false. Use a caveat verdict when the assertion is true as stated and context qualifies how it should be read.
-
-**Choosing between the two caveats.** Use `real_operational_caveat` where the qualification depends on deployment, configuration, environment, workload or timing. Otherwise use `real_minor_caveat`.
+**`unverifiable` is not `contradicted`.** Failing to find supporting evidence is not evidence that the claim is false. §8 governs it.
 
 ## 7. Evidence
 
@@ -153,7 +156,7 @@ The adjudication also records what the searches established, as one of:
 | `present_but_not_readable` | The material is supplied and cannot be interrogated as given — a compiled archive with no source |
 | `outside_the_materials` | The kind of material needed to test the claim was not supplied at all — no customer records of any sort |
 
-If the searches do not settle the question, the verdict is `unverifiable`, never `delta`.
+If the searches do not settle the question, the verdict is `unverifiable`, never `contradicted`.
 
 ## 9. Unclaimed observations
 
@@ -223,7 +226,7 @@ Two JSON objects, one per phase. Each is emitted once, complete, and nothing goe
 | `findings[]` | One per frozen claim, per §4 |
 | `findings[].claim_id` | The `id` of the frozen claim this finding adjudicates |
 | `findings[].adjudication.verdict` | One value from §6 |
-| `findings[].adjudication.gap` | The qualification, discrepancy or contradiction the verdict rests on. Required for every verdict except `real`, which has none, and `unverifiable`, which uses the field below. **Where there is no gap, leave the field out.** Do not write "None" — an absent field is how the output says there is nothing, and the word is a value like any other. Why a claim holds belongs in its evidence, under `shows` |
+| `findings[].adjudication.gap` | What the verdict rests on: the caveat a reader needs, the part of the assertion that fails, or the contradiction. Required for `real_with_caveat`, `partial` and `contradicted`. Absent for `real`, which has nothing beside it, and for `unverifiable`, which uses the field below. **Where there is no gap, leave the field out.** Do not write "None" — an absent field is how the output says there is nothing, and the word is a value like any other. Why a claim holds belongs in its evidence, under `shows` |
 | `findings[].adjudication.unresolved_because` | Per §8, required when the verdict is `unverifiable` |
 | `findings[].evidence[]` | One list, each item declaring its `form` — per §7 |
 | `findings[].correction` | Per §10, where a finding changed |
@@ -330,6 +333,36 @@ The tiers ordered the work so the highest-consequence claims were settled first,
 ### The finding was defined ontologically
 
 §4 once read: "A finding is the statement of the verdict of adjudicating a set of cited evidence with respect to a claim." That is the formulation the ontology was settled on, and it is why a finding contains its evidence rather than pointing at it. It was replaced in the executable text by four nested definitions, because it introduces `finding`, `verdict` and `adjudication` at once and a model has to unpick the recursion before it can act.
+
+### There were two caveat verdicts, and a claim could hold with one
+
+`real_minor_caveat` and `real_operational_caveat` both meant "the claim holds,
+however —". Across three runs they took 18 of 64 findings, and **five of the
+nine adverse findings two stronger models independently produced on the same
+corpus were filed under `real_operational_caveat`**, recorded as claims that
+hold. Minimal operational overhead and horizontal scaling both went that way.
+
+The cause was structural rather than a model failing. The verdicts encode one
+dimension — how the claim fared against the evidence — and a model that is
+confident but not certain has nowhere to put that, so uncertainty drained into
+the slot that sounded like it. A framework version inferred from directory
+names was recorded as holding with a caveat when §8 makes it `unverifiable`.
+
+One caveat verdict remains because one case needs it and nothing else fits:
+a claim every part of which is true, where the evidence shows something a
+reader must know. Blended MRR of $40,000 that is 60% manual wire transfers
+from three customers is the case, and it is a finding three earlier runs
+missed entirely. `partial` would be wrong — no part of the assertion fails —
+and `real` would be misleading. What changed is that the boundary is now a
+test rather than a magnitude: can you name a part of the assertion that fails?
+
+### `delta` was the word for a contradicted claim
+
+`delta` is engineering vocabulary for a difference. It is not the register the
+rest of this method borrows — assurance work says misstatement, exception or
+deviation — and it names only that something differs, which is equally true of
+`partial` and of a caveat. `contradicted` says the direction, which is the
+thing that separates it from the others.
 
 ### The verdict vocabulary was bracketed
 
