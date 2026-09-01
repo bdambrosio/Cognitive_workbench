@@ -1,0 +1,1 @@
+{"arm": "v1_prohibitions", "rep": 1, "doc": "doc1_seller_listing_description.md", "model": "primitive-ai/Qwen3.8-Flash-Next-NVFP4", "claims": 33, "lines_covered": 9, "check_ok": true, "problems": 0, "secs": 122.9, "chars": 6770}

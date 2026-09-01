@@ -29,8 +29,8 @@ REPLICATES ARE NOT OPTIONAL. Three v2 runs on doc1 enumerated 36, 33 and 30 —
 a 20% spread with the text held constant. An arm run once measures that spread
 and nothing else.
 
-    python3 measure/claim_grain/run.py --model measure/models/local_qwen38flashnext.yaml
-    python3 measure/claim_grain/run.py --reps 5 --doc doc2_tech_stack_description_as_provided_by_se.md
+    python3 measure/claim_granularity/run.py --model measure/models/local_qwen38flashnext.yaml
+    python3 measure/claim_granularity/run.py --reps 5 --doc doc2_tech_stack_description_as_provided_by_se.md
 """
 from __future__ import annotations
 
@@ -95,7 +95,7 @@ def method_for(arm: str) -> str:
             "was written. Update CURRENT to match it before trusting any arm — "
             "a swap that silently did nothing would report the same text three "
             "times as three arms.")
-    swapped = REPO / "measure/claim_grain/_arm.md"
+    swapped = REPO / "measure/claim_granularity/_arm.md"
     swapped.write_text(raw.replace(CURRENT, ARMS[arm]), encoding="utf-8")
     try:
         return load_workflow(swapped)
@@ -110,7 +110,7 @@ def main() -> int:
     ap.add_argument("--doc", default="doc1_seller_listing_description.md")
     ap.add_argument("--reps", type=int, default=3)
     ap.add_argument("--max-tokens", type=int, default=32768)
-    ap.add_argument("--out", default="measure/claim_grain/results.jsonl")
+    ap.add_argument("--out", default="measure/claim_granularity/results.jsonl")
     args = ap.parse_args()
 
     doc = yaml.safe_load(Path(args.model).read_text(encoding="utf-8")) or {}
@@ -118,7 +118,18 @@ def main() -> int:
     if not llm:
         raise SystemExit(f"{args.model}: no llm_config block")
     from chat.backend import _ChatBackend                       # noqa: E402
-    backend = _ChatBackend(llm)
+    import os
+    # Same construction as measure/regrade.py's. The model yaml names an env
+    # var for its key rather than the key; a local server names none.
+    key = llm.get("api_key")
+    backend = _ChatBackend(
+        server=llm.get("server", "local"),
+        model=llm.get("model", ""),
+        base_url=llm.get("vllm_url") or llm.get("base_url", ""),
+        is_reasoning=llm.get("is_reasoning_model"),
+        api_key=(os.environ.get(key) if key and key.isupper() else key),
+        reasoning_effort=llm.get("reasoning_effort"),
+        extra_body=llm.get("extra_body"))
     user = prompt(args.doc)
     src = CORPUS / args.doc
     out = Path(args.out)

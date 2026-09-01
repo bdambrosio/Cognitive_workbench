@@ -53,6 +53,22 @@ VERDICTS: Tuple[str, ...] = (
 #: beside it; `unverifiable` uses `unresolved_because` instead.
 GAP_REQUIRED: Tuple[str, ...] = ("real_with_caveat", "partial", "contradicted")
 
+#: The verdicts that report something wrong with the target. Defined HERE,
+#: beside the vocabulary, because which verdicts are adverse is a property of
+#: the vocabulary rather than of whoever counts them.
+#:
+#: `unverifiable` IS DELIBERATELY NOT ADVERSE. It reports a limit of the
+#: supplied materials, not a defect in the target — `gap-analysis.md` calls
+#: inability to obtain evidence "a scope limitation, not an adverse finding".
+#: A reader may still care that a fifth of the claims went unsettled; that is
+#: reported as its own figure and never folded into this one.
+#:
+#: NOTHING HERE COUNTS THEM. The audit does not publish a figure that reads as
+#: a score on its own work — that is the audit's account of itself, and the
+#: review exists not to trust it. `audit_review` computes the counts, from the
+#: artifacts, using this definition.
+ADVERSE_VERDICTS: Tuple[str, ...] = ("partial", "contradicted")
+
 UNRESOLVED_BECAUSE: Tuple[str, ...] = (
     "not_in_the_materials", "present_but_not_readable", "outside_the_materials")
 

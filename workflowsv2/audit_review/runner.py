@@ -139,10 +139,27 @@ def statistics(run: Path, corpus: Path, claim_source: str) -> Dict[str, Any]:
     corpus_docs = {p.name for p in corpus.rglob("*") if p.is_file()} \
         if corpus.is_dir() else set()
 
+    verdicts = (output.get("figures") or {}).get("verdicts") or {}
     return {
         "claim_source": claim_source,
         "surface_check": surface,
         "output_check": output,
+        # THE AUTHORITATIVE FIGURES. Bruce's call: the review reports, the
+        # audit does not score itself. Every count here is recomputed from
+        # claims.json, findings.json and the materials — never read from the
+        # audit's run_meta.json — and `adverse` uses the one definition, in
+        # claims_audit/schemas.py, rather than a rule the reader has to infer.
+        "counts": {
+            "claims": len(frozen),
+            "findings": len(findings.get("findings") or []),
+            "verdicts": verdicts,
+            "adverse_findings": sum(verdicts.get(v, 0)
+                                    for v in audit_schemas.ADVERSE_VERDICTS),
+            "adverse_verdicts": list(audit_schemas.ADVERSE_VERDICTS),
+            # Reported beside `adverse_findings`, never inside it: an
+            # unsettled claim is a limit of the materials, not a defect in
+            # the target. A reader who wants to weigh it can.
+            "unverifiable": verdicts.get("unverifiable", 0)},
         "evidence_per_finding": {
             "min": ev_per[0] if ev_per else 0,
             "median": ev_per[len(ev_per) // 2] if ev_per else 0,
