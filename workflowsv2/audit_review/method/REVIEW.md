@@ -128,7 +128,9 @@ This is a statement about the audit, not an observation about a finding, and §6
 
 ## 8. The output
 
-One JSON object, emitted once. Its shape is enforced; this document says what makes a field correct.
+Your answer is one JSON object. Its shape is enforced; this document says what makes a field correct.
+
+**You may be asked for the whole review, or for one part of it** — a batch of claim checks, a batch of finding reviews, or the record check. Answer with the part you were asked for and nothing else. The client's process assembles the parts and does not expect you to remember what an earlier batch said. Batches exist because a generation cut short under an enforced schema is unreadable rather than short, so a large review is asked for in pieces that each survive on their own.
 
 You record observations. The outcome — whether each finding holds — is derived from them by the client's process, per §6, and is not a field you write.
 
@@ -176,6 +178,14 @@ review is not discriminating and its numbers should not be used.
 
 **A retest that disagrees does not overturn you.** It records that the finding
 is borderline. Report the disagreement; do not resolve it.
+
+**A disagreement about a sampled finding that holds changes nothing about that
+finding.** It counts toward the control and nowhere else. The two directions are
+not symmetric: a reviewer asserting a defect in finished work carries the higher
+standard, because one wrong exception puts a defect on the record against an
+audit that does not carry it, while a wrong pass would need every real exception
+missed at once. So an exception can be marked borderline by a retest, and a
+finding that holds cannot be failed by one.
 
 **A retest that did not run is not a retest that disagreed.** If it could not be
 obtained, say so and leave the standing unknown.

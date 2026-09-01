@@ -1,187 +1,171 @@
 #!/usr/bin/env python3
-"""Review a finished claims audit against the evidence it cites.
+"""Review one finished claims audit against the evidence it cites.
 
     python3 workflowsv2/audit_review/runner.py --run <audit run directory>
-    python3 workflowsv2/audit_review/runner.py --run <dir> --model measure/models/grok_4p6.yaml
+    python3 workflowsv2/audit_review/runner.py --run <dir> \
+            --model measure/models/grok_4p6.yaml
 
-WHY. METHOD §12a: "There is no independent review of the report, and that is a
-decision... Revisit it before the first engagement where a finding moves real
-money." And METHOD §12 step 6b, on the audit checking its own citations: "This catches
-a citation pointing at nothing. It will not catch one pointing convincingly at
-the wrong line." This catches that one.
+A review has three parts, in this order:
 
-WHAT IS MECHANICAL HERE AND WHAT IS NOT. Two jobs are done before the reviewer
-starts, because they have answers that do not depend on judgement:
+  1. STATISTICS. Every mechanical property of the audit's output, recomputed
+     here from `claims.json`, `findings.json` and the materials. Written to
+     `review/statistics.json` for the reviewer to read.
+  2. GATHER. The reviewer opens the documents it needs, for as long as it
+     keeps yielding.
+  3. EMIT. Schema-constrained calls producing the observations REVIEW.md §6
+     defines. The outcome — whether each finding holds — is derived from those
+     observations here, not written by the reviewer.
 
-  conformance   the method-conformance criteria that need no answer key —
-                markers, closed vocabularies, a claim surface that closed
-  citations     every cited line, fetched, and every quoted span, looked for.
-                Whether doc4:16-19 EXISTS is a file operation, and it decides
-                one of the two verdicts that fail a report. Resolving it here
-                means the reviewer cannot hallucinate a line it never fetched,
-                and spends its judgement on whether the line SUPPORTS the claim.
-  scheme        whether those integers can be line numbers at all. A reference
-                past the end of its document proves they are not — see §4.0.
-                This does not decide admissibility; it is what the reviewer
-                decides it on.
+Then the retest: the adverse observations that qualify, plus a sample of
+findings that hold, given to a second reviewer that has not seen the first.
 
-An LLM asked whether `=== LIMITATIONS ===` appears is slower, dearer and less
-reliable than a substring test. The workflow's value is the checks with no
-mechanical form.
+WHY THE STATISTICS ARE RECOMPUTED AND NOT READ FROM `run_meta.json`. The audit
+records its own checks there. A review that reads them is checking the audit's
+account of itself, which is the one thing it must not do. Same code, run over
+the artifacts by a different process, is not the same as trusting a figure.
 
-ONE REVIEW PER RUN. The runner refuses if <run>/review/ exists: a reviewer whose
-`inspect` can see a previous review is not independent of it.
+WHAT IS MECHANICAL HERE AND WHAT IS NOT. Typed output moved most of the old
+review into arithmetic: whether a document exists, whether a line range is real,
+whether a quote appears where it says. All of that is settled before the
+reviewer starts, and REVIEW.md §4 tells it so. What is left is the five
+judgements in §5, of which evidence RELEVANCE is the one nothing mechanical can
+reach — a citation can resolve, quote the document exactly, and be about
+something else.
 
-CHOOSE THE REVIEWER FOR QUALITY, NOT FOR DISTANCE FROM THE AUDITOR. A model
-reviewing its own report is not disqualified. Bruce's call, 2026-08-29: the
-intra-model effect on review quality is much smaller than the difference
-between a strong reviewer and a weak one, so GLM reviewing GLM is still a
-GLM-quality review and is worth more than a weaker model's independent one.
-Run the best available reviewer and say which it was.
+ONE REVIEW PER RUN. The runner refuses if `<run>/review/` already holds a
+review: a reviewer whose `inspect` can see a previous one is not independent
+of it.
 
-Two things make that cheaper than it sounds. The citation and conformance
-checks above run BEFORE the reviewer and are file operations, so the half of a
-review most exposed to self-favour — whether a cited line really exists — is
-decided by neither model. What remains exposed is the judgement half, whether
-the line SUPPORTS the claim, and that is exactly where a weak reviewer costs
-more than a self-interested one.
-
-The independence that does still bind is the paragraph above: never let a
-reviewer see an earlier review of the same run. Renaming the old directory does
-NOT satisfy that — `inspect` is bound to the whole run directory, so any name
-inside it is still reachable, and the refusal above says so. Move it out of the
-run directory entirely; engagements/<name>/reviews_superseded/ is where the
-ChatterMate ones went.
-
-NOT A RE-AUDIT. The subject is the report, not the business — REVIEW.md §2, §10.
+CHOOSE THE REVIEWER FOR QUALITY, NOT FOR DISTANCE FROM THE AUDITOR. Bruce's
+call, 2026-08-29: the intra-model effect is much smaller than the difference
+between a strong reviewer and a weak one, so a model reviewing its own audit is
+still worth more than a weaker model's independent review. Run the best
+available and say which it was.
 """
-
 from __future__ import annotations
 
 import argparse
 import datetime
 import json
 import logging
-import re
+import random
 import sys
-import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-HERE = Path(__file__).resolve().parent          # workflowsv2/audit_review
+HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
-for p in (str(REPO), str(REPO / "src")):
-    if p not in sys.path:
-        sys.path.insert(0, p)
+sys.path.insert(0, str(REPO))
+sys.path.insert(0, str(REPO / "src"))
 
 import yaml                                                    # noqa: E402
 
+from chat.workflow import load_workflow                        # noqa: E402
+from utils.json_utils import repair_json_string                # noqa: E402
+from workflowsv2 import issues                                 # noqa: E402
+from workflowsv2.audit_review import schemas                   # noqa: E402
+from workflowsv2.claims_audit import schemas as audit_schemas  # noqa: E402
+from workflowsv2.turns import last_exit_reason, latest_reply   # noqa: E402
+
 SCENARIO = HERE / "scenario.yaml"
+REVIEW_PATH = "workflowsv2/audit_review/method/REVIEW.md"
 SOURCE = "User"
-
-logging.basicConfig(level=logging.WARNING)
-logger = logging.getLogger("audit_review")
-logger.setLevel(logging.INFO)
-
-# DELIVERY IS BY BLOCK (REVIEW.md §8), not by turn boundary. Until 2026-08-27
-# this runner had the defect workflowsv2/blocks.py exists to remove: a turn that
-# did not `yield` was taken as the review whatever it contained, and the
-# reviewer was told "The review is received" either way. Worse than the audit's
-# version of the same bug — the retest is driven by parsing that reply, so a
-# progress note taken as a review yields zero disputed findings, no retest, and
-# a clean-looking result with no exceptions in it.
-from workflowsv2 import blocks                                   # noqa: E402
-
-# ASSERTS NOTHING ABOUT WHAT ARRIVED. The summary is still asked for, because
-# §9 requires the reviewer to be told the retest result before writing it — but
-# the asking no longer claims the review was received.
-SUMMARY_REQUEST = ("Now the `=== SUMMARY ===` block, per §8.")
 CONTINUE = "continue"
 
-# CITATION RESOLUTION LIVES IN `workflowsv2/citations.py` since 2026-08-30, when
-# audit_postprocess became its second caller. Moved unchanged; the reasoning
-# that shaped it — one quote one document, segments not spans, indexed by path
-# not basename — is in that module's docstrings.
-from workflowsv2.citations import (                              # noqa: E402
-    _CITE, _EVIDENCE_FIELD, _FINDING, _MIN_QUOTE_CHARS, _quoted_spans,
-    resolve_citations, resolve_quotes, scheme)
+logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger("audit_review.run")
+logger.setLevel(logging.INFO)
 
 
-def unpointed_fields(report: str) -> List[str]:
-    """Evidence fields carrying neither a line reference nor a quote.
+# ---------------------------------------------------------------------------
+# Part one: the statistics
+# ---------------------------------------------------------------------------
 
-    THE DENOMINATOR THAT WAS MISSING. `resolve_citations` and `resolve_quotes`
-    score the pointers a report makes. Neither notices a field that makes none,
-    so a report can read `16 of 23 quotes resolving` while ten of its evidence
-    fields say `Evidence (doc4): Single standard-1x dyno, no read replicas` —
-    prose, naming a whole document, with nothing a reader can search for. That
-    is §5's requirement failing silently: "without both, a reader cannot check
-    the finding and the practice cannot defend it."
+def unclaimed_spans(claims: Sequence[Dict[str, Any]],
+                    src: Path) -> List[Dict[str, Any]]:
+    """Lines of the claim source no claim covers.
 
-    Measured 2026-08-26 across four reports: 1 of 29 and 1 of 45 under §5 as it
-    stands, and both of those assert that no evidence exists ("no source code
-    provided to verify exact version"), which is the one legitimate case. A
-    report written to a quote-only contract left 10 of 33.
+    FOR A PERSON, NOT FOR THE REVIEWER. REVIEW.md §7: judging whether an
+    unenumerated sentence contains a seller assertion is the enumeration task
+    over again, and a model that missed it once will miss it twice. This
+    reports where to look; a human decides.
 
-    Structure only, no corpus. Whether a pointer RESOLVES is the other two
-    functions' job; this one asks whether the auditor pointed at all.
+    Blank lines and markdown headings are dropped — an unclaimed heading is
+    not a missed claim, and leaving them in buries the real gaps.
     """
-    body = _FINDING.sub("", report)     # titles quote the claim; they are headings
-    out: List[str] = []
-    for field in _EVIDENCE_FIELD.finditer(body):
-        text = field.group(0)
-        quoted = [q for q in _quoted_spans(text) if len(q) >= _MIN_QUOTE_CHARS]
-        if quoted or _CITE.search(text):
-            continue
-        out.append(" ".join(text.split())[:160])
+    if not src.is_file():
+        return []
+    lines = src.read_text(encoding="utf-8", errors="replace").splitlines()
+    covered = set()
+    for c in claims:
+        ln = c.get("lines")
+        if isinstance(ln, list) and len(ln) == 2 \
+                and all(isinstance(n, int) for n in ln):
+            covered.update(range(max(1, ln[0]), min(len(lines), ln[1]) + 1))
+    out, run_start = [], None
+    for n in range(1, len(lines) + 2):
+        text = lines[n - 1].strip() if n <= len(lines) else ""
+        skip = n > len(lines) or n in covered or not text \
+            or text.startswith("#") or set(text) <= set("*-_= ")
+        if skip:
+            if run_start is not None:
+                out.append({"lines": [run_start, n - 1],
+                            "text": "\n".join(lines[run_start - 1:n - 1])})
+                run_start = None
+        elif run_start is None:
+            run_start = n
     return out
 
 
-def conformance(run: Path) -> Dict[str, Any]:
-    """The method-conformance checks that need no answer key.
+def statistics(run: Path, corpus: Path, claim_source: str) -> Dict[str, Any]:
+    """Every mechanical property of the audit's output, recomputed here."""
+    claims = json.loads((run / "claims.json").read_text())
+    findings = json.loads((run / "findings.json").read_text())
+    frozen = claims.get("claims") or []
+    surface = audit_schemas.check_surface(claims, corpus, claim_source)
+    output = audit_schemas.check_output(findings, corpus, claim_source, frozen)
 
-    Reused from the fixture scorer rather than reimplemented — these are the
-    five criteria that hold for ANY engagement, including a paying client's
-    where no answer key exists or ever will. Recall against a key stays in
-    measure/, which is where the key is.
-    """
-    sys.path.insert(0, str(REPO / "measure" / "fixtures" / "dataroom"))
-    import score                                               # noqa: E402
-    report = (run / "report.md").read_text(errors="replace") \
-        if (run / "report.md").is_file() else ""
-    gap = (run / "gap_map.md").read_text(errors="replace") \
-        if (run / "gap_map.md").is_file() else ""
-    vc = score.verdict_conformance(report)
-    rec = score.recommendation_of(report)
-    el = score.gap_map_elements(gap) if gap else {}
-    # CLOSERS ARE RECORDED, NEVER GATED (METHOD §16). A closing marker says
-    # the model finished writing rather than ran out of room, which is the only
-    # mechanical evidence of truncation available here. Making it load-bearing
-    # would double the ways a delivered report gets rejected.
-    from workflowsv2 import blocks                                # noqa: E402
-    closed = {n: blocks.closed(report if n != "GAP MAP" else gap, n)
-              for n in ("REPORT", "LIMITATIONS", "GAP MAP")}
+    ev_per, cited_docs, no_citation = [], set(), []
+    for f in findings.get("findings") or []:
+        ev = f.get("evidence") or []
+        ev_per.append(len(ev))
+        cites = [e for e in ev if e.get("form") == "citation"]
+        for e in cites:
+            cited_docs.add(e.get("document"))
+        if not cites and (f.get("adjudication") or {}).get("verdict") \
+                != "unverifiable":
+            no_citation.append(f.get("claim_id"))
+    ev_per.sort()
+    corpus_docs = {p.name for p in corpus.rglob("*") if p.is_file()} \
+        if corpus.is_dir() else set()
+
     return {
-        "recommendation": rec,
-        "blocks closed": closed,
-        "blocks not closed": [n for n, ok in closed.items() if not ok],
-        "METHOD §6 verdicts only": not vc["off_vocabulary"],
-        "off_vocabulary": vc["off_vocabulary"],
-        "limitations statement": bool(score._LIMITS_RE.search(report)),
-        "gap map present": bool(gap.strip()),
-        "METHOD §15 elements missing": [k for k, ok in el.items() if not ok],
-        "evidence fields": len(_EVIDENCE_FIELD.findall(report)),
-        "evidence fields pointing nowhere": unpointed_fields(report),
-        "findings": [{"n": int(n), "verdict": v.strip()}
-                     for n, v in _FINDING.findall(report)],
+        "claim_source": claim_source,
+        "surface_check": surface,
+        "output_check": output,
+        "evidence_per_finding": {
+            "min": ev_per[0] if ev_per else 0,
+            "median": ev_per[len(ev_per) // 2] if ev_per else 0,
+            "max": ev_per[-1] if ev_per else 0},
+        # A finding resting on no citation, whose verdict is not
+        # `unverifiable`, has asserted an outcome from nothing readable.
+        "findings_without_a_citation": no_citation,
+        "documents_cited": sorted(d for d in cited_docs if d),
+        "documents_never_cited": sorted(corpus_docs - cited_docs),
+        # For a person, per REVIEW.md §7.
+        "unclaimed_spans": unclaimed_spans(frozen, corpus / claim_source),
     }
 
 
+# ---------------------------------------------------------------------------
+# The reviewer
+# ---------------------------------------------------------------------------
+
 def build_config(run: Path, world: str, model_path: Optional[Path],
                  target: Path) -> Tuple[str, Dict[str, Any]]:
-    """Same shape as the audit runner's, and the same reasons: the model config
-    REPLACES the llm_config block rather than merging into it, and per-session
-    paths are set here rather than by editing the committed scenario."""
+    """Same shape and the same reasons as the audit runner's: the model config
+    REPLACES `llm_config` rather than merging into it, so a stale field from
+    the scenario cannot survive into a model that never declared one."""
     from launcher import parse_characters                      # noqa: E402
     scenario = yaml.safe_load(SCENARIO.read_text(encoding="utf-8")) or {}
     scen_llm = dict(scenario.get("llm_config") or {})
@@ -209,482 +193,333 @@ def build_config(run: Path, world: str, model_path: Optional[Path],
     return name, cfg
 
 
-BRIEF = """You are reviewing the claims audit in this run directory, per REVIEW.md.
+def _emit(loop, system: str, user: str, schema: Dict[str, Any],
+          max_tokens: int) -> Dict[str, Any]:
+    """One schema-constrained call, parsed, with what could have degraded it.
 
-The report and the Gap Map are under `inspect`, with the auditor's working
-record. The materials that audit examined are under `inspect_external`.
-
-Citations have been resolved for you as far as a file operation reaches.
-`review/citations.json` holds three things: every `docN:NN` reference with the
-text of the line it names; every quote in a Claim, Evidence or Basis field,
-looked for in the materials, with the document that holds all of it; and a
-`scheme` block saying whether those integers can be line numbers at all.
-
-A quote resolves only when one document holds every part of it. `split` means
-each part was found but never together in one document — fragments from two
-documents joined into a sentence that reads as continuous evidence. `miss`
-means the words are not in the materials as written.
-
-`review/conformance.json` holds the checks that need no answer key, including
-`evidence fields` and `evidence fields pointing nowhere` — the fields carrying
-neither a reference nor a quote, which §4.0's second question turns on. A field
-that names a document and then writes prose gives a reader nothing to search
-for, and it is invisible in the citation counts because it makes no citation.
-
-Do not re-fetch what it has already resolved, and do not assess support for a
-finding whose citation is broken. **It is not the whole of the materials.** A
-reference it does not cover — an evidence document named by section rather than
-by line — is absent from it because no regex could fetch it, not because the
-document says nothing. Read anything it does not cover under `inspect_external`.
-
-Settle admissibility first, per §4.0. If the report's citation scheme cannot be
-established, say so and stop: do not enumerate, do not check findings, do not
-report a supported ratio.
-
-Otherwise enumerate the findings and close the review surface as the method
-says, then check every one. Work in as many legs as you need — end a leg with
-`yield` and I will say continue. End with the review; I will ask for the summary
-after it.
-"""
+    The audit runner carries the same function for the same reasons: an action
+    payload is unconstrained by design, so the emission answers under its own
+    schema outside the ReAct loop; and an empty completion with finish=stop is
+    frequent enough on the local route to need a retry that `react.py` has and
+    a bare call does not.
+    """
+    before = set(getattr(loop.backend, "_param_drops", set()))
+    messages = [{"role": "system", "content": system},
+                {"role": "user", "content": user}]
+    attempts, raw = [], ""
+    for _ in range(2):
+        raw = loop.backend.chat(messages, max_tokens=max_tokens,
+                                response_schema=schema)
+        attempts.append({
+            "chars": len(raw or ""),
+            "finish": getattr(loop.backend, "last_finish_reason", None),
+            "reasoning_chars": getattr(loop.backend,
+                                       "last_reasoning_chars", None)})
+        if (raw or "").strip():
+            break
+    dropped = sorted(set(getattr(loop.backend, "_param_drops", set())) - before)
+    obj, how, err = None, None, None
+    try:
+        obj, how = json.loads(raw), "parsed"
+    except Exception as e:                                     # noqa: BLE001
+        err = f"{type(e).__name__}: {e}"
+        repaired = repair_json_string(raw)
+        obj, how = (repaired, "repaired") if isinstance(repaired, dict) \
+            else (None, "unparseable")
+    return {"raw": raw, "obj": obj, "parse": how, "parse_error": err,
+            "attempts": attempts, "response_format_dropped": dropped}
 
 
-# Exceptions in a finished review, as §6 writes them:
-#   **Exception 1: F1 (report:42-48) — [unsupported]**
-# The label is the reviewer's own (REVIEW.md §4) and means nothing to the
-# retest, which does not see this review. The report line range is the referent
-# that carries, which is why §6 puts it on this line.
-_EXCEPTION = re.compile(
-    r"^\s*\**\s*Exception\s+\d+\s*:\s*"
-    r"(?P<label>F\d+)\s*\(\s*report\s*:\s*"
-    r"(?P<lines>\d+(?:\s*[-–]\s*\d+)?)\s*\)"
-    r"[^\n\[]*\[(?P<verdict>[^\]]+)\]",
-    re.M | re.I)
+def _finding_text(f: Dict[str, Any], claims: Dict[int, Dict[str, Any]]) -> str:
+    """One finding, and the claim it adjudicates, as the reviewer reads it."""
+    c = claims.get(f.get("claim_id")) or {}
+    adj = f.get("adjudication") or {}
+    out = [f"--- claim {f.get('claim_id')}",
+           f"    quote     : {c.get('quote')}",
+           f"    lines     : {c.get('lines')}",
+           f"    statement : {c.get('statement')}",
+           f"    verdict   : {adj.get('verdict')}"]
+    if adj.get("gap"):
+        out.append(f"    gap       : {adj['gap']}")
+    if adj.get("unresolved_because"):
+        out.append(f"    unresolved_because: {adj['unresolved_because']}")
+    for i, e in enumerate(f.get("evidence") or [], 1):
+        out.append(f"    evidence {i} ({e.get('form')}): "
+                   + json.dumps({k: v for k, v in e.items() if k != "form"},
+                                ensure_ascii=False)[:1500])
+    return "\n".join(out)
 
 
-# Any line that opens an Exception block, whatever shape the rest is in.
-# Paired with `_EXCEPTION` above to detect format drift: a review that wrote
-# exceptions the strict pattern did not understand is a parser/spec mismatch,
-# and it is silent otherwise — the retest simply does not run and §9 returns
-# INCONCLUSIVE with nothing naming the cause.
-_EXCEPTION_ANY = re.compile(r"^\s*\**\s*Exception\s+\d+\s*:", re.M | re.I)
+def emit_parts(loop, method_text: str, stats: Dict[str, Any],
+               frozen: Sequence[Dict[str, Any]],
+               findings: Sequence[Dict[str, Any]],
+               max_tokens: int, batch: int = 0) -> Dict[str, Any]:
+    """The review, in one call or in batches.
+
+    BATCHING IS A RUNNER DECISION, NOT A SCHEMA CHANGE. `schemas.py` carries
+    one schema per part precisely so a batch is the same call over ten items
+    instead of forty. `batch=0` asks for everything at once, which is the
+    default because nothing has yet truncated; a review of two hundred
+    findings is what the flag is for.
+    """
+    claims_by_id = {c.get("id"): c for c in frozen}
+    facts = json.dumps({k: v for k, v in stats.items()
+                        if k != "unclaimed_spans"},
+                       ensure_ascii=False, indent=1)[:20_000]
+    head = ("The audit under review is in the run directory. Its claim surface "
+            "and findings follow, and the statistics the client's process "
+            "computed are:\n\n" + facts + "\n\n")
+    parts, calls = [], []
+
+    def ask(what: str, body: str, schema) -> None:
+        out = _emit(loop, method_text, head + body, schema, max_tokens)
+        calls.append({"part": what,
+                      **{k: v for k, v in out.items() if k not in ("raw", "obj")}})
+        if out["obj"] is not None:
+            parts.append(out["obj"])
+        else:
+            logger.warning("%s did not parse: %s", what, out["parse_error"])
+
+    groups = ([list(frozen)] if not batch
+              else [list(frozen)[i:i + batch]
+                    for i in range(0, len(frozen), batch)])
+    for n, g in enumerate(groups, 1):
+        body = ("Check the fidelity of these claims, per REVIEW §5 check 1 — "
+                "does each `statement` faithfully render its `quote`?\n\n"
+                + json.dumps(g, ensure_ascii=False, indent=1)
+                + "\n\nEmit `claim_checks` for exactly these claims.")
+        ask(f"claim_checks[{n}/{len(groups)}]", body,
+            schemas.claim_checks_schema())
+
+    groups = ([list(findings)] if not batch
+              else [list(findings)[i:i + batch]
+                    for i in range(0, len(findings), batch)])
+    for n, g in enumerate(groups, 1):
+        body = ("Review these findings, per REVIEW §5 checks 2 to 5. Record "
+                "the four observations for each; the outcome is derived from "
+                "them and is not yours to write.\n\n"
+                + "\n\n".join(_finding_text(f, claims_by_id) for f in g)
+                + "\n\nEmit `finding_reviews` for exactly these findings.")
+        ask(f"finding_reviews[{n}/{len(groups)}]", body,
+            schemas.finding_reviews_schema())
+
+    ask("record_check",
+        "You have checked every finding. Now read the working record under "
+        "`inspect` and report the one statement REVIEW §7 asks for: whether "
+        "the record bears out the work the findings claim.",
+        schemas.record_check_schema())
+
+    return {"obj": schemas.merge_parts(parts), "calls": calls,
+            "batched": bool(batch)}
 
 
-def unparsed_exceptions(review_text: str) -> int:
-    """Exception blocks the strict §6 pattern could not read. 0 is healthy."""
-    text = review_text or ""
-    return max(0, len(_EXCEPTION_ANY.findall(text))
-               - len(_EXCEPTION.findall(text)))
+# ---------------------------------------------------------------------------
+# The retest
+# ---------------------------------------------------------------------------
 
+def retest(run: Path, world: str, model_path: Optional[Path], target: Path,
+           claims_by_id: Dict[int, Dict[str, Any]],
+           findings_by_id: Dict[int, Dict[str, Any]],
+           candidates: Sequence[int], sampled: Sequence[int],
+           max_tokens: int) -> Dict[str, Any]:
+    """A second reviewer, on the findings that qualify and on a sample.
 
-def _norm_lines(text: str) -> str:
-    """One spelling for a line range, so it can be a dict key."""
-    return re.sub(r"\s*[-–]\s*", "-", (text or "").strip())
+    BLIND. It is given the finding and the materials and nothing else — not the
+    first reviewer's observations, not its exception, and not whether this
+    finding was one it failed or one it passed. It runs in its own world, and
+    the first review is not on disk when it starts.
 
-# Superseded 2026-08-29; see _RETESTABLE_VERDICTS below. `[broken citation]` and
-# `[uncited]` were decided by a file operation — citations.json says a
-# reference resolves or it does not, conformance.json says a field carries a
-# pointer or it does not — so re-asking a model would spend money to
-# re-derive a fact it cannot change.
-# Every disposition that fails a report and can be checked a second time.
-#
-# `broken citation` joined these 2026-08-29. It was excluded because a file
-# operation settles it and asking a model to re-derive a fact is not a second
-# opinion — sound as far as it went, but it set severity by how the defect was
-# detected rather than by what it was. A citation naming line 697 when the code
-# is at 1226 is exactly as useless to a reader as one naming a line past the end
-# of the file; the first was `[unsupported]`, retestable and survivable, and the
-# second was fatal on sight. Two spellings of one defect, two verdicts.
-#
-# `uncited` stays out, and not for symmetry: there is no reference to check. A
-# field carries a pointer or it does not, and a retest has nothing to open.
-_RETESTABLE_VERDICTS = ("unsupported", "indeterminate", "broken citation")
-
-
-# A MENTION IS NOT AN EMISSION, the same rule `blocks.marker_re` is anchored
-# for. This searched the whole REVIEW body until 2026-08-30, so an ADMISSIBLE
-# review that discussed the criterion, or quoted §8 back, flipped the run onto
-# the three-block path and the REVIEW SURFACE it still owed was marked not
-# owed. REVIEW.md §8 tells the reviewer to OPEN the block with the token, so
-# that is what is matched: the first non-blank line, optionally decorated.
-_OPENS_INADMISSIBLE = re.compile(r"\s*\**\s*(?:Result\s*:\s*)?INADMISSIBLE\b",
-                                 re.I)
-
-
-def retestable_exceptions(review_text: str) -> List[Dict[str, str]]:
-    """Findings a review failed that a second reviewer can check."""
-    out, seen = [], set()
-    for m in _EXCEPTION.finditer(review_text or ""):
-        v = m.group("verdict").strip().lower()
-        lines = _norm_lines(m.group("lines"))
-        if v in _RETESTABLE_VERDICTS and lines not in seen:
-            seen.add(lines)
-            out.append({"finding": m.group("label"), "lines": lines,
-                        "verdict": v})
+    THE TWO SETS ARE NOT SYMMETRIC, and REVIEW.md §9 says why. A disagreement
+    about a finding the first reviewer FAILED marks that finding borderline: a
+    reviewer asserting a defect in finished work carries the higher standard,
+    because one wrong exception puts a defect on the record against an audit
+    that does not carry it. A disagreement about a SAMPLED finding that held
+    changes nothing about that finding — it counts toward the control and
+    nowhere else. Sampling exists because retesting only exceptions can catch a
+    reviewer that is too harsh and can never catch one that is too lax.
+    """
+    subjects = list(dict.fromkeys(list(candidates) + list(sampled)))
+    if not subjects:
+        return {"ran": False, "reason": "nothing qualified and nothing sampled"}
+    from chat.chat_loop import ChatLoop                        # noqa: E402
+    name, cfg = build_config(run, world, model_path, target)
+    loop = ChatLoop(character_name=name, character_config=cfg)
+    method_text = load_workflow(REPO / REVIEW_PATH)
+    out: Dict[str, Any] = {"ran": True, "world": world,
+                           "resolved_model": loop.backend.resolved_model(),
+                           "results": {}}
+    try:
+        for cid in subjects:
+            f = findings_by_id.get(cid)
+            if f is None:
+                continue
+            body = ("Review this one finding, per REVIEW §5 checks 2 to 5. You "
+                    "have not seen any other review of it.\n\n"
+                    + _finding_text(f, claims_by_id)
+                    + "\n\nEmit `finding_reviews` for this finding only.")
+            r = _emit(loop, method_text, body,
+                      schemas.finding_reviews_schema(), max_tokens)
+            rows = ((r.get("obj") or {}).get("finding_reviews") or [])
+            row = next((x for x in rows if x.get("claim_id") == cid),
+                       rows[0] if rows else None)
+            out["results"][cid] = {
+                "parse": r["parse"],
+                "observations": ({k: row.get(k) for k in schemas.OBSERVATIONS}
+                                 if row else None)}
+    finally:
+        try:
+            loop._post_turn_executor.shutdown(wait=True)
+        except Exception as e:                                 # noqa: BLE001
+            logger.warning("retest executor shutdown failed: %s", e)
     return out
 
 
-CONFIRM_BRIEF = """A colleague is reviewing the claims audit in this run directory and has
-asked for a second opinion on specific findings, before anything is
-reported.
+def standings(first: Dict[str, Any], second: Dict[str, Any],
+              candidates: Sequence[int],
+              sampled: Sequence[int]) -> Dict[str, Any]:
+    """What the retest made of each subject, per REVIEW.md §9."""
+    if not second.get("ran"):
+        return {"ran": False, "reason": second.get("reason"),
+                "note": "a retest that did not run is not one that disagreed"}
+    firsts = {r.get("claim_id"): r for r in first.get("finding_reviews") or []}
+    rows, agree_ex, dis_ex, agree_s, dis_s = {}, 0, 0, 0, 0
+    for cid, got in (second.get("results") or {}).items():
+        obs = got.get("observations")
+        mine = firsts.get(cid)
+        if obs is None or mine is None:
+            rows[cid] = {"standing": "not retested",
+                         "why": "the retest produced nothing readable"}
+            continue
+        same = all(obs.get(n) == mine.get(n) for n in schemas.OBSERVATIONS)
+        if cid in candidates:
+            rows[cid] = {"standing": "stands" if same else "does not stand",
+                         "set": "exception"}
+            agree_ex += same
+            dis_ex += (not same)
+        else:
+            # A sampled finding that holds is a control, not a correction:
+            # the disagreement is counted and the finding is untouched.
+            rows[cid] = {"standing": "control", "agreed": same, "set": "held"}
+            agree_s += same
+            dis_s += (not same)
+    return {"ran": True, "per_finding": rows,
+            "exceptions": {"agreed": agree_ex, "disagreed": dis_ex},
+            "held_sample": {"agreed": agree_s, "disagreed": dis_s},
+            # The comparison REVIEW §9 exists for: if the second reviewer
+            # disagrees about findings the first passed at a rate near the rate
+            # it disagrees about ones the first failed, the review is not
+            # discriminating and its numbers should not be used.
+            "discriminating": None if not (agree_s + dis_s) and not (agree_ex + dis_ex)
+            else {"disagreement_on_exceptions":
+                  round(dis_ex / (agree_ex + dis_ex), 2) if (agree_ex + dis_ex) else None,
+                  "disagreement_on_held":
+                  round(dis_s / (agree_s + dis_s), 2) if (agree_s + dis_s) else None}}
 
-Check these findings, and only these, each named by the report lines it
-occupies: {findings}.
 
-For each one, read what the report claims and what its citations actually
-say, and give it a disposition from REVIEW.md §6.
+BRIEF = """You are reviewing the claims audit in this run directory, per REVIEW.md.
 
-`review/citations.json` holds every cited line already fetched, and it is a
-convenience for reading them — not the authority on whether a citation
-resolves. Where what is in question is the citation itself, open the cited file
-through `inspect_external` and check the coordinate there. Confirming an index
-from itself is not a second opinion: on 2026-08-29 that index resolved a bare
-`README.md` to a 149-line file when the one cited was 625 lines, and marked
-fourteen sound references broken. A reviewer reading only the index would have
-agreed with all fourteen. Judge each finding on the evidence in front
-of you. You have not been told what anyone else concluded, and you should not
-try to infer it: a second opinion that guesses at the first is not one.
+Under `inspect`: the audit's frozen claim surface (`claims.json`), its findings
+(`findings.json`), the statistics the client's process computed
+(`review/statistics.json`), and the auditor's working record. The materials that
+audit examined are under `inspect_external`.
 
-REVIEW.md §2 and §10 bind here as everywhere. The subject is the report, not
-the business. A claim the report never made is not an exception, and a
-statement about what the audit could NOT verify belongs to the coverage
-block rather than being a claim about the target.
+Every mechanical property of the output has been checked already, per REVIEW §4.
+Each cited document exists, each line range is inside its file, and each quoted
+span was found at the lines it names. Do not re-check those; the statistics
+record what they found. Your subject is the citations that do resolve, where
+the only remaining question is what they mean.
 
-Answer with one line per finding and nothing else:
+Read the findings and the materials now. Do not read the working record yet —
+REVIEW §7 says when. Work in as many legs as you need: end a leg with `yield`
+and I will say continue, or with `respond` when you have read what you need.
 
-    report:<lines>: [verdict] — <one sentence, citing the line that settles it>
+Do not write the review in a leg. When you stop reading I will ask you for it,
+under the schema in REVIEW §8.
 """
 
 
-# When the review fails a finding, retest it once. The fail stands only if
-# the retest agrees; a single disagreement ignores it. Two reviewers in
-# total: the one who wrote the review, plus CONFIRMING_REVIEWERS more.
-REVIEWERS_REQUIRED = 2
-CONFIRMING_REVIEWERS = REVIEWERS_REQUIRED - 1
-
-
-def confirm_exceptions(run: Path, world: str, model_path: Optional[Path],
-                       target: Path, disputed: List[Dict[str, str]],
-                       ) -> Dict[str, Any]:
-    """Retest the findings the first reviewer failed.
-
-    THE RULE. When the review fails a finding, that finding is retested
-    once, by a reviewer who has not seen the first verdict. The fail stands
-    only if the retest reaches the same verdict. A single disagreement
-    ignores the fail, and the disagreement is reported.
-
-    WHY IT APPLIES ONLY TO FINDINGS THAT FAIL. A reviewer asserting a defect in
-    finished work carries the higher standard: one wrong exception puts a defect
-    on the record against a report that does not carry it. Measured on
-    2026-08-26: one clean report was reviewed five times and came back
-    supported 12 of 12 four times and 11 of 12 once, and the one dissent had
-    rebutted a finding by attacking a claim the audit never made. A wrong
-    judgement the other way cannot do the same damage, because passing a bad
-    report would need every real exception missed at once. A reviewer
-    asserting a defect in finished work carries the higher standard; a
-    reviewer finding no defect does not.
-
-    A DISAGREEMENT IS NOT NOISE. One reviewer finding a fault and the other
-    not means the finding is genuinely borderline, and saying so is more use
-    than rounding it to yes or no. The tally is reported either way.
-
-    BLIND. The retest is launched before `review.md` is written to disk, so
-    it cannot reach the first verdict through `inspect`, and it is not told
-    it. It confirms; it does not overrule. A finding whose fail does not
-    stand stays in the review as recorded, with its tally.
-    """
-    names = ", ".join(f"report:{d['lines']}" for d in disputed)
-    from chat.chat_loop import ChatLoop                        # noqa: E402
-    # Imported here as well as in main(): main()'s import is local to it, and
-    # a NameError raised inside the retest reads as "could not obtain the
-    # retest", which silently turns every failed finding into one that does
-    # not stand. Cost one review on 2026-08-26 before it was noticed.
-    from workflowsv2.turns import latest_reply                   # noqa: E402
-    t0, opinions, replies, models = time.time(), [], [], []
-
-    for n in range(1, CONFIRMING_REVIEWERS + 1):
-        # A world of its own: the retest must not see the first review any
-        # more than it is told its verdict.
-        name, cfg = build_config(run, f"{world}_{n}", model_path, target)
-        loop = ChatLoop(character_name=name, character_config=cfg)
-        try:
-            loop._process_user_turn(source=SOURCE, close=False,
-                                    text=CONFIRM_BRIEF.format(findings=names))
-            reply = latest_reply(loop, SOURCE)
-            models.append(loop.backend.resolved_model())
-        except Exception as e:                                 # noqa: BLE001
-            logger.warning("retest %d failed: %s", n, e)
-            return {"ran": False, "error": f"{type(e).__name__}: {e}",
-                    "reviewers_required": REVIEWERS_REQUIRED,
-                    "reviewers_obtained": len(opinions) + 1,
-                    "disputed": disputed}
-        finally:
-            try:
-                loop._post_turn_executor.shutdown(wait=True)
-            except Exception as e:                             # noqa: BLE001
-                logger.warning("confirm executor shutdown failed: %s", e)
-        replies.append(reply)
-        verdicts = {}
-        for m in re.finditer(
-                r"report\s*:\s*(\d+(?:\s*[-–]\s*\d+)?)\s*:\s*\[([^\]]+)\]",
-                reply or "", re.I):
-            verdicts[_norm_lines(m.group(1))] = m.group(2).strip().lower()
-        opinions.append(verdicts)
-
-    results = []
-    for d in disputed:
-        others = [o.get(d["lines"]) for o in opinions]
-        agreeing = 1 + sum(1 for v in others if v == d["verdict"])
-        results.append({**d, "other_verdicts": others,
-                        "agreeing": agreeing,
-                        "of": REVIEWERS_REQUIRED,
-                        # The retest must have reached the same verdict. A
-                        # retest that returned no verdict for this finding
-                        # has not agreed to fail it.
-                        "accepted_as_failed": agreeing == REVIEWERS_REQUIRED})
-    n_acc = sum(1 for r in results if r["accepted_as_failed"])
-    logger.info("retest: %d of %d failed findings stand", n_acc, len(results))
-    return {"ran": True, "error": None, "world": world,
-            "reviewers_required": REVIEWERS_REQUIRED,
-            "resolved_models": models,
-            "wall_clock_s": round(time.time() - t0, 1),
-            "replies": replies, "results": results,
-            "accepted_as_failed": n_acc, "failed_findings": len(results)}
-
-
-def _confirmation_note(c: Dict[str, Any]) -> str:
-    """What the summary turn is told about the retest.
-
-    States what it found and does not argue the verdict: REVIEW.md §9 carries
-    the rule, and a runner that also reasoned the conclusion would be writing
-    the review.
-    """
-    if not c.get("ran"):
-        return ("\n\n[The client's process could not obtain the retest. Per "
-                "§9: report ADMISSIBLE or INADMISSIBLE as you found it, and "
-                "mark every exception NOT RETESTED, naming the reason. A "
-                "retest that could not be run is not a finding that did not "
-                "hold, and an exception whose standing is unknown must not be "
-                "reported as one that does not stand.]")
-    lines = []
-    for r in c["results"]:
-        others = ", ".join(f"[{v}]" if v else "[no disposition returned]"
-                           for v in r["other_verdicts"])
-        lines.append(
-            f"  Finding {r['finding']}: you found [{r['verdict']}]; the "
-            f"retest found {others} — {r['agreeing']} of {r['of']} — "
-            + ("STANDS" if r["accepted_as_failed"] else "DOES NOT STAND"))
-    return ("\n\n[The retest, obtained by the client's process from a reviewer "
-            "who was not told your dispositions and did not see your review:\n"
-            + "\n".join(lines) +
-            "\n\nApply §9. An exception stands only where the retest reached "
-            "the same disposition on it. Report every exception with its "
-            "standing — stands, does not stand, or not retested — and give "
-            "the tally. Do not delete an exception that does not stand, and "
-            "do not restate it as agreement. There is no grade to report: the "
-            "exceptions and their standings are the result.]")
-
-
 def main() -> int:
-    ap = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--run", type=Path, required=True,
-                    help="the audit run directory to review")
-    ap.add_argument("--model", type=Path, default=None,
-                    help="YAML with an llm_config block. Need not be the model "
-                         "that produced the audit — arguably should not be")
-    ap.add_argument("--world", default=None)
-    ap.add_argument("--max-turns", type=int, default=25)
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--run", required=True, help="a finished audit run directory")
+    ap.add_argument("--model", help="YAML with an llm_config block")
+    ap.add_argument("--retest-model", help="the second reviewer; defaults to --model")
+    ap.add_argument("--world", help="fresh world name; defaults from the run")
+    ap.add_argument("--max-turns", type=int, default=12)
+    ap.add_argument("--batch", type=int, default=0,
+                    help="items per emission call; 0 asks for each part at once")
+    ap.add_argument("--held-sample", type=int, default=3,
+                    help="findings that hold, retested as a control (REVIEW §9)")
+    ap.add_argument("--seed", type=int, default=0, help="for the held sample")
     args = ap.parse_args()
 
-    run = args.run.resolve()
-    meta_p = run / "run_meta.json"
-    if not meta_p.is_file():
-        raise SystemExit(f"{run}: no run_meta.json — not a run directory")
-    if not (run / "report.md").is_file():
-        raise SystemExit(f"{run}: no report.md to review")
+    run = Path(args.run).resolve()
+    for needed in ("claims.json", "findings.json", "run_meta.json"):
+        if not (run / needed).is_file():
+            raise SystemExit(f"{run}: no {needed} — not a finished audit run")
     out = run / "review"
-    if out.exists():
-        raise SystemExit(
-            f"{out} already exists. One review per run: a reviewer whose "
-            f"`inspect` can see a previous review is not independent of it. "
-            f"Move it OUT of the run directory, or delete it, to review again.")
-    # RENAMING IS NOT MOVING. `inspect` reaches the whole run directory, so a
-    # previous review parked alongside as review.8192-era/ or
-    # review.pre-admissibility/ is exactly as visible as review/ was. The
-    # guard above was written for the name and missed the point of itself.
-    stale = sorted(d.name for d in run.glob("review*")
-                   if d.is_dir() and (d / "review.md").is_file())
-    if stale:
-        raise SystemExit(
-            f"{run} still holds a previous review: {', '.join(stale)}. "
-            f"`inspect` reaches the whole run directory, so renaming one does "
-            f"not hide it. Move it outside the run directory to review again.")
+    if (out / "review.json").is_file():
+        raise SystemExit(f"{out}: already reviewed. A reviewer whose `inspect` "
+                         f"can see a previous review is not independent of it.")
+    out.mkdir(exist_ok=True)
 
-    meta = json.loads(meta_p.read_text(encoding="utf-8"))
-    target = Path(meta.get("external_repo") or "").resolve()
-    if not target.is_dir():
-        raise SystemExit(f"target {target} does not exist — citations cannot "
-                         f"be resolved, and a review without them is opinion")
-    out.mkdir(parents=True)
+    meta = json.loads((run / "run_meta.json").read_text())
+    target = Path(meta.get("external_repo") or ".")
+    claims_doc = json.loads((run / "claims.json").read_text())
+    findings_doc = json.loads((run / "findings.json").read_text())
+    claim_source = claims_doc.get("claim_source") or ""
+    frozen = claims_doc.get("claims") or []
+    findings = findings_doc.get("findings") or []
+    world = args.world or f"review_{run.name[-40:]}"
 
-    report = (run / "report.md").read_text(encoding="utf-8", errors="replace")
-    cites = resolve_citations(report, target)
-    (out / "citations.json").write_text(json.dumps(cites, indent=2), encoding="utf-8")
-    conf = conformance(run)
-    (out / "conformance.json").write_text(json.dumps(conf, indent=2), encoding="utf-8")
-    logger.info("resolved %d citations, %d broken; %d quotes, %d resolving; "
-                "%d findings parsed", cites["total"], cites["broken"],
-                cites["scheme"]["quotes"], cites["scheme"]["quotes_resolving"],
-                len(conf["findings"]))
+    # ---- part one: the statistics, recomputed here -------------------------
+    stats = statistics(run, target, claim_source)
+    (out / "statistics.json").write_text(
+        json.dumps(stats, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    logger.info("statistics: %d claims, %d findings, audit checks %s/%s, "
+                "%d unclaimed span(s)", len(frozen), len(findings),
+                "ok" if stats["surface_check"]["ok"] else "FAIL",
+                "ok" if stats["output_check"]["ok"] else "FAIL",
+                len(stats["unclaimed_spans"]))
 
-    world = args.world or f"review_{run.name.split('_', 1)[-1]}"
-    if (REPO / "scenarios" / world).exists():
-        raise SystemExit(f"world '{world}' already exists — pass --world")
-
-    name, cfg = build_config(run, world, args.model, target)
     from chat.chat_loop import ChatLoop                        # noqa: E402
-    from chat.model_params import TOP_P                        # noqa: E402
-    from workflowsv2.claims_audit.runner import (                # noqa: E402
-        git_rev)
-    from workflowsv2.turns import (                              # noqa: E402
-        latest_reply, last_exit_reason)
+    name, cfg = build_config(run, world, Path(args.model) if args.model else None,
+                             target)
     loop = ChatLoop(character_name=name, character_config=cfg)
-    resolved_model = loop.backend.resolved_model()
-    logger.info("reviewing %s with %s", run.name, resolved_model)
-
-    ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
-    t0, legs, error = time.time(), [], None
-    confirmation: Optional[Dict[str, Any]] = None
-    # THE REVIEW BLOCKS ARE DELIVERED IN TWO PHASES, and the retest is the gate
-    # between them. REVIEW.md §9 requires the reviewer to be told the retest
-    # result BEFORE it writes the summary, so SUMMARY cannot be accepted from a
-    # leg that ran before the retest — that is the one ordering this runner
-    # enforces, and it is enforced on the block, never on the turn.
-    # AN INADMISSIBLE REPORT HAS THREE BLOCKS. REVIEW.md §4.0 forbids
-    # enumerating the findings of a report whose citation scheme cannot be
-    # established, so no REVIEW SURFACE exists to deliver. Demanding one would
-    # prompt to the leg cap and record no_deliverable — on exactly the case the
-    # admissibility gate exists for. `INADMISSIBLE` is a copyable token §9
-    # requires on its own line, so this reads a fact rather than judging one.
-    PHASE1_FULL = ("REVIEW SURFACE", "REVIEW", "LIMITATIONS")
-    PHASE1_INADMISSIBLE = ("REVIEW", "LIMITATIONS")
-    phase1 = PHASE1_FULL
-    delivered = {n: False for n in blocks.REVIEW_BLOCKS}
-    prompted = {n: 0 for n in blocks.REVIEW_BLOCKS}
-    transcript, post_retest = [], []
-    retested = False
-    undelivered = list(blocks.REVIEW_BLOCKS)
-    # Spent when every block looks delivered but the reviewer yielded anyway.
-    grace_leg_spent = False
-
-    def _state(nxt_leg: int) -> str:
-        return (f"\n\n[review state, recorded by the client's process — leg "
-                f"{nxt_leg} of {args.max_turns}, "
-                f"{(time.time() - t0) / 60:.0f} min elapsed.]")
+    method_text = load_workflow(REPO / REVIEW_PATH)
+    max_tokens = int((cfg.get("chat") or {}).get("react_max_tokens", 32768))
+    legs, error, emission = [], None, None
+    t0 = datetime.datetime.now(datetime.timezone.utc)
 
     try:
-        text = BRIEF
+        # ---- part two: the reviewer reads ---------------------------------
+        text, reason = BRIEF, "opening brief"
         for i in range(args.max_turns):
             loop._process_user_turn(source=SOURCE, text=text, close=False)
             reply = latest_reply(loop, SOURCE)
             exit_reason = last_exit_reason(world, name)
-            legs.append({"leg": i + 1, "exit_reason": exit_reason,
-                         "reply_chars": len(reply),
-                         "blocks": [n for n in blocks.REVIEW_BLOCKS
-                                    if blocks.opened(reply, n)]})
-            logger.info("leg %d: exit=%s chars=%d blocks=%s", i + 1, exit_reason,
-                        len(reply), legs[-1]["blocks"])
+            legs.append({"leg": i + 1, "sent": reason,
+                         "exit_reason": exit_reason, "reply_chars": len(reply)})
+            logger.info("leg %d: exit=%s chars=%d", i + 1, exit_reason, len(reply))
             if exit_reason in ("llm_error", "crashed"):
                 error = f"turn {i + 1} ended {exit_reason} — review is not valid"
                 break
-            transcript.append(reply)
-            if retested:
-                post_retest.append(reply)
-            for n, seen in blocks.present(reply, blocks.REVIEW_BLOCKS).items():
-                # A SUMMARY emitted before the retest is not a summary of a
-                # result the reviewer had; it is re-asked for after.
-                if n == "SUMMARY" and not retested:
-                    continue
-                delivered[n] = delivered[n] or seen
-            if delivered["REVIEW"] and phase1 is PHASE1_FULL:
-                body = blocks.content("\n\n".join(t for t in transcript if t),
-                                      "REVIEW", blocks.REVIEW_BLOCKS) or ""
-                if _OPENS_INADMISSIBLE.match(body):
-                    phase1 = PHASE1_INADMISSIBLE
-                    delivered["REVIEW SURFACE"] = True   # not owed, not missing
-                    logger.info("review is INADMISSIBLE — no REVIEW SURFACE owed")
-            undelivered = blocks.missing(delivered, blocks.REVIEW_BLOCKS)
-
-            if all(delivered[n] for n in phase1) and not retested:
-                whole = "\n\n".join(t for t in transcript if t)
-                review_text = blocks.content(whole, "REVIEW",
-                                             blocks.REVIEW_BLOCKS) or ""
-                disputed = retestable_exceptions(review_text)
-                # A review with no judgement fails needs no retest, which is
-                # the healthy majority — do NOT warn on that. Warn only when
-                # the review wrote Exception blocks this parser could not
-                # read, which is a spec/parser mismatch and is otherwise
-                # silent: the retest does not run and the exception is
-                # reported not-retested with nothing naming the cause. That
-                # silence is how it went unnoticed for a whole campaign.
-                unread = unparsed_exceptions(review_text)
-                if unread:
-                    logger.warning(
-                        "%d Exception block(s) did not match the §6 format "
-                        "and were not read. Any fail among them is not "
-                        "retested and will be reported as such. Fix "
-                        "the parser or the format — do not widen one to fit "
-                        "the other without checking the referent resolves.",
-                        unread)
-                if disputed:
-                    logger.info("%d finding(s) failed on judgement — retesting",
-                                len(disputed))
-                    confirmation = confirm_exceptions(
-                        run, f"{world}_confirm", args.model, target, disputed)
-                retested = True
-                # NO DISPUTES, NO NOTE. `confirmation` stays None when nothing
-                # was retested, and _confirmation_note reads `.get` off it —
-                # the original only called it inside `if disputed`, and moving
-                # the call out of that branch crashed the first review run.
-                note = _confirmation_note(confirmation) if confirmation else ""
-                text = SUMMARY_REQUEST + note + _state(i + 2)
-                continue
-
-            # A YIELD IS A NOT-DONE SIGNAL, AND BELIEVING IT IS FREE. Same
-            # rule as the audit runner, for the same reason: `respond` does not
-            # prove delivery, but the converse is not symmetric. Believing "I
-            # am finished" can end a review with nothing written; believing "I
-            # am not finished" costs one leg.
-            #
-            # This runner is the more exposed of the two. A reviewer describing
-            # the blocks it still owes has to name them, and REVIEW.md §8 makes
-            # those names the proof of delivery — the collision that ended
-            # cs2_flashnext_med on the audit side. One grace leg bounds a
-            # reviewer that only ever yields.
-            if not undelivered and (exit_reason != "yield" or grace_leg_spent):
+            if exit_reason == "max_iters":
+                error = f"turn {i + 1} hit max_iters — review is not valid"
                 break
-            if not undelivered:
-                grace_leg_spent = True
-                logger.info("leg %d: every block delivered but the reviewer "
-                            "yielded — granting one further leg", i + 1)
+            if exit_reason != "yield":
+                break
+            text, reason = CONTINUE, "reviewer yielded — continue reading"
 
-            # exit_reason decides the MESSAGE, never the ending: `yield` means
-            # the reviewer says it is still working, so it is not interrupted to
-            # name a block legitimately still to come.
-            if exit_reason == "yield":
-                text = CONTINUE + _state(i + 2)
-                continue
-            nxt = undelivered[0]
-            prompted[nxt] += 1
-            logger.info("leg %d: %s not delivered — prompting (%d)",
-                        i + 1, nxt, prompted[nxt])
-            text = (CONTINUE + "\n\n"
-                    + blocks.rejection(nxt, "REVIEW.md §8") + _state(i + 2))
-        else:
-            if undelivered:
-                error = ("no_deliverable: " + ", ".join(undelivered)
-                         + f" not delivered in {args.max_turns} legs")
+        # ---- part three: the observations ---------------------------------
+        if not error:
+            emission = emit_parts(loop, method_text, stats, frozen, findings,
+                                  max_tokens, batch=args.batch)
+            for c in emission["calls"]:
+                if c["response_format_dropped"]:
+                    error = (f"the route dropped "
+                             f"{', '.join(c['response_format_dropped'])} on "
+                             f"{c['part']} — the review was not constrained")
     except Exception as e:                                     # noqa: BLE001
         error = f"{type(e).__name__}: {e}"
         logger.exception("review failed")
@@ -694,66 +529,51 @@ def main() -> int:
         except Exception as e:                                 # noqa: BLE001
             logger.warning("executor shutdown failed: %s", e)
 
-    # ASSEMBLED FROM BLOCKS, ACROSS EVERY LEG (REVIEW.md §8). Nothing is inferred
-    # from which leg a reply arrived in — that inference is what filed a progress
-    # note as a review and then found nothing to retest.
-    #
-    # review.md is the REVIEW block plus the LIMITATIONS block: two blocks so
-    # nothing has to nest, one document because that is what a reader receives.
-    # SUMMARY is read from the POST-RETEST legs only, so a summary written
-    # before the reviewer knew the retest result cannot become the deliverable.
-    whole = "\n\n".join(t for t in transcript if t)
-    after = "\n\n".join(t for t in post_retest if t)
-    parts = [b for b in (blocks.span(whole, n, blocks.REVIEW_BLOCKS)
-                         for n in ("REVIEW", "LIMITATIONS")) if b]
-    if parts:
-        (out / "review.md").write_text("\n\n".join(parts).rstrip() + "\n",
-                                       encoding="utf-8")
-    else:
-        logger.warning("no REVIEW block in the engagement — no review.md")
-    summary = blocks.span(after, "SUMMARY", blocks.REVIEW_BLOCKS)
-    if summary:
-        (out / "summary.md").write_text(summary.rstrip() + "\n", encoding="utf-8")
-    else:
-        logger.warning("no SUMMARY block after the retest — summary not produced")
+    obj = (emission or {}).get("obj") or {"claim_checks": [],
+                                          "finding_reviews": [],
+                                          "record_check": ""}
+    check = schemas.check_review(obj, frozen, findings)
+    for problem in check["problems"]:
+        issues.note(out, stage="audit_review", code="review_check",
+                    text=problem, severity="blocking")
+    derived = schemas.derive_outcomes(obj)
 
+    # ---- the retest, blind, before the review is on disk --------------------
+    held = [cid for cid, o in derived["outcomes"].items() if o["holds"]]
+    random.Random(args.seed).shuffle(held)
+    sampled = held[:max(0, args.held_sample)]
+    second = retest(run, f"{world}_retest",
+                    Path(args.retest_model or args.model)
+                    if (args.retest_model or args.model) else None,
+                    target, {c.get("id"): c for c in frozen},
+                    {f.get("claim_id"): f for f in findings},
+                    derived["retest_candidates"], sampled, max_tokens) \
+        if not error else {"ran": False, "reason": "the review did not complete"}
+    stand = standings(obj, second, derived["retest_candidates"], sampled)
+
+    (out / "review.json").write_text(
+        json.dumps(obj, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    (out / "outcomes.json").write_text(
+        json.dumps({"derived": derived, "standings": stand}, indent=1,
+                   ensure_ascii=False, default=str) + "\n", encoding="utf-8")
+    wall = round((datetime.datetime.now(datetime.timezone.utc) - t0).total_seconds(), 1)
     (out / "review_meta.json").write_text(json.dumps({
-        "reviewed_run": run.name,
-        "world": world,
-        "model_config": str(args.model) if args.model else "(scenario default)",
-        "resolved_model": resolved_model,
-        "top_p": TOP_P,
-        "target": str(target),
-        "target_rev": meta.get("target_rev"),
-        "harness_rev": git_rev(REPO),
-        # Action emissions the token ceiling cut off. Reviews carry the
-        # report AND the working record, so they meet the ceiling where
-        # audits do not.
-        "finish_length_events": getattr(loop, "finish_length_events", None),
-        "citations_total": cites["total"],
-        "citations_broken": cites["broken"],
-        "scheme": cites["scheme"],
-        "findings_parsed": len(conf["findings"]),
-        "confirmation": confirmation,
-        "blocks_prompted": prompted,
-        "blocks_delivered": delivered,
-        "blocks_closed": {n: blocks.closed(whole, n)
-                          for n in blocks.REVIEW_BLOCKS},
-        "legs": legs,
-        "wall_clock_s": round(time.time() - t0, 1),
+        "reviewed_run": run.name, "world": world,
+        "model_config": args.model, "resolved_model": loop.backend.resolved_model(),
+        "batch": args.batch, "held_sample": len(sampled),
+        "legs": legs, "wall_clock_s": wall,
+        "emission": [{k: v for k, v in c.items() if k != "raw"}
+                     for c in (emission or {}).get("calls", [])],
+        "review_check": check, "retest": {k: v for k, v in second.items()
+                                          if k != "results"},
         "error": error,
-        "captured_at_utc": ts,
     }, indent=2, default=str) + "\n", encoding="utf-8")
 
-    print(f"\n{len(legs)} legs, {round(time.time() - t0, 1)}s, error={error}")
-    sch = cites["scheme"]
-    print(f"citations: {cites['total']} line refs, {cites['broken']} broken; "
-          f"{sch['quotes']} quotes, {sch['quotes_resolving']} resolving")
-    if sch["consistent_with_line_numbering"] is False:
-        print(f"scheme: NOT line numbers — "
-              f"{sch['line_refs_exceeding_file_length']} references exceed "
-              f"their document's line count. See REVIEW.md §4.0.")
-    print(f"review: {out}/review.md, summary.md")
+    print(f"\n{len(legs)} legs, {wall}s, error={error}")
+    print(f"observations: {check['figures']}")
+    print(f"retest: {stand.get('exceptions')} on exceptions, "
+          f"{stand.get('held_sample')} on the held sample")
+    print(f"review: {out}/review.json, outcomes.json")
     return 1 if error else 0
 
 

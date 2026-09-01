@@ -612,6 +612,40 @@ def _emit(loop, system: str, user: str, schema: Dict[str, Any],
             "response_format_dropped": dropped}
 
 
+def _merge_emissions(parts: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    """Batched adjudications into the one object the checks read.
+
+    Findings concatenate in the order the batches were asked for. Nothing is
+    deduplicated: a claim adjudicated twice is a defect `check_output` reports,
+    and collapsing it here would hide a batch boundary that went wrong.
+
+    `parse` is the worst outcome across the batches, so one unparseable batch
+    cannot read as a clean run.
+    """
+    if len(parts) == 1:
+        return parts[0]
+    rank = {"parsed": 0, "repaired": 1, "salvaged": 2, "unparseable": 3}
+    findings, unclaimed, questions = [], [], []
+    for p in parts:
+        o = p.get("obj") or {}
+        findings.extend(o.get("findings") or [])
+        unclaimed.extend(o.get("unclaimed") or [])
+        questions.extend(o.get("questions") or [])
+    worst = max(parts, key=lambda p: rank.get(p.get("parse"), 3))
+    head = dict(parts[0].get("obj") or {})
+    head.update({"findings": findings, "unclaimed": unclaimed,
+                 "questions": questions})
+    return {"raw": "\n".join(p.get("raw") or "" for p in parts),
+            "obj": head, "parse": worst.get("parse"),
+            "parse_error": worst.get("parse_error"),
+            "finish": worst.get("finish"),
+            "attempts": [a for p in parts for a in (p.get("attempts") or [])],
+            "response_format_dropped": sorted(
+                {d for p in parts for d in (p.get("response_format_dropped") or [])}),
+            "phase": "findings", "batches": len(parts),
+            "evidence": parts[0].get("evidence")}
+
+
 def emit_surface(loop, method_text: str, claim_source: Path,
                  max_tokens: int) -> Dict[str, Any]:
     """Phase one: enumerate the claims, before any evidence is gathered.
@@ -721,6 +755,9 @@ def main() -> int:
     ap.add_argument("--temperature", type=float, default=None,
                     help="override the action-emission temperature "
                          "(scenario default 0.7)")
+    ap.add_argument("--batch", type=int, default=0,
+                    help="claims per adjudication call; 0 adjudicates the "
+                         "frozen surface in one call")
     ap.add_argument("--workflow-mode", choices=("on", "off"), default=None,
                     help="override the scenario's workflow_mode; omit to use "
                          "whatever audit.yaml declares")
@@ -904,12 +941,33 @@ def main() -> int:
         # ---- phase two: adjudicate the frozen claims --------------------
         if not error and frozen:
             logger.info("phase 2: adjudicating %d frozen claims", len(frozen))
-            emission = emit_findings(
-                loop, method_text=method_text, claim_source=src_doc,
-                frozen=frozen,
-                traces=(REPO / "scenarios" / args.world / name
-                        / "inspect_traces"),
-                max_tokens=emit_tokens)
+            # BATCHING IS A RUNNER DECISION, NOT A SCHEMA CHANGE, and the
+            # same one the review makes: `emit_findings` already takes a
+            # subset of claims — the reprompt path passes only those that got
+            # no finding — so a batch is that call over ten claims instead of
+            # forty. Default 0 asks for the whole surface at once, because
+            # nothing has truncated yet; a hundred-claim source is what the
+            # flag is for.
+            #
+            # THE COST IS THE EVIDENCE, RE-SENT. Each batch carries the whole
+            # gathered record, so four batches is four times the input. Cheap
+            # locally, not free hosted. And it changes what the model sees, so
+            # it is an instrument change and gets validated as one.
+            groups = ([frozen] if not args.batch
+                      else [frozen[i:i + args.batch]
+                            for i in range(0, len(frozen), args.batch)])
+            emissions = []
+            for gi, g in enumerate(groups, 1):
+                if len(groups) > 1:
+                    logger.info("adjudicating batch %d/%d (%d claims)",
+                                gi, len(groups), len(g))
+                emissions.append(emit_findings(
+                    loop, method_text=method_text, claim_source=src_doc,
+                    frozen=g,
+                    traces=(REPO / "scenarios" / args.world / name
+                            / "inspect_traces"),
+                    max_tokens=emit_tokens))
+            emission = _merge_emissions(emissions)
             logger.info("findings: %s, finish=%s, %d chars, evidence %s",
                         emission["parse"], emission["finish"],
                         len(emission["raw"] or ""), emission["evidence"])

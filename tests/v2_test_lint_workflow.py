@@ -127,8 +127,6 @@ def test_a_dead_section_reference_in_runner_code_is_caught(tmp_path, monkeypatch
     assert any("§99" in f for f in found), found
 
 
-@pytest.mark.xfail(reason="v1 consumer: audit_review/runner.py cites METHOD \u00a712a still reads v2's METHOD. Rewritten with the downstream stages; the xfail is the reminder.",
-                   strict=False)
 def test_runner_code_references_resolve_now():
     for runner, doc in lw.RUNNERS.items():
         assert not lw.check_code_refs(runner, doc), runner

@@ -51,26 +51,92 @@ FIDELITY: Tuple[str, ...] = ("faithful", "overstates", "understates",
                              "unrelated")
 
 
-def review_schema() -> Dict[str, Any]:
-    """The response schema for the review call, per REVIEW.md §8."""
-    claim_check = {"type": "object", "properties": {
+def _claim_check() -> Dict[str, Any]:
+    return {"type": "object", "properties": {
         "claim_id": {"type": "integer", "minimum": 1},
         "fidelity": {"enum": list(FIDELITY)},
         "note": {"type": "string"}},
         "required": ["claim_id", "fidelity"]}
-    finding_review = {"type": "object", "properties": {
+
+
+def _finding_review() -> Dict[str, Any]:
+    props: Dict[str, Any] = {
         "claim_id": {"type": "integer", "minimum": 1},
         "exception": {"type": "string"},
         "finding_says": {"type": "string"},
-        "materials_show": {"type": "string"}}}
+        "materials_show": {"type": "string"}}
     for name, values in OBSERVATIONS.items():
-        finding_review["properties"][name] = {"enum": list(values)}
-    finding_review["required"] = ["claim_id", *OBSERVATIONS]
+        props[name] = {"enum": list(values)}
+    return {"type": "object", "properties": props,
+            "required": ["claim_id", *OBSERVATIONS]}
+
+
+# ---------------------------------------------------------------------------
+# ONE SCHEMA PER PART, AND THE WHOLE AS THEIR UNION.
+#
+# The review's three parts are independent — claim fidelity is over the claim
+# surface, the reviews are over findings, the record check is one statement
+# about the audit — so each can be asked for on its own. That is what makes
+# BATCHING A RUNNER DECISION rather than a schema change: a batch is a call for
+# `finding_reviews_schema` over ten findings instead of forty, and the runner
+# concatenates.
+#
+# It has to be built in from the start. Under constrained decoding a generation
+# cut at max_tokens is invalid JSON rather than a short answer, so the loss is
+# total; a review of two hundred findings that can only be asked for at once is
+# a review that cannot be recovered when it breaks. The audit's adjudication
+# call already takes a subset of claims for the same reason — its reprompt path
+# passes only the claims that got no finding.
+# ---------------------------------------------------------------------------
+
+def claim_checks_schema() -> Dict[str, Any]:
+    """Part one, or one batch of it: REVIEW.md §5 check 1."""
     return {"type": "object", "properties": {
-        "claim_checks": {"type": "array", "items": claim_check},
-        "finding_reviews": {"type": "array", "items": finding_review},
+        "claim_checks": {"type": "array", "items": _claim_check()}},
+        "required": ["claim_checks"]}
+
+
+def finding_reviews_schema() -> Dict[str, Any]:
+    """Part two, or one batch of it: REVIEW.md §5 checks 2 to 5."""
+    return {"type": "object", "properties": {
+        "finding_reviews": {"type": "array", "items": _finding_review()}},
+        "required": ["finding_reviews"]}
+
+
+def record_check_schema() -> Dict[str, Any]:
+    """Part three: REVIEW.md §7's one statement about the audit as a whole."""
+    return {"type": "object", "properties": {
+        "record_check": {"type": "string"}},
+        "required": ["record_check"]}
+
+
+def review_schema() -> Dict[str, Any]:
+    """All three parts in one response, for a review small enough to ask at once."""
+    return {"type": "object", "properties": {
+        "claim_checks": {"type": "array", "items": _claim_check()},
+        "finding_reviews": {"type": "array", "items": _finding_review()},
         "record_check": {"type": "string"}},
         "required": ["claim_checks", "finding_reviews", "record_check"]}
+
+
+def merge_parts(parts: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    """Assemble batch responses into the one object `check_review` reads.
+
+    Arrays concatenate in the order the batches were asked for; `record_check`
+    takes the last non-empty one. Duplicates are NOT removed here — a claim
+    reviewed twice is a defect `check_review` reports, and silently collapsing
+    it would hide a batch boundary that went wrong.
+    """
+    out: Dict[str, Any] = {"claim_checks": [], "finding_reviews": [],
+                           "record_check": ""}
+    for part in parts:
+        if not isinstance(part, dict):
+            continue
+        out["claim_checks"].extend(part.get("claim_checks") or [])
+        out["finding_reviews"].extend(part.get("finding_reviews") or [])
+        if (part.get("record_check") or "").strip():
+            out["record_check"] = part["record_check"]
+    return out
 
 
 def derive_outcomes(obj: Dict[str, Any]) -> Dict[str, Any]:

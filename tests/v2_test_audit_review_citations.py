@@ -1,3 +1,19 @@
+import pytest
+
+pytest.skip(
+    "v1 review internals, gone with the v2 rewrite. This module tested "
+    "audit_review.runner's own citation resolution — resolve_citations, "
+    "resolve_quotes, the Exception-block regexes, REVIEWERS_REQUIRED — none "
+    "of which the v2 review has. Citations are resolved once, by the audit, "
+    "in claims_audit/schemas.py, and REVIEW.md §4 tells the reviewer they are "
+    "already settled.\n\n"
+    "WHAT STILL NEEDS COVER, and where it is: quote-against-span matching and "
+    "markdown normalisation are pinned in v2_test_coverage_ledger.py; a quote "
+    "assembled from two documents fails there because it matches no single "
+    "span. The retest is now workflowsv2/audit_review/runner.py:standings and "
+    "has no test yet — that is a real gap, not a covered case.",
+    allow_module_level=True)
+
 """Tests for the audit reviewer's citation resolver.
 
 On 2026-08-26 a review of `m1_qwen_2` returned "supported 1 of 15, FAIL" on a
