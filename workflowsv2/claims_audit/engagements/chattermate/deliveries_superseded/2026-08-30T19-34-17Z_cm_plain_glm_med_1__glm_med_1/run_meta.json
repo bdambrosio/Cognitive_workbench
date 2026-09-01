@@ -1,0 +1,42 @@
+{
+  "captured_at_utc": "2026-08-30T23-08-15Z",
+  "delivered_for": "2026-08-30T19-34-17Z_cm_plain_glm_med_1",
+  "model_config": "measure/models/or_glm53flash.yaml",
+  "resolved_model": "z-ai/glm-5.3-flash",
+  "wall_clock_s": 8.2,
+  "legs": [
+    {
+      "leg": 1,
+      "exit_reason": "respond",
+      "reply_chars": 2580,
+      "blocks": [
+        "COVER",
+        "SECTION NOTES",
+        "COVERAGE"
+      ]
+    }
+  ],
+  "blocks_delivered": {
+    "COVER": true,
+    "SECTION NOTES": true,
+    "COVERAGE": true
+  },
+  "groups_issued": [
+    "group1",
+    "group2",
+    "group3",
+    "group4"
+  ],
+  "groups_written": [
+    "group1",
+    "group2",
+    "group3",
+    "group4"
+  ],
+  "citations_unresolved": [
+    "ticket_investigator.py:628-635",
+    "ticket.py:755-767",
+    "package.json:17-18"
+  ],
+  "error": null
+}

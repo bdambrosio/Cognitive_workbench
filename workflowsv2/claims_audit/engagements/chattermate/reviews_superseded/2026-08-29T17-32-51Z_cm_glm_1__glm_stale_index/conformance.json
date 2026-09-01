@@ -1,0 +1,38 @@
+{
+  "recommendation": "Conditional",
+  "blocks closed": {
+    "REPORT": true,
+    "LIMITATIONS": true,
+    "GAP MAP": true
+  },
+  "blocks not closed": [],
+  "METHOD \u00a76 verdicts only": true,
+  "off_vocabulary": [],
+  "limitations statement": true,
+  "gap map present": true,
+  "METHOD \u00a715 elements missing": [],
+  "evidence fields": 10,
+  "evidence fields pointing nowhere": [],
+  "findings": [
+    {
+      "n": 1,
+      "verdict": "delta"
+    },
+    {
+      "n": 2,
+      "verdict": "delta"
+    },
+    {
+      "n": 3,
+      "verdict": "partial"
+    },
+    {
+      "n": 4,
+      "verdict": "partial"
+    },
+    {
+      "n": 5,
+      "verdict": "partial"
+    }
+  ]
+}

@@ -1,0 +1,107 @@
+{
+  "reviewed_run": "2026-08-29T18-02-44Z_cm_glm_2",
+  "world": "review_cm_glm_2_newdoc",
+  "model_config": "measure/models/local_qwen38flashnext_med.yaml",
+  "resolved_model": "primitive-ai/Qwen3.8-Flash-Next-NVFP4",
+  "top_p": 0.95,
+  "target": "/home/bruce/Downloads/Cognitive_workbench/targets/chattermate",
+  "target_rev": "ac1a7588109749e15671cab4a5f667863ac7d530",
+  "harness_rev": "8af2a717645431e0d301054b593d52e483cd681d",
+  "finish_length_events": 0,
+  "citations_total": 127,
+  "citations_broken": 1,
+  "scheme": {
+    "line_refs": 127,
+    "line_refs_resolving": 126,
+    "line_refs_exceeding_file_length": 1,
+    "by_document": {
+      "tools/guardrailed_db_toolkit.py": {
+        "refs": 1,
+        "exceeding": 1,
+        "max_cited": 355,
+        "file_lines": "guardrailed_db_toolkit.py has 280 lines"
+      }
+    },
+    "quotes": 9,
+    "quotes_resolving": 6,
+    "quotes_contiguous": 6,
+    "consistent_with_line_numbering": false
+  },
+  "findings_parsed": 52,
+  "confirmation": {
+    "ran": true,
+    "error": null,
+    "world": "review_cm_glm_2_newdoc_confirm",
+    "reviewers_required": 2,
+    "resolved_models": [
+      "primitive-ai/Qwen3.8-Flash-Next-NVFP4"
+    ],
+    "wall_clock_s": 120.7,
+    "replies": [
+      "report:54-55: [broken citation] \u2014 `tools/guardrailed_db_toolkit.py` is 280 lines; the cited range 355\u2013369 does not exist there (mask_rows is applied at line 273 of that file, and defined at `sql_guardrails.py:355\u2013369`, so the finding's second evidence reference points past the end of its named file)."
+    ],
+    "results": [
+      {
+        "finding": "F12",
+        "lines": "54-55",
+        "verdict": "broken citation",
+        "other_verdicts": [
+          "broken citation"
+        ],
+        "agreeing": 2,
+        "of": 2,
+        "accepted_as_failed": true
+      }
+    ],
+    "accepted_as_failed": 1,
+    "failed_findings": 1
+  },
+  "blocks_prompted": {
+    "REVIEW SURFACE": 0,
+    "REVIEW": 1,
+    "LIMITATIONS": 0,
+    "SUMMARY": 0
+  },
+  "blocks_delivered": {
+    "REVIEW SURFACE": true,
+    "REVIEW": true,
+    "LIMITATIONS": true,
+    "SUMMARY": true
+  },
+  "blocks_closed": {
+    "REVIEW SURFACE": true,
+    "REVIEW": true,
+    "LIMITATIONS": true,
+    "SUMMARY": true
+  },
+  "legs": [
+    {
+      "leg": 1,
+      "exit_reason": "respond",
+      "reply_chars": 6439,
+      "blocks": [
+        "REVIEW SURFACE"
+      ]
+    },
+    {
+      "leg": 2,
+      "exit_reason": "yield",
+      "reply_chars": 4380,
+      "blocks": [
+        "REVIEW",
+        "LIMITATIONS"
+      ]
+    },
+    {
+      "leg": 3,
+      "exit_reason": "respond",
+      "reply_chars": 3338,
+      "blocks": [
+        "SUMMARY"
+      ]
+    }
+  ],
+  "wall_clock_s": 1702.0,
+  "error": null,
+  "captured_at_utc": "2026-08-30T19-07-16Z"
+}

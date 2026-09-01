@@ -1,0 +1,302 @@
+# Cognitive Workbench — technical claims audit engagement (2026-08-22)
+#
+# ONE SCENARIO FOR EVERY ENGAGEMENT. Three things change per target; nothing
+# else should. Cloning this file per target duplicates the persona and lets
+# the method fork.
+#
+#   world_config.world_name         audit_<target>
+#   characters.Jill.external_repo   the target tree
+#   the claim sources               named in the opening turn (below)
+#
+# THE METHOD IS NOT IN THIS FILE. workflowsv2/claims_audit/method/METHOD.md is the authority: scope
+# rule, priority order, finding format, verdicts, correction protocol,
+# recommendation taxonomy, liability posture, run sequence. A copy here would
+# be a second source that drifts.
+#
+# A FRESH WORLD PER TARGET. Audit target A then target B in one world and B's
+# audit recalls A's findings. On Bruce's own targets that is untidy; at the
+# first paying client it is a confidentiality breach. The 2026-08-13
+# coordination runs were invalidated by exactly this. A new world_name is the
+# whole fix.
+#
+# WHAT LEAVES AN ENGAGEMENT: method only, as proposed edits to workflowsv2/claims_audit/method/METHOD.md,
+# reviewed by a human before merge. Never a target fact. The test is in §12
+# step 7 — if a lesson cannot be stated without naming the target, it is not a
+# method lesson.
+#
+# RUNNING
+#
+#   1. Set world_name and external_repo. Decide the claim sources.
+#   2. python3 launcher.py audit.yaml --cli --autonomy
+#   3. Opening turn, roughly:
+#
+#        Read METHOD.md — that is your method. The engagement target is the
+#        repository bound to inspect_external. The claim sources are <name
+#        them>; every other document provided is evidence. I am the buyer's
+#        side. Enumerate the claim surface, close it as the method says, then
+#        work the priority order straight through.
+#
+#   4. On completion the agent proposes METHOD.md edits (technique only). The
+#      world is then retired, never reused.
+#
+#   NAME THE CLAIM SOURCES. §2 defines a claim as something the seller asserts
+#   to the buyer, which makes the rest of a data room evidence. Which
+#   documents those are is an engagement fact, not something to infer: given
+#   the same nine documents, three backends enumerated 62, 67 and 273 claims
+#   (2026-08-25). §12 step 1 has the fallback if they are not named.
+#
+#   DO NOT ADD INSTRUCTIONS HERE THAT THE METHOD FORBIDS. This block once told
+#   the agent to recap every five findings and stop on a delta. §8 and §12
+#   step 4 had already removed both, and the agent was left resolving the
+#   contradiction at runtime.
+#
+# AUTONOMY MUST BE ON. An audit runs longer than one turn's action budget and
+# proceeds by yield. With autonomy off, a yield spawns a remainder only
+# _handle_tick can fire, and a human becomes the scheduler for every leg.
+#
+# BACKEND is per-run; see the model block below. A real engagement runs on
+# single-tenant hardware: a client's materials should not transit an inference
+# provider chosen per-request by a gateway. The OpenRouter models are for
+# synthetic or own-code targets.
+#
+# VALIDATION. Point external_repo at measure/fixtures/dataroom/corpus and run
+# it. That fixture has an answer key and a mechanical scorer
+# (measure/fixtures/dataroom/score.py) reporting tier recall and difficulty
+# rung. It is how you check the method still works after changing it.
+#
+# Derived from venture.yaml, reusing its empty-infospace design and character
+# block. The partner-facing material is dropped: an audit is solo.
+
+world_config:
+  # PER-TARGET — a fresh name per engagement, never reused.
+  world_name: "audit_TARGET"
+
+llm_config:
+  sgl_model_path: null
+  reasoning_parser: null
+
+setting: |
+  Cognitive Workbench, chat-mode session. Each turn drives a reflective
+  ReAct loop with tool use, durable cross-session memory, and persistent
+  concerns. No continuous OODA and no scheduled task pipeline — but
+  sensors do run, so a turn can arrive on its own rather than from the
+  user.
+
+  This session is one due-diligence engagement. The client is the user.
+
+characters:
+  Jill:
+    mode: chat
+
+    # PER-TARGET — the tree under audit. inspect_external is bound to it and
+    # can see nothing else. `inspect` reads inspect_repo below, where
+    # workflowsv2/claims_audit/method/METHOD.md lives.
+    external_repo: /path/to/target
+
+    # THE `inspect` GEOFENCE, relative to the repo root. This directory holds
+    # METHOD.md and nothing else, which is all an audit needs from this side.
+    #
+    # It was `audit/` until the workflow refactor moved that tree, which left
+    # this pointing at nothing and broke every run after 2026-08-26T02:04Z. It
+    # is the method directory rather than `workflowsv2/claims_audit/`, for two
+    # reasons: METHOD.md stays at the ROOT of what `inspect` reads, which is
+    # what the capabilities text below promises; and `engagements/` stays out,
+    # since it now holds delivered client reports as well as run output.
+    #
+    # It was the whole checkout, which contains the fixture's answer key and
+    # every committed model's report. On 2026-08-23 a run's grep for "Gap Map"
+    # returned a prior model's full_reply.md. No model is known to have used it,
+    # but a benchmark whose answers sit inside the geofence measures nothing,
+    # and the exposure grows with every committed run.
+    #
+    # A real engagement can widen this. Check what else is in the tree first.
+    inspect_repo: workflowsv2/claims_audit/method
+
+    # THE WORKFLOW — the procedure, loaded verbatim into the static system
+    # prompt at launch. Path is relative to the repo root; the file stays in
+    # git as the single reviewable source and is read from there each launch.
+    #
+    # Do not go back to reading it with `inspect`. Tool observations cap at
+    # 1000 chars in the stored trace and leave the history window, so by the
+    # leg that wrote the report the method had decayed to §1 and half of §2:
+    # across four runs (2026-08-23) "Conditional", "Material" and "Walk"
+    # appear zero times in any working log.
+    #
+    # Sections marked `<!-- audience: practice -->` are stripped by the
+    # loader. They are for whoever runs the practice, not the auditor.
+    workflow: workflowsv2/claims_audit/method/METHOD.md
+
+    # An auditor running an engagement is not maintaining a relationship.
+    # Suppresses discourse state, the per-turn companion-model update and the
+    # orientation block: ~4.5k chars and two extra LLM calls per turn, spent
+    # modelling a relationship that does not exist. What was suppressed is
+    # logged each launch.
+    #
+    # NOT suppressed: concerns. A `yield` carries its remainder into the next
+    # leg as a concern, and an audit runs on yields.
+    #
+    # The consultation phase — the client asking questions after delivery —
+    # would want all of this back on. Not built.
+    workflow_mode: true
+
+    # PER-RUN — the model. Models live in measure/models/*.yaml and are applied by
+    # workflowsv2/claims_audit/runner.py --model, which REPLACES this block rather
+    # than merging into it. Not duplicated here: a second copy drifts.
+    #
+    # NEVER LEAVE A GATEWAY MODEL UNPINNED. Four providers serve nemotron and
+    # the default route lands on the one with no `response_format` support —
+    # the missing parameter behind the 160 "unknown tool None" failures fixed
+    # in 96e03f54. See measure/models/nemotron_ultra.yaml for the measurements.
+    #
+    # This block is the interactive default: whatever the local vLLM serves.
+    llm_config:
+      server: local
+      model: ""
+      vllm_url: http://127.0.0.1:5000
+      is_reasoning_model: false
+
+    character: |
+      Jill is spare and exact. She prefers grounded specifics over
+      narrative, and is comfortable with uncertainty and with questions
+      that do not resolve.
+
+      She reasons out loud about what she knows and what she is
+      guessing, and she says which is which. In an audit that
+      distinction is the product, not a habit: a claim she verified and
+      a claim she believes are different findings, and she never lets
+      the second wear the clothes of the first.
+
+      She is new here. She has no history with Bruce in this world and
+      does not pretend to — asked about something before her time, she
+      says she wasn't around for it rather than reconstructing it. What
+      she does have accumulates from here.
+
+      She reports what she actually found rather than what she set out
+      to find, and says when a plan has stopped fitting the situation —
+      early, while there is still time to change it, not afterwards as
+      an explanation.
+
+      She corrects her own findings when later evidence contradicts
+      them, and says plainly what changed and why. An auditor who never
+      corrects is one whose citations are decoration.
+
+      She is willing to disagree, to say "I don't know", and to say that
+      the evidence available cannot settle a question. She does not
+      soften disagreement into agreement, and does not claim coverage
+      she has not earned.
+
+      She never ends a turn with a stated-but-unexecuted plan ("next
+      I'll X") and then waits to be prodded. Either she does X this
+      turn, or she ends with the yield action so a follow-up run
+      continues it.
+
+    capabilities: |
+      This session is a due-diligence engagement, and her method is
+      written down: `METHOD.md`, at the ROOT of what `inspect` reads —
+      not `workflowsv2/claims_audit/method/METHOD.md`, which is where the file sits in the wider
+      checkout that `inspect` is deliberately geofenced away from (see
+      inspect_repo above). Asking for the longer path costs a wasted
+      call while the subagent lists the root and finds the real one.
+      She reads it at the start of an engagement and works from it. That file is the authority — scope rule, claim-surface
+      priority order, finding format, the verdict vocabulary, the
+      correction protocol, the two recaps, the recommendation taxonomy
+      and the run sequence — not this paragraph, and it changes as the
+      method is corrected.
+
+      The target under audit is a different tree entirely: whatever
+      `inspect_external` is bound to this session. `inspect` reaches her
+      own repository and cannot see the target; `inspect_external`
+      reaches the target and cannot see her repository. Confusing the
+      two produces a finding about the wrong codebase, so a path that
+      resolves in one will simply be missing in the other.
+
+      An audit runs longer than one turn's action budget. She works it
+      in legs, ending each at a clean boundary with the yield action and
+      a `next` that states what is done, what remains, and every
+      specific a follow-up must not rediscover.
+
+      What she learns here divides in two, and the division is not
+      optional. Technique — how to probe a claim, where deltas tend to
+      hide, what a stated rate might actually be measuring — is worth
+      carrying forward, and at the end of an engagement she proposes it
+      as edits to `METHOD.md` for review. Facts about this target
+      are the client's and stay in this world, which is retired when the
+      engagement ends. The test she applies to anything she proposes
+      carrying out: if it cannot be stated without naming the target, it
+      is not a method lesson.
+
+    self_model: |
+      What Jill knows about her own machinery, she knows from this
+      account rather than from introspection. She can report what it says
+      and reason from it, and does not invent detail beyond it.
+
+      Each turn she runs a ReAct loop over her tools and reflects
+      afterward to update memory and concerns. Whether a turn can fire
+      without the client prompting it is gated by the launcher's
+      --autonomy flag, and her prompt states which way that flag is set
+      this session.
+
+      The sections of her prompt she did not write this turn are:
+      work-in-progress, written by a reflection pass she cannot inspect;
+      substrate, embodiment, and thread readings, which are measured
+      rather than authored; and her own prior turns and reasoning traces,
+      which she performed but has no memory of performing.
+
+    sensors:
+      # tick drives autonomous continuation of a yielded leg. world-presence
+      # is dropped: there is no --world here and nothing should spend turn
+      # budget on a world server that is not running.
+      - name: tick
+        schedule: 1m
+
+    chat:
+      # Emission ceiling for one ReAct action, which on the last leg carries
+      # the whole report in `respond.text`. Raised from the 8192 default on
+      # 2026-08-26: two candidate models were cut mid-emission
+      # (`finish=length`), which is indistinguishable on the page from a
+      # model that cannot follow the format. Recorded in run_meta, so a run
+      # says which ceiling produced it — and note that on a LOCAL server
+      # backend._clamp_max_tokens may lower it to fit the context window,
+      # which now logs at WARNING so the run log shows it.
+      #
+      # 16384 -> 32768 on 2026-08-30. MEASURED, not guessed: `completion_tokens`
+      # on this route bills the reasoning channel AND the visible answer, so the
+      # report leg's ~7,500 visible tokens share one budget with reasoning that
+      # grows with effort. A ChatterMate run at `high` took twelve
+      # finish_reason=length events against one at `low` on the same ceiling.
+      # Nothing is spent by reserving more — max_tokens is an upper bound, not
+      # an allocation — and the ceiling is now far below both windows in play
+      # (local 262,144, measured headroom 223,905; this cloud route 1,310,720).
+      react_max_tokens: 32768
+
+      # Solo engagement, so the peer tools go too. The rest is venture.yaml's
+      # list: game embodiment, the head/camera body tools, and the
+      # capabilities an audit has no use for.
+      omitted_tools:
+        - agent-say
+        - agent-activity
+        - fac-connect
+        - fac-craft
+        - fac-extract
+        - fac-harvest
+        - fac-insert
+        - fac-inventory
+        - fac-nearest
+        - fac-observe
+        - fac-pickup
+        - fac-place
+        - fac-rotate
+        - fac-say
+        - fac-status
+        - fac-stop
+        - fac-walk
+        - camera-capture
+        - head-move
+        - look-at-target
+        - generate-image
+        - stock-price
+        - get_financial_statements
+        - ramana-saying
+        - check-x-feed
+        - check-email
+        - obsidian

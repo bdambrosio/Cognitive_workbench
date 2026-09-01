@@ -1,0 +1,49 @@
+# security-audit engagement: this workstation
+#
+# The first engagement, and the one that exists to make the workflow runnable
+# end to end. The target is Bruce's own machine.
+#
+# WHAT THE ENGAGEMENT SUPPLIES, and the method must not invent: which hosts are
+# in scope, and which probes are authorised on them. METHOD §12 makes
+# authorisation a precondition and makes it per probe — a probe not listed here
+# is recorded `not run`, in the collection, with the reason.
+
+hosts:
+  - localhost
+
+# AUTHORISED PROBES. Every one is read-only and comes from the fixed set in
+# src/chat/subagents/security.py, which Sentinel already runs under the same
+# discipline: hardcoded argv, no shell, no argument supplied by a model.
+#
+# The three `sudo -n` probes need a sudoers grant. Without it they return
+# `unauthorised` rather than failing the run, and METHOD §10 then bars the
+# strongest conclusion unless LIMITATIONS says which layer is uncovered.
+probes:
+  # unprivileged — network surface
+  - sockets
+  - udp_sockets
+  - routes
+  - arp
+  - interfaces
+  # unprivileged — host state
+  - processes
+  - enabled_units
+  - failed_units
+  - timers
+  - containers
+  - os_release
+  - kernel
+  - upgradable
+  - suid
+  # privileged, read-only, fenced through `sudo -n`
+  - firewall
+  - listener_owners
+  - apparmor
+
+# NOT AUTHORISED HERE, deliberately: auth_failures, logins, privilege_events.
+# All three read journal entries about people. METHOD §12 says a collection
+# carries system state and never user data, and who logged in when is closer to
+# the second than the first. Add them to a specific engagement if the question
+# needs them, and say so in the brief.
+
+retention: keep — own machine, no client material

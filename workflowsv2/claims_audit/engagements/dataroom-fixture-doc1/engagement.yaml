@@ -1,0 +1,24 @@
+# claims-audit engagement: dataroom-fixture-doc1
+#
+# The synthetic FlowMetrics data room, with the claim surface split by source
+# document. Same nine documents and same target as dataroom-fixture; the only
+# difference is that this engagement declares ONE claim source instead of
+# three.
+#
+# WHY THE SPLIT EXISTS. A single run enumerates the surface of all three claim
+# sources at once, and the count is unstable across models. These three
+# engagements run the same audit one claim source at a time so the surfaces can
+# be compared against a single run and against each other. Citation finding is
+# unaffected: the target is still the whole data room, because the evidence for
+# a claim in one document usually sits in another.
+#
+# Compare with measure/fixtures/dataroom/overlap.py, which compares surfaces by
+# the lines they cite rather than by how many claims they contain.
+
+target: measure/fixtures/dataroom/corpus
+
+# ONE CLAIM SOURCE. brief.md says the same in words and must stay in step.
+claim_sources:
+  - doc1_seller_listing_description.md
+
+retention: keep — synthetic, no client material
