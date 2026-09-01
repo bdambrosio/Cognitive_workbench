@@ -69,9 +69,11 @@ Read the claim source and enumerate every assertion in it the seller makes about
 - **`lines`** — where that quote sits in the claim source, as a start and end line number.
 - **`statement`** — the claim in your own plain words, so a reader knows what is being tested.
 
-**Where to divide the text into claims.** Split assertions apart where different evidence could give them different verdicts. Keep them together where they stand or fall on the same evidence.
+**Where to divide the text into claims.** Split assertions apart where different evidence could give them different verdicts. Keep them together where they stand or fall on the same evidence. **Do not split one assertion into artificial parts**, and do not combine separate assertions because they share a subject. Both are faults, and the second is not worse than the first.
 
-Sharing a subject is not a reason to combine: "backups run daily" and "backups are retained 30 days" are settled by different evidence and are two claims.
+> "Backups run daily with 30-day retention" is **two** claims. The schedule and the retention period are settled by different evidence, and one can hold while the other fails. Sharing a sentence is not a reason to combine.
+>
+> "Platform-level redundancy and automatic failover" is **one** claim. Both stand or fall on whether replicas exist, and one line of the infrastructure config settles both. Sharing a subject is not, by itself, a reason to combine — but being settled by the same evidence is.
 
 **Enumerate before you adjudicate, and enumerate everything.** At this point you have not tested any claim, so you cannot know which will hold. A claim that looks obviously true, or obviously false, or impossible to check, is enumerated exactly like the rest.
 
@@ -83,13 +85,15 @@ Every finding carries exactly one.
 
 | Verdict | Meaning |
 |---|---|
-| `real` | The evidence bears the claim out, and there is nothing a reader needs beside it |
+| `real` | The evidence supports the claim without a reportable caveat |
 | `real_with_caveat` | Every part of the claim is borne out, and the evidence shows something a reader must know to read the claim correctly |
-| `partial` | A part of the assertion is not borne out, and you can name which part |
+| `partial` | The claim is substantially true and has a specific, citable gap |
 | `contradicted` | The claim is false — the claim source says one thing and the evidence shows another |
 | `unverifiable` | The claim was attempted and the supplied materials cannot settle it |
 
-**Choosing between `partial` and `real_with_caveat`.** Ask whether you can point at a part of the assertion the evidence does not bear out. If you can, the verdict is `partial`. If every part holds and there is still something to say, it is `real_with_caveat`.
+**A gap must be citable, not merely unfound.** `partial` requires evidence you can point at showing the gap. Evidence you looked for and did not find is not a gap — that is `unverifiable`, and §8 governs it. The distinction is the same one that separates `unverifiable` from `contradicted`, and it is as easy to get wrong here.
+
+**Choosing between `partial` and `real_with_caveat`.** Ask whether you can cite a part of the assertion the evidence shows is not borne out. If you can, the verdict is `partial`. If every part holds and there is still something to say, it is `real_with_caveat`.
 
 > "Blended MRR is $40,000", against $16,000 from the payment processor and three wire transfers of $8,000. Every part of the assertion holds; the total is $40,000. That 60% of it arrives by manual wire from three customers is not a failure of the claim, and a reader must know it. `real_with_caveat`.
 >
@@ -355,6 +359,23 @@ from three customers is the case, and it is a finding three earlier runs
 missed entirely. `partial` would be wrong — no part of the assertion fails —
 and `real` would be misleading. What changed is that the boundary is now a
 test rather than a magnitude: can you name a part of the assertion that fails?
+
+### The v2 wordings lowered the evidential bar, twice
+
+Rewriting §6 for v2 replaced two v1 phrasings that each demanded positive
+evidence with ones satisfied by less:
+
+    real     "without a reportable caveat"  ->  "nothing a reader needs"
+    partial  "specific, citable material gap" -> "a part is not borne out"
+
+Both were unintended. `reportable` is a judgement about what is worth
+reporting; `needs` is met by almost any fact, which invites a model out of
+`real` — GLM used `real` zero times in seventeen findings. And "not borne out"
+is satisfied by silence, which makes an unsettled claim recordable as adverse:
+the error §6 warns about one row above, written into the row itself.
+
+v1's wordings are restored, less `material`, which moved downstream with the
+materiality judgement and was not the word doing the work.
 
 ### `delta` was the word for a contradicted claim
 
