@@ -53,23 +53,63 @@ def test_a_verdict_outside_method_6_is_caught():
     assert not c["ok"] and c["bad_verdicts"] == ["mostly true"]
 
 
-def test_the_checks_actually_execute_on_a_delivered_transcript(tmp_path):
-    """The regression that motivated extracting them: inline code referencing a
-    variable assigned twenty lines later, wrapped so the failure was silent."""
-    whole = SURFACE + "\n\n=== REPORT ===\nbody\n=== END REPORT ===\n\n" + LEDGER
-    got = post_run_checks(tmp_path, whole, str(tmp_path))
-    assert got["coverage"] is not None, "the coverage check did not run"
-    assert got["coverage"]["ok"], got["coverage"]["problems"]
-    assert got["citations"] is not None, "the citation check did not run"
+# --- The runner's post-run check, over the v2 output --------------------------
+#
+# These pin the regression that motivated extracting the checks in the first
+# place: inline code referencing a variable assigned twenty lines later,
+# wrapped so the failure was silent. The checks now read typed output instead
+# of a transcript, and "did they run at all" is the same question.
+
+def _corpus(tmp_path):
+    d = tmp_path / "corpus"
+    d.mkdir()
+    (d / "src.md").write_text("alpha claim one\nbeta claim two\n")
+    (d / "ev.md").write_text("the evidence line\n")
+    return d
 
 
-def test_a_bad_ledger_is_written_to_the_issue_log(tmp_path):
+_FROZEN = [{"id": 1, "quote": "alpha claim one", "lines": [1, 1],
+            "statement": "one"},
+           {"id": 2, "quote": "beta claim two", "lines": [2, 2],
+            "statement": "two"}]
+
+
+def _finding(cid):
+    return {"claim_id": cid,
+            "adjudication": {"verdict": "delta", "gap": "g"},
+            "evidence": [{"form": "citation", "document": "ev.md",
+                          "lines": [1, 1], "quote": "the evidence line",
+                          "shows": "s"}]}
+
+
+def test_the_checks_actually_execute_on_v2_output(tmp_path):
+    corpus = _corpus(tmp_path)
+    obj = {"claim_source": "src.md", "findings": [_finding(1), _finding(2)]}
+    got = post_run_checks(obj, corpus, "src.md", _FROZEN, tmp_path)
+    assert got is not None, "the output check did not run"
+    assert got["ok"], got["problems"]
+    assert got["figures"]["frozen_claims"] == 2
+    assert got["figures"]["adjudicated"] == 2
+
+
+def test_a_claim_with_no_finding_is_written_to_the_issue_log(tmp_path):
+    """The check freezing buys: v1 could not tell an unenumerated claim from
+    an unadjudicated one, because one pass produced both."""
     from workflowsv2 import issues
-    whole = SURFACE + "\n\n" + LEDGER.replace("3. [partial]", "3. [partial]\n3. [real]")
-    post_run_checks(tmp_path, whole, str(tmp_path))
+    corpus = _corpus(tmp_path)
+    obj = {"claim_source": "src.md", "findings": [_finding(1)]}
+    got = post_run_checks(obj, corpus, "src.md", _FROZEN, tmp_path)
+    assert not got["ok"]
+    assert any("claim 2" in p and "no finding" in p for p in got["problems"]), \
+        got["problems"]
     rows = issues.read(tmp_path)
-    assert any(r["code"] == "coverage_ledger" and r["severity"] == "blocking"
+    assert any(r["code"] == "output_check" and r["severity"] == "blocking"
                for r in rows), rows
+
+
+def test_an_unparseable_emission_is_not_silently_clean(tmp_path):
+    got = post_run_checks(None, _corpus(tmp_path), "src.md", _FROZEN, tmp_path)
+    assert not got["ok"] and got["problems"]
 
 
 
@@ -194,13 +234,12 @@ def test_a_title_parenthesis_is_not_read_as_a_claim_list():
     assert c["ok"], c["problems"]
 
 
-def test_the_findings_check_runs_and_logs_a_blocking_issue(tmp_path):
-    from workflowsv2 import issues
-    whole = SURFACE + "\n\n" + REPORT.replace(
-        "**Finding 2 (claim 2): b holds with a caveat — [real, minor caveat]**\n\n", "") + "\n\n" + LEDGER
-    got = post_run_checks(tmp_path, whole, str(tmp_path))
-    assert got["findings"] is not None, "the findings check did not run"
-    assert not got["findings"]["ok"]
-    rows = issues.read(tmp_path)
-    assert any(r["code"] == "findings_ledger" and r["severity"] == "blocking"
-               for r in rows), rows
+def test_a_finding_naming_an_unfrozen_claim_is_caught(tmp_path):
+    """A finding may only adjudicate a claim the frozen surface holds."""
+    corpus = _corpus(tmp_path)
+    obj = {"claim_source": "src.md",
+           "findings": [_finding(1), _finding(2), _finding(7)]}
+    got = post_run_checks(obj, corpus, "src.md", _FROZEN, tmp_path)
+    assert not got["ok"]
+    assert any("claim_id 7" in p for p in got["problems"]), got["problems"]
+

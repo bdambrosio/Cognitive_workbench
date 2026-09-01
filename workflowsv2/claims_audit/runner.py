@@ -5,10 +5,27 @@
     python3 workflowsv2/claims_audit/runner.py --world dataroom_2 \
             --model measure/models/nemotron_fp8.yaml --max-turns 20
 
-Loads `workflowsv2/claims_audit/scenario.yaml`, points `inspect_external` at the fixture
-corpus, gives the brief as the opening turn, then drives "continue" for as
-long as the agent keeps yielding. Writes the reply and the trace next to the
-run so `score.py` can read them.
+Loads `workflowsv2/claims_audit/scenario.yaml` and points `inspect_external` at
+the target. A run has three parts, in this order:
+
+  1. ENUMERATE. One schema-constrained call over the claim source, no tools
+     and no legs, producing `claims.json`. The surface freezes here.
+  2. GATHER. The brief and the frozen surface open the engagement; the agent
+     works the corpus with tools for as long as it keeps yielding.
+  3. ADJUDICATE. One schema-constrained call over the frozen surface and the
+     evidence gathered, producing `findings.json`.
+
+WHY THE RUNNER MAKES THE TWO EMISSIONS RATHER THAN THE AGENT. The deliverables
+are schema-enforced, and a ReAct action's payload field is not — it is
+`additionalProperties` on an action schema, and stuffing a document into it is
+a documented death spiral. Tools gather; the emissions answer under their own
+schema.
+
+WHY THE SURFACE FREEZES BEFORE ANY EVIDENCE IS READ (METHOD §5). Enumerating
+while adjudicating means choosing what counts as a claim with the verdicts
+already in view, which is choosing the sample after seeing the result. Freezing
+also buys the check that v1 could not make: a claim adjudicated by no finding
+is visible, because the surface says it existed.
 
 WHY A RUNNER AND NOT --cli. The interactive path needs a human to paste the
 brief and press return between legs. A benchmark needs the same input every
@@ -37,7 +54,7 @@ import shutil
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Sequence, Tuple
 
 HERE = Path(__file__).resolve().parent          # workflowsv2/claims_audit
 REPO = HERE.parent.parent
@@ -48,15 +65,23 @@ import yaml                                                    # noqa: E402
 
 SCENARIO = HERE / "scenario.yaml"
 ENGAGEMENTS = HERE / "engagements"
+#: The method the agent works to, and the system prompt of both emission
+#: calls. Read from one place so a run cannot be driven by one text and
+#: adjudicated under another.
+METHOD_PATH = "workflowsv2/claims_audit/method/METHOD.md"
+
 SOURCE = "User"
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger("dataroom.run")
 logger.setLevel(logging.INFO)
 
-# DELIVERY IS BY BLOCK (METHOD §16), not by turn boundary. `workflowsv2/blocks.py`
-# holds the vocabulary and the reason; this file only drives it.
-from workflowsv2 import blocks                                   # noqa: E402
+# DELIVERY IS BY SCHEMA (METHOD §13), not by marker and not by turn boundary.
+# `schemas.py` holds the contract and the reason; this file only drives it.
+from chat.workflow import load_workflow                          # noqa: E402
+from workflowsv2 import issues                                    # noqa: E402
+from workflowsv2.claims_audit import schemas                     # noqa: E402
+from utils.json_utils import repair_json_string                 # noqa: E402
 
 # The brief lives with its engagement, in engagements/<name>/brief.md — it is
 # what a client says, and it differs per engagement. Its history travels with
@@ -496,96 +521,162 @@ def log_incoming(path: Path, leg: int, sent: str, reason: str,
 
 
 
-def post_run_checks(out: Path, whole: str, external_repo: str) -> Dict[str, Any]:
-    """The two file-operation checks, on the delivered blocks.
+def numbered(path: Path) -> str:
+    """A document with the line numbers its citations refer to.
 
-    A FUNCTION WITH ARGUMENTS, NOT INLINE CODE. Both of these were inline
-    against `whole` and were placed above the line that assigns it, so every
-    run since they were added raised UnboundLocalError and skipped both —
-    silently, because each is wrapped to never lose a report. The citation
-    check had therefore never run at all. Taking what they read as parameters
-    is what makes that impossible and makes them testable without a model.
+    The evidence traces already carry this form — `inspect_external`'s reader
+    emits `9|text`. The claim source is handed over the same way so a claim's
+    `lines` is read off the same rendering the evidence was.
     """
-    from workflowsv2 import coverage as _cov, issues as _iss
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    return "\n".join(f"{n}|{t}" for n, t in enumerate(lines, 1))
 
-    # THE COVERAGE FIGURES ARE ARITHMETIC OVER THE LEDGER, NOT THE MODEL'S.
-    # METHOD §16's COVERAGE block carries one verdict per claim. The check
-    # NAMES the defect — a claim appearing twice, a claim in the surface and
-    # absent from the ledger — because "the numbers disagree" sends a person
-    # back through the whole report. Nothing is corrected: which claim was
-    # doubled is a judgement about the surface.
-    coverage_check = None
+
+def gathered_evidence(traces: Path, budget: int) -> Dict[str, Any]:
+    """The engagement's evidence requests and what they returned.
+
+    WHY THE TRACES AND NOT THE TARGET. Handing the emission call the corpus
+    would make it a single-call audit that never used the legs — the fixture is
+    11 kB and would fit, and a real target would not. The traces are what this
+    run actually looked at, which is also what METHOD §14 calls the working
+    papers.
+    """
+    files = sorted(traces.glob("inspect_external_*.txt")) if traces.is_dir() else []
+    kept, used = [], 0
+    for f in files:
+        t = f.read_text(encoding="utf-8", errors="replace")
+        if used + len(t) > budget:
+            break
+        kept.append(t)
+        used += len(t)
+    return {"text": "\n\n".join(kept), "files": len(files),
+            "included": len(kept), "chars": used}
+
+
+def _emit(loop, system: str, user: str, schema: Dict[str, Any],
+          max_tokens: int) -> Dict[str, Any]:
+    """One schema-constrained call, parsed, with everything that could have
+    silently degraded it recorded.
+
+    OUTSIDE THE ReAct LOOP, DELIBERATELY. `REACT_ACTION_SCHEMA` leaves `text`
+    unconstrained by design, and a large payload stuffed into an action field
+    is a documented death spiral — seven identical retries and six minutes for
+    zero progress (subagents/subagent.py). These calls use no tools and answer
+    under their own schema instead. It is the shape
+    `src/tools/look-at-target/tool.py` already uses, and the shape
+    `measure/form_grid`'s adjudicate arm holds form in.
+    """
+    before = set(getattr(loop.backend, "_param_drops", set()))
+    raw = loop.backend.chat(
+        [{"role": "system", "content": system},
+         {"role": "user", "content": user}],
+        max_tokens=max_tokens, response_schema=schema)
+    dropped = sorted(set(getattr(loop.backend, "_param_drops", set())) - before)
+    obj, how, err = None, None, None
     try:
-        surface = blocks.content(whole, "CLAIM SURFACE", blocks.BLOCKS) or ""
-        covblk = blocks.content(whole, "COVERAGE", blocks.BLOCKS) or ""
-        coverage_check = _cov.check(surface, covblk)
-        if not coverage_check["ok"]:
-            for problem in coverage_check["problems"]:
-                logger.warning("coverage: %s", problem)
-                _iss.note(out, "claims_audit", "coverage_ledger", problem,
-                          severity="blocking")
+        obj, how = json.loads(raw), "parsed"
+    except Exception as e:                                     # noqa: BLE001
+        err = f"{type(e).__name__}: {e}"
+        repaired = repair_json_string(raw)
+        if isinstance(repaired, dict):
+            obj, how = repaired, "repaired"
         else:
-            logger.info("coverage: %s",
-                        _cov.statement(coverage_check["figures"]))
-    except Exception as e:                                     # noqa: BLE001
-        logger.warning("coverage check skipped (%s: %s)", type(e).__name__, e)
+            obj = schemas.salvage_findings(raw)
+            how = "salvaged" if obj else "unparseable"
+    return {"raw": raw, "obj": obj, "parse": how, "parse_error": err,
+            "finish": getattr(loop.backend, "last_finish_reason", None),
+            "response_format_dropped": dropped}
 
-    # WHETHER EVERY CLAIM WITH A VERDICT IS BACKED BY A FINDING THAT CITES IT.
-    # The check above proves the ledger accounts for the surface; this proves
-    # no verdict was asserted without evidence. Traceability, not ratios: a
-    # finding may bear on several claims and a claim on several findings.
-    # Reasoning in workflowsv2/coverage.findings_check.
-    findings_check = None
-    try:
-        report_blk = blocks.content(whole, "REPORT", blocks.BLOCKS) or ""
-        covblk2 = blocks.content(whole, "COVERAGE", blocks.BLOCKS) or ""
-        findings_check = _cov.findings_check(report_blk, covblk2)
-        if not findings_check["ok"]:
-            for problem in findings_check["problems"]:
-                logger.warning("findings: %s", problem)
-                _iss.note(out, "claims_audit", "findings_ledger", problem,
-                          severity="blocking")
-        else:
-            logger.info("findings: %d findings for %d claims in the ledger",
-                        findings_check["claim_findings"],
-                        findings_check["ledger_claims"])
-    except Exception as e:                                     # noqa: BLE001
-        logger.warning("findings check skipped (%s: %s)", type(e).__name__, e)
 
-    # WHETHER THE REPORT'S CITATIONS RESOLVE, decided by a file operation.
-    # METHOD §12 step 6b says a finding with an invalid citation does not ship,
-    # and three shipped on 2026-08-30 past both the agent's own check and an
-    # independent review. This does not gate: a truncated citation is not a
-    # reason to throw away the work.
-    citation_check = None
-    try:
-        from workflowsv2.citations import resolve_citations
-        tgt = Path(external_repo)
-        if tgt.is_dir():
-            res = resolve_citations(
-                blocks.content(whole, "REPORT", blocks.BLOCKS) or "", tgt)
-            rows = res.get("citations") or []
-            bad = [c.get("cited") for c in rows
-                   if str(c.get("resolved")).lower() == "false"]
-            # A citation naming a file that exists several times is resolved
-            # against the one holding the lines and is NOT reported. Someone
-            # verifying opens two files instead of one; that is a wish, not a
-            # defect, and there is no version of this audit worth failing for
-            # it.
-            citation_check = {"total": len(rows), "unresolved": bad}
-            if bad:
-                logger.warning("%d of %d citations did not resolve: %s",
-                               len(bad), len(rows), ", ".join(map(str, bad)))
-                _iss.note(out, "claims_audit", "citations_unresolved",
-                          f"{len(bad)} of {len(rows)} citations did not "
-                          "resolve against the materials: "
-                          + ", ".join(map(str, bad)),
-                          severity="check", citations=bad)
-    except Exception as e:                                     # noqa: BLE001
-        logger.warning("citation check skipped (%s: %s)", type(e).__name__, e)
+def emit_surface(loop, method_text: str, claim_source: Path,
+                 max_tokens: int) -> Dict[str, Any]:
+    """Phase one: enumerate the claims, before any evidence is gathered.
 
-    return {"coverage": coverage_check, "citations": citation_check,
-            "findings": findings_check}
+    NO TOOLS AND NO LEGS. Enumeration is reading one document, which the runner
+    can hand over directly and line-numbered. Giving the agent a tool loop to
+    fetch a document the runner already has would add a failure mode and buy
+    nothing — and it would put evidence in front of the enumeration, which is
+    the ordering METHOD §5 freezes against.
+    """
+    user = (f"The claim source for this run is `{claim_source.name}`. Its "
+            f"text, with the line numbers your citations refer to:\n\n"
+            f"{numbered(claim_source)}\n\n"
+            f"Emit the claim surface now, per METHOD \u00a75 and \u00a713. You "
+            f"have gathered no evidence and formed no verdicts; enumerate "
+            f"every assertion the seller makes about the target.")
+    out = _emit(loop, method_text, user, schemas.surface_schema(), max_tokens)
+    out["phase"] = "surface"
+    return out
+
+
+def emit_findings(loop, method_text: str, claim_source: Path,
+                  frozen: Sequence[Dict[str, Any]],
+                  traces: Path, max_tokens: int,
+                  evidence_budget: int = 120_000) -> Dict[str, Any]:
+    """The one schema-constrained call that produces the deliverable.
+
+    OUTSIDE THE ReAct LOOP, DELIBERATELY. `REACT_ACTION_SCHEMA` leaves `text`
+    unconstrained by design, and a large payload stuffed into an action field
+    is a documented death spiral — seven identical retries and six minutes for
+    zero progress (subagents/subagent.py). The gathering legs use tools; this
+    call uses none and answers under the audit schema instead. It is the shape
+    `src/tools/look-at-target/tool.py` already uses, and the shape
+    `measure/form_grid`'s adjudicate arm holds form in.
+
+    LARGE READ, BOUNDED WRITE. Every collapse on record tracks how much was
+    being generated, never how much was read: 30 of 30 whole findings at 30,000
+    characters of context, against a live run breaking inside a 13,767-char
+    generation. This call is built to sit on the safe side of that.
+    """
+    ev = gathered_evidence(traces, evidence_budget)
+    user = (
+        f"The claim source for this run is `{claim_source.name}`. Its text, "
+        f"with the line numbers your citations refer to:\n\n"
+        f"{numbered(claim_source)}\n\n"
+        f"THE FROZEN CLAIM SURFACE. These are the claims you enumerated, and "
+        f"the surface does not change. Adjudicate every one of them, and refer "
+        f"to each by its id:\n\n"
+        + "\n".join(f"  {c.get('id')}. [{c.get('lines')}] {c.get('quote')}"
+                    for c in frozen)
+        + f"\n\nThe evidence requests made during this engagement, and what "
+          f"they returned:\n\n{ev['text']}\n\n"
+          f"Emit the findings document now, per METHOD \u00a713. Every frozen "
+          f"claim gets exactly one finding.")
+    out = _emit(loop, method_text, user, schemas.audit_schema(), max_tokens)
+    out["phase"] = "findings"
+    out["evidence"] = {k: v for k, v in ev.items() if k != "text"}
+    return out
+
+
+def post_run_checks(obj: Optional[Dict[str, Any]], corpus: Path,
+                    claim_source: str, frozen: Sequence[Dict[str, Any]],
+                    out: Path) -> Dict[str, Any]:
+    """METHOD's requirements, over the parsed output.
+
+    REPLACES THREE PROSE PARSERS. v1 checked the ledger with a line regex, the
+    findings with a header regex, and the citations by scanning the report for
+    `docN:NN`. All three read a document that no longer exists; the same
+    requirements are now arithmetic over typed fields, in
+    `schemas.check_output`, and they are stricter for it. The ordinal defect
+    that once needed a reviewer's judgement — integers in a line-number slot
+    that are not line numbers — is a file operation here.
+    """
+    if obj is None:
+        res = {"ok": False, "problems": ["no parseable output to check"],
+               "figures": {}}
+    else:
+        res = schemas.check_output(obj, corpus, claim_source, frozen)
+    for problem in res["problems"]:
+        issues.note(out, stage="claims_audit", code="output_check",
+                    text=problem, severity="blocking")
+    if res["ok"]:
+        logger.info("output check: clean — %s", res["figures"])
+    else:
+        logger.warning("output check: %d problem(s)", len(res["problems"]))
+        for problem in res["problems"]:
+            logger.warning("  %s", problem)
+    return res
+
 
 def main() -> int:
     ap = argparse.ArgumentParser(
@@ -694,126 +785,161 @@ def main() -> int:
     t0 = time.time()
     legs, error = [], None
     text_first_leg = ''
-    # Blocks seen anywhere across the engagement, and how many times the runner
-    # had to say one was missing. `blocks_prompted` is the metric that lets the
-    # gates exist at all: gating every block means a model that forgets to
-    # enumerate is told to, which would have turned campaign m1's three
-    # claim-surface failures into successes and flattened the only criterion
-    # that discriminated. Counting the prompts keeps the signal and makes it
-    # finer than the pass/fail it replaces — "claim surface: 1 prompt" says
-    # more than "criterion absent".
-    delivered = {n: False for n in blocks.BLOCKS}
-    prompted = {n: 0 for n in blocks.BLOCKS}
-    # Spent when every block looks delivered but the agent yielded anyway.
-    grace_leg_spent = False
+    # PHASE ONE ENUMERATES, PHASE TWO ADJUDICATES, AND THE LEGS SIT BETWEEN
+    # THEM. v1 drove legs until five text blocks had been seen, and the loop's
+    # whole complexity was in not believing a model that said it was finished.
+    # The deliverables are now produced by two calls the runner makes itself,
+    # so the agent's signal has become cheap to believe: `respond` means it has
+    # stopped gathering, and being wrong costs evidence, never a deliverable.
     transcript = []
-    undelivered = list(blocks.BLOCKS)
+    gathering_legs = 0
+    surface: Optional[Dict[str, Any]] = None
+    emission: Optional[Dict[str, Any]] = None
+    frozen: list = []
+    src_doc = eng["target"] / eng["claim_sources"][0]
+    method_text = load_workflow(REPO / METHOD_PATH)
+    emit_tokens = int((cfg.get("chat") or {}).get("react_max_tokens", 32768))
     try:
-        text = eng["brief"].read_text(encoding='utf-8')
-        text_first_leg = text
-        sent_reason = "opening brief"
-        for i in range(args.max_turns):
-            log_outgoing(i + 1, sent_reason, text)
-            concerns_before = concern_snapshot(loop)
-            resources_before = resource_snapshot(loop)
-            loop._process_user_turn(source=SOURCE, text=text, close=False)
-            reply = latest_reply(loop, SOURCE)
-            exit_reason = last_exit_reason(args.world, name)
-            # Snapshotted the moment the turn returns. The yield spawn is
-            # synchronous inside the turn, so the concern set is final here;
-            # post-turn work on the executor touches claims and the trace,
-            # not concerns.
-            log_incoming(concern_log, i + 1, text, sent_reason, exit_reason,
-                         len(reply), concerns_before, concern_snapshot(loop),
-                         resources_before, resource_snapshot(loop))
-            legs.append({"leg": i + 1, "sent": text[:80],
-                         "exit_reason": exit_reason,
-                         "reply_chars": len(reply)})
-            logger.info("leg %d: exit=%s chars=%d", i + 1, exit_reason,
-                        len(reply))
-            # A turn that died is not a turn that finished. llm_error and
-            # max_iters both end the loop, and treating them as ordinary
-            # completion reported error=None on a run whose only output was
-            # "[degraded reply — a model call failed mid-loop]". Silence
-            # reading as success is the failure mode this whole suite exists
-            # to catch; it should not be in the runner.
-            if exit_reason in ("llm_error", "crashed"):
-                error = f"turn {i + 1} ended {exit_reason} — run is not valid"
-                break
-            if exit_reason == "max_iters":
-                error = (f"turn {i + 1} hit max_iters without answering — "
-                         f"run is not valid")
-                break
+        # ---- phase one: enumerate, then freeze --------------------------
+        logger.info("phase 1: enumerating %s", src_doc.name)
+        surface = emit_surface(loop, method_text, src_doc, emit_tokens)
+        logger.info("surface: %s, finish=%s, %d chars", surface["parse"],
+                    surface["finish"], len(surface["raw"] or ""))
+        if surface["response_format_dropped"]:
+            error = ("the route dropped "
+                     + ", ".join(surface["response_format_dropped"])
+                     + " — the claim surface was not schema-constrained")
+        elif surface["obj"] is None:
+            error = (f"claim surface did not parse "
+                     f"(finish={surface['finish']}): {surface['parse_error']}")
+        else:
+            frozen = surface["obj"].get("claims") or []
+            surface_check = schemas.check_surface(
+                surface["obj"], eng["target"], eng["claim_sources"][0])
+            for problem in surface_check["problems"]:
+                issues.note(out, stage="claims_audit", code="surface_check",
+                            text=problem, severity="blocking")
+            logger.info("claim surface frozen: %d claims, check %s",
+                        len(frozen),
+                        "clean" if surface_check["ok"]
+                        else f"{len(surface_check['problems'])} problem(s)")
+            for problem in surface_check["problems"]:
+                logger.warning("  %s", problem)
+            (out / "claims.json").write_text(
+                json.dumps(surface["obj"], indent=1, ensure_ascii=False) + "\n",
+                encoding="utf-8")
 
-            # DELIVERY IS TESTED, NOT INFERRED. Every block the reply carries
-            # counts as delivered, whatever leg it arrived in and however many
-            # arrived together.
-            transcript.append(reply)
-            for n, seen in blocks.present(reply).items():
-                delivered[n] = delivered[n] or seen
-            legs[-1]["blocks"] = [n for n in blocks.BLOCKS
-                                  if blocks.opened(reply, n)]
-            undelivered = blocks.missing(delivered)
-            # A YIELD IS A NOT-DONE SIGNAL, AND BELIEVING IT IS FREE. That
-            # `respond` does not prove delivery is why this runner stopped
-            # reading turn boundaries; the converse is not symmetric.
-            # Believing "I am finished" can end a run with nothing written.
-            # Believing "I am not finished" costs one leg. So the agent's own
-            # signal is trusted in the cheap direction only, and a yield does
-            # not end the engagement even when every block looks delivered.
-            #
-            # Observed 2026-08-29 on cs2_flashnext_med: a yield whose status
-            # line named the three blocks it was about to write marked all
-            # three delivered and broke this loop, and report.md was fifteen
-            # words. Anchoring the marker stops that sentence from counting;
-            # this stops the next spelling of it from ending a run, because a
-            # model listing blocks it still owes is almost always yielding.
-            #
-            # ONE GRACE LEG, NOT UNBOUNDED. A model that always yields would
-            # otherwise run to the cap and be filed no_deliverable having
-            # delivered everything. The alternative — telling it "all four
-            # received, respond if you are done" — is barred: engagement_state
-            # carries what happened, never the stopping rule, and handing that
-            # over feeds the metric to the thing being measured.
-            if not undelivered and (exit_reason != "yield" or grace_leg_spent):
-                break
-            if not undelivered:
-                grace_leg_spent = True
-                logger.info("leg %d: every block delivered but the agent "
-                            "yielded — granting one further leg", i + 1)
-
-            # `exit_reason` DECIDES THE MESSAGE, NEVER THE ENDING. This is the
-            # one job the yield/respond signal keeps, and it is a continuation
-            # job: `yield` means the agent says it is still working, so the
-            # runner does not interrupt it to name a block that is legitimately
-            # still to come. `respond` means the agent believes it is finished
-            # — so if a block is missing, that is the moment to say which, and
-            # the moment worth counting. Nothing here ends the engagement; only
-            # the blocks or the leg cap do.
-            if exit_reason == "yield":
+        # ---- the gathering legs -----------------------------------------
+        if not error and frozen:
+            text = (eng["brief"].read_text(encoding='utf-8')
+                    + "\n\nThe claim surface is frozen. These are the claims "
+                      "to find evidence for:\n\n"
+                    + "\n".join(f"  {c.get('id')}. {c.get('quote')}"
+                                 for c in frozen))
+            text_first_leg = text
+            sent_reason = "opening brief and the frozen claim surface"
+            for i in range(args.max_turns):
+                log_outgoing(i + 1, sent_reason, text)
+                concerns_before = concern_snapshot(loop)
+                resources_before = resource_snapshot(loop)
+                loop._process_user_turn(source=SOURCE, text=text, close=False)
+                reply = latest_reply(loop, SOURCE)
+                exit_reason = last_exit_reason(args.world, name)
+                log_incoming(concern_log, i + 1, text, sent_reason, exit_reason,
+                             len(reply), concerns_before, concern_snapshot(loop),
+                             resources_before, resource_snapshot(loop))
+                legs.append({"leg": i + 1, "sent": text[:80],
+                             "exit_reason": exit_reason,
+                             "reply_chars": len(reply)})
+                logger.info("leg %d: exit=%s chars=%d", i + 1, exit_reason,
+                            len(reply))
+                # A turn that died is not a turn that finished. Silence reading
+                # as success is the failure mode this suite exists to catch.
+                if exit_reason in ("llm_error", "crashed"):
+                    error = f"turn {i + 1} ended {exit_reason} — run is not valid"
+                    break
+                if exit_reason == "max_iters":
+                    error = (f"turn {i + 1} hit max_iters without answering — "
+                             f"run is not valid")
+                    break
+                transcript.append(reply)
+                gathering_legs = i + 1
+                if exit_reason != "yield":
+                    logger.info("leg %d: agent stopped gathering", i + 1)
+                    break
                 text = CONTINUE + engagement_state(
                     args.world, name, i + 2, args.max_turns,
                     time.time() - t0, claim_sources=eng["claim_sources"])
-                sent_reason = "agent yielded — continue, no block named"
-                continue
-            nxt = undelivered[0]
-            prompted[nxt] += 1
-            logger.info("leg %d: %s not delivered — prompting (%d)",
-                        i + 1, nxt, prompted[nxt])
-            text = (CONTINUE + "\n\n" + blocks.rejection(nxt) + "\n"
-                    + engagement_state(args.world, name, i + 2, args.max_turns,
-                                       time.time() - t0, claim_sources=eng["claim_sources"]))
-            sent_reason = (f"agent responded but {nxt} not delivered "
-                           f"— prompt #{prompted[nxt]}")
-            continue
-        else:
-            # THE LEG CAP IS A TERMINAL STATE OF ITS OWN, and it names the
-            # block it died on. "Never enumerated" and "produced a report and
-            # no Gap Map" are different failures; collapsing them into one
-            # outcome loses the only thing that distinguishes them.
-            if undelivered:
-                error = ("no_deliverable: " + ", ".join(undelivered)
-                         + f" not delivered in {args.max_turns} legs")
+                sent_reason = "agent yielded — continue gathering"
+            else:
+                # Not an error. The cap means gathering was cut short and the
+                # adjudication still runs on what was gathered — a thin audit
+                # that says so beats no audit. `gathering_capped` records it.
+                logger.info("leg cap reached with the agent still gathering")
+
+        # ---- phase two: adjudicate the frozen claims --------------------
+        if not error and frozen:
+            logger.info("phase 2: adjudicating %d frozen claims", len(frozen))
+            emission = emit_findings(
+                loop, method_text=method_text, claim_source=src_doc,
+                frozen=frozen,
+                traces=(REPO / "scenarios" / args.world / name
+                        / "inspect_traces"),
+                max_tokens=emit_tokens)
+            logger.info("findings: %s, finish=%s, %d chars, evidence %s",
+                        emission["parse"], emission["finish"],
+                        len(emission["raw"] or ""), emission["evidence"])
+            # A SILENTLY UNCONSTRAINED RUN IS WORSE THAN A FAILED ONE.
+            # backend._post_adapting drops response_format for the whole
+            # session on one 400 and logs it at INFO, so a schema-dependent
+            # audit can quietly become a free-text one. Fatal here.
+            if emission["response_format_dropped"]:
+                error = ("the route dropped "
+                         + ", ".join(emission["response_format_dropped"])
+                         + " — the findings were not schema-constrained")
+            elif emission["parse"] == "unparseable":
+                error = (f"findings did not parse "
+                         f"(finish={emission['finish']}): "
+                         f"{emission['parse_error']}")
+
+            # ONE REPROMPT FOR CLAIMS THAT GOT NO FINDING. Mechanical, and no
+            # judgement is involved: the frozen surface says which claims
+            # exist, the emission says which were adjudicated, and the
+            # difference is a set operation. Bruce's call, one reprompt only
+            # — a loop that asks until the model complies measures the loop
+            # rather than the model, which is the argument that kept a
+            # retry-until-it-looks-right runner out of v1.
+            if not error and emission and emission.get("obj"):
+                done = {f.get("claim_id")
+                        for f in (emission["obj"].get("findings") or [])}
+                missing = [c for c in frozen if c.get("id") not in done]
+                if missing:
+                    ids = ", ".join(str(c.get("id")) for c in missing)
+                    logger.warning("%d frozen claim(s) with no finding: %s "
+                                   "— reprompting once", len(missing), ids)
+                    again = emit_findings(
+                        loop, method_text=method_text, claim_source=src_doc,
+                        frozen=missing,
+                        traces=(REPO / "scenarios" / args.world / name
+                                / "inspect_traces"),
+                        max_tokens=emit_tokens)
+                    reprompt = {"claims": [c.get("id") for c in missing],
+                                "parse": again["parse"],
+                                "finish": again["finish"],
+                                "recovered": 0}
+                    extra = ((again.get("obj") or {}).get("findings") or [])
+                    # Only findings for the claims that were actually missing.
+                    # A reprompt that re-adjudicates a claim already settled
+                    # would put two findings on one claim, which METHOD §4
+                    # forbids and check_output would then report as our defect.
+                    wanted = {c.get("id") for c in missing}
+                    keep = [f for f in extra if f.get("claim_id") in wanted
+                            and f.get("claim_id") not in done]
+                    emission["obj"]["findings"].extend(keep)
+                    reprompt["recovered"] = len(keep)
+                    emission["reprompt"] = reprompt
+                    logger.info("reprompt recovered %d of %d",
+                                len(keep), len(missing))
     except Exception as e:                                     # noqa: BLE001
         error = f"{type(e).__name__}: {e}"
         logger.exception("run failed")
@@ -829,81 +955,34 @@ def main() -> int:
 
     wall = round(time.time() - t0, 1)
 
-    # Write the deliverables as files. run_meta.json carries the metadata;
-    # without this the report exists only inside the trace's raw_response,
-    # which is not somewhere a human reads a report from.
-    #
-    # ASSEMBLED FROM BLOCKS, ACROSS EVERY LEG (§16). Nothing is inferred from
-    # which leg a reply arrived in — that inference is what filed a claim
-    # enumeration as `b2_glm_2/report.md` on 2026-08-27. A block is taken from
-    # wherever it was emitted, and a leg carrying several is not a special
-    # case.
-    #
-    # report.md IS THE REPORT, COVERAGE AND LIMITATIONS BLOCKS. They are
-    # separate blocks so that nothing has to nest, and one document because
-    # that is what the client receives — ISAE 3000 / AT-C 205 require the
-    # limitations to travel with the report, not beside it, and a report whose
-    # coverage travels separately is one a reader cannot size.
-    whole = "\n\n".join(t for t in transcript if t)
-
-    _checks = post_run_checks(out, whole, str(cfg.get("external_repo") or ""))
-    coverage_check = _checks["coverage"]
-    citation_check = _checks["citations"]
-    findings_check = _checks["findings"]
-
-    # Write the deliverables as files. run_meta.json carries the metadata;
-    # without this the report exists only inside the trace's raw_response,
-    # which is not somewhere a human reads a report from.
-    #
-    # ASSEMBLED FROM BLOCKS, ACROSS EVERY LEG (§16). Nothing is inferred from
-    # which leg a reply arrived in — that inference is what filed a claim
-    # enumeration as `b2_glm_2/report.md` on 2026-08-27. A block is taken from
-    # wherever it was emitted, and a leg carrying several is not a special
-    # case.
-    #
-    # report.md IS THE REPORT, COVERAGE AND LIMITATIONS BLOCKS. They are
-    # separate blocks so that nothing has to nest, and one document because
-    # that is what the client receives — ISAE 3000 / AT-C 205 require the
-    # limitations to travel with the report, not beside it, and a report whose
-    # coverage travels separately is one a reader cannot size.
-    whole = "\n\n".join(t for t in transcript if t)
-
+    # TWO DELIVERABLES, ONE PER PHASE. v1 assembled report.md from three text
+    # blocks and gap_map.md from a fourth, and spliced a coverage sentence
+    # into each because the agent was forbidden to compute one. None of that
+    # survives: the outputs are JSON, the figures are arithmetic over them,
+    # and the client's report is written two stages downstream.
     final = latest_reply(loop, SOURCE)
     if final:
         (out / "full_reply.md").write_text(final, encoding="utf-8")
-    if whole:
-        parts = [b for b in (blocks.span(whole, n)
-                             for n in blocks.REPORT_BLOCKS) if b]
-        # Same for the report: §1a says coverage travels with the conclusion,
-        # and the figures are the process's to emit.
-        if coverage_check and coverage_check.get("ok"):
-            from workflowsv2.coverage import statement as _stmt2
-            parts.insert(1, _stmt2(coverage_check["figures"]))
-        if parts:
-            (out / "report.md").write_text("\n\n".join(parts).rstrip() + "\n",
-                                           encoding="utf-8")
-        else:
-            logger.warning("no REPORT block in the engagement — no report.md")
-        # A SPAN, LIKE report.md. Writing this one stripped and the report one
-        # whole made the two files disagree about the same fact: run_meta
-        # recorded `GAP MAP` closed and conformance.json recorded it open,
-        # because conformance looked for the closer in a file the runner had
-        # just removed it from. Both deliverables are faithful copies.
-        gap = blocks.span(whole, "GAP MAP")
-        if gap:
-            # THE COVERAGE LINE IS PLACED HERE, NOT WRITTEN BY THE AGENT.
-            # METHOD §1a and §15 both promise it and §16 forbids the agent to
-            # compute it, so something has to supply it — this is that
-            # something. Appended rather than spliced: the Gap Map is the
-            # agent's document and nothing already in it moves.
-            _line = ""
-            if coverage_check and coverage_check.get("ok"):
-                from workflowsv2.coverage import statement as _stmt
-                _line = "\n\n" + _stmt(coverage_check["figures"]) + "\n"
-            (out / "gap_map.md").write_text(gap.rstrip() + _line + "\n",
-                                            encoding="utf-8")
-        else:
-            logger.warning("no GAP MAP block in the engagement — no gap_map.md")
+
+    if surface is not None:
+        (out / "surface_emission.txt").write_text(surface.get("raw") or "",
+                                                  encoding="utf-8")
+    obj = (emission or {}).get("obj")
+    if emission is not None:
+        # The raw emission is kept whatever happened to it. A response that did
+        # not parse is the only evidence of why, and discarding it leaves a run
+        # that failed with nothing to look at.
+        (out / "emission.txt").write_text(emission.get("raw") or "",
+                                          encoding="utf-8")
+    if obj is not None:
+        (out / "findings.json").write_text(
+            json.dumps(obj, indent=1, ensure_ascii=False) + "\n",
+            encoding="utf-8")
+
+    checks = post_run_checks(obj, eng["target"], eng["claim_sources"][0],
+                             frozen, out)
+    if not error and not checks["ok"]:
+        error = f"output check failed: {len(checks['problems'])} problem(s)"
 
     # THE WORKING RECORD, COPIED OUT (§14). The world is discarded after an
     # engagement; these two are the evidence that the work was systematic, and
@@ -935,7 +1014,6 @@ def main() -> int:
     # self-contained and is the artifact itself.
     record.mkdir(parents=True, exist_ok=True)
     try:
-        from chat.workflow import load_workflow                # noqa: E402
         wf = (cfg.get("workflow") or "").strip()
         if wf:
             (record / "method_as_delivered.md").write_text(
@@ -1009,43 +1087,41 @@ def main() -> int:
         "files_read": files_read(record / "inspect_traces",
                                  Path(cfg.get("external_repo") or ".")),
         "legs": legs,
-        # HOW MUCH THE HARNESS HAD TO CARRY. Gating every block means a model
-        # that forgets to enumerate is told to, and campaign m1's three
-        # claim-surface failures would have become successes — the only
-        # criterion that discriminated, spent. This is what keeps the signal,
-        # and it is finer than the pass/fail it replaces: "claim surface: 1
-        # prompt" says more than "criterion absent". A model that emits
-        # everything unprompted is zero across the board.
-        "blocks_prompted": prompted,
-        "blocks_delivered": delivered,
-        "blocks_closed": {n: blocks.closed(whole, n) for n in blocks.BLOCKS},
+        # WHAT THE GATHERING LEGS COST, and whether the cap cut them short.
+        # v1 recorded which of five blocks each leg delivered and how often the
+        # runner had to ask; there are no blocks to ask for now, and the one
+        # thing worth knowing about the legs is how many the evidence took.
+        "gathering_legs": gathering_legs,
+        "gathering_capped": gathering_legs >= args.max_turns,
         "wall_clock_s": wall,
-        # Action emissions the token ceiling cut off. Non-zero means the
-        # run was retried into shape rather than produced cleanly.
+        # Action emissions the token ceiling cut off, across the gathering
+        # legs. The emission call reports its own separately, below.
         "finish_length_events": getattr(loop, "finish_length_events", None),
-        # WHETHER THE REPORT'S CITATIONS RESOLVE, decided here by a file
-        # operation rather than left to whoever reads it next. METHOD §12 step
-        # 6b says "a finding with a missing or invalid citation does not ship",
-        # and on 2026-08-30 three shipped naming lines past the end of their
-        # files — the agent's own check missed them and an independent review
-        # reported none. This does not gate the run: a report is still written,
-        # because a truncated citation is not a reason to throw away the work.
-        # It records the fact, so a run carrying bad citations is visibly not
-        # clean in the one file everything downstream reads.
-        "citations_unresolved": citation_check,
-        "coverage": coverage_check,
-        "findings": findings_check,
+        # THE EMISSION, AND EVERYTHING THAT COULD HAVE SILENTLY DEGRADED IT.
+        # `parse` is "parsed" on a clean run; "repaired" or "salvaged" means
+        # the response was cut and only some of it survived, which is the
+        # constrained-decoding failure mode — invalid JSON rather than a short
+        # report. `response_format_dropped` is fatal upstream and recorded
+        # here too, because a run that silently stopped being schema-
+        # constrained must never read as a clean one.
+        "surface": ({k: v for k, v in surface.items() if k not in ("raw", "obj")}
+                    if surface else None),
+        "frozen_claims": len(frozen),
+        "emission": ({k: v for k, v in emission.items() if k not in ("raw", "obj")}
+                     if emission else None),
+        # METHOD's requirements over the parsed output, in place of v1's three
+        # prose parsers. `problems` is empty on a clean run.
+        "output_check": checks,
         "error": error,
         "captured_at_utc": ts,
     }, indent=2, default=str) + "\n", encoding="utf-8")
 
     print(f"\n{len(legs)} legs, {wall}s, error={error}")
-    print("blocks: " + ", ".join(
-        f"{n}={'ok' if delivered[n] else 'MISSING'}"
-        + (f"(+{prompted[n]} prompt{'s' if prompted[n] > 1 else ''})"
-           if prompted[n] else "")
-        for n in blocks.BLOCKS))
-    print(f"deliverables: {out}/report.md, gap_map.md")
+    fig = checks.get("figures") or {}
+    print(f"emission: {(emission or {}).get('parse')}, "
+          f"findings={fig.get('findings')}, verdicts={fig.get('verdicts')}")
+    print(f"output check: {'clean' if checks['ok'] else str(len(checks['problems'])) + ' problem(s)'}")
+    print(f"deliverables: {out}/claims.json, findings.json")
     print(f"meta: {out / 'run_meta.json'}")
     # --run, not --world: the run directory is the archive and survives the
     # world's deletion (§14). Scoring is fixture-only; a real engagement has no

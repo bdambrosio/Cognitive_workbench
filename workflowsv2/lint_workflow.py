@@ -316,6 +316,81 @@ def check_code_comment_refs(runner: str) -> List[str]:
     return out
 
 
+def check_schema_vocab(path: str, raw: str) -> List[str]:
+    """METHOD's closed vocabularies against the schema the runner enforces.
+
+    THIS REPLACES `check_block_vocab` FOR claims_audit, and it is the same
+    check pointed at a different contract. The invariant has not changed: what
+    the document specifies to the agent and what the code enforces must be one
+    object. `=== GAP MAP ===` was declared in two runners and specified to the
+    agent in neither, and that is what the block check caught.
+
+    In v2 the contract is the JSON schema, not a marker set, so comparing
+    METHOD's declared markers against `blocks.BLOCKS` would compare two empty
+    sets and report ok — a green check that verifies nothing. A schema and a
+    prose table that disagree fail silently, which is worse than a stalled run.
+
+    EACH VOCABULARY IS READ FROM THE SECTION THAT DEFINES IT, never from the
+    document at large. Reading every table cost this check four false
+    positives on its first run: §13's field table lists `claim_source` and
+    `not_completed`, which are fields and not vocabulary, and a table's own
+    header row names the column.
+    """
+    from workflowsv2.claims_audit import schemas as sch          # noqa: E402
+    bodies = {re.match(r"## (\d+[a-z]?)\.", b.splitlines()[0]).group(1): b
+              for _, b in sections(raw)
+              if b.strip() and re.match(r"## (\d+[a-z]?)\.", b.splitlines()[0])}
+
+    def first_col(sec: str) -> set:
+        """Backticked tokens in a table's first column, below the header rule.
+
+        The header row is skipped by position, not by name: §8's header cell
+        is `unresolved_because` in backticks, which a name-blind reader takes
+        for a value of itself.
+        """
+        out, in_body = set(), False
+        for line in bodies.get(sec, "").splitlines():
+            if not line.lstrip().startswith("|"):
+                in_body = False
+                continue
+            if re.match(r"^\s*\|[\s:|-]+\|\s*$", line):
+                in_body = True
+                continue
+            if in_body:
+                m = re.match(r"^\s*\|\s*`([a-z_]+)`\s*\|", line)
+                if m:
+                    out.add(m.group(1))
+        return out
+
+    def bold_tokens(sec: str) -> set:
+        """Backticked tokens introduced as bold lead-ins — §7's evidence forms."""
+        return set(re.findall(r"(?m)^\*\*`([a-z_]+)`\*\*", bodies.get(sec, "")))
+
+    bad = []
+    for sec, group, names, read in (
+            ("6", "verdict", sch.VERDICTS, first_col),
+            ("8", "unresolved_because", sch.UNRESOLVED_BECAUSE, first_col),
+            ("7", "evidence form", sch.EVIDENCE_FORMS, bold_tokens)):
+        declared = read(sec)
+        if not declared:
+            bad.append(f"§{sec} declares no {group} at all")
+            continue
+        for n in names:
+            if n not in declared:
+                bad.append(f"schemas.py {group} {n!r} is not declared in §{sec}")
+        for d in sorted(declared - set(names)):
+            bad.append(f"§{sec} declares {group} {d!r}, "
+                       f"which schemas.py does not define")
+
+    # Every form's required fields must be named where the form is specified.
+    for form, fields in sch.FORM_FIELDS.items():
+        for f in fields:
+            if f"`{f}`" not in raw:
+                bad.append(f"form {form!r} requires {f!r}, "
+                           f"which METHOD never names")
+    return bad
+
+
 def lint(path: str) -> Dict[str, List[str]]:
     name = Path(path).name
     raw = (REPO / path).read_text(encoding="utf-8")
@@ -325,7 +400,12 @@ def lint(path: str) -> Dict[str, List[str]]:
         "retired tokens in the prompt": check_retired(name, agent),
         "dates in the prompt": check_dates(name, agent, allow),
         "section references": check_refs(name, raw, agent),
-        "block vocabulary": check_block_vocab(path, raw),
+        # claims_audit's contract is the schema; every other workflow still
+        # delivers text blocks. One key either way, so the report reads the
+        # same and a reader is told which contract was checked.
+        ("schema vocabulary" if "claims_audit" in path else "block vocabulary"):
+            (check_schema_vocab(path, raw) if "claims_audit" in path
+             else check_block_vocab(path, raw)),
     }
 
 
@@ -372,7 +452,10 @@ def main() -> int:
                 print(f"          {c}")
 
     extra = check_code_vocab()
-    print("\n=== the client-facing verdict glossary against METHOD §6")
+    print("\n=== the client-facing verdict glossary against METHOD §6"
+          "\n    (deliver.py is a v1 consumer: it reads bracketed verdicts out"
+          "\n     of prose. Expected to fail until audit_postprocess is"
+          "\n     rewritten against schemas.py.)")
     for p_ in check_delivery_gloss():
         failed += 1
         print(f"  FAIL  {p_}")
@@ -380,7 +463,9 @@ def main() -> int:
         if not check_delivery_gloss():
             print("  ok    every verdict a finding can carry is explained")
 
-    print("\n=== METHOD vocabularies against score.py")
+    print("\n=== METHOD vocabularies against score.py"
+          "\n    (score.py is a v1 consumer: it scores a text report and a §9"
+          "\n     conclusion, neither of which this stage produces now.)")
     if extra:
         failed += len(extra)
         for e in extra:
