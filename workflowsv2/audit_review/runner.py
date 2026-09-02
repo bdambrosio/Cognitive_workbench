@@ -125,19 +125,33 @@ def statistics(run: Path, corpus: Path, claim_source: str) -> Dict[str, Any]:
     surface = audit_schemas.check_surface(claims, corpus, claim_source)
     output = audit_schemas.check_output(findings, corpus, claim_source, frozen)
 
+    docs = audit_schemas.corpus_index(corpus)
     ev_per, cited_docs, no_citation = [], set(), []
+    cited_by: Dict[str, List[Any]] = {}
     for f in findings.get("findings") or []:
         ev = f.get("evidence") or []
         ev_per.append(len(ev))
         cites = [e for e in ev if e.get("form") == "citation"]
         for e in cites:
-            cited_docs.add(e.get("document"))
+            key, _ = audit_schemas.resolve_document(docs, e.get("document"))
+            name = key or e.get("document")
+            cited_docs.add(name)
+            cited_by.setdefault(name, []).append(f.get("claim_id"))
         if not cites and (f.get("adjudication") or {}).get("verdict") \
                 != "unverifiable":
             no_citation.append(f.get("claim_id"))
     ev_per.sort()
-    corpus_docs = {p.name for p in corpus.rglob("*") if p.is_file()} \
-        if corpus.is_dir() else set()
+    corpus_docs = set(docs)
+    # THE RECORD CHECK'S ARITHMETIC. REVIEW.md §7 asks whether the record
+    # shows each cited document being opened. `files_read` in run_meta.json is
+    # that record, derived from the evidence traces by the audit runner; a
+    # cited document absent from it was never opened by any evidence request.
+    # Computed here, not asked of the reviewer, because it is a set difference.
+    meta = json.loads((run / "run_meta.json").read_text()) \
+        if (run / "run_meta.json").is_file() else {}
+    opened = sorted((meta.get("files_read") or {}).keys())
+    never_opened = {d: sorted(set(cited_by[d]), key=lambda x: (x is None, x))
+                    for d in sorted(cited_docs - set(opened)) if d}
 
     verdicts = (output.get("figures") or {}).get("verdicts") or {}
     return {
@@ -169,6 +183,11 @@ def statistics(run: Path, corpus: Path, claim_source: str) -> Dict[str, Any]:
         "findings_without_a_citation": no_citation,
         "documents_cited": sorted(d for d in cited_docs if d),
         "documents_never_cited": sorted(corpus_docs - cited_docs),
+        # The audit's own record of what it opened, and the cited documents
+        # that record does not show being opened, each with the claims whose
+        # findings cite it. REVIEW.md §7.
+        "documents_opened": opened,
+        "documents_cited_but_never_opened": never_opened,
         # For a person, per REVIEW.md §7.
         "unclaimed_spans": unclaimed_spans(frozen, corpus / claim_source),
     }
@@ -267,10 +286,76 @@ def _finding_text(f: Dict[str, Any], claims: Dict[int, Dict[str, Any]]) -> str:
     return "\n".join(out)
 
 
+#: Lines shown on each side of a cited range. Enough to see a heading, the
+#: sentence before and the sentence after; not enough to hand over the file.
+CONTEXT_LINES = 8
+#: Characters of cited material per finding. A finding with many citations
+#: gets its first ones in full and a note that the rest were cut.
+MATERIALS_BUDGET = 8_000
+
+
+def _cited_materials(f: Dict[str, Any], docs: Dict[str, List[str]],
+                     context: int = CONTEXT_LINES,
+                     budget: int = MATERIALS_BUDGET) -> str:
+    """The lines each citation of one finding points at, with context.
+
+    WHY THE EMISSION NEEDS THIS. `_emit` is a two-message call with no tools
+    and no history: nothing the reviewer opened in its reading legs reaches it.
+    Without this, REVIEW.md §5 checks 2 and 3 were judged from the auditor's
+    own `quote` and `shows`, and both v2 reviews on 2026-09-01 passed every
+    finding — including two whose quote appears nowhere in the document cited.
+    This is the review-side half of what the scenario promises: citations are
+    resolved before the review starts, and the reviewer's judgement is spent
+    on what the resolved lines mean.
+
+    A citation that does not resolve is shown as such, with the reason, so the
+    reviewer sees the same fact the statistics record.
+    """
+    refs: List[Tuple[str, Any, Any]] = []
+    for e in f.get("evidence") or []:
+        if not isinstance(e, dict):
+            continue
+        if e.get("form") == "citation":
+            refs.append((e.get("document"), e.get("lines"), e.get("quote")))
+        elif e.get("form") == "derived":
+            for b in e.get("basis") or []:
+                if isinstance(b, dict):
+                    refs.append((b.get("document"), b.get("lines"),
+                                 b.get("quote")))
+    out, used = [], 0
+    for doc, lines, _quote in refs:
+        key, why = audit_schemas.resolve_document(docs, doc)
+        if key is None:
+            block = f"    [{doc}:{lines}] does not resolve: {why}"
+        elif (not isinstance(lines, list) or len(lines) != 2
+              or not all(isinstance(n, int) for n in lines)
+              or lines[0] < 1 or lines[1] < lines[0]):
+            block = f"    [{doc}:{lines}] does not resolve: not a line range"
+        elif lines[1] > len(docs[key]):
+            block = (f"    [{key}:{lines[0]}-{lines[1]}] does not resolve: "
+                     f"the file has {len(docs[key])} lines")
+        else:
+            body = docs[key]
+            lo, hi = lines
+            a, b = max(1, lo - context), min(len(body), hi + context)
+            rows = [f"    {n:>5}{'>' if lo <= n <= hi else ' '}|{body[n - 1]}"
+                    for n in range(a, b + 1)]
+            block = (f"    [{key}:{lo}-{hi}] lines {a}-{b}, the cited range "
+                     f"marked with >\n" + "\n".join(rows))
+        if used + len(block) > budget:
+            out.append(f"    [{len(refs) - len(out)} further citation(s) not "
+                       f"shown: over the materials budget]")
+            break
+        out.append(block)
+        used += len(block)
+    return "\n".join(out)
+
+
 def emit_parts(loop, method_text: str, stats: Dict[str, Any],
                frozen: Sequence[Dict[str, Any]],
                findings: Sequence[Dict[str, Any]],
-               max_tokens: int, batch: int = 0) -> Dict[str, Any]:
+               max_tokens: int, batch: int = 0,
+               docs: Optional[Dict[str, List[str]]] = None) -> Dict[str, Any]:
     """The review, in one call or in batches.
 
     BATCHING IS A RUNNER DECISION, NOT A SCHEMA CHANGE. `schemas.py` carries
@@ -280,6 +365,7 @@ def emit_parts(loop, method_text: str, stats: Dict[str, Any],
     findings is what the flag is for.
     """
     claims_by_id = {c.get("id"): c for c in frozen}
+    docs = docs or {}
     facts = json.dumps({k: v for k, v in stats.items()
                         if k != "unclaimed_spans"},
                        ensure_ascii=False, indent=1)[:20_000]
@@ -314,16 +400,31 @@ def emit_parts(loop, method_text: str, stats: Dict[str, Any],
     for n, g in enumerate(groups, 1):
         body = ("Review these findings, per REVIEW §5 checks 2 to 5. Record "
                 "the four observations for each; the outcome is derived from "
-                "them and is not yours to write.\n\n"
-                + "\n\n".join(_finding_text(f, claims_by_id) for f in g)
+                "them and is not yours to write. Under each finding, the "
+                "client's process has placed the lines its citations point "
+                "at, with the lines around them.\n\n"
+                + "\n\n".join(_finding_text(f, claims_by_id)
+                                + "\n    cited material:\n"
+                                + _cited_materials(f, docs) for f in g)
                 + "\n\nEmit `finding_reviews` for exactly these findings.")
         ask(f"finding_reviews[{n}/{len(groups)}]", body,
             schemas.finding_reviews_schema())
 
+    never = stats.get("documents_cited_but_never_opened") or {}
     ask("record_check",
-        "You have checked every finding. Now read the working record under "
-        "`inspect` and report the one statement REVIEW §7 asks for: whether "
-        "the record bears out the work the findings claim.",
+        "You have checked every finding. Report the one statement REVIEW §7 "
+        "asks for: whether the audit's record bears out the work the findings "
+        "claim. The client's process read the record; these are its facts.\n\n"
+        "Documents the record shows the audit opened:\n"
+        + ("\n".join(f"  {d}" for d in stats.get("documents_opened") or [])
+           or "  (none)")
+        + "\n\nDocuments the findings cite:\n"
+        + ("\n".join(f"  {d}" for d in stats.get("documents_cited") or [])
+           or "  (none)")
+        + "\n\nCited documents the record does not show being opened, with "
+          "the claims whose findings cite them:\n"
+        + ("\n".join(f"  {d}: claims {', '.join(str(c) for c in cs)}"
+                      for d, cs in never.items()) or "  (none)"),
         schemas.record_check_schema())
 
     return {"obj": schemas.merge_parts(parts), "calls": calls,
@@ -338,7 +439,8 @@ def retest(run: Path, world: str, model_path: Optional[Path], target: Path,
            claims_by_id: Dict[int, Dict[str, Any]],
            findings_by_id: Dict[int, Dict[str, Any]],
            candidates: Sequence[int], sampled: Sequence[int],
-           max_tokens: int) -> Dict[str, Any]:
+           max_tokens: int,
+           docs: Optional[Dict[str, List[str]]] = None) -> Dict[str, Any]:
     """A second reviewer, on the findings that qualify and on a sample.
 
     BLIND. It is given the finding and the materials and nothing else — not the
@@ -371,8 +473,12 @@ def retest(run: Path, world: str, model_path: Optional[Path], target: Path,
             if f is None:
                 continue
             body = ("Review this one finding, per REVIEW §5 checks 2 to 5. You "
-                    "have not seen any other review of it.\n\n"
+                    "have not seen any other review of it. Under the finding, "
+                    "the client's process has placed the lines its citations "
+                    "point at, with the lines around them.\n\n"
                     + _finding_text(f, claims_by_id)
+                    + "\n    cited material:\n"
+                    + _cited_materials(f, docs or {})
                     + "\n\nEmit `finding_reviews` for this finding only.")
             r = _emit(loop, method_text, body,
                       schemas.finding_reviews_schema(), max_tokens)
@@ -382,7 +488,9 @@ def retest(run: Path, world: str, model_path: Optional[Path], target: Path,
             out["results"][cid] = {
                 "parse": r["parse"],
                 "observations": ({k: row.get(k) for k in schemas.OBSERVATIONS}
-                                 if row else None)}
+                                 if row else None),
+                "exception": (row or {}).get("exception"),
+                "materials_show": (row or {}).get("materials_show")}
     finally:
         try:
             loop._post_turn_executor.shutdown(wait=True)
@@ -408,15 +516,21 @@ def standings(first: Dict[str, Any], second: Dict[str, Any],
                          "why": "the retest produced nothing readable"}
             continue
         same = all(obs.get(n) == mine.get(n) for n in schemas.OBSERVATIONS)
+        # BOTH SETS OF OBSERVATIONS ARE KEPT. The first version recorded only
+        # `agreed`, so a control that disagreed on 2 of 3 (Qwen, 2026-09-02)
+        # could not say what the second reviewer had seen differently.
+        both = {"first": {n: mine.get(n) for n in schemas.OBSERVATIONS},
+                "second": obs}
         if cid in candidates:
             rows[cid] = {"standing": "stands" if same else "does not stand",
-                         "set": "exception"}
+                         "set": "exception", **both}
             agree_ex += same
             dis_ex += (not same)
         else:
             # A sampled finding that holds is a control, not a correction:
             # the disagreement is counted and the finding is untouched.
-            rows[cid] = {"standing": "control", "agreed": same, "set": "held"}
+            rows[cid] = {"standing": "control", "agreed": same, "set": "held",
+                         **both}
             agree_s += same
             dis_s += (not same)
     return {"ran": True, "per_finding": rows,
@@ -446,9 +560,9 @@ span was found at the lines it names. Do not re-check those; the statistics
 record what they found. Your subject is the citations that do resolve, where
 the only remaining question is what they mean.
 
-Read the findings and the materials now. Do not read the working record yet —
-REVIEW §7 says when. Work in as many legs as you need: end a leg with `yield`
-and I will say continue, or with `respond` when you have read what you need.
+Read the findings and the materials now, and the working record last, per
+REVIEW §3. Work in as many legs as you need: end a leg with `yield` and I will
+say continue, or with `respond` when you have read what you need.
 
 Do not write the review in a leg. When you stop reading I will ask you for it,
 under the schema in REVIEW §8.
@@ -491,6 +605,7 @@ def main() -> int:
 
     # ---- part one: the statistics, recomputed here -------------------------
     stats = statistics(run, target, claim_source)
+    docs = audit_schemas.corpus_index(target)
     (out / "statistics.json").write_text(
         json.dumps(stats, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     logger.info("statistics: %d claims, %d findings, audit checks %s/%s, "
@@ -531,7 +646,7 @@ def main() -> int:
         # ---- part three: the observations ---------------------------------
         if not error:
             emission = emit_parts(loop, method_text, stats, frozen, findings,
-                                  max_tokens, batch=args.batch)
+                                  max_tokens, batch=args.batch, docs=docs)
             for c in emission["calls"]:
                 if c["response_format_dropped"]:
                     error = (f"the route dropped "
@@ -564,10 +679,16 @@ def main() -> int:
                     if (args.retest_model or args.model) else None,
                     target, {c.get("id"): c for c in frozen},
                     {f.get("claim_id"): f for f in findings},
-                    derived["retest_candidates"], sampled, max_tokens) \
+                    derived["retest_candidates"], sampled, max_tokens,
+                    docs=docs) \
         if not error else {"ran": False, "reason": "the review did not complete"}
     stand = standings(obj, second, derived["retest_candidates"], sampled)
 
+    # The second reviewer's answers in full, including parse state and any
+    # exception text — the standings summarise them, and did not keep them.
+    (out / "retest.json").write_text(
+        json.dumps(second, indent=1, ensure_ascii=False, default=str) + "\n",
+        encoding="utf-8")
     (out / "review.json").write_text(
         json.dumps(obj, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     (out / "outcomes.json").write_text(

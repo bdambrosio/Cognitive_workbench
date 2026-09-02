@@ -302,6 +302,63 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", _DECORATION.sub(" ", s or "")).strip()
 
 
+#: Directory names never read as materials. `.git` holds thousands of binary
+#: objects; a dependency tree is not the target. Files whose own name starts
+#: with a dot (`.env.example`) are materials and are kept.
+_SKIP_DIRS = ("node_modules", "__pycache__")
+
+
+def corpus_index(corpus: Path) -> Dict[str, List[str]]:
+    """Every readable file under the target, keyed by its path relative to
+    the target root in POSIX form, as a list of lines.
+
+    KEYED BY RELATIVE PATH, NOT BASENAME. The first version keyed on `f.name`,
+    which is exact for a nine-document fixture and wrong for a repository:
+    ChatterMate has two `README.md` and several `agent.py`, and a basename
+    index silently checks a quote against whichever one sorted last.
+    `resolve_document` accepts a basename when it is unique, so the fixture's
+    citations still resolve as written.
+    """
+    docs: Dict[str, List[str]] = {}
+    if not corpus.is_dir():
+        return docs
+    for f in sorted(corpus.rglob("*")):
+        if not f.is_file():
+            continue
+        rel = f.relative_to(corpus)
+        if any(part.startswith(".") or part in _SKIP_DIRS
+               for part in rel.parts[:-1]):
+            continue
+        try:
+            docs[rel.as_posix()] = f.read_text(
+                encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            continue
+    return docs
+
+
+def resolve_document(docs: Dict[str, List[str]], name: Any
+                     ) -> Tuple[Optional[str], Optional[str]]:
+    """The index key a cited `document` names, or why it names none.
+
+    Returns `(key, problem)`: exactly one is set. A relative path resolves
+    exactly; a bare filename resolves when exactly one file has it, and is a
+    problem naming the candidates when several do.
+    """
+    if not isinstance(name, str) or not name.strip():
+        return None, f"document {name!r} is not a name"
+    n = name.strip().lstrip("./")
+    if n in docs:
+        return n, None
+    hits = [k for k in docs if k.rsplit("/", 1)[-1] == n]
+    if len(hits) == 1:
+        return hits[0], None
+    if len(hits) > 1:
+        return None, (f"document {name!r} names {len(hits)} files "
+                      f"({', '.join(hits[:4])}); cite the path")
+    return None, f"document {name!r} is not in the materials"
+
+
 def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
                  frozen: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     """Everything METHOD requires that the schema cannot express.
@@ -311,22 +368,29 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
     person can act on, not a code.
     """
     problems: List[str] = []
-    docs: Dict[str, List[str]] = {}
-    if corpus.is_dir():
-        for f in sorted(corpus.rglob("*")):
-            if f.is_file():
-                try:
-                    docs[f.name] = f.read_text(
-                        encoding="utf-8", errors="replace").splitlines()
-                except OSError as e:
-                    problems.append(f"could not read {f.name}: {e}")
+    docs = corpus_index(corpus)
+    joined: List[str] = []
 
     def _cite(where: str, doc: Any, lines: Any, quote: Any) -> None:
-        """One citation, against the corpus. METHOD §7."""
-        if not isinstance(doc, str) or doc not in docs:
-            problems.append(f"{where}: document {doc!r} is not in the materials")
+        """One citation, against the corpus. METHOD §7.
+
+        A QUOTE THAT JOINS LINES OF THE CITED RANGE IS COUNTED, NOT FAILED.
+        METHOD §7 asks for one contiguous span, and the whole-quote test is
+        the check of that. But 11 of the 12 quote failures in one GLM run
+        (2026-09-02) were bullets copied from inside the cited range with the
+        sub-bullets between them dropped, joined with newlines: the lines all
+        exist, at the lines cited. Reporting that as "does not appear in the
+        document at all" was false and blocked the run. So a quote whose
+        newline-separated pieces each sit inside the cited span is recorded in
+        `figures["joined_quotes"]` and is not a problem. The tolerance depends
+        on the model joining with a newline; a quote joined with spaces still
+        fails whole, as it should, since the method forbids the join.
+        """
+        key, why = resolve_document(docs, doc)
+        if key is None:
+            problems.append(f"{where}: {why}")
             return
-        body = docs[doc]
+        body = docs[key]
         if (not isinstance(lines, list) or len(lines) != 2
                 or not all(isinstance(n, int) for n in lines)):
             problems.append(f"{where}: lines {lines!r} is not a start and end")
@@ -343,12 +407,18 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
         if isinstance(quote, str) and _norm(quote):
             span = _norm("\n".join(body[lo - 1:hi]))
             if _norm(quote) not in span:
+                pieces = [_norm(x) for x in quote.splitlines() if _norm(x)]
+                if len(pieces) > 1 and all(pc in span for pc in pieces):
+                    joined.append(where)
+                    return
                 whole = _norm("\n".join(body))
+                missing = [pc for pc in pieces if pc not in span] or [_norm(quote)]
                 problems.append(
                     f"{where}: quote is not at {doc}:{lo}-{hi}"
                     + ("; it is elsewhere in that document"
                        if _norm(quote) in whole else
-                       "; it does not appear in that document at all"))
+                       f"; this part is not at those lines: "
+                       f"{missing[0][:80]!r}"))
 
     findings = obj.get("findings")
     if not isinstance(findings, list):
@@ -452,6 +522,7 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
                         "adjudicated": len(seen),
                         "verdicts": verdicts,
                         "evidence_forms": forms,
+                        "joined_quotes": joined,
                         "unclaimed": len(obj.get("unclaimed") or []),
                         "questions": len(obj.get("questions") or []),
                         "not_completed": bool(incomplete)}}
