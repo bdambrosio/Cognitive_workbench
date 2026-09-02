@@ -193,6 +193,16 @@ def assemble_surface(claim_source: str, sections: Sequence[Dict[str, Any]]
     lines join the named claim's `locations`. A `restates` that names no
     assigned id is kept as a claim and reported by `check_surface`, so the
     assertion is not lost to a bad reference.
+
+    A DUPLICATE WITHIN ONE SECTION FOLDS TOO. `restates` can only name a
+    claim from an earlier section, because ids are assigned when a section
+    closes; a model that splits one line into several claims and quotes the
+    whole line each time has no way to name the repeat. One README line
+    came back as seven claims with one quote (2026-09-02). The test is
+    string equality on the normalised quote, the rule the merge already
+    uses across claim sources, and the second copy becomes a location on
+    the first — its `statement` is kept in `statements` so a split the
+    model meant is not lost.
     """
     claims: List[Dict[str, Any]] = []
     by_id: Dict[int, Dict[str, Any]] = {}
@@ -200,11 +210,21 @@ def assemble_surface(claim_source: str, sections: Sequence[Dict[str, Any]]
     for sec in sections:
         if sec.get("not_completed"):
             not_completed.append(sec["not_completed"])
+        seen_in_section: Dict[str, Dict[str, Any]] = {}
         for c in sec.get("claims") or []:
             loc = {"quote": c.get("quote"), "lines": c.get("lines")}
             target = by_id.get(c.get("restates")) if c.get("restates") else None
             if target is not None:
                 target.setdefault("locations", []).append(loc)
+                continue
+            key = _norm(c.get("quote") or "")
+            twin = seen_in_section.get(key) if key else None
+            if twin is not None:
+                twin.setdefault("locations", []).append(loc)
+                st = c.get("statement")
+                if st and st != twin.get("statement") \
+                        and st not in twin.get("statements", []):
+                    twin.setdefault("statements", []).append(st)
                 continue
             row = {"id": len(claims) + 1, "quote": c.get("quote"),
                    "lines": c.get("lines"), "statement": c.get("statement"),
@@ -213,6 +233,8 @@ def assemble_surface(claim_source: str, sections: Sequence[Dict[str, Any]]
                 row["restates"] = c["restates"]      # unresolved; reported
             claims.append(row)
             by_id[row["id"]] = row
+            if key:
+                seen_in_section[key] = row
     out: Dict[str, Any] = {"claim_source": claim_source, "claims": claims}
     if not_completed and not claims:
         out["not_completed"] = "; ".join(not_completed)

@@ -25,7 +25,7 @@ A claim is an assertion the seller makes to the buyer in the designated claim so
 
 **Not every sentence of a claim source is a claim.** Three kinds are not, or not as written:
 
-- **Navigation and courtesy.** A heading, a link, a badge, an image, a table of contents, "see LICENSE", "we welcome contributions", a sign-off. These point or greet and assert nothing about the target. A badge or link that states a fact — a licence badge, a version badge — is the fact it states, quoted as it appears.
+- **Navigation and courtesy.** A heading, a link, a badge, an image, a table of contents, "see LICENSE", "we welcome contributions", a sign-off. These point or greet and assert nothing about the target, even where the link points at the seller's own site, documentation or demo. A badge or link that states a fact — a licence badge, a version badge — is the fact it states, quoted as it appears.
 - **Instructions.** A command, an installation step, a prerequisite, a configuration example. Enumerate what the block asserts about the target: that a tool has the subcommands shown, that the stack runs on the named database, that a step has the stated effect. One claim per capability asserted, not one per line.
 - **Intent.** A roadmap item, a feature marked as coming, a plan. It concerns what the seller means to do, not the target's present state, and is enumerated as about the seller, per §5.
 

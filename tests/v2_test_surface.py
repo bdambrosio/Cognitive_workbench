@@ -83,3 +83,22 @@ def test_check_surface_covers_locations_about_and_dangling_restates(tmp_path):
                         "about": "target", "restates": 1}]}]
     res = sch.check_surface(sch.assemble_surface("d.md", bad), tmp_path, "d.md")
     assert any(p.startswith("claim 1 location 2: quote is not at lines 14-14") for p in res["problems"])
+
+
+def test_assemble_surface_folds_duplicate_quotes_within_a_section():
+    parts = [{"claims": [
+        {"quote": "multi-model AI (OpenAI, Claude)", "lines": [9, 9], "statement": "OpenAI", "about": "target"},
+        {"quote": "multi-model AI (OpenAI, Claude)", "lines": [9, 9], "statement": "Claude", "about": "target"},
+        {"quote": "multi-model  AI (OpenAI, Claude)", "lines": [9, 9], "statement": "Claude", "about": "target"},
+        {"quote": "self-host it", "lines": [10, 10], "statement": "s", "about": "target"}]}]
+    out = sch.assemble_surface("d.md", parts)
+    assert [c["id"] for c in out["claims"]] == [1, 2]
+    first = out["claims"][0]
+    assert len(first["locations"]) == 2
+    assert first["statement"] == "OpenAI" and first["statements"] == ["Claude"]
+    # a duplicate in a LATER section is not folded by this rule: that is what
+    # `restates` is for, and the surface check reports the repeat
+    later = parts + [{"claims": [
+        {"quote": "self-host it", "lines": [40, 40], "statement": "s", "about": "target"}]}]
+    out = sch.assemble_surface("d.md", later)
+    assert [c["id"] for c in out["claims"]] == [1, 2, 3]
