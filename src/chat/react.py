@@ -725,7 +725,7 @@ class ReactMixin:
                 obs = self._run_inspect(q)
             elif tool == 'inspect_external':
                 q = self._resolve_react_value(action.get('query', ''), log)
-                obs = self._run_inspect_external(q)
+                obs = self._run_inspect_external(q, claims=action.get('claims'))
             elif tool == 'security':
                 q = self._resolve_react_value(action.get('query', ''), log)
                 obs = self._run_security(q)
@@ -1001,15 +1001,26 @@ class ReactMixin:
             return 'EMPTY: inspect subagent produced no answer'
         return 'OK: ' + text
 
-    def _run_inspect_external(self, query: str) -> str:
+    def _run_inspect_external(self, query: str, claims=None) -> str:
         """Backend for the ReAct `inspect_external` tool. Delegates to the
         same subagent loop as `inspect`, geofenced to the bound external
         repo (see _set_external_repo / _get_external_repo). Returns ERROR
         if no repo is currently bound — the system prompt only advertises
         this tool when a binding exists, so a call here without binding
-        means the model fabricated the tool."""
+        means the model fabricated the tool.
+
+        `claims`, when it is a list of integers, is written into the query
+        as a `[claims N, M]` prefix. The subagent trace records the query
+        verbatim, so the prefix is how a workflow later knows which
+        enumerated claims an evidence request served (claims_audit reads it
+        back with `trace_claims`)."""
         if not query or not str(query).strip():
             return "EMPTY: inspect_external query was empty"
+        ids = [int(c) for c in (claims or []) if isinstance(c, int)
+               or (isinstance(c, str) and c.strip().isdigit())] \
+            if isinstance(claims, list) else []
+        if ids:
+            query = f"[claims {', '.join(str(c) for c in sorted(set(ids)))}] {query}"
         repo = self._get_external_repo()
         if repo is None:
             return ("ERROR: no external repo is bound for this session "

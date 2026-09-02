@@ -98,10 +98,11 @@ def unclaimed_spans(claims: Sequence[Dict[str, Any]],
     lines = src.read_text(encoding="utf-8", errors="replace").splitlines()
     covered = set()
     for c in claims:
-        ln = c.get("lines")
-        if isinstance(ln, list) and len(ln) == 2 \
-                and all(isinstance(n, int) for n in ln):
-            covered.update(range(max(1, ln[0]), min(len(lines), ln[1]) + 1))
+        for loc in audit_schemas.locations(c):
+            ln = loc.get("lines")
+            if isinstance(ln, list) and len(ln) == 2 \
+                    and all(isinstance(n, int) for n in ln):
+                covered.update(range(max(1, ln[0]), min(len(lines), ln[1]) + 1))
     out, run_start = [], None
     for n in range(1, len(lines) + 2):
         text = lines[n - 1].strip() if n <= len(lines) else ""
@@ -235,9 +236,13 @@ def _finding_text(f: Dict[str, Any], claims: Dict[int, Dict[str, Any]]) -> str:
     adj = f.get("adjudication") or {}
     out = [f"--- claim {f.get('claim_id')}",
            f"    quote     : {c.get('quote')}",
-           f"    lines     : {c.get('lines')}",
-           f"    statement : {c.get('statement')}",
-           f"    verdict   : {adj.get('verdict')}"]
+           f"    lines     : {c.get('lines')}"]
+    for loc in c.get("locations") or []:
+        out.append(f"    also at   : {loc.get('lines')} {loc.get('quote')}")
+    out += [f"    statement : {c.get('statement')}"]
+    if c.get("about") == "seller":
+        out.append("    about     : the seller (METHOD \u00a75)")
+    out += [f"    verdict   : {adj.get('verdict')}"]
     if adj.get("gap"):
         out.append(f"    gap       : {adj['gap']}")
     if adj.get("unresolved_because"):
@@ -314,11 +319,25 @@ def _cited_materials(f: Dict[str, Any], docs: Dict[str, List[str]],
     return "\n".join(out)
 
 
+def _unexplained(rows: Sequence[Dict[str, Any]]) -> List[Any]:
+    """Claim ids of reviews with an observation not clean and no exception
+    quoting the material — what REVIEW.md §6 requires and the flat schema
+    cannot make conditional."""
+    out = []
+    for r in rows or []:
+        bad = [n for n in schemas.OBSERVATIONS if r.get(n) not in schemas.CLEAN[n]]
+        if bad and not ((r.get("exception") or "").strip()
+                        and (r.get("materials_show") or "").strip()):
+            out.append(r.get("claim_id"))
+    return out
+
+
 def emit_parts(loop, method_text: str, stats: Dict[str, Any],
                frozen: Sequence[Dict[str, Any]],
                findings: Sequence[Dict[str, Any]],
                max_tokens: int, batch: int = 0,
-               docs: Optional[Dict[str, List[str]]] = None) -> Dict[str, Any]:
+               docs: Optional[Dict[str, List[str]]] = None,
+               partial: Optional[Path] = None) -> Dict[str, Any]:
     """The review, in one call or in batches.
 
     BATCHING IS A RUNNER DECISION, NOT A SCHEMA CHANGE. `schemas.py` carries
@@ -337,7 +356,7 @@ def emit_parts(loop, method_text: str, stats: Dict[str, Any],
             "computed are:\n\n" + facts + "\n\n")
     parts, calls = [], []
 
-    def ask(what: str, body: str, schema) -> None:
+    def ask(what: str, body: str, schema) -> Optional[Dict[str, Any]]:
         out = emit(loop, method_text, head + body, schema, max_tokens)
         calls.append({"part": what,
                       **{k: v for k, v in out.items() if k not in ("raw", "obj")}})
@@ -345,6 +364,11 @@ def emit_parts(loop, method_text: str, stats: Dict[str, Any],
             parts.append(out["obj"])
         else:
             logger.warning("%s did not parse: %s", what, out["parse_error"])
+        if partial is not None:
+            partial.write_text(json.dumps(schemas.merge_parts(parts), indent=1,
+                                          ensure_ascii=False) + "\n",
+                               encoding="utf-8")
+        return out["obj"]
 
     groups = ([list(frozen)] if not batch
               else [list(frozen)[i:i + batch]
@@ -370,8 +394,32 @@ def emit_parts(loop, method_text: str, stats: Dict[str, Any],
                                 + "\n    cited material:\n"
                                 + _cited_materials(f, docs) for f in g)
                 + "\n\nEmit `finding_reviews` for exactly these findings.")
-        ask(f"finding_reviews[{n}/{len(groups)}]", body,
-            schemas.finding_reviews_schema())
+        got = ask(f"finding_reviews[{n}/{len(groups)}]", body,
+                  schemas.finding_reviews_schema())
+        # AN ADVERSE OBSERVATION WITHOUT ITS EXCEPTION IS NOT A REVIEW. The
+        # schema cannot require `exception` only when an observation is not
+        # clean, so a batch that returns one is asked for once more, naming
+        # the findings, and the first answer for those findings is dropped.
+        # 17 of 17 reviews came back that way in one call on 2026-09-02.
+        bad = _unexplained((got or {}).get("finding_reviews"))
+        if bad and got is not None:
+            logger.warning("batch %d: %d review(s) adverse with no exception "
+                           "— asking once more", n, len(bad))
+            got["finding_reviews"] = [r for r in got["finding_reviews"]
+                                      if r.get("claim_id") not in bad]
+            redo = [f for f in g if f.get("claim_id") in bad]
+            ask(f"finding_reviews[{n}/{len(groups)} again]",
+                "These reviews came back with an observation that is not "
+                "clean and no exception. REVIEW \u00a76 requires the "
+                "exception: the specific mismatch, with `finding_says` and "
+                "`materials_show` quoted. Review these findings again and "
+                "give each adverse observation its exception, or record the "
+                "observation as clean if it is.\n\n"
+                + "\n\n".join(_finding_text(f, claims_by_id)
+                                + "\n    cited material:\n"
+                                + _cited_materials(f, docs) for f in redo)
+                + "\n\nEmit `finding_reviews` for exactly these findings.",
+                schemas.finding_reviews_schema())
 
     never = stats.get("documents_cited_but_never_opened") or {}
     ask("record_check",
@@ -540,8 +588,9 @@ def main() -> int:
     ap.add_argument("--retest-model", help="the second reviewer; defaults to --model")
     ap.add_argument("--world", help="fresh world name; defaults from the run")
     ap.add_argument("--max-turns", type=int, default=12)
-    ap.add_argument("--batch", type=int, default=0,
-                    help="items per emission call; 0 asks for each part at once")
+    ap.add_argument("--batch", type=int, default=10,
+                    help="items per emission call (default 10); 0 asks for "
+                         "each part at once")
     ap.add_argument("--held-sample", type=int, default=3,
                     help="findings that hold, retested as a control (REVIEW §9)")
     ap.add_argument("--seed", type=int, default=0, help="for the held sample")
@@ -609,7 +658,8 @@ def main() -> int:
         # ---- part three: the observations ---------------------------------
         if not error:
             emission = emit_parts(loop, method_text, stats, frozen, findings,
-                                  max_tokens, batch=args.batch, docs=docs)
+                                  max_tokens, batch=args.batch, docs=docs,
+                                  partial=out / "review.partial.json")
             for c in emission["calls"]:
                 if c["response_format_dropped"]:
                     error = (f"the route dropped "
@@ -654,6 +704,8 @@ def main() -> int:
         encoding="utf-8")
     (out / "review.json").write_text(
         json.dumps(obj, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    if (out / "review.partial.json").is_file():
+        (out / "review.partial.json").unlink()
     (out / "outcomes.json").write_text(
         json.dumps({"derived": derived, "standings": stand}, indent=1,
                    ensure_ascii=False, default=str) + "\n", encoding="utf-8")

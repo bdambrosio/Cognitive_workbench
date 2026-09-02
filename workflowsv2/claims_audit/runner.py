@@ -8,12 +8,15 @@
 Loads `workflowsv2/claims_audit/scenario.yaml` and points `inspect_external` at
 the target. A run has three parts, in this order:
 
-  1. ENUMERATE. One schema-constrained call over the claim source, no tools
-     and no legs, producing `claims.json`. The surface freezes here.
+  1. ENUMERATE. One schema-constrained call per section of the claim source,
+     no tools and no legs, each given the claims enumerated so far, producing
+     `claims.json`. The surface freezes when the last section is in.
   2. GATHER. The brief and the frozen surface open the engagement; the agent
-     works the corpus with tools for as long as it keeps yielding.
-  3. ADJUDICATE. One schema-constrained call over the frozen surface and the
-     evidence gathered, producing `findings.json`.
+     works the corpus with tools for as long as it keeps yielding, naming on
+     each evidence request the claims it serves.
+  3. ADJUDICATE. Schema-constrained calls over batches of claims that share
+     evidence, each given only the evidence requests filed under its claims,
+     producing `findings.json`.
 
 WHY THE RUNNER MAKES THE TWO EMISSIONS RATHER THAN THE AGENT. The deliverables
 are schema-enforced, and a ReAct action's payload field is not — it is
@@ -224,6 +227,63 @@ def git_rev(path: Path) -> Optional[str]:
     except Exception as e:                                     # noqa: BLE001
         logger.warning("git rev for %s: %s", path, e)
         return None
+
+
+_TRACE_CLAIMS = re.compile(r"^Query: \[claims ([\d, ]+)\]", re.M)
+
+
+def trace_claims(text: str) -> List[int]:
+    """The claim ids an evidence request was filed under, from the `[claims
+    N, M]` prefix `react._run_inspect_external` writes into the query."""
+    m = _TRACE_CLAIMS.search(text)
+    return sorted({int(x) for x in m.group(1).split(",") if x.strip()}) if m else []
+
+
+def trace_index(traces: Path) -> Dict[Path, Dict[str, Any]]:
+    """Every evidence request: the claims it named, its size in full and
+    in the trimmed form the adjudication is normally handed."""
+    out: Dict[Path, Dict[str, Any]] = {}
+    for t in sorted(traces.glob("inspect_external_*.txt")) if traces.is_dir() else []:
+        text = t.read_text(encoding="utf-8", errors="replace")
+        out[t] = {"claims": trace_claims(text), "chars": len(text),
+                  "trimmed": len(trim_trace(text))}
+    return out
+
+
+def evidence_batches(claim_ids: Sequence[int], index: Dict[Path, Dict[str, Any]],
+                     batch: int, budget: int) -> List[Dict[str, Any]]:
+    """Batches of claims in id order, each with the traces filed under its
+    claims.
+
+    GREEDY, IN CLAIM ORDER, AND NOTHING FANCIER (Bruce, 2026-09-02). Start a
+    batch with the next claim; add the next one while the batch holds fewer
+    than `batch` claims and the FULL traces of the union fit the budget;
+    otherwise close it. Sized on the full form so that trimming stays the
+    exception: a batch that fits only trimmed would make the cut lines
+    routine, and the lines a subagent read but did not cite are worth more
+    than one call saved. A claim whose own full traces exceed the budget is a
+    batch of one, and `gathered_evidence` hands it the trimmed or compact
+    form. A claim no request named joins the walk with no traces, and the
+    adjudication is told so: nothing is dumped in to stand in for evidence.
+    """
+    by_claim = {c: {t for t, v in index.items() if c in v["claims"]}
+                for c in claim_ids}
+
+    def size(ts) -> int:
+        return sum(index[t]["chars"] for t in ts)
+
+    out: List[Dict[str, Any]] = []
+    for c in claim_ids:
+        if out and len(out[-1]["claims"]) < max(1, batch):
+            union = set(out[-1]["traces"]) | by_claim[c]
+            if size(union) <= budget:
+                out[-1]["claims"].append(c)
+                out[-1]["traces"] = sorted(union)
+                continue
+        out.append({"claims": [c], "traces": sorted(by_claim[c])})
+    for b in out:
+        b["untagged"] = [c for c in b["claims"] if not by_claim[c]]
+    return out
 
 
 def files_read(traces: Path, target: Path) -> Dict[str, str]:
@@ -520,7 +580,8 @@ def chase_message(todo: Dict[Any, List[str]],
     lines = ["These claims are unsettled. Your searches named the files below "
              "as the places where the material that could settle each claim "
              "would appear, and you have not opened them. Open each one with "
-             "inspect_external and gather the evidence that settles the "
+             "inspect_external, naming the claim ids in the request's "
+             "`claims` field, and gather the evidence that settles the "
              "claim. Do not write findings; end the leg with `yield` or "
              "`respond` when the files are read.", ""]
     for cid in sorted(todo, key=lambda x: (x is None, x)):
@@ -562,6 +623,89 @@ def numbered(path: Path) -> str:
 EVIDENCE_BUDGET = 400_000
 
 
+#: Lines kept each side of a cited range when a trace is trimmed. Enough for
+#: a signature and its docstring; a constant to tune after a run, not a rule.
+GUARD_BAND = 16
+
+_REF = re.compile(r"([\w./-]+\.\w{1,5}):(\d+)(?:-(\d+))?")
+_NUMBERED = re.compile(r"^(?:OK: )?(\d+)\|")
+
+
+def _same_file(ref: str, file: str) -> bool:
+    ref, file = ref.strip("./"), file.strip("./")
+    return (ref == file or file.endswith("/" + ref) or ref.endswith("/" + file)
+            or ("/" not in ref and file.rsplit("/", 1)[-1] == ref))
+
+
+def trim_trace(text: str, band: int = GUARD_BAND) -> str:
+    """One evidence request with its file reads cut down to the lines the
+    answer cites, plus `band` lines each side, and its grep hits cut down
+    to the files the answer cites. The query, list observations, the tool
+    calls without their `thought`, and the final answer are kept whole.
+
+    WHY. A full trace is mostly files read on the way to an answer; the
+    compact form (query + answer) drops the numbered lines a verbatim quote
+    needs, and adjudicating from it failed the quote check on 51 of 103
+    citations (2026-09-02). This keeps what the answer points at, from the
+    trace itself, so the adjudication sees the lines the subagent saw.
+    """
+    head, sep, answer = text.partition("\nFINAL ANSWER:\n")
+    if not sep:
+        return text
+    refs: Dict[str, List[Tuple[int, int]]] = {}
+    for m in _REF.finditer(answer):
+        lo, hi = int(m.group(2)), int(m.group(3) or m.group(2))
+        refs.setdefault(m.group(1), []).append((min(lo, hi), max(lo, hi)))
+    out_parts: List[str] = []
+    pieces = re.split(r"(?m)^(?=--- iter \d+ ---$)", head)
+    out_parts.append(pieces[0].rstrip("\n"))
+    for piece in pieces[1:]:
+        a, _, obs = piece.partition("\nOBSERVATION:\n")
+        a = re.sub(r'(?m)^\s*"thought":\s*".*",?\n', "", a)
+        tool = re.search(r'"tool":\s*"([^"]+)"', a)
+        ff = re.search(r'"file":\s*"([^"]+)"', a)
+        if tool and tool.group(1) == "grep" and obs:
+            kept, dropped = [], 0
+            for line in obs.splitlines():
+                hm = re.match(r"(?:OK: )?([\w./-]+):(\d+):", line)
+                if hm and any(_same_file(ref, hm.group(1)) for ref in refs):
+                    kept.append(line[4:] if line.startswith("OK: ") else line)
+                elif hm:
+                    dropped += 1
+                else:
+                    kept.append(line)
+            if dropped:
+                kept.append(f"    … {dropped} hit(s) in files the answer does "
+                            f"not cite, not shown")
+            out_parts.append(a.rstrip("\n") + "\nOBSERVATION:\n" + "\n".join(kept))
+            continue
+        if not (tool and tool.group(1) == "read" and ff) or not obs:
+            out_parts.append(piece.rstrip("\n"))
+            continue
+        ranges = [r for ref, rs in refs.items() if _same_file(ref, ff.group(1))
+                  for r in rs]
+        kept, last, dropped = [], None, 0
+        for line in obs.splitlines():
+            nm = _NUMBERED.match(line)
+            if not nm:
+                continue
+            n = int(nm.group(1))
+            if any(lo - band <= n <= hi + band for lo, hi in ranges):
+                if last is not None and n != last + 1:
+                    kept.append(f"    … {n - last - 1} line(s) not cited")
+                kept.append(line[4:] if line.startswith("OK: ") else line)
+                last = n
+            else:
+                dropped += 1
+        if not ranges:
+            kept = [f"    (read {ff.group(1)}; the answer cites no line of it — "
+                    f"{dropped} line(s) not shown)"]
+        elif dropped:
+            kept.append(f"    … {dropped} line(s) of {ff.group(1)} not cited, not shown")
+        out_parts.append(a.rstrip("\n") + "\nOBSERVATION:\n" + "\n".join(kept))
+    return "\n\n".join(out_parts) + "\n\nFINAL ANSWER:\n" + answer
+
+
 def compact_trace(text: str) -> str:
     """One evidence request as its query and the subagent's final answer.
 
@@ -576,8 +720,9 @@ def compact_trace(text: str) -> str:
     return f"{query}\nFINAL ANSWER:\n{answer}"
 
 
-def gathered_evidence(traces: Path, budget: int) -> Dict[str, Any]:
-    """The engagement's evidence requests and what they returned.
+def gathered_evidence(files: Sequence[Path], budget: int) -> Dict[str, Any]:
+    """The evidence requests handed to one adjudication call, and what they
+    returned. `files` is the batch's traces (`evidence_batches`).
 
     WHY THE TRACES AND NOT THE TARGET. Handing the emission call the corpus
     would make it a single-call audit that never used the legs — the fixture is
@@ -589,17 +734,19 @@ def gathered_evidence(traces: Path, budget: int) -> Dict[str, Any]:
     trace that overran the budget, and on ChatterMate the adjudication was
     handed 2 of 40 requests: one directory listing and one file. Seventy-two
     claims came back `unverifiable`, most of them citing files the run had in
-    fact read. Now the full traces are handed over when they fit, and the
-    compact form of every trace when they do not; `form` records which. Only
-    when the compact set overruns the budget are traces left out, in order,
-    and `omitted` counts them.
+    fact read. Now three forms are tried in order — full, trimmed to the
+    cited lines with a guard band, compact (query and answer) — and the first
+    that fits the budget is handed over; `form` records which. Only when the
+    compact set overruns the budget are traces left out, in order, and
+    `omitted` counts them.
     """
-    files = sorted(traces.glob("inspect_external_*.txt")) if traces.is_dir() else []
+    files = list(files)
     texts = [f.read_text(encoding="utf-8", errors="replace") for f in files]
     form = "full"
     if sum(len(t) for t in texts) > budget:
-        form = "compact"
-        texts = [compact_trace(t) for t in texts]
+        form, texts = "trimmed", [trim_trace(t) for t in texts]
+    if sum(len(t) for t in texts) > budget:
+        form, texts = "compact", [compact_trace(t) for t in texts]
     kept, used = [], 0
     for t in texts:
         if used + len(t) > budget:
@@ -646,29 +793,47 @@ def _merge_emissions(parts: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
 
 
 def emit_surface(loop, method_text: str, claim_source: Path,
-                 max_tokens: int) -> Dict[str, Any]:
-    """Phase one: enumerate the claims, before any evidence is gathered.
+                 section: Tuple[int, int], n: int, of: int,
+                 so_far: Sequence[Dict[str, Any]], max_tokens: int
+                 ) -> Dict[str, Any]:
+    """Phase one, one section: enumerate its claims, before any evidence.
 
     NO TOOLS AND NO LEGS. Enumeration is reading one document, which the runner
     can hand over directly and line-numbered. Giving the agent a tool loop to
     fetch a document the runner already has would add a failure mode and buy
     nothing — and it would put evidence in front of the enumeration, which is
     the ordering METHOD §5 freezes against.
+
+    ONE SECTION AT A TIME, WITH THE CLAIMS SO FAR. A whole document in one
+    call enumerated 101 claims of which a third restated another (ChatterMate
+    README, 2026-09-02) and joined table rows the surface check could not
+    find. A section is small enough to read closely, and the list of ids so
+    far is what lets a restatement be named instead of counted again.
     """
-    user = (f"The claim source for this run is `{claim_source.name}`. Its "
-            f"text, with the line numbers your citations refer to:\n\n"
-            f"{numbered(claim_source)}\n\n"
-            f"Emit the claim surface now, per METHOD \u00a75 and \u00a713. You "
-            f"have gathered no evidence and formed no verdicts; enumerate "
-            f"every assertion the seller makes about the target.")
+    lo, hi = section
+    lines = claim_source.read_text(encoding="utf-8", errors="replace").splitlines()
+    body = "\n".join(f"{k}|{t}" for k, t in enumerate(lines[lo - 1:hi], lo))
+    prior = ("\n".join(f"  {c['id']}. {c.get('quote')}" for c in so_far)
+             or "  (none yet)")
+    user = (f"The claim source for this run is `{claim_source.name}`, "
+            f"{len(lines)} lines. This is section {n} of {of}, lines {lo} to "
+            f"{hi}, with the line numbers your citations refer to:\n\n"
+            f"{body}\n\n"
+            f"Claims already enumerated from the sections before this one, "
+            f"with their ids:\n\n{prior}\n\n"
+            f"Emit the claims this section makes, per METHOD \u00a75 and "
+            f"\u00a713. You have gathered no evidence and formed no verdicts. "
+            f"An assertion already in the list above is emitted with "
+            f"`restates` naming its id, not as a new claim.")
     out = emit(loop, method_text, user, schemas.surface_schema(), max_tokens)
     out["phase"] = "surface"
+    out["section"] = [lo, hi]
     return out
 
 
 def emit_findings(loop, method_text: str, claim_source: Path,
                   frozen: Sequence[Dict[str, Any]],
-                  traces: Path, max_tokens: int,
+                  traces: Sequence[Path], max_tokens: int,
                   evidence_budget: int = EVIDENCE_BUDGET,
                   note: str = "") -> Dict[str, Any]:
     """The one schema-constrained call that produces the deliverable.
@@ -694,10 +859,9 @@ def emit_findings(loop, method_text: str, claim_source: Path,
         f"THE FROZEN CLAIM SURFACE. These are the claims you enumerated, and "
         f"the surface does not change. Adjudicate every one of them, and refer "
         f"to each by its id:\n\n"
-        + "\n".join(f"  {c.get('id')}. [{c.get('lines')}] {c.get('quote')}"
-                    for c in frozen)
+        + "\n".join(_claim_line(c) for c in frozen)
         + (f"\n\n{note}" if note else "")
-        + f"\n\nThe evidence requests made during this engagement, and what "
+        + f"\n\nThe evidence requests filed under these claims, and what "
           f"they returned:\n\n{ev['text']}\n\n"
           f"Emit the findings document now, per METHOD \u00a713. Every frozen "
           f"claim gets exactly one finding.")
@@ -706,6 +870,36 @@ def emit_findings(loop, method_text: str, claim_source: Path,
     out["phase"] = "findings"
     out["evidence"] = {k: v for k, v in ev.items() if k != "text"}
     return out
+
+
+def _claim_line(c: Dict[str, Any]) -> str:
+    """One frozen claim as the adjudication and the legs see it: id, lines,
+    quote, the statement, the `seller` mark, and every further place it is
+    made.
+
+    THE STATEMENT IS SHOWN, NOT ONLY THE QUOTE. A quote is verbatim by METHOD
+    §5, so a claim split out of a sentence can read "which provides
+    automatic scaling..." with its subject in the claim before it — and that
+    claim may sit in another batch. The statement is where the enumeration
+    resolves the referent ("The platform (Heroku) provides..."), and it was
+    not being handed over (Bruce, 2026-09-02).
+    """
+    line = (f"  {c.get('id')}. [{c.get('lines')}] {c.get('quote')}\n"
+            f"      statement: {c.get('statement')}")
+    if c.get("about") == "seller":
+        line += "  (about the seller, per METHOD \u00a75)"
+    for loc in c.get("locations") or []:
+        line += f"\n      also at [{loc.get('lines')}]: {loc.get('quote')}"
+    return line
+
+
+#: Appended to the brief. Mechanical, so it lives here and not in each
+#: engagement's brief.md: the runner is what reads the tags back.
+TAG_INSTRUCTION = (
+    "Per METHOD \u00a712 step 3: on every `inspect_external` request, name in "
+    "its `claims` field the ids of the claims it gathers evidence for. The "
+    "record of the request is filed under those claims, and a claim is "
+    "adjudicated on the requests filed under it and nothing else.")
 
 
 def post_run_checks(obj: Optional[Dict[str, Any]], corpus: Path,
@@ -757,9 +951,9 @@ def main() -> int:
     ap.add_argument("--temperature", type=float, default=None,
                     help="override the action-emission temperature "
                          "(scenario default 0.7)")
-    ap.add_argument("--batch", type=int, default=0,
-                    help="claims per adjudication call; 0 adjudicates the "
-                         "frozen surface in one call")
+    ap.add_argument("--batch", type=int, default=10,
+                    help="claims per adjudication call at most; batches are "
+                         "formed from claims that share evidence (default 10)")
     ap.add_argument("--evidence-budget", type=int, default=EVIDENCE_BUDGET,
                     help="characters of evidence traces handed to each "
                          "adjudication call (default %(default)s); over it, "
@@ -865,27 +1059,54 @@ def main() -> int:
     emission: Optional[Dict[str, Any]] = None
     frozen: list = []
     chase: Dict[str, Any] = {"passes": [], "unopened_after": []}
+    batch_log: List[Dict[str, Any]] = []
     traces_dir = REPO / "scenarios" / args.world / name / "inspect_traces"
     src_doc = eng["target"] / eng["claim_sources"][0]
     method_text = load_workflow(REPO / METHOD_PATH)
     emit_tokens = int((cfg.get("chat") or {}).get("react_max_tokens", 32768))
     try:
-        # ---- phase one: enumerate, then freeze --------------------------
-        logger.info("phase 1: enumerating %s", src_doc.name)
-        surface = emit_surface(loop, method_text, src_doc, emit_tokens)
-        logger.info("surface: %s, finish=%s, %d chars", surface["parse"],
-                    surface["finish"], len(surface["raw"] or ""))
-        if surface["response_format_dropped"]:
-            error = ("the route dropped "
-                     + ", ".join(surface["response_format_dropped"])
-                     + " — the claim surface was not schema-constrained")
-        elif surface["obj"] is None:
-            error = (f"claim surface did not parse "
-                     f"(finish={surface['finish']}): {surface['parse_error']}")
-        else:
-            frozen = surface["obj"].get("claims") or []
+        # ---- phase one: enumerate section by section, then freeze --------
+        sections = schemas.split_sections(
+            src_doc.read_text(encoding="utf-8", errors="replace"))
+        logger.info("phase 1: enumerating %s in %d section(s)", src_doc.name,
+                    len(sections))
+        parts, calls, raws = [], [], []
+        assembled: Dict[str, Any] = {"claim_source": src_doc.name, "claims": []}
+        for n, sec in enumerate(sections, 1):
+            part = emit_surface(loop, method_text, src_doc, sec, n,
+                                len(sections), assembled["claims"], emit_tokens)
+            calls.append({k: v for k, v in part.items() if k not in ("raw", "obj")})
+            raws.append(part.get("raw") or "")
+            logger.info("section %d/%d lines %d-%d: %s, finish=%s, %d chars",
+                        n, len(sections), sec[0], sec[1], part["parse"],
+                        part["finish"], len(part["raw"] or ""))
+            if part["response_format_dropped"]:
+                error = ("the route dropped "
+                         + ", ".join(part["response_format_dropped"])
+                         + " — the claim surface was not schema-constrained")
+                break
+            if part["obj"] is None:
+                error = (f"section {n} of the claim surface did not parse "
+                         f"(finish={part['finish']}): {part['parse_error']}")
+                break
+            parts.append(part["obj"])
+            assembled = schemas.assemble_surface(src_doc.name, parts)
+        surface = {"raw": "\n\n".join(raws),
+                   "obj": assembled if parts else None,
+                   "parse": max((c["parse"] for c in calls), default=None,
+                                key=lambda x: {"parsed": 0, "repaired": 1,
+                                               "salvaged": 2}.get(x, 3)),
+                   "finish": calls[-1]["finish"] if calls else None,
+                   "parse_error": next((c["parse_error"] for c in calls
+                                        if c.get("parse_error")), None),
+                   "response_format_dropped": sorted(
+                       {d for c in calls for d in c["response_format_dropped"]}),
+                   "sections": [list(sec) for sec in sections],
+                   "calls": calls, "phase": "surface"}
+        if not error:
+            frozen = assembled.get("claims") or []
             surface_check = schemas.check_surface(
-                surface["obj"], eng["target"], eng["claim_sources"][0])
+                assembled, eng["target"], eng["claim_sources"][0])
             for problem in surface_check["problems"]:
                 issues.note(out, stage="claims_audit", code="surface_check",
                             text=problem, severity="blocking")
@@ -896,16 +1117,16 @@ def main() -> int:
             for problem in surface_check["problems"]:
                 logger.warning("  %s", problem)
             (out / "claims.json").write_text(
-                json.dumps(surface["obj"], indent=1, ensure_ascii=False) + "\n",
+                json.dumps(assembled, indent=1, ensure_ascii=False) + "\n",
                 encoding="utf-8")
 
         # ---- the gathering legs -----------------------------------------
         if not error and frozen:
             text = (eng["brief"].read_text(encoding='utf-8')
+                    + "\n\n" + TAG_INSTRUCTION
                     + "\n\nThe claim surface is frozen. These are the claims "
                       "to find evidence for:\n\n"
-                    + "\n".join(f"  {c.get('id')}. {c.get('quote')}"
-                                 for c in frozen))
+                    + "\n".join(_claim_line(c) for c in frozen))
             text_first_leg = text
             sent_reason = "opening brief and the frozen claim surface"
             traces_before = 0
@@ -953,33 +1174,62 @@ def main() -> int:
                 logger.info("leg cap reached with the agent still gathering")
 
         # ---- phase two: adjudicate the frozen claims --------------------
+        by_id = {c.get("id"): c for c in frozen}
+
+        def adjudicate(ids: Sequence[int], note: str = "") -> Dict[str, Any]:
+            """The claims `ids`, in batches that share evidence, each given
+            only the evidence requests filed under its claims (METHOD §8's
+            `claims` tags). One function for the first pass, the reprompt
+            and the chase, so all three see the same evidence rule.
+
+            THE BATCH IS SIZED BY EVIDENCE, NOT BY COUNT ALONE. One call over
+            101 claims quoted from the compact record and failed the verbatim
+            check on 51 of 103 citations (2026-09-02). A batch that shares
+            traces fits them in full, so the quote comes from numbered lines.
+            Each batch's findings are written to findings.partial.json as
+            they land, so a run that dies keeps what it had.
+            """
+            index = trace_index(traces_dir)
+            batches = evidence_batches(list(ids), index, args.batch,
+                                       args.evidence_budget)
+            emissions = []
+            for bi, b in enumerate(batches, 1):
+                logger.info("adjudicating batch %d/%d: %d claim(s), %d "
+                            "trace(s), %d with no request filed", bi,
+                            len(batches), len(b["claims"]), len(b["traces"]),
+                            len(b["untagged"]))
+                bnote = note
+                if b["untagged"]:
+                    bnote += (("\n\n" if note else "")
+                              + "No evidence request was filed under "
+                              + ("claim " if len(b["untagged"]) == 1 else "claims ")
+                              + ", ".join(str(c) for c in b["untagged"])
+                              + ". Adjudicate on what is below; where nothing "
+                                "below bears on such a claim, the materials "
+                                "have not been searched for it.")
+                e = emit_findings(
+                    loop, method_text=method_text, claim_source=src_doc,
+                    frozen=[by_id[c] for c in b["claims"] if c in by_id],
+                    traces=b["traces"], max_tokens=emit_tokens,
+                    evidence_budget=args.evidence_budget, note=bnote)
+                emissions.append(e)
+                batch_log.append({"claims": b["claims"],
+                                  "traces": len(b["traces"]),
+                                  "untagged": b["untagged"],
+                                  "parse": e["parse"], "finish": e["finish"],
+                                  "evidence": e["evidence"]})
+                (out / "findings.partial.json").write_text(json.dumps(
+                    _merge_emissions(emissions).get("obj") or {},
+                    indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+            return _merge_emissions(emissions) if emissions else {
+                "raw": "", "obj": None, "parse": "unparseable",
+                "parse_error": "no claims to adjudicate", "finish": None,
+                "attempts": [], "response_format_dropped": [],
+                "phase": "findings", "evidence": None}
+
         if not error and frozen:
             logger.info("phase 2: adjudicating %d frozen claims", len(frozen))
-            # BATCHING IS A RUNNER DECISION, NOT A SCHEMA CHANGE, and the
-            # same one the review makes: `emit_findings` already takes a
-            # subset of claims — the reprompt path passes only those that got
-            # no finding — so a batch is that call over ten claims instead of
-            # forty. Default 0 asks for the whole surface at once, because
-            # nothing has truncated yet; a hundred-claim source is what the
-            # flag is for.
-            #
-            # THE COST IS THE EVIDENCE, RE-SENT. Each batch carries the whole
-            # gathered record, so four batches is four times the input. Cheap
-            # locally, not free hosted. And it changes what the model sees, so
-            # it is an instrument change and gets validated as one.
-            groups = ([frozen] if not args.batch
-                      else [frozen[i:i + args.batch]
-                            for i in range(0, len(frozen), args.batch)])
-            emissions = []
-            for gi, g in enumerate(groups, 1):
-                if len(groups) > 1:
-                    logger.info("adjudicating batch %d/%d (%d claims)",
-                                gi, len(groups), len(g))
-                emissions.append(emit_findings(
-                    loop, method_text=method_text, claim_source=src_doc,
-                    frozen=g, traces=traces_dir, max_tokens=emit_tokens,
-                    evidence_budget=args.evidence_budget))
-            emission = _merge_emissions(emissions)
+            emission = adjudicate([c.get("id") for c in frozen])
             logger.info("findings: %s, finish=%s, %d chars, evidence %s",
                         emission["parse"], emission["finish"],
                         len(emission["raw"] or ""), emission["evidence"])
@@ -1011,11 +1261,7 @@ def main() -> int:
                     ids = ", ".join(str(c.get("id")) for c in missing)
                     logger.warning("%d frozen claim(s) with no finding: %s "
                                    "— reprompting once", len(missing), ids)
-                    again = emit_findings(
-                        loop, method_text=method_text, claim_source=src_doc,
-                        frozen=missing, traces=traces_dir,
-                        max_tokens=emit_tokens,
-                        evidence_budget=args.evidence_budget)
+                    again = adjudicate([c.get("id") for c in missing])
                     reprompt = {"claims": [c.get("id") for c in missing],
                                 "parse": again["parse"],
                                 "finish": again["finish"],
@@ -1079,11 +1325,8 @@ def main() -> int:
                     if not opened:
                         logger.warning("chase pass opened no new file — stopping")
                         break
-                    again = emit_findings(
-                        loop, method_text=method_text, claim_source=src_doc,
-                        frozen=[c for c in frozen if c.get("id") in todo],
-                        traces=traces_dir, max_tokens=emit_tokens,
-                        evidence_budget=args.evidence_budget,
+                    again = adjudicate(
+                        sorted(todo, key=lambda x: (x is None, x)),
                         note=("These claims were adjudicated `not_examined`: "
                               "their searches named files that had not been "
                               "opened. Those files have since been opened and "
@@ -1148,6 +1391,8 @@ def main() -> int:
     checks = post_run_checks(obj, eng["target"], eng["claim_sources"][0],
                              frozen, out,
                              read=set(files_read(traces_dir, eng["target"])))
+    if obj is not None and (out / "findings.partial.json").is_file():
+        (out / "findings.partial.json").unlink()
     if not error and not checks["ok"]:
         error = f"output check failed: {len(checks['problems'])} problem(s)"
     if chase["unopened_after"]:
@@ -1286,6 +1531,11 @@ def main() -> int:
         "surface": ({k: v for k, v in surface.items() if k not in ("raw", "obj")}
                     if surface else None),
         "frozen_claims": len(frozen),
+        "sections": (surface or {}).get("sections"),
+        # THE ADJUDICATION BATCHES: which claims, how many traces each was
+        # handed, and whether it fell back to the whole record because no
+        # request named its claims.
+        "batches": batch_log if frozen else [],
         "emission": ({k: v for k, v in emission.items() if k not in ("raw", "obj")}
                      if emission else None),
         # METHOD's requirements over the parsed output, in place of v1's three

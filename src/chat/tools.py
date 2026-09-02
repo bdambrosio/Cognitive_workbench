@@ -292,8 +292,11 @@ class ToolsMixin:
         external_repo = self._get_external_repo()
         if external_repo is not None:
             tools.append(("inspect_external",
-                "`{\"thought\": \"<one terse sentence>\", \"tool\": \"inspect_external\", \"query\": <string>}` — "
+                "`{\"thought\": \"<one terse sentence>\", \"tool\": \"inspect_external\", \"query\": <string>, "
+                "\"claims\": [<int>, ...]}` — "
                 f"query the external project repo currently bound to this session: `{external_repo}`. "
+                "`claims` is optional: when the query gathers evidence for enumerated claims, list their ids "
+                "and the record of this request is filed under them. "
                 "Same primitives as `inspect` (list/read/grep), different geofence — this is reading an external "
                 "codebase as documentation, not introspection of your own substrate. Use ONLY when the user asks "
                 "questions about THAT project (its code, README, structure, behavior). It cannot see your own "

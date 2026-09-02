@@ -60,6 +60,13 @@ def _claim_check() -> Dict[str, Any]:
 
 
 def _finding_review() -> Dict[str, Any]:
+    """The three exception fields are REQUIRED, empty when every observation
+    is clean. They were optional until 2026-09-02, and a model under
+    constrained decoding simply left them out: 17 of 17 adverse reviews on
+    one run and 3 of 3 on the next, twice, after a re-ask that spelled the
+    requirement out. A required field is generated; an optional one is a
+    choice the decoder makes for the model. `check_review` still requires
+    the text to be non-empty when an observation is not clean."""
     props: Dict[str, Any] = {
         "claim_id": {"type": "integer", "minimum": 1},
         "exception": {"type": "string"},
@@ -68,7 +75,8 @@ def _finding_review() -> Dict[str, Any]:
     for name, values in OBSERVATIONS.items():
         props[name] = {"enum": list(values)}
     return {"type": "object", "properties": props,
-            "required": ["claim_id", *OBSERVATIONS]}
+            "required": ["claim_id", *OBSERVATIONS,
+                         "exception", "finding_says", "materials_show"]}
 
 
 # ---------------------------------------------------------------------------

@@ -146,8 +146,16 @@ def _finding(f: Dict[str, Any], rating: Optional[Dict[str, Any]],
         head += f" — {field}: {rating.get(field)}"
     out = [head, "",
            f"> \"{(f.get('quote') or '').strip()}\" "
-           f"({f.get('claim_source')}, {_lines(f.get('lines'))})", "",
-           f"**Verdict:** {VERDICT_WORDS.get(v, v)}."]
+           f"({f.get('claim_source')}, {_lines(f.get('lines'))})"]
+    for loc in f.get("locations") or []:
+        out.append(f"> also, at {_lines(loc.get('lines'))}: "
+                   f"\"{(loc.get('quote') or '').strip()}\"")
+    out += [""]
+    if f.get("about") == "seller":
+        out.append("This assertion is about the seller's own activity or "
+                   "hosted service, which the supplied materials are not "
+                   "expected to reach.")
+    out += [f"**Verdict:** {VERDICT_WORDS.get(v, v)}."]
     if adj.get("gap"):
         out.append(f"**The gap:** {adj['gap'].strip()}")
     if adj.get("unresolved_because"):

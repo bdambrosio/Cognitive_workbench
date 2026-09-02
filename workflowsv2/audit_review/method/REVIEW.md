@@ -24,7 +24,7 @@ The audit's own method states the gap this review fills. METHOD §7: *"This chec
 
 ## 3. What you have
 
-**The claim surface** — `claims.json`. Every claim the audit froze, each with an `id`, the seller's assertion `quote`d verbatim, the `lines` it sits on, and the auditor's `statement` of it.
+**The claim surface** — `claims.json`. Every claim the audit froze, each with an `id`, the seller's assertion `quote`d verbatim, the `lines` it sits on, the auditor's `statement` of it, whom it is `about`, and any further `locations` where the claim source makes the same assertion again.
 
 **The findings** — `findings.json`. One finding per frozen claim, each naming its claim by `claim_id`, carrying an `adjudication` and the `evidence` it rests on.
 
@@ -147,9 +147,9 @@ You record observations. The outcome — whether each finding holds — is deriv
 | `finding_reviews[].evidence_supports` | Per §6 |
 | `finding_reviews[].verdict_calibration` | Per §6 |
 | `finding_reviews[].searches_adequate` | Per §6 |
-| `finding_reviews[].exception` | Required when any observation is not clean: the specific mismatch |
-| `finding_reviews[].finding_says` | Required with an exception: what the finding states, quoted |
-| `finding_reviews[].materials_show` | Required with an exception: what the cited material says, quoted |
+| `finding_reviews[].exception` | The specific mismatch, when any observation is not clean; an empty string when every observation is clean |
+| `finding_reviews[].finding_says` | With an exception, what the finding states, quoted; otherwise an empty string |
+| `finding_reviews[].materials_show` | With an exception, what the cited material says, quoted; otherwise an empty string |
 | `record_check` | §7's one statement about the audit as a whole |
 
 Emit nothing outside the JSON object. There is no covering note and no summary of the audit's conclusions.
@@ -182,7 +182,8 @@ exception does not stand; the exception stays on the record with that
 standing. Report the disagreement; do not resolve it.
 
 **A disagreement about a sampled finding that holds changes nothing about that
-finding.** It counts toward the control and nowhere else. The two directions are
+finding.** It counts toward the control and nowhere else: not toward the
+finding's outcome, and not toward anything a later stage reads. The two directions are
 not symmetric: a reviewer asserting a defect in finished work carries the higher
 standard, because one wrong exception puts a defect on the record against an
 audit that does not carry it, while a wrong pass would need every real exception

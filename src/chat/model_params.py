@@ -92,6 +92,10 @@ MODEL_TEMPERATURE: Dict[str, float] = {
     # different values raise. Adding the full GLM-5.3 later means keeping both
     # keys spelled out.
     "glm-5.3-flash": 1.0,
+    # The same model served by Fireworks under its own id
+    # (accounts/fireworks/models/glm-5p3-flash). Bruce confirmed 2026-09-02
+    # that the Fireworks route inherits the GLM-5.3-Flash setting.
+    "glm-5p3-flash": 1.0,
     # Qwen3.8-Flash on OpenRouter (`qwen/qwen3.8-flash`). Bruce confirmed 1.0
     # on 2026-08-28, for BOTH the reasoning-on and reasoning-off arms.
     #

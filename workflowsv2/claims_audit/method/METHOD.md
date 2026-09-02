@@ -6,7 +6,7 @@ One claim-source document is audited per run. The engagement names it. Every oth
 
 > Compare what the seller asserts in this claim source against what the supplied materials show, and cite the material used.
 
-The run has two phases and produces two JSON documents. First you enumerate the claims and the surface is **frozen**; then you adjudicate the frozen claims against the evidence. Both are read by a machine, not by the buyer. A later stage combines the runs over every claim source, and a stage after that writes the client's report.
+The run has two phases and produces two JSON documents, each assembled by the client's process from the objects you emit. First you enumerate the claims, section by section, and the surface is **frozen**; then you adjudicate the frozen claims against the evidence, batch by batch. Both documents are read by a machine, not by the buyer. A later stage combines the runs over every claim source, and a stage after that writes the client's report.
 
 **The surface is frozen before any claim is adjudicated, and this is a control rather than a convenience.** Enumerating while adjudicating means choosing what counts as a claim with the verdicts already in view, which is choosing the sample after seeing the result. You will be given the frozen list back; you do not revise it.
 
@@ -22,6 +22,10 @@ Two things follow from being one stage of several:
 **Evaluate what the seller asserts about the target against what the supplied materials show.**
 
 A claim is an assertion the seller makes to the buyer in the designated claim source — a listing, a technical description, a specification, a marketing document. The engagement names which document that is for this run.
+
+**Not every sentence of a claim source is a claim.** A command, an installation step, a list of prerequisites or a configuration example instructs the reader. It is a claim only where it asserts a property of the target — that a named command exists, that the stack runs on a named database, that a step has the stated effect. Enumerate what it asserts, and not the instruction.
+
+**An assertion about the seller rather than the target is still a claim.** A sign-up page, a directory listing said to be in progress, a hosted plan and its price: the seller asserts them to the buyer, and the supplied materials are not expected to reach them. §5 marks such a claim so the reader knows why it went unsettled.
 
 Other supplied documents, including source code and code comments, are evidence sources. They test claims. They are not themselves seller claims, even when they assert something.
 
@@ -62,12 +66,23 @@ A derived fact (§7) is evidence. It is not a finding of its own.
 
 ## 5. The claim surface
 
-Read the claim source and enumerate every assertion in it the seller makes about the target. Each one carries:
+The claim source is given to you one section at a time, in document order, with the claims already enumerated from the sections before it. Enumerate every assertion in the section you are given. Each one carries:
 
-- **`id`** — a number, from 1, counting up in the order the claims appear in the document. This is how findings refer to it.
 - **`quote`** — the assertion as the claim source states it, **verbatim**. Copy it; do not paraphrase, tidy, or join text that is not contiguous.
 - **`lines`** — where that quote sits in the claim source, as a start and end line number.
 - **`statement`** — the claim in your own plain words, so a reader knows what is being tested.
+- **`about`** — whom the assertion concerns, per §2:
+
+| `about` | Meaning |
+|---|---|
+| `target` | The product, code, infrastructure, business or terms the buyer would acquire |
+| `seller` | The seller's own activity or hosted service, which the supplied materials are not expected to reach |
+
+- **`restates`** — present only when the assertion is one already enumerated, made again: the `id` of that claim.
+
+**`id`** is assigned by the client's process, from 1, in document order, once a section's claims are in. Claims from earlier sections reach you with their ids, and that is how findings refer to them.
+
+**An assertion made twice is one claim.** A feature table, a comparison table and a FAQ routinely repeat the headline. Where the section you are given asserts something a listed claim already asserts, emit it with `restates` naming that claim, and the client's process records the second place on the one claim. A claim is adjudicated once, and its finding covers every place it is made. Two assertions that share a subject and differ in what they assert are two claims, per the rule below.
 
 **Where to divide the text into claims.** Split assertions apart where different evidence could give them different verdicts. Keep them together where they stand or fall on the same evidence. **Do not split one assertion into parts that the same evidence settles**, and do not combine separate assertions because they share a subject. Both are faults, and the second is not worse than the first.
 
@@ -77,7 +92,7 @@ Read the claim source and enumerate every assertion in it the seller makes about
 
 **Enumerate before you adjudicate, and enumerate everything.** At this point you have not tested any claim, so you cannot know which will hold. A claim that looks obviously true, or obviously false, or impossible to check, is enumerated exactly like the rest.
 
-**Once emitted the surface is frozen.** It is handed back to you for the adjudication phase and it does not change. An assertion you notice after the surface has closed is not added to it and is not adjudicated. Enumerate carefully the first time; that is what this phase is for.
+**Once the last section is enumerated the surface is frozen.** It is handed back to you for the adjudication phase and it does not change. An assertion you notice after the surface has closed is not added to it and is not adjudicated. Enumerate each section carefully the first time; that is what this phase is for.
 
 ## 6. Verdicts
 
@@ -190,13 +205,13 @@ If evidence found later contradicts a finding you have already formed, revise th
 
 **Phase one — enumerate.**
 
-1. **Read the claim source named by the engagement.** If the engagement names none, the run cannot proceed: say so in `not_completed`, per §4.
+1. **Read the section of the claim source you are given**, with the claims already enumerated before it. If the section cannot be read, say so in `not_completed`, per §4.
 
-2. **Enumerate every claim in it** and emit the claim surface, per §5 and §13. Do not gather evidence yet and do not form verdicts. The surface freezes when you emit it.
+2. **Enumerate every claim in the section**, naming any restatement, and emit them per §5 and §13. Do not gather evidence yet and do not form verdicts. The surface freezes when the last section's claims are in.
 
 **Phase two — adjudicate.** You are given the frozen surface back.
 
-3. **Gather evidence** across all the supplied materials, not only the claim source. The evidence that settles a claim made in one document usually sits in another.
+3. **Gather evidence** across all the supplied materials, not only the claim source. The evidence that settles a claim made in one document usually sits in another. On every evidence request, name the claims it gathers evidence for: the record of the request is filed under those claims, and a claim is adjudicated on the requests filed under it and nothing else.
 
 4. **Adjudicate each frozen claim** and assign one verdict, per §6. Where a claim raises something only the seller can answer, record it in `questions`.
 
@@ -210,19 +225,20 @@ If evidence found later contradicts a finding you have already formed, revise th
 
 ## 13. The output
 
-Two JSON objects, one per phase. Each is emitted once, complete, and nothing goes outside it.
+Two kinds of JSON object, one per phase. Phase one is emitted once per section of the claim source; phase two once per batch of claims. Each is complete for what it was asked, and nothing goes outside it.
 
 **Phase one — the claim surface.**
 
 | Field | Contents |
 |---|---|
 | `claim_source` | The document named by the engagement |
-| `claims[]` | Every assertion the claim source makes, per §5 |
-| `claims[].id` | A number, from 1, in document order |
+| `claims[]` | Every assertion the section you were given makes, per §5 |
 | `claims[].quote` | The assertion verbatim, per §5 |
 | `claims[].lines` | Where that quote sits in the claim source |
 | `claims[].statement` | The claim in plain words |
-| `not_completed` | Present only when the claim source could not be read, per §4. When it is present, `claims` is empty |
+| `claims[].about` | `target` or `seller`, per §5 |
+| `claims[].restates` | Present only for an assertion already enumerated: the `id` of that claim, per §5 |
+| `not_completed` | Present only when the section could not be read, per §4. When it is present, `claims` is empty |
 
 **Phase two — the findings.** The fields follow §4's shape.
 

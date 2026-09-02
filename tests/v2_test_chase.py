@@ -12,7 +12,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from workflowsv2.claims_audit import schemas as sch             # noqa: E402
 from workflowsv2.claims_audit.runner import (                     # noqa: E402
-    chase_message, compact_trace, gathered_evidence, replace_findings)
+    chase_message, compact_trace, evidence_batches, gathered_evidence,
+    replace_findings, trace_claims)
 
 
 def _corpus(tmp_path):
@@ -96,15 +97,16 @@ def test_gathered_evidence_represents_every_request(tmp_path):
     for i in range(3):
         (d / f"inspect_external_2026-09-02T00-00-0{i}Z.txt").write_text(
             _trace(f"q{i}", big, f"answer {i}"))
-    full = gathered_evidence(d, budget=10 ** 6)
+    files = sorted(d.glob("*.txt"))
+    full = gathered_evidence(files, budget=10 ** 6)
     assert full["form"] == "full" and full["included"] == 3 and full["omitted"] == 0
     assert "OBSERVATION" in full["text"]
-    compact = gathered_evidence(d, budget=5000)
+    compact = gathered_evidence(files, budget=5000)
     assert compact["form"] == "compact" and compact["included"] == 3
     assert compact["omitted"] == 0
     assert all(f"answer {i}" in compact["text"] for i in range(3))
     assert "OBSERVATION" not in compact["text"]
-    cut = gathered_evidence(d, budget=400)
+    cut = gathered_evidence(files, budget=400)
     assert cut["form"] == "compact" and cut["included"] < 3 and cut["omitted"] >= 1
 
 
@@ -130,3 +132,74 @@ def test_replace_findings_swaps_only_the_wanted_claims():
     assert [f["adjudication"]["verdict"] for f in obj["findings"]] == \
         ["contradicted", "real", "unverifiable"]
     assert len(obj["findings"]) == 3
+
+
+def test_trace_claims_reads_the_prefix():
+    assert trace_claims("=" * 80 + "\n[x]\n" + "=" * 80
+                        + "\nQuery: [claims 5, 2, 5] read a.py\n") == [2, 5]
+    assert trace_claims("Query: read a.py\n") == []
+
+
+def test_evidence_batches_walk_claims_in_order_within_size_and_budget():
+    from pathlib import PurePosixPath as P
+    index = {P("t1"): {"claims": [1, 2], "chars": 500, "trimmed": 100},
+             P("t2"): {"claims": [2, 3], "chars": 500, "trimmed": 100},
+             P("t3"): {"claims": [4], "chars": 500, "trimmed": 100},
+             P("t4"): {"claims": [], "chars": 500, "trimmed": 100}}
+    b = evidence_batches([1, 2, 3, 4, 5], index, batch=10, budget=10_000)
+    assert [x["claims"] for x in b] == [[1, 2, 3, 4, 5]]
+    assert b[0]["traces"] == [P("t1"), P("t2"), P("t3")]
+    assert b[0]["untagged"] == [5]
+    # the budget closes a batch before the next claim's traces overflow it;
+    # sized on the FULL form, so trimming stays the exception
+    b = evidence_batches([1, 2, 3, 4], index, batch=10, budget=1_250)
+    assert [x["claims"] for x in b] == [[1, 2, 3], [4]]
+    b = evidence_batches([1, 2, 3, 4], index, batch=10, budget=250)
+    assert [x["claims"] for x in b] == [[1], [2], [3], [4]]
+    # the size cap closes it too
+    b = evidence_batches([1, 2, 3, 4], index, batch=2, budget=10_000)
+    assert [x["claims"] for x in b] == [[1, 2], [3, 4]]
+    # a claim over budget alone is a batch of one, never dropped
+    b = evidence_batches([1, 2], index, batch=10, budget=400)
+    assert [x["claims"] for x in b] == [[1], [2]]
+    assert b[0]["traces"] == [P("t1")]
+
+
+TRACE = ("=" * 80 + "\n[inspect_external] t exit=respond iters=3\n" + "=" * 80
+         + "\nQuery: [claims 3] where is the guard\n\n"
+         "--- iter 1 ---\nACTION:\n{\n  \"thought\": \"look\",\n  \"tool\": \"grep\",\n  \"pattern\": \"guard\"\n}\n"
+         "OBSERVATION:\nOK: app/g.py:40: def guard():\napp/z.py:7: guard = None\n\n"
+         "--- iter 2 ---\nACTION:\n{\n  \"tool\": \"read\",\n  \"file\": \"app/g.py\"\n}\n"
+         "OBSERVATION:\nOK: 1|import x\n" + "".join(f"{n}|line {n}\n" for n in range(2, 101))
+         + "\n--- iter 3 ---\nACTION:\n{\n  \"tool\": \"read\",\n  \"file\": \"app/h.py\"\n}\n"
+         "OBSERVATION:\nOK: 1|nothing cited\n2|here\n\n"
+         "FINAL ANSWER:\nThe guard is at g.py:40-42 and app/g.py:90.")
+
+
+def test_trim_trace_keeps_cited_lines_with_a_band_and_grep_whole():
+    from workflowsv2.claims_audit.runner import trim_trace
+    out = trim_trace(TRACE, band=3)
+    assert "Query: [claims 3] where is the guard" in out
+    assert "app/g.py:40: def guard():" in out              # a hit in a cited file
+    assert "app/z.py:7" not in out and "1 hit(s) in files the answer does not cite" in out
+    assert '"thought"' not in out
+    kept = [int(l.split("|")[0]) for l in out.splitlines() if "|" in l and l.split("|")[0].isdigit()]
+    assert kept == list(range(37, 46)) + list(range(87, 94))
+    assert "… 41 line(s) not cited" in out                 # the gap between ranges
+    assert "line(s) of app/g.py not cited, not shown" in out
+    assert "read app/h.py; the answer cites no line of it" in out
+    assert out.endswith("FINAL ANSWER:\nThe guard is at g.py:40-42 and app/g.py:90.")
+    assert len(out) < len(TRACE)
+    assert trim_trace("no answer") == "no answer"
+
+
+def test_gathered_evidence_tries_full_then_trimmed_then_compact(tmp_path):
+    f = tmp_path / "inspect_external_2026-09-02T00-00-00Z.txt"
+    f.write_text(TRACE)
+    full = gathered_evidence([f], budget=10 ** 6)
+    assert full["form"] == "full" and "99|line 99" in full["text"]
+    trimmed = gathered_evidence([f], budget=len(TRACE) - 1)
+    assert trimmed["form"] == "trimmed" and "42|line 42" in trimmed["text"]
+    assert "60|line 60" not in trimmed["text"]   # outside the band of 40-42 and 90
+    compact = gathered_evidence([f], budget=400)
+    assert compact["form"] == "compact" and "OBSERVATION" not in compact["text"]

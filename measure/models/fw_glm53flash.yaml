@@ -1,0 +1,47 @@
+# GLM-5.3-Flash served by Fireworks directly, added 2026-09-02.
+#
+# WHY. The OpenRouter route (or_glm53flash.yaml, Modal) was throttled every
+# day it was used: 191 rate-limit retries and two fatal errors across three
+# chains on 2026-09-02, with the 429 body naming the model rather than the
+# endpoint. Fireworks hosts this model itself, so there is no shared upstream
+# quota. First-party pricing on the standard serverless tier, from
+# docs.fireworks.ai/serverless/pricing on 2026-09-02: $0.15 input, $0.03
+# cached input, $0.50 output per million tokens. Rate limits not stated.
+#
+# PROBED 2026-09-02 with the real payload (REACT_ACTION_SCHEMA, max_tokens
+# 16384). Gate 1: schema-valid action, finish=stop, ~1 s. Gate 2, completion
+# tokens for a one-line action, n=3 per row:
+#
+#   nothing sent              89 / 118 / 99   reasoning 47-55
+#   reasoning_effort medium   63 /  80 / 56   reasoning  7-10
+#   reasoning_effort low      46 /  37 / 46   reasoning  0-6
+#
+# `reasoning_effort` is honoured. Default reasoning here is ~20x smaller than
+# the OpenRouter route's, so "nothing sent" is not the runaway it is there.
+# Medium is kept to match or_glm53flash.yaml, so a comparison across the two
+# routes varies the host and not the effort. Gate 3 (a fixture run) is the
+# smoke test this file was written for.
+#
+# THE RATE LIMIT IS THE ACCOUNT'S, NOT THE MODEL'S. The first fixture chain
+# on this route (fx2_sections_fwglm_1, 2026-09-02) drew 35 rate-limit
+# retries and 2 exhausted backoffs across four stages, all recovered, on an
+# account holding only the $5.86 opening credit — the state Fireworks' docs
+# put at 10 requests a minute. Bruce added $20 the same day. Probed after:
+# 18 of 24 concurrent requests in 11 s, 19 of 20 sequential in 46 s (against
+# 1 of 6 before). The docs' ceiling with a payment method is 6,000 a minute,
+# adaptive within it. A chain's calls are sequential, so the sequential
+# figure is the one that describes a run.
+#
+# TEMPERATURE resolves through the substring key `glm-5p3-flash` in
+# src/chat/model_params.py to 1.0 — the value Bruce set for this model on
+# 2026-08-26, confirmed for this route on 2026-09-02.
+llm_config:
+  # _ChatBackend route 2: api_key set -> POSTs to
+  # {vllm_url}/v1/chat/completions with an Authorization bearer.
+  server: local
+  model: "accounts/fireworks/models/glm-5p3-flash"
+  vllm_url: https://api.fireworks.ai/inference/v1
+  # NAME of the env var holding the bearer token, not the token.
+  api_key: FIREWORKS_API_KEY
+  is_reasoning_model: true
+  reasoning_effort: medium

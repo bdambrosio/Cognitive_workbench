@@ -28,6 +28,15 @@ they do not describe this workload. The endpoints API is for shortlisting only:
 it lists `response_format` for endpoints that then 404, and lists endpoints that
 are not servable at all. **Probe with the real payload.**
 
+**Shortlist a direct host before a broker.** Check Fireworks' model list first
+(`GET https://api.fireworks.ai/inference/v1/models`); a model it serves is
+probed there, against `https://api.fireworks.ai/inference/v1`, and OpenRouter is
+the fallback for models it does not. Bruce, 2026-09-02, after the OpenRouter
+GLM-5.3-Flash route was rate-limited on every day it was used: a broker's 429
+names the model and is a shared upstream quota; a direct host's is the
+account's own ceiling, which a payment method lifts. The record is in
+`measure/models/fw_glm53flash.yaml`.
+
 Gate 1 is binary and reproducible. It is the only gate here whose results
 transfer.
 

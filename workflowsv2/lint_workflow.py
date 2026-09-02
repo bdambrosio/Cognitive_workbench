@@ -393,6 +393,7 @@ def check_schema_vocab(path: str, raw: str) -> List[str]:
     for sec, group, names, read in (
             ("6", "verdict", sch.VERDICTS, first_col),
             ("8", "unresolved_because", sch.UNRESOLVED_BECAUSE, first_col),
+            ("5", "about", sch.ABOUT, first_col),
             ("7", "evidence form", sch.EVIDENCE_FORMS, bold_tokens)):
         declared = read(sec)
         if not declared:

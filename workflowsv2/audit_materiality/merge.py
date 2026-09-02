@@ -130,6 +130,8 @@ def merge(run_dirs: Sequence[Path]) -> Dict[str, Any]:
             rec = {"claim_source": src, "claim_id": cid,
                    "quote": c.get("quote"), "lines": c.get("lines"),
                    "statement": c.get("statement"),
+                   "about": c.get("about"),
+                   "locations": list(c.get("locations") or []),
                    "adjudication": adj, "evidence": f.get("evidence") or [],
                    "review": review,
                    "citation_problems": per_finding.get(i, [])}

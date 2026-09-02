@@ -81,6 +81,11 @@ NOT_EXAMINED = "not_examined"
 
 EVIDENCE_FORMS: Tuple[str, ...] = ("citation", "derived", "search")
 
+#: METHOD §5: whom a claim concerns. `seller` marks an assertion the supplied
+#: materials are not expected to reach, so the reader knows why it went
+#: unsettled.
+ABOUT: Tuple[str, ...] = ("target", "seller")
+
 SEARCH_KINDS: Tuple[str, ...] = ("lexical", "structural")
 
 #: Fields each evidence form requires, per METHOD §7. The schema requires only
@@ -96,22 +101,129 @@ _LINES = {"type": "array", "items": {"type": "integer"},
 
 
 def surface_schema() -> Dict[str, Any]:
-    """Phase one: the claim surface, per METHOD §5 and §13.
+    """Phase one, one section of the claim source: METHOD §5 and §13.
 
-    Emitted before any evidence is gathered and frozen when it lands. The
-    freeze is a control, not a convenience — enumerating while adjudicating
-    means choosing what counts as a claim with the verdicts already in view.
+    Emitted before any evidence is gathered and frozen when the last section
+    lands. The freeze is a control, not a convenience — enumerating while
+    adjudicating means choosing what counts as a claim with the verdicts
+    already in view.
+
+    NO `id`. Ids are assigned by the runner in document order as sections
+    complete (`assemble_surface`), so a model enumerating section four cannot
+    collide with section one. `restates` names an id the model was given.
     """
     claim = {"type": "object", "properties": {
-        "id": {"type": "integer", "minimum": 1},
         "quote": {"type": "string"}, "lines": _LINES,
-        "statement": {"type": "string"}},
-        "required": ["id", "quote", "lines", "statement"]}
+        "statement": {"type": "string"},
+        "about": {"enum": list(ABOUT)},
+        "restates": {"type": "integer", "minimum": 1}},
+        "required": ["quote", "lines", "statement", "about"]}
     return {"type": "object", "properties": {
         "claim_source": {"type": "string"},
         "claims": {"type": "array", "items": claim},
         "not_completed": {"type": "string"}},
         "required": ["claim_source", "claims"]}
+
+
+#: Section sizing for enumeration, in characters. A section smaller than
+#: MIN is joined to the next; one larger than MAX is cut at a blank line.
+SECTION_MIN = 1_500
+SECTION_MAX = 12_000
+
+_HEADING = re.compile(r"^#{1,6}\s")
+_FENCE = re.compile(r"^\s*(```|~~~)")
+
+
+def split_sections(text: str, minimum: int = SECTION_MIN,
+                   maximum: int = SECTION_MAX) -> List[Tuple[int, int]]:
+    """The claim source as sections, each a 1-based inclusive line range.
+
+    Cut at every markdown heading outside a code fence, so a table stays
+    with its heading and a `# comment` inside a shell block does not start a
+    section. Short sections are joined forward to `minimum`; a section over
+    `maximum` is cut at the last blank line before the limit. A document
+    with no heading is one section, which is what enumeration was before.
+    """
+    lines = text.splitlines()
+    if not lines:
+        return []
+    cuts, in_fence = [1], False
+    for n, line in enumerate(lines, 1):
+        if _FENCE.match(line):
+            in_fence = not in_fence
+        elif not in_fence and _HEADING.match(line) and n > 1:
+            cuts.append(n)
+    spans = [(a, b - 1) for a, b in zip(cuts, cuts[1:] + [len(lines) + 1])]
+
+    def size(a: int, b: int) -> int:
+        return sum(len(l) + 1 for l in lines[a - 1:b])
+
+    merged: List[Tuple[int, int]] = []
+    for a, b in spans:
+        if merged and size(*merged[-1]) < minimum:
+            merged[-1] = (merged[-1][0], b)
+        else:
+            merged.append((a, b))
+    if len(merged) > 1 and size(*merged[-1]) < minimum:
+        _, b = merged.pop()
+        merged[-1] = (merged[-1][0], b)
+    out: List[Tuple[int, int]] = []
+    for a, b in merged:
+        while size(a, b) > maximum:
+            cut, used = None, 0
+            for n in range(a, b + 1):
+                used += len(lines[n - 1]) + 1
+                if used > maximum:
+                    break
+                if not lines[n - 1].strip():
+                    cut = n
+            if cut is None or cut <= a:
+                break
+            out.append((a, cut))
+            a = cut + 1
+        out.append((a, b))
+    return out
+
+
+def assemble_surface(claim_source: str, sections: Sequence[Dict[str, Any]]
+                     ) -> Dict[str, Any]:
+    """The frozen surface from per-section emissions, ids in document order.
+
+    A claim carrying `restates` is not a claim of its own: its quote and
+    lines join the named claim's `locations`. A `restates` that names no
+    assigned id is kept as a claim and reported by `check_surface`, so the
+    assertion is not lost to a bad reference.
+    """
+    claims: List[Dict[str, Any]] = []
+    by_id: Dict[int, Dict[str, Any]] = {}
+    not_completed = []
+    for sec in sections:
+        if sec.get("not_completed"):
+            not_completed.append(sec["not_completed"])
+        for c in sec.get("claims") or []:
+            loc = {"quote": c.get("quote"), "lines": c.get("lines")}
+            target = by_id.get(c.get("restates")) if c.get("restates") else None
+            if target is not None:
+                target.setdefault("locations", []).append(loc)
+                continue
+            row = {"id": len(claims) + 1, "quote": c.get("quote"),
+                   "lines": c.get("lines"), "statement": c.get("statement"),
+                   "about": c.get("about")}
+            if c.get("restates"):
+                row["restates"] = c["restates"]      # unresolved; reported
+            claims.append(row)
+            by_id[row["id"]] = row
+    out: Dict[str, Any] = {"claim_source": claim_source, "claims": claims}
+    if not_completed and not claims:
+        out["not_completed"] = "; ".join(not_completed)
+    return out
+
+
+def locations(claim: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Every place a claim is made: its own quote and lines, then any
+    restatement `assemble_surface` folded in."""
+    return ([{"quote": claim.get("quote"), "lines": claim.get("lines")}]
+            + list(claim.get("locations") or []))
 
 
 def check_surface(obj: Dict[str, Any], corpus: Path,
@@ -138,6 +250,8 @@ def check_surface(obj: Dict[str, Any], corpus: Path,
                         "one or the other")
 
     seen_id, seen_q = {}, {}
+    ids = {c.get("id") for c in claims}
+    restated = 0
     for i, c in enumerate(claims, 1):
         w = f"claim {c.get('id', f'#{i}')}"
         cid = c.get("id")
@@ -146,32 +260,51 @@ def check_surface(obj: Dict[str, Any], corpus: Path,
                             f"{seen_id[cid]}) — findings refer to claims by id")
         else:
             seen_id[cid] = i
-        q = _norm(c.get("quote"))
-        if not q:
-            problems.append(f"{w}: no quote — METHOD §5 makes the verbatim "
-                            f"quote the claim's identity")
-        elif q in seen_q:
-            problems.append(f"{w}: same quote as claim {seen_q[q]}")
-        else:
-            seen_q[q] = cid
-        lines = c.get("lines")
-        if body and isinstance(lines, list) and len(lines) == 2 \
-                and all(isinstance(n, int) for n in lines):
-            lo, hi = lines
-            if lo < 1 or hi < lo or hi > len(body):
-                problems.append(f"{w}: lines {lo}-{hi} against a "
-                                f"{len(body)}-line claim source")
-            elif q and q not in _norm("\n".join(body[lo - 1:hi])):
-                where = ("elsewhere in the document"
-                         if q in _norm("\n".join(body)) else "nowhere in it")
-                problems.append(f"{w}: quote is not at lines {lo}-{hi}; it is "
-                                f"{where}")
-        else:
-            problems.append(f"{w}: lines {lines!r} is not a start and end")
+        if c.get("about") not in ABOUT:
+            problems.append(f"{w}: `about` {c.get('about')!r} is not one of "
+                            f"METHOD §5's")
+        if c.get("restates"):
+            problems.append(f"{w}: restates claim {c['restates']}, which "
+                            f"{'is not' if c['restates'] not in ids else 'was not yet'}"
+                            f" assigned when this section was enumerated; kept "
+                            f"as a claim of its own")
+        restated += len(c.get("locations") or [])
+        for j, loc in enumerate(locations(c)):
+            lw = w if j == 0 else f"{w} location {j + 1}"
+            q = _norm(loc.get("quote"))
+            if not q:
+                problems.append(f"{lw}: no quote — METHOD §5 makes the "
+                                f"verbatim quote the claim's identity")
+            elif j == 0 and q in seen_q:
+                problems.append(f"{w}: same quote as claim {seen_q[q]}")
+            elif j == 0:
+                seen_q[q] = cid
+            lines = loc.get("lines")
+            if body and isinstance(lines, list) and len(lines) == 2 \
+                    and all(isinstance(n, int) for n in lines):
+                lo, hi = lines
+                if lo < 1 or hi < lo or hi > len(body):
+                    problems.append(f"{lw}: lines {lo}-{hi} against a "
+                                    f"{len(body)}-line claim source")
+                elif q and q not in _norm("\n".join(body[lo - 1:hi])):
+                    where = ("elsewhere in the document"
+                             if q in _norm("\n".join(body)) else "nowhere in it")
+                    problems.append(f"{lw}: quote is not at lines {lo}-{hi}; "
+                                    f"it is {where}")
+            else:
+                problems.append(f"{lw}: lines {lines!r} is not a start and end")
 
     return {"ok": not problems, "problems": problems,
-            "figures": {"claims": len(claims),
+            "figures": {"claims": len(claims), "restatements": restated,
+                        "about": _tally(claims, "about"),
                         "not_completed": bool(incomplete)}}
+
+
+def _tally(rows: Sequence[Dict[str, Any]], field: str) -> Dict[str, int]:
+    out: Dict[str, int] = {}
+    for r in rows:
+        out[r.get(field)] = out.get(r.get(field), 0) + 1
+    return out
 
 
 def audit_schema() -> Dict[str, Any]:
