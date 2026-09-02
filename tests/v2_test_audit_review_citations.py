@@ -29,7 +29,7 @@ document, so §4.0 can tell one stray reference from a different coordinate
 system.
 
 Everything here runs against the real corpus and real reports on disk. No model
-calls. Do not call score.py's trace-reading functions from a test — its
+calls. Do not read traces from a test — a scorer once did, and its
 module-global `_RECORD` is set only inside `main()`.
 """
 

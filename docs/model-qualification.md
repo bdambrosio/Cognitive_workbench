@@ -61,12 +61,12 @@ a card that vLLM had 91 GB of.
 Three is the floor, not a target. At n=1 the m1 campaign looked saturated —
 three models, eight of eight criteria each — and at n=3 it separated them. Two
 conclusions in this project have been retracted for treating a single run as a
-result, and `score.py` prints "n=1 is anecdote" on every run for this reason.
+result; one run is anecdote, for this reason.
 
-**No code aggregates runs.** `score.py` scores one run; `measure/report.py`
+**No code aggregates runs.** A run is scored by reading; `measure/report.py`
 reads chat-trace worlds rather than audit runs and declines a composite by
 design. A campaign result is assembled by hand from three `run_meta.json` files,
-three `score.py` outputs and three `review/` directories.
+three scored runs and three `review/` directories.
 `measure/fixtures/dataroom/RESULTS.md` is that assembly, maintained by hand.
 
 Record `git rev-parse HEAD` per run and keep the tree clean while a campaign
@@ -82,7 +82,7 @@ client, and the gating criteria are built on those two.
 |---|---|---|---|---|
 | **the audit runner** — `workflows/claims_audit/runner.py` | `run_meta.json` | `error`, `blocks_delivered`, `blocks_prompted`, `blocks_closed`, `harness_rev`, `target_rev`, `resolved_model`, `resolved_temperature`, `top_p`, `workflow_mode`, `workflow_suppressed`, `wall_clock_s`, `finish_length_events` | no | **yes** |
 | **the review** — `workflows/audit_review/runner.py` | `review/conformance.json`, `review/citations.json`, `review/summary.md` | markers, closed vocabularies, claim surface; every cited line fetched, references past end-of-file, `scheme`; ADMISSIBLE / INADMISSIBLE, supported N of M, exceptions with their standing | no | **yes** |
-| **the fixture scorer** — `measure/fixtures/dataroom/score.py` | stdout | `MEASUREMENT INVALID`, Tier 1/2/3 recall, ladder rung, placement, subagent no-answer rate, report length, eight criteria and their conjunction | **yes** | no |
+| **the fixture scorer** — DELETED 2026-09-02; a fixture run is scored by reading `findings.json` against `answer_key.md` | — | `MEASUREMENT INVALID`, Tier 1/2/3 recall, ladder rung, placement, subagent no-answer rate, report length, eight criteria and their conjunction | **yes** | no |
 
 ## The reviewer is pinned, and it is never the model under test
 
@@ -112,9 +112,8 @@ and picking one is part of setting up any campaign in which grok is an arm.
 
 A run is **VOID** and re-run rather than scored if any of:
 
-- **the answer key was opened** — `score.py` prints `MEASUREMENT INVALID — the
-  trace shows answer_key was opened` and refuses to score. A run that read the
-  answers measured nothing.
+- **the answer key was opened** — the working record shows `answer_key` among
+  the files read. A run that read the answers measured nothing.
 - **the review could not obtain its retest** — read off `review/summary.md`,
   where the exceptions are marked *not retested*. An exception whose standing is
   unknown is not one that did not stand. This is our infrastructure failing, not
@@ -210,7 +209,7 @@ clean.** What the exception was is the input to the next decision.
 
 ## Q4 — the mechanical criteria, read one at a time
 
-`score.py` prints eight criteria and their conjunction: all three must-find
+The scorer printed eight criteria and their conjunction, and a reader applies the same: all three must-find
 items, Gap Map produced, §9 recommendation used, leads with a top-3 finding, no
 unsupported claims, §6 verdicts only, limitations statement, claim surface
 closed.
@@ -228,7 +227,7 @@ Read against the m1 campaign this isolates the finding worth having — all thre
 of that campaign's failures were the claim surface, and no other criterion
 failed more than once across nine runs.
 
-**`score.py` computes the conjunction and not this rule.** The per-criterion
+**The conjunction is computed, this rule is not.** The per-criterion
 lines are printed per run; the 2-of-3 reading is done by hand across three
 outputs.
 

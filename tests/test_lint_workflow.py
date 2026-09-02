@@ -48,10 +48,6 @@ def test_both_documents_are_clean_now():
             assert not problems, f"{path}: {check}: {problems}"
 
 
-def test_method_vocabularies_match_the_scorer():
-    assert not lw.check_code_vocab()
-
-
 def test_retired_token_check_fires_on_the_revision_that_had_it(tmp_path):
     """§9 named `Walk` three lines under the table that forbids it, and §6 named
     `non-delta` after renaming it. Fixed 032f056b."""

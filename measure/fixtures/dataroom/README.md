@@ -23,9 +23,9 @@ varying.
 python3 launcher.py dataroom.yaml --cli --autonomy
 
 # then, mechanical metrics only, free:
-python3 measure/fixtures/dataroom/score.py --world dataroom_1 --dry-run
 # with finding-matching (one pinned LLM call):
-python3 measure/fixtures/dataroom/score.py --world dataroom_1
+# Score by reading: compare the run's findings.json against answer_key.md.
+# The mechanical scorer (score.py, v1 text reports) was deleted 2026-09-02.
 ```
 
 `run.py` supplies the brief. Do not paraphrase it and do not answer questions

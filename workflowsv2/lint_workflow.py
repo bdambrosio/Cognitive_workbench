@@ -49,11 +49,10 @@ from workflowsv2 import blocks                                  # noqa: E402
 # position is not a name.
 METHOD_DOC = "workflowsv2/claims_audit/method/METHOD.md"
 REVIEW_DOC = "workflowsv2/audit_review/method/REVIEW.md"
-DELIVERY_DOC = "workflowsv2/audit_postprocess/method/DELIVERY.md"
 MATERIALITY_DOC = "workflowsv2/audit_materiality/method/MATERIALITY.md"
 REPORT_DOC = "workflowsv2/audit_report/method/REPORT.md"
 
-DOCS = (METHOD_DOC, REVIEW_DOC, DELIVERY_DOC, MATERIALITY_DOC, REPORT_DOC)
+DOCS = (METHOD_DOC, REVIEW_DOC, MATERIALITY_DOC, REPORT_DOC)
 
 # The runner that drives each document, and the document its bare §N means.
 # A runner emits text the agent reads — "See REVIEW.md §4.0." is a sentence in
@@ -205,7 +204,6 @@ def check_block_vocab(name: str, raw: str) -> List[str]:
     declared = set(re.findall(r"===\s*(?!END\b)([A-Z][A-Z ]*?)\s*===", raw))
     declared = {d.strip() for d in declared if d.strip()}
     expected = (set(blocks.BLOCKS) if "claims_audit" in name
-                else set(blocks.DELIVERY_BLOCKS) if "audit_postprocess" in name
                 else set(blocks.REVIEW_BLOCKS))
     bad = []
     for missing in sorted(expected - declared):
@@ -215,68 +213,6 @@ def check_block_vocab(name: str, raw: str) -> List[str]:
     for b in sorted(expected & declared):
         if not re.search(rf"===\s*END\s+{re.escape(b)}\s*===", raw):
             bad.append(f"block {b!r} has an opener specified and no closer")
-    return bad
-
-
-def check_delivery_gloss() -> List[str]:
-    """The client-facing glossary must name exactly METHOD's verdict set.
-
-    The delivery script explains `[delta]` and its siblings to a reader who has
-    never seen METHOD, because the delivery agent is not given METHOD and
-    cannot. That makes the glossary a second place the closed vocabulary lives,
-    and a second place it can drift — the failure this file already guards for
-    score.py. Same check, same reason: a verdict added or retired in §6 must
-    fail here rather than leave a buyer reading an undefined bracket.
-
-    The WORDING is the delivery script's own, pitched at a buyer. Only the set
-    of keys is checked.
-    """
-    sys.path.insert(0, str(REPO / "workflowsv2" / "audit_postprocess"))
-    import deliver                                             # noqa: E402
-    raw = (REPO / METHOD_DOC).read_text(encoding="utf-8")
-    in_method = set(re.findall(r"\|\s*`(\[[^`\]]+\])`\s*\|", raw))
-    # §6 also tables `[unclaimed]`, which is not a verdict on a seller claim and
-    # never appears in a finding title's bracket.
-    in_method -= {"[unclaimed]"}
-    glossed = {k for k, _ in deliver.VERDICT_GLOSS}
-    return ([f"verdict {v!r} is in METHOD but not glossed for the client"
-             for v in sorted(in_method - glossed)]
-            + [f"glossary explains {v!r}, which METHOD does not define"
-               for v in sorted(glossed - in_method)])
-
-
-def check_code_vocab() -> List[str]:
-    """Closed vocabularies in METHOD must equal the sets score.py enforces.
-
-    §9's five conclusions and §6's verdicts are gates. When `Walk` became
-    `Systemically inconsistent` (be911d20), a stale `_REC_VOCAB` would have
-    scored every conformant report as stating no conclusion.
-    """
-    sys.path.insert(0, str(REPO / "measure" / "fixtures" / "dataroom"))
-    import score                                              # noqa: E402
-    # THE DELIVERED TEXT, NOT THE FILE. score.py scores reports written by an
-    # agent that reads the delivered text, and §19 is titled "Superseded rules"
-    # — a retired token lives there by design. Reading the raw file let
-    # `[derived]`, removed from §6 on 2026-08-31, go on satisfying this check
-    # from a section no agent has ever read.
-    raw = load_workflow(REPO / METHOD_DOC)
-    bad = []
-    for term in score._REC_VOCAB:
-        if f"**{term}**" not in raw:
-            bad.append(f"score.py conclusion {term!r} is not a §9 table row")
-    for verdict in score._VERDICTS:
-        if f"`[{verdict}]`" not in raw:
-            bad.append(f"score.py verdict '[{verdict}]' appears nowhere in METHOD")
-    # AND THE OTHER DIRECTION. This walked score.py -> METHOD only until
-    # 2026-08-31, when a status added to §6 that day scored as
-    # off-vocabulary in a checker that had never heard of it — silently,
-    # because nothing looked this way. The status was withdrawn the same
-    # day; the half-check it exposed was not. A one-way equality check is
-    # half a check.
-    for term in re.findall(r"^\| `\[([^\]]+)\]`", raw, re.M):
-        if term not in score._VERDICTS:
-            bad.append(f"METHOD \u00a76 defines '[{term}]' and score.py "
-                       "does not recognise it")
     return bad
 
 
@@ -516,9 +452,10 @@ def lint(path: str) -> Dict[str, List[str]]:
         "retired tokens in the prompt": check_retired(name, agent),
         "dates in the prompt": check_dates(name, agent, allow),
         "section references": check_refs(name, raw, agent),
-        # claims_audit and audit_review answer under schemas; audit_postprocess
-        # still delivers text blocks. One key either way, so the report reads
-        # the same and a reader is told which contract was checked.
+        # Every v2 document answers under a schema; the block-vocabulary
+        # check remains for a document that still delivers text blocks. One
+        # key either way, so the report reads the same and a reader is told
+        # which contract was checked.
         **({"schema vocabulary": check_schema_vocab(path, raw)}
            if "claims_audit" in path else
            {"schema vocabulary": check_review_vocab(path, raw)}
@@ -573,27 +510,6 @@ def main() -> int:
             for c in comments:
                 print(f"          {c}")
 
-    extra = check_code_vocab()
-    print("\n=== the client-facing verdict glossary against METHOD §6"
-          "\n    (deliver.py is a v1 consumer: it reads bracketed verdicts out"
-          "\n     of prose. Expected to fail until audit_postprocess is"
-          "\n     rewritten against schemas.py.)")
-    for p_ in check_delivery_gloss():
-        failed += 1
-        print(f"  FAIL  {p_}")
-    else:
-        if not check_delivery_gloss():
-            print("  ok    every verdict a finding can carry is explained")
-
-    print("\n=== METHOD vocabularies against score.py"
-          "\n    (score.py is a v1 consumer: it scores a text report and a §9"
-          "\n     conclusion, neither of which this stage produces now.)")
-    if extra:
-        failed += len(extra)
-        for e in extra:
-            print(f"  FAIL  {e}")
-    else:
-        print("  ok    conclusions and verdicts match")
     print(f"\n{failed} problem(s). Form only — a clean run is not a "
           f"consistency guarantee.")
     return 1 if failed else 0

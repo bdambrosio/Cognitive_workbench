@@ -57,7 +57,7 @@ characters:
     # Replaced by the launcher: the run directory. Deliberately NOT `audit/`
     # as in an engagement — what this session reads is the record, and
     # METHOD.md is reachable through it for the verdict definitions.
-    inspect_repo: /path/to/run
+    inspect_repo: /path/to/engagement
 
     # The role, in the static system prompt for the reason audit.yaml gives:
     # a document read with `inspect` decays out of the history window, and by

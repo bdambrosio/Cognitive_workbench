@@ -224,9 +224,15 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
     when = ""
     for r in merged.get("runs") or []:
         when = when or (r.get("dir") or "")[-40:]
+    runs = merged.get("runs") or []
+    dates = sorted({(r.get("captured_at_utc") or "")[:10] for r in runs} - {""})
+    revs = sorted({r.get("target_rev") or "" for r in runs} - {""})
     out = [f"# Technical claims audit — {engagement or merged.get('engagement') or 'engagement'}",
-           "", "Limited assurance; see Limitations. Every finding cites the "
-               "material that settles it.", ""]
+           "",
+           "Materials as of " + (", ".join(dates) if dates else "an undated run")
+           + (" at commit " + ", ".join(r[:12] for r in revs) if revs else "")
+           + ". Limited assurance; see Limitations. Every finding cites the "
+             "material that settles it.", ""]
     if transaction:
         out += ["## The transaction", "", transaction.strip(), ""]
     else:
@@ -284,4 +290,61 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
     out += ["## Coverage", ""] + coverage(merged, ratings, classes) + [""]
     out += _slot("coverage_note", prose)
     out += ["## Limitations", ""] + _slot("limitations", prose)
+    out += ["## Appendix — every claim and its verdict", "",
+            "The claim surface as the audit froze it, in document order, with "
+            "the verdict each claim received and, where rated, its "
+            "materiality or exposure.", "",
+            "| source | id | lines | claim | verdict | rating |",
+            "|---|---|---|---|---|---|"]
+    for f in sorted(merged.get("findings") or [],
+                    key=lambda x: (x.get("claim_source") or "", x.get("claim_id") or 0)):
+        k = _key(f)
+        r = by_m.get(k) or by_e.get(k) or {}
+        rating = r.get("materiality") or r.get("exposure") or ""
+        q = (f.get("quote") or "").replace("|", "\\|").replace("\n", " ")
+        out.append(f"| {f.get('claim_source')} | {f.get('claim_id')} | "
+                   f"{_lines(f.get('lines'))} | {q[:120]} | "
+                   f"{(f.get('adjudication') or {}).get('verdict')} | {rating} |")
     return "\n".join(out).rstrip() + "\n"
+
+
+def worklist(merged: Dict[str, Any], merged_dir: Optional[Path] = None) -> str:
+    """worklist.md: what a person still has to look at, gathered from every
+    stage's issues file — each run directory's, its review's, and the merged
+    directory's. v1's editor notes did this from one run; v2 spread the
+    record across stages and consolidated nothing until 2026-09-02."""
+    rows: List[Dict[str, Any]] = []
+    places = []
+    for r in merged.get("runs") or []:
+        d = Path(r.get("dir") or "")
+        places += [(r.get("claim_source"), d / "issues.jsonl"),
+                   (r.get("claim_source"), d / "review" / "issues.jsonl")]
+    if merged_dir is not None:
+        places.append(("merged", Path(merged_dir) / "issues.jsonl"))
+    for source, path in places:
+        if not path.is_file():
+            continue
+        for line in path.read_text(encoding="utf-8").splitlines():
+            try:
+                d = json.loads(line)
+            except ValueError:
+                continue
+            d["source"] = source
+            rows.append(d)
+    order = {"blocking": 0, "check": 1, "note": 2}
+    rows.sort(key=lambda d: (order.get(d.get("severity"), 9), d.get("stage") or "",
+                             d.get("code") or ""))
+    out = ["# Worklist", "",
+           f"{len(rows)} item(s) recorded by the stages. `blocking`: a client "
+           "must not see this as it stands. `check`: a person decides; it may "
+           "be fine. `note`: recorded so it is not lost.", ""]
+    if not rows:
+        out.append("Nothing recorded.")
+    last = None
+    for d in rows:
+        if d.get("severity") != last:
+            last = d.get("severity")
+            out += ["", f"## {last}", ""]
+        out.append(f"- **{d.get('stage')} / {d.get('code')}** ({d.get('source')}): "
+                   f"{d.get('text')}")
+    return "\n".join(out) + "\n"

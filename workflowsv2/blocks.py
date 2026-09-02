@@ -49,16 +49,9 @@ BLOCKS: Tuple[str, ...] = ("CLAIM SURFACE", "REPORT", "COVERAGE",
 REVIEW_BLOCKS: Tuple[str, ...] = ("REVIEW SURFACE", "REVIEW", "LIMITATIONS",
                                   "SUMMARY")
 
-# The delivery stage's three, and they are deliberately NOT a document. The
-# agent there writes only the connecting prose — a cover, a passage per finding
-# group, and the coverage statement in sentences — and the script fits those
-# around findings it copies verbatim. It never emits a finding, so it cannot
-# alter one: the guarantee is structural rather than a rule it is asked to obey.
-DELIVERY_BLOCKS: Tuple[str, ...] = ("COVER", "SECTION NOTES", "COVERAGE")
-
 # Every block name this module knows, for the marker regexes below.
 _ALL: Tuple[str, ...] = tuple(dict.fromkeys(BLOCKS + REVIEW_BLOCKS
-                                              + DELIVERY_BLOCKS))
+                                              ))
 
 # What `report.md` is assembled from, in this order. LIMITATIONS is a separate
 # block and still part of the report — the client receives one document with

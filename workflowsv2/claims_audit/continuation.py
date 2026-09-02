@@ -1,28 +1,30 @@
 #!/usr/bin/env python3
-"""Talk to a finished audit, using the record it left behind.
+"""Talk to a finished engagement, using the record it left behind.
 
-    python3 workflowsv2/claims_audit/continuation.py --run measure/fixtures/dataroom/results/<dir>
-    python3 workflowsv2/claims_audit/continuation.py --run <dir> --model measure/models/grok_4p6.yaml
+    python3 workflowsv2/claims_audit/continuation.py --engagement chattermate-readme \
+        --merged <merged output dir> [--model measure/models/fw_glm53flash.yaml]
 
 WHY THIS EXISTS. A report ships the conclusions and deletes the machinery that
-produced them. The machinery is still on disk — every run leaves its
-deliverables, its reasoning trace, and one file per evidence request — but
-nothing could reach it. This makes the run directory answerable.
+produced them. The machinery is still on disk — every run leaves its surface,
+findings, review, reasoning trace and one file per evidence request, and the
+merged directory holds the ratings and the report — but nothing could reach
+it. This makes the engagement directory answerable.
 
 WHAT IT BINDS, and keeping the three apart is the whole design:
 
-    inspect_external   the TARGET the audit examined, from run_meta's
-                       external_repo, so a citation in the report resolves by
-                       the path that produced it
-    inspect            the RUN DIRECTORY: deliverables, run_meta, working record
-    system prompt      workflowsv2/claims_audit/method/CONTINUATION.md, via workflowsv2/claims_audit/continuation.yaml
+    inspect_external   the TARGET the audit examined, from the engagement,
+                       so a citation in a finding resolves by the path that
+                       produced it
+    inspect            the ENGAGEMENT DIRECTORY: runs/, merged/, the brief
+    system prompt      workflowsv2/claims_audit/method/CONTINUATION.md, via
+                       workflowsv2/claims_audit/continuation.yaml
 
-Binding only the run directory is not enough. The report cites doc4:16-19, and
-those lines are in the corpus, which the run directory does not contain.
+Re-pointed at the v2 record on 2026-09-02; until then it bound one v1 run
+directory and named report.md and gap_map.md, which v2 does not produce.
 
 NOT AN AUDIT. The engagement is over. CONTINUATION.md is mostly prohibitions:
-do not speak with the report's authority, do not revise it, do not re-issue its
-recommendation, and where the record does not answer, say so.
+do not speak with the report's authority, do not revise it, do not re-rate
+a finding, and where the record does not answer, say so.
 """
 
 from __future__ import annotations
@@ -88,21 +90,34 @@ def build_config(run_dir: Path, world: str, model_path: Optional[Path],
     return name, cfg
 
 
-def describe(run_dir: Path, meta: Dict[str, Any], target: Path) -> str:
+def describe(merged_dir: Path, merged: Dict[str, Any], target: Path) -> str:
     """What the session is looking at, printed before the first prompt.
 
     The point is that the reader can see the engagement's configuration before
     asking it anything — including whether the target still exists, which is
     the one failure that makes every citation unresolvable.
     """
+    lines = [f"  merged       {merged_dir.name}",
+             f"  target       {target}"
+             + ("" if target.exists() else "   <-- MISSING: citations will not resolve"),
+             f"  report       {'present' if (merged_dir / 'report.md').is_file() else 'ABSENT'}"
+             f", worklist {'present' if (merged_dir / 'worklist.md').is_file() else 'absent'}"]
+    for r in merged.get("runs") or []:
+        run_dir = Path(r.get("dir") or "")
+        lines.append(f"  run          {run_dir.name}: {r.get('claim_source')}, "
+                     f"{r.get('claims')} claims, {r.get('findings')} findings, "
+                     f"{'reviewed' if r.get('reviewed') else 'NOT reviewed'}, "
+                     f"model {r.get('resolved_model')}")
+        lines.append("               " + _method_state(run_dir))
+    return "\n".join(lines)
+
+
+def _method_state(run_dir: Path) -> str:
+    """Has the method moved since this run? CONTINUATION.md §6 says the
+    record's vocabulary still applies, which is only true if METHOD still
+    says what it said. The run carries the delivered text, so this is a
+    comparison rather than an assumption."""
     rec = run_dir / "working_record"
-    traces = len(list((rec / "inspect_traces").glob("*.txt"))) \
-        if (rec / "inspect_traces").is_dir() else 0
-    legs = meta.get("legs") or []
-    # HAS THE METHOD MOVED SINCE? CONTINUATION.md §5 says the report's verdict
-    # vocabulary still applies, which is only true if METHOD still says what it
-    # said when the report was written. The run carries the delivered text, so
-    # this is a comparison rather than an assumption.
     delivered = rec / "method_as_delivered.md"
     if delivered.is_file():
         try:
@@ -111,35 +126,26 @@ def describe(run_dir: Path, meta: Dict[str, Any], target: Path) -> str:
             same = now == delivered.read_text(encoding="utf-8")
             method = "as delivered, unchanged since" if same else \
                 "CHANGED since this run — the current method is not the one " \
-                "that produced this report"
+                "that produced these findings"
         except Exception as e:                                 # noqa: BLE001
             method = f"copied, not compared ({e})"
     else:
         method = "NOT RECORDED — this run predates the method copy"
-
-    lines = [
-        f"  run          {run_dir.name}",
-        f"  model        {meta.get('resolved_model')} "
-        f"(temp {meta.get('resolved_temperature')}, top_p {meta.get('top_p')})",
-        f"  legs         {len(legs)}  "
-        f"exits {[l.get('exit_reason') for l in legs]}",
-        f"  error        {meta.get('error') or 'none'}",
-        f"  target       {target}"
-        + ("" if target.exists() else "   <-- MISSING: citations will not resolve"),
-        f"  record       {'trace' if (rec / 'reasoning_trace.jsonl').exists() else 'NO TRACE'}"
-        f", {traces} evidence requests",
-        f"  brief        {'recorded' if (rec / 'brief.md').is_file() else 'not recorded'}",
-        f"  method       {method}",
-    ]
-    return "\n".join(lines)
+    traces = len(list((rec / "inspect_traces").glob("*.txt"))) \
+        if (rec / "inspect_traces").is_dir() else 0
+    return f"method {method}; {traces} evidence requests"
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--run", type=Path, required=True,
-                    help="a results directory containing run_meta.json")
+    ap.add_argument("--engagement", required=True,
+                    help="engagement name under engagements/; `inspect` is "
+                         "bound to its directory")
+    ap.add_argument("--merged", type=Path, required=True,
+                    help="the materiality/report output directory holding "
+                         "merged.json, materiality.json and report.md")
     ap.add_argument("--model", type=Path, default=None,
                     help="YAML with an llm_config block; replaces the "
                          "scenario's. Omit to use whatever the local vLLM "
@@ -152,20 +158,21 @@ def main() -> int:
                     help="world name (default: continuation_<run dir>)")
     args = ap.parse_args()
 
-    run_dir = args.run.resolve()
-    meta_path = run_dir / "run_meta.json"
-    if not meta_path.is_file():
-        raise SystemExit(f"{run_dir}: no run_meta.json — not a results directory")
-    meta = json.loads(meta_path.read_text(encoding="utf-8"))
-
-    # THE TARGET IS A PATH, NOT A PIN. run_meta records where the corpus was,
-    # not what it contained. For the fixture that is stable and in git; for a
-    # repository under audit it moves, and a citation then resolves against a
-    # tree the report never saw. Nothing here can detect that — it can only
-    # report which tree it bound and whether it still exists.
-    target = (args.target or Path(meta.get("external_repo") or "")).resolve()
-
-    world = args.world or f"continuation_{run_dir.name.split('_', 1)[-1]}"
+    from workflowsv2.claims_audit.runner import load_engagement  # noqa: E402
+    eng = load_engagement(args.engagement)
+    merged_dir = args.merged.resolve()
+    if not (merged_dir / "merged.json").is_file():
+        raise SystemExit(f"{merged_dir}: no merged.json — not a merged output "
+                         f"directory")
+    merged = json.loads((merged_dir / "merged.json").read_text(encoding="utf-8"))
+    # THE TARGET IS A PATH, NOT A PIN. The engagement records where the
+    # materials are, not what they contained; each run's run_meta carries the
+    # commit it saw (`target_rev`). A repository under audit moves, and a
+    # citation then resolves against a tree the report never saw. This can
+    # only report which tree it bound and whether it still exists.
+    target = (args.target or eng["target"]).resolve()
+    run_dir = eng["dir"]
+    world = args.world or f"continuation_{merged_dir.name[-40:]}"
     if (REPO / "scenarios" / world).exists():
         raise SystemExit(
             f"world '{world}' already exists. A world that has answered "
@@ -181,10 +188,10 @@ def main() -> int:
                 loop.backend.resolved_model(), TOP_P)
 
     print("\n=== continuation ===")
-    print(describe(run_dir, meta, target))
+    print(describe(merged_dir, merged, target))
     print("\n  The engagement is finished. This answers questions about it from")
-    print("  its record; it does not revise the report or re-issue its")
-    print("  recommendation. Ctrl-D or 'quit' to end.\n")
+    print("  its record; it does not revise the report or re-rate a finding.")
+    print("  Ctrl-D or 'quit' to end.\n")
 
     try:
         while True:

@@ -126,6 +126,8 @@ def main() -> int:
 
     skeleton = render.assemble(record, None, transaction, eng_name)
     (out / "report_skeleton.md").write_text(skeleton, encoding="utf-8")
+    (out / "worklist.md").write_text(render.worklist(record["merged"], out),
+                                     encoding="utf-8")
     classes = render.classify(record["merged"])
     logger.info("assembled: shown %d, unsettled %d, not examined %d, hold %d",
                 *(len(classes[k]) for k in ("shown", "unsettled",

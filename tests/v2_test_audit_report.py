@@ -27,7 +27,8 @@ def _record():
     merged = {"engagement": "eng", "runs": [
         {"dir": "runs/x", "claim_source": "README.md", "reviewed": True,
          "claims": 5, "findings": 5, "files_read": 12, "gathering_legs": 3,
-         "resolved_model": "m", "unopened_candidates": ["app/h.py"]}],
+         "resolved_model": "m", "unopened_candidates": ["app/h.py"],
+         "captured_at_utc": "2026-09-02T16-12-41Z", "target_rev": "abcdef0123456789"}],
         "findings": [
             f("README.md", 1, "contradicted", gap="g1"),
             f("README.md", 2, "real"),
@@ -105,3 +106,31 @@ def test_check_prose():
     assert res["problems"] == ["not_examined_note: written, and the document has "
                                "no such claims (REPORT.md §6)"]
     assert schemas.check_prose(dict(good, not_examined_note=""), m, False)["ok"]
+
+
+def test_header_index_and_worklist(tmp_path):
+    rec = _record()
+    doc = render.assemble(rec, None, None, "eng")
+    assert doc.splitlines()[2].startswith("Materials as of 2026-09-02 at commit abcdef012345.")
+    apx = doc[doc.index("## Appendix — every claim and its verdict"):]
+    rows = [l for l in apx.splitlines() if l.startswith("| README.md")]
+    assert len(rows) == 5
+    assert "| README.md | 1 | line 1 | claim 1 text | contradicted | material |" in rows[0]
+    assert "| README.md | 4 | line 4 | claim 4 text | unverifiable | decisive |" in rows[3]
+    # worklist gathers every stage's issues, blocking first
+    run = tmp_path / "runs" / "x"; (run / "review").mkdir(parents=True)
+    (run / "issues.jsonl").write_text(
+        '{"ts":"t","stage":"claims_audit","code":"output_check","severity":"blocking","text":"finding 1: bad quote"}\n'
+        '{"ts":"t","stage":"claims_audit","code":"not_examined","severity":"check","text":"2 files unopened"}\n')
+    (run / "review" / "issues.jsonl").write_text(
+        '{"ts":"t","stage":"audit_review","code":"review_check","severity":"blocking","text":"finding 3 no exception"}\n')
+    md = tmp_path / "merged"; md.mkdir()
+    (md / "issues.jsonl").write_text(
+        '{"ts":"t","stage":"audit_materiality","code":"unreviewed_run","severity":"check","text":"no review"}\n')
+    rec["merged"]["runs"][0]["dir"] = str(run)
+    wl = render.worklist(rec["merged"], md)
+    assert "4 item(s)" in wl
+    assert wl.index("## blocking") < wl.index("## check")
+    assert "**claims_audit / output_check** (README.md): finding 1: bad quote" in wl
+    assert "**audit_materiality / unreviewed_run** (merged): no review" in wl
+    assert render.worklist({"runs": []}).strip().endswith("Nothing recorded.")

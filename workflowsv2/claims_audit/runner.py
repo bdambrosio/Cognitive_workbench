@@ -1640,11 +1640,10 @@ def main() -> int:
           f"{len(chase['unopened_after'])} file(s) named and not opened")
     print(f"deliverables: {out}/claims.json, findings.json")
     print(f"meta: {out / 'run_meta.json'}")
-    # --run, not --world: the run directory is the archive and survives the
-    # world's deletion (§14). Scoring is fixture-only; a real engagement has no
-    # answer key.
-    print(f"score with:  python3 measure/fixtures/dataroom/score.py "
-          f"--run {out}")
+    # A FIXTURE RUN IS SCORED BY READING. The answer key is
+    # measure/fixtures/dataroom/answer_key.md; the mechanical scorer that read
+    # v1 text reports was deleted 2026-09-02 (Bruce: "I'd rather have you
+    # perform that step"). A real engagement has no answer key.
     return 1 if error else 0
 
 

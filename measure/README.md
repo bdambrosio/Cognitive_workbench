@@ -149,4 +149,5 @@ space* is itself measured, and a difficulty ladder (*stated* →
 than pass/fail. Retire it when every model tops out. See its README.
 
     python3 launcher.py dataroom.yaml --cli --autonomy
-    python3 measure/fixtures/dataroom/score.py --world dataroom_1 --dry-run
+    # scored by reading findings.json against measure/fixtures/dataroom/answer_key.md
+    # (score.py, the v1 text-report scorer, was deleted 2026-09-02)

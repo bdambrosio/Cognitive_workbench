@@ -74,6 +74,7 @@ point of recording this here:
 
 | Doc | Covers |
 |---|---|
+| [workflowsv2-architecture.md](workflowsv2-architecture.md) | The claims-audit workflow as built (`workflowsv2/`): audit → review → materiality → report, each a runner over a method document and a schema; chases, batching, routes, what is not built — re-derived from code 2026-09-02 |
 | [RESOURCE_BROWSER.md](RESOURCE_BROWSER.md) | Standalone web resource browser (`src/resource_browser.py`, port 3001); banner 2026-07-19 — now read-write (edit/delete/concern management), Graph tab non-functional |
 | [REMOTE_VIEWER_DESIGN.md](REMOTE_VIEWER_DESIGN.md) | Remote viewing via `mirror.sh` (affect/canvas/CLI tunneling); runbook verified 2026-07-19 |
 | [audio-out-design.md](audio-out-design.md) | ChatterBot audio-out ("say") — CW binding SHIPPED (`zenoh_io._publish_say` → `voice_pipeline.synthesize` → `chatter/audio/out`) |
