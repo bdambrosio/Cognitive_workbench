@@ -51,8 +51,9 @@ METHOD_DOC = "workflowsv2/claims_audit/method/METHOD.md"
 REVIEW_DOC = "workflowsv2/audit_review/method/REVIEW.md"
 MATERIALITY_DOC = "workflowsv2/audit_materiality/method/MATERIALITY.md"
 REPORT_DOC = "workflowsv2/audit_report/method/REPORT.md"
+INTAKE_DOC = "workflowsv2/intake/method/INTAKE.md"
 
-DOCS = (METHOD_DOC, REVIEW_DOC, MATERIALITY_DOC, REPORT_DOC)
+DOCS = (METHOD_DOC, REVIEW_DOC, MATERIALITY_DOC, REPORT_DOC, INTAKE_DOC)
 
 # The runner that drives each document, and the document its bare §N means.
 # A runner emits text the agent reads — "See REVIEW.md §4.0." is a sentence in
@@ -61,7 +62,8 @@ DOCS = (METHOD_DOC, REVIEW_DOC, MATERIALITY_DOC, REPORT_DOC)
 RUNNERS = {"workflowsv2/claims_audit/runner.py": METHOD_DOC,
            "workflowsv2/audit_review/runner.py": REVIEW_DOC,
            "workflowsv2/audit_materiality/runner.py": MATERIALITY_DOC,
-           "workflowsv2/audit_report/runner.py": REPORT_DOC}
+           "workflowsv2/audit_report/runner.py": REPORT_DOC,
+           "workflowsv2/intake/runner.py": INTAKE_DOC}
 
 #: The name a runner's string uses for each document — "MATERIALITY §2" —
 #: and the document a bare §N in that runner means. Until 2026-09-02 only
@@ -70,10 +72,11 @@ RUNNERS = {"workflowsv2/claims_audit/runner.py": METHOD_DOC,
 def _doc_names() -> Dict[str, str]:
     """Read at call time, so a test that repoints one document sees it."""
     return {"METHOD": METHOD_DOC, "REVIEW": REVIEW_DOC,
-            "MATERIALITY": MATERIALITY_DOC, "REPORT": REPORT_DOC}
+            "MATERIALITY": MATERIALITY_DOC, "REPORT": REPORT_DOC,
+            "INTAKE": INTAKE_DOC}
 
 
-_REF = r"(METHOD|REVIEW|MATERIALITY|REPORT)?[\w.]*\s*§(\d+[a-z]?(?:\.\d+)?)"
+_REF = r"(METHOD|REVIEW|MATERIALITY|REPORT|INTAKE)?[\w.]*\s*§(\d+[a-z]?(?:\.\d+)?)"
 
 # Tokens a document retired. Naming one in the text the agent reads puts the
 # forbidden vocabulary back in the prompt, three lines from the table it was
@@ -443,6 +446,26 @@ def check_report_fields(path: str, raw: str) -> List[str]:
     return bad
 
 
+def check_intake_fields(path: str, raw: str) -> List[str]:
+    """INTAKE §4's field table against `schemas.SLOTS`: every slot.field the
+    schema requires is specified, plus the two arrays, and nothing more."""
+    from workflowsv2.intake import schemas as isch                    # noqa: E402
+    bodies = {re.match(r"## (\d+[a-z]?)\.", b.splitlines()[0]).group(1): b
+              for _, b in sections(raw)
+              if b.strip() and re.match(r"## (\d+[a-z]?)\.", b.splitlines()[0])}
+    four = bodies.get("4", "")
+    if not four:
+        return ["INTAKE has no §4 to declare the fields in"]
+    declared = set(re.findall(r"(?m)^\s*\|\s*`([a-z_.]+)(?:\[\])?`\s*\|", four))
+    expected = {f"{slot}.{f}" for slot, fs in isch.SLOTS.items() for f in fs}
+    expected |= {"open_questions", "notes"}
+    bad = [f"schemas.py field {f!r} is not in §4's table"
+           for f in sorted(expected - declared)]
+    bad += [f"§4 declares {d!r}, which schemas.py does not define"
+            for d in sorted(declared - expected)]
+    return bad
+
+
 def lint(path: str) -> Dict[str, List[str]]:
     name = Path(path).name
     raw = (REPO / path).read_text(encoding="utf-8")
@@ -464,6 +487,8 @@ def lint(path: str) -> Dict[str, List[str]]:
            if "audit_materiality" in path else
            {"schema vocabulary": check_report_fields(path, raw)}
            if "audit_report" in path else
+           {"schema vocabulary": check_intake_fields(path, raw)}
+           if "workflowsv2/intake" in path else
            {"block vocabulary": check_block_vocab(path, raw)}),
     }
 

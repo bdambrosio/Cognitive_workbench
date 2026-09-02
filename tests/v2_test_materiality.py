@@ -136,6 +136,7 @@ import pytest  # noqa: E402
     "workflowsv2.audit_report.runner",
     "workflowsv2.claims_audit.runner",
     "workflowsv2.claims_audit.continuation",
+    "workflowsv2.intake.runner",
     "workflowsv2.audit_review.runner",
     "workflowsv2.emit",
 ])
@@ -204,3 +205,18 @@ def test_render_puts_decisive_first_and_marks_real(tmp_path):
     text = _rating_text(m["findings"][0])
     assert text.startswith("--- doc1.md claim 1") and "review    : does_not_hold" in text
     assert "citation problems:" in text
+
+
+def test_load_engagement_returns_thresholds(tmp_path, monkeypatch):
+    from workflowsv2.claims_audit import runner as rn
+    d = tmp_path / "eng"; d.mkdir()
+    (d / "engagement.yaml").write_text(
+        "target: t\nclaim_sources: [a.md]\ntransaction: |\n  buys it\n"
+        "thresholds: |\n  walks if backups are not daily\n")
+    (d / "brief.md").write_text("brief")
+    monkeypatch.setattr(rn, "ENGAGEMENTS", tmp_path)
+    e = rn.load_engagement("eng")
+    assert e["transaction"].strip() == "buys it"
+    assert e["thresholds"].strip() == "walks if backups are not daily"
+    (d / "engagement.yaml").write_text("target: t\nclaim_sources: [a.md]\n")
+    assert rn.load_engagement("eng")["thresholds"] is None

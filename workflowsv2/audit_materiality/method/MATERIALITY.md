@@ -16,6 +16,8 @@ You did not perform the audit and you do not revise it. The findings are settled
 
 **The transaction** — what the engagement states about the buyer, the purpose of the acquisition, the price basis and the intended structure. Where the engagement states none of this, rate against a buyer paying a price that assumes every claim holds.
 
+**The buyer's thresholds** — what the engagement records of the buyer's own view: what they are paying for, what would change the price or the terms, and what would make them walk away. Where the engagement records them, a rating is read against them; a gap the buyer has said would change the price is `material`, and one they have said would end the deal is `decisive`. Where the engagement records none, rate as §3 defines the values.
+
 You have no tools and no access to the target. Rate on what the finding shows.
 
 ## 3. The scale
@@ -45,7 +47,7 @@ Rate each finding on its own. Do not combine findings, and do not rate a finding
 
 ## 5. `basis`
 
-One to three sentences: what in the finding's `gap` or evidence drives the rating, and how it bears on the transaction as stated. Quote the figure or the fact from the finding. Do not restate the claim. For `exposure`, say what the buyer would lose if the claim were false.
+One to three sentences: what in the finding's `gap` or evidence drives the rating, and how it bears on the transaction and the buyer's thresholds as stated. Quote the figure or the fact from the finding. Do not restate the claim. For `exposure`, say what the buyer would lose if the claim were false.
 
 ## 6. What this stage does not do
 

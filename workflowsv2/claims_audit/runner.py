@@ -128,7 +128,10 @@ def load_engagement(name: str) -> Dict[str, Any]:
             "retention": cfg.get("retention"),
             # What the practice knows of the deal, for the materiality stage.
             # Free text, handed over verbatim; may be absent.
-            "transaction": cfg.get("transaction")}
+            "transaction": cfg.get("transaction"),
+            # The buyer's own thresholds — what changes the price, what ends
+            # the deal — written by the intake stage. Free text; may be absent.
+            "thresholds": cfg.get("thresholds")}
 
 
 def engagement_state(world: str, agent: str, leg: int, max_legs: int,
@@ -971,6 +974,10 @@ def main() -> int:
     ap.add_argument("--batch", type=int, default=10,
                     help="claims per adjudication call at most; batches are "
                          "formed from claims that share evidence (default 10)")
+    ap.add_argument("--surface", type=Path, default=None,
+                    help="a claims.json to adjudicate instead of enumerating: "
+                         "the surface the practice edited after an "
+                         "--enumerate-only run. Checked, then frozen")
     ap.add_argument("--enumerate-only", action="store_true",
                     help="stop after the claim surface is frozen: no gathering "
                          "legs, no adjudication. For comparing enumerations")
@@ -1087,12 +1094,21 @@ def main() -> int:
     emit_tokens = int((cfg.get("chat") or {}).get("react_max_tokens", 32768))
     try:
         # ---- phase one: enumerate section by section, then freeze --------
-        sections = schemas.split_sections(
-            src_doc.read_text(encoding="utf-8", errors="replace"))
-        logger.info("phase 1: enumerating %s in %d section(s)", src_doc.name,
-                    len(sections))
+        # OR TAKE THE SURFACE THE PRACTICE EDITED. The surface is human-owned
+        # by decision; `--enumerate-only` produces it and this consumes it
+        # after the edit. It is checked like an emitted one and frozen.
+        sections = ([] if args.surface else schemas.split_sections(
+            src_doc.read_text(encoding="utf-8", errors="replace")))
+        if args.surface:
+            logger.info("phase 1: taking the edited surface %s", args.surface)
+        else:
+            logger.info("phase 1: enumerating %s in %d section(s)",
+                        src_doc.name, len(sections))
         parts, calls, raws = [], [], []
         assembled: Dict[str, Any] = {"claim_source": src_doc.name, "claims": []}
+        if args.surface:
+            assembled = json.loads(Path(args.surface).read_text(encoding="utf-8"))
+            parts = [assembled]
         for n, sec in enumerate(sections, 1):
             part = emit_surface(loop, method_text, src_doc, sec, n,
                                 len(sections), assembled["claims"], emit_tokens)
@@ -1123,6 +1139,7 @@ def main() -> int:
                    "response_format_dropped": sorted(
                        {d for c in calls for d in c["response_format_dropped"]}),
                    "sections": [list(sec) for sec in sections],
+                   "surface_source": "edited" if args.surface else "enumerated",
                    "calls": calls, "phase": "surface"}
         if not error:
             frozen = assembled.get("claims") or []
@@ -1618,6 +1635,7 @@ def main() -> int:
                     if surface else None),
         "frozen_claims": len(frozen),
         "sections": (surface or {}).get("sections"),
+        "surface_source": (surface or {}).get("surface_source"),
         # THE ADJUDICATION BATCHES: which claims, how many traces each was
         # handed, and whether it fell back to the whole record because no
         # request named its claims.

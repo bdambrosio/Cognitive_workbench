@@ -113,7 +113,8 @@ def _rating_text(f: Dict[str, Any]) -> str:
 
 def rate(loop, method_text: str, transaction: Optional[str],
          rateable: List[Dict[str, Any]], exposable: List[Dict[str, Any]],
-         max_tokens: int, batch: int) -> Dict[str, Any]:
+         max_tokens: int, batch: int,
+         thresholds: Optional[str] = None) -> Dict[str, Any]:
     """The ratings, in batches. Same runner-decides-the-batch pattern as the
     review's emit_parts: one schema per part, concatenated by merge_parts.
 
@@ -124,6 +125,10 @@ def rate(loop, method_text: str, transaction: Optional[str],
                "(The engagement states nothing about the transaction. Rate "
                "against a buyer paying a price that assumes every claim "
                "holds, per MATERIALITY \u00a72.)")
+            + "\n\nThe buyer's thresholds, as the engagement records them:\n\n"
+            + (thresholds.strip() if thresholds else
+               "(The engagement records no thresholds. Rate as MATERIALITY "
+               "\u00a73 defines the values.)")
             + "\n\n")
 
     def groups_of(xs):
@@ -287,6 +292,12 @@ def main() -> int:
                     text="engagement.yaml has no `transaction:` block; rated "
                          "against a buyer paying a price that assumes every "
                          "claim holds", severity="check")
+    if not eng.get("thresholds"):
+        issues.note(out, stage=STAGE, code="no_thresholds",
+                    text="engagement.yaml has no `thresholds:` block; ratings "
+                         "are read against MATERIALITY \u00a73 alone, not "
+                         "against what the buyer said would change the price",
+                    severity="check")
 
     # ---- part two: rate -----------------------------------------------------
     rateable = [f for f in merged["findings"] if schemas.rateable(f)]
@@ -302,7 +313,8 @@ def main() -> int:
     error, result = None, {"obj": {"ratings": [], "exposures": []}, "calls": []}
     try:
         result = rate(loop, method_text, eng.get("transaction"), rateable,
-                      exposable, max_tokens, args.batch)
+                      exposable, max_tokens, args.batch,
+                      thresholds=eng.get("thresholds"))
         for c in result["calls"]:
             if c["response_format_dropped"]:
                 error = (f"the route dropped "
@@ -360,6 +372,7 @@ def main() -> int:
                                     "resolved_model", "reviewed")}
                  for r in merged["runs"]],
         "batch": args.batch, "rateable": len(rateable),
+        "thresholds_recorded": bool(eng.get("thresholds")),
         "exposable": len(exposable),
         "calls": result["calls"], "ratings_check": check,
         "wall_clock_s": wall, "error": error,
