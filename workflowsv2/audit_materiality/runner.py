@@ -363,6 +363,7 @@ def main() -> int:
         "exposable": len(exposable),
         "calls": result["calls"], "ratings_check": check,
         "wall_clock_s": wall, "error": error,
+        "transient_events": getattr(loop, "transient_events", None),
         "captured_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     }, indent=2, default=str) + "\n", encoding="utf-8")
 

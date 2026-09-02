@@ -145,6 +145,13 @@ class _ChatBackend:
         # subagent truncated twice, which is exactly the invisibility the
         # counter exists to remove.
         self.finish_length_events: int = 0
+        # EVERY transient upstream status this backend retried, by code, and
+        # how many calls spent the whole retry budget. Same reason as above:
+        # counted here so the subagents' calls count too. Until 2026-09-02
+        # the only record of a throttled route was WARNING lines in a log,
+        # and a route's reliability had to be re-read from logs each time.
+        self.transient_events: Dict[int, int] = {}
+        self.transient_exhausted: int = 0
         # Chars on the reasoning channel of the most recent emission, or None
         # if the engine reported none. Field name differs by engine: vLLM
         # returns `reasoning`, SGLang returns `reasoning_content` — checking
@@ -399,6 +406,8 @@ class _ChatBackend:
                     wait = float(hinted)
             except ValueError:
                 pass
+            self.transient_events[resp.status_code] = \
+                self.transient_events.get(resp.status_code, 0) + 1
             logger.warning(
                 "_ChatBackend: %s returned %s; retry %d/%d in %.1fs",
                 self.model or self.base_url, resp.status_code,
@@ -406,6 +415,8 @@ class _ChatBackend:
             _time.sleep(wait)
             delay *= 2
             resp = _post()
+        if not resp.ok and resp.status_code in self._TRANSIENT_STATUS:
+            self.transient_exhausted += 1
         return resp
 
     def _post_adapting(self, url: str, headers: Dict[str, str],

@@ -1009,6 +1009,15 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
         record to one that never did."""
         return getattr(self.backend, 'finish_length_events', 0)
 
+    @property
+    def transient_events(self) -> Dict[str, Any]:
+        """Transient upstream statuses retried on this backend, by code, and
+        the calls that spent the whole retry budget. Surfaced in every
+        stage's metadata so a route's reliability accumulates as a record
+        rather than as log lines to be re-read."""
+        return {"retried": dict(getattr(self.backend, 'transient_events', {})),
+                "exhausted": getattr(self.backend, 'transient_exhausted', 0)}
+
     def _record_empty_response(self, cot_profile: Optional[str],
                                max_tokens: int) -> None:
         """Tally a call that returned no content, with the cause attached.

@@ -1521,6 +1521,10 @@ def main() -> int:
         # Action emissions the token ceiling cut off, across the gathering
         # legs. The emission call reports its own separately, below.
         "finish_length_events": getattr(loop, "finish_length_events", None),
+        # THE ROUTE'S RELIABILITY ENTRY: 429s and 5xx retried, by code, and
+        # calls that exhausted the retry budget. Counted on the backend so
+        # the subagents' calls are in it.
+        "transient_events": getattr(loop, "transient_events", None),
         # THE EMISSION, AND EVERYTHING THAT COULD HAVE SILENTLY DEGRADED IT.
         # `parse` is "parsed" on a clean run; "repaired" or "salvaged" means
         # the response was cut and only some of it survived, which is the

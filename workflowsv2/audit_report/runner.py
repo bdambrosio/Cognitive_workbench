@@ -182,6 +182,7 @@ def main() -> int:
         "classes": {k: len(v) for k, v in classes.items()},
         "call": {k: v for k, v in call.items() if k not in ("raw", "obj")},
         "prose_check": check, "wall_clock_s": wall, "error": error,
+        "transient_events": getattr(loop, "transient_events", None),
         "captured_at_utc": ts,
     }, indent=2, default=str) + "\n", encoding="utf-8")
 

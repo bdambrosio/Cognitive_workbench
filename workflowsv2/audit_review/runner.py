@@ -503,6 +503,7 @@ def retest(run: Path, world: str, model_path: Optional[Path], target: Path,
                 "exception": (row or {}).get("exception"),
                 "materials_show": (row or {}).get("materials_show")}
     finally:
+        out["transient_events"] = getattr(loop, "transient_events", None)
         try:
             loop._post_turn_executor.shutdown(wait=True)
         except Exception as e:                                 # noqa: BLE001
@@ -715,6 +716,7 @@ def main() -> int:
         "model_config": args.model, "resolved_model": loop.backend.resolved_model(),
         "batch": args.batch, "held_sample": len(sampled),
         "legs": legs, "wall_clock_s": wall,
+        "transient_events": getattr(loop, "transient_events", None),
         "emission": [{k: v for k, v in c.items() if k != "raw"}
                      for c in (emission or {}).get("calls", [])],
         "review_check": check, "retest": {k: v for k, v in second.items()
