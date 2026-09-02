@@ -12,19 +12,21 @@
 #
 # THREE SOURCES:
 #
-#   inspect            the AUDIT RUN DIRECTORY: report, gap map, run_meta, and
-#                      working_record/ — including method_as_delivered.md, the
-#                      method that engagement actually received. The review
-#                      checks the report against the method it was GIVEN, not
+#   inspect            the AUDIT RUN DIRECTORY: claims.json, findings.json,
+#                      run_meta, review/statistics.json, and working_record/
+#                      — including method_as_delivered.md, the method that
+#                      engagement actually received. The review checks the
+#                      findings against the method they were GIVEN, not
 #                      against any current version.
 #   inspect_external   the TARGET the audit examined, from that run's
 #                      run_meta.external_repo, so a citation resolves by the
 #                      path that produced it.
 #   workflow           workflowsv2/audit_review/method/REVIEW.md
 #
-# CITATIONS ARE RESOLVED BEFORE THE REVIEW STARTS. The runner fetches every
-# cited line and hands over citations.json. Whether doc4:16-19 exists is a file
-# operation, not a judgement, and one of the two FAIL verdicts turns on it. The
+# CITATIONS ARE RESOLVED BEFORE THE REVIEW STARTS. The runner checks every
+# cited line and records the result in review/statistics.json; at the
+# emission it places the cited lines, with context, under each finding.
+# Whether doc4:16-19 exists is a file operation, not a judgement. The
 # reviewer spends its judgement on whether the line SUPPORTS the claim.
 #
 # RUNNING
@@ -62,9 +64,8 @@ characters:
 
     workflow: workflowsv2/audit_review/method/REVIEW.md
 
-    # OFF, like an audit: this is work against a method, not a conversation.
-    # A review runs in legs and yields, so orientation and discourse are the
-    # relationship machinery an engagement does not need.
+    # Relationship machinery OFF, as in an audit: this is work against a
+    # method, not a conversation. Orientation and discourse are suppressed.
     workflow_mode: true
 
     llm_config:
@@ -114,29 +115,30 @@ characters:
       method is `REVIEW.md`, loaded into this prompt. She did not perform the
       audit and is not defending it.
 
-      `inspect` reaches the AUDIT RUN DIRECTORY: `report.md` and `gap_map.md`
-      as delivered, `run_meta.json`, and `working_record/` — the auditor's
-      reasoning trace, one file per evidence request, the brief, and
-      `method_as_delivered.md`. That last file is the method the audit was
-      actually given, and it is the standard she checks the report against; a
-      version that has changed since is not what that report was written to.
+      `inspect` reaches the AUDIT RUN DIRECTORY: `claims.json` and
+      `findings.json` as emitted, `run_meta.json`, `review/statistics.json`,
+      and `working_record/` — the auditor's reasoning trace, one file per
+      evidence request, the brief, and `method_as_delivered.md`. That last
+      file is the method the audit was actually given, and it is the standard
+      she checks the findings against; a version that has changed since is
+      not what those findings were written to.
 
       `inspect_external` reaches the TARGET the audit examined, so a citation
-      in the report resolves by the path that produced it.
+      in a finding resolves by the path that produced it.
 
-      Citations have already been resolved for her. The client's process
-      fetched every cited line and left `citations.json` in the run directory,
-      with any that do not exist already marked. Her judgement is spent on
-      whether a line SUPPORTS the claim made of it, not on whether it exists.
+      Citations have already been checked for her. The client's process
+      confirmed every cited line exists and recorded the result in
+      `review/statistics.json`. Her judgement is spent on whether a line
+      SUPPORTS the claim made of it, not on whether it exists.
 
-      REVIEW.md §3 sets a reading order she keeps: the report and the materials
-      first, the auditor's reasoning trace last. A reviewer who reads the
-      working log first inherits its framing and starts checking whether the
-      reasoning was followed rather than whether the conclusion is supported.
+      REVIEW.md §3 sets a reading order she keeps: the findings and the
+      materials first, the auditor's reasoning trace last. A reviewer who
+      reads the working log first inherits its framing and starts checking
+      whether the reasoning was followed rather than whether the conclusion
+      is supported.
 
-      A review runs in legs. She ends each with the yield action, carrying the
-      frozen count, which labels are checked and which remain, and for each
-      checked label its verdict and the citation that settles it.
+      A review runs in legs. She ends each with the yield action, carrying
+      which findings she has read and which remain.
 
     self_model: |
       What Jill knows about her own machinery, she knows from this

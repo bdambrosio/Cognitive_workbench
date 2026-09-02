@@ -45,7 +45,7 @@ Four terms, and they nest:
 
 - **claim** — one seller assertion that can be evaluated as true or false, enumerated and frozen in §5.
 - **verdict** — the classification assigned after comparing the claim with the evidence, from §6.
-- **adjudication** — the verdict, together with the gap or unresolved status that verdict requires.
+- **adjudication** — the verdict, together with the `gap` or `unresolved_because` field that verdict requires, per §13.
 - **finding** — one output record: the `claim_id` of a frozen claim, its adjudication, and the evidence used.
 
 Every frozen claim produces exactly one finding, and every finding adjudicates exactly one claim. A claim carries one verdict, so two findings on one claim are either redundant or in conflict.
@@ -69,7 +69,7 @@ Read the claim source and enumerate every assertion in it the seller makes about
 - **`lines`** — where that quote sits in the claim source, as a start and end line number.
 - **`statement`** — the claim in your own plain words, so a reader knows what is being tested.
 
-**Where to divide the text into claims.** Split assertions apart where different evidence could give them different verdicts. Keep them together where they stand or fall on the same evidence. **Do not split one assertion into artificial parts**, and do not combine separate assertions because they share a subject. Both are faults, and the second is not worse than the first.
+**Where to divide the text into claims.** Split assertions apart where different evidence could give them different verdicts. Keep them together where they stand or fall on the same evidence. **Do not split one assertion into parts that the same evidence settles**, and do not combine separate assertions because they share a subject. Both are faults, and the second is not worse than the first.
 
 > "Backups run daily with 30-day retention" is **two** claims. The schedule and the retention period are settled by different evidence, and one can hold while the other fails. Sharing a sentence is not a reason to combine.
 >
@@ -101,11 +101,9 @@ Every finding carries exactly one.
 
 **A caveat is not for weak evidence.** If what you have does not settle the claim, the verdict is `unverifiable` and §8 governs it. A framework version inferred from directory names, where no manifest or lockfile was supplied, is `unverifiable` — not a claim that holds with a caveat. The verdict says how the claim fared against the evidence; it does not say how confident you are.
 
-**Keep `partial` and `contradicted` apart.** `partial` means most of the claim is borne out and a named part is not. `contradicted` means the evidence says otherwise.
+**Keep `partial` and `contradicted` apart.** `partial` means the claim is substantially true and a named part is not borne out. `contradicted` means the evidence says otherwise.
 
 **Do not judge whether a gap matters to the buyer.** That judgement depends on the transaction and on what every other claim source shows, and a later stage makes it. Record what the claim says, what the evidence shows, and the difference.
-
-**`unverifiable` is not `contradicted`.** Failing to find supporting evidence is not evidence that the claim is false. §8 governs it.
 
 ## 7. Evidence
 
@@ -116,12 +114,12 @@ A finding's evidence is **one list**. Each item in it declares its `form`, and t
 **`citation`** — material that bears directly on the claim.
 
 - **`document`**, **`lines`** — where it is;
-- **`quote`** — the text, verbatim;
+- **`quote`** — the text, verbatim: one contiguous span of the cited lines, copied as it appears. Do not join text that is not contiguous. Where a second span is needed, cite it as a second item;
 - **`shows`** — what it demonstrates about the claim.
 
 **`derived`** — a fact that follows from two or more supplied facts. A retention period in one document and the date of the last usable backup in another together determine when recovery becomes impossible; the seller stated neither consequence.
 
-- **`basis`** — every source fact it rests on, each with its document, lines and verbatim quote;
+- **`basis`** — every source fact it rests on, each with `document`, `lines` and `quote` under the same rules as a `citation`;
 - **`derivation`** — the arithmetic or reasoning, shown so a reader can reproduce it;
 - **`consequence`** — what follows, and why it bears on the claim.
 
@@ -137,7 +135,7 @@ Derive only from facts supplied in the materials; do not import market forecasts
 
 **Every citation must resolve.** Before you emit, check that each document named exists, each line range is real, and each quoted span appears in the document as you have written it.
 
-Correct any citation that does not resolve. If it cannot be corrected — the material you remembered is not there — the claim is `unverifiable` under §8, and the finding says so. Do not drop the finding: §4 gives every claim exactly one.
+Correct any citation that does not resolve. If it cannot be corrected — the material you remembered is not there — remove that item. If no remaining evidence settles the claim, the verdict is `unverifiable` under §8. Do not drop the finding: §4 gives every claim exactly one.
 
 This check confirms that the cited text exists. It does not establish that the text supports the claim, which remains your judgement.
 
@@ -196,7 +194,7 @@ If evidence found later contradicts a finding you have already formed, revise th
 
 3. **Gather evidence** across all the supplied materials, not only the claim source. The evidence that settles a claim made in one document usually sits in another.
 
-4. **Adjudicate each frozen claim** and assign one verdict, per §6. Do not ask the client between claims. Where a claim raises something only the seller can answer, record it in `questions`.
+4. **Adjudicate each frozen claim** and assign one verdict, per §6. Where a claim raises something only the seller can answer, record it in `questions`.
 
    `questions` supplements the findings and never replaces one. A claim that needs seller information still gets its finding, and still gets `unverifiable` if the supplied materials cannot settle it.
 

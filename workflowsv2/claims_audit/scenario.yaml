@@ -8,10 +8,10 @@
 #   characters.Jill.external_repo   the target tree
 #   the claim sources               named in the opening turn (below)
 #
-# THE METHOD IS NOT IN THIS FILE. workflowsv2/claims_audit/method/METHOD.md is the authority: scope
-# rule, priority order, finding format, verdicts, correction protocol,
-# recommendation taxonomy, liability posture, run sequence. A copy here would
-# be a second source that drifts.
+# THE METHOD IS NOT IN THIS FILE. workflowsv2/claims_audit/method/METHOD.md is
+# the authority: scope rule, claim division, verdicts, evidence forms, the
+# correction protocol, the output fields, run sequence. A copy here would be a
+# second source that drifts.
 #
 # A FRESH WORLD PER TARGET. Audit target A then target B in one world and B's
 # audit recalls A's findings. On Bruce's own targets that is untidy; at the
@@ -19,40 +19,38 @@
 # coordination runs were invalidated by exactly this. A new world_name is the
 # whole fix.
 #
-# WHAT LEAVES AN ENGAGEMENT: method only, as proposed edits to workflowsv2/claims_audit/method/METHOD.md,
-# reviewed by a human before merge. Never a target fact. The test is in §12
-# step 7 — if a lesson cannot be stated without naming the target, it is not a
-# method lesson.
+# WHAT LEAVES AN ENGAGEMENT: method only, as edits to
+# workflowsv2/claims_audit/method/METHOD.md reviewed by a human before merge.
+# Never a target fact. The test is in §17 — if a lesson cannot be stated
+# without naming the target, it is not a method lesson.
 #
 # RUNNING
 #
-#   1. Set world_name and external_repo. Decide the claim sources.
-#   2. python3 launcher.py audit.yaml --cli --autonomy
-#   3. Opening turn, roughly:
+#   python3 workflowsv2/claims_audit/runner.py --engagement <name> \
+#           --world <fresh name> --model measure/models/<model>.yaml
 #
-#        Read METHOD.md — that is your method. The engagement target is the
-#        repository bound to inspect_external. The claim sources are <name
-#        them>; every other document provided is evidence. I am the buyer's
-#        side. Enumerate the claim surface, close it as the method says, then
-#        work the priority order straight through.
+#   The engagement (engagements/<name>/engagement.yaml and brief.md) supplies
+#   the target and the claim source. The runner enumerates the claim source in
+#   one schema-constrained call, drives the gathering legs with "continue",
+#   and adjudicates the frozen surface in a second call. The world is then
+#   retired, never reused. There is no interactive path.
 #
-#   4. On completion the agent proposes METHOD.md edits (technique only). The
-#      world is then retired, never reused.
-#
-#   NAME THE CLAIM SOURCES. §2 defines a claim as something the seller asserts
-#   to the buyer, which makes the rest of a data room evidence. Which
-#   documents those are is an engagement fact, not something to infer: given
-#   the same nine documents, three backends enumerated 62, 67 and 273 claims
-#   (2026-08-25). §12 step 1 has the fallback if they are not named.
+#   ONE CLAIM SOURCE PER RUN. The runner audits the first entry of the
+#   engagement's `claim_sources`; an engagement that lists several is run as
+#   one engagement per document (see engagements/dataroom-fixture-doc1).
+#   Which document carries the seller's claims is an engagement fact, not
+#   something to infer: given the same nine documents, three backends
+#   enumerated 62, 67 and 273 claims (2026-08-25).
 #
 #   DO NOT ADD INSTRUCTIONS HERE THAT THE METHOD FORBIDS. This block once told
-#   the agent to recap every five findings and stop on a delta. §8 and §12
-#   step 4 had already removed both, and the agent was left resolving the
+#   the agent to recap every five findings and stop on a delta after the
+#   method had removed both, and the agent was left resolving the
 #   contradiction at runtime.
 #
-# AUTONOMY MUST BE ON. An audit runs longer than one turn's action budget and
-# proceeds by yield. With autonomy off, a yield spawns a remainder only
-# _handle_tick can fire, and a human becomes the scheduler for every leg.
+# AUTONOMY IS OFF. The runner drives every leg with "continue", so a run is
+# deterministic in its leg count and a stall is visible as a stall. The tick
+# sensor below is inert with autonomy off and is kept so the scenario can be
+# run under the launcher if that path is ever wanted again.
 #
 # BACKEND is per-run; see the model block below. A real engagement runs on
 # single-tenant hardware: a client's materials should not transit an inference
@@ -197,11 +195,11 @@ characters:
       checkout that `inspect` is deliberately geofenced away from (see
       inspect_repo above). Asking for the longer path costs a wasted
       call while the subagent lists the root and finds the real one.
-      She reads it at the start of an engagement and works from it. That file is the authority — scope rule, claim-surface
-      priority order, finding format, the verdict vocabulary, the
-      correction protocol, the two recaps, the recommendation taxonomy
-      and the run sequence — not this paragraph, and it changes as the
-      method is corrected.
+      She reads it at the start of an engagement and works from it. That
+      file is the authority — scope rule, how claims are divided, the
+      verdict vocabulary, the evidence forms, the correction protocol,
+      the output fields and the run sequence — not this paragraph, and it
+      changes as the method is corrected.
 
       The target under audit is a different tree entirely: whatever
       `inspect_external` is bound to this session. `inspect` reaches her
@@ -215,15 +213,8 @@ characters:
       a `next` that states what is done, what remains, and every
       specific a follow-up must not rediscover.
 
-      What she learns here divides in two, and the division is not
-      optional. Technique — how to probe a claim, where deltas tend to
-      hide, what a stated rate might actually be measuring — is worth
-      carrying forward, and at the end of an engagement she proposes it
-      as edits to `METHOD.md` for review. Facts about this target
-      are the client's and stay in this world, which is retired when the
-      engagement ends. The test she applies to anything she proposes
-      carrying out: if it cannot be stated without naming the target, it
-      is not a method lesson.
+      Facts about this target are the client's and stay in this world,
+      which is retired when the engagement ends.
 
     self_model: |
       What Jill knows about her own machinery, she knows from this

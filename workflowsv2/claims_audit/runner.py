@@ -88,11 +88,12 @@ from utils.json_utils import repair_json_string                 # noqa: E402
 # it as HTML comments in that file.
 CONTINUE = "continue"
 
-# NO DELIVERABLE IS ASKED FOR ANY MORE. Until 2026-08-27 the runner drove the
+# THE LEGS PRODUCE NO DELIVERABLE. Until 2026-08-27 the runner drove the
 # report and the Gap Map as one turn each and knew which was which because it
-# had asked — which is exactly how a claim enumeration became a report. Blocks
-# announce themselves (METHOD §16), so the runner asks for nothing while they
-# arrive and speaks only to name one that has not.
+# had asked — which is exactly how a claim enumeration became a report. In v2
+# the legs only gather; both deliverables are schema-constrained calls the
+# runner makes itself (`emit_surface`, `emit_findings`), so "continue" is all
+# a leg is ever asked.
 
 
 def load_engagement(name: str) -> Dict[str, Any]:
@@ -124,11 +125,6 @@ def load_engagement(name: str) -> Dict[str, Any]:
             "retention": cfg.get("retention")}
 
 
-# The `"file"` fields an inspect_external trace records, which is the same
-# record files_read() reads to build the manifest.
-_re_ledger = re.compile(r'"file":\s*"([^"]+)"')
-
-
 def engagement_state(world: str, agent: str, leg: int, max_legs: int,
                      elapsed_s: float,
                      claim_sources: Optional[List[str]] = None) -> str:
@@ -141,15 +137,16 @@ def engagement_state(world: str, agent: str, leg: int, max_legs: int,
     thing the process driving it already knows for free.
 
     STATE, NOT GAPS — the line worth holding. Everything here is something
-    that happened: legs taken, documents opened, minutes spent. Nothing here
-    says what remains. The runner uses the Gap Map marker as its stopping
-    rule, and handing the agent the stopping rule would be feeding the metric
-    to the thing being measured. "9 of 9 documents opened" is a ledger entry;
-    "you still owe me a Gap Map" is the answer sheet.
+    that happened: legs taken, files read, minutes spent. Nothing here says
+    what remains: the agent decides when gathering is done, and handing it a
+    completion signal would be feeding the metric to the thing being measured.
 
-    Nothing here is interpreted. Filenames are matched against the
-    engagement's declared claim sources — a string comparison, not a
-    judgement about what the agent meant or intended.
+    NO CLAIM-SOURCE FRACTION IN v2. The claim source is handed to the
+    enumeration call by the runner, line-numbered, so the agent has no reason
+    to open it with `inspect_external` and "Claim sources: 0 of 1 opened" read
+    as work not done. The fraction was a v1 progress signal for a run that
+    enumerated by reading; `claim_sources` is still accepted so the ledger's
+    callers need not change, and is not reported.
     """
     # THE ENGAGEMENT DECLARES THE SET; THE RUNNER DOES NOT GUESS IT. This
     # globbed `*.md` in the target until 2026-08-29, which is only meaningful
@@ -159,47 +156,15 @@ def engagement_state(world: str, agent: str, leg: int, max_legs: int,
     # deciding whether to keep working. Wrong numerator and wrong denominator,
     # agreeing by coincidence: CONTRIBUTING.md is not a claim source and
     # llms.txt is not matched by the glob.
-    docs = sorted(claim_sources or [])
     traces = REPO / "scenarios" / world / agent / "inspect_traces"
-    seen, opened = set(), 0
-    if traces.is_dir():
-        for t in traces.glob("inspect_external_*.txt"):
-            try:
-                body = t.read_text(errors="replace")
-            except OSError as e:
-                logger.warning("ledger: unreadable trace %s (%s)", t, e)
-                continue
-            # THE PATH THE TRACE RECORDED, NOT A SUBSTRING OF IT. `d in body`
-            # credits a claim source whenever its name appears anywhere, and a
-            # declared source is a substring of any deeper path ending the same
-            # way. The ChatterMate engagement names both `README.md` and
-            # `backend/app/knowledge/README.md`, so opening the second credited
-            # both, and the ledger reported two of four sources opened on one
-            # read. That is the saturating fraction the note below warns
-            # about, manufactured by the runner rather than earned.
-            #
-            # Matching the `"file"` fields is what files_read() already trusts
-            # to build the content-hash manifest, so the ledger and the
-            # manifest now answer from the same record. It can undercount if a
-            # source is reached by some path that records no file field —
-            # which is the safe direction here, because this fraction's only
-            # failure mode that matters is reading as finished.
-            seen.update(d for d in docs
-                        if d in set(_re_ledger.findall(body)))
-            opened += 1
+    opened = len(list(traces.glob("inspect_external_*.txt"))) \
+        if traces.is_dir() else 0
     head = (f"\n\n[engagement state, recorded by the client's process — "
             f"leg {leg} of {max_legs}, {elapsed_s / 60:.0f} min elapsed")
-    # A FRACTION THAT SATURATES READS AS "FINISHED", so the claim-source
-    # fraction — which is small, and which an agent completes early and
-    # correctly — is followed by a count that only grows. "3 of 3 claim
-    # sources opened" on its own is what the agent saw before it stopped
-    # auditing at 24 of 86 claims; "and 37 files opened" says the work is
-    # still moving. Both are things that happened, which is the line this
-    # ledger holds: state, never gaps.
-    if docs:
-        head += (f". Claim sources: {len(seen)} of {len(docs)} opened")
+    # A COUNT THAT ONLY GROWS. A fraction saturates and reads as "finished";
+    # "37 file reads so far" says the work is still moving and nothing else.
     if opened:
-        head += f". {opened} file reads so far"
+        head += f". {opened} evidence requests so far"
     return head + ".]"
 
 

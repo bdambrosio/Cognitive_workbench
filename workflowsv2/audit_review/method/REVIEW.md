@@ -32,11 +32,13 @@ The audit's own method states the gap this review fills. METHOD §7: *"This chec
 
 **The materials** — the target itself, under `inspect_external`. The same tree the auditor read.
 
+**The cited material** — for every citation in a finding, the lines it names and the lines around them, placed under the finding by the client's process when it asks for your review. A citation that does not resolve is marked so there, with the reason.
+
 **The method the audit worked to** — `working_record/method_as_delivered.md`, the text that engagement actually received. Use this file, not any current version: you are checking whether the audit followed the method it was given.
 
 **The working record** — the auditor's reasoning trace and one file per evidence request.
 
-**Read the findings and the materials first. Do not read the working record until §7.** A reviewer who reads the auditor's log first adopts its framing, and then checks whether the reasoning was followed rather than whether the conclusion is supported.
+**Read the findings and the materials first, and the working record last.** A reviewer who reads the auditor's log first adopts its framing, and then checks whether the reasoning was followed rather than whether the conclusion is supported.
 
 ## 4. What is already settled before you start
 
@@ -63,7 +65,7 @@ Five checks. The first is over the claim surface; the rest are per finding.
 
 **3. Evidence support.** Does the cited text show what the evidence item's `shows` says it shows?
 
-**4. Verdict calibration.** Given the claim, the evidence and the `gap`, is the verdict the right one from METHOD §6? A claim shown to be false but carrying `partial` is understated. A named part of the assertion failing, recorded as `real_with_caveat`, is overstated — METHOD §6 makes that boundary a test, and it is the one most often got wrong. Weak evidence recorded as a caveat rather than `unverifiable` is the other.
+**4. Verdict calibration.** Given the claim, the evidence and the `gap`, is the verdict the right one from METHOD §6? A verdict is **overstated** when it credits the claim more than the cited evidence supports, and **understated** when it credits the claim less. A claim shown to be false but carrying `partial` is understated. A named part of the assertion failing, recorded as `real_with_caveat`, is overstated — METHOD §6 makes that boundary a test, and it is the one most often got wrong. Weak evidence recorded as a caveat rather than `unverifiable` is also overstated.
 
 **5. Search adequacy** — for `unverifiable` findings only. METHOD §8 requires a lexical and a structural search and the process has confirmed both are present. The question left is whether they were searches that would have found the thing: right terms, right places. A search recorded against the wrong terms is diligence on paper and none in fact.
 
@@ -79,7 +81,7 @@ the whole of this section.
 **The process observations** are what you saw: how the audit went about
 settling this claim. Each is independent of the others and each answers one of
 §5's checks. A finding can fail several at once, and which ones it fails is the
-information — not a single label chosen from a ranking.
+information.
 
 | Observation | Values | The check it answers |
 |---|---|---|
@@ -88,11 +90,12 @@ information — not a single label chosen from a ranking.
 | `verdict_calibration` | `correct`, `overstated`, `understated` | §5 check 4 — is the verdict the right one from METHOD §6 |
 | `searches_adequate` | `yes`, `no`, `not_applicable` | §5 check 5 — `not_applicable` unless the verdict is `unverifiable` |
 
+An observation is **clean** when its value is `yes`, `correct` or
+`not_applicable`. Every other value is **not clean**.
+
 **The outcome** is whether the audit's finding survives what you saw. You do not
 write it. The client's process derives it: a finding **holds** when every
-observation is clean, and **does not hold** when any is not. Nothing is gained
-by asking you for a conclusion that follows from your own observations, and a
-model that disagrees with itself between the two is a defect with no upside.
+observation is clean, and **does not hold** when any is not.
 
 **Two observations can point at the same defect and mean different things
 together.** Irrelevant evidence with adequate searches says the materials do not
@@ -103,10 +106,8 @@ single label cannot.
 
 **A finding with any observation not clean carries one exception**: the
 specific mismatch, quoting both sides — what the finding says, and what the
-cited material says. Where more than one observation is adverse, the exception
-covers them together; the observations themselves already record which failed,
-so nothing is lost by writing it once. A reader who cannot see the difference
-cannot check you.
+cited material says. Where more than one observation is not clean, the
+exception covers them together; the observations themselves record which.
 
 **`holds` is about the audit's finding, never about the claim.** Whether the
 seller's claim is borne out is METHOD §6's verdict and belongs to the audit;
@@ -120,9 +121,9 @@ read as one.
 
 **What they cannot tell you, and you can.** A figure counts citations that resolve. It cannot count citations that resolve and are irrelevant, which is §5 check 2 and the reason this review exists.
 
-**Once every finding is checked** — not before — read the working record and report one thing about the audit as a whole: whether the record bears out the work the findings claim. The trace and the evidence requests show what was actually read.
+**Once every finding is checked** — not before — report one thing about the audit as a whole: whether the record bears out the work the findings claim. The client's process reads the working record and gives you, with that request, the documents the record shows the audit opened, the documents the findings cite, and any cited document the record does not show being opened, with the claims whose findings cite it.
 
-This is a statement about the audit, not an observation about a finding, and §6's four do not apply to it. Where the record does not show a cited document ever being opened, say so here and name the findings it affects.
+This is a statement about the audit, not an observation about a finding, and §6's four do not apply to it. Where a cited document was never opened, say so here and name the claims it affects.
 
 **Spans of the claim source that no claim covers are reported to a person, not to you.** Judging whether an unenumerated sentence contains a seller assertion is the enumeration task over again, and a reviewer who missed it once will miss it twice. The process lists those spans; a human reads them.
 
@@ -158,7 +159,7 @@ Emit nothing outside the JSON object. There is no covering note and no summary o
 **There is no grade and no pass mark.** The result is the observations, the
 outcomes that follow from them, and what a second reviewer made of a subset.
 
-**Three observations are retested when they come back adverse:**
+**Three observations are retested when they are not clean:**
 `evidence_relevant`, `evidence_supports` and `searches_adequate`. Each asserts
 that the audit's evidence does not do a job, and a second reviewer can settle
 whether that is so. The client's process gives each to a reviewer who is not
@@ -171,21 +172,22 @@ step tells you about the reviewers rather than about the audit.
 **A sample of findings that hold is retested too, and this is not a formality.**
 Retesting only the exceptions can catch a reviewer who is too harsh and can
 never catch one who is too lax: a review that passes everything raises nothing
-to retest and is never challenged. Sampling clean findings is the control that
+to retest and is never challenged. Sampling findings that hold is the control that
 makes the ratio mean something. If the second reviewer disagrees about findings
-you passed at a rate near the rate it disagrees about ones you failed, the
+that hold at a rate near the rate it disagrees about ones that do not, the
 review is not discriminating and its numbers should not be used.
 
-**A retest that disagrees does not overturn you.** It records that the finding
-is borderline. Report the disagreement; do not resolve it.
+**A retest that disagrees does not overturn you.** It records that the
+exception does not stand; the exception stays on the record with that
+standing. Report the disagreement; do not resolve it.
 
 **A disagreement about a sampled finding that holds changes nothing about that
 finding.** It counts toward the control and nowhere else. The two directions are
 not symmetric: a reviewer asserting a defect in finished work carries the higher
 standard, because one wrong exception puts a defect on the record against an
 audit that does not carry it, while a wrong pass would need every real exception
-missed at once. So an exception can be marked borderline by a retest, and a
-finding that holds cannot be failed by one.
+missed at once. So an exception can be recorded as not standing by a retest, and a
+finding that holds cannot be made not to hold by one.
 
 **A retest that did not run is not a retest that disagreed.** If it could not be
 obtained, say so and leave the standing unknown.
