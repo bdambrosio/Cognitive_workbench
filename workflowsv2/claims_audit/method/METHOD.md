@@ -129,7 +129,8 @@ Derive only from facts supplied in the materials; do not import market forecasts
 
 - **`kind`** — `lexical` or `structural`;
 - **`performed`** — what you actually searched;
-- **`result`** — what came back.
+- **`result`** — what came back;
+- **`candidates`** — every file the search found where material that could settle the claim would appear, each by its path from the target root. An empty list when the search found none. A file listed here and not opened makes the claim `not_examined`, per §8.
 
 **For numbers and dates, quote the source line.** A summary produced by a tool is useful for navigation and is not sufficient evidence for an exact quantitative claim.
 
@@ -148,7 +149,9 @@ Two are required, and they are complementary:
 - **`lexical`** — search using terms taken from the claim itself, including reasonable stems and variants;
 - **`structural`** — inspect the directory, module or document set where the material would reasonably appear.
 
-For each, state what you actually searched and what came back. A search establishes diligence, not absolute absence.
+For each, state what you actually searched, what came back, and in `candidates` the files it found where the material would appear. A search establishes diligence, not absolute absence.
+
+**Every candidate is opened before the claim is recorded as unsettled.** A file the searches named and nobody read does not show that the materials cannot settle the claim; it shows that the engagement has not looked. *Opened* means its contents were read and appear in the evidence requests. If a candidate of any search on the claim was not opened, the disposition is `not_examined`; the client's process then asks you to open those files and to adjudicate the claim again. The other three dispositions are recorded only when every candidate has been opened.
 
 The adjudication also records what the searches established, as one of:
 
@@ -157,6 +160,7 @@ The adjudication also records what the searches established, as one of:
 | `not_in_the_materials` | Material of the right kind was supplied, and none of it settles the claim — an accounting export that carries no customer count |
 | `present_but_not_readable` | The material is supplied and cannot be interrogated as given — a compiled archive with no source |
 | `outside_the_materials` | The kind of material needed to test the claim was not supplied at all — no customer records of any sort |
+| `not_examined` | The searches named one or more files where the material would appear, and at least one of them was not opened in this engagement |
 
 If the searches do not settle the question, the verdict is `unverifiable`, never `contradicted`.
 
@@ -242,7 +246,7 @@ An evidence item's `form` decides its fields, per §7:
 |---|---|
 | `citation` | `document`, `lines`, `quote`, `shows` |
 | `derived` | `basis[]` (each `document`, `lines`, `quote`), `derivation`, `consequence` |
-| `search` | `kind`, `performed`, `result` |
+| `search` | `kind`, `performed`, `result`, `candidates` |
 
 The schema requires `form` and leaves the rest of each item open, because a form-by-form requirement is checked after the response is parsed rather than during decoding. An item missing a field its form requires fails that check, and the output is invalid.
 

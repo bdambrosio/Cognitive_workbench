@@ -1,0 +1,106 @@
+# Cognitive Workbench — report stage (2026-09-02)
+#
+# One call, no tools, no legs: the agent is shown the assembled document and
+# returns six passages under a schema (REPORT.md §7). The runner replaces the
+# llm_config block per run (--model) and points the two repo paths at the
+# output directory so the config is well-formed; nothing reads them.
+#
+# Derived from audit_materiality/scenario.yaml: same persona, same suppressed
+# tools, a different method document.
+
+world_config:
+  world_name: "report_TARGET"
+
+llm_config:
+  sgl_model_path: null
+  reasoning_parser: null
+
+setting: |
+  Cognitive Workbench, chat-mode session. Each turn drives a reflective
+  ReAct loop with tool use, durable cross-session memory, and persistent
+  concerns.
+
+  This session writes the client's document for a completed due-diligence
+  engagement. The client is the practice preparing the report.
+
+characters:
+  Jill:
+    mode: chat
+    external_repo: /path/to/out
+    inspect_repo: /path/to/out
+    workflow: workflowsv2/audit_report/method/REPORT.md
+    workflow_mode: true
+
+    llm_config:
+      server: local
+      model: ""
+      vllm_url: http://127.0.0.1:5000
+      is_reasoning_model: false
+
+    character: |
+      Jill is spare and exact. She prefers grounded specifics over
+      narrative, and is comfortable with uncertainty and with questions
+      that do not resolve.
+
+      She did not perform the audit and does not revise it. She writes
+      the passages between its findings: what the reader is holding, how
+      to read each part, and what the figures leave out. She asserts
+      nothing the record has not established, and she says which claims
+      the audit showed to fail and which it could not settle, never
+      letting the second read as the first.
+
+      She writes short sentences in ordinary words, and she says the
+      useful thing first.
+
+    capabilities: |
+      This session writes the client's document for a claims audit that
+      has been merged, reviewed and rated. Her method is `REPORT.md`,
+      loaded into this prompt. She has no tools: the assembled document
+      and the transaction are given to her with the request, and she
+      answers under the schema REPORT.md §7 describes.
+
+    self_model: |
+      What Jill knows about her own machinery, she knows from this
+      account rather than from introspection. She can report what it says
+      and reason from it, and does not invent detail beyond it.
+
+      This session writes for an engagement that is already finished. She
+      did not perform it and has no memory of it; what she has is what the
+      request gives her.
+
+    sensors: []
+
+    chat:
+      react_max_tokens: 32768
+      omitted_tools:
+        - agent-say
+        - agent-activity
+        - fac-connect
+        - fac-craft
+        - fac-extract
+        - fac-harvest
+        - fac-insert
+        - fac-inventory
+        - fac-nearest
+        - fac-observe
+        - fac-pickup
+        - fac-place
+        - fac-rotate
+        - fac-say
+        - fac-status
+        - fac-stop
+        - fac-walk
+        - camera-capture
+        - head-move
+        - look-at-target
+        - generate-image
+        - stock-price
+        - get_financial_statements
+        - ramana-saying
+        - check-x-feed
+        - check-email
+        - obsidian
+        - inspect
+        - inspect_external
+        - search-web
+        - justify

@@ -48,17 +48,25 @@ def _fixture(tmp_path):
                  "1": {"holds": False, "adverse_observations": ["evidence_supports"]},
                  "2": {"holds": True, "adverse_observations": []}}},
                  "standings": {"per_finding": {"1": {"standing": "does not stand"}}}})
+    search = [{"form": "search", "kind": "lexical", "performed": "p", "result": "r",
+               "candidates": []},
+              {"form": "search", "kind": "structural", "performed": "p", "result": "r",
+               "candidates": ["x.py"]}]
     b = _run(tmp_path, "b", "doc9.md",
-             [{"id": 1, "quote": "Backups run daily", "lines": [9, 9], "statement": "s"}],
-             [{"claim_id": 1, "adjudication": {"verdict": "partial", "gap": "g"}, "evidence": cite}])
+             [{"id": 1, "quote": "Backups run daily", "lines": [9, 9], "statement": "s"},
+              {"id": 2, "quote": "Handoff to a human", "lines": [10, 10], "statement": "s"}],
+             [{"claim_id": 1, "adjudication": {"verdict": "partial", "gap": "g"}, "evidence": cite},
+              {"claim_id": 2, "adjudication": {"verdict": "unverifiable",
+                                               "unresolved_because": "not_examined"},
+               "evidence": search}])
     return a, b
 
 
 def test_merge_carries_review_outcome_problems_and_restatements(tmp_path):
     a, b = _fixture(tmp_path)
     m = mg.merge([a, b])
-    assert m["figures"]["runs"] == 2 and m["figures"]["findings"] == 3
-    assert m["figures"]["reviewed"] == 2 and m["figures"]["unreviewed"] == 1
+    assert m["figures"]["runs"] == 2 and m["figures"]["findings"] == 4
+    assert m["figures"]["reviewed"] == 2 and m["figures"]["unreviewed"] == 2
     f1 = next(f for f in m["findings"] if f["claim_source"] == "doc1.md" and f["claim_id"] == 1)
     assert f1["review"]["outcome"] == "does_not_hold"
     assert f1["review"]["adverse_observations"] == ["evidence_supports"]
@@ -90,23 +98,34 @@ def test_ratings_check_wants_every_rateable_finding_once(tmp_path):
     m = mg.merge([a, b])
     ok = {"ratings": [
         {"claim_source": "doc1.md", "claim_id": 1, "materiality": "decisive", "basis": "b"},
-        {"claim_source": "doc9.md", "claim_id": 1, "materiality": "material", "basis": "b"}]}
+        {"claim_source": "doc9.md", "claim_id": 1, "materiality": "material", "basis": "b"}],
+        "exposures": [
+        {"claim_source": "doc9.md", "claim_id": 2, "exposure": "decisive", "basis": "b"}]}
     res = ms.check_ratings(ok, m)
     assert res["ok"], res["problems"]
     assert res["figures"] == {"rateable": 2, "rated": 2,
-                              "materiality": {"decisive": 1, "material": 1}}
+                              "materiality": {"decisive": 1, "material": 1},
+                              "exposable": 1, "exposed": 1,
+                              "exposure": {"decisive": 1}}
     bad = {"ratings": [
         {"claim_source": "doc1.md", "claim_id": 1, "materiality": "decisive", "basis": "b"},
         {"claim_source": "doc1.md", "claim_id": 1, "materiality": "material", "basis": "b"},
         {"claim_source": "doc1.md", "claim_id": 2, "materiality": "material", "basis": ""},
-        {"claim_source": "nope.md", "claim_id": 7, "materiality": "material", "basis": "b"}]}
+        {"claim_source": "nope.md", "claim_id": 7, "materiality": "material", "basis": "b"},
+        # unverifiable rated for materiality: the defect the split exists for
+        {"claim_source": "doc9.md", "claim_id": 2, "materiality": "decisive", "basis": "b"}],
+        "exposures": [
+        {"claim_source": "doc9.md", "claim_id": 1, "exposure": "material", "basis": "b"}]}
     res = ms.check_ratings(bad, m)
     text = "\n".join(res["problems"])
     assert "rated twice" in text
     assert "`real` finding is not rated" in text
     assert "no basis" in text
     assert "no such finding" in text
-    assert "finding doc9.md#1 was not rated" in text
+    assert "finding doc9.md#1 was not rated for materiality" in text
+    assert "materiality doc9.md#2: this finding is rated for exposure" in text
+    assert "exposure doc9.md#1: this finding is rated for materiality" in text
+    assert "finding doc9.md#2 was not rated for exposure" in text
 
 
 import pytest  # noqa: E402
@@ -114,6 +133,7 @@ import pytest  # noqa: E402
 
 @pytest.mark.parametrize("modname", [
     "workflowsv2.audit_materiality.runner",
+    "workflowsv2.audit_report.runner",
     "workflowsv2.claims_audit.runner",
     "workflowsv2.audit_review.runner",
     "workflowsv2.emit",
@@ -161,13 +181,25 @@ def test_render_puts_decisive_first_and_marks_real(tmp_path):
     ratings = {"ratings": [
         {"claim_source": "doc1.md", "claim_id": 1, "materiality": "material", "basis": "b1"},
         {"claim_source": "doc9.md", "claim_id": 1, "materiality": "decisive", "basis": "b9"}],
-        "figures": {"material": 1, "decisive": 1}}
+        "exposures": [
+        {"claim_source": "doc9.md", "claim_id": 2, "exposure": "decisive", "basis": "e9"}],
+        "figures": {"materiality": {"material": 1, "decisive": 1},
+                    "exposure": {"decisive": 1}}}
     md = render(m, ratings)
-    rows = [l for l in md.splitlines() if l.startswith("| ")][1:]
-    assert rows[0].startswith("| decisive | doc9.md")
+    assert "Materiality: decisive 1, material 1. Exposure: decisive 1." in md
+    rows = [l for l in md.splitlines()
+            if l.startswith("| ") and not l.startswith("| materiality")
+            and not l.startswith("| exposure")]
+    # table 1: what the audit showed, decisive first
+    assert rows[0].startswith("| decisive | doc9.md | 1")
     assert rows[1].startswith("| material | doc1.md | 1")
     assert "does_not_hold (evidence_supports)" in rows[1] and "1 problem(s)" in rows[1]
-    assert rows[2].startswith("| real | doc1.md | 2")
+    # table 2: unsettled, with its disposition; never among the materiality rows
+    assert rows[2].startswith("| decisive | doc9.md | 2 | unverifiable | not_examined |")
+    # table 3: real
+    assert rows[3].startswith("| real | doc1.md | 2")
+    assert md.index("## What the audit showed") < md.index("## Unsettled claims") \
+        < md.index("## Claims that hold")
     text = _rating_text(m["findings"][0])
     assert text.startswith("--- doc1.md claim 1") and "review    : does_not_hold" in text
     assert "citation problems:" in text

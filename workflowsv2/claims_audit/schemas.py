@@ -70,7 +70,14 @@ GAP_REQUIRED: Tuple[str, ...] = ("real_with_caveat", "partial", "contradicted")
 ADVERSE_VERDICTS: Tuple[str, ...] = ("partial", "contradicted")
 
 UNRESOLVED_BECAUSE: Tuple[str, ...] = (
-    "not_in_the_materials", "present_but_not_readable", "outside_the_materials")
+    "not_in_the_materials", "present_but_not_readable", "outside_the_materials",
+    "not_examined")
+
+#: METHOD §8: the disposition for an `unverifiable` claim whose searches named
+#: a file that was never opened. The runner chases these before delivery
+#: (`claims_audit/runner.py`, the chase loop); what remains is reported as a
+#: count of files named and not opened, never folded into the other three.
+NOT_EXAMINED = "not_examined"
 
 EVIDENCE_FORMS: Tuple[str, ...] = ("citation", "derived", "search")
 
@@ -187,7 +194,8 @@ def audit_schema() -> Dict[str, Any]:
         "derivation": {"type": "string"}, "consequence": {"type": "string"},
         # search
         "kind": {"enum": list(SEARCH_KINDS)},
-        "performed": {"type": "string"}, "result": {"type": "string"}},
+        "performed": {"type": "string"}, "result": {"type": "string"},
+        "candidates": {"type": "array", "items": {"type": "string"}}},
         "required": ["form"]}
     adjudication = {"type": "object", "properties": {
         "verdict": {"enum": list(VERDICTS)},
@@ -347,7 +355,13 @@ def resolve_document(docs: Dict[str, List[str]], name: Any
     """
     if not isinstance(name, str) or not name.strip():
         return None, f"document {name!r} is not a name"
-    n = name.strip().lstrip("./")
+    # A leading "./" is dropped as a prefix. `lstrip("./")` strips the
+    # CHARACTERS, which turned `.gitmodules` into `gitmodules` and reported
+    # every dotfile citation as not in the materials (found 2026-09-02).
+    n = name.strip()
+    while n.startswith("./"):
+        n = n[2:]
+    n = n.lstrip("/")
     if n in docs:
         return n, None
     hits = [k for k in docs if k.rsplit("/", 1)[-1] == n]
@@ -359,13 +373,75 @@ def resolve_document(docs: Dict[str, List[str]], name: Any
     return None, f"document {name!r} is not in the materials"
 
 
+def candidate_files(findings: Sequence[Dict[str, Any]],
+                    docs: Dict[str, List[str]], read: Optional[set]
+                    ) -> Dict[Any, Dict[str, List[str]]]:
+    """Per `unverifiable` finding: the files its searches named in
+    `candidates`, resolved against the corpus, and which of them were not
+    opened. METHOD §8.
+
+    `read` is the set of corpus keys the run opened (`runner.files_read`);
+    None means the caller cannot say, and `unopened` is then left empty rather
+    than guessed. `unresolved` holds the names that resolve to no single file,
+    with the reason, so the caller can report them.
+
+    Keyed by `claim_id`. Only findings with the `unverifiable` verdict are
+    present: a candidate on a settled claim is a note, not an obligation.
+
+    A candidate that names a DIRECTORY of the corpus is recorded under
+    `directories` and is neither an obligation nor a problem: there is no one
+    file to open, and a model naming the module where the material would sit
+    is answering §8's question honestly. A name that resolves to nothing is
+    a problem, as a cited document would be.
+    """
+    dirs = {k.rsplit("/", 1)[0] for k in docs if "/" in k}
+    dirs = {d[:i] for d in dirs for i in range(len(d) + 1)
+            if i == len(d) or d[i] == "/"} - {""}
+    out: Dict[Any, Dict[str, List[str]]] = {}
+    for f in findings:
+        adj = f.get("adjudication") or {}
+        if adj.get("verdict") != "unverifiable":
+            continue
+        named: List[str] = []
+        unresolved: List[str] = []
+        directories: List[str] = []
+        for e in f.get("evidence") or []:
+            if not isinstance(e, dict) or e.get("form") != "search":
+                continue
+            for c in e.get("candidates") or []:
+                key, why = resolve_document(docs, c)
+                if key is None:
+                    d = (c or "").strip().rstrip("/")
+                    while d.startswith("./"):
+                        d = d[2:]
+                    if d in dirs:
+                        if d not in directories:
+                            directories.append(d)
+                        continue
+                    unresolved.append(why or f"{c!r} does not resolve")
+                elif key not in named:
+                    named.append(key)
+        unopened = [k for k in named if k not in read] if read is not None else []
+        out[f.get("claim_id")] = {"named": named, "unopened": unopened,
+                                  "unresolved": unresolved,
+                                  "directories": directories}
+    return out
+
+
 def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
-                 frozen: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+                 frozen: Sequence[Dict[str, Any]],
+                 read: Optional[set] = None) -> Dict[str, Any]:
     """Everything METHOD requires that the schema cannot express.
 
     Returns `{"ok": bool, "problems": [...], "figures": {...}}`, the shape the
     runner already records for its other checks. A problem is a sentence a
     person can act on, not a code.
+
+    `read` is the set of corpus keys the run opened. With it, METHOD §8's
+    candidate rule is checked: an `unverifiable` finding whose searches named
+    a file that was not opened must carry `not_examined`, and one that carries
+    `not_examined` must name such a file. Without it (None) the disposition is
+    taken as recorded.
     """
     problems: List[str] = []
     docs = corpus_index(corpus)
@@ -441,6 +517,9 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
     seen: Dict[Any, int] = {}
     verdicts: Dict[str, int] = {}
     forms: Dict[str, int] = {}
+    candidates = candidate_files(findings, docs, read)
+    not_examined = 0
+    unopened = sorted({k for c in candidates.values() for k in c["unopened"]})
     for i, f in enumerate(findings, 1):
         w = f"finding {i}"
         adj = f.get("adjudication") or {}
@@ -466,7 +545,8 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
         if v == "real" and _norm(adj.get("gap")):
             problems.append(f"{w}: verdict `real` carries a `gap`")
         if v == "unverifiable":
-            if adj.get("unresolved_because") not in UNRESOLVED_BECAUSE:
+            because = adj.get("unresolved_because")
+            if because not in UNRESOLVED_BECAUSE:
                 problems.append(f"{w}: `unverifiable` requires "
                                 f"`unresolved_because` (METHOD §8)")
             kinds = {e.get("kind") for e in ev
@@ -476,6 +556,25 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
                 problems.append(f"{w}: `unverifiable` needs a lexical and a "
                                 f"structural search (METHOD §8); missing "
                                 f"{', '.join(missing)}")
+            cand = candidates.get(cid) or {}
+            for why in cand.get("unresolved") or []:
+                problems.append(f"{w}: candidate {why}")
+            if because == NOT_EXAMINED:
+                not_examined += 1
+            if read is not None:
+                if cand.get("unopened") and because in UNRESOLVED_BECAUSE \
+                        and because != NOT_EXAMINED:
+                    problems.append(
+                        f"{w}: searches named "
+                        f"{', '.join(cand['unopened'])} and the run did not "
+                        f"open it — the disposition is `not_examined` "
+                        f"(METHOD §8)")
+                if because == NOT_EXAMINED and not cand.get("unopened"):
+                    problems.append(
+                        f"{w}: `not_examined` but every candidate the "
+                        f"searches named was opened"
+                        + (" (none were named)" if not cand.get("named")
+                           else "") + " (METHOD §8)")
 
         if not ev:
             problems.append(f"{w}: no evidence — METHOD §4 gives every finding "
@@ -523,6 +622,10 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
                         "verdicts": verdicts,
                         "evidence_forms": forms,
                         "joined_quotes": joined,
+                        # METHOD §8: findings recorded `not_examined`, and the
+                        # files searches named that the run never opened.
+                        "not_examined": not_examined,
+                        "unopened_candidates": unopened,
                         "unclaimed": len(obj.get("unclaimed") or []),
                         "questions": len(obj.get("questions") or []),
                         "not_completed": bool(incomplete)}}

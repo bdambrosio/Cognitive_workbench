@@ -10,9 +10,10 @@ Two parts, in order:
   1. MERGE (merge.py). Mechanical: the named runs' findings, each with its
      review outcome and the citation problems the output check recorded,
      concatenated. No deduplication — the claim surface is human-owned.
-  2. RATE. Schema-constrained calls over batches of rateable findings, per
-     MATERIALITY.md. No tools, no legs: the finding and the transaction are
-     the whole input.
+  2. RATE. Schema-constrained calls over batches of findings, per
+     MATERIALITY.md: `materiality` for findings with a verdict about the
+     claim, `exposure` for `unverifiable` ones, never in one total. No tools,
+     no legs: the finding and the transaction are the whole input.
 
 Output, under engagements/<name>/merged/<ts>_<label>/: merged.json,
 materiality.json, materiality.md (for a person: decisive first), meta.json,
@@ -111,55 +112,98 @@ def _rating_text(f: Dict[str, Any]) -> str:
 
 
 def rate(loop, method_text: str, transaction: Optional[str],
-         findings: List[Dict[str, Any]], max_tokens: int, batch: int
-         ) -> Dict[str, Any]:
+         rateable: List[Dict[str, Any]], exposable: List[Dict[str, Any]],
+         max_tokens: int, batch: int) -> Dict[str, Any]:
     """The ratings, in batches. Same runner-decides-the-batch pattern as the
-    review's emit_parts: one schema per part, concatenated by merge_parts."""
+    review's emit_parts: one schema per part, concatenated by merge_parts.
+
+    A batch holds one kind of finding (MATERIALITY §7): the `materiality`
+    batches first, then the `exposure` ones, each asked for its own array."""
     head = ("The transaction, as the engagement states it:\n\n"
             + (transaction.strip() if transaction else
                "(The engagement states nothing about the transaction. Rate "
                "against a buyer paying a price that assumes every claim "
                "holds, per MATERIALITY \u00a72.)")
             + "\n\n")
-    groups = ([findings] if not batch
-              else [findings[i:i + batch] for i in range(0, len(findings), batch)])
+
+    def groups_of(xs):
+        return ([xs] if not batch else
+                [xs[i:i + batch] for i in range(0, len(xs), batch)]) if xs else []
+
+    plan = ([("materiality", "ratings", "exposures", g)
+             for g in groups_of(rateable)]
+            + [("exposure", "exposures", "ratings", g)
+               for g in groups_of(exposable)])
     parts, calls = [], []
-    for n, g in enumerate(groups, 1):
-        body = (f"Rate these {len(g)} findings, per MATERIALITY \u00a73 to \u00a75. "
-                f"Each carries its claim source and claim id; return both as "
-                f"given.\n\n" + "\n\n".join(_rating_text(f) for f in g)
-                + "\n\nEmit `ratings` for exactly these findings.")
+    for n, (field, array, other, g) in enumerate(plan, 1):
+        body = (f"Rate these {len(g)} findings for `{field}`, per MATERIALITY "
+                f"\u00a73 to \u00a75. Each carries its claim source and claim "
+                f"id; return both as given.\n\n"
+                + "\n\n".join(_rating_text(f) for f in g)
+                + f"\n\nEmit `{array}` for exactly these findings, and an "
+                  f"empty `{other}`.")
         out = emit(loop, method_text, head + body, schemas.ratings_schema(),
                    max_tokens)
-        calls.append({"part": f"ratings[{n}/{len(groups)}]", "findings": len(g),
+        calls.append({"part": f"{array}[{n}/{len(plan)}]", "findings": len(g),
                       **{k: v for k, v in out.items() if k not in ("raw", "obj")}})
         if out["obj"] is not None:
             parts.append(out["obj"])
         else:
-            logger.warning("batch %d/%d did not parse: %s", n, len(groups),
+            logger.warning("batch %d/%d did not parse: %s", n, len(plan),
                            out["parse_error"])
     return {"obj": schemas.merge_parts(parts), "calls": calls}
 
 
-def render(merged: Dict[str, Any], ratings: Dict[str, Any]) -> str:
-    """materiality.md: what a person reads. Decisive first."""
-    by_key = {f"{r.get('claim_source')}#{r.get('claim_id')}": r
-              for r in ratings.get("ratings") or []}
+def _table(findings: List[Dict[str, Any]], rated: Dict[str, Dict[str, Any]],
+           field: str, unrated: str) -> List[str]:
+    """One table, highest value first. `unrated` labels a finding this table
+    holds that carries no rating."""
     order = {m: i for i, m in enumerate(reversed(schemas.MATERIALITY))}
     rows = []
-    for f in merged["findings"]:
-        k = f"{f['claim_source']}#{f['claim_id']}"
-        r = by_key.get(k)
-        m = r.get("materiality") if r else ("not rated" if schemas.rateable(f)
-                                            else "real")
+    for f in findings:
+        r = rated.get(f"{f['claim_source']}#{f['claim_id']}")
+        m = r.get(field) if r else unrated
         rows.append((order.get(m, 99), f, r, m))
     rows.sort(key=lambda x: (x[0], x[1]["claim_source"], x[1]["claim_id"]))
+    lines = [f"| {field} | source | id | verdict | disposition | review | "
+             f"citations | claim | basis |",
+             "|---|---|---|---|---|---|---|---|---|"]
+    for _, f, r, m in rows:
+        rv = f.get("review") or {}
+        review = rv.get("outcome", "unreviewed")
+        if rv.get("adverse_observations"):
+            review += " (" + ", ".join(rv["adverse_observations"]) + ")"
+        cites = f"{len(f.get('citation_problems') or [])} problem(s)" \
+            if f.get("citation_problems") else "ok"
+        adj = f.get("adjudication") or {}
+        q = (f.get("quote") or "").replace("|", "\\|").replace("\n", " ")
+        b = ((r or {}).get("basis") or "").replace("|", "\\|").replace("\n", " ")
+        lines.append(f"| {m} | {f['claim_source']} | {f['claim_id']} | "
+                     f"{adj.get('verdict')} | {adj.get('unresolved_because') or ''} "
+                     f"| {review} | {cites} | {q[:160]} | {b} |")
+    return lines
+
+
+def render(merged: Dict[str, Any], ratings: Dict[str, Any]) -> str:
+    """materiality.md: what a person reads. Two tables — what the audit
+    showed, rated for materiality, then the unsettled claims ranked by
+    exposure — and `real` findings last. Highest value first in each."""
+    by_m = {f"{r.get('claim_source')}#{r.get('claim_id')}": r
+            for r in ratings.get("ratings") or []}
+    by_e = {f"{r.get('claim_source')}#{r.get('claim_id')}": r
+            for r in ratings.get("exposures") or []}
     fig = merged["figures"]
+    rf = ratings.get("figures") or {}
     lines = ["# Materiality", "",
              f"{fig['runs']} run(s), {fig['findings']} findings, "
              f"{fig['reviewed']} reviewed, {fig['unreviewed']} unreviewed. "
-             f"Ratings: " + ", ".join(f"{k} {v}" for k, v in
-                                       sorted((ratings.get('figures') or {}).items()))
+             f"Materiality: "
+             + (", ".join(f"{k} {v}" for k, v in
+                          sorted((rf.get("materiality") or {}).items()))
+                or "none")
+             + ". Exposure: "
+             + (", ".join(f"{k} {v}" for k, v in
+                          sorted((rf.get("exposure") or {}).items())) or "none")
              + ".", ""]
     if fig.get("restated_quotes"):
         lines += ["## Restated across claim sources", ""]
@@ -168,20 +212,20 @@ def render(merged: Dict[str, Any], ratings: Dict[str, Any]) -> str:
                                           f"{i['verdict']}" for i in x["in"])
                          + f" — \"{(x['quote'] or '')[:120]}\"")
         lines.append("")
-    lines += ["| rating | source | id | verdict | review | citations | claim | basis |",
-              "|---|---|---|---|---|---|---|---|"]
-    for _, f, r, m in rows:
-        rv = f.get("review") or {}
-        review = rv.get("outcome", "unreviewed")
-        if rv.get("adverse_observations"):
-            review += " (" + ", ".join(rv["adverse_observations"]) + ")"
-        cites = f"{len(f.get('citation_problems') or [])} problem(s)" \
-            if f.get("citation_problems") else "ok"
-        q = (f.get("quote") or "").replace("|", "\\|").replace("\n", " ")
-        b = ((r or {}).get("basis") or "").replace("|", "\\|").replace("\n", " ")
-        lines.append(f"| {m} | {f['claim_source']} | {f['claim_id']} | "
-                     f"{(f.get('adjudication') or {}).get('verdict')} | {review} | "
-                     f"{cites} | {q[:160]} | {b} |")
+    shown = [f for f in merged["findings"] if schemas.rateable(f)]
+    unsettled = [f for f in merged["findings"] if schemas.exposable(f)]
+    real = [f for f in merged["findings"]
+            if not schemas.rateable(f) and not schemas.exposable(f)]
+    lines += ["## What the audit showed, by materiality", ""]
+    lines += _table(shown, by_m, "materiality", "not rated")
+    lines += ["", "## Unsettled claims, by exposure", "",
+              "Not a mark against the seller: the audit showed nothing "
+              "against these claims. `disposition` says why each is "
+              "unsettled; `not_examined` means the searches named a file "
+              "the engagement did not open.", ""]
+    lines += _table(unsettled, by_e, "exposure", "not rated")
+    lines += ["", "## Claims that hold", ""]
+    lines += _table(real, {}, "materiality", "real")
     if merged.get("questions"):
         lines += ["", "## Questions for the seller", ""]
         lines += [f"- ({q['claim_source']}) {q['question']}"
@@ -246,6 +290,7 @@ def main() -> int:
 
     # ---- part two: rate -----------------------------------------------------
     rateable = [f for f in merged["findings"] if schemas.rateable(f)]
+    exposable = [f for f in merged["findings"] if schemas.exposable(f)]
     from chat.chat_loop import ChatLoop                        # noqa: E402
     world = f"materiality_{ts}_{label}"[:60]
     name, cfg = build_config(out, world, args.model)
@@ -254,10 +299,10 @@ def main() -> int:
     max_tokens = args.max_tokens or int((cfg.get("chat") or {})
                                         .get("react_max_tokens", 32768))
     t0 = datetime.datetime.now(datetime.timezone.utc)
-    error, result = None, {"obj": {"ratings": []}, "calls": []}
+    error, result = None, {"obj": {"ratings": [], "exposures": []}, "calls": []}
     try:
         result = rate(loop, method_text, eng.get("transaction"), rateable,
-                      max_tokens, args.batch)
+                      exposable, max_tokens, args.batch)
         for c in result["calls"]:
             if c["response_format_dropped"]:
                 error = (f"the route dropped "
@@ -279,14 +324,16 @@ def main() -> int:
     for p in check["problems"]:
         issues.note(out, stage=STAGE, code="ratings_check", text=p,
                     severity="blocking")
-    ratings["figures"] = check["figures"]["materiality"]
+    ratings["figures"] = {k: check["figures"][k]
+                          for k in ("materiality", "exposure")}
 
     # A consequential rating on a finding the review did not uphold, or whose
     # citation failed the mechanical check, is for a person to read.
     by_key = {f"{f['claim_source']}#{f['claim_id']}": f for f in merged["findings"]}
-    for r in ratings.get("ratings") or []:
+    for field, r in ([("materiality", r) for r in ratings.get("ratings") or []]
+                     + [("exposure", r) for r in ratings.get("exposures") or []]):
         f = by_key.get(f"{r.get('claim_source')}#{r.get('claim_id')}")
-        if not f or r.get("materiality") == "not_material":
+        if not f or r.get(field) == "not_material":
             continue
         rv = f.get("review") or {}
         if rv.get("outcome") == "does_not_hold" or f.get("citation_problems"):
@@ -297,8 +344,8 @@ def main() -> int:
             if f.get("citation_problems"):
                 why.append(f"{len(f['citation_problems'])} citation problem(s)")
             issues.note(out, stage=STAGE, code="rated_but_not_upheld",
-                        text=f"{r['claim_source']} #{r['claim_id']} rated "
-                             f"{r['materiality']}; " + "; ".join(why),
+                        text=f"{r['claim_source']} #{r['claim_id']} {field} "
+                             f"{r[field]}; " + "; ".join(why),
                         severity="check")
 
     (out / "materiality.json").write_text(
@@ -313,6 +360,7 @@ def main() -> int:
                                     "resolved_model", "reviewed")}
                  for r in merged["runs"]],
         "batch": args.batch, "rateable": len(rateable),
+        "exposable": len(exposable),
         "calls": result["calls"], "ratings_check": check,
         "wall_clock_s": wall, "error": error,
         "captured_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -320,7 +368,7 @@ def main() -> int:
 
     print(f"\n{len(result['calls'])} call(s), {wall}s, error={error}")
     print(f"merged: {fig['findings']} findings from {fig['runs']} run(s); "
-          f"rateable {len(rateable)}")
+          f"rateable {len(rateable)}, exposable {len(exposable)}")
     print(f"ratings: {check['figures']}")
     print(f"ratings check: {'clean' if check['ok'] else str(len(check['problems'])) + ' problem(s)'}")
     print(f"out: {out}/materiality.md")

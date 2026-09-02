@@ -248,6 +248,7 @@ def files_read(traces: Path, target: Path) -> Dict[str, str]:
         except OSError as e:
             logger.warning("manifest: unreadable trace %s (%s)", t, e)
     for n in sorted(names):
+        n = n.lstrip("./")
         f = target / n
         if f.is_file():
             try:
@@ -489,6 +490,62 @@ def log_incoming(path: Path, leg: int, sent: str, reason: str,
 
 
 
+def drive_leg(loop, name: str, world: str, leg: int, text: str, reason: str,
+              concern_log: Path, legs: list) -> Tuple[str, str]:
+    """One leg: send `text`, log both directions, record it in `legs`.
+
+    Returns the exit reason and the reply. The two loops that drive legs — the
+    gathering legs and the chase — do exactly this and differ only in what
+    they send and when they stop.
+    """
+    log_outgoing(leg, reason, text)
+    concerns_before = concern_snapshot(loop)
+    resources_before = resource_snapshot(loop)
+    loop._process_user_turn(source=SOURCE, text=text, close=False)
+    reply = latest_reply(loop, SOURCE)
+    exit_reason = last_exit_reason(world, name)
+    log_incoming(concern_log, leg, text, reason, exit_reason, len(reply),
+                 concerns_before, concern_snapshot(loop),
+                 resources_before, resource_snapshot(loop))
+    legs.append({"leg": leg, "sent": text[:80], "exit_reason": exit_reason,
+                 "reply_chars": len(reply)})
+    logger.info("leg %d: exit=%s chars=%d", leg, exit_reason, len(reply))
+    return exit_reason, reply
+
+
+def chase_message(todo: Dict[Any, List[str]],
+                  frozen: Sequence[Dict[str, Any]]) -> str:
+    """The gathering leg that opens the files the searches named. METHOD §8."""
+    quotes = {c.get("id"): c.get("quote") for c in frozen}
+    lines = ["These claims are unsettled. Your searches named the files below "
+             "as the places where the material that could settle each claim "
+             "would appear, and you have not opened them. Open each one with "
+             "inspect_external and gather the evidence that settles the "
+             "claim. Do not write findings; end the leg with `yield` or "
+             "`respond` when the files are read.", ""]
+    for cid in sorted(todo, key=lambda x: (x is None, x)):
+        lines.append(f"  claim {cid}. {quotes.get(cid)}")
+        for f in todo[cid]:
+            lines.append(f"      {f}")
+    return "\n".join(lines)
+
+
+def replace_findings(obj: Dict[str, Any], again: Dict[str, Any],
+                     wanted: set) -> int:
+    """Put the re-adjudicated findings for `wanted` in place of the old ones.
+    A finding for a claim outside `wanted` is dropped: the surface is frozen
+    and METHOD §4 gives each claim one finding. Returns how many replaced."""
+    fresh = {f.get("claim_id"): f
+             for f in ((again.get("obj") or {}).get("findings") or [])
+             if f.get("claim_id") in wanted}
+    n = 0
+    for i, f in enumerate(obj.get("findings") or []):
+        if f.get("claim_id") in fresh:
+            obj["findings"][i] = fresh[f.get("claim_id")]
+            n += 1
+    return n
+
+
 def numbered(path: Path) -> str:
     """A document with the line numbers its citations refer to.
 
@@ -500,6 +557,25 @@ def numbered(path: Path) -> str:
     return "\n".join(f"{n}|{t}" for n, t in enumerate(lines, 1))
 
 
+#: Characters of evidence the adjudication call is handed. ~100k tokens: under
+#: the local window with a 64k emission to spare, cheap on the cloud route.
+EVIDENCE_BUDGET = 400_000
+
+
+def compact_trace(text: str) -> str:
+    """One evidence request as its query and the subagent's final answer.
+
+    The answer is what the subagent was asked for — quotes with line numbers
+    — and it is what the agent itself saw. The iterations between hold the
+    raw files it read on the way, which is most of the trace's size.
+    """
+    head, sep, answer = text.partition("\nFINAL ANSWER:\n")
+    if not sep:
+        return text
+    query = head.split("\n--- iter 1 ---", 1)[0]
+    return f"{query}\nFINAL ANSWER:\n{answer}"
+
+
 def gathered_evidence(traces: Path, budget: int) -> Dict[str, Any]:
     """The engagement's evidence requests and what they returned.
 
@@ -508,17 +584,31 @@ def gathered_evidence(traces: Path, budget: int) -> Dict[str, Any]:
     11 kB and would fit, and a real target would not. The traces are what this
     run actually looked at, which is also what METHOD §14 calls the working
     papers.
+
+    EVERY REQUEST IS REPRESENTED. Until 2026-09-02 this stopped at the first
+    trace that overran the budget, and on ChatterMate the adjudication was
+    handed 2 of 40 requests: one directory listing and one file. Seventy-two
+    claims came back `unverifiable`, most of them citing files the run had in
+    fact read. Now the full traces are handed over when they fit, and the
+    compact form of every trace when they do not; `form` records which. Only
+    when the compact set overruns the budget are traces left out, in order,
+    and `omitted` counts them.
     """
     files = sorted(traces.glob("inspect_external_*.txt")) if traces.is_dir() else []
+    texts = [f.read_text(encoding="utf-8", errors="replace") for f in files]
+    form = "full"
+    if sum(len(t) for t in texts) > budget:
+        form = "compact"
+        texts = [compact_trace(t) for t in texts]
     kept, used = [], 0
-    for f in files:
-        t = f.read_text(encoding="utf-8", errors="replace")
+    for t in texts:
         if used + len(t) > budget:
             break
         kept.append(t)
         used += len(t)
     return {"text": "\n\n".join(kept), "files": len(files),
-            "included": len(kept), "chars": used}
+            "included": len(kept), "omitted": len(files) - len(kept),
+            "form": form, "chars": used}
 
 
 def _merge_emissions(parts: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
@@ -579,7 +669,8 @@ def emit_surface(loop, method_text: str, claim_source: Path,
 def emit_findings(loop, method_text: str, claim_source: Path,
                   frozen: Sequence[Dict[str, Any]],
                   traces: Path, max_tokens: int,
-                  evidence_budget: int = 120_000) -> Dict[str, Any]:
+                  evidence_budget: int = EVIDENCE_BUDGET,
+                  note: str = "") -> Dict[str, Any]:
     """The one schema-constrained call that produces the deliverable.
 
     OUTSIDE THE ReAct LOOP, DELIBERATELY. `REACT_ACTION_SCHEMA` leaves `text`
@@ -605,6 +696,7 @@ def emit_findings(loop, method_text: str, claim_source: Path,
         f"to each by its id:\n\n"
         + "\n".join(f"  {c.get('id')}. [{c.get('lines')}] {c.get('quote')}"
                     for c in frozen)
+        + (f"\n\n{note}" if note else "")
         + f"\n\nThe evidence requests made during this engagement, and what "
           f"they returned:\n\n{ev['text']}\n\n"
           f"Emit the findings document now, per METHOD \u00a713. Every frozen "
@@ -618,7 +710,7 @@ def emit_findings(loop, method_text: str, claim_source: Path,
 
 def post_run_checks(obj: Optional[Dict[str, Any]], corpus: Path,
                     claim_source: str, frozen: Sequence[Dict[str, Any]],
-                    out: Path) -> Dict[str, Any]:
+                    out: Path, read: Optional[set] = None) -> Dict[str, Any]:
     """METHOD's requirements, over the parsed output.
 
     REPLACES THREE PROSE PARSERS. v1 checked the ledger with a line regex, the
@@ -633,7 +725,7 @@ def post_run_checks(obj: Optional[Dict[str, Any]], corpus: Path,
         res = {"ok": False, "problems": ["no parseable output to check"],
                "figures": {}}
     else:
-        res = schemas.check_output(obj, corpus, claim_source, frozen)
+        res = schemas.check_output(obj, corpus, claim_source, frozen, read)
     for problem in res["problems"]:
         issues.note(out, stage="claims_audit", code="output_check",
                     text=problem, severity="blocking")
@@ -668,6 +760,10 @@ def main() -> int:
     ap.add_argument("--batch", type=int, default=0,
                     help="claims per adjudication call; 0 adjudicates the "
                          "frozen surface in one call")
+    ap.add_argument("--evidence-budget", type=int, default=EVIDENCE_BUDGET,
+                    help="characters of evidence traces handed to each "
+                         "adjudication call (default %(default)s); over it, "
+                         "every trace is handed over in compact form")
     ap.add_argument("--workflow-mode", choices=("on", "off"), default=None,
                     help="override the scenario's workflow_mode; omit to use "
                          "whatever audit.yaml declares")
@@ -768,6 +864,8 @@ def main() -> int:
     surface: Optional[Dict[str, Any]] = None
     emission: Optional[Dict[str, Any]] = None
     frozen: list = []
+    chase: Dict[str, Any] = {"passes": [], "unopened_after": []}
+    traces_dir = REPO / "scenarios" / args.world / name / "inspect_traces"
     src_doc = eng["target"] / eng["claim_sources"][0]
     method_text = load_workflow(REPO / METHOD_PATH)
     emit_tokens = int((cfg.get("chat") or {}).get("react_max_tokens", 32768))
@@ -812,20 +910,9 @@ def main() -> int:
             sent_reason = "opening brief and the frozen claim surface"
             traces_before = 0
             for i in range(args.max_turns):
-                log_outgoing(i + 1, sent_reason, text)
-                concerns_before = concern_snapshot(loop)
-                resources_before = resource_snapshot(loop)
-                loop._process_user_turn(source=SOURCE, text=text, close=False)
-                reply = latest_reply(loop, SOURCE)
-                exit_reason = last_exit_reason(args.world, name)
-                log_incoming(concern_log, i + 1, text, sent_reason, exit_reason,
-                             len(reply), concerns_before, concern_snapshot(loop),
-                             resources_before, resource_snapshot(loop))
-                legs.append({"leg": i + 1, "sent": text[:80],
-                             "exit_reason": exit_reason,
-                             "reply_chars": len(reply)})
-                logger.info("leg %d: exit=%s chars=%d", i + 1, exit_reason,
-                            len(reply))
+                exit_reason, reply = drive_leg(
+                    loop, name, args.world, i + 1, text, sent_reason,
+                    concern_log, legs)
                 # A turn that died is not a turn that finished. Silence reading
                 # as success is the failure mode this suite exists to catch.
                 if exit_reason in ("llm_error", "crashed"):
@@ -890,10 +977,8 @@ def main() -> int:
                                 gi, len(groups), len(g))
                 emissions.append(emit_findings(
                     loop, method_text=method_text, claim_source=src_doc,
-                    frozen=g,
-                    traces=(REPO / "scenarios" / args.world / name
-                            / "inspect_traces"),
-                    max_tokens=emit_tokens))
+                    frozen=g, traces=traces_dir, max_tokens=emit_tokens,
+                    evidence_budget=args.evidence_budget))
             emission = _merge_emissions(emissions)
             logger.info("findings: %s, finish=%s, %d chars, evidence %s",
                         emission["parse"], emission["finish"],
@@ -928,10 +1013,9 @@ def main() -> int:
                                    "— reprompting once", len(missing), ids)
                     again = emit_findings(
                         loop, method_text=method_text, claim_source=src_doc,
-                        frozen=missing,
-                        traces=(REPO / "scenarios" / args.world / name
-                                / "inspect_traces"),
-                        max_tokens=emit_tokens)
+                        frozen=missing, traces=traces_dir,
+                        max_tokens=emit_tokens,
+                        evidence_budget=args.evidence_budget)
                     reprompt = {"claims": [c.get("id") for c in missing],
                                 "parse": again["parse"],
                                 "finish": again["finish"],
@@ -949,6 +1033,79 @@ def main() -> int:
                     emission["reprompt"] = reprompt
                     logger.info("reprompt recovered %d of %d",
                                 len(keep), len(missing))
+
+            # THE CHASE (METHOD §8). An `unverifiable` finding whose searches
+            # named a file the run never opened is not unsettled by the
+            # materials; it is unexamined. Nothing is adjudicated during the
+            # gathering legs, so the runner had no grounds to disbelieve a
+            # `respond` with those files still unread. Now it has: for each
+            # such claim, one gathering leg names the claims and the files,
+            # then only those claims are adjudicated again over the enlarged
+            # record. It stops when no claim names an unopened file, when a
+            # pass opened nothing new, or when the leg cap is spent. What is
+            # left is reported as a number — files named and not opened —
+            # and the findings keep `not_examined`.
+            if not error and emission and emission.get("obj"):
+                docs = schemas.corpus_index(eng["target"])
+                while len(legs) < args.max_turns:
+                    read = set(files_read(traces_dir, eng["target"]))
+                    cands = schemas.candidate_files(
+                        emission["obj"].get("findings") or [], docs, read)
+                    todo = {cid: c["unopened"] for cid, c in cands.items()
+                            if c["unopened"]}
+                    if not todo:
+                        break
+                    files = sorted({f for fs in todo.values() for f in fs})
+                    leg_no = len(legs) + 1
+                    logger.warning("chase pass %d: %d claim(s) name %d unopened "
+                                   "file(s) — gathering leg %d",
+                                   len(chase["passes"]) + 1, len(todo),
+                                   len(files), leg_no)
+                    exit_reason, _ = drive_leg(
+                        loop, name, args.world, leg_no,
+                        chase_message(todo, frozen),
+                        "chase: open the files the searches named",
+                        concern_log, legs)
+                    opened = set(files_read(traces_dir, eng["target"])) - read
+                    entry = {"leg": leg_no, "claims": sorted(todo),
+                             "files_named": files,
+                             "files_opened": sorted(opened),
+                             "exit_reason": exit_reason, "readjudicated": 0}
+                    chase["passes"].append(entry)
+                    if exit_reason in ("llm_error", "crashed"):
+                        error = (f"chase leg {leg_no} ended {exit_reason} — "
+                                 f"run is not valid")
+                        break
+                    if not opened:
+                        logger.warning("chase pass opened no new file — stopping")
+                        break
+                    again = emit_findings(
+                        loop, method_text=method_text, claim_source=src_doc,
+                        frozen=[c for c in frozen if c.get("id") in todo],
+                        traces=traces_dir, max_tokens=emit_tokens,
+                        evidence_budget=args.evidence_budget,
+                        note=("These claims were adjudicated `not_examined`: "
+                              "their searches named files that had not been "
+                              "opened. Those files have since been opened and "
+                              "their contents are in the evidence below. "
+                              "Adjudicate these claims again."))
+                    entry["parse"] = again["parse"]
+                    entry["finish"] = again["finish"]
+                    entry["readjudicated"] = replace_findings(
+                        emission["obj"], again, set(todo))
+                    logger.info("chase pass: re-adjudicated %d of %d",
+                                entry["readjudicated"], len(todo))
+                    if entry["readjudicated"] == 0:
+                        break
+                read = set(files_read(traces_dir, eng["target"]))
+                cands = schemas.candidate_files(
+                    emission["obj"].get("findings") or [], docs, read)
+                chase["unopened_after"] = sorted(
+                    {f for c in cands.values() for f in c["unopened"]})
+                if chase["unopened_after"]:
+                    logger.warning("%d file(s) named by searches were not "
+                                   "opened: %s", len(chase["unopened_after"]),
+                                   ", ".join(chase["unopened_after"]))
     except Exception as e:                                     # noqa: BLE001
         error = f"{type(e).__name__}: {e}"
         logger.exception("run failed")
@@ -989,9 +1146,16 @@ def main() -> int:
             encoding="utf-8")
 
     checks = post_run_checks(obj, eng["target"], eng["claim_sources"][0],
-                             frozen, out)
+                             frozen, out,
+                             read=set(files_read(traces_dir, eng["target"])))
     if not error and not checks["ok"]:
         error = f"output check failed: {len(checks['problems'])} problem(s)"
+    if chase["unopened_after"]:
+        issues.note(out, stage="claims_audit", code="not_examined",
+                    text=f"{len(chase['unopened_after'])} file(s) named by "
+                         f"searches were not opened: "
+                         + ", ".join(chase["unopened_after"]),
+                    severity="check")
 
     # THE WORKING RECORD, COPIED OUT (§14). The world is discarded after an
     # engagement; these two are the evidence that the work was systematic, and
@@ -1103,6 +1267,11 @@ def main() -> int:
         "gathering_legs": gathering_legs,
         "gathering_capped": gathering_legs >= args.max_turns,
         "max_iters_legs": max_iters_legs,
+        # METHOD §8's chase: each pass's leg, the claims and files it named,
+        # what it opened, and how many claims were adjudicated again. What is
+        # still unopened at the end is the not-examined figure.
+        "chase": chase,
+        "evidence_budget": args.evidence_budget,
         "wall_clock_s": wall,
         # Action emissions the token ceiling cut off, across the gathering
         # legs. The emission call reports its own separately, below.
@@ -1131,6 +1300,8 @@ def main() -> int:
     print(f"emission: {(emission or {}).get('parse')}, "
           f"findings={fig.get('findings')}, verdicts={fig.get('verdicts')}")
     print(f"output check: {'clean' if checks['ok'] else str(len(checks['problems'])) + ' problem(s)'}")
+    print(f"chase: {len(chase['passes'])} pass(es), "
+          f"{len(chase['unopened_after'])} file(s) named and not opened")
     print(f"deliverables: {out}/claims.json, findings.json")
     print(f"meta: {out / 'run_meta.json'}")
     # --run, not --world: the run directory is the archive and survives the

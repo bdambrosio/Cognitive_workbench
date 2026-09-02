@@ -107,7 +107,15 @@ def merge(run_dirs: Sequence[Path]) -> Dict[str, Any]:
             "target_rev": meta.get("target_rev"),
             "reviewed": r["outcomes"] is not None,
             "claims": len(claims_by_id),
-            "findings": len(r["findings"].get("findings") or [])})
+            "findings": len(r["findings"].get("findings") or []),
+            # Coverage figures the report stage places: what the run read,
+            # how long it gathered, and the files its searches named that it
+            # never opened (METHOD §8). All from run_meta; nothing judged.
+            "files_read": len(meta.get("files_read") or {}),
+            "gathering_legs": meta.get("gathering_legs"),
+            "unopened_candidates": list(
+                ((meta.get("output_check") or {}).get("figures") or {})
+                .get("unopened_candidates") or [])})
         for i, f in enumerate(r["findings"].get("findings") or [], 1):
             cid = f.get("claim_id")
             c = claims_by_id.get(cid) or {}

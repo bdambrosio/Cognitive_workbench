@@ -51,8 +51,9 @@ METHOD_DOC = "workflowsv2/claims_audit/method/METHOD.md"
 REVIEW_DOC = "workflowsv2/audit_review/method/REVIEW.md"
 DELIVERY_DOC = "workflowsv2/audit_postprocess/method/DELIVERY.md"
 MATERIALITY_DOC = "workflowsv2/audit_materiality/method/MATERIALITY.md"
+REPORT_DOC = "workflowsv2/audit_report/method/REPORT.md"
 
-DOCS = (METHOD_DOC, REVIEW_DOC, DELIVERY_DOC, MATERIALITY_DOC)
+DOCS = (METHOD_DOC, REVIEW_DOC, DELIVERY_DOC, MATERIALITY_DOC, REPORT_DOC)
 
 # The runner that drives each document, and the document its bare §N means.
 # A runner emits text the agent reads — "See REVIEW.md §4.0." is a sentence in
@@ -60,7 +61,20 @@ DOCS = (METHOD_DOC, REVIEW_DOC, DELIVERY_DOC, MATERIALITY_DOC)
 # in the method, and nothing was checking it.
 RUNNERS = {"workflowsv2/claims_audit/runner.py": METHOD_DOC,
            "workflowsv2/audit_review/runner.py": REVIEW_DOC,
-           "workflowsv2/audit_materiality/runner.py": MATERIALITY_DOC}
+           "workflowsv2/audit_materiality/runner.py": MATERIALITY_DOC,
+           "workflowsv2/audit_report/runner.py": REPORT_DOC}
+
+#: The name a runner's string uses for each document — "MATERIALITY §2" —
+#: and the document a bare §N in that runner means. Until 2026-09-02 only
+#: METHOD and REVIEW were known, so a materiality runner's "§3" resolved
+#: against REVIEW and passed by coincidence.
+def _doc_names() -> Dict[str, str]:
+    """Read at call time, so a test that repoints one document sees it."""
+    return {"METHOD": METHOD_DOC, "REVIEW": REVIEW_DOC,
+            "MATERIALITY": MATERIALITY_DOC, "REPORT": REPORT_DOC}
+
+
+_REF = r"(METHOD|REVIEW|MATERIALITY|REPORT)?[\w.]*\s*§(\d+[a-z]?(?:\.\d+)?)"
 
 # Tokens a document retired. Naming one in the text the agent reads puts the
 # forbidden vocabulary back in the prompt, three lines from the table it was
@@ -267,7 +281,11 @@ def check_code_vocab() -> List[str]:
 
 
 def _doc_sections(path: str) -> set:
+    """A document that is not there declares no sections, so every §N against
+    it is reported — loud, not silent."""
     have = set()
+    if not (REPO / path).is_file():
+        return have
     for head, _ in sections((REPO / path).read_text(encoding="utf-8")):
         m = re.match(r"## (\d+[a-z]?(?:\.\d+)?)\.?\s", head)
         if m:
@@ -290,14 +308,13 @@ def check_code_refs(runner: str, doc: str) -> List[str]:
     """
     import ast
     src = (REPO / runner).read_text(encoding="utf-8")
-    known = {"METHOD": _doc_sections(METHOD_DOC), "REVIEW": _doc_sections(REVIEW_DOC)}
-    own = "METHOD" if "claims_audit" in runner else "REVIEW"
+    known = {k: _doc_sections(v) for k, v in _doc_names().items()}
+    own = next(k for k, v in _doc_names().items() if v == doc)
     bad = []
     for node in ast.walk(ast.parse(src)):
         if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
             continue
-        for m in re.finditer(r"(METHOD|REVIEW)?[\w.]*\s*§(\d+[a-z]?(?:\.\d+)?)",
-                             node.value):
+        for m in re.finditer(_REF, node.value):
             doc_key = m.group(1) or own
             ref = m.group(2)
             if ref not in known.get(doc_key, set()):
@@ -308,15 +325,14 @@ def check_code_refs(runner: str, doc: str) -> List[str]:
 
 def check_code_comment_refs(runner: str) -> List[str]:
     """Same, for comments. Advisory: rot for the next reader, not the agent."""
-    known = {"METHOD": _doc_sections(METHOD_DOC), "REVIEW": _doc_sections(REVIEW_DOC)}
-    own = "METHOD" if "claims_audit" in runner else "REVIEW"
+    known = {k: _doc_sections(v) for k, v in _doc_names().items()}
+    own = next(k for k, v in _doc_names().items() if v == RUNNERS[runner])
     out = []
     for i, line in enumerate((REPO / runner).read_text().splitlines(), 1):
         code, _, comment = line.partition("#")
         if not comment or code.count('"') % 2 or code.count("'") % 2:
             continue
-        for m in re.finditer(r"(METHOD|REVIEW)?[\w.]*\s*§(\d+[a-z]?(?:\.\d+)?)",
-                             comment):
+        for m in re.finditer(_REF, comment):
             if m.group(2) not in known.get(m.group(1) or own, set()):
                 out.append(f"{runner}:{i} comment cites §{m.group(2)} "
                            f"({m.group(1) or own}) — no such section")
@@ -471,6 +487,25 @@ def check_materiality_vocab(path: str, raw: str) -> List[str]:
     return bad
 
 
+def check_report_fields(path: str, raw: str) -> List[str]:
+    """REPORT §7's field table against `schemas.FIELDS`. The report's output
+    is prose fields with no closed vocabulary, so the invariant is the field
+    set: every field the schema requires is specified, and nothing more."""
+    from workflowsv2.audit_report import schemas as rs               # noqa: E402
+    bodies = {re.match(r"## (\d+[a-z]?)\.", b.splitlines()[0]).group(1): b
+              for _, b in sections(raw)
+              if b.strip() and re.match(r"## (\d+[a-z]?)\.", b.splitlines()[0])}
+    seven = bodies.get("7", "")
+    if not seven:
+        return ["REPORT has no §7 to declare the fields in"]
+    declared = set(re.findall(r"(?m)^\s*\|\s*`([a-z_]+)`\s*\|", seven))
+    bad = [f"schemas.py field {f!r} is not in §7's table"
+           for f in rs.FIELDS if f not in declared]
+    bad += [f"§7 declares {d!r}, which schemas.py does not define"
+            for d in sorted(declared - set(rs.FIELDS))]
+    return bad
+
+
 def lint(path: str) -> Dict[str, List[str]]:
     name = Path(path).name
     raw = (REPO / path).read_text(encoding="utf-8")
@@ -489,6 +524,8 @@ def lint(path: str) -> Dict[str, List[str]]:
            if "audit_review" in path else
            {"schema vocabulary": check_materiality_vocab(path, raw)}
            if "audit_materiality" in path else
+           {"schema vocabulary": check_report_fields(path, raw)}
+           if "audit_report" in path else
            {"block vocabulary": check_block_vocab(path, raw)}),
     }
 
