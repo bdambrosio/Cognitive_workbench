@@ -50,15 +50,17 @@ from workflowsv2 import blocks                                  # noqa: E402
 METHOD_DOC = "workflowsv2/claims_audit/method/METHOD.md"
 REVIEW_DOC = "workflowsv2/audit_review/method/REVIEW.md"
 DELIVERY_DOC = "workflowsv2/audit_postprocess/method/DELIVERY.md"
+MATERIALITY_DOC = "workflowsv2/audit_materiality/method/MATERIALITY.md"
 
-DOCS = (METHOD_DOC, REVIEW_DOC, DELIVERY_DOC)
+DOCS = (METHOD_DOC, REVIEW_DOC, DELIVERY_DOC, MATERIALITY_DOC)
 
 # The runner that drives each document, and the document its bare §N means.
 # A runner emits text the agent reads — "See REVIEW.md §4.0." is a sentence in
 # the review's output, not a comment — so a §N there is as load-bearing as one
 # in the method, and nothing was checking it.
 RUNNERS = {"workflowsv2/claims_audit/runner.py": METHOD_DOC,
-           "workflowsv2/audit_review/runner.py": REVIEW_DOC}
+           "workflowsv2/audit_review/runner.py": REVIEW_DOC,
+           "workflowsv2/audit_materiality/runner.py": MATERIALITY_DOC}
 
 # Tokens a document retired. Naming one in the text the agent reads puts the
 # forbidden vocabulary back in the prompt, three lines from the table it was
@@ -435,6 +437,40 @@ def check_review_vocab(path: str, raw: str) -> List[str]:
     return bad
 
 
+def check_materiality_vocab(path: str, raw: str) -> List[str]:
+    """MATERIALITY §3's scale against `schemas.MATERIALITY`. The same invariant
+    as the other two vocabulary checks, for a one-column table."""
+    from workflowsv2.audit_materiality import schemas as ms          # noqa: E402
+    bodies = {re.match(r"## (\d+[a-z]?)\.", b.splitlines()[0]).group(1): b
+              for _, b in sections(raw)
+              if b.strip() and re.match(r"## (\d+[a-z]?)\.", b.splitlines()[0])}
+    three = bodies.get("3", "")
+    if not three:
+        return ["MATERIALITY has no §3 to declare the scale in"]
+    declared, in_body = [], False
+    for line in three.splitlines():
+        if not line.lstrip().startswith("|"):
+            in_body = False
+            continue
+        if re.match(r"^\s*\|[\s:|-]+\|\s*$", line):
+            in_body = True
+            continue
+        if in_body:
+            m = re.match(r"^\s*\|\s*`([a-z_]+)`\s*\|", line)
+            if m:
+                declared.append(m.group(1))
+    bad = []
+    for v in ms.MATERIALITY:
+        if v not in declared:
+            bad.append(f"schemas.py value {v!r} is not in §3's table")
+    for v in declared:
+        if v not in ms.MATERIALITY:
+            bad.append(f"§3 declares {v!r}, which schemas.py does not define")
+    if tuple(declared) != tuple(ms.MATERIALITY):
+        bad.append("§3 lists the scale in a different order from schemas.py")
+    return bad
+
+
 def lint(path: str) -> Dict[str, List[str]]:
     name = Path(path).name
     raw = (REPO / path).read_text(encoding="utf-8")
@@ -451,6 +487,8 @@ def lint(path: str) -> Dict[str, List[str]]:
            if "claims_audit" in path else
            {"schema vocabulary": check_review_vocab(path, raw)}
            if "audit_review" in path else
+           {"schema vocabulary": check_materiality_vocab(path, raw)}
+           if "audit_materiality" in path else
            {"block vocabulary": check_block_vocab(path, raw)}),
     }
 

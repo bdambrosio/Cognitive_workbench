@@ -22,3 +22,14 @@ claim_sources:
   - doc2_tech_stack_description_as_provided_by_se.md
 
 retention: keep — synthetic, no client material
+
+# THE TRANSACTION, for the materiality stage (MATERIALITY.md §2). What the
+# practice knows of the deal, in words; handed over verbatim.
+transaction: |
+  The buyer is an operator entering the e-commerce analytics space and would
+  acquire FlowMetrics as a going concern: the product, the customer contracts
+  and the infrastructure, with the seller (Dave) leaving after handover. The
+  listing asks $480,000, stated by the seller as 12x blended monthly recurring
+  revenue of $40,000. The buyer expects immediate cash flow from the existing
+  subscribers and enterprise contracts, and intends to operate the platform
+  as it stands before investing in it.

@@ -18,3 +18,12 @@ claim_sources:
   - README.md
 
 retention: keep — public repository, no confidential material
+
+# THE TRANSACTION, for the materiality stage (MATERIALITY.md §2). What the
+# practice knows of the deal, in words; handed over verbatim.
+transaction: |
+  The buyer operates an e-commerce business and is considering acquiring
+  ChatterMate — the product and its team — to run customer support for its
+  own stores and to offer it to other merchants. No price is stated. The
+  buyer would rely on the platform's stated capabilities (AI agent with human
+  handover, chat widget, Shopify integration, knowledge base) from day one.
