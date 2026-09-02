@@ -23,9 +23,13 @@ Two things follow from being one stage of several:
 
 A claim is an assertion the seller makes to the buyer in the designated claim source — a listing, a technical description, a specification, a marketing document. The engagement names which document that is for this run.
 
-**Not every sentence of a claim source is a claim.** A command, an installation step, a list of prerequisites or a configuration example instructs the reader. It is a claim only where it asserts a property of the target — that a named command exists, that the stack runs on a named database, that a step has the stated effect. Enumerate what it asserts, and not the instruction.
+**Not every sentence of a claim source is a claim.** Three kinds are not, or not as written:
 
-**An assertion about the seller rather than the target is still a claim.** A sign-up page, a directory listing said to be in progress, a hosted plan and its price: the seller asserts them to the buyer, and the supplied materials are not expected to reach them. §5 marks such a claim so the reader knows why it went unsettled.
+- **Navigation and courtesy.** A heading, a link, a badge, an image, a table of contents, "see LICENSE", "we welcome contributions", a sign-off. These point or greet and assert nothing about the target. A badge or link that states a fact — a licence badge, a version badge — is the fact it states, quoted as it appears.
+- **Instructions.** A command, an installation step, a prerequisite, a configuration example. Enumerate what the block asserts about the target: that a tool has the subcommands shown, that the stack runs on the named database, that a step has the stated effect. One claim per capability asserted, not one per line.
+- **Intent.** A roadmap item, a feature marked as coming, a plan. It concerns what the seller means to do, not the target's present state, and is enumerated as about the seller, per §5.
+
+**An assertion about the seller rather than the target is still a claim.** A sign-up page, a directory listing said to be in progress, a hosted plan and its price, a stated plan: the seller asserts them to the buyer, and the supplied materials are not expected to reach them. §5 marks such a claim so the reader knows why it went unsettled.
 
 Other supplied documents, including source code and code comments, are evidence sources. They test claims. They are not themselves seller claims, even when they assert something.
 
@@ -76,7 +80,7 @@ The claim source is given to you one section at a time, in document order, with 
 | `about` | Meaning |
 |---|---|
 | `target` | The product, code, infrastructure, business or terms the buyer would acquire |
-| `seller` | The seller's own activity or hosted service, which the supplied materials are not expected to reach |
+| `seller` | The seller's own activity, hosted service or stated intent, which the supplied materials are not expected to reach |
 
 - **`restates`** — present only when the assertion is one already enumerated, made again: the `id` of that claim.
 
@@ -89,6 +93,8 @@ The claim source is given to you one section at a time, in document order, with 
 > "Backups run daily with 30-day retention" is **two** claims. The schedule and the retention period are settled by different evidence, and one can hold while the other fails. Sharing a sentence is not a reason to combine.
 >
 > "Platform-level redundancy and automatic failover" is **one** claim. Both stand or fall on whether replicas exist, and one line of the infrastructure config settles both. Sharing a subject is not, by itself, a reason to combine — but being settled by the same evidence is.
+
+An instruction block is divided by what it asserts, not by its lines: six subcommands listed in one block assert one thing, that the tool has them, and are one claim.
 
 **Enumerate before you adjudicate, and enumerate everything.** At this point you have not tested any claim, so you cannot know which will hold. A claim that looks obviously true, or obviously false, or impossible to check, is enumerated exactly like the rest.
 
@@ -166,7 +172,7 @@ Two are required, and they are complementary:
 
 For each, state what you actually searched, what came back, and in `candidates` the files it found where the material would appear. A search establishes diligence, not absolute absence.
 
-**Every candidate is opened before the claim is recorded as unsettled.** A file the searches named and nobody read does not show that the materials cannot settle the claim; it shows that the engagement has not looked. *Opened* means its contents were read and appear in the evidence requests. If a candidate of any search on the claim was not opened, the disposition is `not_examined`; the client's process then asks you to open those files and to adjudicate the claim again. The other three dispositions are recorded only when every candidate has been opened.
+**Every candidate is opened before the claim is recorded as unsettled.** A file the searches named and nobody read does not show that the materials cannot settle the claim; it shows that the engagement has not looked. *Opened* means its contents were read and appear in the evidence requests. If a candidate of any search on the claim was not opened, the disposition is `not_examined`; the client's process then asks you to open those files and to adjudicate the claim again. The other three dispositions are recorded only when every candidate has been opened. `not_examined` requires a named file: where the searches named no file, one of the other three applies.
 
 The adjudication also records what the searches established, as one of:
 

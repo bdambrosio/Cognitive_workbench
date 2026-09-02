@@ -591,6 +591,23 @@ def chase_message(todo: Dict[Any, List[str]],
     return "\n".join(lines)
 
 
+def untagged_message(ids: Sequence[int], frozen: Sequence[Dict[str, Any]]) -> str:
+    """The gathering leg for claims no evidence request was filed under.
+    METHOD §12 step 3: a claim is adjudicated on the requests filed under it
+    and nothing else, so a claim with none would be adjudicated on nothing."""
+    quotes = {c.get("id"): c for c in frozen}
+    lines = ["No evidence request has been filed under the claims below, so "
+             "nothing gathered so far can be used to adjudicate them. Gather "
+             "the evidence that settles each one with inspect_external, "
+             "naming the claim ids in the request's `claims` field. Where the "
+             "materials cannot settle a claim, record the searches you made "
+             "under its id. Do not write findings; end the leg with `yield` "
+             "or `respond` when done.", ""]
+    for cid in ids:
+        lines.append(_claim_line(quotes.get(cid, {"id": cid})))
+    return "\n".join(lines)
+
+
 def replace_findings(obj: Dict[str, Any], again: Dict[str, Any],
                      wanted: set) -> int:
     """Put the re-adjudicated findings for `wanted` in place of the old ones.
@@ -954,6 +971,9 @@ def main() -> int:
     ap.add_argument("--batch", type=int, default=10,
                     help="claims per adjudication call at most; batches are "
                          "formed from claims that share evidence (default 10)")
+    ap.add_argument("--enumerate-only", action="store_true",
+                    help="stop after the claim surface is frozen: no gathering "
+                         "legs, no adjudication. For comparing enumerations")
     ap.add_argument("--evidence-budget", type=int, default=EVIDENCE_BUDGET,
                     help="characters of evidence traces handed to each "
                          "adjudication call (default %(default)s); over it, "
@@ -1058,7 +1078,8 @@ def main() -> int:
     surface: Optional[Dict[str, Any]] = None
     emission: Optional[Dict[str, Any]] = None
     frozen: list = []
-    chase: Dict[str, Any] = {"passes": [], "unopened_after": []}
+    chase: Dict[str, Any] = {"passes": [], "unopened_after": [],
+                             "untagged_passes": [], "untagged_after": []}
     batch_log: List[Dict[str, Any]] = []
     traces_dir = REPO / "scenarios" / args.world / name / "inspect_traces"
     src_doc = eng["target"] / eng["claim_sources"][0]
@@ -1121,7 +1142,9 @@ def main() -> int:
                 encoding="utf-8")
 
         # ---- the gathering legs -----------------------------------------
-        if not error and frozen:
+        if args.enumerate_only:
+            logger.info("--enumerate-only: stopping at the frozen surface")
+        if not error and frozen and not args.enumerate_only:
             text = (eng["brief"].read_text(encoding='utf-8')
                     + "\n\n" + TAG_INSTRUCTION
                     + "\n\nThe claim surface is frozen. These are the claims "
@@ -1204,9 +1227,11 @@ def main() -> int:
                               + "No evidence request was filed under "
                               + ("claim " if len(b["untagged"]) == 1 else "claims ")
                               + ", ".join(str(c) for c in b["untagged"])
-                              + ". Adjudicate on what is below; where nothing "
-                                "below bears on such a claim, the materials "
-                                "have not been searched for it.")
+                              + ". Every claim still gets exactly one finding "
+                                "(METHOD \u00a74). Adjudicate such a claim on "
+                                "what is below if it bears on the claim; "
+                                "otherwise its verdict is `unverifiable`, "
+                                "recording that no search was made.")
                 e = emit_findings(
                     loop, method_text=method_text, claim_source=src_doc,
                     frozen=[by_id[c] for c in b["claims"] if c in by_id],
@@ -1227,7 +1252,54 @@ def main() -> int:
                 "attempts": [], "response_format_dropped": [],
                 "phase": "findings", "evidence": None}
 
-        if not error and frozen:
+        # THE UNTAGGED CHASE, BEFORE ADJUDICATION. A claim no evidence
+        # request was filed under is adjudicated on nothing: a batch of ten
+        # such claims returned an empty findings list, twice, on the first
+        # local ChatterMate run (2026-09-02). Same loop shape as the chase
+        # below — one targeted gathering leg naming the claims, then
+        # recompute — until every claim is named, a pass names nothing new,
+        # or the leg cap is spent. What is left is recorded, and those claims
+        # are adjudicated with the note that nothing was filed.
+        if not error and frozen and not args.enumerate_only:
+            all_ids = [c.get("id") for c in frozen]
+            while len(legs) < args.max_turns:
+                index = trace_index(traces_dir)
+                tagged = {cid for v in index.values() for cid in v["claims"]}
+                untagged = [cid for cid in all_ids if cid not in tagged]
+                if not untagged:
+                    break
+                leg_no = len(legs) + 1
+                logger.warning("untagged chase pass %d: %d claim(s) with no "
+                               "evidence request filed — gathering leg %d",
+                               len(chase["untagged_passes"]) + 1,
+                               len(untagged), leg_no)
+                exit_reason, _ = drive_leg(
+                    loop, name, args.world, leg_no,
+                    untagged_message(untagged, frozen),
+                    "untagged chase: gather evidence for claims with none",
+                    concern_log, legs)
+                now_tagged = {cid for v in trace_index(traces_dir).values()
+                              for cid in v["claims"]}
+                newly = sorted(set(untagged) & now_tagged)
+                chase["untagged_passes"].append(
+                    {"leg": leg_no, "claims": untagged, "newly_tagged": newly,
+                     "exit_reason": exit_reason})
+                if exit_reason in ("llm_error", "crashed"):
+                    error = (f"untagged chase leg {leg_no} ended {exit_reason} "
+                             f"— run is not valid")
+                    break
+                if not newly:
+                    logger.warning("untagged chase pass named no new claim — stopping")
+                    break
+            index = trace_index(traces_dir)
+            tagged = {cid for v in index.values() for cid in v["claims"]}
+            chase["untagged_after"] = [cid for cid in all_ids if cid not in tagged]
+            if chase["untagged_after"]:
+                logger.warning("%d claim(s) still have no evidence request: %s",
+                               len(chase["untagged_after"]),
+                               ", ".join(str(c) for c in chase["untagged_after"]))
+
+        if not error and frozen and not args.enumerate_only:
             logger.info("phase 2: adjudicating %d frozen claims", len(frozen))
             emission = adjudicate([c.get("id") for c in frozen])
             logger.info("findings: %s, finish=%s, %d chars, evidence %s",
@@ -1388,13 +1460,23 @@ def main() -> int:
             json.dumps(obj, indent=1, ensure_ascii=False) + "\n",
             encoding="utf-8")
 
-    checks = post_run_checks(obj, eng["target"], eng["claim_sources"][0],
-                             frozen, out,
-                             read=set(files_read(traces_dir, eng["target"])))
+    if args.enumerate_only:
+        checks = {"ok": True, "problems": [],
+                  "figures": {"enumerate_only": True}}
+    else:
+        checks = post_run_checks(obj, eng["target"], eng["claim_sources"][0],
+                                 frozen, out,
+                                 read=set(files_read(traces_dir, eng["target"])))
     if obj is not None and (out / "findings.partial.json").is_file():
         (out / "findings.partial.json").unlink()
     if not error and not checks["ok"]:
         error = f"output check failed: {len(checks['problems'])} problem(s)"
+    if chase["untagged_after"]:
+        issues.note(out, stage="claims_audit", code="no_evidence_request",
+                    text=f"{len(chase['untagged_after'])} claim(s) had no "
+                         f"evidence request filed under them after the chase: "
+                         + ", ".join(str(c) for c in chase["untagged_after"]),
+                    severity="check")
     if chase["unopened_after"]:
         issues.note(out, stage="claims_audit", code="not_examined",
                     text=f"{len(chase['unopened_after'])} file(s) named by "

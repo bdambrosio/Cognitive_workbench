@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from workflowsv2.claims_audit import schemas as sch             # noqa: E402
 from workflowsv2.claims_audit.runner import (                     # noqa: E402
     chase_message, compact_trace, evidence_batches, gathered_evidence,
-    replace_findings, trace_claims)
+    replace_findings, trace_claims, untagged_message)
 
 
 def _corpus(tmp_path):
@@ -203,3 +203,12 @@ def test_gathered_evidence_tries_full_then_trimmed_then_compact(tmp_path):
     assert "60|line 60" not in trimmed["text"]   # outside the band of 40-42 and 90
     compact = gathered_evidence([f], budget=400)
     assert compact["form"] == "compact" and "OBSERVATION" not in compact["text"]
+
+
+def test_untagged_message_names_each_claim_with_its_statement():
+    frozen = [{"id": 4, "quote": "Docker Pulls", "statement": "Images are pulled.", "lines": [4, 4]},
+              {"id": 9, "quote": "Shopify support", "statement": "Shopify is supported.", "lines": [9, 9]}]
+    msg = untagged_message([9, 4], frozen)
+    assert "No evidence request has been filed" in msg
+    assert msg.index("9. [[9, 9]] Shopify support") < msg.index("4. [[4, 4]] Docker Pulls")
+    assert "statement: Shopify is supported." in msg and "`claims` field" in msg
