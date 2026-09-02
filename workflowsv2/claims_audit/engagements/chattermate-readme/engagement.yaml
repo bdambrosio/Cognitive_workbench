@@ -1,0 +1,20 @@
+# claims-audit engagement: chattermate-readme
+#
+# ChatterMate, an open-source AI customer-support platform. Python backend,
+# Vue frontend, roughly 1,100 tracked files. This engagement audits ONE of its
+# four claim sources; the v2 runner audits one claim source per run, and the
+# four-source `chattermate` engagement predates that (its brief is v1 text and
+# is not run under v2).
+#
+# WHY README.md FIRST. It is the longest of the four (625 lines against 194,
+# 149 and 49) and the document a buyer reads first. The other three get their
+# own engagement when this one has been through review.
+#
+# Same target, same retention as `chattermate`.
+
+target: targets/chattermate
+
+claim_sources:
+  - README.md
+
+retention: keep — public repository, no confidential material
