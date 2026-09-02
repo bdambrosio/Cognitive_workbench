@@ -61,9 +61,9 @@ sys.path.insert(0, str(REPO / "src"))
 import yaml                                                    # noqa: E402
 
 from chat.workflow import load_workflow                        # noqa: E402
-from utils.json_utils import repair_json_string                # noqa: E402
 from workflowsv2 import issues                                 # noqa: E402
 from workflowsv2.audit_review import schemas                   # noqa: E402
+from workflowsv2.emit import emit                              # noqa: E402
 from workflowsv2.claims_audit import schemas as audit_schemas  # noqa: E402
 from workflowsv2.turns import last_exit_reason, latest_reply   # noqa: E402
 
@@ -229,43 +229,6 @@ def build_config(run: Path, world: str, model_path: Optional[Path],
     return name, cfg
 
 
-def _emit(loop, system: str, user: str, schema: Dict[str, Any],
-          max_tokens: int) -> Dict[str, Any]:
-    """One schema-constrained call, parsed, with what could have degraded it.
-
-    The audit runner carries the same function for the same reasons: an action
-    payload is unconstrained by design, so the emission answers under its own
-    schema outside the ReAct loop; and an empty completion with finish=stop is
-    frequent enough on the local route to need a retry that `react.py` has and
-    a bare call does not.
-    """
-    before = set(getattr(loop.backend, "_param_drops", set()))
-    messages = [{"role": "system", "content": system},
-                {"role": "user", "content": user}]
-    attempts, raw = [], ""
-    for _ in range(2):
-        raw = loop.backend.chat(messages, max_tokens=max_tokens,
-                                response_schema=schema)
-        attempts.append({
-            "chars": len(raw or ""),
-            "finish": getattr(loop.backend, "last_finish_reason", None),
-            "reasoning_chars": getattr(loop.backend,
-                                       "last_reasoning_chars", None)})
-        if (raw or "").strip():
-            break
-    dropped = sorted(set(getattr(loop.backend, "_param_drops", set())) - before)
-    obj, how, err = None, None, None
-    try:
-        obj, how = json.loads(raw), "parsed"
-    except Exception as e:                                     # noqa: BLE001
-        err = f"{type(e).__name__}: {e}"
-        repaired = repair_json_string(raw)
-        obj, how = (repaired, "repaired") if isinstance(repaired, dict) \
-            else (None, "unparseable")
-    return {"raw": raw, "obj": obj, "parse": how, "parse_error": err,
-            "attempts": attempts, "response_format_dropped": dropped}
-
-
 def _finding_text(f: Dict[str, Any], claims: Dict[int, Dict[str, Any]]) -> str:
     """One finding, and the claim it adjudicates, as the reviewer reads it."""
     c = claims.get(f.get("claim_id")) or {}
@@ -299,7 +262,7 @@ def _cited_materials(f: Dict[str, Any], docs: Dict[str, List[str]],
                      budget: int = MATERIALS_BUDGET) -> str:
     """The lines each citation of one finding points at, with context.
 
-    WHY THE EMISSION NEEDS THIS. `_emit` is a two-message call with no tools
+    WHY THE EMISSION NEEDS THIS. `emit` is a two-message call with no tools
     and no history: nothing the reviewer opened in its reading legs reaches it.
     Without this, REVIEW.md §5 checks 2 and 3 were judged from the auditor's
     own `quote` and `shows`, and both v2 reviews on 2026-09-01 passed every
@@ -375,7 +338,7 @@ def emit_parts(loop, method_text: str, stats: Dict[str, Any],
     parts, calls = [], []
 
     def ask(what: str, body: str, schema) -> None:
-        out = _emit(loop, method_text, head + body, schema, max_tokens)
+        out = emit(loop, method_text, head + body, schema, max_tokens)
         calls.append({"part": what,
                       **{k: v for k, v in out.items() if k not in ("raw", "obj")}})
         if out["obj"] is not None:
@@ -480,7 +443,7 @@ def retest(run: Path, world: str, model_path: Optional[Path], target: Path,
                     + "\n    cited material:\n"
                     + _cited_materials(f, docs or {})
                     + "\n\nEmit `finding_reviews` for this finding only.")
-            r = _emit(loop, method_text, body,
+            r = emit(loop, method_text, body,
                       schemas.finding_reviews_schema(), max_tokens)
             rows = ((r.get("obj") or {}).get("finding_reviews") or [])
             row = next((x for x in rows if x.get("claim_id") == cid),

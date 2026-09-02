@@ -347,7 +347,8 @@ class _ChatBackend:
     _TRANSPORT_MAX_RETRIES = 2
 
     def _post_transient_retrying(self, url: str, headers: Dict[str, str],
-                                 body: Dict[str, Any]):
+                                 body: Dict[str, Any],
+                                 timeout_s: Optional[float] = None):
         """POST, retrying transient upstream failures with backoff.
 
         Two kinds, with separate budgets: a transient STATUS, where the gateway
@@ -372,7 +373,7 @@ class _ChatBackend:
             while True:
                 try:
                     return requests.post(url, headers=headers, json=body,
-                                         timeout=_HTTP_TIMEOUT_S)
+                                         timeout=timeout_s or _HTTP_TIMEOUT_S)
                 except (requests.exceptions.Timeout,
                         requests.exceptions.ConnectionError) as e:
                     if transport_left <= 0:
@@ -408,8 +409,10 @@ class _ChatBackend:
         return resp
 
     def _post_adapting(self, url: str, headers: Dict[str, str],
-                       body: Dict[str, Any]):
-        resp = self._post_transient_retrying(url, headers, body)
+                       body: Dict[str, Any],
+                       timeout_s: Optional[float] = None):
+        resp = self._post_transient_retrying(url, headers, body,
+                                             timeout_s=timeout_s)
         for _ in range(self._PARAM_ADAPT_MAX):
             if resp.ok or resp.status_code != 400:
                 return resp
@@ -442,7 +445,8 @@ class _ChatBackend:
                 logger.info(
                     "_ChatBackend: %s rejects %r; dropping it for this session",
                     self.model or self.base_url, param)
-            resp = self._post_transient_retrying(url, headers, body)
+            resp = self._post_transient_retrying(url, headers, body,
+                                                 timeout_s=timeout_s)
         return resp
 
     def chat(self, messages: List[Dict[str, Any]],
@@ -471,7 +475,13 @@ class _ChatBackend:
              cot_profile: Optional[str] = None,
              enable_thinking: Optional[bool] = None,
              reasoning_effort: Optional[str] = None,
-             response_schema: Optional[Dict[str, Any]] = None) -> str:
+             response_schema: Optional[Dict[str, Any]] = None,
+             # A read timeout for THIS call, when the caller knows its
+             # generation can outlast _HTTP_TIMEOUT_S: a schema-constrained
+             # emission with a 32k budget on the local route runs ~385s at
+             # 85 tok/s, and the 300s constant voided a ChatterMate
+             # enumeration on 2026-09-02. None keeps the constant.
+             timeout_s: Optional[float] = None) -> str:
         # THE DEFAULT COMES FROM THE MODEL, NOT FROM THIS SIGNATURE. Raises
         # for a model with no configured temperature, which is the point:
         # a run that cannot name its own sampling settings must not start.
@@ -702,7 +712,7 @@ class _ChatBackend:
         for dead in self._param_drops:
             body.pop(dead, None)
 
-        resp = self._post_adapting(url, headers, body)
+        resp = self._post_adapting(url, headers, body, timeout_s=timeout_s)
         if not resp.ok:
             # Surface the provider's actual error reason (xAI/OpenAI return
             # JSON like {"error":{"message":"...","type":"..."}}); requests'

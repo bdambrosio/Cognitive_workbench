@@ -54,7 +54,7 @@ import shutil
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 HERE = Path(__file__).resolve().parent          # workflowsv2/claims_audit
 REPO = HERE.parent.parent
@@ -81,7 +81,7 @@ logger.setLevel(logging.INFO)
 from chat.workflow import load_workflow                          # noqa: E402
 from workflowsv2 import issues                                    # noqa: E402
 from workflowsv2.claims_audit import schemas                     # noqa: E402
-from utils.json_utils import repair_json_string                 # noqa: E402
+from workflowsv2.emit import emit                                 # noqa: E402
 
 # The brief lives with its engagement, in engagements/<name>/brief.md — it is
 # what a client says, and it differs per engagement. Its history travels with
@@ -122,7 +122,10 @@ def load_engagement(name: str) -> Dict[str, Any]:
             # which the target asserts things about itself.
             "claim_sources": list(cfg.get("claim_sources") or []),
             "brief": brief, "runs": d / "runs",
-            "retention": cfg.get("retention")}
+            "retention": cfg.get("retention"),
+            # What the practice knows of the deal, for the materiality stage.
+            # Free text, handed over verbatim; may be absent.
+            "transaction": cfg.get("transaction")}
 
 
 def engagement_state(world: str, agent: str, leg: int, max_legs: int,
@@ -518,65 +521,6 @@ def gathered_evidence(traces: Path, budget: int) -> Dict[str, Any]:
             "included": len(kept), "chars": used}
 
 
-def _emit(loop, system: str, user: str, schema: Dict[str, Any],
-          max_tokens: int) -> Dict[str, Any]:
-    """One schema-constrained call, parsed, with everything that could have
-    silently degraded it recorded.
-
-    OUTSIDE THE ReAct LOOP, DELIBERATELY. `REACT_ACTION_SCHEMA` leaves `text`
-    unconstrained by design, and a large payload stuffed into an action field
-    is a documented death spiral — seven identical retries and six minutes for
-    zero progress (subagents/subagent.py). These calls use no tools and answer
-    under their own schema instead. It is the shape
-    `src/tools/look-at-target/tool.py` already uses, and the shape
-    `measure/form_grid`'s adjudicate arm holds form in.
-    """
-    before = set(getattr(loop.backend, "_param_drops", set()))
-    messages = [{"role": "system", "content": system},
-                {"role": "user", "content": user}]
-
-    # RETRY AN EMPTY COMPLETION, ONCE. The local route returns "" with
-    # finish=stop often enough that `react.py` carries its own retry for it
-    # (REACT_MAX_FORMAT_RETRIES) — and moving the emission outside that loop
-    # left the resilience behind. doc9 lost a whole run to it: phase 1 clean,
-    # 75 kB of evidence gathered, and a zero-character adjudication.
-    #
-    # An empty answer is NOT truncation: finish reads `stop`, so nothing was
-    # cut and a larger budget would not help. Retrying the identical request is
-    # the mitigation because the cause is sampling, not the prompt.
-    attempts = []
-    raw = ""
-    for attempt in range(2):
-        raw = loop.backend.chat(messages, max_tokens=max_tokens,
-                                response_schema=schema)
-        attempts.append({
-            "chars": len(raw or ""),
-            "finish": getattr(loop.backend, "last_finish_reason", None),
-            # Recorded to tell "generated nothing" from "generated into the
-            # reasoning channel and lost on the way out". backend.py already
-            # tracks this; nothing new is being measured here.
-            "reasoning_chars": getattr(loop.backend,
-                                       "last_reasoning_chars", None)})
-        if (raw or "").strip():
-            break
-    dropped = sorted(set(getattr(loop.backend, "_param_drops", set())) - before)
-    obj, how, err = None, None, None
-    try:
-        obj, how = json.loads(raw), "parsed"
-    except Exception as e:                                     # noqa: BLE001
-        err = f"{type(e).__name__}: {e}"
-        repaired = repair_json_string(raw)
-        if isinstance(repaired, dict):
-            obj, how = repaired, "repaired"
-        else:
-            obj = schemas.salvage_findings(raw)
-            how = "salvaged" if obj else "unparseable"
-    return {"raw": raw, "obj": obj, "parse": how, "parse_error": err,
-            "finish": getattr(loop.backend, "last_finish_reason", None),
-            "attempts": attempts,
-            "response_format_dropped": dropped}
-
-
 def _merge_emissions(parts: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     """Batched adjudications into the one object the checks read.
 
@@ -627,7 +571,7 @@ def emit_surface(loop, method_text: str, claim_source: Path,
             f"Emit the claim surface now, per METHOD \u00a75 and \u00a713. You "
             f"have gathered no evidence and formed no verdicts; enumerate "
             f"every assertion the seller makes about the target.")
-    out = _emit(loop, method_text, user, schemas.surface_schema(), max_tokens)
+    out = emit(loop, method_text, user, schemas.surface_schema(), max_tokens)
     out["phase"] = "surface"
     return out
 
@@ -665,7 +609,8 @@ def emit_findings(loop, method_text: str, claim_source: Path,
           f"they returned:\n\n{ev['text']}\n\n"
           f"Emit the findings document now, per METHOD \u00a713. Every frozen "
           f"claim gets exactly one finding.")
-    out = _emit(loop, method_text, user, schemas.audit_schema(), max_tokens)
+    out = emit(loop, method_text, user, schemas.audit_schema(), max_tokens,
+               salvage=schemas.salvage_findings)
     out["phase"] = "findings"
     out["evidence"] = {k: v for k, v in ev.items() if k != "text"}
     return out
@@ -819,6 +764,7 @@ def main() -> int:
     # stopped gathering, and being wrong costs evidence, never a deliverable.
     transcript = []
     gathering_legs = 0
+    max_iters_legs = 0
     surface: Optional[Dict[str, Any]] = None
     emission: Optional[Dict[str, Any]] = None
     frozen: list = []
@@ -864,6 +810,7 @@ def main() -> int:
                                  for c in frozen))
             text_first_leg = text
             sent_reason = "opening brief and the frozen claim surface"
+            traces_before = 0
             for i in range(args.max_turns):
                 log_outgoing(i + 1, sent_reason, text)
                 concerns_before = concern_snapshot(loop)
@@ -884,10 +831,25 @@ def main() -> int:
                 if exit_reason in ("llm_error", "crashed"):
                     error = f"turn {i + 1} ended {exit_reason} — run is not valid"
                     break
+                # A LEG CUT BY THE ACTION CAP IS A BOUNDARY, NOT A CRASH. On a
+                # 1,100-file target the local model spent 16 actions reading and
+                # never reached `yield`; its evidence requests were on disk and
+                # the run was thrown away (chattermate-readme, 2026-09-02). The
+                # cap ends the leg the way `yield` does, and is counted. The
+                # run stops when a capped leg added no evidence request, which
+                # is a model going round in circles rather than reading.
                 if exit_reason == "max_iters":
-                    error = (f"turn {i + 1} hit max_iters without answering — "
-                             f"run is not valid")
-                    break
+                    max_iters_legs += 1
+                    traces_now = len(list((REPO / "scenarios" / args.world / name
+                                           / "inspect_traces").glob("inspect_external_*.txt")))
+                    if traces_now <= traces_before:
+                        error = (f"turn {i + 1} hit max_iters and made no new "
+                                 f"evidence request — run is not valid")
+                        break
+                    traces_before = traces_now
+                    logger.warning("leg %d: cut by the action cap; %d evidence "
+                                   "requests so far — continuing", i + 1, traces_now)
+                    exit_reason = "yield"
                 transcript.append(reply)
                 gathering_legs = i + 1
                 if exit_reason != "yield":
@@ -1140,6 +1102,7 @@ def main() -> int:
         # thing worth knowing about the legs is how many the evidence took.
         "gathering_legs": gathering_legs,
         "gathering_capped": gathering_legs >= args.max_turns,
+        "max_iters_legs": max_iters_legs,
         "wall_clock_s": wall,
         # Action emissions the token ceiling cut off, across the gathering
         # legs. The emission call reports its own separately, below.
