@@ -1439,10 +1439,11 @@ def main() -> int:
             # and the findings keep `not_examined`.
             if not error and emission and emission.get("obj"):
                 docs = schemas.corpus_index(eng["target"])
+                submodules = schemas.corpus_view(eng["target"])["submodules"]
                 while len(legs) < args.max_turns:
                     read = set(files_read(traces_dir, eng["target"]))
                     cands = schemas.candidate_files(
-                        emission["obj"].get("findings") or [], docs, read)
+                        emission["obj"].get("findings") or [], docs, read, submodules)
                     todo = {cid: c["unopened"] for cid, c in cands.items()
                             if c["unopened"]}
                     if not todo:
@@ -1488,7 +1489,7 @@ def main() -> int:
                         break
                 read = set(files_read(traces_dir, eng["target"]))
                 cands = schemas.candidate_files(
-                    emission["obj"].get("findings") or [], docs, read)
+                    emission["obj"].get("findings") or [], docs, read, submodules)
                 chase["unopened_after"] = sorted(
                     {f for c in cands.values() for f in c["unopened"]})
                 if chase["unopened_after"]:

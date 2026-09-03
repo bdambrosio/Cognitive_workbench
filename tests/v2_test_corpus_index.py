@@ -121,7 +121,8 @@ def test_a_worktree_is_its_tracked_files_minus_binaries(tmp_path):
     assert v["binary_skipped"] == ["logo.png"]
     assert set(corpus_index(repo)) == set(v["materials"])
     assert corpus_view_summary(repo) == {
-        "view": "tracked", "materials": 3, "binary_skipped": ["logo.png"]}
+        "view": "tracked", "materials": 3, "binary_skipped": ["logo.png"],
+        "submodules": []}
 
 
 def test_a_plain_directory_is_walked_minus_binaries(tmp_path):
@@ -142,4 +143,16 @@ def test_a_plain_directory_is_walked_minus_binaries(tmp_path):
 def test_a_missing_target_is_an_empty_walk(tmp_path):
     from workflowsv2.claims_audit.schemas import corpus_view
     assert corpus_view(tmp_path / "nowhere") == {
-        "view": "walk", "materials": [], "binary_skipped": []}
+        "view": "walk", "materials": [], "binary_skipped": [], "submodules": []}
+
+
+def test_a_submodule_is_listed_and_is_not_a_material(tmp_path):
+    """A tracked entry of mode 160000 names a place the materials do not
+    reach; it is recorded under `submodules`, never under `materials`."""
+    from workflowsv2.claims_audit.schemas import corpus_view
+    repo = _repo(tmp_path)
+    _git(repo, "update-index", "--add", "--cacheinfo",
+         "160000,0123456789012345678901234567890123456789,vendor/private")
+    v = corpus_view(repo)
+    assert v["submodules"] == ["vendor/private"]
+    assert "vendor/private" not in v["materials"]

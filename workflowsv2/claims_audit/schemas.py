@@ -494,16 +494,22 @@ def corpus_view(corpus: Path) -> Dict[str, Any]:
     dropped as binary (ChatterMate: 28 of 1,114 tracked files).
 
     Returns `{"view": "tracked" | "walk", "materials": [paths],
-    "binary_skipped": [paths]}`, paths relative to the target in POSIX form
-    and sorted. Submodule entries and other tracked non-files are not listed.
+    "binary_skipped": [paths], "submodules": [paths]}`, paths relative to
+    the target in POSIX form and sorted. A SUBMODULE IS A PLACE THE MATERIALS
+    DO NOT REACH: a tracked entry of mode 160000 names a directory the seller
+    keeps elsewhere, checked out here or not. It is listed so a candidate that
+    names it can be recognised as outside the materials (ChatterMate's two
+    enterprise submodules, 2026-09-03) rather than as a path that resolves to
+    nothing. Its files, when it is checked out, are still not materials.
     """
     import subprocess
-    out: Dict[str, Any] = {"view": "walk", "materials": [], "binary_skipped": []}
+    out: Dict[str, Any] = {"view": "walk", "materials": [], "binary_skipped": [],
+                           "submodules": []}
     if not corpus.is_dir():
         return out
     rels: List[Path] = []
     try:
-        r = subprocess.run(["git", "-C", str(corpus), "ls-files", "-z"],
+        r = subprocess.run(["git", "-C", str(corpus), "ls-files", "-s", "-z"],
                            capture_output=True, timeout=30)
     except Exception as e:                                     # noqa: BLE001
         logger.warning("corpus view: git ls-files failed under %s (%s); "
@@ -511,7 +517,15 @@ def corpus_view(corpus: Path) -> Dict[str, Any]:
         r = None
     if r is not None and r.returncode == 0:
         out["view"] = "tracked"
-        rels = [Path(n) for n in r.stdout.decode("utf-8", "replace").split("\0") if n]
+        for entry in r.stdout.decode("utf-8", "replace").split("\0"):
+            if not entry or "\t" not in entry:
+                continue
+            meta, name = entry.split("\t", 1)
+            if meta.split(" ", 1)[0] == "160000":
+                out["submodules"].append(Path(name).as_posix())
+            else:
+                rels.append(Path(name))
+        out["submodules"].sort()
     else:
         for f in sorted(corpus.rglob("*")):
             rel = f.relative_to(corpus)
@@ -538,7 +552,8 @@ def corpus_view_summary(corpus: Path) -> Dict[str, Any]:
     metadata and the review's statistics."""
     v = corpus_view(corpus)
     return {"view": v["view"], "materials": len(v["materials"]),
-            "binary_skipped": v["binary_skipped"]}
+            "binary_skipped": v["binary_skipped"],
+            "submodules": v["submodules"]}
 
 
 def corpus_index(corpus: Path) -> Dict[str, List[str]]:
@@ -591,7 +606,8 @@ def resolve_document(docs: Dict[str, List[str]], name: Any
 
 
 def candidate_files(findings: Sequence[Dict[str, Any]],
-                    docs: Dict[str, List[str]], read: Optional[set]
+                    docs: Dict[str, List[str]], read: Optional[set],
+                    submodules: Sequence[str] = ()
                     ) -> Dict[Any, Dict[str, List[str]]]:
     """Per `unverifiable` finding: the files its searches named in
     `candidates`, resolved against the corpus, and which of them were not
@@ -605,7 +621,9 @@ def candidate_files(findings: Sequence[Dict[str, Any]],
     Keyed by `claim_id`. Only findings with the `unverifiable` verdict are
     present: a candidate on a settled claim is a note, not an obligation.
 
-    A candidate that names a DIRECTORY of the corpus is recorded under
+    `outside` holds candidates that name a submodule — a place the materials
+    do not reach — which is consistent with `outside_the_materials` and with
+    nothing else. A candidate that names a DIRECTORY of the corpus is recorded under
     `directories` and is neither an obligation nor a problem: there is no one
     file to open, and a model naming the module where the material would sit
     is answering §8's question honestly. A name that resolves to nothing is
@@ -622,6 +640,8 @@ def candidate_files(findings: Sequence[Dict[str, Any]],
         named: List[str] = []
         unresolved: List[str] = []
         directories: List[str] = []
+        outside: List[str] = []
+        subs = {m.rstrip("/") for m in submodules}
         for e in f.get("evidence") or []:
             if not isinstance(e, dict) or e.get("form") != "search":
                 continue
@@ -631,6 +651,10 @@ def candidate_files(findings: Sequence[Dict[str, Any]],
                     d = (c or "").strip().rstrip("/")
                     while d.startswith("./"):
                         d = d[2:]
+                    if d in subs or any(d.startswith(m + "/") for m in subs):
+                        if d not in outside:
+                            outside.append(d)
+                        continue
                     if d in dirs:
                         if d not in directories:
                             directories.append(d)
@@ -641,7 +665,8 @@ def candidate_files(findings: Sequence[Dict[str, Any]],
         unopened = [k for k in named if k not in read] if read is not None else []
         out[f.get("claim_id")] = {"named": named, "unopened": unopened,
                                   "unresolved": unresolved,
-                                  "directories": directories}
+                                  "directories": directories,
+                                  "outside": outside}
     return out
 
 
@@ -661,6 +686,7 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
     taken as recorded.
     """
     problems: List[str] = []
+    view = corpus_view(corpus)
     docs = corpus_index(corpus)
     joined: List[str] = []
 
@@ -734,7 +760,7 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
     seen: Dict[Any, int] = {}
     verdicts: Dict[str, int] = {}
     forms: Dict[str, int] = {}
-    candidates = candidate_files(findings, docs, read)
+    candidates = candidate_files(findings, docs, read, view["submodules"])
     not_examined = 0
     unopened = sorted({k for c in candidates.values() for k in c["unopened"]})
     for i, f in enumerate(findings, 1):
@@ -776,6 +802,14 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
             cand = candidates.get(cid) or {}
             for why in cand.get("unresolved") or []:
                 problems.append(f"{w}: candidate {why}")
+            # A candidate in a submodule names a place the materials do not
+            # reach: consistent with `outside_the_materials`, and with no
+            # other disposition.
+            if cand.get("outside") and because != "outside_the_materials":
+                problems.append(
+                    f"{w}: candidate {', '.join(cand['outside'])} is a "
+                    f"submodule the materials do not include — the "
+                    f"disposition is `outside_the_materials` (METHOD §8)")
             if because == NOT_EXAMINED:
                 not_examined += 1
             if read is not None:

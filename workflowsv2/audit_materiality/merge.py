@@ -112,6 +112,7 @@ def merge(run_dirs: Sequence[Path]) -> Dict[str, Any]:
             # how long it gathered, and the files its searches named that it
             # never opened (METHOD §8). All from run_meta; nothing judged.
             "files_read": len(meta.get("files_read") or {}),
+            "materials": meta.get("materials"),
             "captured_at_utc": meta.get("captured_at_utc"),
             "gathering_legs": meta.get("gathering_legs"),
             "unopened_candidates": list(

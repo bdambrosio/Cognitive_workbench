@@ -229,3 +229,16 @@ def test_files_matched_reads_search_hits_not_reads(tmp_path):
         'ACTION:\n{"tool": "list"}\nOBSERVATION:\nOK: ./\na.py\t2 bytes\n')
     assert files_matched(tr, tgt) == [".github/ci.yml", "a.py"]
     assert set(files_read(tr, tgt)) == {"a.py"}
+
+
+def test_a_candidate_in_a_submodule_is_outside_not_unresolved(tmp_path):
+    from workflowsv2.claims_audit import schemas as sch
+    docs = sch.corpus_index(_corpus(tmp_path))
+    fs = [_unv(1, "outside_the_materials", ["backend/app/enterprise", "app/a.py"]),
+          _unv(2, "not_in_the_materials", ["backend/app/enterprise/x.py"])]
+    out = sch.candidate_files(fs, docs, read={"app/a.py"},
+                              submodules=["backend/app/enterprise"])
+    assert out[1]["outside"] == ["backend/app/enterprise"] and out[1]["unresolved"] == []
+    assert out[2]["outside"] == ["backend/app/enterprise/x.py"]
+    # without the submodule list the same candidate is unresolved, as before
+    assert sch.candidate_files(fs[:1], docs, read=set())[1]["unresolved"]

@@ -414,6 +414,13 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
                 "target's files the audit opened while gathering evidence, "
                 "over the number of *gathering legs* it took. *Reviewed* says "
                 "whether the independent review ran on that claim source.", ""]
+    subs = sorted({m for r in runs for m in ((r.get("materials") or {}).get("submodules") or [])})
+    if subs:
+        out += ["**Not supplied:** the materials name "
+                + ("one submodule" if len(subs) == 1 else f"{len(subs)} submodules")
+                + " kept elsewhere by the seller — " + ", ".join(f"`{m}`" for m in subs)
+                + ". Nothing under them was examined; a claim whose evidence "
+                "would sit there is reported as unsettled, with that reason.", ""]
     out += _slot("scope_note", prose)
 
     out += _how_to_read()
