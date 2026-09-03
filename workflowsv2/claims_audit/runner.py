@@ -1538,13 +1538,18 @@ def main() -> int:
         checks = {"ok": True, "problems": [],
                   "figures": {"enumerate_only": True}}
     else:
-        checks = post_run_checks(obj, eng["target"], eng["claim_sources"][0],
+        checks = post_run_checks(obj, eng["target"], claim_source,
                                  frozen, out,
                                  read=set(files_read(traces_dir, eng["target"])))
     if obj is not None and (out / "findings.partial.json").is_file():
         (out / "findings.partial.json").unlink()
-    if not error and not checks["ok"]:
-        error = f"output check failed: {len(checks['problems'])} problem(s)"
+    # A CHECK PROBLEM IS NOT A FAILED RUN (Bruce, 2026-09-03). The run
+    # completed; the check found citations to correct, and they are recorded
+    # as blocking issues the practice resolves before delivery and carried
+    # by the review, the merge and the report. `error` — and the exit code —
+    # mean the run did not complete: a stage that did not parse, a leg that
+    # ended badly, an exception. Until tonight a check problem set `error`
+    # too, and a chain script read exit code 1 as "audit failed".
     if chase["untagged_after"]:
         issues.note(out, stage="claims_audit", code="no_evidence_request",
                     text=f"{len(chase['untagged_after'])} claim(s) had no "
@@ -1713,7 +1718,8 @@ def main() -> int:
         "captured_at_utc": ts,
     }, indent=2, default=str) + "\n", encoding="utf-8")
 
-    print(f"\n{len(legs)} legs, {wall}s, error={error}")
+    print(f"\n{len(legs)} legs, {wall}s, error={error}, "
+          f"check problems={len(checks.get('problems') or [])}")
     fig = checks.get("figures") or {}
     print(f"emission: {(emission or {}).get('parse')}, "
           f"findings={fig.get('findings')}, verdicts={fig.get('verdicts')}")
@@ -1722,6 +1728,8 @@ def main() -> int:
           f"{len(chase['unopened_after'])} file(s) named and not opened")
     print(f"deliverables: {out}/claims.json, findings.json")
     print(f"meta: {out / 'run_meta.json'}")
+    # EXIT CODE: 0 when the run completed, whatever the check found; 1 when
+    # it did not (`error` is set, findings are absent or partial).
     # A FIXTURE RUN IS SCORED BY READING. The answer key is
     # measure/fixtures/dataroom/answer_key.md; the mechanical scorer that read
     # v1 text reports was deleted 2026-09-02 (Bruce: "I'd rather have you
