@@ -86,3 +86,60 @@ def test_a_quote_joining_lines_of_the_cited_range_is_counted_not_failed(tmp_path
     assert not res["ok"]
     assert "this part is not at those lines" in res["problems"][0]
     assert "Dependency: 90%" in res["problems"][0]
+
+
+def _git(cwd, *args):
+    import subprocess
+    subprocess.run(["git", "-C", str(cwd), *args], check=True,
+                   capture_output=True)
+
+
+def _repo(tmp_path):
+    """A worktree with a tracked dot-directory file, an ignored .venv file,
+    a tracked image, and an untracked text file."""
+    _git(tmp_path, "init", "-q")
+    (tmp_path / ".github" / "workflows").mkdir(parents=True)
+    (tmp_path / ".github" / "workflows" / "ci.yml").write_text("on: push\n")
+    (tmp_path / "README.md").write_text("root readme\n")
+    (tmp_path / "logo.png").write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00IHDR")
+    (tmp_path / ".gitignore").write_text(".venv/\n")
+    (tmp_path / ".venv" / "lib").mkdir(parents=True)
+    (tmp_path / ".venv" / "lib" / "site.py").write_text("ignored = True\n")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "-c", "user.email=t@t", "-c", "user.name=t",
+         "commit", "-q", "-m", "init")
+    (tmp_path / "untracked.md").write_text("not committed\n")
+    return tmp_path
+
+
+def test_a_worktree_is_its_tracked_files_minus_binaries(tmp_path):
+    from workflowsv2.claims_audit.schemas import corpus_view, corpus_view_summary
+    repo = _repo(tmp_path)
+    v = corpus_view(repo)
+    assert v["view"] == "tracked"
+    assert v["materials"] == [".github/workflows/ci.yml", ".gitignore", "README.md"]
+    assert v["binary_skipped"] == ["logo.png"]
+    assert set(corpus_index(repo)) == set(v["materials"])
+    assert corpus_view_summary(repo) == {
+        "view": "tracked", "materials": 3, "binary_skipped": ["logo.png"]}
+
+
+def test_a_plain_directory_is_walked_minus_binaries(tmp_path):
+    from workflowsv2.claims_audit.schemas import corpus_view
+    d = tmp_path / "plain"
+    d.mkdir()
+    (d / "a.md").write_text("a\n")
+    (d / ".hidden.md").write_text("h\n")
+    (d / "node_modules").mkdir()
+    (d / "node_modules" / "x.js").write_text("x\n")
+    (d / "pic.png").write_bytes(b"\x00\x01")
+    v = corpus_view(d)
+    assert v["view"] == "walk"
+    assert v["materials"] == [".hidden.md", "a.md"]
+    assert v["binary_skipped"] == ["pic.png"]
+
+
+def test_a_missing_target_is_an_empty_walk(tmp_path):
+    from workflowsv2.claims_audit.schemas import corpus_view
+    assert corpus_view(tmp_path / "nowhere") == {
+        "view": "walk", "materials": [], "binary_skipped": []}

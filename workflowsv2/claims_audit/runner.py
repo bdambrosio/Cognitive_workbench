@@ -311,7 +311,12 @@ def files_read(traces: Path, target: Path) -> Dict[str, str]:
         except OSError as e:
             logger.warning("manifest: unreadable trace %s (%s)", t, e)
     for n in sorted(names):
-        n = n.lstrip("./")
+        # A leading "./" is a prefix, not a character set: `lstrip("./")`
+        # turned `.github/...` into `github/...` and dropped every dotfile
+        # from the record (same defect as resolve_document, 2026-09-02).
+        while n.startswith("./"):
+            n = n[2:]
+        n = n.lstrip("/")
         f = target / n
         if f.is_file():
             try:
@@ -1600,6 +1605,11 @@ def main() -> int:
         # tree the report never saw, silently. The commit says the tree moved;
         # the manifest below says whether it moved under a file this run read.
         "target_rev": git_rev(Path(cfg.get("external_repo") or ".")),
+        # WHICH FILES WERE THE MATERIALS: tracked files when the target is a
+        # worktree, else the walk; binary files named so a reader can see
+        # what the index never held (schemas.corpus_view).
+        "materials": schemas.corpus_view_summary(
+            Path(cfg.get("external_repo") or ".")),
         "harness_rev": git_rev(REPO),
         "files_read": files_read(record / "inspect_traces",
                                  Path(cfg.get("external_repo") or ".")),

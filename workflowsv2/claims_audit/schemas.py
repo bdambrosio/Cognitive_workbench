@@ -38,9 +38,12 @@ which is sound for the same reason: array elements here are independent.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+logger = logging.getLogger("claims_audit.schemas")
 
 # --------------------------------------------------------------------------
 # The closed vocabularies. METHOD §6 and §8 are the source; the linter checks
@@ -465,19 +468,82 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", _DECORATION.sub(" ", s or "")).strip()
 
 
-#: Directory names never read as materials. `.git` holds thousands of binary
-#: objects; a dependency tree is not the target. Every other directory is
-#: materials, dot-directories included: `.github/workflows/` is where a
-#: repository says how it publishes its images, and twelve citations into
-#: it were reported "not in the materials" while the subagent had read the
-#: file (ChatterMate, 2026-09-02). Files whose own name starts with a dot
-#: (`.env.example`) are materials too.
+#: Directory names never read as materials when the target is not a git
+#: worktree. `.git` holds thousands of binary objects; a dependency tree is
+#: not the target. Every other directory is materials, dot-directories
+#: included: `.github/workflows/` is where a repository says how it publishes
+#: its images, and twelve citations into it were reported "not in the
+#: materials" while the subagent had read the file (ChatterMate, 2026-09-02).
+#: Files whose own name starts with a dot (`.env.example`) are materials too.
 _SKIP_DIRS = (".git", "node_modules", "__pycache__")
+
+#: A file with a NUL byte this early is not text: an image, a zip, a
+#: coverage database. It is never a material, whichever view listed it.
+_BINARY_PROBE_BYTES = 8192
+
+
+def corpus_view(corpus: Path) -> Dict[str, Any]:
+    """Which files are the materials, and how that was decided.
+
+    THE MATERIALS ARE WHAT THE SELLER COMMITTED. When the target is inside a
+    git worktree, the materials are its tracked files (`git ls-files`): an
+    ignored virtual environment or build tree is not the seller's work, and
+    one target (Body, 2026-09-03) had 21 tracked files under 2,260 ignored
+    ones. Outside a worktree, every file under the target except those in
+    `_SKIP_DIRS`. In both views a file with a NUL byte in its first 8 KB is
+    dropped as binary (ChatterMate: 28 of 1,114 tracked files).
+
+    Returns `{"view": "tracked" | "walk", "materials": [paths],
+    "binary_skipped": [paths]}`, paths relative to the target in POSIX form
+    and sorted. Submodule entries and other tracked non-files are not listed.
+    """
+    import subprocess
+    out: Dict[str, Any] = {"view": "walk", "materials": [], "binary_skipped": []}
+    if not corpus.is_dir():
+        return out
+    rels: List[Path] = []
+    try:
+        r = subprocess.run(["git", "-C", str(corpus), "ls-files", "-z"],
+                           capture_output=True, timeout=30)
+    except Exception as e:                                     # noqa: BLE001
+        logger.warning("corpus view: git ls-files failed under %s (%s); "
+                       "walking instead", corpus, e)
+        r = None
+    if r is not None and r.returncode == 0:
+        out["view"] = "tracked"
+        rels = [Path(n) for n in r.stdout.decode("utf-8", "replace").split("\0") if n]
+    else:
+        for f in sorted(corpus.rglob("*")):
+            rel = f.relative_to(corpus)
+            if any(part in _SKIP_DIRS for part in rel.parts[:-1]):
+                continue
+            rels.append(rel)
+    for rel in sorted(rels):
+        f = corpus / rel
+        if not f.is_file():
+            continue
+        try:
+            with f.open("rb") as fh:
+                head = fh.read(_BINARY_PROBE_BYTES)
+        except OSError as e:
+            logger.warning("corpus view: unreadable %s (%s)", f, e)
+            continue
+        (out["binary_skipped"] if b"\0" in head else out["materials"]).append(
+            rel.as_posix())
+    return out
+
+
+def corpus_view_summary(corpus: Path) -> Dict[str, Any]:
+    """The view's name and counts, with the binary files named, for a run's
+    metadata and the review's statistics."""
+    v = corpus_view(corpus)
+    return {"view": v["view"], "materials": len(v["materials"]),
+            "binary_skipped": v["binary_skipped"]}
 
 
 def corpus_index(corpus: Path) -> Dict[str, List[str]]:
-    """Every readable file under the target, keyed by its path relative to
-    the target root in POSIX form, as a list of lines.
+    """Every material file (`corpus_view`), keyed by its path relative to the
+    target root in POSIX form, as a list of lines.
 
     KEYED BY RELATIVE PATH, NOT BASENAME. The first version keyed on `f.name`,
     which is exact for a nine-document fixture and wrong for a repository:
@@ -487,19 +553,12 @@ def corpus_index(corpus: Path) -> Dict[str, List[str]]:
     citations still resolve as written.
     """
     docs: Dict[str, List[str]] = {}
-    if not corpus.is_dir():
-        return docs
-    for f in sorted(corpus.rglob("*")):
-        if not f.is_file():
-            continue
-        rel = f.relative_to(corpus)
-        if any(part in _SKIP_DIRS for part in rel.parts[:-1]):
-            continue
+    for rel in corpus_view(corpus)["materials"]:
         try:
-            docs[rel.as_posix()] = f.read_text(
+            docs[rel] = (corpus / rel).read_text(
                 encoding="utf-8", errors="replace").splitlines()
-        except OSError:
-            continue
+        except OSError as e:
+            logger.warning("corpus index: unreadable %s (%s)", corpus / rel, e)
     return docs
 
 

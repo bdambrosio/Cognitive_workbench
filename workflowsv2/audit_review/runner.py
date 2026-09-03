@@ -157,6 +157,9 @@ def statistics(run: Path, corpus: Path, claim_source: str) -> Dict[str, Any]:
     verdicts = (output.get("figures") or {}).get("verdicts") or {}
     return {
         "claim_source": claim_source,
+        # Which files the index held: the view (tracked / walk), how many
+        # materials, and the binary files it dropped.
+        "materials": audit_schemas.corpus_view_summary(corpus),
         "surface_check": surface,
         "output_check": output,
         # THE AUTHORITATIVE FIGURES. Bruce's call: the review reports, the
