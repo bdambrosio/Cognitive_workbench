@@ -1,0 +1,15 @@
+# claims-audit engagement: demo-chhoto
+#
+# Created 2026-09-03T21-15-25Z. The practice fills `claim_sources:` (the documents in the
+# target that carry the seller's claims, by path from the target root) and,
+# where the materials are not under target/, `target:`. `transaction:` and
+# `thresholds:` come from the current intake's blocks.yaml, not from here.
+
+target: target
+
+claim_sources:
+  - README.md
+  - docs/INSTALLATION.md
+
+
+retention: keep
