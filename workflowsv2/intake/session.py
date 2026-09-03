@@ -54,7 +54,10 @@ class IntakeSession:
                  max_tokens: int = 8192) -> None:
         self.engagement = engagement
         self.eng_dir = rn.ENGAGEMENTS / engagement
-        self.eng_dir.mkdir(parents=True, exist_ok=True)
+        if not self.eng_dir.is_dir():
+            raise SystemExit(f"no engagement '{self.eng_dir.name}' — the engagement comes "
+                             f"first: python3 workflowsv2/engagement_state.py "
+                             f"{self.eng_dir.name} new")
         intake_id = state.current_intake(self.eng_dir)
         if new or intake_id is None:
             intake_id = state.new_intake(self.eng_dir)

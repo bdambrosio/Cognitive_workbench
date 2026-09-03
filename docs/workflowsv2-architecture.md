@@ -20,6 +20,13 @@ questions about a finished run from its record and is interactive.
 
 ## Engagement state (2026-09-03)
 
+The engagement comes first, explicitly: `engagement_state.py <name> new
+[--clone <url or path>]` creates the directory, a stub engagement.yaml and,
+with `--clone`, the materials at `target/` inside it (the default `target:`;
+a local clone hardlinks objects and takes seconds). Nothing else creates an
+engagement, and the intake refuses a name it does not find. The practice
+fills `claim_sources:` after the intake has said where the claims are.
+
 An engagement directory holds intakes under `intakes/<id>/` (the form,
 `intake_meta.json`, `intake.log`, and after `--finish` a `blocks.yaml` with
 `transaction:` and `thresholds:`) and runs under `merged/<ts>_<label>/`, each

@@ -90,3 +90,11 @@ def test_finish_writes_the_intake_blocks_and_a_brief_once(tmp_path):
     assert res["written"] == ["transaction", "thresholds"]
     assert yaml.safe_load((idir / "blocks.yaml").read_text())["thresholds"].strip() == "Would end the deal: changed"
     assert (eng / "brief.md").read_text() == "edited by hand"
+
+
+def test_intake_session_refuses_a_missing_engagement(tmp_path, monkeypatch):
+    import pytest
+    from workflowsv2.intake.session import IntakeSession
+    monkeypatch.setattr(rn, "ENGAGEMENTS", tmp_path)
+    with pytest.raises(SystemExit, match="the engagement comes first"):
+        IntakeSession("nope")

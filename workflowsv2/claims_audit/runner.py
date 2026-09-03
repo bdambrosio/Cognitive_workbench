@@ -120,9 +120,11 @@ def load_engagement(name: str, intake: Optional[str] = None) -> Dict[str, Any]:
                                 if x.is_dir())) or "none"
         raise SystemExit(f"no engagement '{name}' in {ENGAGEMENTS} (have: {have})")
     cfg = yaml.safe_load(cfg_file.read_text(encoding="utf-8")) or {}
-    target = Path(cfg.get("target") or "")
+    # THE MATERIALS LIVE IN THE ENGAGEMENT: `target/` under its directory
+    # unless engagement.yaml names another place, relative to the repo root.
+    target = Path(cfg.get("target") or "target")
     if not target.is_absolute():
-        target = REPO / target
+        target = (d / target) if (d / target).is_dir() else REPO / target
     brief = d / "brief.md"
     if not brief.is_file():
         raise SystemExit(f"engagement '{name}' has no brief.md")

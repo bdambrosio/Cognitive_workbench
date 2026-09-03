@@ -1,11 +1,20 @@
 #!/usr/bin/env python3
 """Which intake and which run an engagement is currently working from.
 
+    python3 workflowsv2/engagement_state.py <engagement> new [--clone <url or path>]
     python3 workflowsv2/engagement_state.py <engagement> status
     python3 workflowsv2/engagement_state.py <engagement> intake current <id>
     python3 workflowsv2/engagement_state.py <engagement> intake cancel <id>
     python3 workflowsv2/engagement_state.py <engagement> run current <merged dir name>
     python3 workflowsv2/engagement_state.py <engagement> run cancel <merged dir name>
+
+THE ENGAGEMENT COMES FIRST, EXPLICITLY. `new` creates the directory and a
+stub engagement.yaml; nothing else creates one, and the intake refuses a
+name it does not find. The materials live INSIDE the engagement, at
+`target/` unless engagement.yaml says otherwise: the report pins what was
+examined, retention is an engagement term, and deleting an engagement
+should delete what it examined. `--clone` fills `target/` from a URL or a
+local checkout (a local clone hardlinks objects and takes seconds).
 
 THE MODEL (Bruce, 2026-09-03). An engagement holds intakes under
 `intakes/<id>/`; one is current. A run — a merged directory under `merged/`,
@@ -65,6 +74,42 @@ def save(eng_dir: Path, st: Dict[str, Any]) -> None:
 
 def stamp() -> str:
     return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
+
+
+# ---- the engagement itself ---------------------------------------------------
+
+TARGET = "target"
+STUB = """\
+# claims-audit engagement: {name}
+#
+# Created {stamp}. The practice fills `claim_sources:` (the documents in the
+# target that carry the seller's claims, by path from the target root) and,
+# where the materials are not under target/, `target:`. `transaction:` and
+# `thresholds:` come from the current intake's blocks.yaml, not from here.
+
+target: target
+
+claim_sources: []
+
+retention: keep
+"""
+
+
+def new_engagement(eng_dir: Path, clone: Optional[str] = None) -> Path:
+    """Create the engagement: its directory, a stub engagement.yaml, and —
+    with `clone` — its target/ from a git URL or a local checkout."""
+    if eng_dir.exists():
+        raise SystemExit(f"engagement '{eng_dir.name}' already exists")
+    eng_dir.mkdir(parents=True)
+    (eng_dir / "engagement.yaml").write_text(
+        STUB.format(name=eng_dir.name, stamp=stamp()), encoding="utf-8")
+    if clone:
+        import subprocess
+        r = subprocess.run(["git", "clone", "--quiet", clone, str(eng_dir / TARGET)],
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            raise SystemExit(f"git clone failed: {r.stderr.strip()}")
+    return eng_dir
 
 
 # ---- intakes ---------------------------------------------------------------
@@ -229,9 +274,20 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(__doc__)
         return 2
     eng_dir = ENGAGEMENTS / a[0]
-    if not eng_dir.is_dir():
-        raise SystemExit(f"no engagement '{a[0]}' in {ENGAGEMENTS}")
     cmd = a[1:]
+    if cmd[0] == "new":
+        clone = cmd[2] if len(cmd) == 3 and cmd[1] == "--clone" else None
+        if len(cmd) not in (1, 3) or (len(cmd) == 3 and cmd[1] != "--clone"):
+            print(__doc__)
+            return 2
+        new_engagement(eng_dir, clone)
+        print(f"created {eng_dir}" + (f"; target cloned from {clone}" if clone else
+                                      f"; put the materials in {eng_dir / TARGET}"))
+        print(f"next: fill claim_sources: in {eng_dir / 'engagement.yaml'}")
+        return 0
+    if not eng_dir.is_dir():
+        raise SystemExit(f"no engagement '{a[0]}' in {ENGAGEMENTS} — create it "
+                         f"with: engagement_state.py {a[0]} new")
     if cmd == ["status"]:
         print(status(eng_dir))
     elif len(cmd) == 3 and cmd[0] == "intake" and cmd[1] == "current":

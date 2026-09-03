@@ -222,6 +222,10 @@ def test_load_engagement_returns_thresholds(tmp_path, monkeypatch):
     (d / "engagement.yaml").write_text("target: t\nclaim_sources: [a.md]\n")
     assert rn.load_engagement("eng")["thresholds"] is None
     assert rn.load_engagement("eng")["intake_id"] is None
+    # the target defaults to <engagement>/target when it exists there
+    (d / "target").mkdir()
+    (d / "engagement.yaml").write_text("claim_sources: [a.md]\n")
+    assert rn.load_engagement("eng")["target"] == (d / "target").resolve()
 
 
 def test_load_engagement_prefers_the_intake_blocks(tmp_path, monkeypatch):

@@ -51,3 +51,27 @@ def test_runs_pin_an_intake_and_current_follows_the_same_rule(tmp_path):
     assert "CURRENT" in text and "cancelled" in text
     state = json.loads((eng / "state.json").read_text())
     assert state["cancelled"]["runs"] == ["2026-01-01T00-00-00Z_a"]
+
+
+def test_new_engagement_writes_a_stub_and_refuses_twice(tmp_path):
+    eng = st.new_engagement(tmp_path / "e")
+    text = (eng / "engagement.yaml").read_text()
+    assert "target: target" in text and "claim_sources: []" in text
+    import pytest
+    with pytest.raises(SystemExit):
+        st.new_engagement(tmp_path / "e")
+
+
+def test_new_engagement_clones_a_local_checkout(tmp_path):
+    import shutil, subprocess
+    if not shutil.which("git"):
+        return
+    src = tmp_path / "src"; src.mkdir()
+    subprocess.run(["git", "-C", str(src), "init", "-q"], check=True)
+    (src / "README.md").write_text("claims\n")
+    subprocess.run(["git", "-C", str(src), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(src), "-c", "user.email=t@t", "-c", "user.name=t",
+                    "commit", "-q", "-m", "x"], check=True)
+    eng = st.new_engagement(tmp_path / "e", clone=str(src))
+    assert (eng / "target" / "README.md").read_text() == "claims\n"
+    assert (eng / "target" / ".git").exists()

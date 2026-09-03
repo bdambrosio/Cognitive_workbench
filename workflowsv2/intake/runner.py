@@ -187,8 +187,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--engagement", required=True,
-                    help="engagement name under claims_audit/engagements/; "
-                         "created if absent")
+                    help="engagement name under claims_audit/engagements/ "
+                         "(create it first: engagement_state.py <name> new)")
     ap.add_argument("--world", default=None,
                     help="the client's persistent world (default client_<engagement>)")
     ap.add_argument("--model", type=Path, default=None,
@@ -205,7 +205,10 @@ def main() -> int:
     args = ap.parse_args()
 
     eng_dir = ENGAGEMENTS / args.engagement
-    eng_dir.mkdir(parents=True, exist_ok=True)
+    if not eng_dir.is_dir():
+        raise SystemExit(f"no engagement '{eng_dir.name}' — the engagement comes "
+                         f"first: python3 workflowsv2/engagement_state.py "
+                         f"{eng_dir.name} new")
     intake_id = state.current_intake(eng_dir)
     if args.finish and (args.new or intake_id is None):
         raise SystemExit(f"{eng_dir}: no intake to finish")
