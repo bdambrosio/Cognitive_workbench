@@ -49,6 +49,8 @@ Rate each finding on its own. Do not combine findings, and do not rate a finding
 
 One to three sentences: what in the finding's `gap` or evidence drives the rating, and how it bears on the transaction and the buyer's thresholds as stated. Quote the figure or the fact from the finding. Do not restate the claim. For `exposure`, say what the buyer would lose if the claim were false.
 
+**Say what the rating rests on.** Where the engagement records thresholds, the last sentence of `basis` says one of two things, in these words: *rated against the buyer's stated threshold*, quoting the threshold it rests on; or *rated on the scale alone*, where no stated threshold reaches the finding. A buyer reading the rating must be able to tell their own words reflected back from the practice's judgement.
+
 ## 6. What this stage does not do
 
 - It does not value the target or state a price.

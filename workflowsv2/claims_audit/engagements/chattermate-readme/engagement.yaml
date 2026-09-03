@@ -19,11 +19,16 @@ claim_sources:
 
 retention: keep — public repository, no confidential material
 
-# THE TRANSACTION, for the materiality stage (MATERIALITY.md §2). What the
-# practice knows of the deal, in words; handed over verbatim.
 transaction: |
-  The buyer operates an e-commerce business and is considering acquiring
-  ChatterMate — the product and its team — to run customer support for its
-  own stores and to offer it to other merchants. No price is stated. The
-  buyer would rely on the platform's stated capabilities (AI agent with human
-  handover, chat widget, Shopify integration, knowledge base) from day one.
+  Client: Test
+  Acting for the client: The client directly (Test)
+  Counterparty: 'Seller'
+  Subject: Sole rights to the source code in the Chattermate directory, together with transfer of Seller's contracts with its current hosting service and all service contracts to buyers of the ChatterMate service Seller currently operates
+  Price and basis: $4M as a working assumption; the actual price listed in the current MOU is confidential. No formal stated basis for the figure.
+  Structure: Asset purchase
+  Timetable: 30 days
+
+thresholds: |
+  Paying for: Current revenue and future growth of an ongoing business, to add to the buyer's portfolio of small business online services
+  Would change the price or terms: Anything that causes the service to stop functioning or require undue attention beyond that expected of any SaaS. If disclosed or discovered in advance, the buyer would want to renegotiate; if not disclosed in advance, the buyer said it would make them regret the purchase.
+  Would end the deal: A very negative client review coming up in conversation.

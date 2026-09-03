@@ -217,6 +217,20 @@ def main() -> int:
         print(f"form: {schemas.ledger(schemas.check_intake(form))}")
         return 0
 
+    # THE CLIENT'S TERMINAL IS NOT A LOG. The harness logs WARNINGs from the
+    # discourse and attribution passes to the console, and in Bruce's first
+    # live intake they landed mid-word in the client's typing. Here the
+    # console shows errors only; everything else goes to intake.log beside
+    # the form.
+    root = logging.getLogger()
+    for h in list(root.handlers):
+        h.setLevel(logging.ERROR)
+    fh = logging.FileHandler(eng_dir / "intake.log", encoding="utf-8")
+    fh.setLevel(logging.INFO)
+    fh.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
+    root.addHandler(fh)
+    logger.setLevel(logging.INFO)
+
     world = args.world or f"client_{args.engagement}"
     returning = (REPO / "scenarios" / world).exists()
     logger.info("world %s: %s", world,

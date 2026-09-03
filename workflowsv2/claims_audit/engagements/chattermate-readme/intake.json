@@ -1,0 +1,52 @@
+{
+ "identify": {
+  "client": "Test",
+  "acting": "The client directly (Test)",
+  "counterparty": "'Seller'",
+  "confidentiality": "All communications and shared documents, files, notes, information and similar material are confidential"
+ },
+ "situation": {
+  "subject": "Sole rights to the source code in the Chattermate directory, together with transfer of Seller's contracts with its current hosting service and all service contracts to buyers of the ChatterMate service Seller currently operates",
+  "price": "$4M as a working assumption; the actual price listed in the current MOU is confidential. No formal stated basis for the figure.",
+  "structure": "Asset purchase",
+  "timetable": "30 days"
+ },
+ "background": {
+  "target": "Chattermate is a customer support service providing a chat UI to end customers of an online sales portal; its own customers are operators of online portals who wish to provide such a service to their end (usually retail) customers",
+  "claim_sources": "A Readme.md supplied by Seller; the client confirmed this is the only material they have been supplied with and there is nothing else",
+  "known": "Chattermate seems to have an ok reputation, and it claims to have about 100 customers. Both points trace to the Readme's own claims rather than anything the client has verified independently, since the Readme is the only material supplied."
+ },
+ "assessment": {
+  "paying_for": "Current revenue and future growth of an ongoing business, to add to the buyer's portfolio of small business online services",
+  "price_movers": "Anything that causes the service to stop functioning or require undue attention beyond that expected of any SaaS. If disclosed or discovered in advance, the buyer would want to renegotiate; if not disclosed in advance, the buyer said it would make them regret the purchase.",
+  "walk_away": "A very negative client review coming up in conversation."
+ },
+ "recommendation": {
+  "scope": "The Readme.md alone, since that is the only claim source Seller has supplied",
+  "deliverable": "A written report of findings together with a ranked list of key risks",
+  "seller_questions": "Number of customers, lengths of contracts, and payment schedules."
+ },
+ "open_questions": [],
+ "notes": [
+  "The client named themselves as Test and described this as a test engagement.",
+  "The client acts for themselves directly in this engagement.",
+  "The client asked to refer to the counterparty simply as 'Seller'.",
+  "The client specified that all communications and shared documents, files, notes and information are confidential.",
+  "The subject is sole rights to the source code in the Chattermate directory, plus transfer of Seller's contracts with its current hosting service and all service contracts to buyers of the ChatterMate service Seller currently operates.",
+  "The actual price listed in the current MOU is confidential; $4M is a working assumption only.",
+  "There is no formal stated basis for the price.",
+  "The transaction is intended to be structured as an asset purchase.",
+  "The client asked why the structure was being asked; it was explained that the structure determines what is being acquired and where risk sits.",
+  "The timetable is 30 days.",
+  "The client confirmed the Readme.md is the only document Seller has supplied — no MOU, financials or contracts have been provided alongside it, despite an MOU being referred to earlier.",
+  "The client's description of the target was given in their own words, not the seller's.",
+  "The buyer's price_movers answer was given in the same breath as a disclosure concern: anything that stops the service functioning or requires undue SaaS-external attention should be disclosed in advance, renegotiated if discovered in advance, and would otherwise make the buyer regret the purchase.",
+  "The buyer's walk-away condition is 'a very negative client review in conversation' — phrased as something surfacing in conversation rather than in a document.",
+  "It was flagged to the buyer that a Readme is the seller's own description, so the audit can check its claims for consistency and flag what it does not cover, but cannot independently reach the things the buyer's thresholds turn on (whether the service runs, what customers think, what contracts commit anyone to); the buyer was told the scope can be widened if further material surfaces.",
+  "It was put to the buyer whether the audit should also reach the MOU, the hosting and service contracts, or anything gathered on the buyer's side; the buyer confirmed the Readme.md alone.",
+  "The buyer specified the deliverable as a written report of findings together with a ranked list of key risks.",
+  "The buyer specified three questions to put to Seller: the number of customers, the lengths of contracts, and the payment schedules.",
+  "All fields of the form are now filled; no open questions remain from the intake conversation.",
+  "The buyer asked 'are we done?'; it was confirmed that the form is complete, nothing more is needed from them, and any changes before the audit runs — additional material or additions to the questions — can be brought back to the intake."
+ ]
+}
