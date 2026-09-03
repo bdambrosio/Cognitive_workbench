@@ -86,6 +86,19 @@ def build_config(out: Path, world: str, model_path: Optional[Path]
     return name, cfg
 
 
+def _printable(out: Path) -> None:
+    """report.html always; report.pdf where a headless Chrome is installed.
+    Markdown is the record; these are the renderings a reader prints."""
+    from workflowsv2.audit_report import html as html_render
+    try:
+        h = html_render.render_file(out / "report.md")
+        pdf = html_render.to_pdf(h)
+        logger.info("printable: %s%s", h.name, f", {pdf.name}" if pdf else
+                    " (no Chrome found: no PDF)")
+    except Exception as e:                                     # noqa: BLE001
+        logger.warning("printable rendering failed: %s", e)
+
+
 def write_prose(loop, method_text: str, skeleton: str,
                 transaction: Optional[str], max_tokens: int) -> Dict[str, Any]:
     user = ("The transaction, as the engagement states it:\n\n"
@@ -135,6 +148,7 @@ def main() -> int:
                                            "not_examined", "holds")))
     if args.no_prose:
         (out / "report.md").write_text(skeleton, encoding="utf-8")
+        _printable(out)
         print(f"out: {out}/report.md (no prose)")
         return 0
 
@@ -178,6 +192,7 @@ def main() -> int:
     (out / "report.md").write_text(
         render.assemble(record, prose, transaction, eng_name, thresholds),
         encoding="utf-8")
+    _printable(out)
     wall = round((datetime.datetime.now(datetime.timezone.utc) - t0).total_seconds(), 1)
     (out / "report_meta.json").write_text(json.dumps({
         "engagement": eng_name, "world": world,

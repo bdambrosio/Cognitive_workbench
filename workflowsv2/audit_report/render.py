@@ -94,10 +94,30 @@ def _ordered(findings: Sequence[Dict[str, Any]], rated: Dict[str, Dict[str, Any]
     return sorted(findings, key=rank)
 
 
+def _md_safe(text: Any) -> str:
+    """Quoted text placed into the markdown as text, never as markup. A
+    ChatterMate quote carried a code fence, which opened a code block that
+    swallowed seven of the document's twelve sections when rendered
+    (2026-09-02). Whitespace collapses to one line; backtick runs and pipes
+    are escaped; a leading `#`, `>` or list marker cannot start a block
+    because the text never starts a line on its own."""
+    s = " ".join(str(text or "").split())
+    s = s.replace("```", "\\`\\`\\`").replace("|", "\\|")
+    return s
+
+
 def _lines(lines: Any) -> str:
     if isinstance(lines, list) and len(lines) == 2:
         return f"line {lines[0]}" if lines[0] == lines[1] \
             else f"lines {lines[0]}–{lines[1]}"
+    return ""
+
+
+def _lines_bare(lines: Any) -> str:
+    """The range alone, for a table column headed `lines`: the word cost a
+    row of height in nearly every appendix entry (Bruce, 2026-09-02)."""
+    if isinstance(lines, list) and len(lines) == 2:
+        return str(lines[0]) if lines[0] == lines[1] else f"{lines[0]}–{lines[1]}"
     return ""
 
 
@@ -109,18 +129,18 @@ def _evidence(items: Sequence[Dict[str, Any]]) -> List[str]:
         form = e.get("form")
         if form == "citation":
             out.append(f"- `{e.get('document')}`, {_lines(e.get('lines'))}: "
-                       f"\"{(e.get('quote') or '').strip()}\" — "
-                       f"{(e.get('shows') or '').strip()}")
+                       f"\"{_md_safe(e.get('quote'))}\" — "
+                       f"{_md_safe(e.get('shows'))}")
         elif form == "derived":
             basis = "; ".join(f"`{b.get('document')}` {_lines(b.get('lines'))}"
                               for b in (e.get("basis") or []) if isinstance(b, dict))
-            out.append(f"- derived from {basis}: {(e.get('derivation') or '').strip()} "
-                       f"— {(e.get('consequence') or '').strip()}")
+            out.append(f"- derived from {basis}: {_md_safe(e.get('derivation'))} "
+                       f"— {_md_safe(e.get('consequence'))}")
         elif form == "search":
             cands = ", ".join(f"`{c}`" for c in (e.get("candidates") or []))
             out.append(f"- searched ({e.get('kind')}): "
-                       f"{(e.get('performed') or '').strip()} — "
-                       f"{(e.get('result') or '').strip()}"
+                       f"{_md_safe(e.get('performed'))} — "
+                       f"{_md_safe(e.get('result'))}"
                        + (f" Files named: {cands}." if cands else ""))
     return out
 
@@ -145,28 +165,28 @@ def _finding(f: Dict[str, Any], rating: Optional[Dict[str, Any]],
     if rating:
         head += f" — {field}: {rating.get(field)}"
     out = [head, "",
-           f"> \"{(f.get('quote') or '').strip()}\" "
+           f"> \"{_md_safe(f.get('quote'))}\" "
            f"({f.get('claim_source')}, {_lines(f.get('lines'))})"]
     for loc in f.get("locations") or []:
         out.append(f"> also, at {_lines(loc.get('lines'))}: "
-                   f"\"{(loc.get('quote') or '').strip()}\"")
+                   f"\"{_md_safe(loc.get('quote'))}\"")
     out += [""]
     if f.get("about") == "seller":
-        out.append("This assertion is about the seller's own activity or "
-                   "hosted service, which the supplied materials are not "
-                   "expected to reach.")
-    out += [f"**Verdict:** {VERDICT_WORDS.get(v, v)}."]
+        out += ["This assertion is about the seller's own activity or "
+                "hosted service, which the supplied materials are not "
+                "expected to reach.", ""]
+    out += [f"**Verdict:** {VERDICT_WORDS.get(v, v)}.", ""]
     if adj.get("gap"):
-        out.append(f"**The gap:** {adj['gap'].strip()}")
+        out += [f"**The gap:** {_md_safe(adj['gap'])}", ""]
     if adj.get("unresolved_because"):
-        out.append(f"**Why unsettled:** "
-                   f"{DISPOSITION_WORDS.get(adj['unresolved_because'], adj['unresolved_because'])}.")
+        out += [f"**Why unsettled:** "
+                f"{DISPOSITION_WORDS.get(adj['unresolved_because'], adj['unresolved_because'])}.", ""]
     if rating:
-        out.append(f"**{field.capitalize()} — {rating.get(field)}:** "
-                   f"{RATING_WORDS.get(rating.get(field), '')}. "
-                   f"{(rating.get('basis') or '').strip()}")
+        out += [f"**{field.capitalize()} — {rating.get(field)}:** "
+                f"{RATING_WORDS.get(rating.get(field), '')}. "
+                f"{_md_safe(rating.get('basis'))}", ""]
     if f.get("correction"):
-        out.append(f"**Correction:** {f['correction'].strip()}")
+        out += [f"**Correction:** {_md_safe(f['correction'])}", ""]
     out += ["", "Evidence:", ""] + (_evidence(f.get("evidence")) or ["- (none)"])
     out += ["", f"Review: {_review_line(f)}.", ""]
     return out
@@ -234,7 +254,7 @@ def key_findings(classes: Dict[str, List[Dict[str, Any]]],
         adj = f.get("adjudication") or {}
         rows.append(f"- **{f.get('claim_source')}, claim {f.get('claim_id')}** "
                     f"({VERDICT_WORDS.get(adj.get('verdict'), adj.get('verdict')).split(' — ')[0]}; "
-                    f"{r.get('materiality')}): {_first_sentence(adj.get('gap') or '')}")
+                    f"{r.get('materiality')}): {_md_safe(_first_sentence(adj.get('gap') or ''))}")
     return rows
 
 
@@ -329,11 +349,11 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
                         dates, revs, sources)
 
     out += ["## The transaction", ""]
-    out += [transaction.strip(), ""] if transaction else [
+    out += ["  \n".join(transaction.strip().splitlines()), ""] if transaction else [
         "The engagement states nothing about the transaction. Ratings assume "
         "a buyer paying a price that assumes every claim holds.", ""]
-    out += ["**The buyer's thresholds.** " + (
-        thresholds.strip() if thresholds else
+    out += ["**The buyer's thresholds.**  \n" + (
+        "  \n".join(thresholds.strip().splitlines()) if thresholds else
         "None recorded. Ratings are read against the rating scale alone, not "
         "against what the buyer said would change the price or end the deal."), ""]
 
@@ -381,7 +401,7 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
         cites = "; ".join(f"`{e.get('document')}` {_lines(e.get('lines'))}"
                           for e in f.get("evidence") or []
                           if isinstance(e, dict) and e.get("form") == "citation")
-        q = (f.get("quote") or "").replace("|", "\\|").replace("\n", " ")
+        q = _md_safe(f.get("quote"))
         out.append(f"| {f.get('claim_source')} | {f.get('claim_id')} | {q[:200]} "
                    f"| {cites} |")
     if not classes["holds"]:
@@ -439,9 +459,9 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
         k = _key(f)
         r = by_m.get(k) or by_e.get(k) or {}
         rating = r.get("materiality") or r.get("exposure") or ""
-        q = (f.get("quote") or "").replace("|", "\\|").replace("\n", " ")
+        q = _md_safe(f.get("quote"))
         out.append(f"| {f.get('claim_source')} | {f.get('claim_id')} | "
-                   f"{_lines(f.get('lines'))} | {q[:120]} | "
+                   f"{_lines_bare(f.get('lines'))} | {q[:120]} | "
                    f"{(f.get('adjudication') or {}).get('verdict')} | {rating} |")
     return "\n".join(out).rstrip() + "\n"
 

@@ -67,7 +67,7 @@ def test_assemble_without_prose_leaves_markers_and_orders_by_rating():
     # front matter, transaction, thresholds, key findings computed
     assert doc.splitlines()[2].startswith("Materials as of 2026-09-02 at commit abcdef012345. Claim sources: `README.md`.")
     assert "**The assurance given is limited.**" in doc and "was not consulted" in doc
-    assert "## The transaction\n\nBuyer buys.\n\n**The buyer's thresholds.** walks if no backups" in doc
+    assert "## The transaction\n\nBuyer buys.\n\n**The buyer's thresholds.**  \nwalks if no backups" in doc
     ex = doc[doc.index("## Executive summary"):doc.index("## Scope and approach")]
     assert "[[summary]]" in ex
     assert "- **README.md, claim 5** (true, with something the buyer must know; decisive): g5" in ex
@@ -107,7 +107,7 @@ def test_assemble_places_prose_and_drops_the_not_examined_section_when_empty():
     doc = render.assemble(rec, prose, None, "eng")
     assert "[[" not in doc and "<summary>" in doc and "<limitations>" in doc
     assert "The engagement states nothing about the transaction" in doc
-    assert "**The buyer's thresholds.** None recorded." in doc
+    assert "**The buyer's thresholds.**  \nNone recorded." in doc
     assert "## Claims not examined" in doc
     rec["merged"]["findings"] = [f for f in rec["merged"]["findings"] if f["claim_id"] != 4]
     doc = render.assemble(rec, None, None, "eng")
@@ -138,8 +138,8 @@ def test_header_index_and_worklist(tmp_path):
     apx = doc[doc.index("## Appendix — every claim and its verdict"):]
     rows = [l for l in apx.splitlines() if l.startswith("| README.md")]
     assert len(rows) == 5
-    assert "| README.md | 1 | line 1 | claim 1 text | contradicted | material |" in rows[0]
-    assert "| README.md | 4 | line 4 | claim 4 text | unverifiable | decisive |" in rows[3]
+    assert "| README.md | 1 | 1 | claim 1 text | contradicted | material |" in rows[0]
+    assert "| README.md | 4 | 4 | claim 4 text | unverifiable | decisive |" in rows[3]
     # worklist gathers every stage's issues, blocking first
     run = tmp_path / "runs" / "x"; (run / "review").mkdir(parents=True)
     (run / "issues.jsonl").write_text(
