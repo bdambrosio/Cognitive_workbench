@@ -16,6 +16,9 @@ target: targets/chattermate
 
 claim_sources:
   - README.md
+  # The second source, added 2026-09-03 to exercise the multi-source merge:
+  # the shortest of ChatterMate's four claim documents (49 lines).
+  - llms.txt
 
 retention: keep — public repository, no confidential material
 

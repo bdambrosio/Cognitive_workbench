@@ -1021,6 +1021,10 @@ def main() -> int:
     ap.add_argument("--batch", type=int, default=10,
                     help="claims per adjudication call at most; batches are "
                          "formed from claims that share evidence (default 10)")
+    ap.add_argument("--claim-source", default=None,
+                    help="which of the engagement's claim_sources this run "
+                         "audits, by its path from the target root (default: "
+                         "the first)")
     ap.add_argument("--surface", type=Path, default=None,
                     help="a claims.json to adjudicate instead of enumerating: "
                          "the surface the practice edited after an "
@@ -1136,7 +1140,13 @@ def main() -> int:
                              "untagged_passes": [], "untagged_after": []}
     batch_log: List[Dict[str, Any]] = []
     traces_dir = REPO / "scenarios" / args.world / name / "inspect_traces"
-    src_doc = eng["target"] / eng["claim_sources"][0]
+    # ONE CLAIM SOURCE PER RUN, chosen from the engagement's list; a second
+    # source is a second run, and the materiality stage merges them.
+    claim_source = args.claim_source or eng["claim_sources"][0]
+    if claim_source not in eng["claim_sources"]:
+        raise SystemExit(f"'{claim_source}' is not one of the engagement's "
+                         f"claim_sources: {', '.join(eng['claim_sources'])}")
+    src_doc = eng["target"] / claim_source
     method_text = load_workflow(REPO / METHOD_PATH)
     emit_tokens = int((cfg.get("chat") or {}).get("react_max_tokens", 32768))
     try:
@@ -1191,7 +1201,7 @@ def main() -> int:
         if not error:
             frozen = assembled.get("claims") or []
             surface_check = schemas.check_surface(
-                assembled, eng["target"], eng["claim_sources"][0])
+                assembled, eng["target"], claim_source)
             for problem in surface_check["problems"]:
                 issues.note(out, stage="claims_audit", code="surface_check",
                             text=problem, severity="blocking")
