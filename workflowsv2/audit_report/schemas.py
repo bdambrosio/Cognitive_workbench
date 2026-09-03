@@ -13,8 +13,8 @@ import re
 from typing import Any, Dict, List, Tuple
 
 #: REPORT.md §7, in document order.
-FIELDS: Tuple[str, ...] = ("summary", "shown_note", "unsettled_note",
-                           "not_examined_note", "coverage_note", "limitations")
+FIELDS: Tuple[str, ...] = ("summary", "scope_note", "shown_note",
+                           "unsettled_note", "not_examined_note", "limitations")
 
 #: The fields that may be empty, and when (REPORT.md §6).
 MAY_BE_EMPTY: Tuple[str, ...] = ("not_examined_note",)

@@ -124,7 +124,8 @@ def main() -> int:
     fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
     logger.addHandler(fh)
 
-    skeleton = render.assemble(record, None, transaction, eng_name)
+    thresholds = eng.get("thresholds")
+    skeleton = render.assemble(record, None, transaction, eng_name, thresholds)
     (out / "report_skeleton.md").write_text(skeleton, encoding="utf-8")
     (out / "worklist.md").write_text(render.worklist(record["merged"], out),
                                      encoding="utf-8")
@@ -175,7 +176,8 @@ def main() -> int:
     # WHAT THE AGENT DID NOT WRITE, THE RECORD STILL DELIVERS: a slot left
     # empty keeps its marker, so a reader sees where a passage is missing.
     (out / "report.md").write_text(
-        render.assemble(record, prose, transaction, eng_name), encoding="utf-8")
+        render.assemble(record, prose, transaction, eng_name, thresholds),
+        encoding="utf-8")
     wall = round((datetime.datetime.now(datetime.timezone.utc) - t0).total_seconds(), 1)
     (out / "report_meta.json").write_text(json.dumps({
         "engagement": eng_name, "world": world,

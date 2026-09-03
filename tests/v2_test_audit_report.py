@@ -61,9 +61,28 @@ def test_classify_sorts_by_verdict_and_disposition():
 
 
 def test_assemble_without_prose_leaves_markers_and_orders_by_rating():
-    doc = render.assemble(_record(), None, "Buyer buys.", "eng")
+    doc = render.assemble(_record(), None, "Buyer buys.", "eng", "walks if no backups")
     for f in schemas.FIELDS:
         assert f"[[{f}]]" in doc
+    # front matter, transaction, thresholds, key findings computed
+    assert doc.splitlines()[2].startswith("Materials as of 2026-09-02 at commit abcdef012345. Claim sources: `README.md`.")
+    assert "**The assurance given is limited.**" in doc and "was not consulted" in doc
+    assert "## The transaction\n\nBuyer buys.\n\n**The buyer's thresholds.** walks if no backups" in doc
+    ex = doc[doc.index("## Executive summary"):doc.index("## Scope and approach")]
+    assert "[[summary]]" in ex
+    assert "- **README.md, claim 5** (true, with something the buyer must know; decisive): g5" in ex
+    assert "- **README.md, claim 1** (contradicted; material): g1" in ex
+    assert ex.index("claim 5") < ex.index("claim 1")
+    # order of sections
+    order = ["## The transaction", "## Executive summary", "## Scope and approach",
+             "## How to read a finding", "## What the audit showed", "## Unsettled claims",
+             "## Claims not examined", "## Claims that hold", "## Questions for the seller",
+             "## Coverage", "## Limitations", "## Appendix"]
+    idx = [doc.index(h) for h in order]
+    assert idx == sorted(idx)
+    scope = doc[doc.index("## Scope and approach"):doc.index("## How to read a finding")]
+    assert "| README.md | 5 | 5 | yes | 12 | 3 | m |" in scope and "[[scope_note]]" in scope
+    assert "| unsettled, or not examined |" in doc                    # the crosswalk
     # decisive before material within the shown section
     shown = doc[doc.index("## What the audit showed"):doc.index("## Unsettled claims")]
     assert shown.index("claim 5 — materiality: decisive") < shown.index("claim 1 — materiality: material")
@@ -74,10 +93,11 @@ def test_assemble_without_prose_leaves_markers_and_orders_by_rating():
     ne = doc[doc.index("## Claims not examined"):doc.index("## Claims that hold")]
     assert "claim 4 — exposure: decisive" in ne and "Files named: `app/h.py`" in ne
     assert "| README.md | 2 | claim 2 text | `app/x.py` lines 3–4 |" in doc
-    cov = doc[doc.index("## Coverage"):]
-    assert "| README.md | 5 | 5 | yes | 12 | 3 | m |" in cov
-    assert "Not examined: 1 claim(s)." in cov and "- `app/h.py`" in cov
-    assert "## The transaction\n\nBuyer buys." in doc
+    cov = doc[doc.index("## Coverage"):doc.index("## Limitations")]
+    assert "| contradicted | shown | 1 |" in cov and "| unverifiable | unsettled | 2 |" in cov
+    assert "Not examined: 1." in cov and "- `app/h.py`" in cov
+    lim = doc[doc.index("## Limitations"):doc.index("## Appendix")]
+    assert "[[limitations]]" in lim and "has not confirmed the audit's interpretation" in lim
     assert "- (README.md) who?" in doc
 
 
@@ -87,6 +107,8 @@ def test_assemble_places_prose_and_drops_the_not_examined_section_when_empty():
     doc = render.assemble(rec, prose, None, "eng")
     assert "[[" not in doc and "<summary>" in doc and "<limitations>" in doc
     assert "The engagement states nothing about the transaction" in doc
+    assert "**The buyer's thresholds.** None recorded." in doc
+    assert "## Claims not examined" in doc
     rec["merged"]["findings"] = [f for f in rec["merged"]["findings"] if f["claim_id"] != 4]
     doc = render.assemble(rec, None, None, "eng")
     assert "## Claims not examined" not in doc and "[[not_examined_note]]" not in doc
@@ -95,6 +117,7 @@ def test_assemble_places_prose_and_drops_the_not_examined_section_when_empty():
 def test_check_prose():
     m = _record()["merged"]
     good = {f: "Claim 1 matters." for f in schemas.FIELDS}
+    assert "scope_note" in schemas.FIELDS and "coverage_note" not in schemas.FIELDS
     assert schemas.check_prose(good, m, True)["ok"]
     bad = dict(good, summary="=== COVER ===\nsee claim 99", not_examined_note="")
     res = schemas.check_prose(bad, m, True)

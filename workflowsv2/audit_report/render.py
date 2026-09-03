@@ -212,44 +212,154 @@ def _slot(name: str, prose: Optional[Dict[str, Any]]) -> List[str]:
     return [f"[[{name}]]", ""]
 
 
+def _first_sentence(text: str) -> str:
+    t = " ".join((text or "").split())
+    for stop in (". ", "; "):
+        i = t.find(stop)
+        if 0 < i < 220:
+            return t[:i + 1]
+    return t[:220]
+
+
+def key_findings(classes: Dict[str, List[Dict[str, Any]]],
+                 by_m: Dict[str, Dict[str, Any]]) -> List[str]:
+    """The shown findings rated material or decisive, one line each, in
+    rating order. Computed, so the executive summary lists what the ratings
+    say and not what a writer chose to mention."""
+    rows = []
+    for f in _ordered(classes["shown"], by_m, "materiality"):
+        r = by_m.get(_key(f))
+        if not r or r.get("materiality") not in ("material", "decisive"):
+            continue
+        adj = f.get("adjudication") or {}
+        rows.append(f"- **{f.get('claim_source')}, claim {f.get('claim_id')}** "
+                    f"({VERDICT_WORDS.get(adj.get('verdict'), adj.get('verdict')).split(' — ')[0]}; "
+                    f"{r.get('materiality')}): {_first_sentence(adj.get('gap') or '')}")
+    return rows
+
+
+def _front_matter(engagement: str, dates: List[str], revs: List[str],
+                  sources: List[str]) -> List[str]:
+    """Title, the materials' date and version, the assurance given, and who
+    is responsible for what. Fixed text from the record; defines the terms it
+    uses at first use."""
+    when = ", ".join(dates) if dates else "an undated run"
+    rev = (" at commit " + ", ".join(r[:12] for r in revs)) if revs else ""
+    src = ", ".join(f"`{s}`" for s in sources) or "the claim sources named by the engagement"
+    return [
+        f"# Technical claims audit — {engagement}", "",
+        f"Materials as of {when}{rev}. Claim sources: {src}.", "",
+        "**What this document is.** A claims audit: the assertions the seller "
+        "makes in the claim sources are tested, one by one, against the "
+        "materials the seller supplied, and each is reported with the "
+        "evidence that settles it. A *claim source* is a document in which "
+        "the seller asserts things about the target; the *materials* are "
+        "everything supplied, including the claim sources, source code and "
+        "configuration. The audit examined what was supplied and nothing "
+        "else.", "",
+        "**The assurance given is limited.** The audit reports what the "
+        "materials show about each claim. It did not perform procedures "
+        "beyond examining the materials, so a claim the materials cannot "
+        "settle is reported as unsettled, not as false, and the document "
+        "states no overall conclusion on the target or the transaction. An "
+        "overall assessment is given only against thresholds the buyer has "
+        "stated; where this document carries none, none was recorded.", "",
+        "**Responsibilities.** The seller made the claims and was not "
+        "consulted; the seller has not confirmed the audit's reading of any "
+        "claim. The practice performed the audit under its written method, "
+        "at the version each run received, retained with the record, and is "
+        "responsible for the findings and their ratings. The buyer is "
+        "responsible for decisions taken on them.", ""]
+
+
+def _how_to_read() -> List[str]:
+    """Every term a finding uses, defined once, before the first finding."""
+    return [
+        "## How to read a finding", "",
+        "Each finding names one claim as the claim source states it, gives a "
+        "*verdict*, cites the *evidence* — a file and line numbers in the "
+        "materials, quoted — and, where a rating applies, says what the gap "
+        "would change for this transaction. A *review* is an independent "
+        "second pass over each finding's evidence, and a *retest* is a "
+        "second reviewer, blind to the first, on the findings the review "
+        "questioned. Each finding ends with the review's outcome.", "",
+        "**Verdicts**, and the class each puts a claim in:", "",
+        "| verdict | meaning | class |", "|---|---|---|",
+        "| contradicted | " + VERDICT_WORDS["contradicted"] + " | shown |",
+        "| partial | " + VERDICT_WORDS["partial"] + " | shown |",
+        "| real_with_caveat | " + VERDICT_WORDS["real_with_caveat"] + " | shown |",
+        "| unverifiable | " + VERDICT_WORDS["unverifiable"] + " | unsettled, or not examined |",
+        "| real | the materials bear the claim out | holds |", "",
+        "**The three classes.** *Shown* findings are gaps the audit "
+        "demonstrated in the materials; they are the only findings that count "
+        "against the seller, and each carries a *materiality* rating. "
+        "*Unsettled* claims are ones the supplied materials cannot settle; "
+        "nothing was found against them, and each carries an *exposure* "
+        "rating. *Not examined* claims are unsettled claims whose searches "
+        "named files the engagement did not open; they are listed apart and "
+        "are the first thing a further pass would settle. Claims that hold "
+        "are listed after the three classes.", "",
+        "**Ratings.** Materiality and exposure use one scale, read for a gap "
+        "the audit showed or for a claim assumed false:", "",
+        "| rating | meaning |", "|---|---|",
+        "| not_material | " + RATING_WORDS["not_material"] + " |",
+        "| material | " + RATING_WORDS["material"] + " |",
+        "| decisive | " + RATING_WORDS["decisive"] + " |", "",
+        "Materiality and exposure are never added together: one counts what "
+        "the audit showed, the other what rests on what it could not settle.", "",
+        "**Why a claim is unsettled** is recorded as one of: " + "; ".join(
+            f"*{k.replace('_', ' ')}*, {v}" for k, v in DISPOSITION_WORDS.items()) + ".", ""]
+
+
 def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
              transaction: Optional[str] = None,
-             engagement: Optional[str] = None) -> str:
+             engagement: Optional[str] = None,
+             thresholds: Optional[str] = None) -> str:
     """REPORT.md §6, in order. `prose` absent leaves a `[[field]]` marker in
     each slot, which is the form the agent is shown."""
     merged, ratings = record["merged"], record["ratings"]
     classes = classify(merged)
     by_m = _ratings_by_key(ratings, "ratings")
     by_e = _ratings_by_key(ratings, "exposures")
-    when = ""
-    for r in merged.get("runs") or []:
-        when = when or (r.get("dir") or "")[-40:]
     runs = merged.get("runs") or []
     dates = sorted({(r.get("captured_at_utc") or "")[:10] for r in runs} - {""})
     revs = sorted({r.get("target_rev") or "" for r in runs} - {""})
-    out = [f"# Technical claims audit — {engagement or merged.get('engagement') or 'engagement'}",
-           "",
-           "Materials as of " + (", ".join(dates) if dates else "an undated run")
-           + (" at commit " + ", ".join(r[:12] for r in revs) if revs else "")
-           + ". Limited assurance; see Limitations. Every finding cites the "
-             "material that settles it.", ""]
-    if transaction:
-        out += ["## The transaction", "", transaction.strip(), ""]
-    else:
-        out += ["## The transaction", "",
-                "The engagement states nothing about the transaction. Ratings "
-                "assume a buyer paying a price that assumes every claim holds.", ""]
-    out += ["## Summary", ""] + _slot("summary", prose)
-    out += ["## How to read a finding", "",
-            "Each finding names the seller's claim as the claim source states "
-            "it, the verdict, the evidence that settles it — a file and line "
-            "numbers in the materials — and, where the audit showed a gap, "
-            "what that gap would change for this transaction.", "",
-            "Three classes follow. **What the audit showed** is the only one "
-            "that counts against the seller. **Unsettled** claims are ones the "
-            "supplied materials cannot settle; nothing was found against them. "
-            "**Not examined** claims are ones whose settling files the "
-            "engagement did not open.", ""]
+    sources = [r.get("claim_source") for r in runs if r.get("claim_source")]
+    out = _front_matter(engagement or merged.get("engagement") or "engagement",
+                        dates, revs, sources)
+
+    out += ["## The transaction", ""]
+    out += [transaction.strip(), ""] if transaction else [
+        "The engagement states nothing about the transaction. Ratings assume "
+        "a buyer paying a price that assumes every claim holds.", ""]
+    out += ["**The buyer's thresholds.** " + (
+        thresholds.strip() if thresholds else
+        "None recorded. Ratings are read against the rating scale alone, not "
+        "against what the buyer said would change the price or end the deal."), ""]
+
+    out += ["## Executive summary", ""] + _slot("summary", prose)
+    kf = key_findings(classes, by_m)
+    out += ["**The material findings**, ordered by rating — each is set out in "
+            "full under *What the audit showed*:", ""]
+    out += kf + [""] if kf else ["No finding was rated material or decisive.", ""]
+
+    out += ["## Scope and approach", "",
+            "| claim source | claims | findings | reviewed | files read | "
+            "gathering legs | model |", "|---|---|---|---|---|---|---|"]
+    for r in runs:
+        out.append(f"| {r.get('claim_source')} | {r.get('claims')} | "
+                   f"{r.get('findings')} | {'yes' if r.get('reviewed') else 'no'} | "
+                   f"{r.get('files_read', '')} | {r.get('gathering_legs', '')} | "
+                   f"{r.get('resolved_model') or ''} |")
+    out += ["", "*Claims* are the seller's assertions as enumerated from the "
+                "claim source, one finding each. *Files read* counts the "
+                "target's files the audit opened while gathering evidence, "
+                "over the number of *gathering legs* it took. *Reviewed* says "
+                "whether the independent review ran on that claim source.", ""]
+    out += _slot("scope_note", prose)
+
+    out += _how_to_read()
+
     out += ["## What the audit showed", ""] + _slot("shown_note", prose)
     for f in _ordered(classes["shown"], by_m, "materiality"):
         out += _finding(f, by_m.get(_key(f)), "materiality")
@@ -287,9 +397,37 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
             out.append(f"- ({u.get('claim_source')}) {u.get('note')}")
             out += ["  " + x for x in _evidence([u.get("evidence") or {}])]
         out.append("")
-    out += ["## Coverage", ""] + coverage(merged, ratings, classes) + [""]
-    out += _slot("coverage_note", prose)
+
+    out += ["## Coverage", "", "Every claim received one finding. By verdict "
+            "and class:", "", "| verdict | class | claims |", "|---|---|---|"]
+    counts = {"contradicted": 0, "partial": 0, "real_with_caveat": 0,
+              "unverifiable": 0, "real": 0}
+    for f in merged.get("findings") or []:
+        v = (f.get("adjudication") or {}).get("verdict")
+        counts[v] = counts.get(v, 0) + 1
+    cls = {"contradicted": "shown", "partial": "shown", "real_with_caveat": "shown",
+           "unverifiable": "unsettled", "real": "holds"}
+    for v, n in counts.items():
+        out.append(f"| {v} | {cls.get(v, '')} | {n} |")
+    rf = ratings.get("figures") or {}
+    out += ["",
+            "Shown findings by materiality: "
+            + (", ".join(f"{k} {n}" for k, n in sorted((rf.get('materiality') or {}).items()))
+               or "none") + ". Unsettled claims by exposure: "
+            + (", ".join(f"{k} {n}" for k, n in sorted((rf.get('exposure') or {}).items()))
+               or "none") + f". Not examined: {len(classes['not_examined'])}.", ""]
+    unopened = sorted({f for r in runs for f in (r.get("unopened_candidates") or [])})
+    if unopened:
+        out += [f"Files the searches named that were not opened ({len(unopened)}):", ""]
+        out += [f"- `{f}`" for f in unopened] + [""]
+
     out += ["## Limitations", ""] + _slot("limitations", prose)
+    out += ["The party that made these claims was not consulted and has not "
+            "confirmed the audit's interpretation of them. Every verdict and "
+            "rating is defined by the practice's method at the version each "
+            "run received, which is retained with the record; a later method "
+            "may define a term differently.", ""]
+
     out += ["## Appendix — every claim and its verdict", "",
             "The claim surface as the audit froze it, in document order, with "
             "the verdict each claim received and, where rated, its "

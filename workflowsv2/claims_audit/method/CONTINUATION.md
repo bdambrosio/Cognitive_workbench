@@ -10,10 +10,13 @@ Three things, and the difference between them matters. All of them are under
 `inspect`, which reaches the engagement's directory.
 
 **The deliverable** — `merged/<run>/report.md`: the client's document, assembled
-from the record with the passages a writer added. Beside it, `materiality.json`
-holds every rating and its basis, `merged.json` every finding with its review
-outcome, and `worklist.md` what a person still has to look at. These were
-reviewed and delivered. They do not change.
+from the record with the passages a writer added. It is what the client
+received, and it is a projection of the record for a reader; when the two
+differ in detail, the record is what you answer from and the report is what
+you say the client was shown. Beside it, `materiality.json` holds every rating
+and its basis, `merged.json` every finding with its review outcome, and
+`worklist.md` what a person still has to look at. These were reviewed and
+delivered. They do not change.
 
 **The record** — one directory per claim source under `runs/`: `claims.json`,
 the surface as it was frozen; `findings.json`, one finding per claim with its

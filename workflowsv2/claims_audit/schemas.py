@@ -466,9 +466,13 @@ def _norm(s: str) -> str:
 
 
 #: Directory names never read as materials. `.git` holds thousands of binary
-#: objects; a dependency tree is not the target. Files whose own name starts
-#: with a dot (`.env.example`) are materials and are kept.
-_SKIP_DIRS = ("node_modules", "__pycache__")
+#: objects; a dependency tree is not the target. Every other directory is
+#: materials, dot-directories included: `.github/workflows/` is where a
+#: repository says how it publishes its images, and twelve citations into
+#: it were reported "not in the materials" while the subagent had read the
+#: file (ChatterMate, 2026-09-02). Files whose own name starts with a dot
+#: (`.env.example`) are materials too.
+_SKIP_DIRS = (".git", "node_modules", "__pycache__")
 
 
 def corpus_index(corpus: Path) -> Dict[str, List[str]]:
@@ -489,8 +493,7 @@ def corpus_index(corpus: Path) -> Dict[str, List[str]]:
         if not f.is_file():
             continue
         rel = f.relative_to(corpus)
-        if any(part.startswith(".") or part in _SKIP_DIRS
-               for part in rel.parts[:-1]):
+        if any(part in _SKIP_DIRS for part in rel.parts[:-1]):
             continue
         try:
             docs[rel.as_posix()] = f.read_text(
