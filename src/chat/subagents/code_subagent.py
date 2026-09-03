@@ -443,10 +443,17 @@ def _tool_grep(repo_root: Path, pattern: str,
         '--glob=!*.bak',
         '--glob=!*.faiss',
         '--glob=!*.meta',
-        '--',
-        pattern,
-        str(target),
     ]
+    # THE SAME BOUNDARY AS list AND read. Those two apply git's ignore
+    # rules only when repo_root is itself a checkout; ripgrep applies the
+    # rules of any checkout ABOVE the root, so a root that is an ignored
+    # subdirectory of one — an engagement's merged/ and runs/ under this
+    # repo — grepped as empty while list showed the files and read opened
+    # them (continuation, 2026-09-03: "Redis" found nowhere in a record with
+    # 45 occurrences). Outside a checkout root, search everything.
+    if not _is_git_checkout(repo_root):
+        cmd.append('--no-ignore')
+    cmd += ['--', pattern, str(target)]
     try:
         proc = subprocess.run(
             cmd, capture_output=True, text=True, timeout=20.0,
