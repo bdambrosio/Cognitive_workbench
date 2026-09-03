@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """Drive an intake conversation and keep the form.
 
-    python3 workflowsv2/intake/runner.py --engagement <name> --world client_<name> \\
+    python3 workflowsv2/intake/runner.py --engagement <name> [--new] \\
         [--model measure/models/fw_glm53flash.yaml]
     python3 workflowsv2/intake/runner.py --engagement <name> --finish
+
+ONE DIRECTORY PER INTAKE: engagements/<name>/intakes/<id>/ holds the form,
+its log and, after --finish, `blocks.yaml`. Without --new the runner continues
+the engagement's current intake (workflowsv2/engagement_state.py); --new
+starts another, which becomes current by being most recent.
 
 AGENT-LED INSIDE A USER-LED LOOP. The chat loop speaks only in reply, so this
 runner supplies what an intake needs beyond that: it sends the opening turn
@@ -16,7 +21,7 @@ front end can add one.
 
 THE FORM IS A FILE, WRITTEN BY THIS RUNNER. After each exchange one
 schema-constrained call (workflowsv2/emit.py) re-emits the whole form from the
-conversation so far, and it is written to engagements/<name>/intake.json and
+conversation so far, and it is written to the intake's intake.json and
 mirrored to a named note in the client's world so recall reaches it. The
 agent never writes it; it has no tool that could.
 
@@ -25,8 +30,9 @@ across sessions by design: a second session finds the first in history. The
 runner says which it is doing.
 
 --finish IS THE PRACTICE'S ACTION. It writes `transaction:` and `thresholds:`
-into engagement.yaml from the form, and brief.md if there is none. The agent
-never declares the intake done.
+from the form into the intake's blocks.yaml, which a run pins and reads, and
+brief.md at the engagement root if there is none. The agent never declares
+the intake done.
 """
 from __future__ import annotations
 
@@ -50,6 +56,7 @@ logger = logging.getLogger("intake.run")
 logger.setLevel(logging.INFO)
 
 from chat.workflow import load_workflow                        # noqa: E402
+from workflowsv2 import engagement_state as state              # noqa: E402
 from workflowsv2 import issues                                 # noqa: E402
 from workflowsv2.emit import emit                              # noqa: E402
 from workflowsv2.intake import schemas                         # noqa: E402
@@ -120,8 +127,8 @@ def fill_form(emit_fn: Callable[[str, str, Dict[str, Any], int], Dict[str, Any]]
             "parse_error": out.get("parse_error"), "updated": form is not None}
 
 
-def write_form(eng_dir: Path, form: Dict[str, Any]) -> Path:
-    p = eng_dir / "intake.json"
+def write_form(intake_dir: Path, form: Dict[str, Any]) -> Path:
+    p = intake_dir / "intake.json"
     p.write_text(json.dumps(form, indent=1, ensure_ascii=False) + "\n",
                  encoding="utf-8")
     return p
@@ -144,26 +151,22 @@ def mirror_note(loop, form: Dict[str, Any]) -> None:
         logger.warning("intake mirror note failed: %s", e)
 
 
-def finish(eng_dir: Path, form: Dict[str, Any]) -> Dict[str, Any]:
-    """The practice's action: the engagement file gets the blocks the
-    materiality stage reads, and a brief if there is none. A block already
-    present is left alone and reported — the practice edits by hand."""
+def finish(eng_dir: Path, intake_dir: Path, form: Dict[str, Any]) -> Dict[str, Any]:
+    """The practice's action: the intake gets the blocks a run reads
+    (`blocks.yaml`: transaction, thresholds), and the engagement a brief if
+    there is none. Finishing again rewrites the blocks from the form as it
+    now stands; a run that already pinned this intake keeps the text it
+    hashed in its meta.json, so the difference is visible."""
     blocks = schemas.engagement_blocks(form)
-    cfg_path = eng_dir / "engagement.yaml"
-    text = cfg_path.read_text(encoding="utf-8") if cfg_path.is_file() else ""
-    existing = yaml.safe_load(text) or {} if text else {}
-    written, skipped = [], []
-    add = ""
+    written = []
+    text = ""
     for key in ("transaction", "thresholds"):
         if not blocks[key].strip():
             continue
-        if key in existing:
-            skipped.append(key)
-            continue
-        add += f"\n{key}: |\n" + "\n".join(f"  {l}" for l in blocks[key].splitlines()) + "\n"
+        text += f"{key}: |\n" + "\n".join(f"  {l}" for l in blocks[key].splitlines()) + "\n"
         written.append(key)
-    if add:
-        cfg_path.write_text(text.rstrip("\n") + "\n" + add, encoding="utf-8")
+    if text:
+        (intake_dir / state.BLOCKS_FILE).write_text(text, encoding="utf-8")
     brief = eng_dir / "brief.md"
     if not brief.is_file():
         b = form.get("background") or {}
@@ -177,10 +180,10 @@ def finish(eng_dir: Path, form: Dict[str, Any]) -> Dict[str, Any]:
             + "\n", encoding="utf-8")
         written.append("brief.md")
     stamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    (eng_dir / "intake_meta.json").write_text(json.dumps(
-        {"intake_finished_at": stamp, "written": written, "skipped": skipped,
+    (intake_dir / "intake_meta.json").write_text(json.dumps(
+        {"intake_finished_at": stamp, "written": written,
          "check": schemas.check_intake(form)}, indent=1) + "\n", encoding="utf-8")
-    return {"written": written, "skipped": skipped}
+    return {"written": written}
 
 
 def main() -> int:
@@ -196,24 +199,32 @@ def main() -> int:
     ap.add_argument("--max-tokens", type=int, default=8192,
                     help="ceiling for the form emission")
     ap.add_argument("--finish", action="store_true",
-                    help="the practice finishes the intake: write the "
-                         "engagement file's transaction and thresholds from "
-                         "the form, and a brief if none; no conversation")
+                    help="the practice finishes the current intake: write "
+                         "its blocks.yaml (transaction, thresholds) from the "
+                         "form, and a brief if none; no conversation")
+    ap.add_argument("--new", action="store_true",
+                    help="start another intake for this engagement; it "
+                         "becomes the current one")
     args = ap.parse_args()
 
     eng_dir = ENGAGEMENTS / args.engagement
     eng_dir.mkdir(parents=True, exist_ok=True)
-    form_path = eng_dir / "intake.json"
+    intake_id = state.current_intake(eng_dir)
+    if args.finish and (args.new or intake_id is None):
+        raise SystemExit(f"{eng_dir}: no intake to finish")
+    if args.new or intake_id is None:
+        intake_id = state.new_intake(eng_dir)
+    intake_dir = state.intake_dir(eng_dir, intake_id)
+    form_path = intake_dir / "intake.json"
     form = (json.loads(form_path.read_text(encoding="utf-8"))
             if form_path.is_file() else schemas.empty_form())
 
     if args.finish:
         if not form_path.is_file():
-            raise SystemExit(f"{eng_dir}: no intake.json to finish from")
-        res = finish(eng_dir, form)
-        print(f"finished: wrote {', '.join(res['written']) or 'nothing'}"
-              + (f"; left alone (already present): {', '.join(res['skipped'])}"
-                 if res["skipped"] else ""))
+            raise SystemExit(f"{intake_dir}: no intake.json to finish from")
+        res = finish(eng_dir, intake_dir, form)
+        print(f"finished intake {intake_id}: wrote "
+              f"{', '.join(res['written']) or 'nothing'}")
         print(f"form: {schemas.ledger(schemas.check_intake(form))}")
         return 0
 
@@ -225,7 +236,7 @@ def main() -> int:
     root = logging.getLogger()
     for h in list(root.handlers):
         h.setLevel(logging.ERROR)
-    fh = logging.FileHandler(eng_dir / "intake.log", encoding="utf-8")
+    fh = logging.FileHandler(intake_dir / "intake.log", encoding="utf-8")
     fh.setLevel(logging.INFO)
     fh.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
     root.addHandler(fh)
@@ -233,7 +244,7 @@ def main() -> int:
 
     world = args.world or f"client_{args.engagement}"
     returning = (REPO / "scenarios" / world).exists()
-    logger.info("world %s: %s", world,
+    logger.info("intake %s; world %s: %s", intake_id, world,
                 "RESUMED — the client's world persists across sessions"
                 if returning else "new")
     name, cfg = build_config(eng_dir, world, args.model)
@@ -287,7 +298,7 @@ def main() -> int:
                 issues.note(eng_dir, stage=STAGE, code="form_emission",
                             text=f"turn {turns}: form did not parse: "
                                  f"{res['parse_error']}", severity="check")
-            write_form(eng_dir, form)
+            write_form(intake_dir, form)
             mirror_note(loop, form)
             print(f"   {schemas.ledger(schemas.check_intake(form))}")
     finally:
@@ -299,7 +310,7 @@ def main() -> int:
             loop._persist_to_disk()
         except Exception as e:                                 # noqa: BLE001
             logger.warning("persist failed: %s", e)
-    print(f"\n{turns} exchange(s); form at {form_path}")
+    print(f"\n{turns} exchange(s); intake {intake_id}; form at {form_path}")
     print(f"finish with:  python3 workflowsv2/intake/runner.py "
           f"--engagement {args.engagement} --finish")
     return 0

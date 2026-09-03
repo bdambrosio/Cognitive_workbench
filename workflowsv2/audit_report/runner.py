@@ -89,10 +89,14 @@ def build_config(out: Path, world: str, model_path: Optional[Path]
 def _printable(out: Path) -> None:
     """report.html always; report.pdf where a headless Chrome is installed.
     Markdown is the record; these are the renderings a reader prints."""
-    from workflowsv2.audit_report import html as html_render
+    # NAMED printable, NOT html: a module called html.py beside a script
+    # shadows the standard library's `html` package when the script's own
+    # directory is sys.path[0], and markdown-it's import of html.entities
+    # then fails (found 2026-09-03; the runner never produced a PDF itself).
     try:
-        h = html_render.render_file(out / "report.md")
-        pdf = html_render.to_pdf(h)
+        from workflowsv2.audit_report import printable
+        h = printable.render_file(out / "report.md")
+        pdf = printable.to_pdf(h)
         logger.info("printable: %s%s", h.name, f", {pdf.name}" if pdf else
                     " (no Chrome found: no PDF)")
     except Exception as e:                                     # noqa: BLE001
@@ -123,15 +127,30 @@ def main() -> int:
     ap.add_argument("--max-tokens", type=int, default=None)
     ap.add_argument("--no-prose", action="store_true",
                     help="assemble the document from the record only; no call")
+    ap.add_argument("--rerender", action="store_true",
+                    help="assemble report.md again from the existing "
+                         "prose.json, with no model call — after a render "
+                         "change, or an edit to the record's presentation")
     args = ap.parse_args()
 
     record = render.load(args.merged)
     out = record["dir"]
-    if (out / "prose.json").is_file():
+    if (out / "prose.json").is_file() and not args.rerender:
         raise SystemExit(f"{out}: already carries prose.json. Move it aside "
-                         f"to write another.")
+                         f"to write another, or pass --rerender to assemble "
+                         f"the document again from it.")
+    if args.rerender and not (out / "prose.json").is_file():
+        raise SystemExit(f"{out}: no prose.json to rerender from")
     eng_name = record["merged"].get("engagement")
-    eng = load_engagement(eng_name) if eng_name else {}
+    # THE REPORT READS THE INTAKE THE RATINGS USED. materiality's meta.json
+    # pins the intake id; reading engagement.yaml live here once produced a
+    # report against thresholds the ratings never saw. A merged directory
+    # from before the pin has no `intake` key and resolves to the
+    # engagement's current intake.
+    meta_path = out / "meta.json"
+    meta = json.loads(meta_path.read_text(encoding="utf-8")) \
+        if meta_path.is_file() else {}
+    eng = load_engagement(eng_name, intake=meta.get("intake")) if eng_name else {}
     transaction = eng.get("transaction")
     fh = logging.FileHandler(out / "report.log", encoding="utf-8")
     fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
@@ -150,6 +169,15 @@ def main() -> int:
         (out / "report.md").write_text(skeleton, encoding="utf-8")
         _printable(out)
         print(f"out: {out}/report.md (no prose)")
+        return 0
+    if args.rerender:
+        prose = json.loads((out / "prose.json").read_text(encoding="utf-8"))
+        (out / "report.md").write_text(
+            render.assemble(record, prose, transaction, eng_name, thresholds),
+            encoding="utf-8")
+        _printable(out)
+        logger.info("rerendered from prose.json; intake %s", eng.get("intake_id"))
+        print(f"out: {out}/report.md (rerendered, intake {eng.get('intake_id')})")
         return 0
 
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")

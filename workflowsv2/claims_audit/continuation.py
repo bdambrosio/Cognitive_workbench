@@ -2,7 +2,17 @@
 """Talk to a finished engagement, using the record it left behind.
 
     python3 workflowsv2/claims_audit/continuation.py --engagement chattermate-readme \
-        --merged <merged output dir> [--model measure/models/fw_glm53flash.yaml]
+        [--intake <id>] [--merged <merged output dir>] \
+        [--model measure/models/fw_glm53flash.yaml]
+
+WHICH RUN. By default the current run of the engagement's current intake
+(workflowsv2/engagement_state.py); --intake and --merged override.
+
+THE WORLD PERSISTS, ONE PER (INTAKE, RUN). A second session over the same
+run under the same intake resumes the first: the client's earlier questions
+are in its history. A different run or a different intake is a different
+world, so an answer about one report never rests on a conversation about
+another. --world names a deliberately fresh one.
 
 WHY THIS EXISTS. A report ships the conclusions and deletes the machinery that
 produced them. The machinery is still on disk — every run leaves its surface,
@@ -90,6 +100,12 @@ def build_config(run_dir: Path, world: str, model_path: Optional[Path],
     return name, cfg
 
 
+def _compact(name: str) -> str:
+    """The digits of a `<ts>_<label>` name's timestamp: 2026-09-03T01-47-16Z
+    → 20260903014716."""
+    return "".join(ch for ch in name.split("_", 1)[0] if ch.isdigit())
+
+
 def describe(merged_dir: Path, merged: Dict[str, Any], target: Path) -> str:
     """What the session is looking at, printed before the first prompt.
 
@@ -143,9 +159,12 @@ def main() -> int:
     ap.add_argument("--engagement", required=True,
                     help="engagement name under engagements/; `inspect` is "
                          "bound to its directory")
-    ap.add_argument("--merged", type=Path, required=True,
+    ap.add_argument("--merged", type=Path, default=None,
                     help="the materiality/report output directory holding "
-                         "merged.json, materiality.json and report.md")
+                         "merged.json, materiality.json and report.md "
+                         "(default: the current run of the intake)")
+    ap.add_argument("--intake", default=None,
+                    help="intake id (default: the engagement's current intake)")
     ap.add_argument("--model", type=Path, default=None,
                     help="YAML with an llm_config block; replaces the "
                          "scenario's. Omit to use whatever the local vLLM "
@@ -155,12 +174,24 @@ def main() -> int:
                     help="override the target tree. Use when the audited "
                          "repository has moved since the run")
     ap.add_argument("--world", default=None,
-                    help="world name (default: continuation_<run dir>)")
+                    help="world name (default: post_<engagement>_<intake>_"
+                         "<run>, resumed if it exists)")
     args = ap.parse_args()
 
+    from workflowsv2 import engagement_state as state            # noqa: E402
     from workflowsv2.claims_audit.runner import load_engagement  # noqa: E402
-    eng = load_engagement(args.engagement)
-    merged_dir = args.merged.resolve()
+    eng = load_engagement(args.engagement, intake=args.intake)
+    intake_id = eng.get("intake_id")
+    if args.merged:
+        merged_dir = args.merged.resolve()
+    else:
+        cur = state.current_run(eng["dir"], intake_id)
+        if cur is None:
+            raise SystemExit(
+                f"engagement '{args.engagement}' has no run of intake "
+                f"{intake_id or '(none)'} — pass --merged, or run the "
+                f"materiality and report stages first")
+        merged_dir = cur.resolve()
     if not (merged_dir / "merged.json").is_file():
         raise SystemExit(f"{merged_dir}: no merged.json — not a merged output "
                          f"directory")
@@ -172,12 +203,15 @@ def main() -> int:
     # only report which tree it bound and whether it still exists.
     target = (args.target or eng["target"]).resolve()
     run_dir = eng["dir"]
-    world = args.world or f"continuation_{merged_dir.name[-40:]}"
-    if (REPO / "scenarios" / world).exists():
-        raise SystemExit(
-            f"world '{world}' already exists. A world that has answered "
-            f"questions about one engagement must not carry them into "
-            f"another — pass --world with a fresh name.")
+    # ONE WORLD PER (INTAKE, RUN), NAMED BY THEIR TIMESTAMPS: short enough
+    # never to be cut, and different for any other intake or run.
+    world = args.world or "post_{}_{}_{}".format(
+        eng["name"], _compact(intake_id) if intake_id else "none",
+        _compact(merged_dir.name))
+    resumed = (REPO / "scenarios" / world).exists()
+    logger.info("intake %s; run %s; world %s: %s", intake_id, merged_dir.name,
+                world, "RESUMED — earlier sessions on this run are in its "
+                "history" if resumed else "new")
 
     name, cfg = build_config(run_dir, world, args.model, target)
 
@@ -188,7 +222,10 @@ def main() -> int:
                 loop.backend.resolved_model(), TOP_P)
 
     print("\n=== continuation ===")
+    print(f"  intake       {intake_id or '(none — thresholds from engagement.yaml)'}")
     print(describe(merged_dir, merged, target))
+    print(f"  world        {world}: "
+          f"{'RESUMED, earlier sessions in history' if resumed else 'new'}")
     print("\n  The engagement is finished. This answers questions about it from")
     print("  its record; it does not revise the report or re-rate a finding.")
     print("  Ctrl-D or 'quit' to end.\n")

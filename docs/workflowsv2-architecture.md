@@ -9,12 +9,35 @@ figure is arithmetic over typed fields.
 |---|---|---|---|---|
 | audit | `workflowsv2/claims_audit/` | `method/METHOD.md` | an engagement (`engagements/<name>/engagement.yaml`, `brief.md`) and its target tree | `runs/<ts>_<world>/claims.json`, `findings.json`, `run_meta.json`, `issues.jsonl`, `working_record/` |
 | review | `workflowsv2/audit_review/` | `method/REVIEW.md` | one run directory and the target | `runs/<run>/review/review.json`, `outcomes.json`, `retest.json`, `statistics.json`, `issues.jsonl` |
-| materiality | `workflowsv2/audit_materiality/` | `method/MATERIALITY.md` | one or more reviewed runs and the engagement's `transaction:` | `merged/<ts>_<label>/merged.json`, `materiality.json`, `materiality.md`, `issues.jsonl` |
-| report | `workflowsv2/audit_report/` | `method/REPORT.md` | one merged directory | `report.md`, `report_skeleton.md`, `prose.json`, `worklist.md` |
+| materiality | `workflowsv2/audit_materiality/` | `method/MATERIALITY.md` | one or more reviewed runs and the current intake's `transaction:` and `thresholds:` (else engagement.yaml's) | `merged/<ts>_<label>/merged.json`, `materiality.json`, `materiality.md`, `meta.json` (pins the intake), `issues.jsonl` |
+| report | `workflowsv2/audit_report/` | `method/REPORT.md` | one merged directory and the intake it pinned | `report.md`, `report.html`, `report.pdf`, `report_skeleton.md`, `prose.json`, `worklist.md` |
 
-A fifth runner, `claims_audit/continuation.py` with `method/CONTINUATION.md`,
-answers questions about a finished engagement from its record and is
-interactive; it is the seed of the post-delivery client conversation.
+Two runners sit either side of the chain. `intake/runner.py` with
+`method/INTAKE.md` is the client conversation that fills the ISBAR form and,
+on `--finish`, writes the blocks a run reads. `claims_audit/continuation.py`
+with `method/CONTINUATION.md` is the post-delivery conversation: it answers
+questions about a finished run from its record and is interactive.
+
+## Engagement state (2026-09-03)
+
+An engagement directory holds intakes under `intakes/<id>/` (the form,
+`intake_meta.json`, `intake.log`, and after `--finish` a `blocks.yaml` with
+`transaction:` and `thresholds:`) and runs under `merged/<ts>_<label>/`, each
+of which pins in its `meta.json` the intake its ratings were read against.
+One intake is *current*, and one run per intake: an explicit choice if one
+was made and not cancelled, else the most recent not cancelled. `state.json`
+holds only the explicit choices and the cancelled marks; nothing is deleted.
+`workflowsv2/engagement_state.py` is the module and the CLI (`status`,
+`intake current|cancel <id>`, `run current|cancel <name>`); every runner
+reads the current intake and run through it, and `--intake` / `--merged`
+override. An engagement with no intake reads its blocks from engagement.yaml,
+which is how the fixtures state them.
+
+Worlds: the intake runs in `client_<engagement>`, reused across sessions. The
+post-delivery conversation runs in one world per (intake, run), named from
+their timestamps and reused, so a second session remembers the first and a
+different run or intake starts clean. Audit, review, materiality and report
+each run in a fresh world.
 
 ## The audit stage
 
@@ -83,8 +106,9 @@ six passages (REPORT.md §6). `--no-prose` assembles without a model.
 - **Method documents are linted** (`lint_workflow.py`): retired tokens, dates
   in the prompt, section references, and each document's vocabulary against
   its schema.
-- **A fresh world per run.** A world that has seen one engagement is never
-  reused.
+- **A fresh world per audit run.** The conversational runners (intake,
+  post-delivery) persist their worlds by design; the four chain stages never
+  reuse one.
 
 ## Routes
 
@@ -95,8 +119,8 @@ for debugging. Hosted: GLM-5.3-Flash on Fireworks
 
 ## Not built
 
-An overall conclusion or recommendation (needs the buyer's thresholds from an
-intake stage); the ISBAR intake and the client conversation it belongs to;
+An overall conclusion or recommendation (the thresholds now exist; the stage
+does not); the browser UI for the intake and post-delivery conversations;
 multi-document merge on a real engagement; the security audit (held); a
 per-stage model choice so enumeration can run hosted while the rest runs
 local. The fixture (`measure/fixtures/dataroom/`) is scored by reading

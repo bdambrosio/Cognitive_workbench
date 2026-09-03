@@ -242,6 +242,11 @@ def render(merged: Dict[str, Any], ratings: Dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _sha(text: Optional[str]) -> Optional[str]:
+    import hashlib
+    return hashlib.sha256(text.encode("utf-8")).hexdigest() if text else None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -255,10 +260,14 @@ def main() -> int:
                     help="findings per rating call; 0 rates all at once")
     ap.add_argument("--label", default=None,
                     help="suffix for the output directory (default: model stem)")
+    ap.add_argument("--intake", default=None,
+                    help="intake id whose transaction and thresholds the "
+                         "ratings are read against (default: the "
+                         "engagement's current intake)")
     ap.add_argument("--max-tokens", type=int, default=None)
     args = ap.parse_args()
 
-    eng = load_engagement(args.engagement)
+    eng = load_engagement(args.engagement, intake=args.intake)
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
     label = args.label or (args.model.stem if args.model else "default")
     out = eng["dir"] / "merged" / f"{ts}_{label}"
@@ -289,12 +298,14 @@ def main() -> int:
                     severity="check")
     if not eng.get("transaction"):
         issues.note(out, stage=STAGE, code="no_transaction",
-                    text="engagement.yaml has no `transaction:` block; rated "
+                    text="no `transaction:` block in the intake or "
+                         "engagement.yaml; rated "
                          "against a buyer paying a price that assumes every "
                          "claim holds", severity="check")
     if not eng.get("thresholds"):
         issues.note(out, stage=STAGE, code="no_thresholds",
-                    text="engagement.yaml has no `thresholds:` block; ratings "
+                    text="no `thresholds:` block in the intake or "
+                         "engagement.yaml; ratings "
                          "are read against MATERIALITY \u00a73 alone, not "
                          "against what the buyer said would change the price",
                     severity="check")
@@ -372,7 +383,13 @@ def main() -> int:
                                     "resolved_model", "reviewed")}
                  for r in merged["runs"]],
         "batch": args.batch, "rateable": len(rateable),
+        # THE RUN PINS ITS INTAKE. The ratings were read against this
+        # intake's blocks; the report stage reads the same ones back by this
+        # id, and the hashes say whether the text has changed since.
+        "intake": eng.get("intake_id"),
         "thresholds_recorded": bool(eng.get("thresholds")),
+        "thresholds_sha256": _sha(eng.get("thresholds")),
+        "transaction_sha256": _sha(eng.get("transaction")),
         "exposable": len(exposable),
         "calls": result["calls"], "ratings_check": check,
         "wall_clock_s": wall, "error": error,

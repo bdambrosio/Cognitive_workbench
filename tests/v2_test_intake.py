@@ -65,24 +65,28 @@ def test_fill_form_with_a_stubbed_emission_updates_or_keeps():
     assert not res["updated"] and res["form"] is prev and res["parse_error"] == "cut"
 
 
-def test_finish_writes_blocks_and_brief_and_leaves_existing_alone(tmp_path):
+def test_finish_writes_the_intake_blocks_and_a_brief_once(tmp_path):
     eng = tmp_path / "e"; eng.mkdir()
     (eng / "engagement.yaml").write_text("# header\ntarget: t\nclaim_sources: [a.md]\n")
+    idir = eng / "intakes" / "2026-09-03T00-00-00Z"; idir.mkdir(parents=True)
     f = sch.empty_form()
     f["identify"]["client"] = "Acme"; f["assessment"]["walk_away"] = "no backups"
     f["background"]["target"] = "FlowMetrics"; f["recommendation"]["scope"] = "doc2"
-    res = rn.finish(eng, f)
-    assert res["written"] == ["transaction", "thresholds", "brief.md"] and res["skipped"] == []
+    res = rn.finish(eng, idir, f)
+    assert res["written"] == ["transaction", "thresholds", "brief.md"]
     import yaml
-    cfg = yaml.safe_load((eng / "engagement.yaml").read_text())
-    assert cfg["target"] == "t" and cfg["transaction"].strip() == "Client: Acme"
-    assert cfg["thresholds"].strip() == "Would end the deal: no backups"
-    assert "# header" in (eng / "engagement.yaml").read_text()
+    blocks = yaml.safe_load((idir / "blocks.yaml").read_text())
+    assert blocks["transaction"].strip() == "Client: Acme"
+    assert blocks["thresholds"].strip() == "Would end the deal: no backups"
+    # engagement.yaml is not touched
+    assert (eng / "engagement.yaml").read_text() == "# header\ntarget: t\nclaim_sources: [a.md]\n"
     assert "The target: FlowMetrics" in (eng / "brief.md").read_text()
-    meta = json.loads((eng / "intake_meta.json").read_text())
+    meta = json.loads((idir / "intake_meta.json").read_text())
     assert meta["written"] == res["written"] and meta["check"]["filled"] == 4
-    # a second finish leaves the present blocks and the brief alone
+    # a second finish rewrites the blocks from the form and leaves the brief
     f["assessment"]["walk_away"] = "changed"
-    res = rn.finish(eng, f)
-    assert res["written"] == [] and res["skipped"] == ["transaction", "thresholds"]
-    assert yaml.safe_load((eng / "engagement.yaml").read_text())["thresholds"].strip() == "Would end the deal: no backups"
+    (eng / "brief.md").write_text("edited by hand")
+    res = rn.finish(eng, idir, f)
+    assert res["written"] == ["transaction", "thresholds"]
+    assert yaml.safe_load((idir / "blocks.yaml").read_text())["thresholds"].strip() == "Would end the deal: changed"
+    assert (eng / "brief.md").read_text() == "edited by hand"

@@ -1,6 +1,6 @@
 """report.md → report.html: a self-contained page with a print stylesheet.
 
-    python3 -m workflowsv2.audit_report.html <report.md> [<report.html>]
+    python3 -m workflowsv2.audit_report.printable <report.md> [<report.html>]
 
 Markdown stays the source of record — it is what the writer emits into and
 what continuation reads. This is the rendering for a reader and a printer:
@@ -11,7 +11,7 @@ external assets, so it opens anywhere and prints from any browser.
 """
 from __future__ import annotations
 
-import html
+import html as html_std
 import re
 import sys
 from pathlib import Path
@@ -54,7 +54,7 @@ def to_html(md_text: str, title: str = "Technical claims audit") -> str:
     body = md.render(md_text)
     # Page breaks before the sections a reader treats as separate documents.
     for name in PAGE_BREAK_BEFORE:
-        body = re.sub(r"<h2>(" + re.escape(html.escape(name, quote=False)) + r")</h2>",
+        body = re.sub(r"<h2>(" + re.escape(html_std.escape(name, quote=False)) + r")</h2>",
                       r'<h2 class="page-break">\1</h2>', body, count=1)
     # Each finding — an h3 and everything to the next heading — in a box.
     parts = re.split(r"(?=<h[23]>)", body)
@@ -72,7 +72,7 @@ def to_html(md_text: str, title: str = "Technical claims audit") -> str:
     # engine does not place; a fixed element lands on the page body instead.
     # Left to a PDF engine that supports them (WeasyPrint) if wanted.
     return (f"<!doctype html><html><head><meta charset=\"utf-8\">"
-            f"<title>{html.escape(title)}</title><style>{CSS}</style></head>"
+            f"<title>{html_std.escape(title)}</title><style>{CSS}</style></head>"
             f"<body>{body}</body></html>")
 
 

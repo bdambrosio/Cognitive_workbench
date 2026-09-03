@@ -99,13 +99,19 @@ CONTINUE = "continue"
 # a leg is ever asked.
 
 
-def load_engagement(name: str) -> Dict[str, Any]:
-    """Target, brief and run directory for one engagement.
+def load_engagement(name: str, intake: Optional[str] = None) -> Dict[str, Any]:
+    """The engagement's configuration, resolved for one intake.
 
     THE ENGAGEMENT SUPPLIES WHAT THE METHOD MUST NOT INVENT: which tree is
     under audit, and — through the brief — which of its documents carry the
     seller's claims (METHOD §12 step 1). Both differ per engagement and neither
     is knowable to the method's author.
+
+    THE INTAKE SUPPLIES THE BUYER. `transaction` and `thresholds` come from the
+    named intake's `blocks.yaml` (`intake`, else the engagement's current
+    intake per workflowsv2/engagement_state.py); an engagement with no intake
+    falls back to the blocks in engagement.yaml, which is how the fixtures
+    state them. `intake_id` says which was used, so a run can pin it.
     """
     d = ENGAGEMENTS / name
     cfg_file = d / "engagement.yaml"
@@ -120,18 +126,25 @@ def load_engagement(name: str) -> Dict[str, Any]:
     brief = d / "brief.md"
     if not brief.is_file():
         raise SystemExit(f"engagement '{name}' has no brief.md")
+    from workflowsv2 import engagement_state as state           # noqa: E402
+    if intake is not None and intake not in state.intakes(d):
+        raise SystemExit(f"engagement '{name}' has no intake '{intake}' "
+                         f"(have: {', '.join(state.intakes(d)) or 'none'})")
+    intake_id = intake if intake is not None else state.current_intake(d)
+    blocks = state.intake_blocks(d, intake_id) if intake_id else {}
     return {"name": name, "dir": d, "target": target.resolve(),
             # Declared by the engagement, never inferred: the documents in
             # which the target asserts things about itself.
             "claim_sources": list(cfg.get("claim_sources") or []),
             "brief": brief, "runs": d / "runs",
             "retention": cfg.get("retention"),
+            "intake_id": intake_id,
             # What the practice knows of the deal, for the materiality stage.
             # Free text, handed over verbatim; may be absent.
-            "transaction": cfg.get("transaction"),
+            "transaction": blocks.get("transaction") or cfg.get("transaction"),
             # The buyer's own thresholds — what changes the price, what ends
             # the deal — written by the intake stage. Free text; may be absent.
-            "thresholds": cfg.get("thresholds")}
+            "thresholds": blocks.get("thresholds") or cfg.get("thresholds")}
 
 
 def engagement_state(world: str, agent: str, leg: int, max_legs: int,
