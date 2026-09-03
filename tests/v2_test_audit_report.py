@@ -157,3 +157,32 @@ def test_header_index_and_worklist(tmp_path):
     assert "**claims_audit / output_check** (README.md): finding 1: bad quote" in wl
     assert "**audit_materiality / unreviewed_run** (merged): no review" in wl
     assert render.worklist({"runs": []}).strip().endswith("Nothing recorded.")
+
+
+def test_an_outside_claim_shows_the_links_the_claim_source_gives():
+    """B, 2026-09-03: a claim resting on a listing or a package shows the
+    claim source's own links, and only those — nothing is inferred from a
+    package name."""
+    def f(cid, quote, locations=(), because="outside_the_materials"):
+        return {"claim_source": "README.md", "claim_id": cid, "quote": quote,
+                "lines": [cid, cid], "statement": "s", "locations": list(locations),
+                "adjudication": {"verdict": "unverifiable",
+                                 "unresolved_because": because},
+                "evidence": [], "review": {"outcome": "holds",
+                                           "adverse_observations": []},
+                "citation_problems": []}
+    linked = f(1, "**[Shopify App](https://apps.shopify.com/chattermate-chat)**",
+               [{"quote": "Install it from the [Shopify App Store]"
+                          "(https://apps.shopify.com/chattermate-chat).", "lines": [9, 9]},
+                {"quote": "see https://docs.example.com/x, then", "lines": [12, 12]}])
+    out = "\n".join(render._finding(linked, None, "exposure"))
+    assert ("**Where the claim source points:** <https://apps.shopify.com/chattermate-chat>, "
+            "<https://docs.example.com/x>. The audit did not follow") in out
+    unlinked = f(2, "pip install chattermate-cli")
+    assert "Where the claim source points" not in "\n".join(render._finding(unlinked, None, "exposure"))
+    badge = f(4, "[![npm version](https://img.shields.io/npm/v/x.svg)]"
+                 "(https://www.npmjs.com/package/x) then open http://localhost/")
+    assert ("**Where the claim source points:** <https://www.npmjs.com/package/x>. "
+            in "\n".join(render._finding(badge, None, "exposure")))
+    not_outside = f(3, "see https://x.example", because="not_in_the_materials")
+    assert "Where the claim source points" not in "\n".join(render._finding(not_outside, None, "exposure"))

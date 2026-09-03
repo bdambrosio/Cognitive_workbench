@@ -16,6 +16,7 @@ record's, copied.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -157,6 +158,32 @@ def _review_line(f: Dict[str, Any]) -> str:
     return line
 
 
+_URL = re.compile(r"https?://[^\s)\]>\"']+")
+#: A markdown image's source: the picture a badge shows, not where it points.
+_IMAGE_SRC = re.compile(r"!\[[^\]]*\]\((https?://[^\s)]+)\)")
+_LOOPBACK = ("localhost", "127.0.0.1", "0.0.0.0", "[::1]")
+
+
+def _links(f: Dict[str, Any]) -> List[str]:
+    """Every link the claim source itself gives where this claim is made,
+    in order of first appearance. THE LINK IS QUOTED, NOT INFERRED: a
+    package name in a shell command is not turned into a registry URL.
+    Two kinds are left out on their syntax alone: an image's source (a
+    badge picture) and an address on the reader's own machine."""
+    texts = [f.get("quote") or ""] + [loc.get("quote") or ""
+                                       for loc in f.get("locations") or []]
+    out: List[str] = []
+    for t in texts:
+        images = set(_IMAGE_SRC.findall(t))
+        for u in _URL.findall(t):
+            u = u.rstrip(".,;:")
+            host = u.split("//", 1)[1].split("/", 1)[0].split(":")[0]
+            if u in images or host in _LOOPBACK or u in out:
+                continue
+            out.append(u)
+    return out
+
+
 def _finding(f: Dict[str, Any], rating: Optional[Dict[str, Any]],
              field: str) -> List[str]:
     adj = f.get("adjudication") or {}
@@ -181,6 +208,12 @@ def _finding(f: Dict[str, Any], rating: Optional[Dict[str, Any]],
     if adj.get("unresolved_because"):
         out += [f"**Why unsettled:** "
                 f"{DISPOSITION_WORDS.get(adj['unresolved_because'], adj['unresolved_because'])}.", ""]
+    if adj.get("unresolved_because") == "outside_the_materials":
+        links = _links(f)
+        if links:
+            out += ["**Where the claim source points:** " + ", ".join(
+                f"<{u}>" for u in links) + ". The audit did not follow "
+                "these links; the buyer can confirm what is there directly.", ""]
     if rating:
         out += [f"**{field.capitalize()} — {rating.get(field)}:** "
                 f"{RATING_WORDS.get(rating.get(field), '')}. "
@@ -319,6 +352,11 @@ def _how_to_read() -> List[str]:
         "named files the engagement did not open; they are listed apart and "
         "are the first thing a further pass would settle. Claims that hold "
         "are listed after the three classes.", "",
+        "**Where the claim source points.** An unsettled claim whose "
+        "materials were not supplied — a listing, a published package, a "
+        "hosted service — shows any link the claim source itself gives for "
+        "it. The audit did not follow those links and says nothing about "
+        "what is there; the buyer can look.", "",
         "**Ratings.** Materiality and exposure use one scale, read for a gap "
         "the audit showed or for a claim assumed false:", "",
         "| rating | meaning |", "|---|---|",
