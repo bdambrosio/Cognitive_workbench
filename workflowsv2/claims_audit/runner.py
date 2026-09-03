@@ -302,6 +302,33 @@ def evidence_batches(claim_ids: Sequence[int], index: Dict[Path, Dict[str, Any]]
     return out
 
 
+def files_matched(traces: Path, target: Path) -> List[str]:
+    """Target files whose lines a search returned to the auditor, without a
+    read. The subagent's grep prints `path:line:text`; those lines are what
+    the auditor saw, and a citation of one of them resolves against the
+    file. NOT `files_read`: METHOD §8's chase asks for a candidate to be
+    opened, and a search hit shows a line, not the file — thirteen cited
+    documents read as "never opened" on ChatterMate (2026-09-03) because the
+    record check counted reads alone."""
+    import re as _re
+    out = set()
+    if not traces.is_dir() or not target.is_dir():
+        return []
+    for t in sorted(traces.glob("*.txt")):
+        try:
+            text = t.read_text(errors="replace")
+        except OSError as e:
+            logger.warning("manifest: unreadable trace %s (%s)", t, e)
+            continue
+        for m in _re.finditer(r"^(?:OK: )?([^\s:|]+):\d+:", text, _re.M):
+            n = m.group(1)
+            while n.startswith("./"):
+                n = n[2:]
+            if (target / n).is_file():
+                out.add(n)
+    return sorted(out)
+
+
 def files_read(traces: Path, target: Path) -> Dict[str, str]:
     """Content hashes for the target files this run actually opened.
 
@@ -1626,6 +1653,8 @@ def main() -> int:
         "harness_rev": git_rev(REPO),
         "files_read": files_read(record / "inspect_traces",
                                  Path(cfg.get("external_repo") or ".")),
+        "files_matched": files_matched(record / "inspect_traces",
+                                       Path(cfg.get("external_repo") or ".")),
         "legs": legs,
         # WHAT THE GATHERING LEGS COST, and whether the cap cut them short.
         # v1 recorded which of five blocks each leg delivered and how often the

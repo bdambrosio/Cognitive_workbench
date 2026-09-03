@@ -212,3 +212,20 @@ def test_untagged_message_names_each_claim_with_its_statement():
     assert "No evidence request has been filed" in msg
     assert msg.index("9. [[9, 9]] Shopify support") < msg.index("4. [[4, 4]] Docker Pulls")
     assert "statement: Shopify is supported." in msg and "`claims` field" in msg
+
+
+def test_files_matched_reads_search_hits_not_reads(tmp_path):
+    """A grep observation's `path:line:` lines name files the auditor saw;
+    a read's `NN|` lines and a listing do not count; a path that is not in
+    the target is dropped."""
+    from workflowsv2.claims_audit.runner import files_matched, files_read
+    tgt = tmp_path / "t"; (tgt / ".github").mkdir(parents=True)
+    (tgt / "a.py").write_text("x\n"); (tgt / ".github" / "ci.yml").write_text("on: push\n")
+    tr = tmp_path / "traces"; tr.mkdir()
+    (tr / "inspect_external_1.txt").write_text(
+        'ACTION:\n{"tool": "grep", "pattern": "x"}\nOBSERVATION:\n'
+        'OK: a.py:1:x\n./.github/ci.yml:1:on: push\nnope.py:3:zzz\n'
+        'ACTION:\n{"tool": "read", "file": "a.py"}\nOBSERVATION:\nOK: 1|x\n'
+        'ACTION:\n{"tool": "list"}\nOBSERVATION:\nOK: ./\na.py\t2 bytes\n')
+    assert files_matched(tr, tgt) == [".github/ci.yml", "a.py"]
+    assert set(files_read(tr, tgt)) == {"a.py"}

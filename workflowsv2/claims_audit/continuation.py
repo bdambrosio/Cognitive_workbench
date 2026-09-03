@@ -215,6 +215,22 @@ def main() -> int:
 
     name, cfg = build_config(run_dir, world, args.model, target)
 
+    # THE CLIENT'S TERMINAL IS NOT A LOG. The harness logs WARNINGs from the
+    # attribution and discourse passes to the console, and they landed on the
+    # prompt line in the first sessions. The console shows errors only;
+    # everything else goes to continuation.log in the world's directory,
+    # beside the conversation it belongs to (the intake runner's pattern).
+    world_dir = REPO / "scenarios" / world
+    world_dir.mkdir(parents=True, exist_ok=True)
+    root = logging.getLogger()
+    for h in list(root.handlers):
+        h.setLevel(logging.ERROR)
+    fh = logging.FileHandler(world_dir / "continuation.log", encoding="utf-8")
+    fh.setLevel(logging.INFO)
+    fh.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
+    root.addHandler(fh)
+    logger.setLevel(logging.INFO)
+
     from chat.chat_loop import ChatLoop                        # noqa: E402
     from chat.model_params import TOP_P                        # noqa: E402
     loop = ChatLoop(character_name=name, character_config=cfg)

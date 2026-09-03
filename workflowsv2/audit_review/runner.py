@@ -150,7 +150,16 @@ def statistics(run: Path, corpus: Path, claim_source: str) -> Dict[str, Any]:
     # Computed here, not asked of the reviewer, because it is a set difference.
     meta = json.loads((run / "run_meta.json").read_text()) \
         if (run / "run_meta.json").is_file() else {}
-    opened = sorted((meta.get("files_read") or {}).keys())
+    # A SEARCH HIT COUNTS AS SEEN. The auditor cites lines a search
+    # returned as readily as lines a read showed, and the citation check
+    # already proves the quote is at those lines. `files_matched` is in
+    # run_meta from 2026-09-03; for an older run it is derived from the
+    # working record here.
+    matched = meta.get("files_matched")
+    if matched is None:
+        from workflowsv2.claims_audit.runner import files_matched
+        matched = files_matched(run / "working_record" / "inspect_traces", corpus)
+    opened = sorted(set((meta.get("files_read") or {}).keys()) | set(matched))
     never_opened = {d: sorted(set(cited_by[d]), key=lambda x: (x is None, x))
                     for d in sorted(cited_docs - set(opened)) if d}
 
