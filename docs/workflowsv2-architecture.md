@@ -49,6 +49,12 @@ upload that lands in `engagements/<e>/uploads/` and is told to the agent as
 a turn. The page initiates nothing: `--new`, `--finish` and the current
 choices stay on the command line.
 
+The practice's own page (`src/client_ui/practice.py`, port 8802) lists the
+engagements with their intakes and runs, makes the current choices and
+cancels, creates an engagement with an optional clone, and shows the launch
+commands to copy. It runs nothing: an intake, a run or a conversation is
+started from the command line by a person.
+
 Worlds: the intake runs in `client_<engagement>`, reused across sessions. The
 post-delivery conversation runs in one world per (intake, run), named from
 their timestamps and reused, so a second session remembers the first and a

@@ -95,6 +95,20 @@ retention: keep
 """
 
 
+def target_dir(eng_dir: Path) -> Path:
+    """Where the engagement's materials are: `target:` from engagement.yaml
+    when it names one (relative to the engagement, else to the repo), else
+    `target/` in the engagement. The same rule as load_engagement."""
+    import yaml
+    cfg_file = eng_dir / "engagement.yaml"
+    cfg = (yaml.safe_load(cfg_file.read_text(encoding="utf-8")) or {}) \
+        if cfg_file.is_file() else {}
+    t = Path(cfg.get("target") or TARGET)
+    if t.is_absolute():
+        return t
+    return (eng_dir / t) if (eng_dir / t).is_dir() else REPO / t
+
+
 def new_engagement(eng_dir: Path, clone: Optional[str] = None) -> Path:
     """Create the engagement: its directory, a stub engagement.yaml, and —
     with `clone` — its target/ from a git URL or a local checkout."""
@@ -138,6 +152,10 @@ def new_intake(eng_dir: Path) -> str:
     """Create an intake directory and make it current by clearing the
     explicit choice: most recent wins."""
     iid = stamp()
+    n = 1
+    while intake_dir(eng_dir, iid).exists():          # two in one second
+        n += 1
+        iid = f"{stamp()}-{n}"
     intake_dir(eng_dir, iid).mkdir(parents=True, exist_ok=False)
     st = load(eng_dir)
     st["current_intake"] = None
@@ -227,6 +245,42 @@ def cancel_run(eng_dir: Path, run_name: str) -> None:
 
 
 # ---- status -----------------------------------------------------------------
+
+def summary(eng_dir: Path) -> Dict[str, Any]:
+    """The engagement's state as data, for the practice page: every intake
+    and run on disk with its marks. `status` is the same as text."""
+    st = load(eng_dir)
+    ci = current_intake(eng_dir)
+    pinned = sorted({run_intake(r) for r in runs(eng_dir)} - {None})
+    ids = sorted(set(intakes(eng_dir)) | set(pinned))
+    out: Dict[str, Any] = {"name": eng_dir.name, "current_intake": ci,
+                           "has_engagement_yaml": (eng_dir / "engagement.yaml").is_file(),
+                           "has_target": target_dir(eng_dir).is_dir(),
+                           "intakes": [], "runs_without_intake": []}
+    for i in ids:
+        cr = current_run(eng_dir, i)
+        out["intakes"].append({
+            "id": i, "current": i == ci,
+            "cancelled": i in st["cancelled"]["intakes"],
+            "finished": bool(intake_blocks(eng_dir, i)),
+            "on_disk": i in intakes(eng_dir),
+            "runs": [{"name": r.name, "current": bool(cr and r.name == cr.name),
+                      "cancelled": r.name in st["cancelled"]["runs"],
+                      "report": (r / "report.md").is_file()}
+                     for r in runs_for(eng_dir, i)]})
+    cr = current_run(eng_dir, None)
+    out["runs_without_intake"] = [
+        {"name": r.name, "current": bool(cr and r.name == cr.name),
+         "cancelled": r.name in st["cancelled"]["runs"],
+         "report": (r / "report.md").is_file()} for r in runs_for(eng_dir, None)]
+    return out
+
+
+def engagements() -> List[str]:
+    """Every engagement directory, by name."""
+    return sorted(p.name for p in ENGAGEMENTS.iterdir() if p.is_dir()) \
+        if ENGAGEMENTS.is_dir() else []
+
 
 def status(eng_dir: Path) -> str:
     st = load(eng_dir)
