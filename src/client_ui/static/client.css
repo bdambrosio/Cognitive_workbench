@@ -44,8 +44,36 @@ button:hover, .upload:hover { background: var(--accent2); }
 button:disabled { opacity: .5; cursor: default; }
 .upload input { display: none; }
 .hint { color: var(--muted); font-size: 12px; margin-top: 8px; font-family: var(--mono); }
-#document { overflow-y: auto; }
-#doc { padding: 20px 28px; max-width: 900px; }
+#document { overflow: hidden; }
+#doc { flex: 1; overflow-y: auto; padding: 20px 28px; }
+#doc > * { max-width: 900px; }
+/* the evidence pane: the finding a reply names or the reader clicks */
+#evidence { max-height: 45%; overflow-y: auto; border-top: 2px solid var(--accent); background: var(--panel); padding: 12px 28px 18px; }
+#evidence .head { display: flex; justify-content: space-between; align-items: baseline; }
+#evidence h4 { margin: 0 0 6px; font-size: 14px; }
+#evidence .close { background: none; color: var(--muted); padding: 0 6px; font-size: 18px; }
+#evidence .verdict { font-family: var(--mono); font-size: 12px; color: var(--ok); }
+#evidence .verdict.adverse { color: var(--empty); }
+#evidence blockquote { margin: 6px 0 10px; padding: 4px 10px; border-left: 3px solid var(--rule); color: var(--muted); font-style: italic; }
+#evidence .gap { margin: 0 0 10px; }
+#evidence .item { border: 1px solid var(--rule); border-radius: 4px; padding: 6px 10px; margin: 6px 0; }
+#evidence .where { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+#evidence pre { margin: 6px 0; padding: 6px 8px; background: var(--bg); font-family: var(--mono); font-size: 12px; white-space: pre-wrap; overflow-x: auto; }
+#evidence .shows { font-size: 14px; }
+.report h3 { cursor: pointer; }
+.report h3:hover { color: #6ea0ff; }
+.report .finding.named { border-color: var(--accent2); box-shadow: 0 0 0 1px var(--accent2); }
+/* fields an exchange changed */
+.form .field.changed { background: #1f3a2a; }
+.form .field.changed .k::after { content: " ●"; color: var(--ok); }
+/* markdown in the agent's replies */
+.msg p { margin: 0 0 .6em; }
+.msg p:last-child { margin-bottom: 0; }
+.msg ul, .msg ol { margin: .2em 0 .6em 1.3em; padding: 0; }
+.msg code { font-family: var(--mono); font-size: 13px; background: var(--bg); padding: 0 .25em; border-radius: 3px; }
+.msg pre { background: var(--bg); padding: 8px 10px; border-radius: 4px; overflow-x: auto; font-family: var(--mono); font-size: 13px; white-space: pre-wrap; }
+.msg h1, .msg h2, .msg h3 { font-size: 15px; margin: .6em 0 .3em; }
+.msg.agent { white-space: normal; }
 /* the intake form */
 .form h2 { font-size: 17px; margin: 0 0 6px; }
 .form .ledger { color: var(--muted); font-family: var(--mono); font-size: 12px; margin-bottom: 18px; }

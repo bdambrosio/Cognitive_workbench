@@ -93,7 +93,39 @@ class PostSession:
         html = printable.to_body(p.read_text(encoding="utf-8")) if p.is_file() else ""
         return {"kind": "report", "engagement": self.engagement,
                 "intake": self.intake_id, "run": self.merged_dir.name,
-                "html": html, "banner": self.describe()}
+                "html": html, "banner": self.describe(),
+                "findings": self.findings()}
+
+    def findings(self) -> Dict[str, Any]:
+        """Every finding's claim, verdict and evidence, keyed `<claim
+        source>#<claim id>`, for the evidence pane: what the page shows
+        beside a finding a reply names or the reader clicks."""
+        out: Dict[str, Any] = {}
+        for f in self.merged.get("findings") or []:
+            adj = f.get("adjudication") or {}
+            ev = []
+            for e in f.get("evidence") or []:
+                if e.get("form") == "citation":
+                    ev.append({"form": "citation", "document": e.get("document"),
+                               "lines": e.get("lines"), "quote": e.get("quote"),
+                               "shows": e.get("shows")})
+                elif e.get("form") == "search":
+                    ev.append({"form": "search", "kind": e.get("kind"),
+                               "performed": e.get("performed"),
+                               "result": e.get("result")})
+                else:
+                    ev.append({"form": "derived",
+                               "derivation": e.get("derivation"),
+                               "consequence": e.get("consequence")})
+            out[f"{f.get('claim_source')}#{f.get('claim_id')}"] = {
+                "claim_source": f.get("claim_source"), "claim_id": f.get("claim_id"),
+                "quote": f.get("quote"), "lines": f.get("lines"),
+                "statement": f.get("statement"), "verdict": adj.get("verdict"),
+                "gap": adj.get("gap"),
+                "unresolved_because": adj.get("unresolved_because"),
+                "review": (f.get("review") or {}).get("outcome"),
+                "evidence": ev}
+        return out
 
     def close(self) -> None:
         try:

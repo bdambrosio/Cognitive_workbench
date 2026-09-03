@@ -81,3 +81,25 @@ def test_history_shows_the_greeting_before_any_client_turn(tmp_path, monkeypatch
     s = _session(tmp_path, monkeypatch)
     s.open()
     assert s.history() == [{"who": "agent", "text": "reply to Practice"}]
+
+
+def test_post_session_findings_for_the_evidence_pane(tmp_path):
+    from workflowsv2.claims_audit.post_session import PostSession
+    s = PostSession.__new__(PostSession)
+    s.engagement = "e"; s.intake_id = "I1"; s.merged_dir = tmp_path
+    s.merged = {"findings": [
+        {"claim_source": "README.md", "claim_id": 20, "quote": "q", "lines": [53, 53],
+         "statement": "st", "adjudication": {"verdict": "partial", "gap": "g"},
+         "review": {"outcome": "holds"},
+         "evidence": [{"form": "citation", "document": "a.py", "lines": [1, 2], "quote": "x", "shows": "y", "extra": 1},
+                      {"form": "search", "kind": "lexical", "performed": "p", "result": "r", "candidates": []},
+                      {"form": "derived", "basis": [], "derivation": "d", "consequence": "c"}]},
+        {"claim_source": "README.md", "claim_id": 2, "quote": "q2", "lines": [4, 4],
+         "adjudication": {"verdict": "unverifiable", "unresolved_because": "outside_the_materials"},
+         "evidence": []}]}
+    f = s.findings()
+    assert set(f) == {"README.md#20", "README.md#2"}
+    assert f["README.md#20"]["verdict"] == "partial" and f["README.md#20"]["review"] == "holds"
+    assert [e["form"] for e in f["README.md#20"]["evidence"]] == ["citation", "search", "derived"]
+    assert "extra" not in f["README.md#20"]["evidence"][0]
+    assert f["README.md#2"]["unresolved_because"] == "outside_the_materials" and f["README.md#2"]["review"] is None
