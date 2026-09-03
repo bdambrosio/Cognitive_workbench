@@ -178,70 +178,12 @@ def main() -> int:
                          "<run>, resumed if it exists)")
     args = ap.parse_args()
 
-    from workflowsv2 import engagement_state as state            # noqa: E402
-    from workflowsv2.claims_audit.runner import load_engagement  # noqa: E402
-    eng = load_engagement(args.engagement, intake=args.intake)
-    intake_id = eng.get("intake_id")
-    if args.merged:
-        merged_dir = args.merged.resolve()
-    else:
-        cur = state.current_run(eng["dir"], intake_id)
-        if cur is None:
-            raise SystemExit(
-                f"engagement '{args.engagement}' has no run of intake "
-                f"{intake_id or '(none)'} — pass --merged, or run the "
-                f"materiality and report stages first")
-        merged_dir = cur.resolve()
-    if not (merged_dir / "merged.json").is_file():
-        raise SystemExit(f"{merged_dir}: no merged.json — not a merged output "
-                         f"directory")
-    merged = json.loads((merged_dir / "merged.json").read_text(encoding="utf-8"))
-    # THE TARGET IS A PATH, NOT A PIN. The engagement records where the
-    # materials are, not what they contained; each run's run_meta carries the
-    # commit it saw (`target_rev`). A repository under audit moves, and a
-    # citation then resolves against a tree the report never saw. This can
-    # only report which tree it bound and whether it still exists.
-    target = (args.target or eng["target"]).resolve()
-    run_dir = eng["dir"]
-    # ONE WORLD PER (INTAKE, RUN), NAMED BY THEIR TIMESTAMPS: short enough
-    # never to be cut, and different for any other intake or run.
-    world = args.world or "post_{}_{}_{}".format(
-        eng["name"], _compact(intake_id) if intake_id else "none",
-        _compact(merged_dir.name))
-    resumed = (REPO / "scenarios" / world).exists()
-    logger.info("intake %s; run %s; world %s: %s", intake_id, merged_dir.name,
-                world, "RESUMED — earlier sessions on this run are in its "
-                "history" if resumed else "new")
-
-    name, cfg = build_config(run_dir, world, args.model, target)
-
-    # THE CLIENT'S TERMINAL IS NOT A LOG. The harness logs WARNINGs from the
-    # attribution and discourse passes to the console, and they landed on the
-    # prompt line in the first sessions. The console shows errors only;
-    # everything else goes to continuation.log in the world's directory,
-    # beside the conversation it belongs to (the intake runner's pattern).
-    world_dir = REPO / "scenarios" / world
-    world_dir.mkdir(parents=True, exist_ok=True)
-    root = logging.getLogger()
-    for h in list(root.handlers):
-        h.setLevel(logging.ERROR)
-    fh = logging.FileHandler(world_dir / "continuation.log", encoding="utf-8")
-    fh.setLevel(logging.INFO)
-    fh.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
-    root.addHandler(fh)
-    logger.setLevel(logging.INFO)
-
-    from chat.chat_loop import ChatLoop                        # noqa: E402
-    from chat.model_params import TOP_P                        # noqa: E402
-    loop = ChatLoop(character_name=name, character_config=cfg)
-    logger.info("continuation model=%s top_p=%s",
-                loop.backend.resolved_model(), TOP_P)
+    from workflowsv2.claims_audit.post_session import PostSession  # noqa: E402
+    session = PostSession(args.engagement, args.model, intake=args.intake,
+                          merged=args.merged, world=args.world, target=args.target)
 
     print("\n=== continuation ===")
-    print(f"  intake       {intake_id or '(none — thresholds from engagement.yaml)'}")
-    print(describe(merged_dir, merged, target))
-    print(f"  world        {world}: "
-          f"{'RESUMED, earlier sessions in history' if resumed else 'new'}")
+    print(session.describe())
     print("\n  The engagement is finished. This answers questions about it from")
     print("  its record; it does not revise the report or re-rate a finding.")
     print("  Ctrl-D or 'quit' to end.\n")
@@ -257,14 +199,9 @@ def main() -> int:
                 continue
             if text.lower() in ("quit", "exit"):
                 break
-            loop._process_user_turn(source="User", text=text, close=False)
-            from workflowsv2.claims_audit.runner import latest_reply  # noqa: E402
-            print(f"\n{name}> {latest_reply(loop, 'User')}\n")
+            print(f"\n{session.name}> {session.turn(text)['reply']}\n")
     finally:
-        try:
-            loop._post_turn_executor.shutdown(wait=True)
-        except Exception as e:                                 # noqa: BLE001
-            logger.warning("executor shutdown failed: %s", e)
+        session.close()
     return 0
 
 

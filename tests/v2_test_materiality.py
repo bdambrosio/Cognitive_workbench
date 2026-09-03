@@ -136,6 +136,7 @@ import pytest  # noqa: E402
     "workflowsv2.audit_report.runner",
     "workflowsv2.claims_audit.runner",
     "workflowsv2.claims_audit.continuation",
+     "workflowsv2.claims_audit.post_session", "workflowsv2.intake.session",
     "workflowsv2.intake.runner",
     "workflowsv2.audit_review.runner",
     "workflowsv2.emit",

@@ -57,10 +57,7 @@ logger.setLevel(logging.INFO)
 
 from chat.workflow import load_workflow                        # noqa: E402
 from workflowsv2 import engagement_state as state              # noqa: E402
-from workflowsv2 import issues                                 # noqa: E402
-from workflowsv2.emit import emit                              # noqa: E402
 from workflowsv2.intake import schemas                         # noqa: E402
-from workflowsv2.turns import latest_reply                     # noqa: E402
 
 SCENARIO = HERE / "scenario.yaml"
 METHOD_PATH = "workflowsv2/intake/method/INTAKE.md"
@@ -212,66 +209,26 @@ def main() -> int:
     intake_id = state.current_intake(eng_dir)
     if args.finish and (args.new or intake_id is None):
         raise SystemExit(f"{eng_dir}: no intake to finish")
-    if args.new or intake_id is None:
+    if args.new:
         intake_id = state.new_intake(eng_dir)
-    intake_dir = state.intake_dir(eng_dir, intake_id)
-    form_path = intake_dir / "intake.json"
-    form = (json.loads(form_path.read_text(encoding="utf-8"))
-            if form_path.is_file() else schemas.empty_form())
 
     if args.finish:
+        intake_dir = state.intake_dir(eng_dir, intake_id)
+        form_path = intake_dir / "intake.json"
         if not form_path.is_file():
             raise SystemExit(f"{intake_dir}: no intake.json to finish from")
+        form = json.loads(form_path.read_text(encoding="utf-8"))
         res = finish(eng_dir, intake_dir, form)
         print(f"finished intake {intake_id}: wrote "
               f"{', '.join(res['written']) or 'nothing'}")
         print(f"form: {schemas.ledger(schemas.check_intake(form))}")
         return 0
 
-    # THE CLIENT'S TERMINAL IS NOT A LOG. The harness logs WARNINGs from the
-    # discourse and attribution passes to the console, and in Bruce's first
-    # live intake they landed mid-word in the client's typing. Here the
-    # console shows errors only; everything else goes to intake.log beside
-    # the form.
-    root = logging.getLogger()
-    for h in list(root.handlers):
-        h.setLevel(logging.ERROR)
-    fh = logging.FileHandler(intake_dir / "intake.log", encoding="utf-8")
-    fh.setLevel(logging.INFO)
-    fh.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
-    root.addHandler(fh)
-    logger.setLevel(logging.INFO)
-
-    world = args.world or f"client_{args.engagement}"
-    returning = (REPO / "scenarios" / world).exists()
-    logger.info("intake %s; world %s: %s", intake_id, world,
-                "RESUMED — the client's world persists across sessions"
-                if returning else "new")
-    name, cfg = build_config(eng_dir, world, args.model)
-    from chat.chat_loop import ChatLoop                        # noqa: E402
-    loop = ChatLoop(character_name=name, character_config=cfg)
-    method_text = load_workflow(REPO / METHOD_PATH)
-
-    def emit_fn(system, user, schema, max_tokens):
-        return emit(loop, system, user, schema, max_tokens)
-
-    # THE INTAKE CONCERN: the backstop for drift, not the driver. The ledger
-    # appended to each turn is what keeps the agent on the emptiest slot.
+    from workflowsv2.intake.session import IntakeSession    # noqa: E402
+    session = IntakeSession(args.engagement, args.model, new=False,
+                            world=args.world, max_tokens=args.max_tokens)
     try:
-        loop._add_agent_concern(
-            "Complete the intake form for this client.", entity=SOURCE,
-            name="intake", instruction="Ask the next question for the "
-            "emptiest slot of the intake form, per INTAKE.md §3.")
-    except Exception as e:                                     # noqa: BLE001
-        logger.warning("intake concern not created: %s", e)
-
-    transcript: List[Tuple[str, str]] = []
-    turns = 0
-    try:
-        loop._process_user_turn(source="Practice",
-                                text=RETURNING if returning else OPENING,
-                                close=False)
-        print(f"\n{name}> {latest_reply(loop, 'Practice')}\n")
+        print(f"\n{session.name}> {session.open()}\n")
         while True:
             try:
                 text = input("client> ").strip()
@@ -282,35 +239,13 @@ def main() -> int:
                 continue
             if text.lower() in ("quit", "exit"):
                 break
-            check = schemas.check_intake(form)
-            loop._process_user_turn(source=SOURCE,
-                                    text=text + "\n\n" + schemas.ledger(check),
-                                    close=False)
-            reply = latest_reply(loop, SOURCE)
-            print(f"\n{name}> {reply}\n")
-            transcript += [("client", text), (name, reply)]
-            turns += 1
-            res = fill_form(emit_fn, method_text, transcript, form, args.max_tokens)
-            form = res["form"]
-            if not res["updated"]:
-                logger.warning("form emission did not parse (%s); previous "
-                               "form stands", res["parse_error"])
-                issues.note(eng_dir, stage=STAGE, code="form_emission",
-                            text=f"turn {turns}: form did not parse: "
-                                 f"{res['parse_error']}", severity="check")
-            write_form(intake_dir, form)
-            mirror_note(loop, form)
-            print(f"   {schemas.ledger(schemas.check_intake(form))}")
+            res = session.turn(text)
+            print(f"\n{session.name}> {res['reply']}\n")
+            print(f"   {res['ledger']}")
     finally:
-        try:
-            loop._post_turn_executor.shutdown(wait=True)
-        except Exception as e:                                 # noqa: BLE001
-            logger.warning("executor shutdown failed: %s", e)
-        try:
-            loop._persist_to_disk()
-        except Exception as e:                                 # noqa: BLE001
-            logger.warning("persist failed: %s", e)
-    print(f"\n{turns} exchange(s); intake {intake_id}; form at {form_path}")
+        session.close()
+    print(f"\n{session.turns} exchange(s); intake {session.intake_id}; "
+          f"form at {session.form_path}")
     print(f"finish with:  python3 workflowsv2/intake/runner.py "
           f"--engagement {args.engagement} --finish")
     return 0

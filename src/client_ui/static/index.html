@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Engagement</title>
+<link rel="stylesheet" href="/static/client.css">
+</head>
+<body>
+<header>
+  <div class="title"><span id="engagement">engagement</span> <span class="mode" id="mode"></span></div>
+  <div class="state"><span id="thinking" class="thinking" hidden>thinking…</span><span id="conn">connecting</span></div>
+</header>
+<main>
+  <section id="chat">
+    <div id="messages"></div>
+    <form id="compose">
+      <textarea id="text" rows="3" placeholder="Type here. Enter to send, Shift+Enter for a new line."></textarea>
+      <div class="row">
+        <label class="upload" id="uploadLabel" hidden>Upload a file<input type="file" id="file"></label>
+        <button type="submit" id="send">Send</button>
+      </div>
+      <div class="hint" id="uploadsHint" hidden></div>
+    </form>
+  </section>
+  <section id="document">
+    <div id="doc"></div>
+  </section>
+</main>
+<script src="/static/client.js"></script>
+</body>
+</html>

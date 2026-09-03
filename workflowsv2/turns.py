@@ -43,8 +43,12 @@ def last_exit_reason(world: str, agent: str) -> Optional[str]:
 
 def latest_reply(loop, source: str) -> str:
     turns = loop.store.get_recent_turns(source, limit=4, scope="all")
+    # The store marks a turn by `direction` ("in" from the source, "out"
+    # from the agent); it has no `name` field. The first version tested a
+    # field that was never there and passed only because the last turn is
+    # the agent's (found 2026-09-03 while building history for the page).
     for t in reversed(turns):
-        if str(t.get("name", "")) != source:
+        if t.get("direction") == "out":
             return str(t.get("text", ""))
     return ""
 

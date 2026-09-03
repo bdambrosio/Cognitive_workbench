@@ -33,6 +33,15 @@ reads the current intake and run through it, and `--intake` / `--merged`
 override. An engagement with no intake reads its blocks from engagement.yaml,
 which is how the fixtures state them.
 
+The browser page (`src/client_ui/app.py`, `intake` and `post` subcommands)
+drives the same two conversations through `workflowsv2/intake/session.py`
+and `workflowsv2/claims_audit/post_session.py`, the objects the terminal
+runners loop over, from one worker thread per process: chat on the left, the
+filling form or the delivered report on the right, a token on the URL, an
+upload that lands in `engagements/<e>/uploads/` and is told to the agent as
+a turn. The page initiates nothing: `--new`, `--finish` and the current
+choices stay on the command line.
+
 Worlds: the intake runs in `client_<engagement>`, reused across sessions. The
 post-delivery conversation runs in one world per (intake, run), named from
 their timestamps and reused, so a second session remembers the first and a

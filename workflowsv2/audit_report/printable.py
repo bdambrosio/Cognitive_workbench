@@ -49,7 +49,11 @@ tr { break-inside: avoid; }
 """
 
 
-def to_html(md_text: str, title: str = "Technical claims audit") -> str:
+def to_body(md_text: str) -> str:
+    """The report's markdown as the HTML body a page carries: page breaks
+    before the sections a reader treats as separate documents, each finding
+    boxed, the materials line marked as front matter. The browser's document
+    pane uses this; `to_html` wraps it in a page."""
     md = MarkdownIt("commonmark").enable("table")
     body = md.render(md_text)
     # Page breaks before the sections a reader treats as separate documents.
@@ -68,6 +72,11 @@ def to_html(md_text: str, title: str = "Technical claims audit") -> str:
     # The materials line under the title is front matter.
     body = re.sub(r"(</h1>\s*)<p>(Materials as of[^<]*)</p>",
                   r'\1<p class="front">\2</p>', body, count=1)
+    return body
+
+
+def to_html(md_text: str, title: str = "Technical claims audit") -> str:
+    body = to_body(md_text)
     # A running page header needs @page margin boxes, which Chrome's print
     # engine does not place; a fixed element lands on the page body instead.
     # Left to a PDF engine that supports them (WeasyPrint) if wanted.
