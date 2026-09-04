@@ -12,3 +12,21 @@ claim_sources:
 
 
 retention: keep
+
+# THE BUYER IS ILLUSTRATIVE. The demo has no client, so the practice wrote
+# this transaction and these thresholds itself, short, so the ratings in the
+# public report read against stated thresholds the way a real engagement's
+# do. The demo page says so. Nothing here describes a real deal.
+transaction: |
+  Client: an illustrative buyer, written by the practice for the public demo
+  Acting for the client: the practice
+  Counterparty: the project's maintainer, as seller
+  Subject: the source code, to be run as a hosted link-shortening service for the buyer's own customers
+  Price and basis: nominal; the buyer assumes the README is accurate
+  Structure: asset purchase
+  Timetable: none; illustrative
+
+thresholds: |
+  Paying for: a small, private link shortener the buyer can run for its customers at low cost, as the README describes it
+  Would change the price or the terms: any way visitors are logged or tracked beyond the hit count; footprint or resource figures materially worse than stated; a hardening step the README implies is on by default but is not
+  Would end the deal: a licence or ownership problem with the code, or a dependency the buyer cannot run on its own hardware
