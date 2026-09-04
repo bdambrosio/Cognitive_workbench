@@ -9,7 +9,6 @@ target: target
 
 claim_sources:
   - README.md
-  - docs/INSTALLATION.md
 
 
 retention: keep
