@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import sys
+import time
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -22,6 +23,10 @@ from cot_profiles import is_reasoning_model, resolve_profile  # noqa: E402
 from chat.model_params import (TOP_P, resolve_temperature)  # noqa: E402
 
 logger = logging.getLogger('chat_loop')
+#: One line per completed OpenAI-compatible call: wall time and the token
+#: counts the server reports. Its own logger so a runner can file it in a
+#: run log at INFO without also taking the <llm-raw> message dumps.
+usage_logger = logging.getLogger('chat.backend.usage')
 
 # Client read timeout for a completion call. It bounds QUEUE WAIT plus
 # generation, not generation alone: a turn fans out into reflection, claim
@@ -723,6 +728,7 @@ class _ChatBackend:
         for dead in self._param_drops:
             body.pop(dead, None)
 
+        _t0 = time.monotonic()
         resp = self._post_adapting(url, headers, body, timeout_s=timeout_s)
         if not resp.ok:
             # Surface the provider's actual error reason (xAI/OpenAI return
@@ -747,6 +753,19 @@ class _ChatBackend:
         _m = choice.get('message') or {}
         _r = _m.get('reasoning_content') or _m.get('reasoning')
         self.last_reasoning_chars = len(_r) if isinstance(_r, str) and _r else None
+        try:
+            _u = data.get('usage') or {}
+            _cd = _u.get('completion_tokens_details') or {}
+            _pd = _u.get('prompt_tokens_details') or {}
+            usage_logger.info(
+                '<llm-usage> elapsed=%.1fs prompt=%s cached=%s completion=%s '
+                'reasoning=%s finish=%s model=%s',
+                time.monotonic() - _t0, _u.get('prompt_tokens'),
+                _pd.get('cached_tokens'), _u.get('completion_tokens'),
+                _cd.get('reasoning_tokens'), choice.get('finish_reason'),
+                self.model)
+        except Exception as e:                                   # noqa: BLE001
+            logger.warning('usage line not written: %s', e)
         try:
             logger.info(
                 "<llm-raw> profile=%s grammar=%s finish=%s message=%s",

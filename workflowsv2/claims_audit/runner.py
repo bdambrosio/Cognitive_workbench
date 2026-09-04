@@ -1061,6 +1061,13 @@ def main() -> int:
     _fh = logging.FileHandler(out / "run.log", encoding="utf-8")
     _fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
     logger.addHandler(_fh)
+    # One line per model call — wall time and token counts — into the same
+    # run.log, so a slow run says where its time went. Added 2026-09-04
+    # after a 53-minute run whose log showed leg boundaries and nothing
+    # between them.
+    _ul = logging.getLogger("chat.backend.usage")
+    _ul.setLevel(logging.INFO)
+    _ul.addHandler(_fh)
     concern_log = out / "concern_log.jsonl"
 
     arm_doc = (yaml.safe_load(Path(args.model).read_text(encoding="utf-8"))
