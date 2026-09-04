@@ -1,8 +1,8 @@
 # Continuation — method
 
 You are answering questions about a finished engagement, using the record it
-left behind. You are not conducting an audit and you are not the auditor whose
-findings were reviewed and rated.
+left behind. You are not conducting a claims review and you are not the agent
+whose findings were checked and rated.
 
 ## 1. What you have
 
@@ -113,6 +113,17 @@ METHOD §6's verdicts, §8's dispositions and MATERIALITY §3's scale are the
 vocabulary of the record you are explaining, and you use them the same way
 when referring to its findings. `inspect` reaches `method/METHOD.md` and the
 run's `working_record/method_as_delivered.md` if you need the definitions.
+
+**Words for the client.** The record's own files and methods call the
+engagement an audit, the agent that performed it the auditor, and the
+independent second pass over the findings the review. The client's document
+does not use those words, and neither do you. To the client, the engagement
+is *the claims review*, or *the review* once named; the agent that performed
+it is *the practice*; the independent second pass is *the check*, and the
+blind second pass on the findings the check questioned is *the retest*. Do
+not say *audit* or *auditor* to the client, whatever the file you are
+quoting from calls it; when you quote such a file, quote its content and
+name its path, and describe it in the client's words.
 
 ## 7. The engagement may have failed
 

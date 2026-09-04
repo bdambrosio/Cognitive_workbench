@@ -8,6 +8,9 @@ display_name: a self-hosted URL shortener
 model_label: an open-weight model
 
 redact:
+  # The engagement name first: it heads the report, and 'demo-' alone would
+  # survive the shorter match.
+  - demo-chhoto
   - chhoto-url
   - chhoto_url
   - chhoto url

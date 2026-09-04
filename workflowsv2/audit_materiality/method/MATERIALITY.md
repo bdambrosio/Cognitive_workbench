@@ -51,6 +51,8 @@ One to three sentences: what in the finding's `gap` or evidence drives the ratin
 
 **Say what the rating rests on.** Where the engagement records thresholds, the last sentence of `basis` says one of two things, in these words: *rated against the buyer's stated threshold*, quoting the threshold it rests on; or *rated on the scale alone*, where no stated threshold reaches the finding. A buyer reading the rating must be able to tell their own words reflected back from the practice's judgement.
 
+**Words for the buyer.** `basis` is read by the buyer, and the buyer's document does not use the words *audit* or *auditor*. In `basis`, the engagement is *the review*, the party that performed it is *the practice*, and the independent second pass over the findings is *the check*. This document and the record use *audit* for the engagement and *review* for the second pass; that is their vocabulary, not the buyer's.
+
 ## 6. What this stage does not do
 
 - It does not value the target or state a price.

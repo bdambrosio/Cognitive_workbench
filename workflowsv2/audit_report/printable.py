@@ -19,7 +19,7 @@ from pathlib import Path
 from markdown_it import MarkdownIt
 
 #: Sections that start a new page in print.
-PAGE_BREAK_BEFORE = ("Executive summary", "What the audit showed",
+PAGE_BREAK_BEFORE = ("Executive summary", "What the review showed",
                      "Appendix — every claim and its verdict")
 
 CSS = """
@@ -75,7 +75,7 @@ def to_body(md_text: str) -> str:
     return body
 
 
-def to_html(md_text: str, title: str = "Technical claims audit") -> str:
+def to_html(md_text: str, title: str = "Claims review") -> str:
     body = to_body(md_text)
     # A running page header needs @page margin boxes, which Chrome's print
     # engine does not place; a fixed element lands on the page body instead.
@@ -89,7 +89,7 @@ def render_file(md_path: Path, html_path: Path | None = None) -> Path:
     md_path = Path(md_path)
     text = md_path.read_text(encoding="utf-8")
     m = re.search(r"(?m)^# (.+)$", text)
-    title = m.group(1) if m else "Technical claims audit"
+    title = m.group(1) if m else "Claims review"
     html_path = Path(html_path) if html_path else md_path.with_suffix(".html")
     html_path.write_text(to_html(text, title), encoding="utf-8")
     return html_path

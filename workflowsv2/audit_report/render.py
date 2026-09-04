@@ -7,7 +7,7 @@ assembles, with a marker where each passage would go, and that is what the
 agent is shown.
 
 THREE CLASSES, AND ONLY ONE IS A MARK AGAINST THE SELLER. Findings with a
-verdict about the claim are what the audit showed, ordered by materiality.
+verdict about the claim are what the review showed, ordered by materiality.
 `unverifiable` findings are unsettled, ordered by exposure, and among them
 those the searches named files for that nobody opened are set apart as not
 examined. Nothing here re-judges: every verdict, gap, rating and basis is the
@@ -148,9 +148,9 @@ def _evidence(items: Sequence[Dict[str, Any]]) -> List[str]:
 
 def _review_line(f: Dict[str, Any]) -> str:
     rv = f.get("review") or {}
-    line = {"holds": "the review upheld this finding",
-            "does_not_hold": "the review did not uphold this finding",
-            "unreviewed": "not reviewed"}.get(rv.get("outcome"), "not reviewed")
+    line = {"holds": "the check upheld this finding",
+            "does_not_hold": "the check did not uphold this finding",
+            "unreviewed": "not checked"}.get(rv.get("outcome"), "not checked")
     if rv.get("adverse_observations"):
         line += " (" + ", ".join(rv["adverse_observations"]) + ")"
     if f.get("citation_problems"):
@@ -212,7 +212,7 @@ def _finding(f: Dict[str, Any], rating: Optional[Dict[str, Any]],
         links = _links(f)
         if links:
             out += ["**Where the claim source points:** " + ", ".join(
-                f"<{u}>" for u in links) + ". The audit did not follow "
+                f"<{u}>" for u in links) + ". The practice did not follow "
                 "these links; the buyer can confirm what is there directly.", ""]
     if rating:
         agree = rating.get("agreement")
@@ -231,7 +231,7 @@ def _finding(f: Dict[str, Any], rating: Optional[Dict[str, Any]],
     if f.get("correction"):
         out += [f"**Correction:** {_md_safe(f['correction'])}", ""]
     out += ["", "Evidence:", ""] + (_evidence(f.get("evidence")) or ["- (none)"])
-    out += ["", f"Review: {_review_line(f)}.", ""]
+    out += ["", f"Check: {_review_line(f)}.", ""]
     return out
 
 
@@ -240,7 +240,7 @@ def coverage(merged: Dict[str, Any], ratings: Dict[str, Any],
     """The figures, computed. Never written by the agent."""
     fig = merged.get("figures") or {}
     rf = ratings.get("figures") or {}
-    out = ["| claim source | claims | findings | reviewed | files read | "
+    out = ["| claim source | claims | findings | checked | files read | "
            "gathering legs | model |", "|---|---|---|---|---|---|---|"]
     for r in merged.get("runs") or []:
         out.append(f"| {r.get('claim_source')} | {r.get('claims')} | "
@@ -310,17 +310,17 @@ def _front_matter(engagement: str, dates: List[str], revs: List[str],
     rev = (" at commit " + ", ".join(r[:12] for r in revs)) if revs else ""
     src = ", ".join(f"`{s}`" for s in sources) or "the claim sources named by the engagement"
     return [
-        f"# Technical claims audit — {engagement}", "",
+        f"# Claims review — {engagement}", "",
         f"Materials as of {when}{rev}. Claim sources: {src}.", "",
-        "**What this document is.** A claims audit: the assertions the seller "
+        "**What this document is.** A claims review: the assertions the seller "
         "makes in the claim sources are tested, one by one, against the "
         "materials the seller supplied, and each is reported with the "
         "evidence that settles it. A *claim source* is a document in which "
         "the seller asserts things about the target; the *materials* are "
         "everything supplied, including the claim sources, source code and "
-        "configuration. The audit examined what was supplied and nothing "
+        "configuration. The review examined what was supplied and nothing "
         "else.", "",
-        "**The assurance given is limited.** The audit reports what the "
+        "**The assurance given is limited.** The review reports what the "
         "materials show about each claim. It did not perform procedures "
         "beyond examining the materials, so a claim the materials cannot "
         "settle is reported as unsettled, not as false, and the document "
@@ -328,8 +328,8 @@ def _front_matter(engagement: str, dates: List[str], revs: List[str],
         "overall assessment is given only against thresholds the buyer has "
         "stated; where this document carries none, none was recorded.", "",
         "**Responsibilities.** The seller made the claims and was not "
-        "consulted; the seller has not confirmed the audit's reading of any "
-        "claim. The practice performed the audit under its written method, "
+        "consulted; the seller has not confirmed the review's reading of any "
+        "claim. The practice performed the review under its written method, "
         "at the version each run received, retained with the record, and is "
         "responsible for the findings and their ratings. The buyer is "
         "responsible for decisions taken on them.", ""]
@@ -342,10 +342,10 @@ def _how_to_read() -> List[str]:
         "Each finding names one claim as the claim source states it, gives a "
         "*verdict*, cites the *evidence* — a file and line numbers in the "
         "materials, quoted — and, where a rating applies, says what the gap "
-        "would change for this transaction. A *review* is an independent "
+        "would change for this transaction. A *check* is an independent "
         "second pass over each finding's evidence, and a *retest* is a "
-        "second reviewer, blind to the first, on the findings the review "
-        "questioned. Each finding ends with the review's outcome.", "",
+        "second check, blind to the first, on the findings the check "
+        "questioned. Each finding ends with the check's outcome.", "",
         "**Verdicts**, and the class each puts a claim in:", "",
         "| verdict | meaning | class |", "|---|---|---|",
         "| contradicted | " + VERDICT_WORDS["contradicted"] + " | shown |",
@@ -353,7 +353,7 @@ def _how_to_read() -> List[str]:
         "| real_with_caveat | " + VERDICT_WORDS["real_with_caveat"] + " | shown |",
         "| unverifiable | " + VERDICT_WORDS["unverifiable"] + " | unsettled, or not examined |",
         "| real | the materials bear the claim out | holds |", "",
-        "**The three classes.** *Shown* findings are gaps the audit "
+        "**The three classes.** *Shown* findings are gaps the review "
         "demonstrated in the materials; they are the only findings that count "
         "against the seller, and each carries a *materiality* rating. "
         "*Unsettled* claims are ones the supplied materials cannot settle; "
@@ -365,16 +365,16 @@ def _how_to_read() -> List[str]:
         "**Where the claim source points.** An unsettled claim whose "
         "materials were not supplied — a listing, a published package, a "
         "hosted service — shows any link the claim source itself gives for "
-        "it. The audit did not follow those links and says nothing about "
+        "it. The practice did not follow those links and says nothing about "
         "what is there; the buyer can look.", "",
         "**Ratings.** Materiality and exposure use one scale, read for a gap "
-        "the audit showed or for a claim assumed false:", "",
+        "the review showed or for a claim assumed false:", "",
         "| rating | meaning |", "|---|---|",
         "| not_material | " + RATING_WORDS["not_material"] + " |",
         "| material | " + RATING_WORDS["material"] + " |",
         "| decisive | " + RATING_WORDS["decisive"] + " |", "",
         "Materiality and exposure are never added together: one counts what "
-        "the audit showed, the other what rests on what it could not settle.", "",
+        "the review showed, the other what rests on what it could not settle.", "",
         "**How stable a rating is.** Each rating was made twice, independently; "
         "where the two readings differed, the finding was rated five times and "
         "the rating shown is the one most of them gave, with the count. A rating "
@@ -416,7 +416,7 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
     out += ["## Executive summary", ""] + _slot("summary", prose)
     kf = key_findings(classes, by_m)
     out += ["**The material findings**, ordered by rating — each is set out in "
-            "full under *What the audit showed*:", ""]
+            "full under *What the review showed*:", ""]
     out += kf + [""] if kf else ["No finding was rated material or decisive.", ""]
 
     # THE CONCLUSION IS OPT-IN AND CONDITIONAL. Present only when the
@@ -427,11 +427,11 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
         out += ["## Conclusion", "",
                 "The engagement asked for a conclusion. It is read against "
                 "the buyer's thresholds stated above and against nothing "
-                "else; it counts what the audit showed, not what it could "
+                "else; it counts what the review showed, not what it could "
                 "not settle.", ""] + _slot("conclusion", prose)
 
     out += ["## Scope and approach", "",
-            "| claim source | claims | findings | reviewed | files read | "
+            "| claim source | claims | findings | checked | files read | "
             "gathering legs | model |", "|---|---|---|---|---|---|---|"]
     for r in runs:
         out.append(f"| {r.get('claim_source')} | {r.get('claims')} | "
@@ -440,9 +440,9 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
                    f"{r.get('resolved_model') or ''} |")
     out += ["", "*Claims* are the seller's assertions as enumerated from the "
                 "claim source, one finding each. *Files read* counts the "
-                "target's files the audit opened while gathering evidence, "
-                "over the number of *gathering legs* it took. *Reviewed* says "
-                "whether the independent review ran on that claim source.", ""]
+                "target's files the practice opened while gathering evidence, "
+                "over the number of *gathering legs* it took. *Checked* says "
+                "whether the independent check ran on that claim source.", ""]
     subs = sorted({m for r in runs for m in ((r.get("materials") or {}).get("submodules") or [])})
     if subs:
         out += ["**Not supplied:** the materials name "
@@ -454,7 +454,7 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
 
     out += _how_to_read()
 
-    out += ["## What the audit showed", ""] + _slot("shown_note", prose)
+    out += ["## What the review showed", ""] + _slot("shown_note", prose)
     for f in _ordered(classes["shown"], by_m, "materiality"):
         out += _finding(f, by_m.get(_key(f)), "materiality")
     if not classes["shown"]:
@@ -517,13 +517,13 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
 
     out += ["## Limitations", ""] + _slot("limitations", prose)
     out += ["The party that made these claims was not consulted and has not "
-            "confirmed the audit's interpretation of them. Every verdict and "
+            "confirmed the review's interpretation of them. Every verdict and "
             "rating is defined by the practice's method at the version each "
             "run received, which is retained with the record; a later method "
             "may define a term differently.", ""]
 
     out += ["## Appendix — every claim and its verdict", "",
-            "The claim surface as the audit froze it, in document order, with "
+            "The claim surface as the review froze it, in document order, with "
             "the verdict each claim received and, where rated, its "
             "materiality or exposure.", "",
             "| source | id | lines | claim | verdict | rating |",
