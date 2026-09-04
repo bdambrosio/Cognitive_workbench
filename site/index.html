@@ -16,9 +16,17 @@
 <main>
 
 <h1>The seller says the software does&nbsp;X.<br>Does it?</h1>
-<p class="lede">We check what a piece of software says about itself against what its code actually does. Every finding names the file and the lines that settle it, so you can look for yourself. The same method serves a developer weighing an open-source dependency and a buyer weighing a company.</p>
+<p class="lede">For buyers and advisers of small software companies, at the point where the seller's description of the product is most of what you have. We check what the software says about itself against what its code actually does, and every finding names the file and the lines that settle it, so you can look for yourself.</p>
 <p class="note">Now taking a small number of pilot engagements.</p>
 <p><a class="btn primary" href="demo.html">Read a finished review</a> <a class="btn" href="about.html">Discuss a pilot review</a></p>
+
+<p class="eyebrow">One finding, from the demo</p>
+<div class="card">
+<p><strong>The claim</strong> (README, lines 66–67): "Counts number of hits for each short link in a privacy respecting way i.e. only the hit is recorded, and nothing else."</p>
+<p><strong>Verdict:</strong> partly true. The counter itself stores one integer per link: <span class="mono">backend/src/database/queries.rs:20–23</span> increments <span class="mono">hits</span> and nothing else. But <span class="mono">backend/src/main.rs:98–99</span> installs the framework's default access log on every request, so each redirect visit is written out with the client address and user agent.</p>
+<p><strong>Rating:</strong> material. A buyer paying for the privacy posture the README describes is not getting it; the price or the terms would change, the deal would not end.</p>
+<p><strong>Check:</strong> the independent check upheld the finding. <a href="demo.html">Read the whole review and ask it questions</a>.</p>
+</div>
 
 <p class="eyebrow">What you receive</p>
 <p>A report you can check line by line, and a private page where you can ask about any part of it. The report has a fixed shape:</p>
@@ -32,22 +40,23 @@
 <tr><td>Appendix</td><td>Every claim and its verdict, in document order.</td></tr>
 </table>
 <p><a href="demo.html">See one, on a real project</a>.</p>
+<p>You supply read access to the repository and name the documents that carry the seller's claims. A small target comes back within days of receiving the materials; a typical deal in about a week.</p>
 
 <p class="eyebrow">Three ways in</p>
 <div class="grid">
   <div class="card"><h3>Try it</h3><p class="mono">Free</p><p>Read a completed claims review of a small open-source project and ask it questions. If you have a repository of your own to evaluate, write to us and we will set you up to run one.</p><p><a href="demo.html">Open the demo</a></p></div>
-  <div class="card"><h3>Claims review</h3><p class="mono">From $500 · quoted after intake</p><p>Every claim in the documents you name, tested against the code, independently reviewed, and rated against what matters to you. A report you can check line by line, and a page where you can keep asking.</p><p><a href="pricing.html">What it covers</a></p></div>
+  <div class="card"><h3>Claims review</h3><p class="mono">From $500 · quoted after intake</p><p>Every claim in the documents you name, tested against the code, independently reviewed, and rated against what matters to you. A report you can check line by line, signed by a person who stands behind it, and a page where you can keep asking.</p><p><a href="pricing.html">What it covers</a></p></div>
   <div class="card"><h3>Attested due diligence</h3><p class="mono">Quoted per engagement</p><p>The claims review, plus a reading of the whole record by someone who has sat on both sides of a deal. A signed opinion, and a person on call to your deal team while it matters.</p><p><a href="about.html">Who signs</a></p></div>
 </div>
 
 <p class="eyebrow">Who it is for</p>
-<p>Developers choosing between open-source projects, where the README is most of what you have to go on. Advisers and buyers of software businesses in the $1M to $5M range, at the point where the seller's description of the product is the main thing on the table. A claims review sits a rung below a full technical due diligence: narrower, quicker, and priced so it can be done before the letter of intent rather than after.</p>
+<p>Advisers and buyers of software businesses in the $1M to $5M range, at the point where the seller's description of the product is the main thing on the table. A claims review sits a rung below a full technical due diligence: narrower, quicker, and priced so it can be done before the letter of intent rather than after. The same method serves a developer choosing an open-source dependency on the strength of its README; the free demo is that case.</p>
 <p>It is not a penetration test, not a review of code quality or architecture, and not legal advice. It reports the state of each claim and what a gap would change for you.</p>
 
 <p class="eyebrow">How it works</p>
 <div class="step"><div class="n">01</div><div><strong>Intake.</strong><p>A short conversation about what you are evaluating and why: what you already know, what would change your mind, and, for a deal, what would move the price or end it.</p></div></div>
 <div class="step"><div class="n">02</div><div><strong>Review.</strong><p>The claims are listed and frozen before any evidence is read, and then each one is tested against the code and the documents supplied.</p></div></div>
-<div class="step"><div class="n">03</div><div><strong>Check and rate.</strong><p>A second, independent pass re-reads the evidence behind every finding. Each gap is rated against your thresholds, twice, and looked at again when the two readings differ.</p></div></div>
+<div class="step"><div class="n">03</div><div><strong>Check and rate.</strong><p>A second, independent pass re-reads the evidence behind every finding. Each gap is rated against your thresholds, twice, and looked at again when the two readings differ. A README that promises no visitor logging while the server writes an access log by default is material to a buyer paying for that privacy posture, and not material to one who is not.</p></div></div>
 <div class="step"><div class="n">04</div><div><strong>Report and questions.</strong><p>You receive the report and a private page where you can ask about any finding in your own time, with the working record behind every answer.</p></div></div>
 
 <p class="eyebrow">Why it holds up</p>
