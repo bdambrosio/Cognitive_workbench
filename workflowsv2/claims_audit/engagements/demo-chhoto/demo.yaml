@@ -5,7 +5,7 @@
 # the practice's list, not a detector: read the demo page before publishing.
 
 display_name: a self-hosted URL shortener
-model_label: a 27B open-weight model
+model_label: an open-weight model
 
 redact:
   - chhoto-url
@@ -15,6 +15,10 @@ redact:
   - SinTan1729
   - Sayantan Santra
   - sintan
+  # The name in Bengali script, and its percent-encoded form in the
+  # Wiktionary link the site and README carry.
+  - "ছোট"
+  - "%E0%A6%9B%E0%A7%8B%E0%A6%9F"
 
 max_live: 8
 max_turns: 20

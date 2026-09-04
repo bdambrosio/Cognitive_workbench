@@ -70,5 +70,5 @@ def banner(display_name: str, claims: int, findings: int, sources: int,
         f"  target       {display_name} — a real public repository, identity withheld",
         f"  audited      {sources} claim document{'s' if sources != 1 else ''}, "
         f"{claims} claims, {findings} findings, reviewed and rated",
-        f"  model        {model_label}, running on the practice's own hardware",
+        f"  model        {model_label}, on a hosted inference service",
         "  this page    your conversation is private to your browser and kept for a few days"])
