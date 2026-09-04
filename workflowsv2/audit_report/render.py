@@ -1,7 +1,7 @@
 """The client's document, assembled from the record. Mechanical.
 
 Reads `merged.json` and `materiality.json` from a materiality output directory
-and writes the document REPORT.md §6 describes. The six passages the agent
+and writes the document REPORT.md §6 describes. The passages the agent
 writes are placed where §6 names them; without them the document still
 assembles, with a marker where each passage would go, and that is what the
 agent is shown.
@@ -372,7 +372,8 @@ def _how_to_read() -> List[str]:
 def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
              transaction: Optional[str] = None,
              engagement: Optional[str] = None,
-             thresholds: Optional[str] = None) -> str:
+             thresholds: Optional[str] = None,
+             conclusion: bool = False) -> str:
     """REPORT.md §6, in order. `prose` absent leaves a `[[field]]` marker in
     each slot, which is the form the agent is shown."""
     merged, ratings = record["merged"], record["ratings"]
@@ -400,6 +401,17 @@ def assemble(record: Dict[str, Any], prose: Optional[Dict[str, Any]] = None,
     out += ["**The material findings**, ordered by rating — each is set out in "
             "full under *What the audit showed*:", ""]
     out += kf + [""] if kf else ["No finding was rated material or decisive.", ""]
+
+    # THE CONCLUSION IS OPT-IN AND CONDITIONAL. Present only when the
+    # engagement asked for one and the buyer's thresholds are recorded; the
+    # front matter says an overall assessment is given only against stated
+    # thresholds, and this is where it is given.
+    if conclusion and thresholds:
+        out += ["## Conclusion", "",
+                "The engagement asked for a conclusion. It is read against "
+                "the buyer's thresholds stated above and against nothing "
+                "else; it counts what the audit showed, not what it could "
+                "not settle.", ""] + _slot("conclusion", prose)
 
     out += ["## Scope and approach", "",
             "| claim source | claims | findings | reviewed | files read | "

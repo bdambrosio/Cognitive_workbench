@@ -246,6 +246,10 @@ def test_load_engagement_prefers_the_intake_blocks(tmp_path, monkeypatch):
     e = rn.load_engagement("eng")
     assert e["thresholds"].strip() == "intake says" and e["transaction"].strip() == "buys it"
     assert rn.load_engagement("eng", intake=a)["intake_id"] == a
+    assert rn.load_engagement("eng")["conclusion"] is False
+    (st.intake_dir(d, a) / st.BLOCKS_FILE).write_text(
+        "thresholds: |\n  intake says\nconclusion: true\n")
+    assert rn.load_engagement("eng")["conclusion"] is True
     import pytest
     with pytest.raises(SystemExit):
         rn.load_engagement("eng", intake="nope")

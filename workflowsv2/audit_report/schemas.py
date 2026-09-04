@@ -2,7 +2,7 @@
 parsed. REPORT.md §7 states the contract; `lint_workflow.check_report_fields`
 keeps the two in step.
 
-The agent's whole output is six passages of prose. Nothing it writes is
+The agent's whole output is seven passages of prose. Nothing it writes is
 checkable against a cited line, which is why the checks here are about the
 passages' relation to the record — a claim id that does not exist, a marker
 that belongs to the harness — and never about their content.
@@ -13,11 +13,12 @@ import re
 from typing import Any, Dict, List, Tuple
 
 #: REPORT.md §7, in document order.
-FIELDS: Tuple[str, ...] = ("summary", "scope_note", "shown_note",
+FIELDS: Tuple[str, ...] = ("summary", "conclusion", "scope_note", "shown_note",
                            "unsettled_note", "not_examined_note", "limitations")
 
-#: The fields that may be empty, and when (REPORT.md §6).
-MAY_BE_EMPTY: Tuple[str, ...] = ("not_examined_note",)
+#: The fields that are written only when the document calls for them
+#: (REPORT.md §6): empty otherwise, and never empty when it does.
+CONDITIONAL: Tuple[str, ...] = ("conclusion", "not_examined_note")
 
 _CLAIM_REF = re.compile(r"\bclaim\s+#?(\d+)\b", re.I)
 
@@ -29,23 +30,27 @@ def prose_schema() -> Dict[str, Any]:
 
 
 def check_prose(obj: Dict[str, Any], merged: Dict[str, Any],
-                has_not_examined: bool) -> Dict[str, Any]:
+                has_not_examined: bool,
+                wants_conclusion: bool = False) -> Dict[str, Any]:
     """What REPORT.md requires that the schema cannot express."""
     problems: List[str] = []
     ids = {f.get("claim_id") for f in merged.get("findings") or []}
+    wanted = {"conclusion": wants_conclusion,
+              "not_examined_note": has_not_examined}
+    why = {"conclusion": "the document does not ask for a conclusion",
+           "not_examined_note": "the document has no such claims"}
     for f in FIELDS:
         text = obj.get(f)
         if not isinstance(text, str):
             problems.append(f"{f}: missing")
             continue
         if not text.strip():
-            if f in MAY_BE_EMPTY and not has_not_examined:
+            if f in CONDITIONAL and not wanted[f]:
                 continue
             problems.append(f"{f}: empty (REPORT.md §6)")
             continue
-        if f in MAY_BE_EMPTY and not has_not_examined:
-            problems.append(f"{f}: written, and the document has no such "
-                            f"claims (REPORT.md §6)")
+        if f in CONDITIONAL and not wanted[f]:
+            problems.append(f"{f}: written, and {why[f]} (REPORT.md §6)")
         if re.search(r"(?m)^\s*===", text):
             problems.append(f"{f}: carries a `===` marker line")
         for m in _CLAIM_REF.finditer(text):

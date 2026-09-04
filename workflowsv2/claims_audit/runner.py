@@ -146,7 +146,10 @@ def load_engagement(name: str, intake: Optional[str] = None) -> Dict[str, Any]:
             "transaction": blocks.get("transaction") or cfg.get("transaction"),
             # The buyer's own thresholds — what changes the price, what ends
             # the deal — written by the intake stage. Free text; may be absent.
-            "thresholds": blocks.get("thresholds") or cfg.get("thresholds")}
+            "thresholds": blocks.get("thresholds") or cfg.get("thresholds"),
+            # Whether the buyer asked for a conclusion (REPORT.md §6 item 3):
+            # written by the intake's --finish --conclusion; may be absent.
+            "conclusion": bool(blocks.get("conclusion", cfg.get("conclusion")))}
 
 
 def engagement_state(world: str, agent: str, leg: int, max_legs: int,

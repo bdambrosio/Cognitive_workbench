@@ -52,18 +52,19 @@ Say the useful thing first. A passage that introduces a section is a paragraph a
 
 ## 6. The passages
 
-Six, each one field of the output. The document is assembled in this order, and the passage is placed where it is named.
+Seven, each one field of the output. The document is assembled in this order, and the passage is placed where it is named.
 
 1. Title, the date and version of the materials, the assurance given, and the transaction as the engagement states it. Written by the client's process.
 2. **Executive summary.** **`summary`** — two or three short paragraphs: what this document is and what was examined, the claim sources and the materials they were tested against; that every finding cites the evidence that settles it, so any finding can be checked; and in one or two sentences what most changes what the buyer assumed, named by claim source and claim id. The client's process then lists the material findings, one line each; do not list them yourself.
-3. **Scope and approach.** The table of what was examined, computed, followed by **`scope_note`** — two or three short paragraphs on what the table does not say: which claim sources were reviewed and which were not, what kind of material was not supplied or sits outside the materials, and what parts of the target the findings did not reach.
-4. How to read a finding, with every term defined. Written by the client's process.
-5. **`shown_note`** — one paragraph before the shown findings: what kind of gaps they are, what pattern they make taken together, and that they are ordered by materiality.
-6. **`unsettled_note`** — one paragraph before the unsettled claims: that nothing was found against them, what they have in common and why the materials cannot settle them, and that they are ordered by exposure.
-7. **`not_examined_note`** — one to three sentences before the unexamined claims: that the searches named files nobody opened, that these claims are the first thing a further pass would settle, and that they are ordered by exposure. Empty when the document has no such claims.
-8. The claims that hold, the questions for the seller, the unclaimed observations, and the coverage figures, copied or computed.
-9. **`limitations`** — one paragraph. What this document is not: not a penetration test, not a code-quality review, not legal advice, not a judgement on claims it did not resolve. The facts about scope come from the document itself; add nothing it does not state. The client's process adds the inherent limitations it states in every report.
-10. The appendix of every claim and its verdict, computed.
+3. **Conclusion.** **`conclusion`** — one paragraph, present only when the document says the engagement asked for a conclusion and the document carries the buyer's thresholds. It is written in the negative form, and every sentence is conditional on those thresholds as the document states them: whether the audit found any gap rated `decisive`, which the buyer said would end the deal — where it found none, say so in those terms; the gaps rated `material`, which the buyer said would change the price or the terms, named by claim source and claim id, and nothing rated below them; and that unsettled claims are not counted, because the audit showed nothing against them. No view on whether the buyer should proceed, and no sentence that is true without the thresholds. An empty string when the document does not ask for a conclusion or carries no thresholds.
+4. **Scope and approach.** The table of what was examined, computed, followed by **`scope_note`** — two or three short paragraphs on what the table does not say: which claim sources were reviewed and which were not, what kind of material was not supplied or sits outside the materials, and what parts of the target the findings did not reach.
+5. How to read a finding, with every term defined. Written by the client's process.
+6. **`shown_note`** — one paragraph before the shown findings: what kind of gaps they are, what pattern they make taken together, and that they are ordered by materiality.
+7. **`unsettled_note`** — one paragraph before the unsettled claims: that nothing was found against them, what they have in common and why the materials cannot settle them, and that they are ordered by exposure.
+8. **`not_examined_note`** — one to three sentences before the unexamined claims: that the searches named files nobody opened, that these claims are the first thing a further pass would settle, and that they are ordered by exposure. Empty when the document has no such claims.
+9. The claims that hold, the questions for the seller, the unclaimed observations, and the coverage figures, copied or computed.
+10. **`limitations`** — one paragraph. What this document is not: not a penetration test, not a code-quality review, not legal advice, not a judgement on claims it did not resolve. The facts about scope come from the document itself; add nothing it does not state. The client's process adds the inherent limitations it states in every report.
+11. The appendix of every claim and its verdict, computed.
 
 ## 7. The output
 
@@ -72,10 +73,11 @@ One JSON object. Its shape is enforced; this document says what makes a field co
 | Field | Contents |
 |---|---|
 | `summary` | Per §6 item 2 |
-| `scope_note` | Per §6 item 3 |
-| `shown_note` | Per §6 item 5 |
-| `unsettled_note` | Per §6 item 6 |
-| `not_examined_note` | Per §6 item 7; an empty string when there are no unexamined claims |
-| `limitations` | Per §6 item 9 |
+| `conclusion` | Per §6 item 3; an empty string when the document does not ask for a conclusion or carries no thresholds |
+| `scope_note` | Per §6 item 4 |
+| `shown_note` | Per §6 item 6 |
+| `unsettled_note` | Per §6 item 7 |
+| `not_examined_note` | Per §6 item 8; an empty string when there are no unexamined claims |
+| `limitations` | Per §6 item 10 |
 
 Emit nothing outside the JSON object.

@@ -11,7 +11,7 @@ Two parts, in order:
      coverage figures computed. This alone is a deliverable.
   2. WRITE. One schema-constrained call, no tools and no legs: the agent is
      shown the assembled document with a marker in each slot and returns the
-     six passages REPORT.md §6 names. They are placed and the document is
+     passages REPORT.md §6 names. They are placed and the document is
      written again.
 
 WHY THE AGENT WRITES AROUND THE FINDINGS AND NEVER OVER THEM. Same reason as
@@ -111,7 +111,7 @@ def write_prose(loop, method_text: str, skeleton: str,
             + "\n\nThe document, without your passages. Each `[[field]]` "
               "marker is where that passage will be placed:\n\n"
             + skeleton
-            + "\n\nWrite the six passages, per REPORT.md \u00a76, and emit them "
+            + "\n\nWrite the passages, per REPORT.md \u00a76, and emit them "
               "under the fields of \u00a77.")
     return emit(loop, method_text, user, schemas.prose_schema(), max_tokens)
 
@@ -157,7 +157,11 @@ def main() -> int:
     logger.addHandler(fh)
 
     thresholds = eng.get("thresholds")
-    skeleton = render.assemble(record, None, transaction, eng_name, thresholds)
+    # The conclusion is written only when the engagement asked for one and
+    # the buyer's thresholds are recorded (REPORT.md §6 item 3).
+    wants_conclusion = bool(eng.get("conclusion")) and bool(thresholds)
+    skeleton = render.assemble(record, None, transaction, eng_name, thresholds,
+                               wants_conclusion)
     (out / "report_skeleton.md").write_text(skeleton, encoding="utf-8")
     (out / "worklist.md").write_text(render.worklist(record["merged"], out),
                                      encoding="utf-8")
@@ -173,7 +177,8 @@ def main() -> int:
     if args.rerender:
         prose = json.loads((out / "prose.json").read_text(encoding="utf-8"))
         (out / "report.md").write_text(
-            render.assemble(record, prose, transaction, eng_name, thresholds),
+            render.assemble(record, prose, transaction, eng_name, thresholds,
+                            wants_conclusion),
             encoding="utf-8")
         _printable(out)
         logger.info("rerendered from prose.json; intake %s", eng.get("intake_id"))
@@ -209,7 +214,7 @@ def main() -> int:
 
     prose = call.get("obj") or {}
     check = schemas.check_prose(prose, record["merged"],
-                                bool(classes["not_examined"]))
+                                bool(classes["not_examined"]), wants_conclusion)
     for p in check["problems"]:
         issues.note(out, stage=STAGE, code="prose_check", text=p,
                     severity="check")
@@ -218,7 +223,8 @@ def main() -> int:
     # WHAT THE AGENT DID NOT WRITE, THE RECORD STILL DELIVERS: a slot left
     # empty keeps its marker, so a reader sees where a passage is missing.
     (out / "report.md").write_text(
-        render.assemble(record, prose, transaction, eng_name, thresholds),
+        render.assemble(record, prose, transaction, eng_name, thresholds,
+                            wants_conclusion),
         encoding="utf-8")
     _printable(out)
     wall = round((datetime.datetime.now(datetime.timezone.utc) - t0).total_seconds(), 1)

@@ -63,6 +63,8 @@ def test_classify_sorts_by_verdict_and_disposition():
 def test_assemble_without_prose_leaves_markers_and_orders_by_rating():
     doc = render.assemble(_record(), None, "Buyer buys.", "eng", "walks if no backups")
     for f in schemas.FIELDS:
+        if f == "conclusion":
+            continue                    # opt-in: absent unless asked for
         assert f"[[{f}]]" in doc
     # front matter, transaction, thresholds, key findings computed
     assert doc.splitlines()[2].startswith("Materials as of 2026-09-02 at commit abcdef012345. Claim sources: `README.md`.")
@@ -118,17 +120,34 @@ def test_check_prose():
     m = _record()["merged"]
     good = {f: "Claim 1 matters." for f in schemas.FIELDS}
     assert "scope_note" in schemas.FIELDS and "coverage_note" not in schemas.FIELDS
-    assert schemas.check_prose(good, m, True)["ok"]
+    assert schemas.check_prose(good, m, True, wants_conclusion=True)["ok"]
     bad = dict(good, summary="=== COVER ===\nsee claim 99", not_examined_note="")
-    res = schemas.check_prose(bad, m, True)
+    res = schemas.check_prose(bad, m, True, wants_conclusion=True)
     text = "\n".join(res["problems"])
     assert "summary: carries a `===` marker" in text
     assert "names claim 99" in text
     assert "not_examined_note: empty" in text
-    res = schemas.check_prose(good, m, False)
+    res = schemas.check_prose(good, m, False, wants_conclusion=True)
     assert res["problems"] == ["not_examined_note: written, and the document has "
                                "no such claims (REPORT.md §6)"]
-    assert schemas.check_prose(dict(good, not_examined_note=""), m, False)["ok"]
+    assert schemas.check_prose(dict(good, not_examined_note=""), m, False, True)["ok"]
+    # the conclusion is written only when asked for
+    res = schemas.check_prose(dict(good, not_examined_note=""), m, False)
+    assert res["problems"] == ["conclusion: written, and the document does not "
+                               "ask for a conclusion (REPORT.md §6)"]
+    assert schemas.check_prose(dict(good, not_examined_note="", conclusion=""), m, False)["ok"]
+    res = schemas.check_prose(dict(good, not_examined_note="", conclusion=""), m, False, True)
+    assert res["problems"] == ["conclusion: empty (REPORT.md §6)"]
+
+
+def test_assemble_carries_a_conclusion_only_when_asked_and_thresholds_exist():
+    rec = _record()
+    prose = {f: f"[{f}]" for f in schemas.FIELDS}
+    doc = render.assemble(rec, prose, "buys it", "eng", "walks if no backups", True)
+    assert "## Conclusion" in doc and "[conclusion]" in doc
+    assert doc.index("## Conclusion") < doc.index("## Scope and approach")
+    assert "## Conclusion" not in render.assemble(rec, prose, "buys it", "eng", "walks", False)
+    assert "## Conclusion" not in render.assemble(rec, prose, "buys it", "eng", None, True)
 
 
 def test_header_index_and_worklist(tmp_path):

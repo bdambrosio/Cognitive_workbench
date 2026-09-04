@@ -1,7 +1,7 @@
 # Cognitive Workbench — report stage (2026-09-02)
 #
 # One call, no tools, no legs: the agent is shown the assembled document and
-# returns six passages under a schema (REPORT.md §7). The runner replaces the
+# returns the passages under a schema (REPORT.md §7). The runner replaces the
 # llm_config block per run (--model) and points the two repo paths at the
 # output directory so the config is well-formed; nothing reads them.
 #

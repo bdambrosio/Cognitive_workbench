@@ -98,3 +98,15 @@ def test_intake_session_refuses_a_missing_engagement(tmp_path, monkeypatch):
     monkeypatch.setattr(rn, "ENGAGEMENTS", tmp_path)
     with pytest.raises(SystemExit, match="the engagement comes first"):
         IntakeSession("nope")
+
+
+def test_finish_records_the_conclusion_opt_in(tmp_path):
+    eng = tmp_path / "e"; eng.mkdir()
+    idir = eng / "intakes" / "I1"; idir.mkdir(parents=True)
+    f = sch.empty_form(); f["identify"]["client"] = "Acme"
+    res = rn.finish(eng, idir, f, conclusion=True)
+    assert "conclusion" in res["written"]
+    import yaml
+    assert yaml.safe_load((idir / "blocks.yaml").read_text())["conclusion"] is True
+    res = rn.finish(eng, idir, f)
+    assert "conclusion" not in yaml.safe_load((idir / "blocks.yaml").read_text())

@@ -148,7 +148,8 @@ def mirror_note(loop, form: Dict[str, Any]) -> None:
         logger.warning("intake mirror note failed: %s", e)
 
 
-def finish(eng_dir: Path, intake_dir: Path, form: Dict[str, Any]) -> Dict[str, Any]:
+def finish(eng_dir: Path, intake_dir: Path, form: Dict[str, Any],
+           conclusion: bool = False) -> Dict[str, Any]:
     """The practice's action: the intake gets the blocks a run reads
     (`blocks.yaml`: transaction, thresholds), and the engagement a brief if
     there is none. Finishing again rewrites the blocks from the form as it
@@ -162,6 +163,12 @@ def finish(eng_dir: Path, intake_dir: Path, form: Dict[str, Any]) -> Dict[str, A
             continue
         text += f"{key}: |\n" + "\n".join(f"  {l}" for l in blocks[key].splitlines()) + "\n"
         written.append(key)
+    if conclusion:
+        # The buyer asked for a conclusion (REPORT.md §6 item 3). The
+        # practice's flag, not the form's: the deliverable field is the
+        # client's words, this is the engagement's decision.
+        text += "conclusion: true\n"
+        written.append("conclusion")
     if text:
         (intake_dir / state.BLOCKS_FILE).write_text(text, encoding="utf-8")
     brief = eng_dir / "brief.md"
@@ -199,6 +206,10 @@ def main() -> int:
                     help="the practice finishes the current intake: write "
                          "its blocks.yaml (transaction, thresholds) from the "
                          "form, and a brief if none; no conversation")
+    ap.add_argument("--conclusion", action="store_true",
+                    help="with --finish: the buyer asked for a conclusion; "
+                         "the report then carries one, read against the "
+                         "thresholds")
     ap.add_argument("--new", action="store_true",
                     help="start another intake for this engagement; it "
                          "becomes the current one")
@@ -221,7 +232,7 @@ def main() -> int:
         if not form_path.is_file():
             raise SystemExit(f"{intake_dir}: no intake.json to finish from")
         form = json.loads(form_path.read_text(encoding="utf-8"))
-        res = finish(eng_dir, intake_dir, form)
+        res = finish(eng_dir, intake_dir, form, conclusion=args.conclusion)
         print(f"finished intake {intake_id}: wrote "
               f"{', '.join(res['written']) or 'nothing'}")
         print(f"form: {schemas.ledger(schemas.check_intake(form))}")

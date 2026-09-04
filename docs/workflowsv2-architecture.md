@@ -115,7 +115,11 @@ findings for `exposure`; never in one total. Rated against the engagement's
 what the audit showed by materiality, unsettled claims by exposure, claims not
 examined, claims that hold, questions, observations, computed coverage, an
 appendix of every claim with its verdict. One schema-constrained call writes
-six passages (REPORT.md §6). `--no-prose` assembles without a model.
+the passages (REPORT.md §6), among them a conclusion that is present only
+when the intake recorded the buyer's opt-in (`--finish --conclusion`) and
+their thresholds: negative in form, every sentence conditional on those
+thresholds, no view on whether to proceed. `--no-prose` assembles without a
+model.
 `worklist.md` gathers every stage's `issues.jsonl`.
 
 ## Controls that hold across stages
@@ -141,9 +145,8 @@ for debugging. Hosted: GLM-5.3-Flash on Fireworks
 
 ## Not built
 
-An overall conclusion or recommendation (the thresholds now exist; the stage
-does not); the browser UI for the intake and post-delivery conversations;
-multi-document merge on a real engagement; the security audit (held); a
+A recommendation (the conclusion exists, as an opt-in passage; advice does
+not); the practice's replicate rating for spread; the public website; the security audit (held); a
 per-stage model choice so enumeration can run hosted while the rest runs
 local. The fixture (`measure/fixtures/dataroom/`) is scored by reading
 `findings.json` against `answer_key.md`.
