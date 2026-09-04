@@ -65,9 +65,9 @@ Five checks. The first is over the claim surface; the rest are per finding.
 
 **3. Evidence support.** Does the cited text show what the evidence item's `shows` says it shows?
 
-**4. Verdict calibration.** Given the claim, the evidence and the `gap`, is the verdict the right one from METHOD §6? A verdict is **overstated** when it credits the claim more than the cited evidence supports, and **understated** when it credits the claim less. A claim shown to be false but carrying `partial` is understated. A named part of the assertion failing, recorded as `real_with_caveat`, is overstated — METHOD §6 makes that boundary a test, and it is the one most often got wrong. Weak evidence recorded as a caveat rather than `unverifiable` is also overstated.
+**4. Verdict calibration.** Given the claim, the evidence and the `gap`, is the verdict the right one from METHOD §6? A verdict is **overstated** when it credits the claim more than the cited evidence supports, and **understated** when it credits the claim less. A claim shown to be false but carrying `partial` is understated. A named part of the assertion failing, recorded as `real_with_caveat`, is overstated — METHOD §6 makes that boundary a test, and it is the one most often got wrong. Weak evidence recorded as a caveat rather than `unverifiable` is also overstated. A `partial` or `contradicted` whose `gap` rests on what a search did not find, with no cited line showing the part of the assertion that fails, is understated: METHOD §6 says that evidence looked for and not found is not a gap, and §8 that a search never settles a claim against the seller; the verdict such a finding supports is `unverifiable`.
 
-**5. Search adequacy** — for `unverifiable` findings only. METHOD §8 requires a lexical and a structural search and the process has confirmed both are present. The question left is whether they were searches that would have found the thing: right terms, right places. A search recorded against the wrong terms is diligence on paper and none in fact.
+**5. Search adequacy** — for every finding whose evidence records a search: every `unverifiable` finding, where METHOD §8 requires a lexical and a structural search and the process has confirmed both are present, and any finding of another verdict that rests part of its `gap` on what a search did not find. The question is whether they were searches that would have found the thing: right terms, right places. A search recorded against the wrong terms, or confined to one directory of a tree that has several where the thing could live, is diligence on paper and none in fact.
 
 **Judge each finding on the evidence it cites, not on evidence you would have chosen.** If you would have cited something better, that is not an exception. The exception is what it did cite failing to do the work.
 
@@ -88,7 +88,7 @@ information.
 | `evidence_relevant` | `yes`, `no` | §5 check 2 — does the cited material bear on this claim |
 | `evidence_supports` | `yes`, `no` | §5 check 3 — does it show what the finding says it shows |
 | `verdict_calibration` | `correct`, `overstated`, `understated` | §5 check 4 — is the verdict the right one from METHOD §6 |
-| `searches_adequate` | `yes`, `no`, `not_applicable` | §5 check 5 — `not_applicable` unless the verdict is `unverifiable` |
+| `searches_adequate` | `yes`, `no`, `not_applicable` | §5 check 5 — `not_applicable` when the finding's evidence records no search |
 
 An observation is **clean** when its value is `yes`, `correct` or
 `not_applicable`. Every other value is **not clean**.

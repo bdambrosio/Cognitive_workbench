@@ -30,7 +30,7 @@ OBSERVATIONS: Dict[str, Tuple[str, ...]] = {
 
 #: The value of each observation that raises nothing. `not_applicable` is clean
 #: because it means the question did not arise — REVIEW.md §6 confines
-#: `searches_adequate` to `unverifiable` findings.
+#: `searches_adequate` to findings whose evidence records a search.
 CLEAN: Dict[str, Tuple[str, ...]] = {
     "evidence_relevant":   ("yes",),
     "evidence_supports":   ("yes",),
@@ -184,6 +184,13 @@ def check_review(obj: Dict[str, Any], frozen: Sequence[Dict[str, Any]],
     finding_ids = {f.get("claim_id") for f in findings}
     verdicts = {f.get("claim_id"): (f.get("adjudication") or {}).get("verdict")
                 for f in findings}
+    # A finding's searches are judged whenever it made any (REVIEW §5 check
+    # 5): every `unverifiable` finding, and a `partial` or `contradicted`
+    # that rests its gap on what a search did not find (ChatterMate claim
+    # 91, 2026-09-03: a search confined to one directory became a gap).
+    has_search = {f.get("claim_id"): any(isinstance(e, dict) and e.get("form") == "search"
+                                         for e in f.get("evidence") or [])
+                  for f in findings}
 
     seen_cc = set()
     for cc in obj.get("claim_checks") or []:
@@ -208,14 +215,15 @@ def check_review(obj: Dict[str, Any], frozen: Sequence[Dict[str, Any]],
         elif cid in seen_fr:
             problems.append(f"{w}: reviewed twice")
         seen_fr.add(cid)
-        # §6 confines searches_adequate to unverifiable findings. A yes/no on a
-        # finding that made no searches is an opinion about nothing.
+        # §6: searches_adequate is answered when the finding's evidence
+        # records a search, and only then. A yes/no on a finding that made
+        # no searches is an opinion about nothing.
         sa, verdict = r.get("searches_adequate"), verdicts.get(cid)
-        if verdict == "unverifiable" and sa == "not_applicable":
-            problems.append(f"{w}: the finding is `unverifiable`, so its "
-                            f"searches are the evidence and must be judged")
-        if verdict is not None and verdict != "unverifiable" \
-                and sa != "not_applicable":
+        searched = has_search.get(cid)
+        if searched and sa == "not_applicable":
+            problems.append(f"{w}: the `{verdict}` finding records a search, "
+                            f"so its adequacy must be judged (REVIEW §5 check 5)")
+        if searched is False and sa != "not_applicable":
             problems.append(f"{w}: `searches_adequate` is {sa!r} on a "
                             f"`{verdict}` finding, which made no searches")
         bad = [n for n in OBSERVATIONS if r.get(n) not in CLEAN[n]]
