@@ -215,9 +215,19 @@ def _finding(f: Dict[str, Any], rating: Optional[Dict[str, Any]],
                 f"<{u}>" for u in links) + ". The audit did not follow "
                 "these links; the buyer can confirm what is there directly.", ""]
     if rating:
-        out += [f"**{field.capitalize()} — {rating.get(field)}:** "
+        agree = rating.get("agreement")
+        tag = ""
+        if agree:
+            tag = (f" (rated {agree.split(' of ')[1]} times, {agree.split(' of ')[0]} agree"
+                   + ("; **borderline**" if rating.get("borderline") else "") + ")")
+        out += [f"**{field.capitalize()} — {rating.get(field)}{tag}:** "
                 f"{RATING_WORDS.get(rating.get(field), '')}. "
                 f"{_md_safe(rating.get('basis'))}", ""]
+        if rating.get("borderline"):
+            out += ["The replicates split on this rating. The other readings:", ""]
+            out += [f"- *{sm.get(field)}* — {_md_safe(sm.get('basis'))}"
+                    for sm in rating.get("samples") or []
+                    if sm.get(field) != rating.get(field)] + [""]
     if f.get("correction"):
         out += [f"**Correction:** {_md_safe(f['correction'])}", ""]
     out += ["", "Evidence:", ""] + (_evidence(f.get("evidence")) or ["- (none)"])
@@ -365,6 +375,13 @@ def _how_to_read() -> List[str]:
         "| decisive | " + RATING_WORDS["decisive"] + " |", "",
         "Materiality and exposure are never added together: one counts what "
         "the audit showed, the other what rests on what it could not settle.", "",
+        "**How stable a rating is.** Each rating was made twice, independently; "
+        "where the two readings differed, the finding was rated five times and "
+        "the rating shown is the one most of them gave, with the count. A rating "
+        "marked *borderline* is one the readings split on: the other readings are "
+        "shown beneath it, and the practice has decided which to carry. The count "
+        "measures how stable one reading of the buyer's thresholds is, not "
+        "whether it is right.", "",
         "**Why a claim is unsettled** is recorded as one of: " + "; ".join(
             f"*{k.replace('_', ' ')}*, {v}" for k, v in DISPOSITION_WORDS.items()) + ".", ""]
 

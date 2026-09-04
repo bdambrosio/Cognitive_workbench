@@ -114,3 +114,45 @@ def check_ratings(obj: Dict[str, Any], merged: Dict[str, Any]
                         "exposable": len(wanted["exposure"]),
                         "exposed": len(seen["exposure"] & wanted["exposure"]),
                         "exposure": tally["exposure"]}}
+
+
+#: Rating replicates (Bruce, 2026-09-03). Two samples; a disagreement
+#: escalates that finding to five; four or five agreeing ships with the
+#: count; three to two, or no majority, ships the plurality marked
+#: borderline with every basis kept, for the practice to decide.
+REPLICATES_FIRST = 2
+REPLICATES_ESCALATED = 5
+
+
+def combine(field: str, samples: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """One rating from its samples. `samples` are rating rows for one
+    finding, each with `field` and `basis`, in sampling order. Returns the
+    shipped row: the majority (or plurality) value with the first basis
+    given for it, plus `samples`, `agreement` ("4 of 5") and `borderline`."""
+    values = [r.get(field) for r in samples]
+    counts: Dict[str, int] = {}
+    for v in values:
+        counts[v] = counts.get(v, 0) + 1
+    top = max(counts.values())
+    leaders = [v for v, c in counts.items() if c == top]
+    # The plurality; on a tie, the value sampled first.
+    value = next(v for v in values if v in leaders)
+    n = len(samples)
+    borderline = n > REPLICATES_FIRST and (top < n - 1 or len(leaders) > 1) or \
+        (n == REPLICATES_FIRST and top < n)
+    first = next(r for r in samples if r.get(field) == value)
+    return {"claim_source": first.get("claim_source"),
+            "claim_id": first.get("claim_id"), field: value,
+            "basis": first.get("basis"),
+            "agreement": f"{top} of {n}", "borderline": bool(borderline),
+            "samples": [{field: r.get(field), "basis": r.get("basis")}
+                        for r in samples]}
+
+
+def contested(field: str, a: Sequence[Dict[str, Any]], b: Sequence[Dict[str, Any]]
+              ) -> List[str]:
+    """The keys (`<source>#<id>`) whose two samples disagree, or that one
+    pass rated and the other did not."""
+    ka = {f"{r.get('claim_source')}#{r.get('claim_id')}": r.get(field) for r in a}
+    kb = {f"{r.get('claim_source')}#{r.get('claim_id')}": r.get(field) for r in b}
+    return sorted(k for k in set(ka) | set(kb) if ka.get(k) != kb.get(k))

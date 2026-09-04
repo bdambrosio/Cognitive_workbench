@@ -114,12 +114,21 @@ def _rating_text(f: Dict[str, Any]) -> str:
 def rate(loop, method_text: str, transaction: Optional[str],
          rateable: List[Dict[str, Any]], exposable: List[Dict[str, Any]],
          max_tokens: int, batch: int,
-         thresholds: Optional[str] = None) -> Dict[str, Any]:
+         thresholds: Optional[str] = None,
+         seed: Optional[int] = None) -> Dict[str, Any]:
     """The ratings, in batches. Same runner-decides-the-batch pattern as the
     review's emit_parts: one schema per part, concatenated by merge_parts.
 
     A batch holds one kind of finding (MATERIALITY §7): the `materiality`
-    batches first, then the `exposure` ones, each asked for its own array."""
+    batches first, then the `exposure` ones, each asked for its own array.
+    With `seed`, the findings are shuffled before batching: a rating is made
+    in the company of its batch-mates, and a replicate that keeps the same
+    company measures only sampling noise."""
+    if seed is not None:
+        import random
+        rng = random.Random(seed)
+        rateable = list(rateable); rng.shuffle(rateable)
+        exposable = list(exposable); rng.shuffle(exposable)
     head = ("The transaction, as the engagement states it:\n\n"
             + (transaction.strip() if transaction else
                "(The engagement states nothing about the transaction. Rate "
@@ -242,6 +251,66 @@ def render(merged: Dict[str, Any], ratings: Dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def replicate(loop, method_text: str, eng: Dict[str, Any],
+              rateable: List[Dict[str, Any]], exposable: List[Dict[str, Any]],
+              max_tokens: int, batch: int, first: Dict[str, Any],
+              log: Dict[str, Any]) -> Dict[str, Any]:
+    """THE REPLICATES (Bruce, 2026-09-03). A second pass over everything in
+    shuffled batches; every finding the two passes rate differently is rated
+    three more times, each in freshly shuffled company, and combined by
+    schemas.combine: a majority of four or five ships with its count, three
+    to two ships the plurality marked borderline. The spread this makes
+    visible is the rater's own, on fixed inputs: two rating runs on one
+    ChatterMate record moved four ratings between them."""
+    by_key = {f"{f['claim_source']}#{f['claim_id']}": f
+              for f in rateable + exposable}
+    seeds = [1, 2, 3, 4]
+    samples: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
+        "materiality": {}, "exposure": {}}
+
+    def take(obj, field, array):
+        for r in obj.get(array) or []:
+            samples[field].setdefault(f"{r.get('claim_source')}#{r.get('claim_id')}", []).append(r)
+
+    take(first["obj"], "materiality", "ratings")
+    take(first["obj"], "exposure", "exposures")
+    calls = list(first["calls"])
+    second = rate(loop, method_text, eng.get("transaction"), rateable, exposable,
+                  max_tokens, batch, thresholds=eng.get("thresholds"), seed=seeds[0])
+    calls += second["calls"]; log["passes"] = 2; log["seeds"].append(seeds[0])
+    take(second["obj"], "materiality", "ratings")
+    take(second["obj"], "exposure", "exposures")
+
+    cm = schemas.contested("materiality", first["obj"].get("ratings") or [],
+                           second["obj"].get("ratings") or [])
+    ce = schemas.contested("exposure", first["obj"].get("exposures") or [],
+                           second["obj"].get("exposures") or [])
+    log["escalated"] = cm + ce
+    if cm or ce:
+        logger.info("replicates: %d contested (%d materiality, %d exposure) "
+                    "— rating each three more times", len(cm) + len(ce), len(cm), len(ce))
+        r_sub = [by_key[k] for k in cm if k in by_key]
+        e_sub = [by_key[k] for k in ce if k in by_key]
+        for seed in seeds[1:]:
+            more = rate(loop, method_text, eng.get("transaction"), r_sub, e_sub,
+                        max_tokens, batch, thresholds=eng.get("thresholds"), seed=seed)
+            calls += more["calls"]; log["passes"] += 1; log["seeds"].append(seed)
+            take(more["obj"], "materiality", "ratings")
+            take(more["obj"], "exposure", "exposures")
+
+    def combined(field):
+        out = []
+        for key, rows in samples[field].items():
+            out.append(schemas.combine(field, rows))
+        return out
+
+    obj = {"ratings": combined("materiality"), "exposures": combined("exposure")}
+    log["borderline"] = sorted(f"{r['claim_source']}#{r['claim_id']}"
+                               for field, arr in (("materiality", "ratings"), ("exposure", "exposures"))
+                               for r in obj[arr] if r.get("borderline"))
+    return {"obj": obj, "calls": calls}
+
+
 def _sha(text: Optional[str]) -> Optional[str]:
     import hashlib
     return hashlib.sha256(text.encode("utf-8")).hexdigest() if text else None
@@ -265,6 +334,9 @@ def main() -> int:
                          "ratings are read against (default: the "
                          "engagement's current intake)")
     ap.add_argument("--max-tokens", type=int, default=None)
+    ap.add_argument("--single", action="store_true",
+                    help="one rating pass; the default rates twice and "
+                         "escalates a disagreement to five samples")
     args = ap.parse_args()
 
     eng = load_engagement(args.engagement, intake=args.intake)
@@ -322,10 +394,15 @@ def main() -> int:
                                         .get("react_max_tokens", 32768))
     t0 = datetime.datetime.now(datetime.timezone.utc)
     error, result = None, {"obj": {"ratings": [], "exposures": []}, "calls": []}
+    replicates: Dict[str, Any] = {"passes": 0, "escalated": [], "seeds": []}
     try:
         result = rate(loop, method_text, eng.get("transaction"), rateable,
                       exposable, max_tokens, args.batch,
                       thresholds=eng.get("thresholds"))
+        replicates["passes"] = 1
+        if not args.single:
+            result = replicate(loop, method_text, eng, rateable, exposable,
+                               max_tokens, args.batch, result, replicates)
         for c in result["calls"]:
             if c["response_format_dropped"]:
                 error = (f"the route dropped "
@@ -350,6 +427,12 @@ def main() -> int:
     ratings["figures"] = {k: check["figures"][k]
                           for k in ("materiality", "exposure")}
 
+    for key in replicates.get("borderline") or []:
+        issues.note(out, stage=STAGE, code="borderline_rating",
+                    text=f"{key}: the replicates split — the shipped rating "
+                         f"is the plurality, marked borderline; every basis "
+                         f"is in materiality.json. The practice decides.",
+                    severity="check")
     # A consequential rating on a finding the review did not uphold, or whose
     # citation failed the mechanical check, is for a person to read.
     by_key = {f"{f['claim_source']}#{f['claim_id']}": f for f in merged["findings"]}
@@ -383,6 +466,7 @@ def main() -> int:
                                     "resolved_model", "reviewed")}
                  for r in merged["runs"]],
         "batch": args.batch, "rateable": len(rateable),
+        "replicates": replicates,
         # THE RUN PINS ITS INTAKE. The ratings were read against this
         # intake's blocks; the report stage reads the same ones back by this
         # id, and the hashes say whether the text has changed since.

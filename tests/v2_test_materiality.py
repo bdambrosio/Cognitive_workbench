@@ -253,3 +253,28 @@ def test_load_engagement_prefers_the_intake_blocks(tmp_path, monkeypatch):
     import pytest
     with pytest.raises(SystemExit):
         rn.load_engagement("eng", intake="nope")
+
+
+def test_combine_two_agree_majority_and_borderline():
+    from workflowsv2.audit_materiality import schemas as ms
+    def r(v, b="b"):
+        return {"claim_source": "d.md", "claim_id": 1, "materiality": v, "basis": b}
+    c = ms.combine("materiality", [r("material", "first"), r("material", "second")])
+    assert (c["materiality"], c["agreement"], c["borderline"], c["basis"]) == ("material", "2 of 2", False, "first")
+    c = ms.combine("materiality", [r("material"), r("not_material"), r("material"), r("material"), r("material")])
+    assert (c["materiality"], c["agreement"], c["borderline"]) == ("material", "4 of 5", False)
+    c = ms.combine("materiality", [r("not_material", "n1"), r("material"), r("material"), r("not_material"), r("not_material")])
+    assert (c["materiality"], c["agreement"], c["borderline"], c["basis"]) == ("not_material", "3 of 5", True, "n1")
+    assert len(c["samples"]) == 5
+    c = ms.combine("materiality", [r("material"), r("decisive"), r("material"), r("decisive"), r("not_material")])
+    assert (c["materiality"], c["agreement"], c["borderline"]) == ("material", "2 of 5", True)   # tie: sampled first
+
+
+def test_contested_finds_disagreements_and_one_sided_ratings():
+    from workflowsv2.audit_materiality import schemas as ms
+    a = [{"claim_source": "d", "claim_id": 1, "exposure": "material"},
+         {"claim_source": "d", "claim_id": 2, "exposure": "not_material"}]
+    b = [{"claim_source": "d", "claim_id": 1, "exposure": "material"},
+         {"claim_source": "d", "claim_id": 2, "exposure": "material"},
+         {"claim_source": "d", "claim_id": 3, "exposure": "material"}]
+    assert ms.contested("exposure", a, b) == ["d#2", "d#3"]

@@ -107,7 +107,13 @@ that hold; the sample is a calibration figure only.
 citation problems, no deduplication (the surface is human-owned). Findings
 with a verdict about the claim are rated for `materiality`; `unverifiable`
 findings for `exposure`; never in one total. Rated against the engagement's
-`transaction:` block.
+`transaction:` block and the intake's thresholds. Every rating is made twice
+in independently shuffled batches; a finding the two passes rate differently
+is rated three more times, and the shipped rating is the majority with its
+count ("4 of 5") or, on a three-to-two split or no majority, the plurality
+marked borderline with every basis kept and a worklist entry for the
+practice. `--single` rates once. The count measures the rater's stability on
+fixed inputs, not the rating's truth.
 
 ## The report stage
 
@@ -146,7 +152,7 @@ for debugging. Hosted: GLM-5.3-Flash on Fireworks
 ## Not built
 
 A recommendation (the conclusion exists, as an opt-in passage; advice does
-not); the practice's replicate rating for spread; the public website; the security audit (held); a
+not); the public website; the security audit (held); a
 per-stage model choice so enumeration can run hosted while the rest runs
 local. The fixture (`measure/fixtures/dataroom/`) is scored by reading
 `findings.json` against `answer_key.md`.
