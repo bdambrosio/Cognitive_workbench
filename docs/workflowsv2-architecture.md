@@ -40,6 +40,13 @@ reads the current intake and run through it, and `--intake` / `--merged`
 override. An engagement with no intake reads its blocks from engagement.yaml,
 which is how the fixtures state them.
 
+**Retention.** Run and merged directories are the record and live as long
+as the engagement's `retention:` term; nothing deletes them but deleting the
+engagement. The world a stage ran in is scratch once its run directory holds
+the working record, and `workflowsv2/sweep_worlds.py` removes such worlds
+after 30 days (dry run by default; post-delivery, intake and demo worlds are
+kept by name). The chat launcher's log rotates at 20 MB.
+
 The browser page (`src/client_ui/app.py`, `intake` and `post` subcommands)
 drives the same two conversations through `workflowsv2/intake/session.py`
 and `workflowsv2/claims_audit/post_session.py`, the objects the terminal

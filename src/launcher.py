@@ -15,6 +15,7 @@ import sys
 import json
 import argparse
 import logging
+import logging.handlers
 import yaml
 import os
 from pathlib import Path
@@ -36,7 +37,12 @@ console_handler.setLevel(logging.WARNING)
 # and chasing missing entries means checking both. This pins the file.
 _LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
 _LOG_DIR.mkdir(parents=True, exist_ok=True)
-file_handler = logging.FileHandler(_LOG_DIR / 'character_launcher.log', mode='a')
+# Rotating, because this file is never truncated otherwise: it reached 127 MB
+# on 2026-09-04, larger than every workflow run on the machine together.
+# 20 MB live plus three kept copies is enough to chase any one session.
+file_handler = logging.handlers.RotatingFileHandler(
+    _LOG_DIR / 'character_launcher.log', mode='a',
+    maxBytes=20 * 1024 * 1024, backupCount=3)
 file_handler.setLevel(logging.INFO)
 
 logging.basicConfig(

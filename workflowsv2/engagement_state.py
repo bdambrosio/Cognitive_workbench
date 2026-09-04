@@ -33,6 +33,13 @@ disk; this file never lists intakes or runs, so it cannot disagree with them.
 Engagements with no `state.json` and no `intakes/` behave as before: the
 engagement.yaml blocks are the thresholds, and every merged directory is a run
 of "no intake".
+
+RETENTION (Bruce, 2026-09-04). Run directories and merged directories are the
+record: they live as long as the engagement's `retention:` term says and go
+when the engagement goes, never on their own. The world a stage ran in is
+scratch once its run directory exists, because the runner copies the working
+record there; `workflowsv2/sweep_worlds.py` deletes such worlds after 30
+days. Post-delivery and intake worlds are conversations and are kept.
 """
 from __future__ import annotations
 
