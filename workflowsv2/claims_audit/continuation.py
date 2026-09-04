@@ -62,7 +62,8 @@ logger = logging.getLogger("continuation")
 
 
 def build_config(run_dir: Path, world: str, model_path: Optional[Path],
-                 target: Path) -> Tuple[str, Dict[str, Any]]:
+                 target: Path, scenario_path: Optional[Path] = None
+                 ) -> Tuple[str, Dict[str, Any]]:
     """Assemble the character config, the way run.py:build_config does.
 
     Same shape and the same reasons: the model REPLACES the llm_config block
@@ -71,7 +72,7 @@ def build_config(run_dir: Path, world: str, model_path: Optional[Path],
     """
     from launcher import parse_characters                      # noqa: E402
 
-    scenario = yaml.safe_load(SCENARIO.read_text(encoding="utf-8")) or {}
+    scenario = yaml.safe_load((scenario_path or SCENARIO).read_text(encoding="utf-8")) or {}
     scen_llm = dict(scenario.get("llm_config") or {})
 
     if model_path:

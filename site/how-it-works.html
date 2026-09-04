@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How it works — {{NAME}}</title>
+<meta name="description" content="Claims enumerated and frozen, every finding cited, an independent review, ratings against your own thresholds, a person signs.">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="index.html">{{NAME}}</a>
+  <nav><a href="index.html">Home</a><a href="how-it-works.html" aria-current="page">How it works</a><a href="pricing.html">Pricing</a><a href="demo.html">Demo</a><a href="about.html">About</a><button class="theme" id="theme" type="button">dark</button></nav>
+</header>
+<main>
+
+<h1>How the audit works</h1>
+<p class="lede">A fixed method, applied the same way every time, with the record kept. This page says what that means in plain words.</p>
+
+<h2>Claims are enumerated, then frozen</h2>
+<p>The seller's documents are read one section at a time and every assertion is written down: features, numbers, guarantees, what a command does, what a default is. The list is frozen before anything is tested, so what counts as a claim is decided before the verdicts are in view. You see the frozen list; nothing is added to it later.</p>
+
+<h2>Every finding cites its evidence</h2>
+<p>Each claim gets one finding. A finding names the file and the lines that settle it, quotes them, and says what they show. A citation that does not resolve to the text it quotes is caught mechanically before anyone reads the report.</p>
+
+<h2>Five verdicts, and "unsettled" is one of them</h2>
+<table>
+<tr><th>Verdict</th><th>Meaning</th></tr>
+<tr><td class="mono">holds</td><td>The evidence bears the claim out.</td></tr>
+<tr><td class="mono">true, with something to know</td><td>Every part holds, and the evidence shows something a buyer must know to read the claim correctly.</td></tr>
+<tr><td class="mono">partly true</td><td>A named part of the claim is not borne out, and the report can point at it.</td></tr>
+<tr><td class="mono">contradicted</td><td>The materials show otherwise.</td></tr>
+<tr><td class="mono">unsettled</td><td>The materials supplied cannot settle it. Nothing was found against it, and the report says why it could not be settled.</td></tr>
+</table>
+<p>Unsettled is not a soft failure. A claim the materials cannot reach is reported as unreachable, with the reason, and is never counted against the seller. What is not examined is listed as not examined.</p>
+
+<h2>An independent review</h2>
+<p>A second pass, which did not perform the audit and does not see its reasoning first, re-reads every finding's cited evidence and asks whether it bears on the claim, whether it shows what the finding says, and whether the verdict is the right one. A finding either holds up under that review or it does not, and the report says which.</p>
+
+<h2>Rated against your thresholds</h2>
+<p>At intake you say what you are paying for, what would change the price or the terms, and what would end the deal. Each gap the audit showed is rated against those words: nothing, the price or terms, or the decision to close. Each rating is made twice, independently; where the two readings differ, the finding is rated five times, and a rating the readings split on is marked borderline and decided by a person, with every reading shown.</p>
+
+<h2>A person confirms and signs</h2>
+<p>The tooling drafts. A person reads the borderline ratings, the citations the check flagged, and the findings the review questioned, and signs the report. The report shows which lines rest on a cited fact and which on the practice's judgement.</p>
+
+<h2>What it is not</h2>
+<p>Not a penetration test. Not a code-quality review. Not legal advice. Not a judgement on claims it did not resolve, and not a recommendation on whether to proceed. It reports the state of each claim and what a gap would change for the deal you described.</p>
+<p><a class="btn primary" href="demo.html">See a finished audit</a></p>
+
+</main>
+<footer>
+  <div>© 2026 {{NAME}} · <a href="mailto:{{EMAIL}}">{{EMAIL}}</a></div>
+  <div><a href="privacy.html">Privacy</a><a href="demo.html">Demo</a><a href="about.html">Contact</a></div>
+</footer>
+</div>
+<script src="site.js"></script>
+</body>
+</html>

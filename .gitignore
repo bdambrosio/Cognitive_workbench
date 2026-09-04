@@ -149,3 +149,5 @@ workflowsv2/claims_audit/engagements/*/merged/
 # An engagement's materials and the client's uploads live in its directory and are never committed
 workflowsv2/claims_audit/engagements/*/target/
 workflowsv2/claims_audit/engagements/*/uploads/
+# The demo's visitor log
+workflowsv2/claims_audit/engagements/*/demo_sessions.jsonl

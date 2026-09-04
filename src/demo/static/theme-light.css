@@ -1,0 +1,21 @@
+/* The site's tokens over the client page: one visual system for the demo and the pages. */
+:root {
+  --bg: #faf8f4; --panel: #ffffff; --panel2: #f2efe9; --rule: #e3dfd6;
+  --text: #17181a; --muted: #6b6f76; --accent: #17181a; --accent2: #3a3d42;
+  --empty: #b5651d; --ok: #1f7a5c;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131416; --panel: #191a1d; --panel2: #202225; --rule: #2c2f33;
+    --text: #e8e6e1; --muted: #9a9ea6; --accent: #e8e6e1; --accent2: #c9c6bf;
+    --ok: #5fc9a3;
+  }
+  .msg.client { color: #131416; }
+  button, .upload { color: #131416; }
+}
+body { font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif; }
+.strip { padding: 8px 18px; font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--rule); background: var(--panel); }
+.msg.client { border-radius: 8px; }
+.report a { color: inherit; text-decoration: underline; }
+.report .finding.named { border-color: var(--ok); box-shadow: 0 0 0 1px var(--ok); }
+#evidence { border-top: 2px solid var(--ok); }

@@ -26,7 +26,9 @@ SOURCE = "User"
 class PostSession:
     def __init__(self, engagement: str, model: Optional[Path] = None,
                  intake: Optional[str] = None, merged: Optional[Path] = None,
-                 world: Optional[str] = None, target: Optional[Path] = None) -> None:
+                 world: Optional[str] = None, target: Optional[Path] = None,
+                 log_to_world: bool = True,
+                 scenario: Optional[Path] = None) -> None:
         self.engagement = engagement
         eng = load_engagement(engagement, intake=intake)
         self.intake_id = eng.get("intake_id")
@@ -54,14 +56,18 @@ class PostSession:
         world_dir = ct.REPO / "scenarios" / self.world
         self.resumed = world_dir.exists()
         world_dir.mkdir(parents=True, exist_ok=True)
-        from workflowsv2.intake.session import route_logging   # noqa: E402
-        route_logging(world_dir / "continuation.log")
+        # The terminal and the client page log beside the world; a server
+        # running many sessions keeps one log of its own instead.
+        if log_to_world:
+            from workflowsv2.intake.session import route_logging  # noqa: E402
+            route_logging(world_dir / "continuation.log")
         logger.setLevel(logging.INFO)
         logger.info("intake %s; run %s; world %s: %s", self.intake_id,
                     self.merged_dir.name, self.world,
                     "RESUMED — earlier sessions on this run are in its "
                     "history" if self.resumed else "new")
-        self.name, cfg = ct.build_config(self.eng_dir, self.world, model, self.target)
+        self.name, cfg = ct.build_config(self.eng_dir, self.world, model, self.target,
+                                         scenario_path=scenario)
         from chat.chat_loop import ChatLoop                    # noqa: E402
         from chat.model_params import TOP_P                    # noqa: E402
         self.loop = ChatLoop(character_name=self.name, character_config=cfg)

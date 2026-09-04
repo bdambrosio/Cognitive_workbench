@@ -1,6 +1,9 @@
 // The client page: one websocket, two panes. No framework.
 (function () {
   const token = new URLSearchParams(location.search).get("token") || "";
+  // The client page carries a token on the URL; the public demo carries none
+  // and identifies the visitor by cookie instead.
+  const tq = token ? "?token=" + encodeURIComponent(token) : "";
   const $ = (id) => document.getElementById(id);
   const messages = $("messages"), doc = $("doc"), evidence = $("evidence"), text = $("text"), send = $("send");
   let kind = null, ws = null, thinking = false;
@@ -170,7 +173,7 @@
   // ---- the websocket ----
   function connect() {
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    ws = new WebSocket(proto + "://" + location.host + "/ws?token=" + encodeURIComponent(token));
+    ws = new WebSocket(proto + "://" + location.host + "/ws" + tq);
     ws.onopen = () => { $("conn").textContent = "connected"; };
     ws.onclose = () => { $("conn").textContent = "disconnected — retrying"; setTimeout(connect, 2000); };
     ws.onmessage = (ev) => {
@@ -214,7 +217,7 @@
     const f = e.target.files[0];
     if (!f) return;
     const body = new FormData(); body.append("file", f);
-    const r = await fetch("/api/upload?token=" + encodeURIComponent(token), {method: "POST", body});
+    const r = await fetch("/api/upload" + tq, {method: "POST", body});
     if (!r.ok) addMessage("error", "upload failed: " + r.status, "error");
     e.target.value = "";
   });

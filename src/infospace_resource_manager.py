@@ -1775,7 +1775,11 @@ class InfospaceResourceManager:
         if not isinstance(text, str):
             text = str(text)
         
-        embedding = self.embedder.encode(text, convert_to_tensor=False, show_progress_bar=False)
+        # ONE MODEL, MANY LOOPS. The embedder is a process-wide singleton on
+        # the GPU; every ChatLoop in the process encodes through it, and the
+        # demo server runs many loops on separate threads (2026-09-03).
+        with InfospaceResourceManager._embedder_lock:
+            embedding = self.embedder.encode(text, convert_to_tensor=False, show_progress_bar=False)
         return embedding.tolist()
     
     def _extract_content_for_embedding(self, item: Any, fields: Dict) -> str:

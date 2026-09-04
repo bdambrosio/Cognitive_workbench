@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demo — a claims audit, read and questioned</title>
+<link rel="stylesheet" href="/static/client.css">
+<link rel="stylesheet" href="/demo-static/theme-light.css">
+</head>
+<body>
+<header>
+  <div class="title"><span id="engagement">Demo</span> <span class="mode" id="mode"></span></div>
+  <div class="state"><span id="thinking" class="thinking" hidden>thinking…</span><span id="conn">connecting</span></div>
+</header>
+<div class="strip">A real public repository, audited by this workflow, its identity withheld. Ask about any finding. Replies come from a model on the practice's own hardware and take a minute or two. Your conversation is private to this browser and kept for a few days.</div>
+<main>
+  <section id="chat">
+    <div id="messages"></div>
+    <form id="compose">
+      <textarea id="text" rows="3" placeholder="Ask about a finding, a rating, or what was not examined. Enter to send."></textarea>
+      <div class="row">
+        <label class="upload" id="uploadLabel" hidden>Upload a file<input type="file" id="file"></label>
+        <button type="submit" id="send">Send</button>
+      </div>
+      <div class="hint" id="uploadsHint" hidden></div>
+    </form>
+  </section>
+  <section id="document">
+    <div id="doc"></div>
+    <div id="evidence" hidden></div>
+  </section>
+</main>
+<script src="/static/client.js"></script>
+</body>
+</html>

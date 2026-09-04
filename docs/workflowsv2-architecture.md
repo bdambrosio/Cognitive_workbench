@@ -55,6 +55,16 @@ cancels, creates an engagement with an optional clone, and shows the launch
 commands to copy. It runs nothing: an intake, a run or a conversation is
 started from the command line by a person.
 
+The public demo (`src/demo/app.py`) serves one delivered run to many
+visitors, each identified by a cookie and given a world of their own
+(`demo_<engagement>_<run>_<sid>`), with live sessions capped and evicted
+least-recently-used, turns in flight held below the local model server's
+concurrency, and per-visitor limits. Everything sent to a browser passes
+`src/demo/redact.py`, a substitution over the identifiers the practice lists
+in the engagement's `demo.yaml`. The site itself is the static folder
+`site/`, six pages and one stylesheet, hosted anywhere; its demo button
+points at the demo's origin.
+
 Worlds: the intake runs in `client_<engagement>`, reused across sessions. The
 post-delivery conversation runs in one world per (intake, run), named from
 their timestamps and reused, so a second session remembers the first and a

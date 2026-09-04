@@ -42,10 +42,19 @@ def route_logging(log_path: Path) -> None:
     root = logging.getLogger()
     for h in list(root.handlers):
         h.setLevel(logging.ERROR)
+    key = str(Path(log_path).resolve())
+    if key in _ROUTED:                         # one handler per file, ever
+        return
     fh = logging.FileHandler(log_path, encoding="utf-8")
     fh.setLevel(logging.INFO)
     fh.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
     root.addHandler(fh)
+    _ROUTED[key] = fh
+
+
+#: The log files already routed to, so a session that is rebuilt in the same
+#: process does not add a second handler for the same file.
+_ROUTED: Dict[str, logging.Handler] = {}
 
 
 class IntakeSession:
