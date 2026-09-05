@@ -157,7 +157,12 @@
     const proto = location.protocol === "https:" ? "wss" : "ws";
     ws = new WebSocket(proto + "://" + location.host + base + "/ws" + qs);
     ws.onopen = () => { $("conn").textContent = "connected"; };
-    ws.onclose = () => { $("conn").textContent = "disconnected — retrying"; setTimeout(connect, 2000); };
+    ws.onclose = (ev) => {
+      // 1011 is the server saying the conversation cannot start; the error
+      // message before it says why. Retrying would only repeat it.
+      if (ev.code === 1011) { $("conn").textContent = "not started"; return; }
+      $("conn").textContent = "disconnected — retrying"; setTimeout(connect, 2000);
+    };
     ws.onmessage = (ev) => {
       const m = JSON.parse(ev.data);
       if (m.type === "history") {

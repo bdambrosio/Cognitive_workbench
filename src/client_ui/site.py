@@ -328,6 +328,10 @@ def make_site_app(access: Access, model: Optional[Path] = None,
     async def accept_letter(name: str, request: Request):
         email, role, eng_dir = _require(request, name, ("client", "practice"))
         state.set_stage(eng_dir, "letter", "accepted", email)
+        if role == "client":
+            mail.send(mail.practice_emails(), f"Tuuyi: {email} accepted the letter for {name}",
+                      f"{email} accepted the engagement letter for {name}. The intake is next; "
+                      f"you will hear again when it is finished.", f"{mail.site_url()}/p/#{name}")
         return JSONResponse(status_for(eng_dir, role))
 
     # ---- the surface, client side ---------------------------------------------
@@ -357,6 +361,14 @@ def make_site_app(access: Access, model: Optional[Path] = None,
 
     def _entry(kind: str, name: str):
         return registry.get((kind, name))
+
+    async def _entry_or_503(kind: str, name: str):
+        try:
+            return await asyncio.get_running_loop().run_in_executor(None, _entry, kind, name)
+        except Exception as e:                                 # noqa: BLE001
+            logger.exception("%s session for %s could not be built", kind, name)
+            raise HTTPException(status_code=503,
+                                detail=f"the conversation could not be started: {type(e).__name__}: {e}")
 
     async def _push(key: Tuple[str, str], msg: Dict[str, Any]) -> None:
         for ws in list(sockets.get(key, ())):
@@ -410,13 +422,13 @@ def make_site_app(access: Access, model: Optional[Path] = None,
         @app.get(prefix + "/api/document")
         async def document(name: str, request: Request):
             _allowed(request, name)
-            e = await asyncio.get_running_loop().run_in_executor(None, _entry, kind, name)
+            e = await _entry_or_503(kind, name)
             return JSONResponse(_document(kind, name, e))
 
         @app.get(prefix + "/api/history")
         async def history(name: str, request: Request):
             _allowed(request, name)
-            e = await asyncio.get_running_loop().run_in_executor(None, _entry, kind, name)
+            e = await _entry_or_503(kind, name)
             return JSONResponse({"kind": kind, "history": e["session"].history()})
 
         if kind == "intake":
@@ -465,7 +477,21 @@ def make_site_app(access: Access, model: Optional[Path] = None,
             await websocket.accept()
             sockets.setdefault(key, set()).add(websocket)
             try:
-                e = await asyncio.get_running_loop().run_in_executor(None, _entry, kind, name)
+                try:
+                    e = await asyncio.get_running_loop().run_in_executor(None, _entry, kind, name)
+                except Exception as ex:                        # noqa: BLE001
+                    # The page shows this line instead of "disconnected, retrying"
+                    # forever. Observed 2026-09-05: the service lacked the
+                    # model route's API key, and the page said nothing.
+                    logger.exception("%s session for %s could not be built", kind, name)
+                    await websocket.send_json({"type": "error", "text":
+                                               f"The conversation could not be started: "
+                                               f"{type(ex).__name__}: {ex}. The practice has been told."})
+                    mail.send(mail.practice_emails(), f"Tuuyi: {kind} page failed for {name}",
+                              f"The {kind} conversation for {name} could not be started: "
+                              f"{type(ex).__name__}: {ex}", f"{mail.site_url()}/p/#{name}")
+                    await websocket.close(code=1011)
+                    return
                 await websocket.send_json({"type": "history", "kind": kind,
                                            "history": e["session"].history()})
                 await websocket.send_json({"type": "document", **_document(kind, name, e)})

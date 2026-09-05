@@ -264,3 +264,29 @@ def test_settings_write_the_engagement_file_letter_and_policy(env, monkeypatch):
     assert "Terms **here**" in c.get("/e/e1/api/status" + _as(CLIENT)).json()["letter"]
     assert st.claim_sources(root / "e1") == ["README.md", "docs/llms.txt"]     # untouched by a letter-only save
     assert c.post("/p/api/engagements/e1/settings" + _as(CLIENT), json={"letter": "x"}).status_code == 403
+
+
+def test_a_conversation_that_cannot_start_says_so(tmp_path, monkeypatch):
+    monkeypatch.setattr(st, "ENGAGEMENTS", tmp_path)
+    monkeypatch.setenv("MAIL_DRY_RUN", "1"); monkeypatch.setenv("PRACTICE_EMAILS", PRACTICE)
+    mail.sent.clear()
+    def broken(key):
+        raise RuntimeError("api_key env var 'FIREWORKS_API_KEY' is not set")
+    c = TestClient(site.make_site_app(Access([PRACTICE], no_access=True), None, build=broken))
+    st.new_engagement(tmp_path / "e1", client_emails=[CLIENT])
+    r = c.get("/e/e1/intake/api/document" + _as(CLIENT))
+    assert r.status_code == 503 and "FIREWORKS_API_KEY" in r.json()["detail"]
+    with c.websocket_connect("/e/e1/intake/ws" + _as(CLIENT)) as ws:
+        m = ws.receive_json()
+        assert m["type"] == "error" and "could not be started" in m["text"]
+    assert mail.sent[-1]["to"] == [PRACTICE] and "failed" in mail.sent[-1]["subject"]
+
+
+def test_client_accepting_the_letter_notifies_the_practice(env):
+    c, root = env
+    _new(c)
+    mail.sent.clear()
+    c.post("/e/e1/api/letter/accept" + _as(PRACTICE))          # the practice's own click: no notice
+    assert mail.sent == []
+    c.post("/e/e1/api/letter/accept" + _as(CLIENT))
+    assert mail.sent[-1]["to"] == [PRACTICE] and "accepted the letter" in mail.sent[-1]["subject"]
