@@ -151,3 +151,6 @@ workflowsv2/claims_audit/engagements/*/target/
 workflowsv2/claims_audit/engagements/*/uploads/
 # The demo's visitor log
 workflowsv2/claims_audit/engagements/*/demo_sessions.jsonl
+
+# Chain scripts, pid files and launcher logs written at the repo root
+logs/
