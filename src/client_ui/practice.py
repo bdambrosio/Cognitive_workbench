@@ -36,32 +36,11 @@ from fastapi.staticfiles import StaticFiles                      # noqa: E402
 from pydantic import BaseModel                                   # noqa: E402
 
 from workflowsv2 import engagement_state as state               # noqa: E402
+from client_ui.jobs import commands, MODEL                     # noqa: E402,F401
 
 logger = logging.getLogger("client_ui.practice")
 STATIC = HERE / "static"
-MODEL = "measure/models/fw_glm53flash.yaml"
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
-
-
-def commands(name: str, s: Dict[str, Any]) -> Dict[str, str]:
-    """The command lines for this engagement, with the current run filled
-    in where one exists. Shown to be copied, never run from here."""
-    ci = s.get("current_intake")
-    cur = None
-    for i in s.get("intakes") or []:
-        if i["id"] == ci:
-            cur = next((r["name"] for r in i["runs"] if r["current"]), None)
-    eng = f"workflowsv2/claims_audit/engagements/{name}"
-    return {
-        "intake": f"python3 src/client_ui/app.py intake --engagement {name} --model {MODEL} --port 8800",
-        "intake_new": f"python3 src/client_ui/app.py intake --engagement {name} --new --model {MODEL} --port 8800",
-        "finish": f"python3 workflowsv2/intake/runner.py --engagement {name} --finish",
-        "audit": f"python3 workflowsv2/claims_audit/runner.py --engagement {name} --world <fresh world> --claim-source <one of claim_sources> --model {MODEL}",
-        "review": f"python3 workflowsv2/audit_review/runner.py --run {eng}/runs/<run dir> --model {MODEL}",
-        "materiality": f"python3 workflowsv2/audit_materiality/runner.py --engagement {name} --run {eng}/runs/<run dir> [--run ...] --model {MODEL} --label <label>",
-        "report": f"python3 workflowsv2/audit_report/runner.py --merged {eng}/merged/{cur or '<merged dir>'} --model {MODEL}",
-        "post": f"python3 src/client_ui/app.py post --engagement {name} --model {MODEL} --port 8801",
-    }
 
 
 class NewEngagement(BaseModel):

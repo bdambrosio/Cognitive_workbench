@@ -7,6 +7,7 @@
     python3 workflowsv2/engagement_state.py <engagement> intake cancel <id>
     python3 workflowsv2/engagement_state.py <engagement> run current <merged dir name>
     python3 workflowsv2/engagement_state.py <engagement> run cancel <merged dir name>
+    python3 workflowsv2/engagement_state.py <engagement> stage <stage> <value>
 
 THE ENGAGEMENT COMES FIRST, EXPLICITLY. `new` creates the directory and a
 stub engagement.yaml; nothing else creates one, and the intake refuses a
@@ -40,6 +41,13 @@ when the engagement goes, never on their own. The world a stage ran in is
 scratch once its run directory exists, because the runner copies the working
 record there; `workflowsv2/sweep_worlds.py` deletes such worlds after 30
 days. Post-delivery and intake worlds are conversations and are kept.
+
+STAGES AND JOBS (2026-09-05, the pilot site). `state.json` also holds
+`stages`, one mark per stage of the engagement as the site walks it (STAGES
+below, each `{"value", "at", "by"}`), and `jobs`, the record of every
+enumeration or chain job the site started: when, which steps, the exit. A
+job in state "running" is the engagement's lock: a second job is refused
+until it ends. Marks again, never deletion.
 """
 from __future__ import annotations
 
@@ -58,10 +66,22 @@ MERGED = "merged"
 #: What an intake's `--finish` writes: the blocks a run reads.
 BLOCKS_FILE = "blocks.yaml"
 
+#: The stages of an engagement, in the order the site walks them. The value
+#: of a mark is a short word: "accepted", "done", "ready", "running",
+#: "failed", "frozen", "released", "closed".
+STAGES = ("created", "letter", "intake", "materials", "enumeration",
+          "surface", "chain", "release", "closed")
+
+#: Where the frozen claim surfaces and the client's comments live.
+SURFACE = "surface"
+#: Where job logs live.
+JOBS = "jobs"
+
 
 def _empty() -> Dict[str, Any]:
     return {"current_intake": None, "current_run": {},
-            "cancelled": {"intakes": [], "runs": []}}
+            "cancelled": {"intakes": [], "runs": []},
+            "stages": {}, "jobs": []}
 
 
 def load(eng_dir: Path) -> Dict[str, Any]:
@@ -98,6 +118,9 @@ target: target
 
 claim_sources: []
 
+# Who may open this engagement's pages on the client site, by email.
+client_emails: {client_emails}
+
 retention: keep
 """
 
@@ -116,14 +139,20 @@ def target_dir(eng_dir: Path) -> Path:
     return (eng_dir / t) if (eng_dir / t).is_dir() else REPO / t
 
 
-def new_engagement(eng_dir: Path, clone: Optional[str] = None) -> Path:
-    """Create the engagement: its directory, a stub engagement.yaml, and —
-    with `clone` — its target/ from a git URL or a local checkout."""
+def new_engagement(eng_dir: Path, clone: Optional[str] = None,
+                   client_emails: Optional[List[str]] = None,
+                   by: Optional[str] = None) -> Path:
+    """Create the engagement: its directory, a stub engagement.yaml (with
+    the client's emails when given), and — with `clone` — its target/ from
+    a git URL or a local checkout. Marks the `created` stage."""
     if eng_dir.exists():
         raise SystemExit(f"engagement '{eng_dir.name}' already exists")
     eng_dir.mkdir(parents=True)
+    emails = json.dumps([e.strip() for e in (client_emails or []) if e.strip()])
     (eng_dir / "engagement.yaml").write_text(
-        STUB.format(name=eng_dir.name, stamp=stamp()), encoding="utf-8")
+        STUB.format(name=eng_dir.name, stamp=stamp(), client_emails=emails),
+        encoding="utf-8")
+    set_stage(eng_dir, "created", "done", by)
     if clone:
         import subprocess
         r = subprocess.run(["git", "clone", "--quiet", clone, str(eng_dir / TARGET)],
@@ -131,6 +160,91 @@ def new_engagement(eng_dir: Path, clone: Optional[str] = None) -> Path:
         if r.returncode != 0:
             raise SystemExit(f"git clone failed: {r.stderr.strip()}")
     return eng_dir
+
+
+def _engagement_yaml(eng_dir: Path) -> Dict[str, Any]:
+    import yaml
+    f = eng_dir / "engagement.yaml"
+    return (yaml.safe_load(f.read_text(encoding="utf-8")) or {}) if f.is_file() else {}
+
+
+def client_emails(eng_dir: Path) -> List[str]:
+    """The emails allowed to open this engagement on the client site."""
+    return [str(e).strip().lower() for e in (_engagement_yaml(eng_dir).get("client_emails") or [])
+            if str(e).strip()]
+
+
+def claim_sources(eng_dir: Path) -> List[str]:
+    return [str(c) for c in (_engagement_yaml(eng_dir).get("claim_sources") or [])]
+
+
+# ---- stages -----------------------------------------------------------------
+
+def set_stage(eng_dir: Path, name: str, value: str, by: Optional[str] = None) -> None:
+    if name not in STAGES:
+        raise SystemExit(f"no stage '{name}' (have: {', '.join(STAGES)})")
+    st = load(eng_dir)
+    st.setdefault("stages", {})[name] = {"value": value, "at": stamp(), "by": by}
+    save(eng_dir, st)
+
+
+def stage(eng_dir: Path, name: str) -> Optional[Dict[str, Any]]:
+    """The mark for a stage, or None when it has none."""
+    return (load(eng_dir).get("stages") or {}).get(name)
+
+
+def stage_value(eng_dir: Path, name: str) -> Optional[str]:
+    m = stage(eng_dir, name)
+    return m.get("value") if m else None
+
+
+# ---- jobs -------------------------------------------------------------------
+
+def jobs(eng_dir: Path) -> List[Dict[str, Any]]:
+    return list(load(eng_dir).get("jobs") or [])
+
+
+def running_job(eng_dir: Path) -> Optional[Dict[str, Any]]:
+    """The job in state "running", which is the engagement's lock."""
+    for j in jobs(eng_dir):
+        if j.get("state") == "running":
+            return j
+    return None
+
+
+def add_job(eng_dir: Path, kind: str, by: Optional[str] = None,
+            log: Optional[str] = None) -> Dict[str, Any]:
+    """Record a job as running. Refuses while another job is running: the
+    site's buttons must not overlap an enumeration with a chain, or a chain
+    with itself."""
+    running = running_job(eng_dir)
+    if running:
+        raise SystemExit(f"job {running['id']} ({running['kind']}) is still running")
+    job = {"id": stamp(), "kind": kind, "state": "running", "by": by,
+           "started": stamp(), "ended": None, "exit": None, "error": None,
+           "log": log, "steps": []}
+    st = load(eng_dir)
+    if any(j["id"] == job["id"] for j in st["jobs"]):        # two in one second
+        job["id"] += "-2"
+    st["jobs"].append(job)
+    save(eng_dir, st)
+    return job
+
+
+def update_job(eng_dir: Path, job_id: str, **fields: Any) -> Dict[str, Any]:
+    st = load(eng_dir)
+    for j in st["jobs"]:
+        if j["id"] == job_id:
+            j.update(fields)
+            save(eng_dir, st)
+            return j
+    raise SystemExit(f"no job '{job_id}'")
+
+
+def finish_job(eng_dir: Path, job_id: str, exit_code: int,
+               error: Optional[str] = None) -> Dict[str, Any]:
+    return update_job(eng_dir, job_id, state="done" if exit_code == 0 else "failed",
+                      ended=stamp(), exit=exit_code, error=error)
 
 
 # ---- intakes ---------------------------------------------------------------
@@ -263,6 +377,11 @@ def summary(eng_dir: Path) -> Dict[str, Any]:
     out: Dict[str, Any] = {"name": eng_dir.name, "current_intake": ci,
                            "has_engagement_yaml": (eng_dir / "engagement.yaml").is_file(),
                            "has_target": target_dir(eng_dir).is_dir(),
+                           "client_emails": client_emails(eng_dir),
+                           "claim_sources": claim_sources(eng_dir),
+                           "stages": st.get("stages") or {},
+                           "job": running_job(eng_dir),
+                           "jobs": st.get("jobs") or [],
                            "intakes": [], "runs_without_intake": []}
     for i in ids:
         cr = current_run(eng_dir, i)
@@ -326,6 +445,16 @@ def status(eng_dir: Path) -> str:
             seen += 1
     if not seen:
         lines.append("  (none)")
+    stages = st.get("stages") or {}
+    if stages:
+        lines.append("stages:")
+        for name in STAGES:
+            m = stages.get(name)
+            if m:
+                lines.append(f"  {name}  {m['value']}  {m['at']}  {m.get('by') or ''}".rstrip())
+    rj = running_job(eng_dir)
+    if rj:
+        lines.append(f"job running: {rj['id']} ({rj['kind']}) since {rj['started']}")
     return "\n".join(lines)
 
 
@@ -362,6 +491,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(status(eng_dir))
     elif len(cmd) == 3 and cmd[0] == "run" and cmd[1] == "cancel":
         cancel_run(eng_dir, cmd[2])
+        print(status(eng_dir))
+    elif len(cmd) == 3 and cmd[0] == "stage":
+        set_stage(eng_dir, cmd[1], cmd[2], by="cli")
         print(status(eng_dir))
     else:
         print(__doc__)

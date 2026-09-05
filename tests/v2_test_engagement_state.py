@@ -75,3 +75,37 @@ def test_new_engagement_clones_a_local_checkout(tmp_path):
     eng = st.new_engagement(tmp_path / "e", clone=str(src))
     assert (eng / "target" / "README.md").read_text() == "claims\n"
     assert (eng / "target" / ".git").exists()
+
+
+def test_stages_are_marks_with_who_and_when(tmp_path):
+    eng = st.new_engagement(tmp_path / "e", client_emails=["A@x.test", " b@x.test "])
+    assert st.client_emails(eng) == ["a@x.test", "b@x.test"]
+    assert st.claim_sources(eng) == []
+    assert st.stage_value(eng, "created") == "done"
+    assert st.stage(eng, "letter") is None
+    st.set_stage(eng, "letter", "accepted", by="a@x.test")
+    m = st.stage(eng, "letter")
+    assert m["value"] == "accepted" and m["by"] == "a@x.test" and m["at"].endswith("Z")
+    import pytest
+    with pytest.raises(SystemExit):
+        st.set_stage(eng, "billing", "done")
+    assert st.summary(eng)["stages"]["letter"]["value"] == "accepted"
+    assert "letter  accepted" in st.status(eng)
+
+
+def test_jobs_lock_and_finish(tmp_path):
+    eng = st.new_engagement(tmp_path / "e")
+    assert st.running_job(eng) is None
+    j = st.add_job(eng, "enumerate", by="p@x.test", log="l")
+    assert st.running_job(eng)["id"] == j["id"]
+    import pytest
+    with pytest.raises(SystemExit):
+        st.add_job(eng, "chain")
+    st.update_job(eng, j["id"], steps=[{"label": "a", "pid": 1, "exit": None}])
+    done = st.finish_job(eng, j["id"], 0)
+    assert done["state"] == "done" and done["ended"] and st.running_job(eng) is None
+    j2 = st.add_job(eng, "chain")
+    failed = st.finish_job(eng, j2["id"], 2, "review exited 2")
+    assert failed["state"] == "failed" and failed["error"] == "review exited 2"
+    assert [x["kind"] for x in st.jobs(eng)] == ["enumerate", "chain"]
+    assert st.summary(eng)["job"] is None
