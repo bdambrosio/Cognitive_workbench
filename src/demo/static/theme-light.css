@@ -1,21 +1,42 @@
-/* The site's tokens over the client page: one visual system for the demo and the pages. */
+/* The site's visual system over the client page, for the demo only: the same
+   tokens as site/site.css (dark by default, 2026-09-04). The client page paid
+   clients use keeps its own look; this file is loaded by demo.html alone. */
 :root {
-  --bg: #faf8f4; --panel: #ffffff; --panel2: #f2efe9; --rule: #e3dfd6;
-  --text: #17181a; --muted: #6b6f76; --accent: #17181a; --accent2: #3a3d42;
-  --empty: #b5651d; --ok: #1f7a5c;
+  --bg: #080f19; --panel: #101d2b; --panel2: #09121e; --rule: #2b3a4b;
+  --text: #f3f6fa; --muted: #acbbcd; --label: #8295ab; --accent: #63efd9; --accent2: #63efd9;
+  --accent-ink: #08141c; --empty: #f3c988; --ok: #63efd9;
+  --mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: dark;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #131416; --panel: #191a1d; --panel2: #202225; --rule: #2c2f33;
-    --text: #e8e6e1; --muted: #9a9ea6; --accent: #e8e6e1; --accent2: #c9c6bf;
-    --ok: #5fc9a3;
-  }
-  .msg.client { color: #131416; }
-  button, .upload { color: #131416; }
+body { font-family: Inter, "Segoe UI", system-ui, -apple-system, Arial, sans-serif; }
+/* header: the brand, then what this page is */
+header .title { font-weight: 500; }
+header .title .brand { font-weight: 700; letter-spacing: -.04em; font-size: 20px; margin-right: 14px; }
+header .title #engagement::before { content: "Demo: a claims review of "; color: var(--muted); }
+header .mode { display: none; }
+/* the strip under the header: short, labelled */
+.strip { padding: 10px 18px; font-size: 13.5px; line-height: 1.5; color: var(--muted); border-bottom: 1px solid var(--rule); background: var(--panel); }
+.strip b { color: var(--text); font-weight: 500; }
+/* the two panes get a label each */
+#chat::before, #document::before {
+  font-family: var(--mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--label); padding: 12px 18px 0; display: block;
 }
-body { font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif; }
-.strip { padding: 8px 18px; font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--rule); background: var(--panel); }
-.msg.client { border-radius: 8px; }
-.report a { color: inherit; text-decoration: underline; }
+#chat::before { content: "Ask the record"; }
+#document::before { content: "The report, as delivered"; }
+/* the banner: engagement facts, boxed and labelled, above the report */
+.banner {
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.6; white-space: pre-wrap;
+  background: var(--panel); border: 1px solid var(--rule); border-left: 2px solid var(--accent);
+  border-radius: 6px; padding: 12px 14px; margin: 12px 0 18px; color: var(--muted);
+}
+.banner::before { content: "About this engagement"; display: block; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--label); margin-bottom: 8px; }
+/* messages and controls in the site's colours */
+.msg.client { background: var(--accent); color: var(--accent-ink); border-radius: 8px; }
+.msg.client .who { color: var(--accent-ink); opacity: .7; }
+button, .upload { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.report a { color: inherit; text-decoration: underline; text-decoration-color: var(--rule); }
+.report a:hover { text-decoration-color: var(--accent); }
 .report .finding.named { border-color: var(--ok); box-shadow: 0 0 0 1px var(--ok); }
+.report code { font-family: var(--mono); color: var(--accent); }
 #evidence { border-top: 2px solid var(--ok); }
