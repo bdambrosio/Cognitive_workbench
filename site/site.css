@@ -100,3 +100,6 @@ footer a { text-decoration: none; margin-right: 18px; }
   .quote { font-size: 19px; }
   .buttons .btn { width: 100%; text-align: center; }
 }
+
+/* Section labels on the home page are h2 elements for heading order; they keep the eyebrow look. */
+h2.eyebrow { font-weight: 400; }
