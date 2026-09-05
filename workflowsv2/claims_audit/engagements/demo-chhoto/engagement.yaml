@@ -34,3 +34,7 @@ thresholds: |
 # Who may open this engagement on the client site, by email.
 client_emails:
   - sales@tuuyi.com
+
+evidence_excludes:
+  - README.md
+  - docs/

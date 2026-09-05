@@ -471,6 +471,12 @@ class ChatLoop(MemoriesMixin, ThreadsMixin, ClaimsMixin, ReflectionMixin,
             yaml_repo = (character_config.get('external_repo') or '').strip()
             if yaml_repo:
                 self._set_external_repo(yaml_repo, persist=True)
+        # Paths under the external repo that are documentation, not evidence
+        # (the engagement's claim sources, a docs directory). The workflow
+        # runners set this from the engagement; inspect_external's subagent
+        # refuses to read or cite them. Not persisted: a property of the run.
+        self._evidence_excludes: List[str] = [
+            str(x) for x in (character_config.get('evidence_excludes') or [])]
 
         # Optional narrowing of the `inspect` geofence, default the whole
         # checkout. DELIBERATELY not persisted and not settable in-session,

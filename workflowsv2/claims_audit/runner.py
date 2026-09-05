@@ -138,6 +138,9 @@ def load_engagement(name: str, intake: Optional[str] = None) -> Dict[str, Any]:
             # Declared by the engagement, never inferred: the documents in
             # which the target asserts things about itself.
             "claim_sources": list(cfg.get("claim_sources") or []),
+            # Documentation, not evidence (METHOD §7): the claim sources by
+            # default, or the engagement's own `evidence_excludes` list.
+            "evidence_excludes": state.evidence_excludes(d),
             "brief": brief, "runs": d / "runs",
             "retention": cfg.get("retention"),
             "intake_id": intake_id,
@@ -340,9 +343,21 @@ def files_matched(traces: Path, target: Path) -> List[str]:
             n = m.group(1)
             while n.startswith("./"):
                 n = n[2:]
-            if (target / n).is_file():
+            if _is_file(target / n):
                 out.add(n)
     return sorted(out)
+
+
+def _is_file(p: Path) -> bool:
+    """`is_file` that treats an impossible name as not a file. A trace can
+    carry a "file" that is a sentence of model prose (observed 2026-09-05:
+    a path 300 characters long ending in "previous turn was injected
+    noise"), and os.stat raises "File name too long" rather than returning
+    False; that crash cost a finished audit its record."""
+    try:
+        return p.is_file()
+    except (OSError, ValueError):
+        return False
 
 
 def files_read(traces: Path, target: Path) -> Dict[str, str]:
@@ -374,7 +389,7 @@ def files_read(traces: Path, target: Path) -> Dict[str, str]:
             n = n[2:]
         n = n.lstrip("/")
         f = target / n
-        if f.is_file():
+        if _is_file(f):
             try:
                 out[n] = hashlib.sha256(f.read_bytes()).hexdigest()[:16]
             except OSError as e:
@@ -386,7 +401,8 @@ def build_config(world: str, model_path: Optional[Path],
                  workflow_mode: Optional[bool] = None,
                  temperature: Optional[float] = None,
                  max_tokens: Optional[int] = None,
-                 external_repo: Optional[Path] = None
+                 external_repo: Optional[Path] = None,
+                 evidence_excludes: Optional[List[str]] = None
                  ) -> Tuple[str, Dict[str, Any]]:
     from launcher import parse_characters                      # noqa: E402
 
@@ -418,6 +434,7 @@ def build_config(world: str, model_path: Optional[Path],
     # The two per-target values, set here rather than by editing the committed
     # scenario, so a run leaves no diff behind.
     cfg["external_repo"] = str(external_repo)
+    cfg["evidence_excludes"] = list(evidence_excludes or [])
     # WHY A FLAG AND NOT A SECOND SCENARIO. Comparing workflow_mode on
     # against off needs both, and audit.yaml's own header says why a copy is
     # the wrong way to get one: "a second copy is a second source that
@@ -995,7 +1012,8 @@ TAG_INSTRUCTION = (
 
 def post_run_checks(obj: Optional[Dict[str, Any]], corpus: Path,
                     claim_source: str, frozen: Sequence[Dict[str, Any]],
-                    out: Path, read: Optional[set] = None) -> Dict[str, Any]:
+                    out: Path, read: Optional[set] = None,
+                    excludes: Optional[List[str]] = None) -> Dict[str, Any]:
     """METHOD's requirements, over the parsed output.
 
     REPLACES THREE PROSE PARSERS. v1 checked the ledger with a line regex, the
@@ -1010,7 +1028,8 @@ def post_run_checks(obj: Optional[Dict[str, Any]], corpus: Path,
         res = {"ok": False, "problems": ["no parseable output to check"],
                "figures": {}}
     else:
-        res = schemas.check_output(obj, corpus, claim_source, frozen, read)
+        res = schemas.check_output(obj, corpus, claim_source, frozen, read,
+                                   excludes=excludes)
     for problem in res["problems"]:
         issues.note(out, stage="claims_audit", code="output_check",
                     text=problem, severity="blocking")
@@ -1105,6 +1124,7 @@ def main() -> int:
     name, cfg = build_config(args.world, args.model, wf_mode,
                              args.temperature, args.max_tokens,
                              eng["target"])
+    cfg["evidence_excludes"] = list(eng["evidence_excludes"])
     logger.info("world=%s model=%s model=%s", args.world, args.model,
                 (cfg.get("llm_config") or {}).get("model") or "(scenario default)")
 
@@ -1572,7 +1592,8 @@ def main() -> int:
     else:
         checks = post_run_checks(obj, eng["target"], claim_source,
                                  frozen, out,
-                                 read=set(files_read(traces_dir, eng["target"])))
+                                 read=set(files_read(traces_dir, eng["target"])),
+                                 excludes=eng["evidence_excludes"])
     if obj is not None and (out / "findings.partial.json").is_file():
         (out / "findings.partial.json").unlink()
     # A CHECK PROBLEM IS NOT A FAILED RUN (Bruce, 2026-09-03). The run
@@ -1700,6 +1721,7 @@ def main() -> int:
         "materials": schemas.corpus_view_summary(
             Path(cfg.get("external_repo") or ".")),
         "harness_rev": git_rev(REPO),
+        "evidence_excludes": list(eng["evidence_excludes"]),
         "files_read": files_read(record / "inspect_traces",
                                  Path(cfg.get("external_repo") or ".")),
         "files_matched": files_matched(record / "inspect_traces",

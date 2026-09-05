@@ -33,6 +33,13 @@ Architectural notes:
   is the authoritative path-traversal layer; the gitignore check is an
   additional discipline layer keeping generated / runtime artifacts
   out of read output.
+- `excludes` (2026-09-05): paths the caller names as documentation, not
+  evidence — the engagement's claim sources and any docs directory. read
+  and cite refuse them, grep skips them, list still shows them marked, so
+  a claim about a document's existence can be settled while its text
+  cannot be cited as evidence for a claim about the software. Enforced
+  here because instruction alone did not hold: told that its own claim
+  source was not evidence, the auditor still cited README lines.
 """
 
 from __future__ import annotations
@@ -246,6 +253,21 @@ def _is_hidden_or_denied(p: Path) -> bool:
     return False
 
 
+def _excluded(rel: str, excludes: Optional[List[str]]) -> bool:
+    """Whether a path relative to the root is one the caller excluded: the
+    entry itself, or anything under an entry given as a directory."""
+    if not excludes:
+        return False
+    rel = rel.strip().lstrip("./")
+    for e in excludes:
+        e = str(e).strip().lstrip("./").rstrip("/")
+        if not e:
+            continue
+        if rel == e or rel.startswith(e + "/"):
+            return True
+    return False
+
+
 def _is_git_checkout(repo_root: Path) -> bool:
     """True if `<repo_root>/.git` exists (as a dir for a normal checkout
     or as a file for a worktree). The `git` binary is also required."""
@@ -337,11 +359,16 @@ def _list_via_git(repo_root: Path, target: Path) -> Optional[List[Tuple[str, boo
     return rows
 
 
-def _tool_list(repo_root: Path, path: Optional[str]) -> str:
+def _tool_list(repo_root: Path, path: Optional[str],
+               excludes: Optional[List[str]] = None) -> str:
     target = _safe_resolve(repo_root, path or '', must_be_dir=True)
     if target is None:
         return f"ERROR: list invalid or out-of-scope path: {path!r}"
     rel = _rel_to_root(repo_root, target) or '.'
+    prefix = '' if rel in ('.', '') else rel.rstrip('/') + '/'
+
+    def _mark(name: str) -> str:
+        return "\t(excluded: documentation, not evidence)" if _excluded(prefix + name, excludes) else ""
 
     rows: List[str] = []
     if _is_git_checkout(repo_root):
@@ -349,14 +376,14 @@ def _tool_list(repo_root: Path, path: Optional[str]) -> str:
         if git_rows is not None:
             for name, is_dir in git_rows:
                 if is_dir:
-                    rows.append(f"{name}/\tDIR")
+                    rows.append(f"{name}/\tDIR{_mark(name)}")
                 else:
                     full = target / name
                     try:
                         size = full.stat().st_size
                     except Exception:
                         size = 0
-                    rows.append(f"{name}\t{size} bytes")
+                    rows.append(f"{name}\t{size} bytes{_mark(name)}")
                 if len(rows) >= _MAX_LIST_ENTRIES:
                     rows.append(f"(list capped at {_MAX_LIST_ENTRIES} entries)")
                     break
@@ -375,13 +402,13 @@ def _tool_list(repo_root: Path, path: Optional[str]) -> str:
         if _is_hidden_or_denied(p):
             continue
         if p.is_dir():
-            rows.append(f"{p.name}/\tDIR")
+            rows.append(f"{p.name}/\tDIR{_mark(p.name)}")
         else:
             try:
                 size = p.stat().st_size
             except Exception:
                 size = 0
-            rows.append(f"{p.name}\t{size} bytes")
+            rows.append(f"{p.name}\t{size} bytes{_mark(p.name)}")
         if len(rows) >= _MAX_LIST_ENTRIES:
             rows.append(f"(list capped at {_MAX_LIST_ENTRIES} entries)")
             break
@@ -395,12 +422,18 @@ def _tool_list(repo_root: Path, path: Optional[str]) -> str:
 # ---------------------------------------------------------------------------
 
 def _tool_read(repo_root: Path, name: str,
-               start_line: Optional[int], end_line: Optional[int]) -> str:
+               start_line: Optional[int], end_line: Optional[int],
+               excludes: Optional[List[str]] = None) -> str:
     if not name:
         return "ERROR: read requires a `file` argument"
     path = _safe_resolve(repo_root, name, must_be_file=True)
     if path is None:
         return f"ERROR: read invalid or out-of-scope file: {name!r}"
+    if _excluded(_rel_to_root(repo_root, path), excludes):
+        return (f"ERROR: read refused: {name} is documentation, excluded from "
+                f"evidence for this review. It restates claims and cannot be "
+                f"cited for one; its existence is visible in `list`. Read the "
+                f"code, configuration or build files the claim is about.")
     if _is_gitignored(repo_root, path):
         return (f"ERROR: read refused: {name} is gitignored "
                 f"(generated or runtime artifact, not source). list and "
@@ -434,7 +467,7 @@ def _tool_read(repo_root: Path, name: str,
 # ---------------------------------------------------------------------------
 
 def _tool_grep(repo_root: Path, pattern: str,
-               path: Optional[str]) -> str:
+               path: Optional[str], excludes: Optional[List[str]] = None) -> str:
     if not pattern:
         return "ERROR: grep requires a `pattern` argument"
     if shutil.which('rg') is None:
@@ -467,6 +500,10 @@ def _tool_grep(repo_root: Path, pattern: str,
     # 45 occurrences). Outside a checkout root, search everything.
     if not _is_git_checkout(repo_root):
         cmd.append('--no-ignore')
+    for e in excludes or []:
+        e = str(e).strip().lstrip("./").rstrip("/")
+        if e:
+            cmd += [f'--glob=!{e}', f'--glob=!{e}/**']
     cmd += ['--', pattern, str(target)]
     try:
         proc = subprocess.run(
@@ -525,11 +562,13 @@ class CodeSubagent(Subagent):
 
     def __init__(self, repo_root: Path, llm_backend, trace_dir: Path, *,
                  mode: str = 'self',
-                 reasoning_effort: Optional[str] = None):
+                 reasoning_effort: Optional[str] = None,
+                 excludes: Optional[List[str]] = None):
         super().__init__(llm_backend, trace_dir,
                          reasoning_effort=reasoning_effort)
         self.repo_root = Path(repo_root)
         self.mode = mode
+        self.excludes = list(excludes or [])
         self.label = 'inspect_external' if mode == 'external' else 'inspect'
         # Spans `cite` carried this run: (file, start, end, numbered text).
         self._cited: List[Tuple[str, int, int, str]] = []
@@ -543,16 +582,24 @@ class CodeSubagent(Subagent):
         return None
 
     def system_prompt(self) -> str:
-        return _build_system_prompt(self.repo_root, self.mode)
+        text = _build_system_prompt(self.repo_root, self.mode)
+        if self.excludes:
+            text += ("\n\n## Excluded from evidence\n\nThese paths are documentation "
+                     "for this review: " + ", ".join(self.excludes) + ". They "
+                     "restate the claims and are not evidence for them. `read`, "
+                     "`cite` and `grep` do not open them; `list` shows them marked. "
+                     "Answer from the code, configuration and build files.")
+        return text
 
     def primitives(self):
         return {
-            'list': lambda a: _tool_list(self.repo_root, a.get('path')),
+            'list': lambda a: _tool_list(self.repo_root, a.get('path'), self.excludes),
             'read': lambda a: _tool_read(self.repo_root, a.get('file', ''),
                                          a.get('start_line'),
-                                         a.get('end_line')),
+                                         a.get('end_line'), self.excludes),
             'grep': lambda a: _tool_grep(self.repo_root,
-                                         a.get('pattern', ''), a.get('path')),
+                                         a.get('pattern', ''), a.get('path'),
+                                         self.excludes),
             'cite': self._tool_cite,
         }
 
@@ -579,7 +626,7 @@ class CodeSubagent(Subagent):
         if e - s + 1 > _MAX_CITE_LINES:
             return (f"ERROR: cite span of {e - s + 1} lines exceeds the cap of "
                     f"{_MAX_CITE_LINES}; cite the lines the caller will quote")
-        out = _tool_read(self.repo_root, name, s, e)
+        out = _tool_read(self.repo_root, name, s, e, self.excludes)
         if not out.startswith('OK: '):
             return out
         text = out[4:].rstrip('\n')
@@ -621,7 +668,8 @@ def inspect(query: str, repo_root: Path, llm_backend,
 
 def inspect_external(query: str, repo_root: Path, llm_backend,
                      trace_dir: Path,
-                     reasoning_effort: Optional[str] = None) -> str:
+                     reasoning_effort: Optional[str] = None,
+                     excludes: Optional[List[str]] = None) -> str:
     """External-codebase inspection: navigate a project repo bound for
     this session (sticky binding via `/set-external-repo` or the YAML
     `external_repo` field). Same primitives as `inspect`, neutral prompt
@@ -634,6 +682,9 @@ def inspect_external(query: str, repo_root: Path, llm_backend,
         trace_dir: where to write the per-call subagent trace (same
             directory as `inspect`; filename prefix differentiates).
         reasoning_effort: same conventions as `inspect`.
+        excludes: paths under the root that are documentation, not evidence
+            (see the module docstring); None or empty excludes nothing.
     """
     return CodeSubagent(repo_root, llm_backend, trace_dir, mode='external',
-                        reasoning_effort=reasoning_effort).run(query)
+                        reasoning_effort=reasoning_effort,
+                        excludes=excludes).run(query)

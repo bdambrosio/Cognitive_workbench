@@ -210,11 +210,21 @@ def claim_sources(eng_dir: Path) -> List[str]:
     return [str(c) for c in (_engagement_yaml(eng_dir).get("claim_sources") or [])]
 
 
+def evidence_excludes(eng_dir: Path) -> List[str]:
+    """Paths under the target that are documentation, not evidence: the
+    engagement's `evidence_excludes` when the key is present, else every
+    claim source. A directory entry excludes everything under it."""
+    cfg = _engagement_yaml(eng_dir)
+    if "evidence_excludes" in cfg:
+        return [str(x).strip() for x in (cfg.get("evidence_excludes") or []) if str(x).strip()]
+    return claim_sources(eng_dir)
+
+
 #: The keys of engagement.yaml the practice page may set. The file is edited
 #: in place, key by key, so its comments and the rest of its text survive:
 #: a yaml dump of demo-chhoto's file on 2026-09-05 dropped the practice's
 #: notes and reformatted the transaction block.
-SETTABLE = ("claim_sources", "client_emails", "target", "retention")
+SETTABLE = ("claim_sources", "client_emails", "target", "retention", "evidence_excludes")
 
 
 def _render_key(key: str, value: Any) -> str:
@@ -267,7 +277,7 @@ def update_engagement(eng_dir: Path, **fields: Any) -> Dict[str, Any]:
     for k, v in fields.items():
         if v is None:
             continue
-        if k in ("claim_sources", "client_emails"):
+        if k in ("claim_sources", "client_emails", "evidence_excludes"):
             v = [str(x).strip() for x in v if str(x).strip()]
         else:
             v = str(v).strip()

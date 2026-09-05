@@ -96,6 +96,7 @@
       + '<label>target (path; "target" is the engagement\'s own clone)' + (st.has_target ? ' <span class="muted">— materials present</span>' : ' <span class="warn">— no materials yet</span>') + '<input id="setTarget" value="' + esc(st.target || "") + '"></label>'
       + (st.has_target ? "" : '<label>clone the target from (git URL or local path); fills target/ on save<input id="setClone" placeholder="https://github.com/org/repo"></label>')
       + '<label>retention<input id="setRetention" value="' + esc(st.retention || "") + '"></label>'
+      + '<label>excluded from evidence, one per line: documentation the review may list but not read or cite (claim sources, a docs/ directory)' + (st.evidence_excludes_explicit ? "" : ' <span class="muted">— defaulting to the claim sources</span>') + '<textarea id="setExcludes" rows="3">' + esc((st.evidence_excludes || []).join("\n")) + "</textarea></label>"
       + '<label>engagement letter' + (st.letter_is_template ? ' <span class="muted">(empty: the template is shown)</span>' : "") + '<textarea id="setLetter" rows="6" placeholder="Leave empty to show the practice\'s template letter.">' + esc(st.letter || "") + "</textarea></label>"
       + '<button id="setSave">Save settings</button></div>';
     return h;
@@ -137,6 +138,7 @@
         claim_sources: $("setSources").value.split("\n").map((x) => x.trim()).filter(Boolean),
         client_emails: $("setEmails").value.split(",").map((x) => x.trim()).filter(Boolean),
         target: $("setTarget").value.trim(), retention: $("setRetention").value.trim(),
+        evidence_excludes: $("setExcludes").value.split("\n").map((x) => x.trim()).filter(Boolean),
         letter: $("setLetter").value,
         clone: $("setClone") ? $("setClone").value.trim() : null,
       };

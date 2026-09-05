@@ -124,7 +124,13 @@ def statistics(run: Path, corpus: Path, claim_source: str) -> Dict[str, Any]:
     findings = json.loads((run / "findings.json").read_text())
     frozen = claims.get("claims") or []
     surface = audit_schemas.check_surface(claims, corpus, claim_source)
-    output = audit_schemas.check_output(findings, corpus, claim_source, frozen)
+    # The documents the audit ran with excluded from evidence, from its own
+    # record; an older run recorded none and excluded nothing.
+    meta0 = json.loads((run / "run_meta.json").read_text()) \
+        if (run / "run_meta.json").is_file() else {}
+    excludes = list(meta0.get("evidence_excludes") or [])
+    output = audit_schemas.check_output(findings, corpus, claim_source, frozen,
+                                        excludes=excludes)
 
     docs = audit_schemas.corpus_index(corpus)
     ev_per, cited_docs, no_citation = [], set(), []
@@ -166,6 +172,10 @@ def statistics(run: Path, corpus: Path, claim_source: str) -> Dict[str, Any]:
     verdicts = (output.get("figures") or {}).get("verdicts") or {}
     return {
         "claim_source": claim_source,
+        # Documentation the audit ran with excluded from evidence (METHOD §7),
+        # and every citation the findings make into it.
+        "evidence_excludes": excludes,
+        "excluded_citations": (output.get("figures") or {}).get("excluded_citations") or [],
         # Which files the index held: the view (tracked / walk), how many
         # materials, and the binary files it dropped.
         "materials": audit_schemas.corpus_view_summary(corpus),
@@ -276,7 +286,8 @@ MATERIALS_BUDGET = 8_000
 
 def _cited_materials(f: Dict[str, Any], docs: Dict[str, List[str]],
                      context: int = CONTEXT_LINES,
-                     budget: int = MATERIALS_BUDGET) -> str:
+                     budget: int = MATERIALS_BUDGET,
+                     excludes: Optional[List[str]] = None) -> str:
     """The lines each citation of one finding points at, with context.
 
     WHY THE EMISSION NEEDS THIS. `emit` is a two-message call with no tools
@@ -322,6 +333,11 @@ def _cited_materials(f: Dict[str, Any], docs: Dict[str, List[str]],
                     for n in range(a, b + 1)]
             block = (f"    [{key}:{lo}-{hi}] lines {a}-{b}, the cited range "
                      f"marked with >\n" + "\n".join(rows))
+            if audit_schemas.doc_excluded(key, excludes):
+                block = (f"    [{key}:{lo}-{hi}] EXCLUDED FROM EVIDENCE: the engagement "
+                         f"lists this document as documentation (a claim source or a "
+                         f"docs directory); for a claim about the software it is not "
+                         f"relevant evidence, per METHOD \u00a77.\n" + block)
         if used + len(block) > budget:
             out.append(f"    [{len(refs) - len(out)} further citation(s) not "
                        f"shown: over the materials budget]")
@@ -404,7 +420,7 @@ def emit_parts(loop, method_text: str, stats: Dict[str, Any],
                 "at, with the lines around them.\n\n"
                 + "\n\n".join(_finding_text(f, claims_by_id)
                                 + "\n    cited material:\n"
-                                + _cited_materials(f, docs) for f in g)
+                                + _cited_materials(f, docs, excludes=stats.get("evidence_excludes")) for f in g)
                 + "\n\nEmit `finding_reviews` for exactly these findings.")
         got = ask(f"finding_reviews[{n}/{len(groups)}]", body,
                   schemas.finding_reviews_schema())
@@ -429,7 +445,7 @@ def emit_parts(loop, method_text: str, stats: Dict[str, Any],
                 "observation as clean if it is.\n\n"
                 + "\n\n".join(_finding_text(f, claims_by_id)
                                 + "\n    cited material:\n"
-                                + _cited_materials(f, docs) for f in redo)
+                                + _cited_materials(f, docs, excludes=stats.get("evidence_excludes")) for f in redo)
                 + "\n\nEmit `finding_reviews` for exactly these findings.",
                 schemas.finding_reviews_schema())
 

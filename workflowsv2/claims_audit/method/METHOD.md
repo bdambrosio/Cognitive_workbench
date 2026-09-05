@@ -155,6 +155,8 @@ Derive only from facts supplied in the materials; do not import market forecasts
 
 **For numbers and dates, quote the source line.** A summary produced by a tool is useful for navigation and is not sufficient evidence for an exact quantitative claim.
 
+**Documentation is not evidence for a claim about the software.** A claim about what the software does is settled by files that take part in building or running it: source, configuration, build and deployment files, dependency manifests, database migrations, tests. A README, a page under a docs directory, a website export or any claim source, named for this run or not, restates a claim and does not settle it. The engagement lists such files as excluded, and the evidence request refuses to open or cite them; `list` still shows they exist, which is all a claim about a document needs: "MIT licensed" is settled by the LICENSE file, "the API is documented" by the presence of the documentation. Inside a code file, cite the statement, not the comment above it.
+
 **Every citation must resolve.** Before you emit, check that each document named exists, each line range is real, and each quoted span appears in the document as you have written it.
 
 Correct any citation that does not resolve. If it cannot be corrected — the material you remembered is not there — remove that item. If no remaining evidence settles the claim, the verdict is `unverifiable` under §8. Do not drop the finding: §4 gives every claim exactly one.

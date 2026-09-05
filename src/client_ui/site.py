@@ -226,6 +226,7 @@ class Settings(BaseModel):
     client_emails: Optional[List[str]] = None
     target: Optional[str] = None
     retention: Optional[str] = None
+    evidence_excludes: Optional[List[str]] = None
     letter: Optional[str] = None            # "" removes the engagement's own letter
     clone: Optional[str] = None             # a git URL or local path to fill target/ from
 
@@ -568,6 +569,8 @@ def make_site_app(access: Access, model: Optional[Path] = None,
                 "client_emails": state.client_emails(eng_dir),
                 "has_target": state.target_dir(eng_dir).is_dir() and any(state.target_dir(eng_dir).iterdir()),
                 "target": str(cfg.get("target") or ""), "retention": str(cfg.get("retention") or ""),
+                "evidence_excludes": state.evidence_excludes(eng_dir),
+                "evidence_excludes_explicit": "evidence_excludes" in cfg,
                 "letter": own.read_text(encoding="utf-8") if own.is_file() else "",
                 "letter_is_template": not own.is_file()}
 
@@ -612,7 +615,8 @@ def make_site_app(access: Access, model: Optional[Path] = None,
         if body.clone and body.clone.strip():
             _act(state.clone_target, eng_dir, body.clone.strip())
         _act(state.update_engagement, eng_dir, claim_sources=body.claim_sources,
-             client_emails=body.client_emails, target=body.target, retention=body.retention)
+             client_emails=body.client_emails, target=body.target, retention=body.retention,
+             evidence_excludes=body.evidence_excludes)
         if body.letter is not None:
             own = eng_dir / "letter.md"
             if body.letter.strip():

@@ -670,9 +670,23 @@ def candidate_files(findings: Sequence[Dict[str, Any]],
     return out
 
 
+def doc_excluded(key: Optional[str], excludes: Optional[Sequence[str]]) -> bool:
+    """Whether a corpus key is one the engagement excluded from evidence as
+    documentation: the entry itself or anything under a directory entry."""
+    if not key or not excludes:
+        return False
+    k = key.strip().lstrip("./")
+    for e in excludes:
+        e = str(e).strip().lstrip("./").rstrip("/")
+        if e and (k == e or k.startswith(e + "/")):
+            return True
+    return False
+
+
 def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
                  frozen: Sequence[Dict[str, Any]],
-                 read: Optional[set] = None) -> Dict[str, Any]:
+                 read: Optional[set] = None,
+                 excludes: Optional[Sequence[str]] = None) -> Dict[str, Any]:
     """Everything METHOD requires that the schema cannot express.
 
     Returns `{"ok": bool, "problems": [...], "figures": {...}}`, the shape the
@@ -689,6 +703,10 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
     view = corpus_view(corpus)
     docs = corpus_index(corpus)
     joined: List[str] = []
+    # Citations into documents the engagement excluded from evidence
+    # (METHOD §7). Recorded, not failed: a claim about the document itself
+    # may cite it, and the review judges relevance with the mark in view.
+    excluded_cites: List[Dict[str, Any]] = []
 
     def _cite(where: str, doc: Any, lines: Any, quote: Any) -> None:
         """One citation, against the corpus. METHOD §7.
@@ -709,6 +727,8 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
         if key is None:
             problems.append(f"{where}: {why}")
             return
+        if doc_excluded(key, excludes):
+            excluded_cites.append({"where": where, "document": key, "lines": lines})
         body = docs[key]
         if (not isinstance(lines, list) or len(lines) != 2
                 or not all(isinstance(n, int) for n in lines)):
@@ -872,7 +892,7 @@ def check_output(obj: Dict[str, Any], corpus: Path, claim_source: str,
                         "adjudicated": len(seen),
                         "verdicts": verdicts,
                         "evidence_forms": forms,
-                        "joined_quotes": joined,
+                        "joined_quotes": joined, "excluded_citations": excluded_cites,
                         # METHOD §8: findings recorded `not_examined`, and the
                         # files searches named that the run never opened.
                         "not_examined": not_examined,
