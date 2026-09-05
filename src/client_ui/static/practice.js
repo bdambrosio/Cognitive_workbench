@@ -60,7 +60,10 @@
     const v = (st) => (e.stages[st] || {}).value;
     const job = e.job;
     const n = e.next || {};
-    let h = "<h3>Stages</h3><div class=\"next\"><span class=\"muted\">" + esc(n.who === "client" ? "waiting on the client" : n.who === "practice" ? "the practice's move" : "finished") + "</span> · " + esc(n.text) + "</div>";
+    const noClient = !(e.client_emails || []).length;
+    const who = n.who === "client" ? (noClient ? "no client on this engagement: the practice takes the client's step, from the client home link below" : "waiting on the client")
+      : n.who === "practice" ? "the practice's move" : "finished";
+    let h = "<h3>Stages</h3><div class=\"next\"><span class=\"muted\">" + esc(who) + "</span> · " + esc(n.text) + "</div>";
     h += "<table class=\"stages\">";
     for (const st of ["created", "letter", "intake", "materials", "enumeration", "surface", "chain", "release", "closed"]) {
       const m = e.stages[st];
