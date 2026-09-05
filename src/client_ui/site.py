@@ -221,6 +221,12 @@ class Source(BaseModel):
     source: str
 
 
+class Decompose(BaseModel):
+    source: str
+    claim_id: int
+    claims: List[Dict[str, Any]]        # the draft as the page holds it, so the proposal sees unsaved edits
+
+
 class Settings(BaseModel):
     claim_sources: Optional[List[str]] = None
     client_emails: Optional[List[str]] = None
@@ -725,6 +731,44 @@ def make_site_app(access: Access, model: Optional[Path] = None,
             raise HTTPException(status_code=400, detail="no such claim source")
         _act(save_draft, eng_dir, body.source, body.claims)
         return JSONResponse(surface_for(eng_dir, body.source))
+
+    @app.post("/p/surface/{name}/api/decompose")
+    async def practice_surface_decompose(name: str, body: Decompose, request: Request):
+        """The agent proposes testable subclaims of one broad claim (DECOMPOSE.md);
+        the page adds them to the draft for the practice to edit, drop or keep.
+        Nothing is written here: the draft is saved by the page, frozen by the
+        practice."""
+        email = _practice(request)
+        eng_dir = _eng(name)
+        if body.source not in state.claim_sources(eng_dir):
+            raise HTTPException(status_code=400, detail="no such claim source")
+        if _surface_paths(eng_dir, body.source)["frozen"].is_file():
+            raise HTTPException(status_code=400, detail=f"the surface for {body.source} is frozen")
+        parent = next((c for c in body.claims if c.get("id") == body.claim_id), None)
+        if parent is None:
+            raise HTTPException(status_code=400, detail=f"no claim {body.claim_id} in the draft")
+        from workflowsv2.claims_audit import decompose               # noqa: E402
+        src_file = state.target_dir(eng_dir) / body.source
+        if not src_file.is_file():
+            raise HTTPException(status_code=400, detail=f"{body.source} is not in the target")
+        note_file = eng_dir / "category_note.md"
+        note = note_file.read_text(encoding="utf-8") if note_file.is_file() else None
+        backend = _decompose_backend()
+        res = await asyncio.get_running_loop().run_in_executor(
+            None, lambda: decompose.propose(backend, parent, decompose.section_text(src_file, parent.get("lines") or [1, 1]),
+                                            body.claims, note))
+        rows = decompose.append_subclaims(list(body.claims), parent, res["subclaims"], email)
+        logger.info("decompose %s claim %s: %d proposed, %d declined, parse %s", name, body.claim_id,
+                    len(rows), len(res["declined"]), res["parse"])
+        return JSONResponse({"subclaims": rows, "declined": res["declined"], "parse": res["parse"]})
+
+    _backend_cache: Dict[str, Any] = {}
+
+    def _decompose_backend():
+        if "b" not in _backend_cache:
+            from workflowsv2.claims_audit import decompose           # noqa: E402
+            _backend_cache["b"] = decompose.backend_from_model(model or Path(jobs.MODEL))
+        return _backend_cache["b"]
 
     @app.post("/p/surface/{name}/api/freeze")
     async def practice_surface_freeze(name: str, body: Source, request: Request):

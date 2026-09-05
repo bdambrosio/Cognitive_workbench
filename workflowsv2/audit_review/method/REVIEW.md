@@ -61,6 +61,8 @@ Five checks. The first is over the claim surface; the rest are per finding.
 | `understates` | The statement asserts less, dropping part of the assertion |
 | `unrelated` | The statement is not a rendering of that quote |
 
+A claim carrying `implied_by` is a subclaim the practice read out of a broader claim and approved before the freeze; its statement says more than its quote by design. It is `faithful` when a reasonable buyer would take the parent's words to assert what the statement says, and `overstates` when they would not.
+
 **2. Evidence relevance.** Does the cited material bear on *this* claim? A citation can resolve, quote the document exactly, and be about something else entirely. Nothing mechanical detects this, and it is the check with the most to find. One case is decided for you: a citation into a document the engagement excluded as documentation, a claim source or a docs directory, is marked so where the cited lines are shown, and for a claim about what the software does it is not relevant evidence, per METHOD §7; a claim about the document itself, its licence or its existence, is the exception.
 
 **3. Evidence support.** Does the cited text show what the evidence item's `shows` says it shows?

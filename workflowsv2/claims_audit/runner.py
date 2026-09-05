@@ -999,6 +999,10 @@ def _claim_line(c: Dict[str, Any]) -> str:
         line += "  (about the seller, per METHOD \u00a75)"
     elif c.get("about") == "document":
         line += "  (about a document itself, per METHOD \u00a75: the document settles it)"
+    if c.get("implied_by") is not None:
+        line += (f"\n      implied by claim {c['implied_by']}: the quote is that claim's; "
+                 f"the statement is the practice's reading of what it asserts, and is "
+                 f"what you test")
     for loc in c.get("locations") or []:
         line += f"\n      also at [{loc.get('lines')}]: {loc.get('quote')}"
     return line

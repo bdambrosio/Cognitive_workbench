@@ -43,3 +43,4 @@ form.comment { display: flex; gap: 4px; margin-top: 4px; }
 form.comment input { flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--rule); border-radius: 4px; padding: 3px 6px; font: inherit; font-size: 13px; }
 form.comment button { padding: 3px 9px; font-size: 12px; }
 .actions { margin-top: 12px; display: flex; gap: 8px; }
+table.claims td button { display: block; margin: 2px 0; }

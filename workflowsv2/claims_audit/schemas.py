@@ -288,6 +288,11 @@ def check_surface(obj: Dict[str, Any], corpus: Path,
         if c.get("about") not in ABOUT:
             problems.append(f"{w}: `about` {c.get('about')!r} is not one of "
                             f"METHOD §5's")
+        # A subclaim (DECOMPOSE.md) names the claim it was read from; the
+        # parent has to be in the surface.
+        if c.get("implied_by") is not None and c.get("implied_by") not in ids:
+            problems.append(f"{w}: implied_by {c.get('implied_by')!r} names no claim "
+                            f"in the surface")
         if c.get("restates"):
             problems.append(f"{w}: restates claim {c['restates']}, which "
                             f"{'is not' if c['restates'] not in ids else 'was not yet'}"

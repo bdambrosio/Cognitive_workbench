@@ -28,7 +28,7 @@
         id, lines: lines.length === 2 && lines.every((n) => !isNaN(n)) ? lines : (orig.lines || [0, 0]),
         quote: tr.querySelector(".quote").textContent.trim(),
         statement: tr.querySelector(".statement").textContent.trim(),
-      }));
+      }));   // implied_by, property and approved_by ride along from orig
     }
     return out;
   }
@@ -44,13 +44,15 @@
     for (const c of src.claims) {
       const cm = byClaim[String(c.id)] || [];
       h += '<tr data-src="' + esc(src.slug) + '" data-id="' + esc(c.id) + '">'
-        + '<td class="id">' + esc(c.id) + (c.about === "seller" ? '<div class="muted">seller</div>' : c.about === "document" ? '<div class="muted">document</div>' : "") + "</td>"
+        + '<td class="id">' + esc(c.id) + (c.about === "seller" ? '<div class="muted">seller</div>' : c.about === "document" ? '<div class="muted">document</div>' : "")
+          + (c.implied_by != null ? '<div class="muted">implied by ' + esc(c.implied_by) + "</div>" : "") + "</td>"
         + '<td class="lines mono"' + (ed ? ' contenteditable="true"' : "") + ">" + esc((c.lines || []).join("–")) + "</td>"
         + '<td class="quote"' + (ed ? ' contenteditable="true"' : "") + ">" + esc(c.quote) + "</td>"
         + '<td class="statement"' + (ed ? ' contenteditable="true"' : "") + ">" + esc(c.statement) + "</td>"
         + '<td class="comments">' + cm.map((x) => '<div class="c"><span class="by">' + esc(x.by) + "</span> " + esc(x.text) + "</div>").join("")
         + '<form class="comment" data-src="' + esc(src.source) + '" data-id="' + esc(c.id) + '"><input placeholder="comment"><button>add</button></form></td>'
-        + (ed ? '<td><button class="quiet drop" title="leave this claim out">drop</button></td>' : "")
+        + (ed ? '<td><button class="quiet drop" title="leave this claim out">drop</button>'
+              + (c.implied_by == null ? '<button class="quiet decompose" title="ask for the testable properties a reasonable buyer would take this claim to assert">decompose</button>' : "") + "</td>" : "")
         + "</tr>";
     }
     h += "</table>";
@@ -78,6 +80,23 @@
     }
     for (const b of document.querySelectorAll("button.drop")) {
       b.addEventListener("click", () => { const tr = b.closest("tr"); tr.dataset.dropped = tr.dataset.dropped === "1" ? "0" : "1"; tr.classList.toggle("dropped"); b.textContent = tr.dataset.dropped === "1" ? "keep" : "drop"; });
+    }
+    for (const b of document.querySelectorAll("button.decompose")) {
+      b.addEventListener("click", async () => {
+        const tr = b.closest("tr");
+        const src = data.sources.find((s) => s.slug === tr.dataset.src);
+        const id = Number(tr.dataset.id);
+        b.disabled = true; b.textContent = "asking…"; $("msg").textContent = "the agent is reading the claim";
+        const j = await api("api/decompose", {source: src.source, claim_id: id, claims: claimsOf(src)});
+        if (!j) { b.disabled = false; b.textContent = "decompose"; return; }
+        // The proposals join the draft as rows the practice can edit or drop; save keeps them.
+        const current = claimsOf(src);
+        for (const row of j.subclaims) current.push(row);
+        src.claims = current;
+        render();
+        const declined = (j.declined || []).map((d) => d.text + " — " + d.why).join("; ");
+        $("msg").textContent = j.subclaims.length + " proposed" + (declined ? " · declined: " + declined : "") + " · edit, drop, then save the draft";
+      });
     }
     for (const b of document.querySelectorAll("button.addClaim")) {
       b.addEventListener("click", () => {
